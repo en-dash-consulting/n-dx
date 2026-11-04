@@ -61,10 +61,24 @@ const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const SHARED_CONFIG_PATH = (dir) => join(dir, ".n-dx.json");
 const LOCAL_CONFIG_PATH = (dir) => join(dir, ".n-dx.local.json");
 
+// A vendor key exported in the developer's shell outranks the credential store
+// when `ndx config` reports where a key comes from, so a test asserting
+// "credential store" fails on any machine with GEMINI_API_KEY set. The CLI
+// runs without them unless a test passes its own `env`.
+const VENDOR_KEY_VARS = [
+  "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
+];
+function isolatedEnv() {
+  const env = { ...process.env };
+  for (const name of VENDOR_KEY_VARS) delete env[name];
+  return env;
+}
+
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
+    env: isolatedEnv(),
     // execFileSync sends child stderr to the parent's stderr unless stdio is
     // set, so without this the CLI's own notices print into the vitest report
     // and read as failures of the run rather than output of a fixture.
@@ -78,6 +92,7 @@ function runFail(args, opts = {}) {
     execFileSync("node", [CLI_PATH, "config", ...args], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
+      env: isolatedEnv(),
       stdio: "pipe",
       ...opts,
     });

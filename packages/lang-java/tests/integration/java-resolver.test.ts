@@ -102,7 +102,9 @@ describe("java resolver", () => {
     });
   });
 
-  it.each(["main", "test"])("falls through invisible same-package declarations to wildcard imports from %s", async (set, ctx) => {
+  // it.for, not it.each: only it.for hands the test context to the callback,
+  // and resolveSources needs it to skip when the grammar is not built.
+  it.for(["main", "test"])("falls through invisible same-package declarations to wildcard imports from %s", async (set, ctx) => {
     const path = `svc-a/src/${set}/java/a/Use.java`;
     const refs = await resolveSources(ctx, {
       [path]: "package a; import b.*; class Use { Helper h; }",
