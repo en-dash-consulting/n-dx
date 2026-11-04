@@ -118,7 +118,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T18:06:23.682Z"
+    lastModified: "2026-11-04T18:20:16.658Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -130,14 +130,16 @@ items:
     resolutionDetail: "resolveVendorCliEnv sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 (any casing replaced) whenever it writes the Claude key itself; the CLI keeps the key for its API calls. Docs state where keys enter child envs. Codex follow-up db3c0066."
     lastModified: "2026-11-04T18:11:04.820Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8d2d9a84-b136-4c51-9532-9b169df13080":
+    lastModified: "2026-11-04T18:20:16.658Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8f7cb2f8-9389-46e7-a092-384e3ccbc31a":
     lastModified: "2026-11-04T17:25:47.816Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94a33e07-b483-4b90-9b37-34911b54f084":
-    status: "in_progress"
     startedAt: "2026-11-04T18:11:11.183Z"
-    activeIntervals: [{"start":"2026-11-04T18:11:11.183Z"}]
-    lastModified: "2026-11-04T18:11:11.781Z"
+    activeIntervals: [{"end":"2026-11-04T18:19:34.377Z","start":"2026-11-04T18:11:11.183Z"}]
+    lastModified: "2026-11-04T18:19:34.966Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
