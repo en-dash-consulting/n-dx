@@ -40,7 +40,9 @@
  * @module web/server/routes-sidecar
  */
 
+import { realpathSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { resolve } from "node:path";
 import { vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -166,6 +168,24 @@ function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
     registries.set(ctx.projectDir, registry);
   }
   return registry;
+}
+
+/** `path` as one spelling per directory: symlinks and, where the filesystem folds case, case resolved. */
+function canonicalPath(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * Whether a session stored with `worktree` belongs to this workspace. The
+ * stored spelling is whatever the creating process was started with, so a
+ * restart from a symlinked or differently cased path must still match.
+ */
+function heldBy(ctx: ServerContext, worktree: string): boolean {
+  return canonicalPath(worktree) === canonicalPath(ctx.projectDir);
 }
 
 /** Build a broker for `projectDir` that announces its cards through `broadcast`. */
@@ -322,7 +342,8 @@ export async function handleSidecarRoute(
 
   if (pathname === PREFIX) {
     if (method === "GET") {
-      const sessions = registry.list({ worktree: ctx.projectDir })
+      const sessions = registry.list()
+        .filter((session) => heldBy(ctx, session.worktree))
         .map((session) => sessionResponse(registry, session));
       jsonResponse(res, 200, { sessions });
       return true;
@@ -356,7 +377,7 @@ export async function handleSidecarRoute(
   const session = registry.get(id);
   // One answer for a session this worktree does not hold, whether it does not
   // exist or belongs to another worktree's checkout.
-  if (!session || session.worktree !== ctx.projectDir) return refuse(res, 404, `No Sidecar session ${id}`);
+  if (!session || !heldBy(ctx, session.worktree)) return refuse(res, 404, `No Sidecar session ${id}`);
 
   const reads = action === "frames" || action === undefined || (action === "cards" && cardId === undefined);
   const allowed = reads ? "GET" : "POST";

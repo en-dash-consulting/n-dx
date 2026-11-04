@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -151,6 +151,23 @@ describe("sessions", () => {
       expect.objectContaining({ running: false, session: expect.objectContaining({ id, worktree: root, name: "Plan", vendor: "claude", cursor: 0 }) }),
     ]);
     expect((await (await api(`/${id}`)).json()).session.id).toBe(id);
+  });
+
+  // #901 F3: a restart from a symlinked or differently spelled path is the same checkout.
+  it("finds a session through a differently spelled projectDir for the same directory", async () => {
+    const id = await createSession();
+    const link = `${root}-link`;
+    symlinkSync(root, link);
+    try {
+      ctx.projectDir = link;
+      const list = await (await api("")).json();
+      expect(list.sessions.map((s: { session: { id: string } }) => s.session.id)).toEqual([id]);
+      expect((await api(`/${id}`)).status).toBe(200);
+      expect((await api(`/${id}/frames?after=0`)).status).toBe(200);
+    } finally {
+      ctx.projectDir = root;
+      await removeTestDir(link);
+    }
   });
 
   it("refuses a vendor without a resumable CLI session", async () => {

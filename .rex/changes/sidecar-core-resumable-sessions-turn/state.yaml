@@ -76,7 +76,14 @@ items:
     lastModified: "2026-10-27T16:34:43.963Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "653be274-7cc8-4bcc-81c7-997c470a708a":
-    lastModified: "2026-11-04T19:04:13.946Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:37:52.744Z"
+    completedAt: "2026-11-04T20:53:16.288Z"
+    endedAt: "2026-11-04T20:53:16.288Z"
+    activeIntervals: [{"end":"2026-11-04T20:53:16.288Z","start":"2026-11-04T20:37:52.744Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-sidecar.ts compares canonical paths (realpathSync.native, fallback resolve) via heldBy for session lookup and list; symlink route test added."
+    lastModified: "2026-11-04T20:53:16.288Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6a764d20-2e7a-4fe3-9c16-47e29fb658cc":
     status: "completed"
