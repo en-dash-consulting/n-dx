@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "The same holds for a callTool failure's ConnectionUnavailableError message"
   - "A reason still names the HTTP status so the operator can diagnose the failure"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
