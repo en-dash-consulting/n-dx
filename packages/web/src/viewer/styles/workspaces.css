@@ -226,6 +226,12 @@
   color: var(--text-dim);
 }
 
+.workspace-card-claim-lost {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
 .workspace-card-error {
   margin: 0;
   font-size: var(--font-xs);

@@ -336,6 +336,20 @@ describe("WorkspacesView", () => {
     cleanupRenderedDiv(root);
     root = null;
     expect(attach).toHaveBeenLastCalledWith(null);
+    });
+
+  it("says when another worktree took over the latest run's task", async () => {
+    const taken = {
+      ...BRANCH_TREE,
+      runs: { ...BRANCH_TREE.runs, latest: { claimLostTo: "/repo" } },
+    };
+    const { fetcher } = makeFetcher({ "/api/worktrees": [ANCHOR_TREE, taken] });
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+
+    const cards = root.querySelectorAll(".workspace-card");
+    expect(cards[1].querySelector(".workspace-card-claim-lost")!.textContent)
+      .toBe("Task taken over by n-dx");
+    expect(cards[0].querySelector(".workspace-card-claim-lost")).toBeNull();
   });
 
   it("names every per-workspace request's workspace", async () => {

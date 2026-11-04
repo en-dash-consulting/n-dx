@@ -130,6 +130,42 @@ describe("predicted conflicts", () => {
     expect(snapshot()).toEqual(before);
   });
 
+  /** git for real, except merge-tree, which answers `answer`. */
+  function mergeTreeAnswers(answer: ExecResult): BranchHealthExec {
+    return async (cmd, args, opts) => (cmd === "git" && args.includes("merge-tree") ? answer : exec(cmd, args, opts));
+  }
+
+  // F5 on PR #930: a timeout was reported as needing git 2.38.
+  it("reports a merge-tree timeout as a timeout, without the git version hint", async () => {
+    divergeWithOneConflict();
+    const timedOut: ExecResult = {
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      error: Object.assign(new Error("Command timed out after 30000ms: git merge-tree"), { code: "ETIMEDOUT", killed: true }),
+      launched: true,
+    };
+
+    const health = await collectBranchHealth(repo, { githubReads: false, exec: mergeTreeAnswers(timedOut) });
+
+    expect(health.conflictsUnavailable).toContain("timed out after 30 s");
+    expect(health.conflictsUnavailable).not.toContain("2.38");
+  });
+
+  it("names git 2.38 only for exit 129 or a complaint about --write-tree", async () => {
+    divergeWithOneConflict();
+    const refused = (stderr: string, exitCode: number): ExecResult => ({ stdout: "", stderr, exitCode, error: new Error("exit"), launched: true });
+
+    const old = await collectBranchHealth(repo, { githubReads: false, exec: mergeTreeAnswers(refused("usage: git merge-tree", 129)) });
+    const flag = await collectBranchHealth(repo, { githubReads: false, exec: mergeTreeAnswers(refused("error: unknown option `--write-tree'", 1)) });
+    const unrelated = await collectBranchHealth(repo, { githubReads: false, exec: mergeTreeAnswers(refused("fatal: refusing to merge unrelated histories", 128)) });
+
+    expect(old.conflictsUnavailable).toContain("git 2.38 or newer");
+    expect(unrelated.conflictsUnavailable).toContain("refusing to merge unrelated histories");
+    expect(unrelated.conflictsUnavailable).not.toContain("2.38");
+    expect(flag.conflictsUnavailable).toContain("git 2.38 or newer");
+  });
+
   it("reports base, ahead/behind and no conflicts for a clean branch", async () => {
     git("checkout", "-q", "-b", "feat");
     write("b.txt", "alpha\nbeta\ngamma\n");
@@ -386,6 +422,39 @@ describe("PR base cache", () => {
     const health = await collectBranchHealth(repo, { githubReads: true, localOnly: true, prBases, exec: stubExec().run });
 
     expect(health.baseSource).toBe("default");
+  });
+
+  // F2 on PR #930: an expanded strip whose gh pr view fails kept the default.
+  it("uses the cached PR base for the base and each layer when gh pr view fails", async () => {
+    // A layer below `layer` with no upstream: only the cache can name it.
+    git("branch", "-q", "lower", "main");
+    const prBases = new PrBaseCache();
+    prBases.set(repo, "feat", "layer");
+    prBases.set(repo, "layer", "lower");
+    prBases.set(repo, "lower", "main");
+    const offline: ExecResult = { stdout: "", stderr: "error connecting to api.github.com", exitCode: 1, error: new Error("exit"), launched: true };
+    const { run, ghCalls } = stubExec(() => offline);
+
+    const health = await collectBranchHealth(repo, { githubReads: true, prBases, exec: run });
+
+    expect(ghCalls.length).toBeGreaterThan(0);
+    expect(health).toMatchObject({
+      base: "layer",
+      baseSource: "pr-cached",
+      github: null,
+    });
+    expect(health.stack).toEqual([{ branch: "layer", contained: true }, { branch: "lower", contained: true }]);
+    expect(health.githubReason).toContain("error connecting");
+  });
+
+  it("does not use the cached PR base when gh finds no PR for the branch", async () => {
+    const prBases = new PrBaseCache();
+    prBases.set(repo, "feat", "layer");
+    const noPr: ExecResult = { stdout: "", stderr: 'no pull requests found for branch "feat"', exitCode: 1, error: new Error("exit"), launched: true };
+
+    const health = await collectBranchHealth(repo, { githubReads: true, prBases, exec: stubExec(() => noPr).run });
+
+    expect(health).toMatchObject({ base: "origin/main", baseSource: "default", stack: [] });
   });
 
   it("adds no note when GitHub reads are off", async () => {

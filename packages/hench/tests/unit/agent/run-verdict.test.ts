@@ -7,7 +7,7 @@ import {
   formatReviewRepairsUncommittedRefusal,
   formatUncommittedWorkRefusal,
 } from "../../../src/agent/lifecycle/uncommitted-work-gate.js";
-import type { ReviewReport } from "../../../src/agent/analysis/adversarial-review.js";
+import { formatUnresolvedMustFixRefusal, type ReviewReport } from "../../../src/agent/analysis/adversarial-review.js";
 import type { RunEvent } from "../../../src/store/run-events.js";
 import { RUN_VERDICT_CLASSES, type RunRecord, type TestGateResult } from "../../../src/schema/index.js";
 
@@ -30,7 +30,7 @@ function run(over: Partial<RunRecord> = {}): RunRecord {
     status: "failed",
     turns: 4,
     tokenUsage: { input: 10, output: 10 },
-    toolCalls: [],
+    toolCalls: [{ turn: 1, tool: "read_file", input: {}, output: "", durationMs: 1 }],
     model: "sonnet",
     worktreeRoot: ROOT,
     commits: [{ sha: "a".repeat(40), subject: "feat: work" }],
@@ -73,7 +73,7 @@ describe("classifyRun — one fixture per class", () => {
     expect(classify(run({ testGate: failedGate(DIGEST) }), { events }).class).toBe("test-gate-new");
   });
 
-  it("test-gate-preexisting: the digest names only files the run did not change", () => {
+  it("test-gate-preexisting: the digest names only tests the run did not edit; nothing asserts it predates the run", () => {
     const d = classify(run({
       testGate: failedGate(DIGEST),
       structuredSummary: {
@@ -83,8 +83,23 @@ describe("classifyRun — one fixture per class", () => {
       },
     }));
     expect(d.class).toBe("test-gate-preexisting");
-    expect(d.evidence).toContain("Not verified on main");
-    expect(d.actions.map((a) => a.kind)).toEqual(["verify-on-main", "close-verified"]);
+    expect(d.summary).toBe("The test gate failed in tests this run did not edit (tests/unit/widget.test.ts); not checked on main.");
+    expect(d.evidence).toEqual(["Gate failure names only unedited tests: tests/unit/widget.test.ts", "Not checked on main"]);
+    expect(d.actions.map((a) => a.kind)).toEqual(["verify-on-main"]);
+  });
+
+  it("test-gate-preexisting: a stack frame in unedited source is not listed as a test", () => {
+    const digest = `${DIGEST}\n ❯ src/widget.ts:4:1`;
+    const d = classify(run({
+      testGate: failedGate(digest),
+      structuredSummary: {
+        filesChanged: ["src/other.ts"],
+        filesRead: [], commandsExecuted: [], testsRun: [],
+        counts: { filesRead: 0, filesChanged: 1, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+      },
+    }));
+    expect(d.class).toBe("test-gate-preexisting");
+    expect(d.summary).toContain("in tests this run did not edit (tests/unit/widget.test.ts)");
   });
 
   it("completion-held: completionHold outcome is not-applied", () => {
@@ -126,8 +141,8 @@ describe("classifyRun — one fixture per class", () => {
     const full = "packages/web/tests/unit/viewer/add-item-form.test.ts";
     const pre = classify(run({ testGate: failedGate(digest), structuredSummary: { ...summary, filesChanged: ["src/other.ts"] } }));
     expect(pre.class).toBe("test-gate-preexisting");
-    expect(pre.summary).toBe(`The test gate failed only in files this run did not change: ${full}.`);
-    expect(pre.evidence[0]).toBe(`Gate failure names only unchanged file(s): ${full}`);
+    expect(pre.summary).toBe(`The test gate failed in tests this run did not edit (${full}); not checked on main.`);
+    expect(pre.evidence[0]).toBe(`Gate failure names only unedited tests: ${full}`);
     const fresh = classify(run({ testGate: failedGate(digest), structuredSummary: { ...summary, filesChanged: [full] } }));
     expect(fresh.class).toBe("test-gate-new");
     expect(fresh.summary).toBe(`The test gate failed in files this run changed: ${full}.`);
@@ -163,7 +178,7 @@ describe("classifyRun — one fixture per class", () => {
       },
     }));
     expect(d.class).toBe("test-gate-preexisting");
-    expect(d.summary).toContain(": tests/unit/widget.test.ts.");
+    expect(d.summary).toContain("(tests/unit/widget.test.ts)");
   });
 
   it("completion-held: gateOnlyRetry is set", () => {
@@ -198,8 +213,27 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.actions.map((a) => a.kind)).toEqual(["release-claim", "re-run"]);
   });
 
-  it("claim-lost: readOnlyRefusal is set", () => {
-    expect(classify(run({ readOnlyRefusal: { reason: "no edits" } })).class).toBe("claim-lost");
+  it("readOnlyRefusal is never a class: a cold retry that broke a test it changed is test-gate-new", () => {
+    const d = classify(run({
+      readOnlyRefusal: { reason: "no edits" },
+      testGate: failedGate(DIGEST),
+      structuredSummary: {
+        filesChanged: ["tests/unit/widget.test.ts"],
+        filesRead: [], commandsExecuted: [], testsRun: [],
+        counts: { filesRead: 0, filesChanged: 1, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+      },
+    }));
+    expect(d.class).toBe("test-gate-new");
+    expect(d.evidence).toEqual(["Gate failure names changed file(s): tests/unit/widget.test.ts", "readOnlyRefusal: no edits"]);
+  });
+
+  it("readOnlyRefusal alone gives no class; it is one evidence line on whatever the record gives", () => {
+    const alone = classify(run({ readOnlyRefusal: { reason: "no edits" } }));
+    expect(alone.class).toBe("unclassified");
+    expect(alone.evidence.filter((e) => e.startsWith("readOnlyRefusal"))).toEqual(["readOnlyRefusal: no edits"]);
+    const timedOut = classify(run({ readOnlyRefusal: { reason: "no edits" }, status: "timeout" }));
+    expect(timedOut.class).toBe("budget-timeout");
+    expect(timedOut.evidence.at(-1)).toBe("readOnlyRefusal: no edits");
   });
 
   it("completion-held: both uncommitted-work refusals the completion gate writes are recognised", () => {
@@ -244,6 +278,50 @@ describe("classifyRun — one fixture per class", () => {
       const r = run({ events: [{ type: "failure", vendor: "claude", turn: 1, timestamp: "t", failure: { category, message: "x" } }] });
       expect(classify(r).class).toBe("vendor-transient");
     }
+  });
+
+  it("vendor-transient: with the event pipeline off, run.error that maps to rate_limit or transient_exhausted", () => {
+    for (const error of ["HTTP 429 Too Many Requests", "API Error: 529 Overloaded", "You've hit your session limit · resets 3pm"]) {
+      const d = classify(run({ error, events: undefined }));
+      expect(d.class).toBe("vendor-transient");
+      expect(d.actions.map((a) => a.kind)).toEqual(["retry-later"]);
+    }
+  });
+
+  it("vendor-transient: an auth failure in run.error re-authenticates rather than retrying later", () => {
+    const d = classify(run({ error: "HTTP 401 Unauthorized", events: undefined }));
+    expect(d.class).toBe("vendor-transient");
+    expect(d.evidence).toContain("failure category: auth");
+    expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
+  });
+
+  it("an auth failure still leads with re-authenticate on the last attempt", () => {
+    const d = classify(run({ error: "HTTP 401 Unauthorized" }), { attempt: 2 });
+    expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
+  });
+
+  it("only run.error's first line is read as a vendor error, so a review refusal's detail does not shadow review-blocked", () => {
+    const record = { failed: "must-fix-unresolved", detail: "must-fix: rate limit 429 handling is missing", reportPath: "/r.json" } as const;
+    const d = classify(run({ error: formatUnresolvedMustFixRefusal(record), review: record }));
+    expect(d.class).toBe("review-blocked");
+  });
+
+  it("a turn-1 vendor failure with no tool calls and no commits is not no-changes", () => {
+    const dead = { turns: 1, toolCalls: [], commits: [] };
+    const limit = classify(run({ ...dead, error: "You've hit your session limit · resets 3pm" }));
+    expect(limit.class).toBe("vendor-transient");
+    const model = classify(run({ ...dead, error: "The model claude-x does not support this model's tools" }));
+    expect(model.class).not.toBe("no-changes");
+    expect(model.actions.map((a) => a.kind)).not.toContain("tighten-done-when");
+  });
+
+  it("no-changes needs a tool call: the summary count counts when no calls are recorded", () => {
+    const counts = { filesRead: 0, filesChanged: 0, commandsExecuted: 0, testsRun: 0 };
+    const summary = (toolCallsTotal: number) => ({
+      filesChanged: [], filesRead: [], commandsExecuted: [], testsRun: [], counts: { ...counts, toolCallsTotal },
+    });
+    expect(classify(run({ turns: 1, toolCalls: [], commits: [], structuredSummary: summary(0) })).class).toBe("unclassified");
+    expect(classify(run({ toolCalls: [], commits: [], structuredSummary: summary(3) })).class).toBe("no-changes");
   });
 
   it("no-changes: no commits", () => {
