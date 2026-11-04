@@ -58,6 +58,16 @@ body. `x` is reserved as a project id (`isReservedProjectId`, twinned in
 from `ndx extensions list --json`, and its `EXTENSION_API_VERSION` is core's
 twin, pinned by the root `extension-api-version-parity` test.
 
+## Home page: uninitialized projects
+
+A card's `initialized` is the child's own `isProjectInitialized`, read from
+`/api/status` — the hub never inspects a project's directories. A card whose
+child says `false` offers only Initialize, which posts to the child's
+`/api/commands/init` through the proxy (the setup wizard's route, not a second
+init) and polls its status. Every exit — failure, refused start, lost server,
+client deadline — must unlock the card; `tests/unit/hub/init-card.test.ts`
+runs the script.
+
 ## Proxy and base path
 
 `hub/proxy.ts` forwards `/p/<id>/…` to that project's server with the prefix

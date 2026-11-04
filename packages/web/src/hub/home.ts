@@ -93,6 +93,29 @@ export function repoLabel(card: ProjectCard): string | null {
 }
 
 /**
+ * True when the card should offer Initialize: the child answered and said n-dx
+ * is not set up there. An unknown answer (unreachable child, older build) is
+ * not "uninitialized" — those cards keep the actions they always had.
+ */
+export function needsInit(card: ProjectCard): boolean {
+  return card.reachable && card.initialized === false;
+}
+
+/**
+ * What the card's Initialize button posts to the project's own
+ * `POST /api/commands/init` — the setup wizard's route, so the hub runs the
+ * same `ndx init` the wizard does. These are the wizard's defaults (Claude,
+ * both assistants); `git` is left out so `ndx init` keeps its own default.
+ */
+export const HUB_INIT_REQUEST = { provider: "claude" } as const;
+
+/**
+ * How long the card waits on a run before giving up and unlocking. The
+ * project server's own init timeout is five minutes; the slack covers polling.
+ */
+export const HUB_INIT_CLIENT_TIMEOUT_MS = 330_000;
+
+/**
  * The card's one-line summary, in the order someone scanning for a project
  * reads it: what it is doing, then what state it is in, then what is next.
  */
@@ -100,7 +123,7 @@ export function cardFacts(card: ProjectCard): string[] {
   if (!card.reachable) {
     return [card.error ? `not answering — ${card.error}` : "not answering"];
   }
-  const facts: string[] = [];
+  const facts: string[] = needsInit(card) ? ["not initialized"] : [];
   const running = runningLabel(card);
   if (running) facts.push(running);
   if (card.branch) facts.push(card.branch);
@@ -227,6 +250,18 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Uninitialized card and its in-card init run */
+.card-uninitialized { position: relative; }
+.card-uninitialized .card-title span.name { font-weight: 600; font-size: 1rem; }
+.init-error { color: var(--red); font-size: 0.75rem; margin: 0; overflow-wrap: anywhere; }
+.init-error[hidden] { display: none; }
+.init-overlay {
+  position: absolute; inset: 0; z-index: 1; border-radius: 10px; padding: 1rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;
+  background: var(--bg-surface); opacity: 0.94; color: var(--text-dim); font-size: 0.8rem; cursor: progress;
+}
+.init-overlay[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 2.4s; }
 }
@@ -242,8 +277,23 @@ const REFRESH_SCRIPT = `
   var list = document.getElementById("cards");
   if (!list) return;
   var count = document.getElementById("project-count");
+  // A card mid-init (or showing an init failure) is kept as it is: swapping it
+  // would drop its overlay or its error. It yields once the server's card for
+  // that project is no longer an uninitialized one.
+  function keepInitCards(stale) {
+    var fresh = list.querySelectorAll(".card-uninitialized[data-project-id]");
+    for (var i = 0; i < stale.length; i++) {
+      var id = stale[i].getAttribute("data-project-id");
+      for (var j = 0; j < fresh.length; j++) {
+        if (fresh[j].getAttribute("data-project-id") === id) {
+          list.replaceChild(stale[i], fresh[j]);
+          break;
+        }
+      }
+    }
+  }
   function tick() {
-    fetch("/api/hub/overview", { headers: { accept: "application/json" } })
+    return fetch("/api/hub/overview", { headers: { accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || typeof data.html !== "string") return;
@@ -253,10 +303,14 @@ const REFRESH_SCRIPT = `
         }
         // Never yank focus out from under someone mid-keyboard-navigation.
         if (list.contains(document.activeElement)) return;
+        var stale = Array.prototype.slice.call(list.querySelectorAll("[data-init-state]"));
         list.innerHTML = data.html || '<li class="empty">No project is registered yet.</li>';
+        keepInitCards(stale);
       })
       .catch(function () {});
   }
+  // The init script asks for a refresh the moment a run succeeds.
+  window.ndxHubRefresh = tick;
   // A deferred page (sent to a navigation, which carries no credential) has
   // no cards yet: load them as soon as the session script has signed in.
   if (list.hasAttribute("data-deferred")) {
@@ -400,6 +454,141 @@ const NEW_PROJECT_SCRIPT = `
 `;
 
 /**
+ * Initialize an uninitialized project from its card, without leaving the page.
+ *
+ * Runs the setup wizard's own path through the proxy: `POST
+ * <project>/api/commands/init`, then poll `<project>/api/commands/init/status`.
+ * While it runs the card is under an overlay showing the latest step and the
+ * elapsed time, and its button is disabled. Every way out unlocks the card:
+ * success hands it to the refresh tick, which renders the initialized card;
+ * a failure, a refused start, a lost server or the client deadline shows the
+ * error and turns the button into Retry.
+ */
+const INIT_SCRIPT = `
+(function () {
+  var list = document.getElementById("cards");
+  if (!list) return;
+  var POLL_MS = 1500;
+  var DEADLINE_MS = ${HUB_INIT_CLIENT_TIMEOUT_MS};
+  var MAX_POLL_FAILURES = 20;
+
+  function parts(card) {
+    return {
+      button: card.querySelector('[data-action="init"]'),
+      overlay: card.querySelector(".init-overlay"),
+      phase: card.querySelector(".init-phase"),
+      error: card.querySelector(".init-error")
+    };
+  }
+
+  function lock(card, message) {
+    var p = parts(card);
+    card.setAttribute("data-init-state", "running");
+    card.setAttribute("aria-busy", "true");
+    p.button.disabled = true;
+    p.error.hidden = true;
+    p.phase.textContent = message;
+    p.overlay.hidden = false;
+  }
+
+  function fail(card, message) {
+    var p = parts(card);
+    card.setAttribute("data-init-state", "failed");
+    card.removeAttribute("aria-busy");
+    p.overlay.hidden = true;
+    p.error.textContent = message;
+    p.error.hidden = false;
+    p.button.textContent = "Retry";
+    p.button.disabled = false;
+  }
+
+  function succeed(card) {
+    var p = parts(card);
+    // No data-init-state: the next refresh replaces this card with the
+    // initialized one. The overlay stays up until it does.
+    card.removeAttribute("data-init-state");
+    card.removeAttribute("aria-busy");
+    p.phase.textContent = "Initialized — loading the project…";
+    if (card.contains(document.activeElement)) document.activeElement.blur();
+    if (window.ndxHubRefresh) window.ndxHubRefresh();
+  }
+
+  // The last line the run printed, ANSI stripped, or a generic step name.
+  function phaseOf(status, startedAt) {
+    var lines = String(status.output || "").replace(/\\u001b\\[[0-9;]*[A-Za-z]/g, "").split("\\n");
+    var step = "";
+    for (var i = lines.length - 1; i >= 0 && !step; i--) step = lines[i].trim();
+    var seconds = Math.round((Date.now() - startedAt) / 1000);
+    return (step || "Initializing…") + " (" + seconds + "s)";
+  }
+
+  function watch(card, base, startedAt) {
+    var failures = 0;
+    var timer = setInterval(function () {
+      if (Date.now() - startedAt > DEADLINE_MS) {
+        clearInterval(timer);
+        fail(card, "Initialization did not finish in time. Check the project's server, then retry.");
+        return;
+      }
+      fetch(base + "api/commands/init/status", { headers: { accept: "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (status) {
+          failures = 0;
+          if (status.running || !status.finishedAt) {
+            card.querySelector(".init-phase").textContent = phaseOf(status, startedAt);
+            return;
+          }
+          clearInterval(timer);
+          if (status.error) fail(card, status.error);
+          else succeed(card);
+        })
+        .catch(function (err) {
+          if (++failures < MAX_POLL_FAILURES) return;
+          clearInterval(timer);
+          fail(card, "Lost contact with the project's server: " + (err && err.message ? err.message : err));
+        });
+    }, POLL_MS);
+  }
+
+  function start(card) {
+    if (card.getAttribute("data-init-state") === "running") return;
+    var base = card.getAttribute("data-init-base");
+    var startedAt = Date.now();
+    lock(card, "Starting initialization…");
+    fetch(base + "api/commands/init", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: ${JSON.stringify(JSON.stringify(HUB_INIT_REQUEST))}
+    })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; })
+          .then(function (body) { return { status: r.status, body: body }; });
+      })
+      .then(function (result) {
+        // 409: a run is already going (another tab, or the wizard) — watch it.
+        if (result.status === 202 || result.status === 409) {
+          card.querySelector(".init-phase").textContent = "Initializing…";
+          watch(card, base, startedAt);
+          return;
+        }
+        fail(card, (result.body && result.body.error) || ("Could not start initialization (HTTP " + result.status + ")."));
+      })
+      .catch(function (err) {
+        fail(card, String(err && err.message ? err.message : err));
+      });
+  }
+
+  list.addEventListener("click", function (event) {
+    var target = event.target;
+    var button = target && target.closest ? target.closest('[data-action="init"]') : null;
+    if (!button || button.disabled) return;
+    var card = button.closest(".card-uninitialized");
+    if (card) start(card);
+  });
+})();
+`;
+
+/**
  * The new-project panel. `defaultParent` is rendered into the field rather
  * than fetched, so the path is on screen in the first paint — the script
  * refreshes it, but a slow or failed fetch still leaves something true there.
@@ -433,14 +622,44 @@ function statusDot(card: ProjectCard): string {
   return `<span class="dot dot-${escapeHtml(state)}" title="${escapeHtml(state)}" aria-hidden="true"></span>`;
 }
 
+/**
+ * The card for a project n-dx is not set up in: Initialize is its only action,
+ * and it links nowhere — the project's URL would only serve the setup wizard
+ * the button already runs. `data-init-base` is where the init script sends the
+ * wizard's requests; the overlay and error line are its to show.
+ */
+function renderUninitializedCard(card: ProjectCard, facts: string, repoLine: string): string {
+  return `<li class="card card-uninitialized" data-project-id="${escapeHtml(card.id)}" data-init-base="${escapeHtml(card.url)}">
+    <div class="card-title">${statusDot(card)}<span class="name">${escapeHtml(card.name)}</span></div>
+    ${repoLine}
+    <p class="path">${escapeHtml(card.repoRoot)}</p>
+    <div class="facts">${facts}</div>
+    <p class="init-error" role="alert" hidden></p>
+    <div class="actions">
+      <button type="button" class="action action-primary" data-action="init">Initialize</button>
+    </div>
+    <div class="init-overlay" role="status" aria-live="polite" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="init-phase">Initializing…</span>
+    </div>
+  </li>`;
+}
+
 /** One card. Exported so the refresh endpoint renders exactly what the page did. */
 export function renderCard(card: ProjectCard): string {
   const facts = cardFacts(card)
     .map((fact, index) => {
-      const cls = !card.reachable ? "fact fact-error" : index === 0 && runningLabel(card) ? "fact fact-running" : "fact";
+      const cls = !card.reachable ? "fact fact-error" : index === 0 && runningLabel(card) && !needsInit(card) ? "fact fact-running" : "fact";
       return `<span class="${cls}">${escapeHtml(fact)}</span>`;
     })
     .join("");
+
+  // Above the path, because it answers the same question better: the path says
+  // where this checkout happens to live, the repo says what it is.
+  const repo = repoLabel(card);
+  const repoLine = repo ? `<p class="repo">${escapeHtml(repo)}</p>` : "";
+
+  if (needsInit(card)) return renderUninitializedCard(card, facts, repoLine);
 
   const next = card.nextTaskTitle
     ? `<p class="next" title="${escapeHtml(card.nextTaskTitle)}">Next: ${escapeHtml(card.nextTaskTitle)}</p>`
@@ -455,11 +674,6 @@ export function renderCard(card: ProjectCard): string {
       <a class="action" href="${escapeHtml(card.url)}">Open dashboard</a>
     </div>`
     : `<div class="actions"><a class="action" href="${escapeHtml(card.url)}">Open dashboard</a></div>`;
-
-  // Above the path, because it answers the same question better: the path says
-  // where this checkout happens to live, the repo says what it is.
-  const repo = repoLabel(card);
-  const repoLine = repo ? `<p class="repo">${escapeHtml(repo)}</p>` : "";
 
   return `<li class="card${card.reachable ? "" : " card-unreachable"}">
     <div class="card-title">${statusDot(card)}<a href="${escapeHtml(card.url)}">${escapeHtml(card.name)}</a></div>
@@ -607,6 +821,7 @@ export function renderHomePage(
 </script>
 <script>${REFRESH_SCRIPT}</script>
 <script>${NEW_PROJECT_SCRIPT}</script>
+<script>${INIT_SCRIPT}</script>
 </body>
 </html>`);
 }
