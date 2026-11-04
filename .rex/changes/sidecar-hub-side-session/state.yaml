@@ -72,7 +72,14 @@ items:
     lastModified: "2026-11-03T01:37:39.192Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8981254d-f128-4a04-9b3a-fc06ca075754":
-    lastModified: "2026-11-04T19:09:20.459Z"
+    status: "completed"
+    startedAt: "2026-11-04T19:12:38.424Z"
+    completedAt: "2026-11-04T19:29:54.871Z"
+    endedAt: "2026-11-04T19:29:54.871Z"
+    activeIntervals: [{"end":"2026-11-04T19:29:54.871Z","start":"2026-11-04T19:12:38.424Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "decideProxy's hub-session branch drops ndx_ticket as well as ndx_token; unit + integration tests added."
+    lastModified: "2026-11-04T19:29:54.871Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
     status: "completed"

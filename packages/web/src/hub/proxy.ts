@@ -193,8 +193,11 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
 
   // The hub session, above every project like the chooser: forwarded to
   // whichever project server hosts it, picked when the request is handled.
+  // An upgrade's ticket was spent by upgradeRefusal; the host gets the token.
   const hubSession = hubSessionUpstreamPath(pathname);
-  if (hubSession !== null) return { kind: "hub-session", path: hubSession + withoutTokenParam(query) };
+  if (hubSession !== null) {
+    return { kind: "hub-session", path: splitQueryParam(hubSession + withoutTokenParam(query), TICKET_QUERY_PARAM).url };
+  }
 
   // The chooser's fixed address, checked before the project rules so it
   // answers the same way at every project count. `/` cannot serve this
