@@ -884,6 +884,23 @@ describe("github_read and draft_github_post", () => {
     await client.close();
   });
 
+  it("reads nothing for a pr card approved after git.branchHealth was turned off", async () => {
+    githubReads(false);
+    branchHealth(true);
+    answerCheckRuns("failure");
+    const client = await brokerClient();
+    const call = client.callTool({ name: "github_read", arguments: { kind: "pr", ref: "elsewhere" } });
+    const { cardId } = await cardAnnounced("pending");
+    branchHealth(false);
+    execMock.mockClear();
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain("Nothing was read: the git.branchHealth feature is off.");
+    expect(execMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
   it("still reads a check while git.branchHealth is off", async () => {
     githubReads(true);
     branchHealth(false);

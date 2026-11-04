@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "0622d9eb-3019-4cc1-b19d-bc963b79b72e":
-    lastModified: "2026-11-04T19:06:44.118Z"
+    status: "completed"
+    startedAt: "2026-11-04T21:30:48.191Z"
+    completedAt: "2026-11-04T21:48:08.554Z"
+    endedAt: "2026-11-04T21:48:08.554Z"
+    activeIntervals: [{"end":"2026-11-04T21:48:08.554Z","start":"2026-11-04T21:30:48.191Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "F3/F4 of #945: class names the base unless it is origin's default branch; pr reads refused while git.branchHealth is off, before a card is raised."
+    lastModified: "2026-11-04T21:48:08.554Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8cb5a7fc-a5c6-4744-b317-6b7b941b2e4c":
     status: "completed"
@@ -14,5 +21,12 @@ items:
     lastModified: "2026-11-04T20:00:39.233Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c977ae06-2e11-4cb7-9f80-e1a2ad155363":
-    lastModified: "2026-11-04T19:06:58.113Z"
+    status: "completed"
+    startedAt: "2026-11-04T21:48:08.554Z"
+    completedAt: "2026-11-04T21:48:08.554Z"
+    endedAt: "2026-11-04T21:48:08.554Z"
+    activeIntervals: [{"end":"2026-11-04T21:48:08.554Z","start":"2026-11-04T21:48:08.554Z"}]
+    appliedAt: "2026-11-04T21:48:08.554Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-04T21:48:08.554Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
