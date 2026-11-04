@@ -106,8 +106,10 @@ import { generateTargetReadme } from "./readme-generator.js";
 import {
   runGitPreflight,
   formatGitWarningLines,
-  commitInitBaseline,
+  snapshotDirtyPaths,
+  finishInitCommit,
   formatGitInitCommitLines,
+  machineLocalIgnoreEntries,
 } from "./git-preflight.js";
 import { formatClaudeCliNotFoundError, moveDiscoveredClaudePath } from "./claude-integration.js";
 import {
@@ -679,7 +681,7 @@ function extractInitGitConsent(args) {
 }
 
 function stripInitGitFlags(args) {
-  return args.filter((a) => a !== "--git" && a !== "--no-git");
+  return args.filter((a) => a !== "--git" && a !== "--no-git" && a !== "--no-commit");
 }
 
 function extractInitClaudeModel(args) {
@@ -870,6 +872,20 @@ function recordInitVersion(dir, version) {
   } catch {
     // Non-fatal — failure to record version doesn't affect init outcome.
   }
+}
+
+/**
+ * Record the n-dx version that ran init and the CLI name the project uses.
+ * Both go to the project config file, so this runs before the init commit.
+ *
+ * @param {string} dir
+ */
+function recordInitIdentity(dir) {
+  try {
+    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+    recordInitVersion(dir, version);
+  } catch { /* non-fatal */ }
+  recordCliName(dir);
 }
 
 /**
@@ -1640,10 +1656,15 @@ async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
   const gitConsent = extractInitGitConsent(rest);
+  const commitInit = !rest.includes("--no-commit");
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
   const quiet = flags.includes("--quiet") || flags.includes("-q");
+
+  // What the user already had changed, before init writes anything: init
+  // commits only the paths that changed after this point.
+  const gitBefore = commitInit ? snapshotDirtyPaths(dir) : null;
 
   await repairInitConfig(dir, quiet);
 
@@ -1690,6 +1711,10 @@ async function handleInit(rest) {
   // The Graview projection is derived from the PRD, the analysis and the runs
   // and rebuilt by every `ndx graview` command, so it is never committed.
   ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
+  // The dashboard's pid/port/spend files and the analysis caches are rewritten
+  // on every server start and analysis. Committed — by init's own commit, or a
+  // user's first `git add .` — they dirty the tree again and block `ndx work`.
+  for (const entry of machineLocalIgnoreEntries(dir)) ensureGitignoreEntry(dir, entry);
   ensureGitattributesRules(dir, layout);
   ensureMergeDriverRegistered(dir);
   // Independent of the Claude integration and of how it finds Claude: a
@@ -1722,6 +1747,11 @@ async function handleInit(rest) {
         tools,
         runInitCapture,
         gitResult,
+        gitBefore,
+        commitInit,
+        // Runs before the init commit, so the identity it writes to the
+        // config file is part of that commit rather than left dirty.
+        recordIdentity: () => recordInitIdentity(dir),
       });
     } catch (err) {
       console.error(err?.message || err);
@@ -1731,11 +1761,6 @@ async function handleInit(rest) {
         if (inkResult.error) console.error(inkResult.error);
         exitWithCleanup(1);
       }
-      try {
-        const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
-        recordInitVersion(dir, version);
-      } catch { /* non-fatal */ }
-      recordCliName(dir);
       exitWithCleanup(0);
     }
   }
@@ -1775,11 +1800,7 @@ async function handleInit(rest) {
     providerSource: providerSourceKey,  // raw key ("flag"|"config"|"prompt"), not display label
   });
 
-  try {
-    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
-    recordInitVersion(dir, version);
-  } catch { /* non-fatal */ }
-  recordCliName(dir);
+  recordInitIdentity(dir);
 
   // Generate a target-repo README before assistant artifacts so the user's
   // project documentation reflects only their own manifest/structure — not
@@ -1798,13 +1819,10 @@ async function handleInit(rest) {
   // until re-init (the regression that caused #284).
   const skillTrackingHints = checkSkillTracking(dir, assistantEnabled);
 
-  // When the user just consented to `git init` in the preflight, stage and
-  // commit the n-dx baseline now that every tool directory and assistant
-  // surface has been written.  Done AFTER all writes so the snapshot is
-  // complete; a missing path here would just be skipped, not error.
-  const gitCommitResult = gitResult?.status === "initialized"
-    ? commitInitBaseline(dir)
-    : null;
+  // Commit what init wrote — the baseline in a repository the preflight just
+  // created, otherwise only the paths init changed — so the first `ndx work`
+  // starts on a clean tree. Done AFTER all writes so the snapshot is complete.
+  const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit });
 
   printStaticInitSummary({
     dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider,

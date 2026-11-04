@@ -159,7 +159,7 @@
     },
     {
       "path": "packages/core/git-preflight.js",
-      "reason": "Git preflight \u2014 invokes `git init` when the user consents during `ndx init`"
+      "reason": "Git preflight \u2014 invokes `git init` when the user consents during `ndx init`, and `git status`/`add`/`commit` to commit the paths init wrote"
     },
     {
       "path": "packages/core/install-identity.js",

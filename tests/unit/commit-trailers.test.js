@@ -164,7 +164,7 @@ describe("the pull-request template carries a trailer block", () => {
  * leave the trailer off by default.
  */
 const CORE_COMMIT_SITES = [
-  ["packages/core/git-preflight.js", "the `ndx init` baseline commit, made before any PRD exists"],
+  ["packages/core/git-preflight.js", "the `ndx init` commits (baseline and init's own files), which belong to no item"],
   ["packages/core/export.js", "the dashboard deploy commit, which publishes the whole PRD"],
   ["packages/core/migrate-layout.js", "the `.ndx/` layout move, which touches every item's file"],
 ];

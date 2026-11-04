@@ -1,5 +1,9 @@
 schema: "rex/v2"
 items:
   "1afdec20-5596-4155-acf7-0f19d92ebc0b":
-    lastModified: "2026-11-04T17:36:18.615Z"
+    status: "failing"
+    startedAt: "2026-11-04T17:46:30.656Z"
+    activeIntervals: [{"end":"2026-11-04T17:46:47.551Z","start":"2026-11-04T17:46:30.656Z"}]
+    failureReason: "Test gate failed [command: npm run test]: `npm run test` did not finish within 30m 0s and was killed; the whole process tree was gone 0.3s after the kill began (ran for 30m 0s in all). If the suite legitimately takes longer, raise `hench.f…\nFailing tests (30):\n- emits a persistent auto-commit warning when the target is not a git repo (non-interactive)\n- stays silent about git when the target is already inside a git working tree\n- creates the repository when --git answers the prompt in a non-interactive run\n- keeps the warning and writes nothing when --no-git declines the prompt\n- does not attempt the baseline commit in non-interactive runs (no consent)\n- writes README.md referencing the target project when no README exists\n- leaves an existing README.md byte-for-byte and writes README.proposed.md\n- uses the proposed-file path when README exists\n… and 22 more"
+    lastModified: "2026-11-04T18:20:49.155Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
