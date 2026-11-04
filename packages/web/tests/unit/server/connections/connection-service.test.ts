@@ -270,11 +270,12 @@ describe("ConnectionService", () => {
   describe("listing a connection that does not answer", () => {
     const RETRY_MS = 1_000;
 
-    function clocked(url: string) {
+    function clocked(url: string, auth?: "token") {
       let time = 0;
       const made = service(
-        { docs: { transport: "http", url } },
-        { connectTimeoutMs: 300, callTimeoutMs: 300, listRetryMs: RETRY_MS, now: () => time },
+        { docs: { transport: "http", url, ...(auth ? { auth } : {}) } },
+        // Long enough for a connect that should succeed under a loaded runner.
+        { connectTimeoutMs: 1_000, callTimeoutMs: 1_000, listRetryMs: RETRY_MS, now: () => time },
       );
       return { ...made, advance: (ms: number) => void (time += ms) };
     }
@@ -306,6 +307,17 @@ describe("ConnectionService", () => {
       expect(await svc.listTools()).toEqual([]);
       advance(RETRY_MS);
       expect((await svc.listTools()).map((t) => t.tool).sort()).toEqual([...SHARED_TOOLS].sort());
+    });
+
+    it("does not back off a refused token, so a replaced one is listed on the next turn", async () => {
+      const http = await httpServer();
+      http.requireToken = "the-right-one";
+      const { svc, ndxHome } = clocked(http.url, "token");
+      setCredential("connection:docs", "a-wrong-one", { ndxHome });
+      expect(await svc.listTools()).toEqual([]);
+
+      setCredential("connection:docs", "the-right-one", { ndxHome });
+      expect((await svc.listTools()).length).toBe(SHARED_TOOLS.length);
     });
 
     it("keeps the last-listed tools while backing off after a connection that was up goes silent", async () => {

@@ -33,10 +33,14 @@ items:
     lastModified: "2026-11-04T17:39:25.942Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9ab5436-8b42-44ce-bfa8-4f15fc911275":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T23:36:06.102Z"
-    activeIntervals: [{"start":"2026-11-04T23:36:06.102Z"}]
-    lastModified: "2026-11-04T23:36:06.678Z"
+    completedAt: "2026-11-04T23:44:28.131Z"
+    endedAt: "2026-11-04T23:44:28.131Z"
+    activeIntervals: [{"end":"2026-11-04T23:44:28.131Z","start":"2026-11-04T23:36:06.102Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: listTools backs off reconnecting after a failed connect (30 s doubling to 5 min, injectable clock); calls reconnect at once; last-known tools kept."
+    lastModified: "2026-11-04T23:44:28.131Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd5defa2-2edd-43e1-9de4-768a1584e660":
     status: "completed"

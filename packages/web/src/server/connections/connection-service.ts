@@ -362,8 +362,12 @@ export class ConnectionService {
     } catch (err) {
       await client.close().catch(() => undefined);
       slot.status = this.failureStatus(config, err);
-      slot.failures += 1;
-      slot.retryAt = this.now() + Math.min(this.listRetryMs * 2 ** (slot.failures - 1), MAX_LIST_RETRY_MS);
+      // A refused token answers at once and is fixed by storing a new one, so
+      // only an unavailable server is backed off.
+      if (slot.status.state === "unavailable") {
+        slot.failures += 1;
+        slot.retryAt = this.now() + Math.min(this.listRetryMs * 2 ** (slot.failures - 1), MAX_LIST_RETRY_MS);
+      }
       return undefined;
     }
   }
