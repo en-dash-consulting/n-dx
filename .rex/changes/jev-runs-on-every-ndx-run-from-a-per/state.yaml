@@ -144,9 +144,14 @@ items:
     lastModified: "2026-11-04T17:25:47.816Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94a33e07-b483-4b90-9b37-34911b54f084":
+    status: "completed"
     startedAt: "2026-11-04T18:11:11.183Z"
-    activeIntervals: [{"end":"2026-11-04T18:19:34.377Z","start":"2026-11-04T18:11:11.183Z"}]
-    lastModified: "2026-11-04T18:19:34.966Z"
+    completedAt: "2026-11-04T18:26:07.463Z"
+    endedAt: "2026-11-04T18:26:07.463Z"
+    activeIntervals: [{"end":"2026-11-04T18:19:34.377Z","start":"2026-11-04T18:11:11.183Z"},{"end":"2026-11-04T18:26:07.463Z","start":"2026-11-04T18:26:07.463Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "f7dfc6c03 (run 2f87c032): under auth cli, and whenever n-dx sets the key, every casing of ANTHROPIC_AUTH_TOKEN / CODEX_API_KEY leaves the vendor CLI child. Its gate failed on web: the throttle-controls load flake plus routes-llm-catalog #686, a real consumer regression (the catalog probe forced auth cli). That was fixed by task 8d2d9a84 in 69018c0a3, whose full gate passed including web. Precedence rests on the vendors' docs, not a live CLI run."
+    lastModified: "2026-11-04T18:26:07.463Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
