@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "A test connects with token A, stores token B, makes a call fail with a body echoing A, and asserts the reason contains neither A nor B"
   - "An oauth connection's reason never contains the access token it sent (test once the OAuth client lands)"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
