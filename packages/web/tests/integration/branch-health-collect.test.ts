@@ -426,9 +426,12 @@ describe("PR base cache", () => {
 
   // F2 on PR #930: an expanded strip whose gh pr view fails kept the default.
   it("uses the cached PR base for the base and each layer when gh pr view fails", async () => {
+    // A layer below `layer` with no upstream: only the cache can name it.
+    git("branch", "-q", "lower", "main");
     const prBases = new PrBaseCache();
     prBases.set(repo, "feat", "layer");
-    prBases.set(repo, "layer", "main");
+    prBases.set(repo, "layer", "lower");
+    prBases.set(repo, "lower", "main");
     const offline: ExecResult = { stdout: "", stderr: "error connecting to api.github.com", exitCode: 1, error: new Error("exit"), launched: true };
     const { run, ghCalls } = stubExec(() => offline);
 
@@ -439,8 +442,8 @@ describe("PR base cache", () => {
       base: "layer",
       baseSource: "pr-cached",
       github: null,
-      stack: [{ branch: "layer", contained: true }],
     });
+    expect(health.stack).toEqual([{ branch: "layer", contained: true }, { branch: "lower", contained: true }]);
     expect(health.githubReason).toContain("error connecting");
   });
 

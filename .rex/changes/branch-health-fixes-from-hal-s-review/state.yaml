@@ -1,14 +1,21 @@
 schema: "rex/v2"
 items:
+  "09c386ce-7fe6-468e-9a85-2fe0daf1e15c":
+    lastModified: "2026-11-04T22:31:31.715Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5af6db8a-4de4-416a-9a0c-3ad31e638a9c":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T22:27:08.802Z"
-    activeIntervals: [{"start":"2026-11-04T22:27:08.802Z"}]
-    lastModified: "2026-11-04T22:27:09.359Z"
+    completedAt: "2026-11-04T22:33:22.907Z"
+    endedAt: "2026-11-04T22:33:22.907Z"
+    activeIntervals: [{"end":"2026-11-04T22:33:22.907Z","start":"2026-11-04T22:27:08.802Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "F2: cached PR base used for base and each stack layer when gh was not asked or failed, not when gh reports no PR (viewPr noPr flag, mayUseCachedBase). F5: Run carries exec's error; merge-tree exitCode null reports a 30 s timeout; git 2.38 hint only for exit 129 or stderr naming --write-tree."
+    lastModified: "2026-11-04T22:33:22.907Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6ded6a40-3201-4a0f-ba10-7c3653cbeddb":
     issues: ["https://github.com/en-dash-consulting/n-dx/pull/930#pullrequestreview-5770574908"]
-    lastModified: "2026-11-04T19:26:27.708Z"
+    lastModified: "2026-11-04T22:31:31.715Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ab81b682-f37c-4fcd-9f26-422dd376b659":
     status: "completed"
