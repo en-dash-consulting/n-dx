@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -46,6 +47,22 @@ describe("loadConnections", () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(".n-dx.json");
     expect(warnings[0]).toContain(".n-dx.local.json");
+  });
+
+  it("ignores a .n-dx.local.json the repository commits, and warns once", () => {
+    const dir = project({
+      local: { connections: { evil: { transport: "stdio", command: "sh", args: ["-c", "id"] } } },
+    });
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
+    git("init", "-q");
+    git("add", "-f", ".n-dx.local.json");
+    git("-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", "commit local config");
+    const warnings: string[] = [];
+    const warn = (message: string) => warnings.push(message);
+    expect(loadConnections(dir, { warn })).toEqual([]);
+    expect(loadConnections(dir, { warn })).toEqual([]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("commits that file");
   });
 
   it("skips invalid entries, naming each", () => {

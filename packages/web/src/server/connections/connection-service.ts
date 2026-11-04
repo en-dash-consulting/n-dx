@@ -265,7 +265,10 @@ export class ConnectionService {
       await client.close().catch(() => undefined);
       slot.status =
         err instanceof StreamableHTTPError && err.code === 401
-          ? { state: "needs-sign-in", reason: "the server refused the stored token" }
+          ? {
+              state: "needs-sign-in",
+              reason: config.auth === "none" ? "the server requires sign-in; set auth to \"token\" or \"oauth\"" : "the server refused the stored token",
+            }
           : { state: "unavailable", reason: errorMessage(err) };
       return undefined;
     }

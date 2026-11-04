@@ -128,6 +128,15 @@ describe("ConnectionService", () => {
     expect(docs.status).toEqual({ state: "needs-sign-in", reason: "the server refused the stored token" });
   });
 
+  it("reads needs-sign-in, not a refused token, when an auth-none server answers 401", async () => {
+    const http = await httpServer();
+    http.requireToken = "anything";
+    const { svc } = service({ docs: { transport: "http", url: http.url } });
+    const [docs] = await svc.listConnections();
+    expect(docs.status.state).toBe("needs-sign-in");
+    expect(docs.status).not.toMatchObject({ reason: expect.stringContaining("stored token") });
+  });
+
   it("reads needs-sign-in for an oauth connection until the sign-in lands", async () => {
     const http = await httpServer();
     const { svc } = service({ docs: { transport: "http", url: http.url, auth: "oauth" } });
