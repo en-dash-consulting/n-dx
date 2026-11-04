@@ -97,7 +97,21 @@ export interface CheckClassInput {
   stack?: readonly StackLayer[];
 }
 
+// Matched against `##[error]` annotation lines and the check name only. A test's
+// own output can say "is out of date with" or "is behind" (iso-skill-drift's
+// assertion, a test named for a stale local main); that is the test failing,
+// not the branch lacking its base.
 const BEHIND_BASE = /\b(?:out of date with|is behind|not up to date with|behind (?:the )?base|must be rebased|needs? (?:a )?rebase)\b/i;
+const ANNOTATION_LINE = /##\[error\].*$/gm;
+
+/** The BEHIND_BASE match in the log's `##[error]` annotation lines, or null. */
+function behindAnnotation(log: string): RegExpExecArray | null {
+  for (const [line] of log.matchAll(ANNOTATION_LINE)) {
+    const match = BEHIND_BASE.exec(line);
+    if (match) return match;
+  }
+  return null;
+}
 // A policy suite's file name. Matched against failing test files only: a log
 // names every suite it ran, passing ones included.
 const POLICY_TEST = /^(?:architecture-policy|domain-isolation|instruction-alignment|boundary-check|agents-md-size-budget|[\w-]+-policy)\.test\.[cm]?[jt]s$/;
@@ -165,7 +179,8 @@ function behindFact(input: CheckClassInput): string | null {
  * 1. **fork-no-ci** — the PR is from a fork and the check left no Actions log,
  *    or GitHub is waiting for a maintainer to approve the workflows.
  * 2. **codeql** — a CodeQL or code-scanning check.
- * 3. **behind-base** — the log or name says the branch is out of date with its base.
+ * 3. **behind-base** — a `##[error]` annotation or the check name says the
+ *    branch is out of date with its base.
  * 4. **policy-test** — a failing test file is one of the repository's policy suites.
  * 5. **touched-test** — the log names a failing test file this branch changed.
  * 6. **behind-base** — the PR's merge state is `BEHIND`, or a stack layer is
@@ -186,7 +201,7 @@ export function classifyFailingCheck(input: CheckClassInput): { class: CheckFail
   if (CODEQL.test(input.name)) {
     return { class: "codeql", evidence: `"${input.name}" is a code-scanning check.` };
   }
-  const behind = BEHIND_BASE.exec(log) ?? BEHIND_BASE.exec(input.name) ?? /up[- ]to[- ]date/i.exec(input.name);
+  const behind = behindAnnotation(log) ?? BEHIND_BASE.exec(input.name) ?? /up[- ]to[- ]date/i.exec(input.name);
   if (behind) {
     return { class: "behind-base", evidence: `The check reports "${behind[0]}".` };
   }
