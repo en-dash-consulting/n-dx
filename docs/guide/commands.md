@@ -274,7 +274,8 @@ ndx status --all .          # include completed items
 ```sh
 ndx config .                          # show all settings
 ndx config llm.vendor claude .        # set vendor
-ndx config llm.claude.api_key KEY .   # set API key
+ndx config credentials.claude          # store an API key (hidden prompt)
+ndx config llm.claude.auth api .      # use it instead of the CLI login
 ndx config hench.provider api .       # API mode
 ndx config --json .                   # JSON output
 ```

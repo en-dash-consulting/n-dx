@@ -27,7 +27,14 @@ export default defineConfig({
     silent: "passed-only",
     // Shared: pin color detection so an ambient FORCE_COLOR in the developer's
     // shell cannot change test verdicts. See tests/setup-color-env.js.
-    setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js"],
+    setupFiles: [
+      "../../tests/setup-color-env.js",
+      "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
+      // Credential isolation: a temp ndx home and no ambient TYPESAFE_API_KEY.
+      // Required by tests/e2e/credential-isolation-setup-policy.test.js.
+      "../../tests/setup-ndx-home.js",
+      "../../tests/setup-judgment-env.js",
+    ],
     include: ["tests/**/*.test.ts"],
     testTimeout: 30000,
     // Never below testTimeout — Vitest's 10s default would give a setup hook

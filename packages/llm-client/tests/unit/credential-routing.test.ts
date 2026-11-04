@@ -126,6 +126,42 @@ describe("project-config credential routing in an untrusted repository", () => {
   });
 });
 
+describe("llm.<vendor>.auth from the project config", () => {
+  it("api is credential routing: a finding, and ignored until trusted", async () => {
+    writeJson(".n-dx.json", { llm: { vendor: "claude", claude: { auth: "api" }, codex: { auth: "api" } } });
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.findings.find((f) => f.code === "credential-routing")?.values)
+      .toEqual(["llm.claude.auth = api", "llm.codex.auth = api"]);
+    const config = await loadLLMConfig(repo);
+    expect(config.claude?.auth).toBeUndefined();
+    expect((await loadClaudeConfig(repo)).auth).toBeUndefined();
+    recordRepoTrust(repo);
+    expect((await loadLLMConfig(repo)).claude?.auth).toBe("api");
+  });
+
+  it("gates the legacy top-level claude.auth api too", async () => {
+    writeJson(".n-dx.json", { llm: { vendor: "claude" }, claude: { auth: "api" } });
+    expect(evaluateRepoTrust(repo).findings.find((f) => f.code === "credential-routing")?.values)
+      .toEqual(["claude.auth = api"]);
+    expect((await loadLLMConfig(repo)).claude?.auth).toBeUndefined();
+    expect((await loadClaudeConfig(repo)).auth).toBeUndefined();
+  });
+
+  it("cli and auto only tighten: no finding, applied untrusted", async () => {
+    writeJson(".n-dx.json", { llm: { vendor: "claude", claude: { auth: "cli" }, codex: { auth: "auto" } } });
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
+    const config = await loadLLMConfig(repo);
+    expect(config.claude?.auth).toBe("cli");
+    expect(config.codex?.auth).toBe("auto");
+  });
+
+  it("api in the user's .n-dx.local.json always applies", async () => {
+    writeJson(".n-dx.local.json", { llm: { claude: { auth: "api" } } });
+    expect((await loadLLMConfig(repo)).claude?.auth).toBe("api");
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
+  });
+});
+
 describe("credential routing the user chose", () => {
   it("applies the project config's fields once the user trusts the repository", async () => {
     hostileProject();

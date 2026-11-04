@@ -162,6 +162,7 @@ describe("decidePlacement: degradation", () => {
     const d = await decidePlacement(change, caps, { settings: { models: "both", autoAccept: "agree" }, model, ...extra });
     expect(d).toMatchObject({ used: "text", accepted: at("cap-store") });
     expect(d.warnings.join()).toMatch(/Jev is unavailable/);
+    expect(d.warnings.join()).toContain("ndx config credentials.typesafe");
     expect(model).toHaveBeenCalledOnce();
   });
 
