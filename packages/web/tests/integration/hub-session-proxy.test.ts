@@ -27,7 +27,7 @@ import {
 } from "../../src/hub/index.js";
 import { handlePublicHubRequest } from "../../src/hub/proxy.js";
 import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "../../src/hub/request-guard.js";
-import { FEATURE_DISABLED_HEADER, SAME_ORIGIN_FRAME_PAGE_CSP } from "../../src/shared/index.js";
+import { FEATURE_DISABLED_HEADER, SAME_ORIGIN_FRAME_PAGE_CSP, TICKET_QUERY_PARAM } from "../../src/shared/index.js";
 
 const TOKEN = "per-user-token";
 
@@ -38,6 +38,8 @@ interface Upstream {
   upgrades: string[];
   /** Every request that arrived, with its body. */
   requests: Array<{ method: string; url: string; headers: IncomingMessage["headers"]; body: string }>;
+  /** The x-ndx-token header each upgrade arrived with. */
+  upgradeTokens: Array<string | undefined>;
   /** Answer as a project whose web.sidecar gate is closed. */
   sidecarOff: boolean;
   /** What the host's hub-lens read reports. */
@@ -60,7 +62,8 @@ async function listen(server: Server): Promise<number> {
 async function startUpstream(): Promise<Upstream> {
   const seen: Upstream["seen"] = [];
   const upgrades: string[] = [];
-  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, requests: [], sidecarOff: false, lensAvailable: false };
+  const upgradeTokens: Upstream["upgradeTokens"] = [];
+  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, upgradeTokens, requests: [], sidecarOff: false, lensAvailable: false };
   const requests: Upstream["requests"] = [];
   upstream.requests = requests;
   const server = createServer((req: IncomingMessage, res) => {
@@ -90,6 +93,7 @@ async function startUpstream(): Promise<Upstream> {
   });
   server.on("upgrade", (req, socket) => {
     upgrades.push(req.url ?? "");
+    upgradeTokens.push(req.headers["x-ndx-token"] as string | undefined);
     if (upstream.sidecarOff) {
       const body = JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" });
       socket.end(
@@ -239,6 +243,14 @@ describe("/hub/session/ through the hub", () => {
     expect(await wsHandshake("/hub/session/ws")).toBe("HTTP/1.1 101 Switching Protocols");
     expect(b.upgrades).toEqual(["/api/sidecar/hub/ws"]);
     expect(a.seen).toEqual([]);
+  });
+
+  it("forwards an upgrade with the per-user token and without the spent ticket, keeping its other parameters", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    expect(await wsHandshake(`/hub/session/ws?after=2&${TICKET_QUERY_PARAM}=spent`)).toBe("HTTP/1.1 101 Switching Protocols");
+    expect(a.upgrades).toEqual(["/api/sidecar/hub/ws?after=2"]);
+    expect(a.upgradeTokens).toEqual([TOKEN]);
   });
 
   it("keeps sending the session to the lock's holder while it is healthy", async () => {

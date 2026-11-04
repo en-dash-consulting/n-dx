@@ -87,9 +87,9 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
-import { readPlacementCall, readPlacementEdit, writePlacementCard } from "./sidecar/placement-card.js";
+import { readPlacementCall, readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
-import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -112,7 +112,7 @@ import { buildLensPacket, HUB_SCOPE_NEEDS, LENS_IDS, LENS_PACKETS, type LensTarg
 import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources, readResolution, type BranchHealthRead, type PacketSources, type SpawnedReads } from "./sidecar/packet-sources.js";
 import { githubFactsBody } from "./sidecar/branch-packet.js";
-import { baseCheckResult, postGithubDraft, readCheckOnBase } from "./sidecar/github.js";
+import { BRANCH_HEALTH_FEATURE_KEY, BRANCH_HEALTH_OFF_READ, baseCheckResult, postGithubDraft, readCheckOnBase, readDefaultBranchName } from "./sidecar/github.js";
 import { collectProjectBranchHealth } from "./routes-branch-health.js";
 import { NotAGitBranchError, type BranchHealthExec } from "./branch-health/index.js";
 import {
@@ -139,7 +139,15 @@ import {
   injectSessionScript,
   applySameOriginFramePolicy,
 } from "../shared/index.js";
-import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, recordHubUsage, resolveHubHome } from "../hub/index.js";
+import {
+  claimHubSessionHost,
+  HUB_SESSION_FEATURE,
+  hubLedgerPath,
+  hubSidecarDir,
+  recordHubUsage,
+  releaseHubSessionHost,
+  resolveHubHome,
+} from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -325,11 +333,13 @@ export function prepareReads(
     preview: typeof previewTaskRun;
     diagnose: typeof diagnoseTaskRun;
     queuePlan: typeof readQueuePlan;
+    runTargets: typeof resolveRunTargets;
   } = {
     resolve: resolveTaskRun,
     preview: previewTaskRun,
     diagnose: diagnoseTaskRun,
     queuePlan: readQueuePlan,
+    runTargets: resolveRunTargets,
   },
   workspaces?: SidecarWorkspaces,
 ): SpawnedReads {
@@ -341,10 +351,13 @@ export function prepareReads(
       const read = await reads.queuePlan(ctx, signal).catch(() => null);
       return read?.ok ? read.plan : null;
     },
-    async diagnose(runId, signal) {
-      const read = await reads.diagnose(ctx, runId, signal).catch(() => null);
+    async diagnose(runId, dir, signal) {
+      const read = await reads.diagnose(ctx, runId, dir, signal).catch(() => null);
       return read?.ok ? readDiagnosis(read.diagnosis) ?? null : null;
     },
+    // Runs (`?scope=repo`) and Live read these same worktrees and judge with the same mirror.
+    runTargets: () => reads.runTargets(ctx),
+    judgeRun: (target, run) => judgeRunInTarget(target, run, Date.now()),
     async resolve(taskId, signal) {
       const read = await reads.resolve(ctx, taskId, {}, signal).catch(() => null);
       return read?.ok ? readResolution(read.resolution) : null;
@@ -397,8 +410,17 @@ export function sidecarActions(
 ): SidecarActions {
   return {
     githubReadsAllowed: () => readSidecarSettings(ctx.projectDir).githubReads,
+    branchHealthEnabled: () => isFeatureEnabled(ctx.projectDir, BRANCH_HEALTH_FEATURE_KEY),
     async githubRead(read) {
-      if (read.kind === "check") return baseCheckResult(await readCheckOnBase(exec, ctx.projectDir, read.ref, read.base), read.ref, read.base);
+      if (read.kind === "check") {
+        const [run, defaultBranch] = await Promise.all([
+          readCheckOnBase(exec, ctx.projectDir, read.ref, read.base),
+          readDefaultBranchName(exec, ctx.projectDir),
+        ]);
+        return baseCheckResult(run, read.ref, read.base, defaultBranch);
+      }
+      // The same gate as GET /api/branch-health, also for a card approved before the feature was turned off.
+      if (!isFeatureEnabled(ctx.projectDir, BRANCH_HEALTH_FEATURE_KEY)) return { ok: false, text: BRANCH_HEALTH_OFF_READ };
       const health = await readWorktreeBranchHealth(ctx, workspaces, read.ref, true, exec);
       if (typeof health === "string") return { ok: false, text: `Nothing was read: ${health}.` };
       const { github, githubReason } = health.health;
@@ -790,6 +812,78 @@ function hubHostState(
   return state;
 }
 
+/** Whether `pathname` is one of the hub session's routes, `/api/sidecar/hub[/…]`. */
+export function isHubSidecarPath(pathname: string): boolean {
+  return pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`);
+}
+
+/** Releases already waiting on a hub turn, by host key, so repeated refusals share one. */
+const hubReleases = new Map<string, Promise<boolean>>();
+
+/**
+ * Give up the hub session host lock because web.sidecar is off on this
+ * server: its route gate refused a `/api/sidecar/hub/*` request, and the hub
+ * has moved on to another project. A hub turn still running here finishes
+ * first, and the lock stays held until it does, so no other host resumes
+ * the session under it. Released only if the feature is still off then.
+ *
+ * @returns true when this call removed the lock.
+ */
+export function releaseHubSessionHostForSidecarOff(ctx: ServerContext, opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> = {}): Promise<boolean> {
+  if (!ctx.port) return Promise.resolve(false);
+  const port = ctx.port;
+  const home = resolveHubHome(opts.homeDir);
+  const pid = opts.pid ?? process.pid;
+  const key = `${hubSidecarDir(home)}\0${pid}`;
+  const pending = hubReleases.get(key);
+  if (pending) return pending;
+  const release = (async () => {
+    await hubHosts.get(key)?.registry.whenIdle();
+    if (isFeatureEnabled(ctx.projectDir, HUB_SESSION_FEATURE)) return false;
+    return releaseHubSessionHost(home, { pid, port });
+  })().finally(() => hubReleases.delete(key));
+  hubReleases.set(key, release);
+  return release;
+}
+
+/** Host keys whose server is shutting down: their hub session routes refuse, so nothing claims the lock again or starts a turn. */
+const hubShuttingDown = new Set<string>();
+
+/** How long shutdown waits for an interrupted hub turn to settle before it leaves the lock to dead-pid takeover. */
+export const HUB_SHUTDOWN_TURN_WAIT_MS = 5_000;
+
+/**
+ * Give up the hub session host lock on shutdown. Hub session routes on this
+ * server refuse from now on; its running hub turns are interrupted, and the
+ * lock goes only once they have settled, so no other host resumes the
+ * session while a turn here still writes it. A turn that outlasts `waitMs`
+ * keeps the lock, which the next host takes once this process has exited.
+ * A lock another server holds is left alone.
+ *
+ * @returns true when this call removed the lock.
+ */
+export async function releaseHubSessionHostOnShutdown(
+  port: number,
+  opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> & { waitMs?: number } = {},
+): Promise<boolean> {
+  const home = resolveHubHome(opts.homeDir);
+  const pid = opts.pid ?? process.pid;
+  const key = `${hubSidecarDir(home)}\0${pid}`;
+  hubShuttingDown.add(key);
+  const registry = hubHosts.get(key)?.registry;
+  if (registry) {
+    await registry.interruptAll();
+    let timer: NodeJS.Timeout | undefined;
+    const settled = await Promise.race([
+      registry.whenIdle().then(() => true),
+      new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), opts.waitMs ?? HUB_SHUTDOWN_TURN_WAIT_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (!settled) return false;
+  }
+  return releaseHubSessionHost(home, { pid, port });
+}
+
 /**
  * Where the drawer page reaches the hub session, and what it posts to close.
  * Mirrored by `HubSessionPageConfig` in viewer/hooks/use-hub-session.ts.
@@ -996,6 +1090,7 @@ async function handleHubSidecarRoute(
   const home = resolveHubHome(opts.homeDir);
   const dir = hubSidecarDir(home);
   const pid = opts.pid ?? process.pid;
+  if (hubShuttingDown.has(`${dir}\0${pid}`)) return refuse(res, 503, "This server is shutting down; the hub session moves to another project server");
   const claim = claimHubSessionHost(home, { pid, port: ctx.port, ...(opts.isAlive && { isAlive: opts.isAlive }) });
 
   if (!claim.held) {
@@ -1043,7 +1138,7 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`)) {
+  if (isHubSidecarPath(pathname)) {
     return handleHubSidecarRoute(req, res, ctx, broadcast, opts.hub, pathname, search);
   }
   if (
@@ -1142,7 +1237,7 @@ export async function handleSidecarRoute(
     broadcast,
     actions: () => (opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces })),
     create: (body) => createWorktreeSession(registry, ctx.projectDir, body),
-    readPlacementEdit: (change, edits) => readPlacementEdit(ctx.rexDir, change, edits),
+    readPlacementEdit: (placement, edits, reviewed) => readPlacementEdit(ctx.rexDir, placement, edits, reviewed),
   });
 }
 
@@ -1220,7 +1315,7 @@ interface SessionRouteScope {
   /** The one lens this scope's sessions run; a PATCH to another, or to a target, is refused. */
   lens?: string;
   /** Dry-runs an edited placement; absent where no placement card is offered (the hub). */
-  readPlacementEdit?: (change: string, edits: unknown) => ReturnType<typeof readPlacementEdit>;
+  readPlacementEdit?: (placement: Parameters<typeof readPlacementEdit>[1], edits: unknown, reviewed: unknown) => ReturnType<typeof readPlacementEdit>;
 }
 
 /** The `name` and `model` fields of a create body, each a non-empty string when present. */
@@ -1376,12 +1471,12 @@ async function handleSessionRoutes(
       }
       if (body.lane !== undefined && typeof body.lane !== "number") return refuse(res, 400, `"lane" must be a number`);
       if (body.path !== undefined && typeof body.path !== "string") return refuse(res, 400, `"path" must be a string`);
-      // A placement card's edit is a placement: dry-run it before the card is touched.
+      // A placement card's edit is a placement: dry-run it, against the dry run the operator reviewed, before the card is touched.
       const waiting = broker.cards(id).find((c) => c.id === cardId);
-      let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, string> | undefined;
+      let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, PlacementEditRefusal> | undefined;
       if (body.edits !== undefined && body.decision === "approve" && waiting?.placement && scope.readPlacementEdit) {
-        const read = await scope.readPlacementEdit(waiting.placement.change, body.edits);
-        if (typeof read === "string") return refuse(res, 400, read);
+        const read = await scope.readPlacementEdit(waiting.placement, body.edits, body.reviewed);
+        if ("error" in read) return refuse(res, read.status, read.error);
         placementEdit = read;
       }
       try {

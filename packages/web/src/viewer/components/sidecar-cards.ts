@@ -35,7 +35,7 @@ import { useCliName } from "../hooks/sidecar.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/sidecar.js";
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
 import { CopyTextButton } from "./copy-text-button.js";
-import { PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
+import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
 
 /** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
 export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
@@ -493,7 +493,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
       ]
     : card.placement
       ? [
-          h(PlacementBody, { card, editable, onEdit: onPlacementEdit }),
+          h(PlacementBody, { card, editable, onEdit: onPlacementEdit, edit: placementEdit }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
     : card.runPlan
@@ -617,8 +617,15 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
+      // An edited placement goes with the dry run the operator read, so the server writes nothing if the PRD moved since.
       if (decision.approve && first.placement && placementEdit?.cardId === first.id) {
-        await decide(first.id, { ...decision, edits: placementEdit.body });
+        const settled = await decide(first.id, { ...decision, edits: placementEdit.body, ...(placementEdit.check && { reviewed: placementEdit.check }) });
+        // A refusal (the PRD moved since the line was read) leaves the card waiting: read the line again so Place cannot repeat it.
+        if (!settled) {
+          const mine = placementEdit;
+          const check = await checkPlacementRequest(first.placement.change, mine.body);
+          setPlacementEdit((current) => (current === mine ? { ...mine, check } : current));
+        }
         return;
       }
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];

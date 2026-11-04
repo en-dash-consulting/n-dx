@@ -190,6 +190,8 @@ export interface SidecarCardDecision {
   remember?: boolean;
   /** A change-set approval's item edits; the approval writes the edited values. */
   edits?: SidecarChangeSetEdit[] | PlacementEditBody;
+  /** A placement edit's dry run as the operator reviewed it; the server refuses the approval when its re-check moved from it. */
+  reviewed?: SidecarPlacementCheck;
   /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
   lane?: number;
   /** A draft-file approval's path as edited on the card; the draft is saved there. */
@@ -469,8 +471,8 @@ export interface SidecarState {
    * `unavailable` when the manifest could not be read (read once per page load).
    */
   commandManifest: SidecarCommandManifest | "loading" | "unavailable" | null;
-  /** Decide the open session's first waiting card. */
-  decide: (cardId: string, decision: SidecarCardDecision) => Promise<void>;
+  /** Decide the open session's first waiting card; false when the server refused the decision. */
+  decide: (cardId: string, decision: SidecarCardDecision) => Promise<boolean>;
   lastTurn: SidecarTurnEnd | null;
   error: string | null;
   /** The agent the picker shows: the open session's, else the one the first prompt will create. */
@@ -777,9 +779,9 @@ export function useSidecar(
     });
   }, [enabled, open, asks, syncKey, openId, wantLens, wantRef, heldLens, heldRef]);
 
-  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision) => {
+  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision): Promise<boolean> => {
     const id = tailRef.current.sessionId;
-    if (!id) return;
+    if (!id) return false;
     const reason = decision.reason?.trim();
     const res = await postJson<{ card: SidecarCard }>(
       `${sessionsPath()}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
@@ -789,16 +791,18 @@ export function useSidecar(
         ...(decision.remember && { remember: true }),
         // An empty list of change-set edits is no edit; a placement's edit is one object.
         ...(decision.approve && decision.edits && (!Array.isArray(decision.edits) || decision.edits.length > 0) && { edits: decision.edits }),
+        ...(decision.approve && decision.reviewed && { reviewed: decision.reviewed }),
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
         ...(decision.approve && decision.path !== undefined && { path: decision.path }),
       },
     );
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return res.ok;
     setError(res.ok ? null : res.error);
     // The settle is also announced on the socket; reading before returning
     // keeps the card from looking undecided until that arrives, so a second
     // ⌘↵ in the meantime cannot answer the same card again.
     await fetchWaiting();
+    return res.ok;
   }, [fetchWaiting]);
 
   const openSession = useCallback(async (id: string): Promise<boolean> => {

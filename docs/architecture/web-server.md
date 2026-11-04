@@ -171,13 +171,22 @@ verdict (`RunRecord.diagnosis`), the review's unrepaired findings and the
 run's last events, each read from disk in `sidecar/packet-sources.ts`; web
 still imports nothing from hench.
 
+The newest run is the task's newest in any worktree of the repository: the
+packet reads the worktrees Runs (`?scope=repo`) and Live read
+(`resolveRunTargets`, injected as `SpawnedReads.runTargets`), and the run
+section names the worktree. A record at `running` is judged with Live's
+liveness mirror (`judgeRunInTarget`, as `SpawnedReads.judgeRun`).
+
 A run from a hench that predates the classifier records no verdict. When the
 newest run has ended without completing, the verdict comes from
-`hench runs diagnose <id> --format=json`, spawned through `SpawnedReads`
-(`diagnoseTaskRun` in `routes-hench-prep.ts`, beside the resolve and preview
-spawns) and named as the section's provenance. A failed or timed-out spawn
-leaves a gap naming the command; a running or completed run is never
-classified. The verdict section also lists the failed run's settings (`model`
+`hench runs diagnose <id> --format=json <worktree>`, spawned in the run's
+worktree through `SpawnedReads` (`diagnoseTaskRun` in `routes-hench-prep.ts`,
+beside the resolve and preview spawns) and named as the section's
+provenance. A failed or timed-out spawn leaves a gap naming the command. A
+running record whose process is gone (`orphaned`) has ended too: it is
+classified, and the verdict section says it is recorded as running and that
+ending it from Live records the end. A completed run, or a running one whose
+process may be alive, is never classified. The verdict section also lists the failed run's settings (`model`
 when a flag chose it, `review` and `reviewModel` when it had a review plan; a
 pair review repeats as `reviewMode: "pair"` with its `reviewVendor`) for the
 model to pass to `start_work` on a re-run or `--fresh`. The spawned verdict
@@ -199,7 +208,11 @@ user's local config; the shared config's `true` applies only in a trusted
 checkout (`network-reads` trust finding). The packet runs gh
 only under it; `github_read` runs without a card under it and raises a
 network-read card otherwise. `github_read` is `per-project` in the broker
-policy, so an allow-list rule for it is ignored. `draft_github_post` is never
+policy, so an allow-list rule for it is ignored. A `pr` read also sits behind
+`git.branchHealth`: while it is off the broker answers "Nothing was read" before
+raising a card. A `check` read names the class "failing on main" only when its
+base is origin's default branch, else "failing on the base (<base>)".
+`draft_github_post` is never
 allowed without its card: Approve posts the card's own input under the
 operator's gh login (`gh pr comment` or `gh pr review --comment`, body on
 stdin); Copy and Discard deny it.
@@ -213,6 +226,11 @@ picks. That is the holder of `<ndx home>/hub/sidecar/host.lock` (pid and port)
 while it is healthy, else the first healthy registered project, skipping one
 the proxy just failed to reach until its next health check. All session state
 is under `<ndx home>/hub/sidecar/`, so a new host resumes it from disk. The
+holder gives the lock up once any hub turn running on it has settled: on
+graceful shutdown (after interrupting the turn, waiting at most 5 s, and
+refusing new hub requests meanwhile), and when its web.sidecar gate refuses a
+hub session route. A crashed holder, or one whose turn outlasts the wait, is
+replaced as a dead pid. The
 path mapping and the lock's location are in `src/shared/base-path.ts`, which
 the host's routes (`server/routes-sidecar.ts`) read too. The hub judges the
 browser's credential and forwards the per-user token to the host, as it does
@@ -253,6 +271,9 @@ The hub session's broker is scoped (`BROKER_SCOPE_TOOLS` in
 - `save_draft` writes nothing before Approve. The card shows the absolute path
   (a relative one lands in `<ndx home>/hub/drafts/`), the operator can change
   it, an existing file is never overwritten, and it is never allow-listable.
+  A path is refused when any segment, or any segment of its nearest existing
+  ancestor's real path, is `.git` compared case-insensitively after an NTFS
+  stream suffix and trailing dots and spaces are stripped.
 
 ## Sidecar Guide and the run-plan card
 

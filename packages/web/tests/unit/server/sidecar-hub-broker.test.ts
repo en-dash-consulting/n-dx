@@ -7,7 +7,7 @@
  * offered at all.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -71,6 +71,7 @@ function spyActions(): SidecarActions & { ran: Array<{ argv: string[]; project?:
     writePlacement: async () => refused,
     readRunPlan: async () => "no",
     githubReadsAllowed: () => false,
+    branchHealthEnabled: () => false,
     githubRead: async () => refused,
     postGithub: async (draft) => { posted.push(draft); return { ok: true, text: "posted" }; },
     projectRepoRoot: async (project) => (project === "app" ? { ok: true, repoRoot: "/r/app" } : { ok: false, error: `the hub has no project "${project}"` }),
@@ -349,6 +350,17 @@ describe("hub save_draft", () => {
     await vi.waitFor(() => expect(raised).toHaveLength(1));
     expect(() => broker.decide("s1", raised[0]!.id, { approve: true, path: "../x.md" })).toThrow(BrokerDecisionError);
     expect(() => broker.decide("s1", raised[0]!.id, { approve: false, path: "ok.md" })).toThrow(BrokerDecisionError);
+    mkdirSync(join(root, "repo", ".git", "hooks"), { recursive: true });
+    symlinkSync(join(root, "repo", ".git"), join(root, "innocent"), "junction");
+    for (const path of [
+      join(root, "repo", ".GIT", "hooks", "pre-commit"),
+      join(root, "repo", ".git.", "hooks", "pre-commit"),
+      join(root, "repo", ".git ", "hooks", "pre-commit"),
+      join(root, "innocent", "hooks", "pre-commit"),
+    ]) {
+      expect(() => broker.decide("s1", raised[0]!.id, { approve: true, path })).toThrow(BrokerDecisionError);
+    }
+    expect(existsSync(join(root, "repo", ".git", "hooks", "pre-commit"))).toBe(false);
     broker.decide("s1", raised[0]!.id, { approve: false });
     await held;
 

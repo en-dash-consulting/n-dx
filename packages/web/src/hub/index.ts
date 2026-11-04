@@ -102,6 +102,7 @@ export {
   hubSidecarDir,
   hubLedgerPath,
   readHubSessionHostLock,
+  releaseHubSessionHost,
 } from "./session-host.js";
 export type { ClaimHubSessionHostInput, HubLensProbeOptions, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";
 export { hubUsagePath, recordHubUsage, readHubUsageTotals } from "./usage-ledger.js";

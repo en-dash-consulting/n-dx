@@ -284,6 +284,8 @@ export class SidecarSessionRegistry {
   private readonly stopRequested = new Set<string>();
   /** One per running turn; a stop or an end aborts it, so a packet still building stops its reads. */
   private readonly turnAborts = new Map<string, AbortController>();
+  /** Callers of {@link whenIdle}, woken whenever a turn settles. */
+  private idleWaiters: Array<() => void> = [];
   private readonly records = new Map<string, SidecarSessionRecord>();
   private readonly live = new Map<string, LiveSession>();
   /** Sessions whose cursor has been checked against the transcript; see {@link reconcileCursor}. */
@@ -393,6 +395,9 @@ export class SidecarSessionRegistry {
       this.turnOpen.delete(id);
       this.turnAborts.delete(id);
       this.stopRequested.delete(id);
+      const waiters = this.idleWaiters;
+      this.idleWaiters = [];
+      for (const wake of waiters) wake();
     }
   }
 
@@ -559,6 +564,13 @@ export class SidecarSessionRegistry {
     return this.turnOpen.has(id);
   }
 
+  /** Settles once no session has a turn running; at once when none has. */
+  async whenIdle(): Promise<void> {
+    while (this.turnOpen.size > 0) {
+      await new Promise<void>((resolve) => this.idleWaiters.push(resolve));
+    }
+  }
+
   /**
    * Stop the running turn; the session stays usable and its next turn
    * resumes. The turn settles as `interrupted`.
@@ -573,6 +585,11 @@ export class SidecarSessionRegistry {
     else this.stopRequested.add(id);
     this.turnAborts.get(id)?.abort();
     return true;
+  }
+
+  /** {@link interrupt} every session's running turn. */
+  async interruptAll(): Promise<void> {
+    await Promise.all([...this.turnOpen].map((id) => this.interrupt(id)));
   }
 
   /** Stop any running turn; the session keeps its record and transcript but never resumes. */

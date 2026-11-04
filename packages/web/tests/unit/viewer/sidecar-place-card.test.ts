@@ -86,7 +86,7 @@ afterEach(async () => {
 
 const settle = (ms = 0) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 
-async function draw(card: SidecarCard, decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => {})) {
+async function draw(card: SidecarCard, decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => true)) {
   host = document.createElement("div");
   document.body.appendChild(host);
   await act(async () => { render(h(SidecarCards, { cards: [card], manifest: null, decide }), host!); });
@@ -200,7 +200,12 @@ describe("placement card", () => {
     expect(checks.at(-1)).toEqual(edited);
     expect(button(el, "sidecar-card-approve").disabled).toBe(false);
     await click(button(el, "sidecar-card-approve"));
-    expect(decide).toHaveBeenCalledWith("p1", { approve: true, edits: edited });
+    // The dry run the operator read goes with it, so the server can refuse a PRD that moved since.
+    expect(decide).toHaveBeenCalledWith("p1", {
+      approve: true,
+      edits: edited,
+      reviewed: { ok: true, action: "place", target: "cap-pay", title: "Pay by card", relation: "amends", base: "4f1c9", warnings: [] },
+    });
   });
 
   it("proposing a new node takes a type, an area and a title, and sends them as a propose body", async () => {
@@ -219,7 +224,45 @@ describe("placement card", () => {
     await recheck();
     expect(checks.at(-1)).toEqual({ propose: { type: "capability", under: "area-pay", title: "Retry a declined card" } });
     await click(button(el, "sidecar-card-approve"));
-    expect(decide).toHaveBeenCalledWith("p1", { approve: true, edits: { propose: { type: "capability", under: "area-pay", title: "Retry a declined card" } } });
+    expect(decide).toHaveBeenCalledWith("p1", {
+      approve: true,
+      edits: { propose: { type: "capability", under: "area-pay", title: "Retry a declined card" } },
+      reviewed: { ok: true, action: "propose", type: "capability", under: "area-pay", title: "Retry a declined card", warnings: [] },
+    });
+  });
+
+  it("a refused approval re-reads the dry run, so the line follows the PRD and Place cannot repeat the refusal", async () => {
+    const decide = vi.fn(async () => false);
+    const { el } = await draw(placementCard(), decide);
+    await click(q(el, 'input[name="place-p1-relation"][value="amends"]'));
+    await recheck();
+    expect(q(el, ".sidecar-place-check").textContent).toContain("Applies cleanly");
+    // The target's spec moves, and the target is now refused outright.
+    answerCheck = () => ({ ok: false, kind: "not-a-target", error: "the node was removed" });
+    const before = checks.length;
+    await click(button(el, "sidecar-card-approve"));
+    await settle();
+    expect(decide).toHaveBeenCalledTimes(1);
+    expect(checks.length).toBe(before + 1);
+    expect(q(el, ".sidecar-place-check").textContent).toBe("Rex refuses this placement (not-a-target): the node was removed");
+    expect(button(el, "sidecar-card-approve").disabled).toBe(true);
+  });
+
+  it("an edit that keeps the card's target and relation is not decidable once the card's spec moved", async () => {
+    // The card was raised on spec aaaa1; rex's re-check of the edit now reads 4f1c9.
+    const card = placementCard({
+      placement: {
+        ...placement,
+        request: { action: "place", target: "cap-pay", relation: "amends", proposed: "Pay by card." },
+        check: { ok: true, action: "place", target: "cap-pay", title: "Pay by card", relation: "amends", base: "aaaa1", warnings: [] },
+      },
+    });
+    const { el } = await draw(card);
+    await type(q(el, ".sidecar-place-statement"), "Shoppers pay by card.");
+    await recheck();
+    expect(q(el, ".sidecar-place-check").textContent).toContain("Applies cleanly");
+    expect(q(el, ".sidecar-place-check.is-refused").textContent).toContain("raise a new card");
+    expect(button(el, "sidecar-card-approve").disabled).toBe(true);
   });
 
   it("a refusal for the edited placement keeps Place disabled and shows rex's kind", async () => {
@@ -275,7 +318,7 @@ describe("placement card", () => {
       }
       return url.endsWith("/placement") ? json(SHORTLIST) : json(PRODUCT);
     }));
-    const decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => {});
+    const decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => true);
     const second = placementCard({ id: "p2", raisedAt: "2026-11-02T00:00:02.000Z" });
     host = document.createElement("div");
     document.body.appendChild(host);

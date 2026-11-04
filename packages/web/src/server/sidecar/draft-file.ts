@@ -5,12 +5,17 @@
  * Nothing is written before Approve. The card shows the path and lets the
  * operator change it; a relative path lands under the hub's drafts directory.
  * An existing file is never overwritten, and a path inside a `.git`
- * directory is refused.
+ * directory is refused: a segment counts as `.git` compared case-insensitively
+ * after an NTFS stream suffix and trailing dots and spaces are stripped
+ * (`.GIT`, `.git.`, `.git ` and `.git::$INDEX_ALLOCATION` name the same
+ * directory on NTFS, and `.GIT` on default APFS), and the nearest existing
+ * ancestor's real path is checked the same way, so a symlink or an 8.3 short
+ * name into `.git` is refused too.
  *
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3, §7.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { errorMessage } from "../response-utils.js";
 import type { CarryOutResult } from "./carry-out.js";
@@ -27,11 +32,38 @@ export function resolveDraftPath(path: unknown, draftsDir: string): { ok: true; 
   if (typeof path !== "string" || path.trim() === "") return { ok: false, error: "a draft's path must be a non-empty string" };
   if (path.includes("\0")) return { ok: false, error: "a draft's path cannot hold a NUL character" };
   const full = resolve(draftsDir, path.trim());
-  if (full.split(sep).includes(".git")) return { ok: false, error: "a draft is never saved inside a .git directory" };
+  if (hasGitSegment(full)) return { ok: false, error: GIT_REFUSAL };
+  const real = realAncestor(full);
+  if (!real.ok) return real;
+  if (hasGitSegment(real.path)) return { ok: false, error: `${GIT_REFUSAL} (${full} resolves to ${real.path})` };
   if (!isAbsolute(path.trim()) && full !== draftsDir && !full.startsWith(draftsDir + sep)) {
     return { ok: false, error: `a relative path stays under ${draftsDir}; give an absolute path to save elsewhere` };
   }
   return { ok: true, path: full };
+}
+
+const GIT_REFUSAL = "a draft is never saved inside a .git directory";
+
+/**
+ * Whether any segment of `path` names `.git` as NTFS or a case-insensitive APFS
+ * would read it: case folded, an NTFS stream suffix (`.git::$INDEX_ALLOCATION`)
+ * dropped, then trailing dots and spaces stripped.
+ */
+function hasGitSegment(path: string): boolean {
+  return path.split(/[\\/]/).some((segment) => segment.replace(/:.*$/, "").replace(/[. ]+$/, "").toLowerCase() === ".git");
+}
+
+/** The real path of `path`'s nearest existing ancestor (or `path` itself), symlinks and short names resolved. */
+function realAncestor(path: string): { ok: true; path: string } | { ok: false; error: string } {
+  for (let current = path; ; current = dirname(current)) {
+    try {
+      return { ok: true, path: realpathSync.native(current) };
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      const missing = code === "ENOENT" || code === "ENOTDIR";
+      if (!missing || dirname(current) === current) return { ok: false, error: `cannot check where ${path} leads: ${errorMessage(err)}` };
+    }
+  }
 }
 
 /** Write `content` to the approved `path`; refuses a file that exists. Never throws. */

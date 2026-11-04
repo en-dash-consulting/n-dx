@@ -1,5 +1,23 @@
 schema: "rex/v2"
 items:
+  "1240c8fa-201e-4663-9f91-384aadd9402f":
+    status: "completed"
+    startedAt: "2026-11-04T19:30:47.366Z"
+    completedAt: "2026-11-04T20:03:53.337Z"
+    endedAt: "2026-11-04T20:03:53.337Z"
+    activeIntervals: [{"end":"2026-11-04T20:03:01.281Z","start":"2026-11-04T19:30:47.366Z"},{"end":"2026-11-04T20:03:53.337Z","start":"2026-11-04T20:03:53.337Z"}]
+    lastModified: "2026-11-04T20:03:53.337Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21c2ba30-9be8-46b1-96ac-2531c0dd753b":
+    status: "completed"
+    startedAt: "2026-11-04T20:04:20.222Z"
+    completedAt: "2026-11-04T20:25:49.792Z"
+    endedAt: "2026-11-04T20:25:49.792Z"
+    activeIntervals: [{"end":"2026-11-04T20:25:49.792Z","start":"2026-11-04T20:04:20.222Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Shutdown refuses hub routes (503), interrupts hub turns, releases the lock only after whenIdle (5 s bound; else lock kept for dead-pid takeover)."
+    lastModified: "2026-11-04T20:25:49.792Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "255ac873-9d63-4e5f-988a-9955cf807a00":
     status: "completed"
     startedAt: "2026-11-02T23:35:12.119Z"
@@ -28,6 +46,16 @@ items:
     resolutionDetail: "Hub marks a host that answers 403 with x-ndx-feature-disabled: web.sidecar and skips it; refusal naming web.sidecar when all healthy projects are skipped. Tests in hub-session-proxy.test.ts."
     lastModified: "2026-11-03T00:20:08.452Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4704cdf5-d927-44d5-aea8-0147a5bce9f1":
+    status: "completed"
+    startedAt: "2026-11-04T20:26:16.726Z"
+    completedAt: "2026-11-04T20:36:49.938Z"
+    endedAt: "2026-11-04T20:36:49.938Z"
+    activeIntervals: [{"end":"2026-11-04T20:36:49.938Z","start":"2026-11-04T20:26:16.726Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "resolveDraftPath refuses .git segments case-insensitively after stripping trailing dots/spaces, and checks the nearest existing ancestor's realpathSync.native path; unit + broker tests cover .GIT, .git., '.git ', symlink into .git."
+    lastModified: "2026-11-04T20:36:49.938Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "702e743b-b4b4-4956-b7c3-9672a024963f":
     status: "completed"
     startedAt: "2026-11-03T01:37:44.731Z"
@@ -40,7 +68,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73f42fbb-cc9b-4c44-8798-06959e234fe2":
     issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
-    lastModified: "2026-11-03T22:05:30.695Z"
+    lastModified: "2026-11-04T19:54:07.024Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "771fdf69-d81a-483e-8108-7d1c1be810cb":
     status: "completed"
@@ -61,6 +89,16 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "routes-sidecar-hub.test.ts: fake Claude honours a HANG prompt; new test lists tools over the hub mcp route and asserts exactly the four hub tools. Verified it fails with brokerScope removed."
     lastModified: "2026-11-03T01:37:39.192Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8981254d-f128-4a04-9b3a-fc06ca075754":
+    status: "completed"
+    startedAt: "2026-11-04T19:12:38.424Z"
+    completedAt: "2026-11-04T19:29:54.871Z"
+    endedAt: "2026-11-04T19:29:54.871Z"
+    activeIntervals: [{"end":"2026-11-04T19:29:54.871Z","start":"2026-11-04T19:12:38.424Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "decideProxy's hub-session branch drops ndx_ticket as well as ndx_token; unit + integration tests added."
+    lastModified: "2026-11-04T19:29:54.871Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
     status: "completed"
