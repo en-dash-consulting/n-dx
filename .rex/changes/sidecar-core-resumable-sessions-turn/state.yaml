@@ -72,6 +72,16 @@ items:
     activeIntervals: [{"end":"2026-10-27T16:34:43.963Z","start":"2026-10-27T16:26:39.443Z"}]
     lastModified: "2026-10-27T16:34:43.963Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "653be274-7cc8-4bcc-81c7-997c470a708a":
+    status: "completed"
+    startedAt: "2026-11-04T20:37:52.744Z"
+    completedAt: "2026-11-04T20:53:16.288Z"
+    endedAt: "2026-11-04T20:53:16.288Z"
+    activeIntervals: [{"end":"2026-11-04T20:53:16.288Z","start":"2026-11-04T20:37:52.744Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-sidecar.ts compares canonical paths (realpathSync.native, fallback resolve) via heldBy for session lookup and list; symlink route test added."
+    lastModified: "2026-11-04T20:53:16.288Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6a764d20-2e7a-4fe3-9c16-47e29fb658cc":
     status: "completed"
     startedAt: "2026-10-27T16:22:17.381Z"
@@ -112,7 +122,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9753d37a-2e7e-4950-8eba-3015eee08734":
     issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]
-    lastModified: "2026-10-28T21:46:02.767Z"
+    lastModified: "2026-11-04T19:04:13.946Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9e47fb80-238b-4cff-a0df-254bce7a8da1":
     status: "completed"
@@ -157,6 +167,26 @@ items:
     endedAt: "2026-10-28T04:34:54.908Z"
     activeIntervals: [{"end":"2026-10-28T04:28:15.354Z","start":"2026-10-28T04:14:29.686Z"},{"end":"2026-10-28T04:34:54.908Z","start":"2026-10-28T04:34:54.908Z"}]
     lastModified: "2026-10-28T04:34:54.908Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b054ee8e-054a-4e91-bda8-36d8aceff063":
+    status: "completed"
+    startedAt: "2026-11-04T20:01:20.545Z"
+    completedAt: "2026-11-04T20:22:17.303Z"
+    endedAt: "2026-11-04T20:22:17.303Z"
+    activeIntervals: [{"end":"2026-11-04T20:22:17.303Z","start":"2026-11-04T20:01:20.545Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "POST /api/sidecar/sessions refuses vendor codex (400, CODEX_SIDECAR_UNAVAILABLE, no record); turns on an indexed Codex session refused (409, same reason, no spawn); driver + spawn-policy comments corrected to point at 31307b89; route tests cover both."
+    lastModified: "2026-11-04T20:22:17.303Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b9161bd9-3d30-46d4-b54b-bd9b1e81f544":
+    status: "completed"
+    startedAt: "2026-11-04T20:22:45.107Z"
+    completedAt: "2026-11-04T20:31:27.302Z"
+    endedAt: "2026-11-04T20:31:27.302Z"
+    activeIntervals: [{"end":"2026-11-04T20:31:27.302Z","start":"2026-11-04T20:22:45.107Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "broker-policy.ts: run_command allow-list inverted to an explicit READ_ONLY_COMMAND_PREFIXES list (ndx status/usage, git status/log/diff/show) matched token-for-token from argv[0]; git --output rejected. Old on-disk rules drop on read via existing re-validation."
+    lastModified: "2026-11-04T20:31:27.302Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e18b93c0-a4b0-4f46-b4d9-9ce2d4ef0d6c":
     status: "completed"

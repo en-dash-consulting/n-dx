@@ -19,8 +19,12 @@
  * call held 65 s returns normally. Not yet verified: a card held for many
  * minutes on the Streamable HTTP transport.
  *
- * **Codex.** A read-only sandbox that never asks for approval. A resumed
- * thread keeps the policy it started with.
+ * **Codex.** A read-only sandbox that never asks for approval — on the first
+ * turn only. `codex exec resume` takes sandbox and approval policy from the
+ * invocation's config, not the thread, and the resume argv carries no policy
+ * flags, so a resumed turn runs under the user's `~/.codex/config.toml`. The
+ * routes refuse Codex sessions until resume re-applies this policy (PRD item
+ * 31307b89).
  */
 
 import { chmodSync, writeFileSync } from "node:fs";

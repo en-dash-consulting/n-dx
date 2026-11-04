@@ -273,6 +273,40 @@ describe("Explain", () => {
     expect(deleted.text).not.toContain("[met]");
   });
 
+  it("constraint: states its statement, requirements, appliesTo and derived status, not the v1 item view", async () => {
+    const sources = await sourcesFor("v2");
+    const tree = (await sources.prd())!.tree;
+    const area = indexTree(tree).resolve(AREA)!;
+    area.children = [
+      ...(area.children ?? []),
+      {
+        id: "d0000000-0000-4000-8000-000000000009",
+        slug: "no-card-storage",
+        displayId: "K1",
+        type: "constraint",
+        title: "No card storage",
+        statement: "Card numbers are never stored.",
+        appliesTo: "all",
+        requirements: [
+          {
+            id: "d0000000-0000-4000-8000-00000000000a",
+            title: "Tokenise at the edge",
+            description: "Only provider tokens reach our database.",
+            category: "security",
+            validationType: "manual",
+            acceptanceCriteria: [],
+          },
+        ],
+      } as never,
+    ];
+    const packet = await buildExplainPacket(sources, { ref: "d0000000-0000-4000-8000-000000000009" }, NOW);
+    expect(packet.text).not.toContain("Done when (acceptance criteria");
+    expect(packet.text).toContain("Statement: Card numbers are never stored.");
+    expect(packet.text).toContain("Tokenise at the edge");
+    expect(packet.text).toContain("Derived status and health");
+    expect(packet.text).toMatchSnapshot();
+  });
+
   it("zone: carries the zone's summary, metrics, entry points and insights", async () => {
     const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: "pay" }, NOW);
     expect(packet.text).toContain("pay (Payments)");
@@ -392,12 +426,14 @@ describe("Describe", () => {
     expect(text).toContain("## Task");
   });
 
-  it("tells the agent to flag vague done-when and propose tightened ones through a change-set card", async () => {
+  it("tells the agent to flag vague done-when and give tightened wording as text, not a change set", async () => {
     const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
     expect(text).toContain(DESCRIBE_INSTRUCTIONS);
     expect(DESCRIBE_INSTRUCTIONS).toMatch(/flag any that is vague/);
-    expect(DESCRIBE_INSTRUCTIONS).toContain("propose_prd_change");
-    expect(DESCRIBE_INSTRUCTIONS).toContain("change-set card");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("quote it and give the tightened wording in your reply");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("`rex update` or the item editor");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("Do not call `propose_prd_change` for an existing task");
+    expect(DESCRIBE_INSTRUCTIONS).not.toContain("change-set card");
   });
 
   it("names each refusal and marks an unanswered resolve as unavailable", async () => {
