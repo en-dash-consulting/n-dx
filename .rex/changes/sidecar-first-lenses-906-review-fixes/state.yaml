@@ -10,9 +10,12 @@ items:
     lastModified: "2026-11-04T20:08:53.392Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adafce1f-9a8f-4308-8ad3-34a2550f7479":
+    status: "completed"
     startedAt: "2026-11-04T20:03:26.278Z"
-    activeIntervals: [{"end":"2026-11-04T20:22:17.818Z","start":"2026-11-04T20:03:26.278Z"}]
-    lastModified: "2026-11-04T20:22:22.340Z"
+    completedAt: "2026-11-04T20:53:45.834Z"
+    endedAt: "2026-11-04T20:53:45.834Z"
+    activeIntervals: [{"end":"2026-11-04T20:22:17.818Z","start":"2026-11-04T20:03:26.278Z"},{"end":"2026-11-04T20:53:45.834Z","start":"2026-11-04T20:53:45.834Z"}]
+    lastModified: "2026-11-04T20:53:45.834Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b3ab2240-ea5d-4c04-80c4-e86d3d22c9f1":
     lastModified: "2026-11-04T19:11:00.873Z"
