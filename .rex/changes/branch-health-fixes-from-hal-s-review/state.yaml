@@ -1,7 +1,10 @@
 schema: "rex/v2"
 items:
   "5af6db8a-4de4-416a-9a0c-3ad31e638a9c":
-    lastModified: "2026-11-04T19:25:48.384Z"
+    status: "in_progress"
+    startedAt: "2026-11-04T22:27:08.802Z"
+    activeIntervals: [{"start":"2026-11-04T22:27:08.802Z"}]
+    lastModified: "2026-11-04T22:27:09.359Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6ded6a40-3201-4a0f-ba10-7c3653cbeddb":
     issues: ["https://github.com/en-dash-consulting/n-dx/pull/930#pullrequestreview-5770574908"]

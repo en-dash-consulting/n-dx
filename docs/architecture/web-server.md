@@ -275,8 +275,9 @@ is on; the route gate refuses it with 403 while the toggle is off.
   merges in the object store and returns the conflicted paths with their index
   stages. It leaves the worktree, the index and HEAD untouched, so a `GET` that
   predicts a merge stays read-only where it matters; the only trace is
-  unreferenced objects that `git gc` collects. A git older than 2.38 cannot do
-  this, and the answer says so in `conflictsUnavailable`.
+  unreferenced objects that `git gc` collects. When merge-tree gives no
+  prediction, `conflictsUnavailable` says why: a timeout as a timeout, and the
+  git 2.38 hint only when git exits 129 or its stderr names `--write-tree`.
 - **Each conflict is classified, with a fix a person runs.**
   `branch-health/conflicts.ts` is a pure function over each file's stages and
   the diff3-style conflicted result merge-tree wrote, plus the project config:
@@ -313,8 +314,10 @@ is on; the route gate refuses it with 403 while the toggle is off.
   way on mount and adds `?github=1` when a card's strip is first expanded, so
   opening a board of many worktrees runs no gh command. A GitHub read
   remembers each PR base it finds, per worktree and branch, in the server's
-  memory; later local-only answers use it for the base (`baseSource:
-  "pr-cached"`) and the stack. Before any GitHub read, a local-only answer
+  memory; later local-only answers, and GitHub reads whose `gh pr view` fails
+  (offline, an expired token), use it for the base (`baseSource:
+  "pr-cached"`) and each stack layer. A branch gh reports has no PR never uses
+  it, since that PR may have merged or closed. Before any GitHub read, a local-only answer
   falls back to upstreams and origin's default branch, and `baseNote` says the
   PR base is not read yet, so a stacked branch's strip does not pass off
   `origin/main` as its base.
