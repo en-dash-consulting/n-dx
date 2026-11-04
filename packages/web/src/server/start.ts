@@ -51,7 +51,7 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
-import { enforceRouteFeatureGate } from "./route-feature-gates.js";
+import { enforceRouteFeatureGate, featureDisabledUpgradeResponse } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
@@ -872,11 +872,7 @@ async function handleApiRoutes(
   if (enforceRouteFeatureGate(req, res, ctx)) {
     // Only web.sidecar gates the hub session routes. The hub moves on to
     // another host, which can claim the lock once this server gives it up.
-    if (isHubSidecarPath((req.url || "/").split("?")[0])) {
-      releaseHubSessionHostForSidecarOff(ctx).catch((err: Error) => {
-        console.error(`[sidecar] failed to release the hub session host lock: ${err.message}`);
-      });
-    }
+    if (isHubSidecarPath((req.url || "/").split("?")[0])) releaseHubSessionHostAfterRefusal(ctx);
     return true;
   }
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
@@ -1073,9 +1069,31 @@ function createHttpServer(
   });
 
   server.on("upgrade", (req, socket, head) => {
-    ws.handleUpgrade(req, socket, head);
+    ws.handleUpgrade(req, socket, head, () => hubSessionUpgradeRefusal(req, registry));
   });
   return server;
+}
+
+/** Give up the hub session host lock in the background after web.sidecar refused a hub session request. */
+function releaseHubSessionHostAfterRefusal(ctx: ServerContext): void {
+  releaseHubSessionHostForSidecarOff(ctx).catch((err: Error) => {
+    console.error(`[sidecar] failed to release the hub session host lock: ${err.message}`);
+  });
+}
+
+/**
+ * The web.sidecar refusal for a hub session upgrade, as handleApiRoutes
+ * answers the same paths over HTTP, so the hub's upgrade failover moves on to
+ * another host. Null for every other path: those upgrades are the dashboard's
+ * own socket, which no toggle governs.
+ */
+function hubSessionUpgradeRefusal(req: IncomingMessage, registry: WorkspaceRegistry): string | null {
+  const pathname = stripWorkspaceSlot(req.url || "/").url.split("?")[0];
+  if (!isHubSidecarPath(pathname)) return null;
+  const { ctx } = registry.resolveWorkspace(req);
+  const refusal = featureDisabledUpgradeResponse(pathname, ctx);
+  if (refusal !== null) releaseHubSessionHostAfterRefusal(ctx);
+  return refusal;
 }
 
 function logStartup(

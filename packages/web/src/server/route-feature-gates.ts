@@ -41,6 +41,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { STATUS_CODES } from "node:http";
 import type { ServerContext } from "./types.js";
 import { FEATURE_DISABLED_HEADER } from "../shared/index.js";
 import { jsonResponse } from "./response-utils.js";
@@ -176,4 +177,26 @@ export function enforceRouteFeatureGate(
   res.setHeader(FEATURE_DISABLED_HEADER, gate.feature);
   jsonResponse(res, 403, featureDisabledBody(gate.feature, pathname));
   return true;
+}
+
+/**
+ * {@link enforceRouteFeatureGate} for a WebSocket upgrade: the raw 403 to write
+ * on the socket in place of the handshake when `pathname`'s toggle is off, or
+ * null. The flag is read per call, as on the HTTP path.
+ */
+export function featureDisabledUpgradeResponse(pathname: string, ctx: ServerContext): string | null {
+  const gate = findRouteFeatureGate(pathname);
+  if (!gate || gate.selfEnforced) return null;
+  if (isFeatureEnabled(ctx.projectDir, gate.feature)) return null;
+
+  const body = JSON.stringify(featureDisabledBody(gate.feature, pathname));
+  return [
+    `HTTP/1.1 403 ${STATUS_CODES[403]}`,
+    "Content-Type: application/json",
+    `${FEATURE_DISABLED_HEADER}: ${gate.feature}`,
+    "Connection: close",
+    `Content-Length: ${Buffer.byteLength(body)}`,
+    "",
+    body,
+  ].join("\r\n");
 }
