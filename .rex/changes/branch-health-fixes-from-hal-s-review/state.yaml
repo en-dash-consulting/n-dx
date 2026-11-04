@@ -38,8 +38,12 @@ items:
     lastModified: "2026-11-04T22:40:39.068Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cf457468-5ec5-4a59-8de8-3edab986760d":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T22:40:48.325Z"
-    activeIntervals: [{"start":"2026-11-04T22:40:48.325Z"}]
-    lastModified: "2026-11-04T22:40:48.930Z"
+    completedAt: "2026-11-04T22:47:50.135Z"
+    endedAt: "2026-11-04T22:47:50.135Z"
+    activeIntervals: [{"end":"2026-11-04T22:47:50.135Z","start":"2026-11-04T22:40:48.325Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "unionResult skips base entries the branch also added (whitespace/trailing comma ignored, multi-line JSON elements compared whole)"
+    lastModified: "2026-11-04T22:47:50.135Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -165,6 +165,14 @@ function decide(c: ConflictSides, ctx: ConflictContext): Verdict {
       return source("Both sides add lines here, but not only list entries: unioning code or mappings is a person's call.");
     }
     const union = unionResult(c.result!);
+    if (union === c.branch) {
+      // Every base entry is one this branch added too: the union is this branch's copy, and a diff would be empty.
+      return {
+        class: "allowlist-union",
+        reason: "The base only adds entries this branch already has: keep this branch's copy.",
+        fix: { steps: [["git", "checkout", "--ours", "--", c.path], ["git", "add", "--", c.path]] },
+      };
+    }
     return {
       class: "allowlist-union",
       reason: "Both sides only add list entries: keep both, this branch's entries first.",

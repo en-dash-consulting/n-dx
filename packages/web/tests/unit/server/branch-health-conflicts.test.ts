@@ -208,6 +208,12 @@ describe("allowlist-union", () => {
     expect(added("allow.json", [...entry("same.js"), ...entry("b.js")], [...entry("same.js"), ...entry("a.js")])).toEqual(entry("b.js"));
   });
 
+  it("offers this branch's copy, not an empty diff, when every base entry is one this branch added", () => {
+    const c = adds("ids.ts", ['  "shared",'], ['    "shared"']);
+    expect(c.class).toBe("allowlist-union");
+    expect(c.fix).toEqual({ steps: [["git", "checkout", "--ours", "--", "ids.ts"], ["git", "add", "--", "ids.ts"]] });
+  });
+
   it("is source when a side adds a code block, a function or a mapping", () => {
     const fn = ["function added() {", "  return 1;", "}"];
     expect(adds("a.ts", ["const b = 2;"], fn)).toMatchObject({ class: "source", fix: null });
