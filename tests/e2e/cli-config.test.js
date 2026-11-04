@@ -792,6 +792,25 @@ describe("n-dx config", () => {
       expect(shared.web.port).toBe(4000);
     });
 
+    it("sets llm.<vendor>.auth in .n-dx.local.json and leaves the committed auth in .n-dx.json", async () => {
+      // A repository's committed auth is a supported team setting, not a
+      // stale copy: the user's local value overrides it, never deletes it.
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ llm: { vendor: "claude", claude: { auth: "cli" } } }, null, 2) + "\n",
+      );
+      const output = run(["llm.claude.auth", "api", tmpDir]);
+      expect(output).not.toContain("moved");
+
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.llm.claude.auth).toBe("api");
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.llm.claude.auth).toBe("cli");
+
+      const { loadLLMConfig } = await import("../../packages/llm-client/dist/public.js");
+      expect((await loadLLMConfig(tmpDir)).claude?.auth).toBe("api");
+    });
+
     it("sets graview.allowNpx and graview.bin in .n-dx.local.json, as the graview install hint says", async () => {
       // `ndx graview` names these two commands when no graview binary is found;
       // in the shared file `bin` is a trust finding and `allowNpx` would opt every clone in.

@@ -123,7 +123,10 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  * - **Credential choice** (`llm.<vendor>.auth`): which of the user's own
  *   credentials a vendor gets. `api` from the shared file is credential
  *   routing too (it sends the user's stored key), so it goes where the
- *   user's other credential settings go.
+ *   user's other credential settings go. Unlike the others, a committed
+ *   auth is a supported team setting (a repository's `cli` or `auto` always
+ *   applies), so the local value overrides it and never removes it — see
+ *   {@link SHARED_COPY_KEPT_SUFFIXES}.
  *
  * - **Security posture** (`web.auth`): whether the dashboard requires the
  *   per-user token is the user's decision, not the repository's, so `ndx
@@ -147,6 +150,13 @@ const LOCAL_ONLY_SETTINGS = {
   // shared config `bin` is a trust finding and `allowNpx` would opt every clone in.
   graview: new Set(["bin", "allowNpx"]),
 };
+
+/**
+ * `llm` settings in {@link LOCAL_ONLY_SETTINGS} whose shared copy is the
+ * repository's own choice rather than a stale or leaked one, so writing the
+ * local value never removes it from `.n-dx.json`.
+ */
+const SHARED_COPY_KEPT_SUFFIXES = [".auth"];
 
 /**
  * The value a package config file keeps for each of its settings in
@@ -3595,8 +3605,11 @@ async function handleSetProjectSection(
   // and a committed secret at worst. Remove it, and any legacy `claude.*` copy
   // of an `llm.claude.*` key along with it — this one still fires, because a
   // secret mirrored into the shared file by an older version must not be left
-  // committed just because the mirror that put it there is gone.
-  if (targetFile === LOCAL_CONFIG_FILE) {
+  // committed just because the mirror that put it there is gone. A committed
+  // `llm.<vendor>.auth` is the repository's setting, so it stays.
+  const keepsSharedCopy = storagePkg === "llm"
+    && SHARED_COPY_KEPT_SUFFIXES.some((suffix) => storageSettingPath.endsWith(suffix));
+  if (targetFile === LOCAL_CONFIG_FILE && !keepsSharedCopy) {
     const sharedPaths = [[storagePkg, storageSettingPath]];
     if (storagePkg === "llm" && storageSettingPath.startsWith("claude.")) {
       sharedPaths.push(["claude", storageSettingPath.slice("claude.".length)]);

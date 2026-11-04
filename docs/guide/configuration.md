@@ -177,7 +177,7 @@ ndx config credentials .                      # backend, source and fingerprint 
 | `cli` | The vendor CLI login; no key or token that outranks it is used or passed on |
 | `api` | A key from config, the environment or the store; a run with none stops with an error |
 
-`ndx config credentials.<vendor>` changes no project's auth: set `llm.<vendor>.auth api` yourself where the key should be used. `hench.provider` still chooses hench's loop; it refuses `api` under `cli`, and under `auto` with only a stored key.
+`ndx config llm.<vendor>.auth` writes `.n-dx.local.json`, which overrides an auth the repository commits in `.n-dx.json` and leaves that committed value in place. A committed `cli` or `auto` always applies; a committed `api` applies only once the repository is trusted. `ndx config credentials.<vendor>` changes no project's auth: set `llm.<vendor>.auth api` yourself where the key should be used. `hench.provider` still chooses hench's loop; it refuses `api` under `cli`, and under `auto` with only a stored key.
 
 **Lookup order.** The first of these that has a key wins: the project's configured key, the exported variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TYPESAFE_API_KEY`…), then the store. An exported `TYPESAFE_API_KEY` therefore overrides the stored one.
 
