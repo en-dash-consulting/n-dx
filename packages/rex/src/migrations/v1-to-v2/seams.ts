@@ -75,7 +75,7 @@ export function planSeams(options: PlanSeamOptions): Partial<Record<ModelPassNam
   const jevPlaces = PLACEMENT_TIERS.jev.includes(models);
   if (jevPlaces || options.jevReview === true) {
     if (options.jevAvailable === false) {
-      options.warn?.("Jev is configured but unavailable (no TYPESAFE_API_KEY): the Jev pass is skipped");
+      options.warn?.("Jev is configured but unavailable (no TypeSafe key; run `ndx config credentials.typesafe`): the Jev pass is skipped");
     } else if (jev) {
       seams.jev = {
         model: jev.model,

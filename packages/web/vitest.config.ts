@@ -48,6 +48,8 @@ export default defineConfig({
       "../../tests/setup-color-env.js",
       "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
       "../../tests/setup-ndx-home.js",
+      // Clears TYPESAFE_API_KEY so no test resolves a live judgment route.
+      "../../tests/setup-judgment-env.js",
     ],
     exclude: sandboxBlocksNetwork
       ? [

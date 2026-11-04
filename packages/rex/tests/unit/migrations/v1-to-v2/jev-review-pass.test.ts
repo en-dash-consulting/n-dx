@@ -212,7 +212,7 @@ describe("v1-to-v2 Jev review", () => {
     const without = await plan(CONFIDENT, undefined);
     expect(judge).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]![0]).toContain("TYPESAFE_API_KEY");
+    expect(warn.mock.calls[0]![0]).toContain("ndx config credentials.typesafe");
     expect(formatPlanFile(skipped)).toBe(formatPlanFile(without));
   });
 

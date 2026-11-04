@@ -19,6 +19,7 @@ import {
   rm,
 } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import { createRequire } from "node:module";
 import { execFileSyncCli } from "./win-spawn.js";
 import { relativeToRoot, resolveLayout, resolveNdxHome } from "./layout.js";
 import {
@@ -119,6 +120,10 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   repository is trusted (llm-client `credential-routing.ts`, hench
  *   `applyRepoTrust`), so writing the user's own choice there would have it
  *   ignored and mark their repository untrusted.
+ * - **Credential choice** (`llm.<vendor>.auth`): which of the user's own
+ *   credentials a vendor gets. `api` from the shared file is credential
+ *   routing too (it sends the user's stored key), so it goes where the
+ *   user's other credential settings go.
  *
  * - **Security posture** (`web.auth`): whether the dashboard requires the
  *   per-user token is the user's decision, not the repository's, so `ndx
@@ -135,7 +140,7 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
 const LOCAL_ONLY_SETTINGS = {
   cli: new Set(["claudePath"]),
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
-  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
+  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv", ".auth"] },
   hench: new Set(["apiKeyEnv", "claudePath"]),
   web: new Set(["auth"]),
 };
@@ -947,8 +952,7 @@ async function runGoogleApiPreflight(dir) {
       vendor: LLM_VENDOR.GOOGLE,
       apiKeyEnv: apiKeyEnvVar,
       detail:
-        `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
-        "n-dx config llm.google.api_key <key>",
+        `No API key found. Export ${apiKeyEnvVar} or store the key with: ndx config credentials.google`,
       errorCode: "NDX_GOOGLE_PREFLIGHT_NO_KEY",
     };
   }
@@ -1360,6 +1364,29 @@ function validateLLMVendor(value) {
   }
 }
 
+/** Values `llm.<vendor>.auth` accepts. Mirrors llm-client's `VENDOR_AUTH_VALUES`; core imports no package. */
+const VENDOR_AUTH_VALUES = ["cli", "api", "auto"];
+
+/**
+ * Validate llm.<vendor>.auth: cli, api or auto. Gemini has no CLI login, so
+ * `cli` is refused for google, naming the value that works.
+ * @param {"claude" | "codex" | "google"} vendor
+ */
+function validateVendorAuth(vendor) {
+  return (value) => {
+    if (vendor === "google" && value === "cli") {
+      throw new Error(
+        `Invalid llm.google.auth "cli": Gemini has no CLI login. Use "api" (or "auto", the same for google).`,
+      );
+    }
+    if (!VENDOR_AUTH_VALUES.includes(value)) {
+      throw new Error(
+        `Invalid llm.${vendor}.auth "${value}". Expected one of: ${VENDOR_AUTH_VALUES.join(", ")}.`,
+      );
+    }
+  };
+}
+
 /**
  * Validate llm.autoFailover.
  */
@@ -1459,6 +1486,9 @@ function validateNonNegativeInteger(key, hint) {
  */
 const LLM_VALIDATORS = {
   vendor: validateLLMVendor,
+  "claude.auth": validateVendorAuth("claude"),
+  "codex.auth": validateVendorAuth("codex"),
+  "google.auth": validateVendorAuth("google"),
   "claude.cli_path": validateCliPath,
   "claude.api_endpoint": validateApiEndpoint,
   "claude.model": validateModel,
@@ -1504,6 +1534,11 @@ const LLM_VALIDATORS = {
     }
   },
   autoFailover: validateAutoFailover,
+  "typesafe.required": (v) => {
+    if (v !== true && v !== false && v !== "true" && v !== "false") {
+      throw new Error(`Invalid llm.typesafe.required "${v}". Expected true or false.`);
+    }
+  },
   "escalation.enabled": (v) => {
     if (v !== true && v !== false && v !== "true" && v !== "false") {
       throw new Error(
@@ -1969,8 +2004,8 @@ async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
     // No key configured yet → distinct "missing API key" root cause.
     if (errorCode === "NDX_GOOGLE_PREFLIGHT_NO_KEY") {
       console.error(red("✗ No API key configured for Google."));
-      console.error(yellow("  Set your API key: ndx config llm.google.api_key <KEY>"));
-      console.error(yellow(`  Or set the env var: export ${apiKeyEnvVar}=<KEY>`));
+      console.error(yellow("  Store your API key: ndx config credentials.google"));
+      console.error(yellow(`  Or set the env var: export ${apiKeyEnvVar}`));
       console.error("  Get a key: https://aistudio.google.com/apikey");
       console.error(dim(`  [${errorCode}]`));
       return;
@@ -2424,7 +2459,7 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     for "claude" on PATH. Validated: must exist and be
                                     executable. Use --force to skip validation.
                                     Stored in .n-dx.local.json.
-  claude.api_key           string    Anthropic API key (optional)
+  claude.api_key           string    Anthropic API key (optional; kept in the credential store)
                                     When set, packages use this key instead of reading
                                     from the ANTHROPIC_API_KEY environment variable.
                                     Validated: must start with "sk-ant-". Use --force
@@ -2453,7 +2488,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Required for multi-vendor workflows.
   llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
-  llm.claude.api_key       string    Claude API key (optional)
+  llm.claude.api_key       string    Claude API key (optional; kept in the credential store)
                                     Stored in .n-dx.local.json.
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
                                     Stored in .n-dx.local.json.
@@ -2464,7 +2499,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     to claude-haiku-4-5 if not set.
   llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
-  llm.codex.api_key        string    Codex API key (optional)
+  llm.codex.api_key        string    Codex API key (optional; kept in the credential store)
                                     Stored in .n-dx.local.json.
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
                                     Stored in .n-dx.local.json.
@@ -2530,6 +2565,10 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.local.profiles       array     Saved local-server connection profiles, managed entirely
                                     by the web dashboard's LLM Provider page — not read by
                                     hench/rex/any CLI at runtime. Not meant to be hand-edited.
+  llm.typesafe.required    boolean   Warn once per process when a Jev-routed call falls back
+                                    to a text model because no TypeSafe key is available
+                                    (default: unset, silent). Store a key with
+                                    ndx config credentials.typesafe
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default
@@ -2750,8 +2789,48 @@ Local overrides (.n-dx.local.json):
   .n-dx.json. A cli_path in .n-dx.json applies only once the repository is
   trusted; web.auth there is ignored.
 
+Credentials (per-user, not per-project):
+  credentials [dir]        Show each credential's backend, source in effect and
+                           fingerprint, and each vendor's auth mode and key source
+                           for the project in dir (default: here). Never prints a value.
+  credentials.typesafe     Store the TypeSafe (Jev) key: hidden prompt on a terminal,
+                           --stdin to read a piped value, --unset to remove it.
+                           A value on the command line works but lands in shell
+                           history and the process list. An exported
+                           TYPESAFE_API_KEY still wins over the stored key.
+  credentials.claude       Store a vendor API key (same input rules). It is used
+  credentials.codex        only under llm.<vendor>.auth api: storing a key never
+  credentials.google       moves a vendor off its CLI login. Google (no CLI) uses
+                           it under auto too. A configured or exported key wins.
+  credentials.<name> --helper "<cmd>"
+                           Store a password-manager command instead of a value,
+                           e.g. --helper "op read op://vault/item/field". It runs
+                           without a shell when the key is needed; its one line
+                           of output is the value, kept for the process (a
+                           failure is retried after 60 s). Quoting as in a
+                           shell, with no expansion; | ; & > < $( and backticks
+                           are refused, and so is bash -c or node -e: an
+                           interpreter needs a script to run.
+
+Vendor auth (llm.<vendor>.auth, written to .n-dx.local.json):
+  auto (default)           API when a key is configured or exported, else the CLI
+                           login; a key held only in the credential store is unused
+  cli                      The vendor CLI login; no API key is used or passed on
+  api                      An API key from config, the environment or the store;
+                           a run with none stops with an error
+  hench.provider (cli|api) still chooses hench's loop; hench refuses provider=api
+  under auth cli, and under auto with only a stored key.
+
 Options:
   --json                   Output as JSON
+  --stdin                  With credentials.<name>: read the value from stdin
+  --unset                  With credentials.<name>: remove the stored value
+  --test                   With credentials.typesafe: make one request and report ok,
+                           rejected or unreachable with the key's fingerprint
+  --helper "<cmd>"         With credentials.<name>: store a helper command (above)
+  --check                  With credentials: run each helper to fingerprint its value
+  --import                 With credentials: move API keys from .n-dx.local.json to the
+                           store without asking
   --force                  Skip validation when setting claude/llm/extensions config values
   --user                   Write an extensions.<name>.<key> value to the user config
                            (<ndx home>/config.json) instead of .n-dx.json
@@ -2779,7 +2858,6 @@ Examples:
   n-dx config claude.cli_path /usr/local/bin/claude
                                                Set Claude CLI binary path (validates path)
   n-dx config claude.cli_path /path --force    Set without validation
-  n-dx config claude.api_key sk-ant-...        Set Anthropic API key (validates format)
   n-dx config claude.api_endpoint https://proxy.example.com
                                                Set custom API endpoint
   n-dx config claude.model claude-opus-5-5     Set default model for API calls
@@ -2793,7 +2871,11 @@ Examples:
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.local.maxRetries 10          Wait longer for a restarting local server
   n-dx config llm.local.maxFormatRetries 5     Resend malformed model replies more often
-  n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
+  n-dx config credentials                      Show stored credentials (no values)
+  n-dx config credentials.typesafe             Store the Jev key (hidden prompt)
+  n-dx config credentials.claude               Store a Claude API key (hidden prompt)
+  n-dx config llm.claude.auth api              Use the API key, from any source
+  n-dx config llm.claude.auth cli              Use the claude CLI login only
   n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
@@ -2965,6 +3047,9 @@ async function loadVendorCheckEnv(dir, vendor) {
   try {
     return await loadVendorCliEnv(dir, vendor, { subject });
   } catch (err) {
+    // llm.<vendor>.auth "api" with no key: a credential problem the check
+    // reports as one, not a malformed env policy.
+    if (err?.reason === "auth") throw err;
     const { loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } = await import("@n-dx/llm-client");
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} ignores the malformed field.`);
@@ -3103,7 +3188,7 @@ async function handleTestConnection(dir) {
   const claudeConfig = await loadClaudeConfig(dir);
   if (Object.keys(claudeConfig).length === 0) {
     console.error(
-      "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
+      "No Claude configuration set. Run 'claude login', or use 'ndx config credentials.claude' for a key or 'ndx config claude.cli_path <path>' for the binary first.",
     );
     process.exit(1);
   }
@@ -3333,6 +3418,13 @@ async function handleSetProjectSection(
     if (classNote) console.error(classNote);
   }
 
+  // A vendor key belongs to the per-user credential store, not a config file.
+  const keyVendor = vendorOfApiKey(`${storagePkg}.${storageSettingPath}`);
+  if (keyVendor) {
+    await storeVendorApiKey(dir, keyVendor, coerced, keyArg);
+    return;
+  }
+
   setByPath(configs[storagePkg], storageSettingPath, coerced, storagePkg);
 
   const targetFile = isLocalProjectSetting(storagePkg, storageSettingPath)
@@ -3340,19 +3432,10 @@ async function handleSetProjectSection(
     : PROJECT_CONFIG_FILE;
   const configPath = projectConfigPath(dir, targetFile);
   if (targetFile === LOCAL_CONFIG_FILE) {
-    // config.js already uses this foundation reader for trust-aware config I/O.
-    const { collectRepoExecutionConfig, isLocalConfigTracked } = await import("@n-dx/llm-client");
-    const config = collectRepoExecutionConfig(dir);
-    // The reader's answer covers what is on disk. A write must also ask git
-    // when nothing is: a deleted tracked file or a sparse checkout still has
-    // the index entry, and saveJSON's rename would put the path back holding
-    // the key, ready for `git commit -a`.
-    const status = config.localConfigTracked
-      ? { tracked: true, unanswered: Boolean(config.localConfigUnanswered) }
-      : { tracked: isLocalConfigTracked(dir, { evenIfAbsent: true }), unanswered: false };
+    const status = await localConfigTrackedStatus(dir);
     if (status.tracked) {
       const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
-      const reason = status.unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git";
+      const reason = status.reason;
       if (storageSettingPath.split(".").at(-1) === SECRET_SETTING_LEAF) {
         throw new Error(`Refusing to write a credential to ${label}: ${reason}. Untrack the local config before storing credentials.`);
       }
@@ -3968,6 +4051,464 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
  *   to set an `extensions.<name>` key; setting one without it throws.
  */
 
+// ── credentials namespace ────────────────────────────────────────────────────
+
+/**
+ * Credential names `ndx config credentials.<name>` accepts: the TypeSafe (Jev)
+ * key and the vendor keys. Mirrors llm-client's `CLI_CREDENTIAL_NAMES`, which
+ * the spawned CLI checks again.
+ */
+const CREDENTIAL_NAMES = new Set(["typesafe", "claude", "codex", "google"]);
+
+/**
+ * Run llm-client's credential CLI. The store is owned by llm-client; this tier
+ * only spawns it, and a value travels on stdin — never argv, so it is in no
+ * process list and no spawn log.
+ *
+ * @returns {{ code: number, stdout: string, stderr: string }}
+ */
+function spawnCredentialsCli(args, input) {
+  const script = createRequire(import.meta.url).resolve(
+    "@n-dx/llm-client/dist/cli/credentials.js",
+  );
+  try {
+    const stdout = execFileSyncCli(process.execPath, [script, ...args], {
+      encoding: "utf-8",
+      input: input ?? "",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return { code: 0, stdout, stderr: "" };
+  } catch (err) {
+    return {
+      code: typeof err.status === "number" ? err.status : 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? err.message ?? ""),
+    };
+  }
+}
+
+/**
+ * Characters `--helper` refuses anywhere in the command, quoted or not. No
+ * shell ever runs the helper, so they would be passed on literally; refusing
+ * them means a command written for a shell (a pipe, a redirect, a
+ * substitution) fails here instead of failing obscurely on every run.
+ */
+const HELPER_REFUSED = [
+  ["|", "a pipe"],
+  [";", "a command separator"],
+  ["&", "a command separator"],
+  [">", "a redirect"],
+  ["<", "a redirect"],
+  ["$(", "a command substitution"],
+  ["`", "a command substitution"],
+];
+
+/**
+ * Split a `--helper` command into argv with shell-style quoting and no
+ * expansion: whitespace separates words; single quotes keep everything
+ * literally; double quotes keep everything but `\"` and `\\`; outside quotes
+ * a backslash keeps the next character. `$VAR`, `~` and globs stay literal.
+ * The helper later runs with `execFileSync(argv[0], argv.slice(1))`, no shell.
+ *
+ * @param {string} text
+ * @returns {{ argv: string[] } | { error: string }}
+ */
+export function parseHelperCommand(text) {
+  for (const [token, what] of HELPER_REFUSED) {
+    if (text.includes(token)) {
+      return { error: `the command contains ${JSON.stringify(token)} (${what}). It runs without a shell, so write a single command; wrap anything more in a script.` };
+    }
+  }
+  if (/[\0\r\n]/.test(text)) return { error: "the command contains a line break." };
+  const argv = [];
+  let word = null;
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+      else word += ch;
+      continue;
+    }
+    if (quote === '"') {
+      if (ch === '"') quote = null;
+      else if (ch === "\\" && (text[i + 1] === '"' || text[i + 1] === "\\")) word += text[++i];
+      else word += ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (word !== null) argv.push(word);
+      word = null;
+      continue;
+    }
+    word ??= "";
+    if (ch === "'" || ch === '"') quote = ch;
+    else if (ch === "\\" && i + 1 < text.length) word += text[++i];
+    else word += ch;
+  }
+  if (quote) return { error: `the command has an unterminated ${quote} quote.` };
+  if (word !== null) argv.push(word);
+  if (argv.length === 0 || argv[0] === "") return { error: "the command is empty." };
+  if (argv[0].startsWith("-")) return { error: `the command may not start with "-" (${JSON.stringify(argv[0])}).` };
+  return { argv };
+}
+
+/** Read one line from a TTY with echo off. Resolves null on Ctrl-C. */
+function readHiddenLine(promptText) {
+  return new Promise((resolveLine) => {
+    const stdin = process.stdin;
+    let value = "";
+    process.stderr.write(promptText);
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf-8");
+    const finish = (result) => {
+      stdin.removeListener("data", onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      process.stderr.write("\n");
+      resolveLine(result);
+    };
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        if (ch === "\u0003" || ch === "\u0004") return finish(null);
+        if (ch === "\r" || ch === "\n") return finish(value);
+        if (ch === "\u007f" || ch === "\b") value = value.slice(0, -1);
+        else value += ch;
+      }
+    };
+    stdin.on("data", onData);
+  });
+}
+
+async function readAllStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
+const ARGV_VALUE_WARNING =
+  "Warning: a value on the command line lands in your shell history and the process list. " +
+  "Prefer the hidden prompt or --stdin.";
+
+/**
+ * The vendor a settings key names when it is a vendor API key:
+ * `llm.<vendor>.api_key`, or the legacy `claude.api_key` (a legacy write is
+ * stored under `llm.`). Null for every other key.
+ *
+ * @param {string} key
+ * @returns {"claude" | "codex" | "google" | null}
+ */
+function vendorOfApiKey(key) {
+  const match = /^(?:llm\.)?(claude|codex|google)\.api_key$/.exec(key);
+  return match ? match[1] : null;
+}
+
+/** Vendors with a CLI login, so a stored key can change which mode they run in. */
+const CLI_VENDORS = new Set(["claude", "codex"]);
+
+/**
+ * Make a vendor's stored key take effect in this checkout: when neither
+ * config file sets `llm.<vendor>.auth`, write `api` to `.n-dx.local.json` and
+ * say so. A store-only key never selects the API (auth `auto`), but writing
+ * `llm.<vendor>.api_key` always has, so the alias keeps that effect visible.
+ * An explicit auth, `cli` included, is never overwritten. google has no CLI
+ * login, so there is no mode to switch. When git tracks the local file, the
+ * switch is not written as a side effect: it would reach everyone who checks
+ * the repository out, so the user is told to set it.
+ */
+async function setApiAuthIfUnset(dir, vendor) {
+  if (!CLI_VENDORS.has(vendor)) return;
+  for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
+    if ((await loadProjectConfigFile(dir, which)).llm?.[vendor]?.auth !== undefined) return;
+  }
+  const status = await localConfigTrackedStatus(dir);
+  if (status.tracked) {
+    console.log(
+      `llm.${vendor}.auth is unset and left so: ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)} is not machine-local (${status.reason}). ` +
+        `To use the stored key in this checkout: ndx config llm.${vendor}.auth api`,
+    );
+    return;
+  }
+  const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
+  setByPath(local, `llm.${vendor}.auth`, "api", "llm");
+  await saveProjectJSON(projectConfigPath(dir, LOCAL_CONFIG_FILE), local, { ownerOnly: true });
+  console.log(
+    `llm.${vendor}.auth = api (it was unset, so ${vendor} now uses the stored key; set it to cli or auto to change that)`,
+  );
+}
+
+/**
+ * Remove a vendor's `api_key` from one project config file, from both its
+ * `llm.<vendor>` and legacy `claude` homes. Returns whether the file changed.
+ */
+async function removeFileApiKey(dir, which, vendor) {
+  const data = await loadProjectConfigFile(dir, which);
+  let changed = false;
+  for (const holder of [data.llm?.[vendor], vendor === "claude" ? data.claude : undefined]) {
+    if (holder && typeof holder === "object" && Object.hasOwn(holder, "api_key")) {
+      delete holder.api_key;
+      changed = true;
+    }
+  }
+  if (changed) await saveProjectJSON(projectConfigPath(dir, which), data, { ownerOnly: which === LOCAL_CONFIG_FILE });
+  return changed;
+}
+
+/**
+ * Whether git tracks `.n-dx.local.json`, which makes it repository config
+ * rather than machine-local. The reader's answer covers what is on disk; a
+ * write must also ask git when nothing is: a deleted tracked file or a sparse
+ * checkout still has the index entry, and saveJSON's rename would put the
+ * path back, ready for `git commit -a`.
+ *
+ * @param {string} dir
+ * @returns {Promise<{ tracked: boolean, reason: string }>}
+ */
+async function localConfigTrackedStatus(dir) {
+  // config.js already uses this foundation reader for trust-aware config I/O.
+  const { collectRepoExecutionConfig, isLocalConfigTracked } = await import("@n-dx/llm-client");
+  const config = collectRepoExecutionConfig(dir);
+  const tracked = config.localConfigTracked || isLocalConfigTracked(dir, { evenIfAbsent: true });
+  const unanswered = Boolean(config.localConfigTracked && config.localConfigUnanswered);
+  return {
+    tracked: Boolean(tracked),
+    reason: unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git",
+  };
+}
+
+/**
+ * `ndx config llm.<vendor>.api_key <value>`: store the key through the
+ * credential CLI, value on stdin. Prints no value. The new key supersedes any
+ * copy left in a config file, which would shadow it, so those copies are
+ * removed once the store write has succeeded.
+ */
+async function storeVendorApiKey(dir, vendor, value, keyArg) {
+  console.error(ARGV_VALUE_WARNING);
+  const result = spawnCredentialsCli(["set", vendor], value);
+  if (result.code !== 0) {
+    console.error(result.stderr.trim());
+    process.exit(1);
+  }
+  console.log(`${keyArg} stored in the credential store`);
+  for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
+    if (await removeFileApiKey(dir, which, vendor)) {
+      console.log(`Removed the older ${keyArg} from ${projectConfigLabel(dir, which)}.`);
+    }
+  }
+  await setApiAuthIfUnset(dir, vendor);
+}
+
+/**
+ * `ndx config llm.<vendor>.api_key` with no value: source and fingerprint,
+ * never the value. A key still in a config file outranks the store, so the
+ * file that holds one is named too.
+ */
+async function showVendorApiKey(dir, vendor, flags) {
+  const result = spawnCredentialsCli(["status", ...(flags.json ? ["--json"] : [])]);
+  if (result.code !== 0) {
+    console.error(result.stderr.trim() || "Could not read the credential store.");
+    process.exit(1);
+  }
+  const shadowedBy = [];
+  for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
+    if ((await fileApiKeys(dir, which)).some((k) => k.vendor === vendor)) shadowedBy.push(which);
+  }
+  if (flags.json) {
+    const { name, source, backend, fingerprint } = JSON.parse(result.stdout).find((s) => s.name === vendor);
+    const configFiles = shadowedBy.map((which) => projectConfigLabel(dir, which));
+    console.log(JSON.stringify({ name, source, backend, fingerprint, configFiles }));
+    return;
+  }
+  console.log(result.stdout.split("\n").find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
+  for (const which of shadowedBy) {
+    const move = which === LOCAL_CONFIG_FILE ? "ndx config credentials --import" : `ndx config credentials.${vendor}, then delete llm.${vendor}.api_key from that file`;
+    console.log(`${projectConfigLabel(dir, which)} also holds a ${vendor} key, which is used instead. Move it: ${move}`);
+  }
+}
+
+/** The vendor keys `.n-dx.local.json` holds, as `{ vendor, value }`. */
+function localFileApiKeys(dir) {
+  return fileApiKeys(dir, LOCAL_CONFIG_FILE);
+}
+
+/** The vendor keys one project config file holds, as `{ vendor, value }`. */
+async function fileApiKeys(dir, which) {
+  const local = await loadProjectConfigFile(dir, which);
+  const found = [];
+  for (const vendor of ["claude", "codex", "google"]) {
+    const candidates = [local.llm?.[vendor]?.api_key, vendor === "claude" ? local.claude?.api_key : undefined];
+    const value = candidates.find((v) => typeof v === "string" && v.length > 0);
+    if (value) found.push({ vendor, value });
+  }
+  return found;
+}
+
+/**
+ * Move `.n-dx.local.json`'s API keys into the credential store. Each key is
+ * written to the store first and removed from the file only after that write
+ * succeeded, so a failed write loses nothing. A vendor whose store entry is a
+ * helper is skipped: the password-manager setup outranks a plaintext file key,
+ * and overwriting it would put that key in the store as plaintext. Never
+ * prints a value. Returns whether nothing failed.
+ */
+async function importLocalApiKeys(dir) {
+  const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+  const status = spawnCredentialsCli(["status", "--json"]);
+  if (status.code !== 0) {
+    console.error(`Could not read the credential store; nothing imported: ${status.stderr.trim()}`);
+    return false;
+  }
+  const helperVendors = new Set(JSON.parse(status.stdout).filter((s) => s.backend === "helper").map((s) => s.name));
+  let allMoved = true;
+  for (const { vendor, value } of await localFileApiKeys(dir)) {
+    if (helperVendors.has(vendor)) {
+      console.log(
+        `Skipped the ${vendor} key: the credential store runs a helper for ${vendor}. ` +
+          `The key stays in ${label}; remove it there by hand.`,
+      );
+      continue;
+    }
+    const result = spawnCredentialsCli(["set", vendor], value);
+    if (result.code !== 0) {
+      allMoved = false;
+      console.error(`Could not store the ${vendor} key; it stays in ${label}: ${result.stderr.trim()}`);
+      continue;
+    }
+    await removeFileApiKey(dir, LOCAL_CONFIG_FILE, vendor);
+    console.log(`Moved the ${vendor} key from ${label} to the credential store.`);
+    await setApiAuthIfUnset(dir, vendor);
+  }
+  return allMoved;
+}
+
+/** One line from stdin, for a yes/no answer. */
+async function readAnswer() {
+  const { createInterface } = await import("node:readline");
+  const rl = createInterface({ input: process.stdin, terminal: false });
+  try {
+    for await (const line of rl) return line;
+    return "";
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * `ndx config credentials` with a key in `.n-dx.local.json`: `--import` moves
+ * it without a prompt, a terminal is asked, and anything else is told how.
+ */
+async function offerKeyImport(dir, flags) {
+  const keys = await localFileApiKeys(dir);
+  if (keys.length === 0) return;
+  const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+  const names = keys.map((k) => k.vendor).join(", ");
+  if (flags.import !== "true") {
+    if (!(process.stdin.isTTY && process.stderr.isTTY)) {
+      console.log(`${label} holds an API key (${names}). Move it to the credential store: ndx config credentials --import`);
+      return;
+    }
+    process.stderr.write(`${label} holds an API key (${names}). Move it to the credential store? [y/N] `);
+    if (!/^y(es)?$/i.test((await readAnswer()).trim())) return;
+  }
+  if (!(await importLocalApiKeys(dir))) process.exit(1);
+}
+
+/**
+ * `ndx config credentials[.<name>]`: the per-user credential store.
+ * Never prints a value. The store is per-user, not per-project; the directory
+ * argument (default: the current one) only chooses whose `llm.<vendor>.auth`
+ * the status reports.
+ */
+async function handleCredentials(positional, flags) {
+  const keyArg = positional[0];
+  const fail = (message) => {
+    console.error(message);
+    process.exit(1);
+  };
+  const usageFail = (message) => {
+    console.error(message);
+    process.exit(2);
+  };
+
+  if (keyArg === "credentials") {
+    const project = resolve(positional[1] ?? ".");
+    const check = flags.check === "true" ? ["--check"] : [];
+    await offerKeyImport(project, flags);
+    const result = spawnCredentialsCli(["status", `--project=${project}`, ...check]);
+    if (result.code !== 0) return fail(result.stderr.trim() || "Could not read the credential store.");
+    console.log("Credentials (per-user: shared by every project)");
+    console.log(result.stdout.trimEnd());
+    console.log(`Set one with: ndx config credentials.<${[...CREDENTIAL_NAMES].join("|")}>`);
+    return;
+  }
+
+  const name = keyArg.slice("credentials.".length);
+  if (!CREDENTIAL_NAMES.has(name)) {
+    return fail(
+      `Unknown credential "${name}". Known: ${[...CREDENTIAL_NAMES].map((n) => `credentials.${n}`).join(", ")}.`,
+    );
+  }
+
+  if (flags.test === "true") {
+    if (name !== "typesafe") return usageFail(`--test checks the TypeSafe key only: ndx config credentials.typesafe --test`);
+    const result = spawnCredentialsCli(["test", name]);
+    // The spawned CLI reports ok on stdout and every failure on stderr.
+    const text = (result.stdout || result.stderr).trim();
+    if (result.code !== 0) return fail(text);
+    console.log(text);
+    return;
+  }
+
+  if (flags.unset === "true") {
+    const result = spawnCredentialsCli(["unset", name]);
+    if (result.code !== 0) return fail(result.stderr.trim());
+    console.log(result.stdout.trimEnd());
+    return;
+  }
+
+  // `ndx config <key> [dir]`: a trailing existing directory is the ignored
+  // directory argument, never the value — `credentials.typesafe .` must not
+  // store "." over a good key.
+  const valueArgs = positional.slice(1);
+  if (valueArgs.length > 0) {
+    const last = await stat(resolve(valueArgs[valueArgs.length - 1])).catch(() => null);
+    if (last?.isDirectory()) valueArgs.pop();
+  }
+
+  if (flags.helper !== undefined) {
+    // `--helper "<cmd>"` arrives as a bare flag and the next positional;
+    // `--helper=<cmd>` as the flag's value.
+    const text = flags.helper === "true" ? valueArgs[0] : flags.helper;
+    if (!text) return usageFail(`--helper needs a command, e.g. ndx config credentials.${name} --helper "op read op://vault/item/field"`);
+    const parsed = parseHelperCommand(text);
+    if ("error" in parsed) return usageFail(`Refusing --helper: ${parsed.error}`);
+    const result = spawnCredentialsCli(["set-helper", name], JSON.stringify(parsed.argv));
+    if (result.code !== 0) return result.code === 2 ? usageFail(result.stderr.trim()) : fail(result.stderr.trim());
+    console.log(result.stdout.trimEnd());
+    return;
+  }
+
+  let value;
+  if (flags.stdin === "true") {
+    value = await readAllStdin();
+  } else if (valueArgs.length > 0) {
+    console.error(ARGV_VALUE_WARNING);
+    value = valueArgs[0];
+  } else if (process.stdin.isTTY && process.stderr.isTTY) {
+    value = await readHiddenLine(`${name} key (input hidden): `);
+    if (value === null) return fail("Cancelled; nothing stored.");
+  } else {
+    return fail(
+      `No value given. Run on a terminal for a hidden prompt, or pipe it: printf %s "$KEY" | ndx config credentials.${name} --stdin`,
+    );
+  }
+
+  const result = spawnCredentialsCli(["set", name], value);
+  if (result.code !== 0) return fail(result.stderr.trim());
+  console.log(result.stdout.trimEnd());
+}
+
 /**
  * @param {string[]} args
  * @param {ConfigCommandDeps} [deps]
@@ -3977,6 +4518,12 @@ export async function runConfig(args, deps = {}) {
 
   if (flags.help) {
     console.log(HELP_TEXT);
+    return;
+  }
+
+  // User-scoped: needs no project, and a directory argument means nothing.
+  if (positional[0] === "credentials" || positional[0]?.startsWith("credentials.")) {
+    await handleCredentials(positional, flags);
     return;
   }
 
@@ -4061,6 +4608,12 @@ export async function runConfig(args, deps = {}) {
         flags,
       );
     }
+    return;
+  }
+
+  // GET mode: a vendor key is in the credential store, and its value is never shown.
+  if (keyArg && vendorOfApiKey(keyArg)) {
+    await showVendorApiKey(dir, vendorOfApiKey(keyArg), flags);
     return;
   }
 

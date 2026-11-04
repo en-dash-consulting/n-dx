@@ -129,7 +129,7 @@ export interface DecidePlacementOptions {
   model?: PlacementModel;
   /** Jev seam. Absent means Jev is unavailable. */
   judge?: PlacementJudge;
-  /** False when there is no TYPESAFE_API_KEY; the caller decides, this module never reads env. */
+  /** False when no TypeSafe key resolves; the caller decides, this module never reads env or the credential store. */
   jevAvailable?: boolean;
   shortlistSize?: number;
   /** Areas a new-node proposal may sit under. The text model is told them; a proposal under any other id is dropped. */
@@ -210,10 +210,10 @@ export async function decidePlacement(
   if (settings.models !== "text" && !jevReady) {
     if (settings.models === "both") {
       used = "text";
-      warnings.push('rex.placement.models is "both" but Jev is unavailable (no TYPESAFE_API_KEY); using the text model only');
+      warnings.push('rex.placement.models is "both" but Jev is unavailable (no TypeSafe key; run `ndx config credentials.typesafe`); using the text model only');
     } else {
       used = "rules";
-      warnings.push('rex.placement.models is "jev" but Jev is unavailable (no TYPESAFE_API_KEY); using rules only');
+      warnings.push('rex.placement.models is "jev" but Jev is unavailable (no TypeSafe key; run `ndx config credentials.typesafe`); using rules only');
     }
   }
   const useText = used === "text" || used === "both";
