@@ -10,7 +10,14 @@ items:
     lastModified: "2026-11-04T19:07:37.486Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "63e72261-cf9f-44c2-a845-f600903a6ad2":
-    lastModified: "2026-11-04T19:06:44.816Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:26:06.926Z"
+    completedAt: "2026-11-04T20:33:43.402Z"
+    endedAt: "2026-11-04T20:33:43.402Z"
+    activeIntervals: [{"end":"2026-11-04T20:33:43.402Z","start":"2026-11-04T20:26:06.926Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sidecar-cards.ts shortcut handler returns on e.repeat and while any [aria-modal=\"true\"] is in the document; two tests in sidecar-drawer.test.ts."
+    lastModified: "2026-11-04T20:33:43.402Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e6dc973a-e7fd-49cc-92f9-45f675c5c0d7":
     lastModified: "2026-11-04T19:07:21.610Z"

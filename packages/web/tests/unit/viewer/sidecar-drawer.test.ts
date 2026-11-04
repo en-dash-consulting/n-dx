@@ -31,6 +31,7 @@ import {
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
+import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -842,6 +843,35 @@ describe("permission cards", () => {
     root.appendChild(select);
     await key(select, { key: "Enter", metaKey: true });
     expect(decisions()).toHaveLength(0);
+  });
+
+  it("ignores a held key's auto-repeat, so the next card waits for a fresh press", async () => {
+    await openWith([card("c1", 1), card("c2", 2)]);
+    await key(document.body, { key: "Enter", metaKey: true });
+    await announce({ type: "sidecar:card", sessionId: "s1", cardId: "c1", status: "approved", timestamp: "t" });
+    await key(document.body, { key: "Enter", metaKey: true, repeat: true });
+    await key(document.body, { key: "Backspace", metaKey: true, repeat: true });
+    expect(decisions().map((r) => r.url)).toEqual(["/api/sidecar/sessions/s1/cards/c1"]);
+    expect(cardEls().find((el) => el.dataset.card === "c2")?.querySelector(".sidecar-card-approve")).not.toBeNull();
+  });
+
+  it("decides no card while the Settings overlay covers the drawer", async () => {
+    await openWith([card("c1", 1)]);
+    const overlayHost = document.createElement("div");
+    document.body.appendChild(overlayHost);
+    await act(async () => {
+      render(h(SettingsOverlay, { view: "analyze", validViews: VALID, onNavigate: () => {}, onClose: () => {} }), overlayHost);
+    });
+    await settle();
+    const close = overlayHost.querySelector<HTMLButtonElement>(".settings-overlay-close")!;
+    await key(close, { key: "Enter", metaKey: true });
+    await key(document.body, { key: "Backspace", metaKey: true });
+    expect(decisions()).toHaveLength(0);
+
+    await act(async () => { render(null, overlayHost); });
+    overlayHost.remove();
+    await key(document.body, { key: "Enter", metaKey: true });
+    expect(decisions().map((r) => r.url)).toEqual(["/api/sidecar/sessions/s1/cards/c1"]);
   });
 
   it("does not answer the same card twice while its decision is still being read back", async () => {
