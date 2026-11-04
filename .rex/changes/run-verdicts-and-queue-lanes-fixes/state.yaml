@@ -9,14 +9,23 @@ items:
     lastModified: "2026-11-04T21:10:34.075Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "224cd1eb-047e-4d93-a913-148558e9fe44":
+    status: "completed"
+    startedAt: "2026-11-04T22:19:41.246Z"
+    completedAt: "2026-11-04T22:19:41.246Z"
+    endedAt: "2026-11-04T22:19:41.246Z"
+    activeIntervals: [{"end":"2026-11-04T22:19:41.246Z","start":"2026-11-04T22:19:41.246Z"}]
+    appliedAt: "2026-11-04T22:19:41.246Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://github.com/en-dash-consulting/n-dx/pull/907#pullrequestreview-5770573884"]
-    lastModified: "2026-11-04T19:23:24.872Z"
+    lastModified: "2026-11-04T22:19:41.246Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bbefb3ae-d581-41ce-b5a7-410b7640532a":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T21:54:38.745Z"
-    activeIntervals: [{"start":"2026-11-04T21:54:38.745Z"}]
-    lastModified: "2026-11-04T21:54:46.490Z"
+    completedAt: "2026-11-04T22:19:41.246Z"
+    endedAt: "2026-11-04T22:19:41.246Z"
+    activeIntervals: [{"end":"2026-11-04T22:18:12.079Z","start":"2026-11-04T21:54:38.745Z"},{"end":"2026-11-04T22:19:41.246Z","start":"2026-11-04T22:19:41.246Z"}]
+    lastModified: "2026-11-04T22:19:41.246Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dc63cd09-8563-4fc0-a4ff-ef26e184d2a5":
     status: "completed"
