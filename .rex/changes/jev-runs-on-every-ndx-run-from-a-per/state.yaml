@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "03dd62b9-6298-4938-b35e-70e3394c6b28":
+    lastModified: "2026-11-04T18:06:23.682Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
     status: "completed"
     startedAt: "2026-11-03T18:34:02.653Z"
@@ -115,13 +118,17 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T18:04:24.255Z"
+    lastModified: "2026-11-04T18:06:23.682Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T18:00:54.054Z"
-    activeIntervals: [{"start":"2026-11-04T18:00:54.054Z"}]
-    lastModified: "2026-11-04T18:00:54.667Z"
+    completedAt: "2026-11-04T18:11:04.820Z"
+    endedAt: "2026-11-04T18:11:04.820Z"
+    activeIntervals: [{"end":"2026-11-04T18:11:04.820Z","start":"2026-11-04T18:00:54.054Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "resolveVendorCliEnv sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 (any casing replaced) whenever it writes the Claude key itself; the CLI keeps the key for its API calls. Docs state where keys enter child envs. Codex follow-up db3c0066."
+    lastModified: "2026-11-04T18:11:04.820Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8f7cb2f8-9389-46e7-a092-384e3ccbc31a":
     lastModified: "2026-11-04T17:25:47.816Z"

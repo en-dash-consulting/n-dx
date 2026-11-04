@@ -264,8 +264,11 @@ describe("resolveVendorCliEnv", () => {
     });
 
     it("api with a helper key: the same", () => {
-      // resolveVendorCliEnv takes no helperExec, so the helper really runs.
-      setHelperCredential("claude", ["echo", HELPER], { ndxHome: home });
+      // resolveVendorCliEnv takes no helperExec, so the helper really runs:
+      // node and a script, since helpers run without a shell (no `echo` on Windows).
+      const script = join(home, "print-key.mjs");
+      writeFileSync(script, `process.stdout.write(${JSON.stringify(HELPER)});\n`);
+      setHelperCredential("claude", [process.execPath, script], { ndxHome: home });
       const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare());
       expect(env.ANTHROPIC_API_KEY).toBe(HELPER);
       expect(env[SCRUB]).toBe("1");
