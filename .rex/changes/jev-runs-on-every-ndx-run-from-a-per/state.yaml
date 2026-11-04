@@ -148,7 +148,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T21:11:27.273Z"
+    lastModified: "2026-11-04T22:05:43.565Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -221,7 +221,14 @@ items:
     lastModified: "2026-11-02T21:20:50.706Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9f3391dc-0852-463d-b0a0-f89f23cfad68":
-    lastModified: "2026-11-04T18:30:29.855Z"
+    status: "completed"
+    startedAt: "2026-11-04T22:02:27.023Z"
+    completedAt: "2026-11-04T22:10:35.789Z"
+    endedAt: "2026-11-04T22:10:35.789Z"
+    activeIntervals: [{"end":"2026-11-04T22:10:35.789Z","start":"2026-11-04T22:02:27.023Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "The guard resolves a security subcommand the way SecurityTool does (getopt hilp:qvR, then the first table entry the word is a prefix of, with case folded), so every abbreviation of find-generic-password is refused."
+    lastModified: "2026-11-04T22:10:35.789Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aba3a023-d594-4962-9d63-a0be5775bb20":
     status: "completed"
@@ -278,6 +285,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option A: importLocalApiKeys skips vendors whose store entry is a helper, keeps the file key, prints one line naming vendor and file."
     lastModified: "2026-11-03T16:29:52.353Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cb238ec9-5e06-4556-8fc7-2a0ef2d61d63":
+    lastModified: "2026-11-04T22:05:43.565Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "db3c0066-8696-45bd-a77a-1c518bfe0221":
     lastModified: "2026-11-04T18:04:24.255Z"

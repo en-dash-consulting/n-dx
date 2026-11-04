@@ -234,11 +234,80 @@ function commandWords(command: string, shellKind: ShellKind): string[] {
 }
 
 /**
+ * macOS `security`'s command table, in its order (as the strings appear in
+ * `/usr/bin/security` on macOS 14). `security` runs the first entry its
+ * subcommand word is a prefix of: SecurityTool's `match_command` is
+ * `strncmp(command, name, strlen(name))` with no ambiguity check. So every
+ * non-empty prefix of `find-generic-password` (`f`, `find`, `find-generic`, …)
+ * runs it, because no earlier entry starts with `f`; `find-c` runs
+ * `find-certificate`. The comparison is case-sensitive, so
+ * `FIND-GENERIC-PASSWORD` is an unknown command; the guard folds case anyway,
+ * which refuses only spellings `security` would reject. Not run on the host
+ * (it needs approval): read from the binary's strings and Apple's source.
+ */
+const SECURITY_COMMANDS = [
+  "help", "list-keychains", "default-keychain", "login-keychain", "create-keychain",
+  "delete-keychain", "lock-keychain", "unlock-keychain", "set-keychain-settings",
+  "set-keychain-password", "show-keychain-info", "dump-keychain", "create-keypair",
+  "add-generic-password", "add-internet-password", "add-certificates", "find-generic-password",
+  "delete-generic-password", "set-generic-password-partition-list", "find-internet-password",
+  "delete-internet-password", "set-internet-password-partition-list", "find-key",
+  "set-key-partition-list", "find-certificate", "find-identity", "delete-certificate",
+  "delete-identity", "set-identity-preference", "create-db", "export", "import", "cms",
+  "install-mds", "add-trusted-cert", "remove-trusted-cert", "dump-trust-settings",
+  "user-trust-settings-enable", "trust-settings-export", "trust-settings-import", "verify-cert",
+  "authorize", "authorizationdb", "execute-with-privileges", "leaks", "error",
+  "create-filevaultmaster-keychain", "smartcards", "translocate-create",
+  "translocate-policy-check", "translocate-status-check", "translocate-original-path",
+  "requirement-evaluate", "filevault",
+];
+
+/**
+ * The subcommand `security <args>` runs, as `security` resolves it: global
+ * options parsed as its `getopt("hilp:qvR")` does (BSD getopt stops at the
+ * first operand or `--`; `-p` takes a value, attached or next), then the first
+ * table entry the word is a prefix of. `null` when no subcommand is named.
+ */
+function securitySubcommand(args: readonly string[]): string | null {
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i]!;
+    if (arg === "--") { i++; break; }
+    if (!arg.startsWith("-") || arg === "-") break;
+    const takesValue = arg.indexOf("p", 1);
+    i += takesValue !== -1 && takesValue === arg.length - 1 ? 2 : 1;
+  }
+  const word = args[i];
+  if (word === undefined) return null;
+  const folded = word.toLowerCase();
+  return SECURITY_COMMANDS.find((name) => name.startsWith(folded)) ?? word;
+}
+
+/**
+ * Whether `words` (program first) runs a command `prefix` names. The program
+ * is compared by name; the rest of `prefix` must appear as a run anywhere among
+ * the later words, so a global option cannot slip one past. For `security`,
+ * the subcommand it would actually run (an abbreviation resolved) is matched
+ * too.
+ */
+function runsDeniedPrefix(words: readonly string[], prefix: readonly string[]): boolean {
+  if (prefix.length === 0 || words.length < prefix.length) return false;
+  const program = programName(prefix[0]!);
+  if (programName(words[0]!) !== program) return false;
+  const args = words.slice(1);
+  if (containsRun(args, prefix.slice(1))) return true;
+  return program === "security" && prefix.length > 1 && securitySubcommand(args) === prefix[1];
+}
+
+/**
  * Refuse a command that reads a credential: one matching any of
  * `deniedPrefixes` (token lists). The first token is compared by program name,
  * so a path or `.exe` spelling still matches. The rest must appear as a run
  * anywhere among the later words, not only right after the program, so a
  * global option (`security -q find-generic-password`) cannot slip one past.
+ * A `security` subcommand is also resolved as `security` resolves it, so an
+ * abbreviation (`security find-generic`) is refused too; see
+ * {@link SECURITY_COMMANDS}.
  * Words are unescaped as sh would (`find\-generic-password`). Checked before
  * the allowlist, so it holds even when a user widens `guard.allowedCommands`
  * to include `op` or `security`.
@@ -259,9 +328,7 @@ export function assertNotCredentialCommand(
   const words = commandWords(command.trim(), shellKind);
   if (words.length === 0) return;
   for (const prefix of deniedPrefixes) {
-    if (prefix.length === 0 || words.length < prefix.length) continue;
-    if (programName(words[0]!) !== programName(prefix[0]!)) continue;
-    if (containsRun(words.slice(1), prefix.slice(1))) {
+    if (runsDeniedPrefix(words, prefix)) {
       throw new GuardError(
         `Command "${prefix.join(" ")}" reads a stored credential; the agent may not run it, ` +
           `whatever guard.allowedCommands lists.`,

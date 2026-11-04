@@ -230,6 +230,24 @@ describe("the agent may not run a command that reads a stored credential", () =>
     "security 'find-generic'-password -w",
     "security \"find-generic-password\" -w",
     "secur\\ity find-generic-password -w",
+    // security runs the first table entry its word is a prefix of, so every
+    // prefix of find-generic-password runs it (no earlier entry starts with `f`).
+    "security f -s X -w",
+    "security fi -w",
+    "security find -s X -w",
+    "security find- -w",
+    "security find-g -w",
+    "security find-generic -s X -w",
+    "security find-generic-passwor -w",
+    // security compares case-sensitively; the guard folds case anyway.
+    "security FIND-GENERIC-PASSWORD -w",
+    "security Find-Generic -w",
+    // Global options parsed as getopt("hilp:qvR") does: -p takes a value.
+    "security -p prompt find-generic -w",
+    "security -pprompt find -w",
+    "security -qvp prompt fin -w",
+    "security -R find-gen -w",
+    "security -- find-generic -w",
     "op read op://vault/item/field",
     "/opt/homebrew/bin/op read x",
     "'/opt/homebrew/bin/op' item list",
@@ -258,6 +276,14 @@ describe("the agent may not run a command that reads a stored credential", () =>
     expect(() => guard.checkCommand("security list-keychains")).not.toThrow();
     expect(() => guard.checkCommand("security -q find-certificate -c x")).not.toThrow();
     expect(() => guard.checkCommand("security find-internet-password -s x")).not.toThrow();
+    expect(() => guard.checkCommand("security find-certificate -c f")).not.toThrow();
+    // Abbreviations of other subcommands resolve to those subcommands.
+    expect(() => guard.checkCommand("security find-c -c x")).not.toThrow();
+    expect(() => guard.checkCommand("security find-i -s x")).not.toThrow();
+    expect(() => guard.checkCommand("security find-k")).not.toThrow();
+    expect(() => guard.checkCommand("security list")).not.toThrow();
+    // A -p value is the prompt, not the subcommand.
+    expect(() => guard.checkCommand("security -p find-generic list-keychains")).not.toThrow();
     // Inside double quotes sh keeps a backslash before `-`, so this is not the subcommand.
     expect(() => guard.checkCommand("security \"find\\-generic-password\"")).not.toThrow();
     expect(() => guard.checkCommand("npm test")).not.toThrow();
