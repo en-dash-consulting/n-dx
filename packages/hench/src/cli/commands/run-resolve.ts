@@ -165,6 +165,13 @@ export interface RunResolution {
     rounds: Resolved<number>;
   };
   /**
+   * `llm.<vendor>.auth` (cli, api or auto) for the vendor this run uses, with
+   * the key that supplied it (`built-in` for the `auto` default); null for a
+   * vendor that takes no credential. No per-run flag, so it sits outside
+   * {@link resolved}; a `provider` it rules out is a refusal.
+   */
+  auth: Resolved<string | null>;
+  /**
    * `hench.escalation` as it bears on this task: its current failure streak,
    * and whether the run would be escalated — in which case {@link resolved}
    * already describes the escalated attempt (vendor, model, provider).
@@ -509,6 +516,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     saved: settings.saved ?? null,
     resolved,
     review: { rounds: settings.reviewRounds },
+    auth: settings.auth,
     escalation: {
       enabled: config.escalation?.enabled === true,
       failures: decision?.failures ?? 0,

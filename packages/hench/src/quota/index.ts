@@ -136,7 +136,7 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
         model: codexModel,
         percentRemaining: 0,
         unavailable: true,
-        notice: "codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota",
+        notice: "codex login (session auth) — export OPENAI_API_KEY or run 'ndx config credentials.codex' for quota (storing a key does not switch modes; 'ndx config llm.codex.auth api' does)",
       });
     }
   }

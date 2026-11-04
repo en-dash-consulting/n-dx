@@ -140,13 +140,13 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
     /claude.*not found|ENOENT.*claude/i,
     CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     "Claude CLI not found.",
-    "Install it with: npm install -g @anthropic-ai/claude-code\n       Or switch to the API provider: n-dx config hench.provider api",
+    "Install it with: npm install -g @anthropic-ai/claude-code\n       Or switch to the API provider: ndx config hench.provider api",
   ],
   [
     /ANTHROPIC_API_KEY/,
     CLI_ERROR_CODES.API_KEY_MISSING,
     "Anthropic API key not configured.",
-    "Set it via 'n-dx config claude.api_key <key>', the ANTHROPIC_API_KEY environment variable, or use 'n-dx config hench.provider cli' for Claude CLI mode.",
+    "Use the Claude CLI login ('claude login', then 'ndx config hench.provider cli'), or store a key with 'ndx config credentials.claude' or the ANTHROPIC_API_KEY environment variable. Storing a key does not switch modes; 'ndx config llm.claude.auth api' does.",
   ],
   // Codex CLI
   [
@@ -159,7 +159,7 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
     /OPENAI_API_KEY/,
     CLI_ERROR_CODES.API_KEY_MISSING,
     "OpenAI API key not configured.",
-    "Set it via 'n-dx config llm.codex.api_key <key>' or the OPENAI_API_KEY environment variable.",
+    "Use the Codex CLI login ('codex login'), or store a key with 'ndx config credentials.codex' or the OPENAI_API_KEY environment variable. Storing a key does not switch modes; 'ndx config llm.codex.auth api' does.",
   ],
   // Generic not-found (must come after vendor-specific patterns)
   [

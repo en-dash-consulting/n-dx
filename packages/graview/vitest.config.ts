@@ -28,7 +28,14 @@ export default defineConfig({
     ],
   },
   test: {
-    setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js"],
+    setupFiles: [
+      "../../tests/setup-color-env.js",
+      "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
+      // Credential isolation: a temp ndx home and no ambient TYPESAFE_API_KEY.
+      // Required by tests/e2e/credential-isolation-setup-policy.test.js.
+      "../../tests/setup-ndx-home.js",
+      "../../tests/setup-judgment-env.js",
+    ],
     include: ["tests/**/*.test.ts"],
     testTimeout: 30_000,
     hookTimeout: 30_000,

@@ -1325,7 +1325,7 @@ async function handleSmartAddPreview(
             `Verify the CLI works from the environment that launched the dashboard: ` +
             `\`time claude -p "hi"\`. If that hangs, the \`claude\` CLI isn't usable there ` +
             `(re-auth with \`claude\`, or run \`ndx start\` from a shell where it works). ` +
-            `An API key (\`n-dx config claude.api_key\`) is an optional faster path, not required.` +
+            `An API key (\`ndx config credentials.claude\`, then \`ndx config llm.claude.auth api\`) is an optional faster path, not required.` +
             (cliResult.stderr.trim() ? `\n\nstderr:\n${cliResult.stderr.trim()}` : ""),
         );
       }

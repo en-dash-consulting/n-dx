@@ -87,14 +87,14 @@ Or check that `.n-dx.json` exists with a valid `llm.vendor` field.
 
 **Fix**:
 ```sh
-# For Claude API mode
-ndx config llm.claude.api_key sk-ant-... .
-# or
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# For Claude CLI mode
+# For Claude CLI mode (default)
 ndx config llm.claude.cli_path claude .
 claude login
+
+# For Claude API mode: hidden prompt, then opt in
+ndx config credentials.claude
+ndx config llm.claude.auth api .
+ndx config credentials .          # which source each key comes from
 
 # For Codex
 ndx config llm.codex.cli_path codex .
