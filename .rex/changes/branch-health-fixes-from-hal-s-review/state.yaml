@@ -28,7 +28,14 @@ items:
     lastModified: "2026-11-04T22:27:02.663Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c9a0e430-c671-451b-8188-7454c936499f":
-    lastModified: "2026-11-04T19:26:02.821Z"
+    status: "completed"
+    startedAt: "2026-11-04T22:33:29.526Z"
+    completedAt: "2026-11-04T22:40:39.068Z"
+    endedAt: "2026-11-04T22:40:39.068Z"
+    activeIntervals: [{"end":"2026-11-04T22:40:39.068Z","start":"2026-11-04T22:33:29.526Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Other-worktree diffs cached server-wide in WorktreeDiffCache keyed by base and tip commit, LRU-capped at 1024; failed diffs not kept."
+    lastModified: "2026-11-04T22:40:39.068Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cf457468-5ec5-4a59-8de8-3edab986760d":
     lastModified: "2026-11-04T19:26:13.769Z"

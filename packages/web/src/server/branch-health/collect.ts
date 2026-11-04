@@ -13,7 +13,8 @@
  * Each predicted conflict is classified with a deterministic fix
  * (`conflicts.ts`) from its merge-tree stages and conflicted result, the
  * project's `web.generatedFiles`, whether the rex-state driver is registered,
- * and the paths other local worktrees' branches changed.
+ * and the paths other local worktrees' branches changed. Those diffs are kept
+ * across requests by base and tip commit (`diff-cache.ts`).
  *
  * Nothing here changes the worktree, the index or HEAD. `git merge-tree
  * --write-tree` computes the merge in the object store only.
@@ -32,6 +33,7 @@ import {
   parseRollup,
 } from "./checks.js";
 import { classifyConflicts, type ConflictSides, type WorktreeChanges } from "./conflicts.js";
+import { worktreeDiffs, type WorktreeDiffCache } from "./diff-cache.js";
 import type {
   BaseSource,
   BranchHealth,
@@ -58,6 +60,8 @@ export interface CollectOptions {
    * local-only read uses it for the base and the stack before upstreams.
    */
   prBases?: PrBaseCache;
+  /** Other worktrees' diffs by commit; defaults to the one this server shares across requests. */
+  worktreeDiffs?: WorktreeDiffCache;
   /** `web.generatedFiles`: conflicts in these paths are regenerated. None when undeclared. */
   generatedFiles?: readonly GeneratedFileRule[];
   /** Injected for tests; defaults to the llm-client `exec`. */
@@ -221,9 +225,19 @@ async function readSides(git: Runner, tree: string, file: MergeTreeFile): Promis
   return { path: file.path, stages: file.stages, ancestor, base, branch, result };
 }
 
-/** Every other local worktree on a branch, with the paths that branch changed against `base`. */
-async function readOtherWorktrees(git: Runner, base: string): Promise<WorktreeChanges[]> {
-  const [list, top] = await Promise.all([git.git(["worktree", "list", "--porcelain", "-z"]), git.git(["rev-parse", "--show-toplevel"])]);
+/**
+ * Every other local worktree on a branch, with the paths that branch changed
+ * against `base`. Each diff is looked up in `diffs` by the base and branch tip
+ * commits, so it runs once however many cards ask; a ref that does not resolve
+ * to a commit is diffed by name and not kept.
+ */
+async function readOtherWorktrees(git: Runner, base: string, diffs: WorktreeDiffCache): Promise<WorktreeChanges[]> {
+  const [list, top, baseCommit, tips] = await Promise.all([
+    git.git(["worktree", "list", "--porcelain", "-z"]),
+    git.git(["rev-parse", "--show-toplevel"]),
+    git.git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`]),
+    git.git(["for-each-ref", "--format=%(objectname)%00%(refname)", "refs/heads"]),
+  ]);
   if (!list.ok) return [];
   const self = top.ok ? top.stdout.trim() : null;
   const worktrees: WorktreeRef[] = [];
@@ -234,9 +248,23 @@ async function readOtherWorktrees(git: Runner, base: string): Promise<WorktreeCh
       worktrees.push({ path, branch: field.slice("branch refs/heads/".length) });
     }
   }
+  const baseId = baseCommit.ok ? baseCommit.stdout.trim() : "";
+  const tipOf = new Map<string, string>();
+  if (tips.ok) {
+    for (const line of tips.stdout.split("\n")) {
+      const [id, ref] = line.split("\0");
+      if (id && ref) tipOf.set(ref, id);
+    }
+  }
+  const diff = async (from: string, to: string): Promise<string[] | null> => {
+    const out = await git.git(["diff", "--name-only", "-z", `${from}...${to}`]);
+    return out.ok ? out.stdout.split("\0").filter(Boolean) : null;
+  };
   return mapLimit(worktrees, GIT_CONCURRENCY, async (w) => {
-    const out = await git.git(["diff", "--name-only", "-z", `${base}...refs/heads/${w.branch}`]);
-    return { ...w, changed: out.ok ? out.stdout.split("\0").filter(Boolean) : [] };
+    const ref = `refs/heads/${w.branch}`;
+    const tip = tipOf.get(ref);
+    const changed = baseId && tip ? await diffs.changed(baseId, tip, () => diff(baseId, tip)) : await diff(base, ref);
+    return { ...w, changed: changed ? [...changed] : [] };
   });
 }
 
@@ -258,6 +286,7 @@ async function predictConflicts(
   git: Runner,
   base: string,
   generatedFiles: readonly GeneratedFileRule[],
+  diffs: WorktreeDiffCache,
 ): Promise<{ conflicts: PredictedConflict[]; unavailable: string | null }> {
   // diff3 style puts the ancestor's lines in each hunk, which tells an
   // add-only hunk from one that changes a line.
@@ -278,7 +307,7 @@ async function predictConflicts(
     // Other worktrees only matter to a source conflict, and a repository can
     // have dozens of them: read their changes only when one needs naming.
     if (!conflicts.some((c) => c.class === "source")) return { conflicts, unavailable: null };
-    return { conflicts: classifyConflicts(sides, { ...ctx, worktrees: await readOtherWorktrees(git, base) }), unavailable: null };
+    return { conflicts: classifyConflicts(sides, { ...ctx, worktrees: await readOtherWorktrees(git, base, diffs) }), unavailable: null };
   }
   return { conflicts: [], unavailable: mergeTreeFailure(out) };
 }
@@ -502,7 +531,7 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
   }
 
   const counts = base ? await aheadBehind(git, base.ref) : { ahead: null, behind: null };
-  const predicted = base ? await predictConflicts(git, base.ref, options.generatedFiles ?? []) : { conflicts: [], unavailable: "There is no base to merge with." };
+  const predicted = base ? await predictConflicts(git, base.ref, options.generatedFiles ?? [], options.worktreeDiffs ?? worktreeDiffs) : { conflicts: [], unavailable: "There is no base to merge with." };
   const prBases: PrBaseLookup = { gh: ghAllowed, projectDir, cache: options.prBases };
   const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, prBases) : [];
   const github = pr ? await readGithubFacts(git, pr, base?.ref ?? null, stack) : null;

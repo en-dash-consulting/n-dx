@@ -18,6 +18,7 @@ export {
   PrBaseCache,
 } from "./collect.js";
 export type { CollectOptions, MergeTreeFile } from "./collect.js";
+export { WORKTREE_DIFF_CACHE_MAX, WorktreeDiffCache } from "./diff-cache.js";
 export {
   classifyConflict,
   classifyConflicts,

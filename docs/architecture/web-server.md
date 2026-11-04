@@ -296,6 +296,10 @@ is on; the route gate refuses it with 403 while the toggle is off.
 
   Stage blobs and other worktrees' diffs are read at most eight git processes
   at a time, and other worktrees only when a `source` conflict needs naming.
+  Each other-worktree diff is kept server-wide, keyed by the base and branch
+  tip commits (`branch-health/diff-cache.ts`, the 1024 most recently used), so
+  a board of W cards runs each diff once rather than W times, and a moved base
+  or tip is a new key, never a stale answer. A failed diff is not kept.
   `web.generatedFiles` is `[{ "paths": [globs], "command": [argv] }]`; with no
   declaration nothing is `generated`. This repository declares the prompt
   baseline, the iso-map skill script and `pnpm-lock.yaml`
