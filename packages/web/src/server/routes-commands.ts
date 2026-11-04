@@ -938,8 +938,15 @@ async function handleInit(
     // covers these same fields post-init). Set here via the same `ndx
     // config` CLI path that page documents; failures here are non-fatal —
     // init itself already succeeded, and these can be set from Settings.
+    // The key goes to the credential store on stdin, never on argv: a spawned
+    // argv is visible in the process list and the history warning would land
+    // in the init log.
     if (provider === "google" && googleApiKey) {
-      await foundationExec(bin, [...prefixArgs, "config", "llm.google.api_key", googleApiKey, ctx.projectDir], { cwd: ctx.projectDir, timeout: 15_000 }).catch(() => {});
+      await foundationExec(bin, [...prefixArgs, "config", "credentials.google", "--stdin", ctx.projectDir], {
+        cwd: ctx.projectDir,
+        timeout: 15_000,
+        input: googleApiKey,
+      }).catch(() => {});
     }
     if (provider === "local") {
       if (localHost) {

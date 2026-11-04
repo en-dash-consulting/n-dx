@@ -1,3 +1,4 @@
+import { jevAvailability } from "@n-dx/llm-client";
 import { SCHEMA_VERSION } from "../../schema/index.js";
 import { TOOL_VERSION } from "../commands/constants.js";
 import type { PRDStore } from "../../store/index.js";
@@ -28,6 +29,8 @@ export async function handleGetCapabilities(store: PRDStore, workspace?: Workspa
           supportsTransactions: caps.supportsTransactions,
           supportsWatch: caps.supportsWatch,
           sourcevision: config.sourcevision ?? "disabled",
+          // Where Jev's key would come from; never the key itself.
+          jev: jevAvailability(),
           future: config.future ?? {},
         },
         null,

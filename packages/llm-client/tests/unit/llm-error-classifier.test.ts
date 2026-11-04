@@ -62,7 +62,8 @@ describe("classifyLLMError", () => {
     const r = classifyLLMError(new Error("401 Unauthorized"), "google");
     expect(r.category).toBe("auth");
     expect(r.message).toContain("Authentication failed for Google");
-    expect(r.suggestion).toContain("llm.google.api_key");
+    expect(r.suggestion).toContain("credentials.google");
+    expect(r.suggestion).not.toContain("llm.google.auth");
     expect(r.suggestion).toContain("GEMINI_API_KEY");
   });
 

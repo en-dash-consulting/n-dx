@@ -340,7 +340,7 @@ describe("hench → llm-client gateway contract", () => {
     "resolveModelPricing",
     "priceTokens",
     "repoCommandEnv",
-    "resolveApiKey",
+    "resolveVendorAuth",
     "resolveCliPath",
     "loadProjectOverrides",
     "mergeWithOverrides",
@@ -356,6 +356,7 @@ describe("hench → llm-client gateway contract", () => {
     "redactDeep",
     "redactSecrets",
     "createLineRedactor",
+    "agentCredentialDenials",
     "setQuiet",
     "isQuiet",
     "setVerbose",
@@ -880,7 +881,10 @@ describe("gateway export auto-detection", () => {
     const sourceExports = parseRuntimeExports(gwPath);
 
     const testedSymbols = new Set([
-      ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
+      ...["loadClaudeConfig", "loadLLMConfig", "resolveCliPath",
+        // llm.<vendor>.auth: the key hench's API loop sends, and whether
+        // provider=api may start (replaced resolveApiKey, which knew no auth).
+        "resolveVendorAuth",
         "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv", "repoCommandEnv",
         // OS sandbox for tool children and the vendor CLI (guard/sandbox.ts).
         "detectSandboxBackend", "resolveSandboxSetting", "wrapInSandbox", "wrapShellInSandbox", "nodeToolchainRoots",
@@ -895,6 +899,9 @@ describe("gateway export auto-detection", () => {
         // trust review does not read them as the repository's routing.
         "HENCH_LOCAL_ONLY_SETTINGS", "writeHenchLocalSetting",
         "redactDeep", "redactSecrets", "createLineRedactor",
+        // The guard and the Claude CLI deny rules keep the agent out of the
+        // store and away from the commands that read a credential.
+        "agentCredentialDenials",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",

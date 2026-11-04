@@ -107,7 +107,8 @@ describe("createOpenAiApiProvider — construction", () => {
       const clientErr = err as ClaudeClientError;
       expect(clientErr.reason).toBe("auth");
       expect(clientErr.retryable).toBe(false);
-      expect(clientErr.message).toContain("OpenAI API key not found");
+      expect(clientErr.message).toContain("ndx config credentials.codex");
+      expect(clientErr.message).toContain("llm.codex.auth");
     }
   });
 

@@ -9,6 +9,10 @@
  * environment), so they get the same isolation sourcevision's own suite has
  * (packages/sourcevision/tests/setup-ndx-home.ts).
  *
+ * The ndx home also holds the per-user credential store, so every suite that
+ * can reach @n-dx/llm-client's resolver loads this file, never the developer's
+ * real store. tests/e2e/credential-isolation-setup-policy.test.js enforces it.
+ *
  * It sets `N_DX_HOME`, the lower-precedence of the two names resolveNdxHome
  * reads, and clears `NDX_HOME`. A test that wants a home of its own sets either
  * name and wins: the hub and token e2e tests pass `N_DX_HOME` to the CLIs they
