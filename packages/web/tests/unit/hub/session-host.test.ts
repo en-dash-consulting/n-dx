@@ -14,6 +14,7 @@ import {
   hubSessionHostLockPath,
   probeHubLens,
   readHubSessionHostLock,
+  releaseHubSessionHost,
   type ProjectView,
 } from "../../../src/hub/index.js";
 import { FEATURE_DISABLED_HEADER } from "../../../src/shared/index.js";
@@ -51,6 +52,26 @@ describe("claimHubSessionHost", () => {
   it("moves its own lock to a new port without counting it as newly acquired", () => {
     claimHubSessionHost(home, { pid: 11, port: 4000, isAlive });
     expect(claimHubSessionHost(home, { pid: 11, port: 4100, isAlive })).toMatchObject({ held: true, acquired: false, lock: { port: 4100 } });
+  });
+});
+
+describe("releaseHubSessionHost", () => {
+  it("removes the lock only while it names this pid and port", () => {
+    claimHubSessionHost(home, { pid: 11, port: 4000, isAlive });
+    expect(releaseHubSessionHost(home, { pid: 22, port: 4000 })).toBe(false);
+    expect(releaseHubSessionHost(home, { pid: 11, port: 4001 })).toBe(false);
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 11, port: 4000 });
+
+    expect(releaseHubSessionHost(home, { pid: 11, port: 4000 })).toBe(true);
+    expect(readHubSessionHostLock(home)).toBeNull();
+    expect(releaseHubSessionHost(home, { pid: 11, port: 4000 })).toBe(false);
+  });
+
+  it("lets a live second server claim the lock once the holder releases it", () => {
+    claimHubSessionHost(home, { pid: 11, port: 4000, isAlive });
+    expect(claimHubSessionHost(home, { pid: 22, port: 5000, isAlive })).toMatchObject({ held: false });
+    releaseHubSessionHost(home, { pid: 11, port: 4000 });
+    expect(claimHubSessionHost(home, { pid: 22, port: 5000, isAlive })).toMatchObject({ held: true, acquired: true });
   });
 });
 

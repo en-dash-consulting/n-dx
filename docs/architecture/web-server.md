@@ -213,6 +213,11 @@ picks. That is the holder of `<ndx home>/hub/sidecar/host.lock` (pid and port)
 while it is healthy, else the first healthy registered project, skipping one
 the proxy just failed to reach until its next health check. All session state
 is under `<ndx home>/hub/sidecar/`, so a new host resumes it from disk. The
+holder gives the lock up once any hub turn running on it has settled: on
+graceful shutdown (after interrupting the turn, waiting at most 5 s, and
+refusing new hub requests meanwhile), and when its web.sidecar gate refuses a
+hub session route. A crashed holder, or one whose turn outlasts the wait, is
+replaced as a dead pid. The
 path mapping and the lock's location are in `src/shared/base-path.ts`, which
 the host's routes (`server/routes-sidecar.ts`) read too. The hub judges the
 browser's credential and forwards the per-user token to the host, as it does
@@ -253,6 +258,9 @@ The hub session's broker is scoped (`BROKER_SCOPE_TOOLS` in
 - `save_draft` writes nothing before Approve. The card shows the absolute path
   (a relative one lands in `<ndx home>/hub/drafts/`), the operator can change
   it, an existing file is never overwritten, and it is never allow-listable.
+  A path is refused when any segment, or any segment of its nearest existing
+  ancestor's real path, is `.git` compared case-insensitively after an NTFS
+  stream suffix and trailing dots and spaces are stripped.
 
 ## Sidecar Guide and the run-plan card
 

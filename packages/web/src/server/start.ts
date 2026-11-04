@@ -56,7 +56,13 @@ import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
-import { handleSidecarRoute, type SidecarWorkspaces } from "./routes-sidecar.js";
+import {
+  handleSidecarRoute,
+  isHubSidecarPath,
+  releaseHubSessionHostForSidecarOff,
+  releaseHubSessionHostOnShutdown,
+  type SidecarWorkspaces,
+} from "./routes-sidecar.js";
 import { isSidecarBrokerRequest } from "./sidecar/broker-credential.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
@@ -162,6 +168,14 @@ export function registerShutdownHandlers(
     closeWorktreeRunWatchers();
     // Leases taken by GET /api/hench/runs/:id/log|events.
     stopRunTailWatches();
+    // The hub session host lock, if this server holds it: released once its
+    // interrupted hub turns settle, so the hub's next pick claims it at once
+    // without two servers writing the session.
+    try {
+      if (await releaseHubSessionHostOnShutdown(actualPort)) console.log("[shutdown] hub session host lock released");
+    } catch (err) {
+      console.error(`[shutdown] failed to release the hub session host lock: ${(err as Error).message}`);
+    }
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
@@ -855,7 +869,16 @@ async function handleApiRoutes(
   // rather than for whichever precondition its handler would have checked
   // first. `ctx` is already the addressed workspace's, so the toggle is read
   // from the project the request named. See route-feature-gates.ts.
-  if (enforceRouteFeatureGate(req, res, ctx)) return true;
+  if (enforceRouteFeatureGate(req, res, ctx)) {
+    // Only web.sidecar gates the hub session routes. The hub moves on to
+    // another host, which can claim the lock once this server gives it up.
+    if (isHubSidecarPath((req.url || "/").split("?")[0])) {
+      releaseHubSessionHostForSidecarOff(ctx).catch((err: Error) => {
+        console.error(`[sidecar] failed to release the hub session host lock: ${err.message}`);
+      });
+    }
+    return true;
+  }
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;

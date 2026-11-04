@@ -139,7 +139,15 @@ import {
   injectSessionScript,
   applySameOriginFramePolicy,
 } from "../shared/index.js";
-import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, recordHubUsage, resolveHubHome } from "../hub/index.js";
+import {
+  claimHubSessionHost,
+  HUB_SESSION_FEATURE,
+  hubLedgerPath,
+  hubSidecarDir,
+  recordHubUsage,
+  releaseHubSessionHost,
+  resolveHubHome,
+} from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -790,6 +798,78 @@ function hubHostState(
   return state;
 }
 
+/** Whether `pathname` is one of the hub session's routes, `/api/sidecar/hub[/…]`. */
+export function isHubSidecarPath(pathname: string): boolean {
+  return pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`);
+}
+
+/** Releases already waiting on a hub turn, by host key, so repeated refusals share one. */
+const hubReleases = new Map<string, Promise<boolean>>();
+
+/**
+ * Give up the hub session host lock because web.sidecar is off on this
+ * server: its route gate refused a `/api/sidecar/hub/*` request, and the hub
+ * has moved on to another project. A hub turn still running here finishes
+ * first, and the lock stays held until it does, so no other host resumes
+ * the session under it. Released only if the feature is still off then.
+ *
+ * @returns true when this call removed the lock.
+ */
+export function releaseHubSessionHostForSidecarOff(ctx: ServerContext, opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> = {}): Promise<boolean> {
+  if (!ctx.port) return Promise.resolve(false);
+  const port = ctx.port;
+  const home = resolveHubHome(opts.homeDir);
+  const pid = opts.pid ?? process.pid;
+  const key = `${hubSidecarDir(home)}\0${pid}`;
+  const pending = hubReleases.get(key);
+  if (pending) return pending;
+  const release = (async () => {
+    await hubHosts.get(key)?.registry.whenIdle();
+    if (isFeatureEnabled(ctx.projectDir, HUB_SESSION_FEATURE)) return false;
+    return releaseHubSessionHost(home, { pid, port });
+  })().finally(() => hubReleases.delete(key));
+  hubReleases.set(key, release);
+  return release;
+}
+
+/** Host keys whose server is shutting down: their hub session routes refuse, so nothing claims the lock again or starts a turn. */
+const hubShuttingDown = new Set<string>();
+
+/** How long shutdown waits for an interrupted hub turn to settle before it leaves the lock to dead-pid takeover. */
+export const HUB_SHUTDOWN_TURN_WAIT_MS = 5_000;
+
+/**
+ * Give up the hub session host lock on shutdown. Hub session routes on this
+ * server refuse from now on; its running hub turns are interrupted, and the
+ * lock goes only once they have settled, so no other host resumes the
+ * session while a turn here still writes it. A turn that outlasts `waitMs`
+ * keeps the lock, which the next host takes once this process has exited.
+ * A lock another server holds is left alone.
+ *
+ * @returns true when this call removed the lock.
+ */
+export async function releaseHubSessionHostOnShutdown(
+  port: number,
+  opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> & { waitMs?: number } = {},
+): Promise<boolean> {
+  const home = resolveHubHome(opts.homeDir);
+  const pid = opts.pid ?? process.pid;
+  const key = `${hubSidecarDir(home)}\0${pid}`;
+  hubShuttingDown.add(key);
+  const registry = hubHosts.get(key)?.registry;
+  if (registry) {
+    await registry.interruptAll();
+    let timer: NodeJS.Timeout | undefined;
+    const settled = await Promise.race([
+      registry.whenIdle().then(() => true),
+      new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), opts.waitMs ?? HUB_SHUTDOWN_TURN_WAIT_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (!settled) return false;
+  }
+  return releaseHubSessionHost(home, { pid, port });
+}
+
 /**
  * Where the drawer page reaches the hub session, and what it posts to close.
  * Mirrored by `HubSessionPageConfig` in viewer/hooks/use-hub-session.ts.
@@ -996,6 +1076,7 @@ async function handleHubSidecarRoute(
   const home = resolveHubHome(opts.homeDir);
   const dir = hubSidecarDir(home);
   const pid = opts.pid ?? process.pid;
+  if (hubShuttingDown.has(`${dir}\0${pid}`)) return refuse(res, 503, "This server is shutting down; the hub session moves to another project server");
   const claim = claimHubSessionHost(home, { pid, port: ctx.port, ...(opts.isAlive && { isAlive: opts.isAlive }) });
 
   if (!claim.held) {
@@ -1043,7 +1124,7 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`)) {
+  if (isHubSidecarPath(pathname)) {
     return handleHubSidecarRoute(req, res, ctx, broadcast, opts.hub, pathname, search);
   }
   if (
