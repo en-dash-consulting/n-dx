@@ -4431,25 +4431,56 @@ async function fileApiKeys(dir, which) {
  * written to the store first and removed from the file only after that write
  * succeeded, so a failed write loses nothing. A vendor whose store entry is a
  * helper is skipped: the password-manager setup outranks a plaintext file key,
- * and overwriting it would put that key in the store as plaintext. Never
- * prints a value. Returns whether nothing failed.
+ * and overwriting it would put that key in the store as plaintext. A key the
+ * store already holds is only removed from the file. A different stored key
+ * is replaced only when `confirm` (a terminal) accepts a question naming both
+ * fingerprints; without one the vendor is skipped. Never prints a value.
+ * Returns whether nothing failed.
+ *
+ * @param {string} dir
+ * @param {((question: string) => Promise<boolean>) | null} confirm
  */
-async function importLocalApiKeys(dir) {
+async function importLocalApiKeys(dir, confirm) {
   const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
   const status = spawnCredentialsCli(["status", "--json"]);
   if (status.code !== 0) {
     console.error(`Could not read the credential store; nothing imported: ${status.stderr.trim()}`);
     return false;
   }
-  const helperVendors = new Set(JSON.parse(status.stdout).filter((s) => s.backend === "helper").map((s) => s.name));
+  const { credentialFingerprint } = await import("@n-dx/llm-client");
+  const stored = new Map(JSON.parse(status.stdout).map((s) => [s.name, s]));
   let allMoved = true;
   for (const { vendor, value } of await localFileApiKeys(dir)) {
-    if (helperVendors.has(vendor)) {
+    const entry = stored.get(vendor);
+    if (entry?.backend === "helper") {
       console.log(
         `Skipped the ${vendor} key: the credential store runs a helper for ${vendor}. ` +
           `The key stays in ${label}; remove it there by hand.`,
       );
       continue;
+    }
+    const fileFingerprint = credentialFingerprint(value);
+    if (entry?.backend) {
+      // An exported key hides the stored one's fingerprint: never a match.
+      const storedFingerprint = entry.source === "file" ? entry.fingerprint : null;
+      if (storedFingerprint === fileFingerprint) {
+        await removeFileApiKey(dir, LOCAL_CONFIG_FILE, vendor);
+        console.log(`The ${vendor} key in ${label} is already in the credential store; removed it from ${label}.`);
+        await setApiAuthIfUnset(dir, vendor);
+        continue;
+      }
+      const shown = storedFingerprint ?? "unknown: an exported key hides it";
+      const question =
+        `The credential store holds a different ${vendor} key (fingerprint ${shown}). ` +
+        `Replace it with the one in ${label} (fingerprint ${fileFingerprint})? [y/N] `;
+      if (!(confirm && (await confirm(question)))) {
+        console.log(
+          `Skipped the ${vendor} key: the credential store holds a different one ` +
+            `(stored fingerprint ${shown}, ${label} fingerprint ${fileFingerprint}). ` +
+            `The key stays in ${label}, where it outranks the store; run ndx config credentials --import in a terminal to choose, or remove it there by hand.`,
+        );
+        continue;
+      }
     }
     const result = spawnCredentialsCli(["set", vendor], value);
     if (result.code !== 0) {
@@ -4476,24 +4507,41 @@ async function readAnswer() {
   }
 }
 
+/** Ask a yes/no question on stderr; only a y or yes is a yes. */
+async function confirmOnTerminal(question) {
+  process.stderr.write(question);
+  return /^y(es)?$/i.test((await readAnswer()).trim());
+}
+
 /**
  * `ndx config credentials` with a key in `.n-dx.local.json`: `--import` moves
  * it without a prompt, a terminal is asked, and anything else is told how.
+ * A tracked (or untellable) local file is repository config: its keys belong
+ * to the repository, so they are never moved into this user's store and the
+ * shared file is never rewritten.
  */
 async function offerKeyImport(dir, flags) {
   const keys = await localFileApiKeys(dir);
   if (keys.length === 0) return;
   const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
   const names = keys.map((k) => k.vendor).join(", ");
+  const tracked = await localConfigTrackedStatus(dir);
+  if (tracked.tracked) {
+    console.log(
+      `${label} holds an API key (${names}), but the file belongs to the repository (${tracked.reason}), ` +
+        `so its keys are not moved to your credential store. Store your own with: ndx config credentials.<vendor>`,
+    );
+    return;
+  }
+  const terminal = Boolean(process.stdin.isTTY && process.stderr.isTTY);
   if (flags.import !== "true") {
-    if (!(process.stdin.isTTY && process.stderr.isTTY)) {
+    if (!terminal) {
       console.log(`${label} holds an API key (${names}). Move it to the credential store: ndx config credentials --import`);
       return;
     }
-    process.stderr.write(`${label} holds an API key (${names}). Move it to the credential store? [y/N] `);
-    if (!/^y(es)?$/i.test((await readAnswer()).trim())) return;
+    if (!(await confirmOnTerminal(`${label} holds an API key (${names}). Move it to the credential store? [y/N] `))) return;
   }
-  if (!(await importLocalApiKeys(dir))) process.exit(1);
+  if (!(await importLocalApiKeys(dir, terminal ? confirmOnTerminal : null))) process.exit(1);
 }
 
 /**

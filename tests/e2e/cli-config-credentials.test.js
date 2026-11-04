@@ -4,6 +4,7 @@ import { mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promise
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { CLI_PATH, DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
@@ -343,6 +344,60 @@ describe("ndx config credentials --import", () => {
     expect(skipped).toHaveLength(1);
     expect(skipped[0]).toContain(".n-dx.local.json");
     expect(r.out + r.err).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+
+  const storedClaude = async () => JSON.parse(await readFile(join(home, "credentials.json"), "utf-8")).entries.claude;
+  const fingerprintOf = (value) => createHash("sha256").update(value).digest("hex").slice(0, 8);
+
+  it("removes a key the store already holds from the file without rewriting the store", async () => {
+    expect(config(["credentials.claude", "--stdin"], KEY).code).toBe(0);
+    const storePath = join(home, "credentials.json");
+    const before = await readFile(storePath, "utf-8");
+    const mtime = (await stat(storePath)).mtimeMs;
+    await seed({ claude: { api_key: KEY } });
+
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).toMatch(/claude key in .*\.n-dx\.local\.json is already in the credential store/);
+    expect(await readFile(localPath(), "utf-8")).not.toContain(KEY);
+    expect(await readFile(storePath, "utf-8")).toBe(before);
+    expect((await stat(storePath)).mtimeMs).toBe(mtime);
+  }, DEFAULT_TIMEOUT);
+
+  it("never replaces a different stored key without a terminal to confirm, and names both fingerprints", async () => {
+    const STORED = "sk-ant-placeholder-stored-9876543210";
+    expect(config(["credentials.claude", "--stdin"], STORED).code).toBe(0);
+    const before = await storedClaude();
+    await seed({ claude: { api_key: KEY } });
+
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code, r.err).toBe(0);
+    expect(await storedClaude()).toEqual(before);
+    expect(await readFile(localPath(), "utf-8")).toContain(KEY);
+    const skipped = r.out.split("\n").find((l) => /Skipped the claude key/.test(l));
+    expect(skipped).toContain(`stored fingerprint ${fingerprintOf(STORED)}`);
+    expect(skipped).toContain(`fingerprint ${fingerprintOf(KEY)}`);
+    for (const text of [r.out, r.err]) {
+      expect(text).not.toContain(KEY);
+      expect(text).not.toContain(STORED);
+    }
+  }, DEFAULT_TIMEOUT);
+
+  it("leaves a git-tracked local file and the store alone, saying the file belongs to the repository", async () => {
+    await seed({ google: { api_key: KEY } });
+    const git = (args) => spawnSync("git", args, { cwd, stdio: "pipe" });
+    git(["init", "-q"]);
+    git(["add", "-f", "--", ".n-dx.local.json"]);
+    const before = await readFile(localPath(), "utf-8");
+
+    for (const args of [["credentials", "--import", cwd], ["credentials", cwd]]) {
+      const r = config(args);
+      expect(r.code, r.err).toBe(0);
+      expect(r.out).toMatch(/holds an API key \(google\), but the file belongs to the repository/);
+      expect(r.out + r.err).not.toContain(KEY);
+    }
+    expect(await readFile(localPath(), "utf-8")).toBe(before);
+    expect(existsSync(join(home, "credentials.json"))).toBe(false);
   }, DEFAULT_TIMEOUT);
 
   it("removes a key from the file only after the store write succeeded", async () => {

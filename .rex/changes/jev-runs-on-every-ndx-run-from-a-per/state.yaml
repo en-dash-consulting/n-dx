@@ -81,7 +81,14 @@ items:
     lastModified: "2026-11-02T20:51:36.470Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5a0e4b05-12bc-46a3-ad63-36d74d54b9d3":
-    lastModified: "2026-11-04T17:25:49.140Z"
+    status: "completed"
+    startedAt: "2026-11-04T19:49:26.603Z"
+    completedAt: "2026-11-04T20:03:03.351Z"
+    endedAt: "2026-11-04T20:03:03.351Z"
+    activeIntervals: [{"end":"2026-11-04T20:03:03.351Z","start":"2026-11-04T19:49:26.603Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "importLocalApiKeys compares fingerprints: a matching stored key is only removed from .n-dx.local.json; a different one needs a terminal confirmation naming both fingerprints, else skipped. offerKeyImport refuses a tracked/untellable local file as repository config."
+    lastModified: "2026-11-04T20:03:03.351Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "68b2709d-174e-4ec2-bf3f-163fdda6115c":
     status: "deferred"
