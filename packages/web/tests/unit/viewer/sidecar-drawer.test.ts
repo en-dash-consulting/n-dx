@@ -516,6 +516,11 @@ describe("the composer", () => {
 // ── Socket reconnect ───────────────────────────────────────────────────────
 
 describe("the socket", () => {
+  /** The server goes away: every open socket closes. */
+  function dropSockets(): void {
+    for (const socket of [...FakeSocket.open]) { FakeSocket.open.delete(socket); socket.onclose?.(); }
+  }
+
   it("reconnects after a drop and catches up on cards and frames", async () => {
     server.sessions = [{ session: session(), running: false }];
     await mount();
@@ -532,17 +537,19 @@ describe("the socket", () => {
     expect(input().disabled).toBe(true);
 
     // The socket drops mid-turn; while it is down a card is raised and the turn ends.
-    const dropped = [...FakeSocket.open];
-    await act(async () => {
-      for (const socket of dropped) { FakeSocket.open.delete(socket); socket.onclose?.(); }
-    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    dropSockets();
     server.cards.push(card("c1", 1));
     server.frames.push(said(1, "Zone 3 is…"));
     server.running = false;
     expect(root.querySelector(".sidecar-card")).toBeNull();
 
-    // Backoff elapses, the hook reopens through openWebSocket, and reopening catches up.
-    await act(async () => { await new Promise<void>((r) => setTimeout(r, 1100)); });
+    // Before the first backoff step nothing reopens; at it, the hook reopens through openWebSocket.
+    vi.advanceTimersByTime(999);
+    expect(FakeSocket.open.size).toBe(0);
+    vi.advanceTimersByTime(1);
+    vi.useRealTimers();
+    // Other listeners in the shell reconnect too; only Sidecar's catches up on cards and frames below.
     expect(FakeSocket.open.size).toBeGreaterThan(0);
     await act(async () => { for (const socket of FakeSocket.open) socket.onopen?.(); });
     await settle();
@@ -554,11 +561,11 @@ describe("the socket", () => {
 
   it("stops retrying once unmounted", async () => {
     await mount();
-    await act(async () => {
-      for (const socket of [...FakeSocket.open]) { FakeSocket.open.delete(socket); socket.onclose?.(); }
-    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    dropSockets();
     await unmount();
-    await act(async () => { await new Promise<void>((r) => setTimeout(r, 1100)); });
+    vi.advanceTimersByTime(60_000);
+    vi.useRealTimers();
     expect(FakeSocket.open.size).toBe(0);
   });
 });
