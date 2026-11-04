@@ -213,6 +213,9 @@ picks. That is the holder of `<ndx home>/hub/sidecar/host.lock` (pid and port)
 while it is healthy, else the first healthy registered project, skipping one
 the proxy just failed to reach until its next health check. All session state
 is under `<ndx home>/hub/sidecar/`, so a new host resumes it from disk. The
+holder gives the lock up on graceful shutdown, and when its web.sidecar gate
+refuses a hub session route, once any hub turn running on it finishes; a
+crashed holder is replaced as a dead pid. The
 path mapping and the lock's location are in `src/shared/base-path.ts`, which
 the host's routes (`server/routes-sidecar.ts`) read too. The hub judges the
 browser's credential and forwards the per-user token to the host, as it does

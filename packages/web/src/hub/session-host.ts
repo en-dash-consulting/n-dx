@@ -8,7 +8,9 @@
  * - **The host lock** (`<ndx home>/hub/sidecar/host.lock`) holds the pid and
  *   port of the server hosting it. A server claims it before serving a hub
  *   session route; a live holder that is not the caller keeps it, a dead
- *   one is replaced. {@link claimHubSessionHost} is the host's side.
+ *   one is replaced. {@link claimHubSessionHost} is the host's side, and
+ *   {@link releaseHubSessionHost} gives the lock up when the host's
+ *   web.sidecar is turned off or it shuts down.
  * - **The pick** is the hub's side: the lock's holder while it is a healthy
  *   registered project, else the first healthy registered project. A host
  *   the proxy could not reach, or whose route gate refused for web.sidecar,
@@ -110,6 +112,18 @@ export function claimHubSessionHost(hubHome: string, input: ClaimHubSessionHostI
   const holder = readHubSessionHostLock(hubHome);
   if (holder) return { held: false, holder };
   throw new Error(`Could not claim ${path}: it changed on every attempt`);
+}
+
+/**
+ * Give up the host lock held by `pid` on `port`, so the next server the hub
+ * picks claims it without waiting for this process to exit. A lock naming any
+ * other pid or port is left alone. True when this call removed the lock.
+ */
+export function releaseHubSessionHost(hubHome: string, holder: { pid: number; port: number }): boolean {
+  const lock = readHubSessionHostLock(hubHome);
+  if (!lock || lock.pid !== holder.pid || lock.port !== holder.port) return false;
+  rmSync(hubSessionHostLockPath(hubHome), { force: true });
+  return true;
 }
 
 /** The project's port, when its last health check answered. */

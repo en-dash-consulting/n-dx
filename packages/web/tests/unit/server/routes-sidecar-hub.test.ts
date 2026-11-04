@@ -28,6 +28,8 @@ import {
   handleSidecarRoute,
   hubLedgerTarget,
   hubSidecarContextOptions,
+  isHubSidecarPath,
+  releaseHubSessionHostForSidecarOff,
   type SidecarFramesMessage,
 } from "../../../src/server/routes-sidecar.js";
 import { SidecarBroker } from "../../../src/server/sidecar/broker.js";
@@ -51,6 +53,8 @@ let messages: SidecarFramesMessage[];
 let worktrees: unknown[];
 /** While set, the Claude stand-in answers every turn with an error, as a signed-out CLI does. */
 let failTurns = false;
+/** Finishers of HOLD turns still running. */
+let held: Array<() => void> = [];
 
 /** Claude stand-in that records each prompt. An operator turn containing BIG reports 50k tokens of context. */
 const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) => {
@@ -71,11 +75,16 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
     out({ type: "system", subtype: "init", session_id: id });
     // A HANG turn never ends, so its broker stays open for the test to reach.
     if (prompt.includes("HANG")) return;
-    out({ type: "assistant", session_id: id, message: { id: `m-${spawns}`, content: [{ type: "text", text: "ok" }], usage: { input_tokens: input, output_tokens: 4 } } });
-    out({ type: "result", session_id: id, result: failTurns ? "not logged in" : "ok", ...(failTurns && { is_error: true }) });
-    stdout.end();
-    Object.assign(child, { exitCode: failTurns ? 1 : 0 });
-    setImmediate(() => { child.emit("exit", 0, null); child.emit("close", 0, null); });
+    const finish = (): void => {
+      out({ type: "assistant", session_id: id, message: { id: `m-${spawns}`, content: [{ type: "text", text: "ok" }], usage: { input_tokens: input, output_tokens: 4 } } });
+      out({ type: "result", session_id: id, result: failTurns ? "not logged in" : "ok", ...(failTurns && { is_error: true }) });
+      stdout.end();
+      Object.assign(child, { exitCode: failTurns ? 1 : 0 });
+      setImmediate(() => { child.emit("exit", 0, null); child.emit("close", 0, null); });
+    };
+    // A HOLD turn ends when the test calls the finisher it leaves in `held`.
+    if (prompt.includes("HOLD")) held.push(finish);
+    else finish();
   });
   return child as unknown as ChildProcess;
 };
@@ -110,12 +119,16 @@ function writeProjectConfig(config: Record<string, unknown>): void {
   writeFileSync(join(ctx.projectDir, ".n-dx.json"), JSON.stringify(config));
 }
 
-/** A project server whose hub-session routes run as `pid` on `port`. */
-async function startHost(pid: number, port: number, drawerHtml?: () => string | null): Promise<RouteTestServer> {
-  const hostCtx: ServerContext = { ...ctx, port };
+/** A project server whose hub-session routes run as `pid` on `port`, over `projectDir` (the shared project by default). */
+async function startHost(pid: number, port: number, drawerHtml?: () => string | null, projectDir?: string): Promise<RouteTestServer> {
+  const hostCtx: ServerContext = { ...ctx, ...(projectDir && { projectDir }), port };
   const server = await startRouteTestServer((req: IncomingMessage, res: ServerResponse) => {
-    // As start.ts does: the feature gate runs before any route.
-    if (enforceRouteFeatureGate(req, res, hostCtx)) return Promise.resolve(true);
+    // As start.ts does: the feature gate runs before any route, and a refused
+    // hub session route gives up the host lock.
+    if (enforceRouteFeatureGate(req, res, hostCtx)) {
+      if (isHubSidecarPath((req.url || "/").split("?")[0])) void releaseHubSessionHostForSidecarOff(hostCtx, { homeDir: home, pid });
+      return Promise.resolve(true);
+    }
     return handleSidecarRoute(req, res, hostCtx, (m) => { messages.push(m as SidecarFramesMessage); }, {
       hub: {
         homeDir: home,
@@ -166,6 +179,7 @@ beforeEach(() => {
   workspaces = { anchor: "main", workspaces: [] };
   handoffs = [];
   failTurns = false;
+  held = [];
   servers = [];
   alive = new Set([1001, 2002]);
 });
@@ -246,6 +260,47 @@ describe("one hub session per machine", () => {
     expect(res.status).toBe(403);
     expect(await res.text()).toContain("web.sidecar");
     expect(existsSync(hubSessionHostLockPath(home))).toBe(false);
+  });
+
+  it("gives up the lock when its web.sidecar is turned off, once the hub turn running on it finishes", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    expect((await hubApi(host, `/${session.id}/turns`, { method: "POST", body: { prompt: "HOLD" } })).status).toBe(202);
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+
+    const otherDir = join(root, "other");
+    mkdirSync(otherDir, { recursive: true });
+    writeFileSync(join(otherDir, ".n-dx.json"), JSON.stringify({ features: { web: { sidecar: true } } }));
+    const other = await startHost(2002, 5555, undefined, otherDir);
+
+    writeProjectConfig({});
+    expect((await hubApi(host, "")).status).toBe(403);
+    // The turn still runs on the old host, so the lock stays and nobody else resumes the session.
+    expect((await hubApi(other, "")).status).toBe(409);
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 1001, port: 4321 });
+
+    held[0]();
+    await vi.waitFor(() => expect(readHubSessionHostLock(home)).toBeNull());
+    const got = await hubApi(other, `/${session.id}`);
+    expect(got.status).toBe(200);
+    expect((await got.json()).session).toMatchObject({ id: session.id, turns: 1 });
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 2002, port: 5555 });
+  });
+
+  it("keeps the lock when web.sidecar is back on by the time its turn finishes", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    expect((await hubApi(host, `/${session.id}/turns`, { method: "POST", body: { prompt: "HOLD" } })).status).toBe(202);
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+
+    writeProjectConfig({});
+    expect((await hubApi(host, "")).status).toBe(403);
+    writeProjectConfig({ features: { web: { sidecar: true } } });
+    const from = messages.length;
+    held[0]();
+    await vi.waitFor(() => expect(messages.slice(from).some((m) => m.sessionId === session.id && !m.running)).toBe(true));
+    expect((await hubApi(host, "")).status).toBe(200);
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 1001, port: 4321 });
   });
 });
 

@@ -138,7 +138,14 @@ import {
   injectSessionScript,
   applySameOriginFramePolicy,
 } from "../shared/index.js";
-import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, resolveHubHome } from "../hub/index.js";
+import {
+  claimHubSessionHost,
+  HUB_SESSION_FEATURE,
+  hubLedgerPath,
+  hubSidecarDir,
+  releaseHubSessionHost,
+  resolveHubHome,
+} from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -759,6 +766,49 @@ function hubHostState(
   return state;
 }
 
+/** Whether `pathname` is one of the hub session's routes, `/api/sidecar/hub[/…]`. */
+export function isHubSidecarPath(pathname: string): boolean {
+  return pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`);
+}
+
+/** Releases already waiting on a hub turn, by host key, so repeated refusals share one. */
+const hubReleases = new Map<string, Promise<boolean>>();
+
+/**
+ * Give up the hub session host lock because web.sidecar is off on this
+ * server: its route gate refused a `/api/sidecar/hub/*` request, and the hub
+ * has moved on to another project. A hub turn still running here finishes
+ * first, and the lock stays held until it does, so no other host resumes
+ * the session under it. Released only if the feature is still off then.
+ *
+ * @returns true when this call removed the lock.
+ */
+export function releaseHubSessionHostForSidecarOff(ctx: ServerContext, opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> = {}): Promise<boolean> {
+  if (!ctx.port) return Promise.resolve(false);
+  const port = ctx.port;
+  const home = resolveHubHome(opts.homeDir);
+  const pid = opts.pid ?? process.pid;
+  const key = `${hubSidecarDir(home)}\0${pid}`;
+  const pending = hubReleases.get(key);
+  if (pending) return pending;
+  const release = (async () => {
+    await hubHosts.get(key)?.registry.whenIdle();
+    if (isFeatureEnabled(ctx.projectDir, HUB_SESSION_FEATURE)) return false;
+    return releaseHubSessionHost(home, { pid, port });
+  })().finally(() => hubReleases.delete(key));
+  hubReleases.set(key, release);
+  return release;
+}
+
+/**
+ * Give up the hub session host lock on shutdown, without waiting: the
+ * shutdown ends this server's turns anyway. A lock another server holds is
+ * left alone.
+ */
+export function releaseHubSessionHostOnShutdown(port: number, opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> = {}): boolean {
+  return releaseHubSessionHost(resolveHubHome(opts.homeDir), { pid: opts.pid ?? process.pid, port });
+}
+
 /**
  * Where the drawer page reaches the hub session, and what it posts to close.
  * Mirrored by `HubSessionPageConfig` in viewer/hooks/use-hub-session.ts.
@@ -1012,7 +1062,7 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`)) {
+  if (isHubSidecarPath(pathname)) {
     return handleHubSidecarRoute(req, res, ctx, broadcast, opts.hub, pathname, search);
   }
   if (
