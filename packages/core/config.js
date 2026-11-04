@@ -2665,6 +2665,7 @@ Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying
   NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH    Configured Claude command is not resolvable on PATH
   NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED  Claude CLI is present but needs authentication
+  NDX_CLAUDE_PREFLIGHT_NO_KEY         llm.claude.auth is "api" and no key may be used (ndx config credentials.claude)
   NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED  Claude appears authenticated/installed, but ndx cannot launch a usable executable
 
 Google preflight error codes:

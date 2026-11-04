@@ -583,6 +583,12 @@ describe("ndx auth", () => {
       expect(await ran(vendor)).toBe(false);
     });
 
+    it("ndx config --help lists the Claude no-key preflight code", () => {
+      const { stdout } = runNdx(["config", "--help"], env);
+
+      expect(stdout).toMatch(/NDX_CLAUDE_PREFLIGHT_NO_KEY\s+llm\.claude\.auth is "api"/);
+    });
+
     it("ndx config llm.vendor --soft-preflight (ndx init) proceeds and persists the vendor", async () => {
       await writeLocal({ llm: { codex: { auth: "api" } } });
 

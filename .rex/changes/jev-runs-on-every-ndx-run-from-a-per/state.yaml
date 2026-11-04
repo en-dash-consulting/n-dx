@@ -259,10 +259,14 @@ items:
     lastModified: "2026-11-03T17:28:25.718Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e97d3394-f0a1-4199-935f-7c7ca4636a87":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T18:38:34.143Z"
-    activeIntervals: [{"start":"2026-11-04T18:38:34.143Z"}]
-    lastModified: "2026-11-04T18:38:34.749Z"
+    completedAt: "2026-11-04T18:55:11.296Z"
+    endedAt: "2026-11-04T18:55:11.296Z"
+    activeIntervals: [{"end":"2026-11-04T18:55:11.296Z","start":"2026-11-04T18:38:34.143Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runVendorAuthPreflight catches the auth-reason error and returns { ok: false, errorCode: NDX_<VENDOR>_PREFLIGHT_NO_KEY }; --version probes resolve auth api as cli (no key, no helper)."
+    lastModified: "2026-11-04T18:55:11.296Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee87336f-2945-4507-a90d-c92f36923c31":
     lastModified: "2026-11-04T17:25:52.134Z"
