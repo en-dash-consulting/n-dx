@@ -112,8 +112,11 @@ export async function readPlacementEdit(
   if (!check.ok) return bad(`Rex would refuse the edited placement (kind: ${check.kind}): ${check.error}`);
   const seen = parseReviewedCheck(reviewed);
   if (typeof seen === "string") return bad(seen);
-  const moved = movedSince(seen, check) ?? movedFromCard(card.check, check);
+  const moved = movedSince(seen, check);
   if (moved) return { status: 409, error: `Nothing was written: ${moved}. Check the placement again before approving.` };
+  // Checking again cannot help here: the card itself was drafted on a spec that is gone.
+  const stale = movedFromCard(card.check, check);
+  if (stale) return { status: 409, error: `Nothing was written: ${stale}. Leave the card in the Inbox and have the agent raise a new one.` };
   return { request, check };
 }
 

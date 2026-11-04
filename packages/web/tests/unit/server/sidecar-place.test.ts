@@ -521,7 +521,11 @@ describe("place_change_card", () => {
     const edited = { add: [{ id: "c3", text: "A declined card can be retried once" }] };
     const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria: edited }, reviewed });
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { error: string }).error).toContain('the spec of "Pay by card" changed since the card was raised');
+    const refusal = ((await res.json()) as { error: string }).error;
+    expect(refusal).toContain('the spec of "Pay by card" changed since the card was raised');
+    // Checking again cannot help: the operator is told to raise a new card.
+    expect(refusal).toContain("raise a new one");
+    expect(refusal).not.toContain("Check the placement again");
     expect(treeHash()).toBe(before);
     expect((await changeNode()).change.amends ?? []).toEqual([]);
     await decide(card.id, { decision: "deny" });

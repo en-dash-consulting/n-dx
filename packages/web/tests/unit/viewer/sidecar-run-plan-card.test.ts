@@ -56,7 +56,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchSpy);
 });
 
-async function draw(card: SidecarCard, decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => {})) {
+async function draw(card: SidecarCard, decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => true)) {
   host = document.createElement("div");
   document.body.appendChild(host);
   await act(async () => {
@@ -151,7 +151,7 @@ describe("the run-plan card", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     await act(async () => {
-      render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => {}) }), host!);
+      render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => true) }), host!);
     });
     return host;
   }
@@ -189,7 +189,7 @@ describe("the run-plan card", () => {
     ["withdrawn", { status: "withdrawn", reason: "the turn stopped" }],
   ] as const)("offers Start lane again on the chosen lane when its work card is %s, and sends a turn instead of deciding", async (_name, over) => {
     const send = vi.fn(async (_prompt: string) => true);
-    const decide = vi.fn(async () => {});
+    const decide = vi.fn(async () => true);
     host = document.createElement("div");
     document.body.appendChild(host);
     await act(async () => {
@@ -217,7 +217,7 @@ describe("the run-plan card", () => {
       host = document.createElement("div");
       document.body.appendChild(host);
       await act(async () => {
-        render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => {}), send: vi.fn(async () => true) }), host!);
+        render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => true), send: vi.fn(async () => true) }), host!);
       });
       expect(host.querySelector(".sidecar-run-plan-start")).toBeNull();
       await act(async () => { render(null, host!); });

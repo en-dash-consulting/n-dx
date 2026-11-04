@@ -428,8 +428,8 @@ export interface SidecarState {
    * `unavailable` when the manifest could not be read (read once per page load).
    */
   commandManifest: SidecarCommandManifest | "loading" | "unavailable" | null;
-  /** Decide the open session's first waiting card. */
-  decide: (cardId: string, decision: SidecarCardDecision) => Promise<void>;
+  /** Decide the open session's first waiting card; false when the server refused the decision. */
+  decide: (cardId: string, decision: SidecarCardDecision) => Promise<boolean>;
   lastTurn: SidecarTurnEnd | null;
   error: string | null;
   /** The agent the picker shows: the open session's, else the one the first prompt will create. */
@@ -713,9 +713,9 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     });
   }, [enabled, open, asks, syncKey, openId, wantLens, wantRef, heldLens, heldRef]);
 
-  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision) => {
+  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision): Promise<boolean> => {
     const id = tailRef.current.sessionId;
-    if (!id) return;
+    if (!id) return false;
     const reason = decision.reason?.trim();
     const res = await postJson<{ card: SidecarCard }>(
       `${SESSIONS}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
@@ -729,12 +729,13 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
       },
     );
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return res.ok;
     setError(res.ok ? null : res.error);
     // The settle is also announced on the socket; reading before returning
     // keeps the card from looking undecided until that arrives, so a second
     // ⌘↵ in the meantime cannot answer the same card again.
     await fetchWaiting();
+    return res.ok;
   }, [fetchWaiting]);
 
   const openSession = useCallback(async (id: string): Promise<boolean> => {
