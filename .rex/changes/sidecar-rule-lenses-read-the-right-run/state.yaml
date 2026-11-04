@@ -4,10 +4,14 @@ items:
     lastModified: "2026-11-04T19:06:44.118Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8cb5a7fc-a5c6-4744-b317-6b7b941b2e4c":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T19:10:21.516Z"
-    activeIntervals: [{"start":"2026-11-04T19:10:21.516Z"}]
-    lastModified: "2026-11-04T19:10:29.162Z"
+    completedAt: "2026-11-04T20:00:39.233Z"
+    endedAt: "2026-11-04T20:00:39.233Z"
+    activeIntervals: [{"end":"2026-11-04T20:00:39.233Z","start":"2026-11-04T19:10:21.516Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "taskRun reads every worktree through resolveRunTargets (injected as SpawnedReads.runTargets), names the run's worktree, judges running records with judgeRunInTarget, and spawns hench runs diagnose in the run's worktree; hench runs diagnose classifies an orphaned running record as ending it would record it."
+    lastModified: "2026-11-04T20:00:39.233Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c977ae06-2e11-4cb7-9f80-e1a2ad155363":
     lastModified: "2026-11-04T19:06:58.113Z"

@@ -413,7 +413,7 @@ describe("prepareReads", () => {
     mkdirSync(main);
     const git = (...args: string[]) => execFileSync("git", args, { cwd: main, stdio: "pipe" });
     git("init", "-q", "-b", "main");
-    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init");
     git("worktree", "add", "-q", "-b", "feat/x", sibling);
     const dead = spawnSync(process.execPath, ["-e", ""]).pid!;
     const runs = (root: string) => {
