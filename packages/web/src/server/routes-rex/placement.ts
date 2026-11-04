@@ -454,7 +454,7 @@ export class PlacementMovedError extends Error {
  * Why `now` is not the placement `then` described (same node, same relation,
  * same spec hash), or undefined when it is. An approval read the earlier one.
  */
-function movedSince(then: Extract<SidecarPlacementCheck, { ok: true }>, now: Extract<SidecarPlacementCheck, { ok: true }>): string | undefined {
+export function movedSince(then: Extract<SidecarPlacementCheck, { ok: true }>, now: Extract<SidecarPlacementCheck, { ok: true }>): string | undefined {
   if (then.action === "place" && now.action === "place") {
     if (now.target !== then.target) return `"${then.title}" (${then.target}) is no longer the node the placement names; it now resolves to ${now.target}`;
     if (now.relation !== then.relation) return `the relation is now ${now.relation}, not ${then.relation}`;

@@ -143,10 +143,22 @@ export interface PlacementEdit {
   check: SidecarPlacementCheck | null;
 }
 
-/** Place is pressable only when the placement shown has a dry run that rex accepts. */
+/**
+ * An edit that keeps the card's target and relation still answers the card's
+ * own spec hash: when the target's spec moved since the card was raised, no
+ * re-check can make approval succeed, and the card must be raised again.
+ */
+export function cardSpecMoved(card: SidecarCard, edit: PlacementEdit | null): boolean {
+  const own = card.placement?.check;
+  const now = edit?.cardId === card.id ? edit.check : null;
+  if (!own?.ok || !now?.ok || own.action !== "place" || now.action !== "place") return false;
+  return own.target === now.target && own.relation === now.relation && own.base !== now.base;
+}
+
+/** Place is pressable only when the placement shown has a dry run that rex accepts and approval would not refuse. */
 export function placementDecidable(card: SidecarCard, edit: PlacementEdit | null): boolean {
   const check = edit?.cardId === card.id ? edit.check : card.placement?.check;
-  return !!check?.ok;
+  return !!check?.ok && !cardSpecMoved(card, edit);
 }
 
 /** The nearest unused `cN` id for a new criterion. */
@@ -213,9 +225,11 @@ export interface PlacementBodyProps {
   editable: boolean;
   /** Reports the operator's edit and its re-check; null when the placement is the card's own again. */
   onEdit: (edit: PlacementEdit | null) => void;
+  /** The edit as the parent holds it, so a re-check the parent makes (after a refused approval) shows here too. */
+  edit: PlacementEdit | null;
 }
 
-export function PlacementBody({ card, editable, onEdit }: PlacementBodyProps) {
+export function PlacementBody({ card, editable, onEdit, edit }: PlacementBodyProps) {
   const placement = card.placement!;
   const original = placement.request;
   // Unedited is the draft the card opened as, not the agent's raw call: a
@@ -226,7 +240,6 @@ export function PlacementBody({ card, editable, onEdit }: PlacementBodyProps) {
   const shortlist = useShortlist(placement.change, editable);
   const product = useProductRead<ProductMap>("/api/rex/product", (body) => body.map as ProductMap);
   const areas = product.state === "ready" ? product.data.areas : [];
-  const [edit, setEdit] = useState<PlacementEdit | null>(null);
   const latest = useRef(0);
   useEffect(() => () => { latest.current += 1; }, []);
 
@@ -240,19 +253,15 @@ export function PlacementBody({ card, editable, onEdit }: PlacementBodyProps) {
     const mine = ++latest.current;
     if (!editable) return;
     if (key === originalKey) {
-      setEdit(null);
       onEdit(null);
       return;
     }
     const pending: PlacementEdit = { cardId: card.id, request, body, check: null };
-    setEdit(pending);
     onEdit(pending);
     const timer = setTimeout(() => {
       void checkPlacementRequest(placement.change, body).then((check) => {
         if (latest.current !== mine) return;
-        const done = { ...pending, check };
-        setEdit(done);
-        onEdit(done);
+        onEdit({ ...pending, check });
       });
     }, CHECK_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -372,5 +381,8 @@ export function PlacementBody({ card, editable, onEdit }: PlacementBodyProps) {
         )
       : null,
     h("p", { class: `sidecar-place-check${shown && !shown.ok ? " is-refused" : ""}`, role: "status", "aria-live": "polite" }, line),
+    editable && cardSpecMoved(card, edit)
+      ? h("p", { class: "sidecar-place-check is-refused", role: "alert" }, "The spec of this target changed since the card was raised. Leave it in the Inbox and have the agent raise a new card.")
+      : null,
   );
 }

@@ -70,6 +70,7 @@ export function createHubActions(opts: HubActionsOptions): SidecarActions {
     writePlacement: async () => refused,
     readRunPlan: async () => HUB_NO_EFFECT,
     githubReadsAllowed: () => false,
+    branchHealthEnabled: () => false,
     githubRead: async () => refused,
     projectRepoRoot: (project, signal) => projectRepoRoot(opts, project, signal),
     async runCommand(argv, signal, project) {

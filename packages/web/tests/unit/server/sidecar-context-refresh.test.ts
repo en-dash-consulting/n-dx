@@ -539,6 +539,7 @@ describe("the packet opens the first turn", () => {
       preview: hang("preview") as typeof previewTaskRun,
       diagnose: (async () => ({ ok: false, failure: "not read by a describe packet" })) as typeof diagnoseTaskRun,
       queuePlan: (async () => ({ ok: false, failure: "not read by a describe packet" })) as typeof readQueuePlan,
+      runTargets: async () => [],
     });
     const sources: PacketSources = {
       sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },

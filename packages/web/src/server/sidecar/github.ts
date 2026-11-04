@@ -74,8 +74,33 @@ export async function readCheckOnBase(
 
 const FAILED_CONCLUSIONS = new Set(["failure", "timed_out", "cancelled", "action_required", "startup_failure"]);
 
-/** The tool result for a `check` read: whether the check fails on the base too, decided by GitHub's answer. */
-export function baseCheckResult(read: BaseCheckRun | string, name: string, base: string): CarryOutResult {
+/** The class a check failing on the repository's default branch takes. */
+export const CLASS_FAILING_ON_MAIN = "failing on main";
+
+/** The class a check failing on any other base takes: a stacked PR's base is its parent layer, not main. */
+export function classFailingOnBase(base: string): string {
+  return `failing on the base (${base})`;
+}
+
+/** The toggle a `pr` read (branch health) sits behind, as GET /api/branch-health. */
+export const BRANCH_HEALTH_FEATURE_KEY = "git.branchHealth";
+
+/** What a `pr` read answers while `git.branchHealth` is off; the Diagnose branch lens is unavailable then too. */
+export const BRANCH_HEALTH_OFF_READ = "Nothing was read: the git.branchHealth feature is off.";
+
+/** origin's default branch name (`main`), or null when this checkout does not know it. */
+export async function readDefaultBranchName(exec: BranchHealthExec, cwd: string): Promise<string | null> {
+  const result = await exec("git", ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], { cwd, timeout: GH_TIMEOUT_MS });
+  const ref = result.launched && !result.error && result.exitCode === 0 ? result.stdout.trim() : "";
+  return ref ? ref.replace(/^origin\//, "") : null;
+}
+
+/**
+ * The tool result for a `check` read: whether the check fails on the base too,
+ * decided by GitHub's answer. The class is "failing on main" only when `base`
+ * is `defaultBranch`; an unknown default branch never earns it.
+ */
+export function baseCheckResult(read: BaseCheckRun | string, name: string, base: string, defaultBranch: string | null): CarryOutResult {
   if (typeof read === "string") {
     return { ok: false, text: `Could not read "${name}" on ${base}: ${read}. Whether it is failing on ${base} is not verified; do not call it that.` };
   }
@@ -87,7 +112,7 @@ export function baseCheckResult(read: BaseCheckRun | string, name: string, base:
   return {
     ok: true,
     text: failing
-      ? `"${name}" on ${at} concluded ${read.conclusion}: it is failing on ${base} too. Class: failing on main.`
+      ? `"${name}" on ${at} concluded ${read.conclusion}: it is failing on ${base} too. Class: ${base === defaultBranch ? CLASS_FAILING_ON_MAIN : classFailingOnBase(base)}.`
       : `"${name}" on ${at} concluded ${read.conclusion}: it is not failing on ${base}. Keep the class the packet gives.`,
   };
 }

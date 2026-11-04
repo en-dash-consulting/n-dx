@@ -769,10 +769,21 @@ describe("github_read and draft_github_post", () => {
     writeFileSync(join(root, file), JSON.stringify({ ...(file === ".n-dx.json" ? { llm: { vendor: "claude" } } : {}), web: { sidecarGithubReads: on } }));
   }
 
-  function answerCheckRuns(conclusion: string): void {
-    execMock.mockImplementation(async (cmd: string) => cmd === "gh"
-      ? { launched: true, error: null, exitCode: 0, stderr: "", stdout: JSON.stringify({ check_runs: [{ conclusion, status: "completed", head_sha: "abcdef0123456", html_url: "https://github.com/o/r/runs/1" }] }) }
-      : { launched: true, error: null, exitCode: 1, stdout: "", stderr: "not here" });
+  /** gh answers the check run; git names `origin/<defaultRef>` as origin's default branch. */
+  function answerCheckRuns(conclusion: string, defaultBranch = "main"): void {
+    execMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "gh") {
+        return { launched: true, error: null, exitCode: 0, stderr: "", stdout: JSON.stringify({ check_runs: [{ conclusion, status: "completed", head_sha: "abcdef0123456", html_url: "https://github.com/o/r/runs/1" }] }) };
+      }
+      return cmd === "git"
+        ? { launched: true, error: null, exitCode: 0, stderr: "", stdout: `origin/${defaultBranch}\n` }
+        : { launched: true, error: null, exitCode: 1, stdout: "", stderr: "not here" };
+    });
+  }
+
+  /** Turns `git.branchHealth` on in the project config; call after `githubReads`, which rewrites that file. */
+  function branchHealth(on: boolean): void {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" }, features: { git: { branchHealth: on } } }));
   }
 
   it("raises a network-read card while web.sidecarGithubReads is off, and reads nothing until it is approved", async () => {
@@ -828,8 +839,80 @@ describe("github_read and draft_github_post", () => {
     await client.close();
   });
 
+  it("calls a check failing on a base that is not the default branch failing on that base, not on main", async () => {
+    githubReads(true);
+    answerCheckRuns("failure");
+    const client = await brokerClient();
+    const text = resultText(await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "feat/parent-layer" } }));
+    expect(text).toContain("failing on feat/parent-layer too. Class: failing on the base (feat/parent-layer).");
+    expect(text).not.toContain("Class: failing on main");
+    await client.close();
+  });
+
+  it("never calls a check failing on main when origin's default branch is unknown", async () => {
+    githubReads(true);
+    answerCheckRuns("failure");
+    const answer = execMock.getMockImplementation()!;
+    execMock.mockImplementation(async (cmd: string, ...rest: unknown[]) =>
+      cmd === "git" ? { launched: true, error: null, exitCode: 1, stderr: "", stdout: "" } : answer(cmd, ...rest));
+    const client = await brokerClient();
+    const text = resultText(await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "main" } }));
+    expect(text).toContain("Class: failing on the base (main).");
+    await client.close();
+  });
+
+  it("describes both classes in the tool description", async () => {
+    const client = await brokerClient();
+    const tool = (await client.listTools()).tools.find((t) => t.name === "github_read");
+    expect(tool?.description).toContain("failing on main");
+    expect(tool?.description).toContain("failing on the base (<base>)");
+    await client.close();
+  });
+
+  it.each([false, true])("reads nothing and raises no card for a pr read while git.branchHealth is off (reads allowed: %s)", async (allowed) => {
+    githubReads(allowed);
+    branchHealth(false);
+    answerCheckRuns("failure");
+    execMock.mockClear();
+    const client = await brokerClient();
+    const result = await client.callTool({ name: "github_read", arguments: { kind: "pr", ref: "elsewhere" } });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe("Nothing was read: the git.branchHealth feature is off.");
+    expect(broker.cards(SESSION)).toEqual([]);
+    expect(execMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("reads nothing for a pr card approved after git.branchHealth was turned off", async () => {
+    githubReads(false);
+    branchHealth(true);
+    answerCheckRuns("failure");
+    const client = await brokerClient();
+    const call = client.callTool({ name: "github_read", arguments: { kind: "pr", ref: "elsewhere" } });
+    const { cardId } = await cardAnnounced("pending");
+    branchHealth(false);
+    execMock.mockClear();
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain("Nothing was read: the git.branchHealth feature is off.");
+    expect(execMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("still reads a check while git.branchHealth is off", async () => {
+    githubReads(true);
+    branchHealth(false);
+    answerCheckRuns("success");
+    const client = await brokerClient();
+    const text = resultText(await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "main" } }));
+    expect(text).toContain("it is not failing on main");
+    await client.close();
+  });
+
   it("a denied network-read card reads nothing", async () => {
     githubReads(false);
+    branchHealth(true);
     const client = await brokerClient();
     const call = client.callTool({ name: "github_read", arguments: { kind: "pr", ref: "elsewhere" } });
     const { cardId } = await cardAnnounced("pending");
