@@ -173,6 +173,63 @@ const DANGEROUS_PATTERNS = [
   /\b\.\s+\//,                     // dot-sourcing
 ];
 
+/** An executable token reduced to what names the program: base name, no `.exe`, lower case. */
+function programName(token: string): string {
+  const base = token.split(/[\\/]/).pop() ?? token;
+  return base.replace(/\.(exe|cmd|bat|com)$/i, "").toLowerCase();
+}
+
+/** Whitespace-separated words with their quotes removed (POSIX-style, no escapes). */
+function commandWords(command: string): string[] {
+  const words: string[] = [];
+  let word: string | null = null;
+  let quote: string | null = null;
+  for (const ch of command) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else word += ch;
+    } else if (/\s/.test(ch)) {
+      if (word !== null) words.push(word);
+      word = null;
+    } else if (ch === "'" || ch === '"') {
+      word ??= "";
+      quote = ch;
+    } else {
+      word = (word ?? "") + ch;
+    }
+  }
+  if (word !== null) words.push(word);
+  return words;
+}
+
+/**
+ * Refuse a command that reads a credential: one starting with any of
+ * `deniedPrefixes` (token lists; the first compared by program name, so a
+ * path or `.exe` spelling still matches). Checked before the allowlist, so it
+ * holds even when a user widens `guard.allowedCommands` to include `op` or
+ * `security`.
+ *
+ * Not a complete barrier: an allowed interpreter (`node -e`, `python -c`) can
+ * still read the credential store or run a helper from inside it. Only the OS
+ * keystore backends close that.
+ *
+ * @throws {GuardError} when the command starts with a denied prefix.
+ */
+export function assertNotCredentialCommand(command: string, deniedPrefixes: readonly (readonly string[])[]): void {
+  const words = commandWords(command.trim());
+  if (words.length === 0) return;
+  for (const prefix of deniedPrefixes) {
+    if (prefix.length === 0 || words.length < prefix.length) continue;
+    if (programName(words[0]!) !== programName(prefix[0]!)) continue;
+    if (prefix.slice(1).every((token, i) => words[i + 1] === token)) {
+      throw new GuardError(
+        `Command "${prefix.join(" ")}" reads a stored credential; the agent may not run it, ` +
+          `whatever guard.allowedCommands lists.`,
+      );
+    }
+  }
+}
+
 /**
  * Validate a command against the guard's security policies.
  *
