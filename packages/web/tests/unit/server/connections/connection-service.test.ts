@@ -193,14 +193,17 @@ describe("ConnectionService", () => {
     expect(JSON.stringify(docs.status)).not.toContain("tok-echoed-secret-1234");
   });
 
-  it("caps a long reason", async () => {
+  it("caps a long reason, keeping the HTTP status", async () => {
     const http = await httpServer();
     http.echoErrors = "all";
-    const { svc, ndxHome } = service({ docs: { transport: "http", url: http.url, auth: "token" } });
-    setCredential("connection:docs", "x".repeat(2_000), { ndxHome });
+    // The server echoes the request URL, so a long query makes a long error body.
+    const { svc } = service({ docs: { transport: "http", url: `${http.url}?pad=${"x".repeat(2_000)}` } });
 
     const [docs] = await svc.listConnections();
-    expect((docs.status as { reason: string }).reason.length).toBeLessThanOrEqual(301);
+    const reason = (docs.status as { reason: string }).reason;
+    expect(reason).toMatch(/^HTTP 500: /);
+    expect(reason).toHaveLength(301);
+    expect(reason.endsWith("…")).toBe(true);
   });
 
   it("reads needs-sign-in for an oauth connection until the sign-in lands", async () => {

@@ -44,7 +44,7 @@ export async function startFakeMcpHttpServer(): Promise<FakeMcpHttpServer> {
       res.writeHead(401).end();
       return;
     }
-    const echoError = () => res.writeHead(500, { "content-type": "text/plain" }).end(`upstream failure; request headers: authorization: ${req.headers.authorization}`);
+    const echoError = () => res.writeHead(500, { "content-type": "text/plain" }).end(`upstream failure on ${req.url}; request headers: authorization: ${req.headers.authorization}`);
     if (fake.echoErrors === "all") {
       echoError();
       return;

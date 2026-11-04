@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "0c8ed747-b17e-4887-93cd-fff683d332bb":
+    lastModified: "2026-11-04T23:31:14.841Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5075f653-b1ee-41cd-a696-7bbaf4de1469":
     status: "completed"
     startedAt: "2026-11-04T20:03:33.483Z"
@@ -24,7 +27,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23959f9-b72d-4d98-ba2e-7e8e49853788":
     issues: ["https://www.notion.so/3f7a80b71924811aafc7edb86c8706cc","https://www.notion.so/3f7a80b7192481a398e1cb38f63618a8","https://www.notion.so/3f7a80b7192481f7ad52e6a9e7739ce4","https://www.notion.so/3f7a80b719248169970dd9029aff5e07"]
-    lastModified: "2026-11-04T23:17:20.477Z"
+    lastModified: "2026-11-04T23:31:14.841Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b59456bd-36ac-4409-9707-6f30c2844f89":
     lastModified: "2026-11-04T17:39:25.942Z"
@@ -33,10 +36,14 @@ items:
     lastModified: "2026-11-04T23:21:42.206Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd5defa2-2edd-43e1-9de4-768a1584e660":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T23:26:12.979Z"
-    activeIntervals: [{"start":"2026-11-04T23:26:12.979Z"}]
-    lastModified: "2026-11-04T23:26:15.204Z"
+    completedAt: "2026-11-04T23:35:33.770Z"
+    endedAt: "2026-11-04T23:35:33.770Z"
+    activeIntervals: [{"end":"2026-11-04T23:35:33.770Z","start":"2026-11-04T23:26:12.979Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ConnectionService scrubs failure reasons: stored token → fingerprint (via withoutConnectionToken in connection-credentials.ts), redactSecrets, 300-char cap, \"HTTP <status>\" prefix kept. Tests with a fake server echoing the token on connect and on tools/call."
+    lastModified: "2026-11-04T23:35:33.770Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d1e807c8-af53-438c-9b13-a7153e3c48bb":
     status: "completed"
