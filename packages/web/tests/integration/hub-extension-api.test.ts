@@ -13,11 +13,12 @@
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { EXTENSION_API_VERSION, buildExtensionsAnswer, ndxCliLister, startHub } from "../../src/hub/index.js";
 import type { ExtensionListing, HubHandle, HubOptions, ListResult } from "../../src/hub/index.js";
 
@@ -46,8 +47,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   while (hubs.length) await hubs.pop()!.close({ stopChildren: true });
-  rmSync(dir, { recursive: true, force: true });
-  rmSync(repo, { recursive: true, force: true });
+  await removeTempDir(dir);
+  await removeTempDir(repo);
 });
 
 function listing(name: string, state: ExtensionListing["state"], extra: Partial<ExtensionListing> = {}): ExtensionListing {
@@ -87,6 +88,7 @@ const LISTED: ListResult = {
 async function hub(options: Partial<HubOptions> = {}): Promise<HubHandle> {
   const handle = await startHub({
     port: 0,
+    selfBin: NDX_BIN,
     homeDir: join(dir, "home"),
     keepAlive: true,
     healthIntervalMs: 60_000,

@@ -391,7 +391,7 @@ describe("turns", () => {
     const events = (await frames(id, 0)).frames.flatMap((f) => (f.type === "event" ? [f.event] : []));
     expect(events.find((e) => e.type === "tool_use")?.toolCall).toMatchObject({ tool: "Read", id: "toolu_01R" });
     expect(events.filter((e) => e.type === "tool_result").map((e) => e.toolResult)).toEqual([
-      { tool: "unknown", output: "     1\texport const a = 1;", durationMs: 0, callId: "toolu_01R" },
+      { tool: "", output: "     1\texport const a = 1;", durationMs: 0, id: "toolu_01R" },
     ]);
   });
 

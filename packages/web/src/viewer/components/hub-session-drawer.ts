@@ -20,8 +20,8 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { DEFAULT_CLI_NAME, latestContextTokens, lensLabel, sidecarSetupNeed } from "../hooks/index.js";
-import type { HubSessionInfo, HubSnapshotWorktree, SidecarState } from "../hooks/index.js";
+import { DEFAULT_CLI_NAME, latestContextTokens, lensLabel, sidecarSetupNeed } from "../hooks/sidecar.js";
+import type { HubSessionInfo, HubSnapshotWorktree, SidecarState } from "../hooks/sidecar.js";
 import { SidecarFrameRow, pairToolResults } from "./sidecar-drawer.js";
 import { SidecarCardList, cardTurnSender } from "./sidecar-cards.js";
 

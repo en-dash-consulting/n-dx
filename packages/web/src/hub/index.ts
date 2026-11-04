@@ -21,6 +21,7 @@ export {
   readHubConfig,
   HUB_CONFIG_DEFAULTS,
   loadRegistry,
+  loadRegistryHealing,
   saveRegistry,
   emptyRegistry,
   readHubPidFile,
@@ -28,7 +29,7 @@ export {
   removeHubPidFile,
   isPidAlive,
 } from "./registry.js";
-export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
+export type { HealedRecord, HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
 export {
   planNewProject,
@@ -89,8 +90,8 @@ export type {
   ExtensionView,
   ExtensionsAnswer,
 } from "./extensions.js";
-export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER, FRAME_CSP } from "./proxy.js";
-export type { ProxyDecision, SidecarForward } from "./proxy.js";
+export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, MAX_HUB_SESSION_BODY_BYTES, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER, FRAME_CSP } from "./proxy.js";
+export type { ProxyDecision, SidecarForward, UpgradeGate } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
 export {
   HubSessionHostPicker,
@@ -103,5 +104,7 @@ export {
   readHubSessionHostLock,
 } from "./session-host.js";
 export type { ClaimHubSessionHostInput, HubLensProbeOptions, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";
+export { hubUsagePath, recordHubUsage, readHubUsageTotals } from "./usage-ledger.js";
+export type { HubUsageRecord, HubUsageTotals } from "./usage-ledger.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
 export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

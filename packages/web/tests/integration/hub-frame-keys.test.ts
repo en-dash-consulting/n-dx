@@ -90,6 +90,7 @@ beforeAll(async () => {
   const tokenFile = join(dir, "home", "auth.token");
   hub = await startHub({
     port: 0,
+    selfBin: NDX_BIN,
     homeDir: join(dir, "home"),
     tokenFile,
     keepAlive: true,

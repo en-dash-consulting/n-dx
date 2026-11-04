@@ -37,6 +37,8 @@
 import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES } from "../shared/index.js";
 import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
+import type { HubUsageTotals } from "./usage-ledger.js";
+import { injectSessionScript } from "../shared/index.js";
 
 export function escapeHtml(value: string): string {
   return value
@@ -256,18 +258,32 @@ const REFRESH_SCRIPT = `
 (function () {
   var list = document.getElementById("cards");
   if (!list) return;
-  function tick() {
-    fetch("/api/hub/overview", { headers: { accept: "application/json" } })
+  var count = document.getElementById("project-count");
+  function tick(withSession) {
+    fetch("/api/hub/overview" + (withSession ? "?hubSession=1" : ""), { headers: { accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
-        if (!data || !data.html) return;
+        if (!data || typeof data.html !== "string") return;
+        // The deferred page's toggle waits, hidden, for the host's answer.
+        var session = document.getElementById("hub-session-toggle");
+        if (session && typeof data.hubSession === "boolean") session.hidden = !data.hubSession;
+        if (count && data.projects) {
+          var n = data.projects.length;
+          count.textContent = n === 1 ? "1 project" : n + " projects";
+        }
         // Never yank focus out from under someone mid-keyboard-navigation.
         if (list.contains(document.activeElement)) return;
-        list.innerHTML = data.html;
+        list.innerHTML = data.html || '<li class="empty">No project is registered yet.</li>';
       })
       .catch(function () {});
   }
-  setInterval(tick, 5000);
+  // A deferred page (sent to a navigation, which carries no credential) has
+  // no cards yet: load them as soon as the session script has signed in.
+  if (list.hasAttribute("data-deferred")) {
+    var ready = window.ndxAuth ? window.ndxAuth.ready : Promise.resolve({ ok: true });
+    ready.then(function (state) { if (state.ok) tick(true); });
+  }
+  setInterval(function () { tick(false); }, 5000);
 })();
 `;
 
@@ -429,6 +445,8 @@ const HUB_SESSION_SCRIPT = `
   toggle.addEventListener("click", function () { setOpen(drawer.hidden); });
   document.addEventListener("keydown", function (e) {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "j") {
+      // A hidden toggle (the deferred page before the host said yes) offers nothing to open.
+      if (toggle.hidden && drawer.hidden) return;
       e.preventDefault();
       setOpen(drawer.hidden);
     }
@@ -440,14 +458,19 @@ const HUB_SESSION_SCRIPT = `
 })();
 `;
 
-/** The header's Hub session toggle; nothing unless the host reports the hub lens available. */
-export function renderHubSessionToggle(hubSession: boolean): string {
+/**
+ * The header's Hub session toggle; nothing unless the host reports the hub
+ * lens available. `"pending"` (the deferred page) renders it hidden, for the
+ * page's script to show once the host has answered.
+ */
+export function renderHubSessionToggle(hubSession: boolean | "pending"): string {
   if (!hubSession) return "";
-  return `<button class="theme-toggle hub-session-btn" type="button" id="hub-session-toggle" aria-expanded="false" aria-controls="hub-session-drawer" aria-keyshortcuts="Meta+J Control+J" title="Hub session (⌘J)">Hub session<kbd aria-hidden="true">⌘J</kbd></button>`;
+  const hidden = hubSession === "pending" ? " hidden" : "";
+  return `<button class="theme-toggle hub-session-btn" type="button" id="hub-session-toggle"${hidden} aria-expanded="false" aria-controls="hub-session-drawer" aria-keyshortcuts="Meta+J Control+J" title="Hub session (⌘J)">Hub session<kbd aria-hidden="true">⌘J</kbd></button>`;
 }
 
 /** The docked drawer: a frame for the drawer-only viewer page the host serves through the hub. */
-export function renderHubSessionDrawer(hubSession: boolean): string {
+export function renderHubSessionDrawer(hubSession: boolean | "pending"): string {
   if (!hubSession) return "";
   const src = `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.drawer}`;
   return `<aside class="hub-drawer" id="hub-session-drawer" aria-label="Hub session" hidden>
@@ -591,6 +614,27 @@ export function renderExtensionsSection(extensions: ExtensionView[]): string {
 
 export interface HomePageOptions {
   hubSession?: boolean;
+  /**
+   * Send the shell only: no project, path or count is in the markup, and
+   * the page's script loads the cards once it has signed in. What a browser
+   * navigation gets, since it carries no credential (see shared/auth.ts).
+   */
+  deferred?: boolean;
+  /** The hub session's spend so far, from `<ndx home>/hub/usage.jsonl`; shown once it has a turn. */
+  hubSpend?: HubUsageTotals;
+}
+
+function compactTokens(n: number): string {
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+}
+
+/** The header's hub-session spend, or nothing before the first turn. */
+export function renderHubSpend(spend: HubUsageTotals | undefined): string {
+  if (!spend || spend.turns === 0) return "";
+  const turns = spend.turns === 1 ? "1 turn" : `${spend.turns} turns`;
+  const cache = spend.cacheCreationTokens + spend.cacheReadTokens;
+  const detail = `${compactTokens(spend.inputTokens)} in / ${compactTokens(spend.outputTokens)} out${cache > 0 ? ` / ${compactTokens(cache)} cache` : ""}`;
+  return `<span class="count" id="hub-spend" title="Hub session spend, all hosts">Hub session: ${escapeHtml(turns)}, ${escapeHtml(detail)}</span>`;
 }
 
 /**
@@ -611,15 +655,18 @@ export function renderHomePage(
   extensions: ExtensionView[] = [],
   options: HomePageOptions = {},
 ): string {
-  const hubSession = options.hubSession === true;
+  // A deferred page cannot know yet: its first read after sign-in asks.
+  const hubSession = options.deferred ? "pending" : options.hubSession === true;
   const { projects } = overview;
-  const body = projects.length === 0
-    ? `<p class="empty">No project is registered yet. Create one above, or run <code>ndx start</code> in a repository you already have.</p>`
-    : `<ul class="cards" id="cards">${renderCards(overview)}</ul>`;
+  const body = options.deferred
+    ? `<ul class="cards" id="cards" data-deferred><li class="empty">Loading…</li></ul>`
+    : projects.length === 0
+      ? `<p class="empty">No project is registered yet. Create one above, or run <code>ndx start</code> in a repository you already have.</p>`
+      : `<ul class="cards" id="cards">${renderCards(overview)}</ul>`;
 
-  const count = projects.length === 1 ? "1 project" : `${projects.length} projects`;
+  const count = options.deferred ? "" : projects.length === 1 ? "1 project" : `${projects.length} projects`;
 
-  return `<!doctype html>
+  return injectSessionScript(`<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
@@ -642,7 +689,8 @@ export function renderHomePage(
 <div class="wrap">
   <header>
     <h1>n-dx hub</h1>
-    <span class="count">${escapeHtml(count)}</span>
+    <span class="count" id="project-count">${escapeHtml(count)}</span>
+    ${renderHubSpend(options.hubSpend)}
     <button class="new-btn" type="button" id="new-toggle" aria-expanded="false" aria-controls="new-panel">New project</button>
     ${renderHubSessionToggle(hubSession)}
     <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle colour theme">Theme</button>
@@ -666,5 +714,5 @@ ${renderHubSessionDrawer(hubSession)}
 <script>${REFRESH_SCRIPT}</script>
 <script>${NEW_PROJECT_SCRIPT}</script>
 </body>
-</html>`;
+</html>`);
 }

@@ -9,7 +9,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -18,17 +17,24 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { resolveOwnPackageCli } from "./own-cli.js";
+import { refuseWhileRestricted } from "./trust-gate.js";
 import { startAsyncJob, stopAsyncJob, newAsyncJob } from "./routes-commands.js";
 import type { AsyncJobStatus } from "./routes-commands.js";
 
 import {
   type PRDItem,
+  type PRDStore,
+  type ProposedWork,
   isPriority,
   resolveStore,
   collectAllIds,
   cascadeParentReset,
   prdLayout,
   loadPrdModel,
+  isChangeLayerStore,
+  changeInputsFromProposals,
+  addProposedChanges,
 } from "./rex-gateway.js";
 import type { V2Tree } from "./rex-gateway.js";
 import { completePreviewPlacement } from "./routes-rex/placement.js";
@@ -43,38 +49,14 @@ const CAPTURE_ROOT_LEVEL = levelOf("change")!;
 const CAPTURE_CHILD_LEVEL = levelOf("change", "change")!;
 
 /**
- * Resolve how to invoke the rex CLI for a given analyzed project.
- *
- * Resolution order:
- *  1. Project-local install: `<projectDir>/node_modules/.bin/rex`.
- *  2. The rex CLI resolved from THIS server's own module graph via the
- *     `@n-dx/rex/dist/*` subpath export. This is the correct path for any
- *     normal analyzed project — rex ships with the running n-dx install and
- *     must NOT be looked up under the analyzed project's directory (doing so
- *     produced `Cannot find module
- *     '<projectDir>/packages/rex/dist/cli/index.js'` whenever the dashboard
- *     pointed at a project that isn't the n-dx monorepo itself).
- *     NOTE: rex's package `exports["."]` only has an `import` condition, so
- *     a bare CJS `require.resolve("@n-dx/rex")` throws
- *     ERR_PACKAGE_PATH_NOT_EXPORTED. We resolve the CLI subpath directly,
- *     which matches the `"./dist/*"` export and works under CJS.
- *  3. Monorepo dogfood fallback: `<projectDir>/packages/rex/dist/cli/index.js`
- *     (only valid when analyzing the n-dx repo itself).
+ * How to invoke the rex CLI: from this server's own install (see own-cli.ts),
+ * never from the analyzed project's node_modules/.bin or a packages/
+ * directory inside it. `projectDir` is accepted for the call sites' shape and
+ * deliberately unused.
  */
-function resolveRexCli(projectDir: string): { binPath: string; prefixArgs: string[] } {
-  const localBin = join(projectDir, "node_modules", ".bin", "rex");
-  if (existsSync(localBin)) return { binPath: localBin, prefixArgs: [] };
-  try {
-    const req = createRequire(import.meta.url);
-    const cli = req.resolve("@n-dx/rex/dist/cli/index.js");
-    if (existsSync(cli)) return { binPath: "node", prefixArgs: [cli] };
-  } catch {
-    /* fall through to dogfood path */
-  }
-  return {
-    binPath: "node",
-    prefixArgs: [join(projectDir, "packages", "rex", "dist", "cli", "index.js")],
-  };
+function resolveRexCli(_projectDir: string): { binPath: string; prefixArgs: string[] } {
+  const { bin, args } = resolveOwnPackageCli("@n-dx/rex", "rex", "rex");
+  return { binPath: bin, prefixArgs: args };
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +169,16 @@ function resolveParentId(ctx: ServerContext, requested: unknown): string | null 
 /** Edited proposal shape sent from the proposal editor. */
 interface EditedProposalTask {
   title: string;
+  /** The proposal's own source, carried through unedited; absent from older editors. */
+  source?: string;
+  /** The proposal's LoE decomposition, carried through unedited. */
+  decomposition?: ProposalDecomposition;
+  /**
+   * The proposal's status, carried through unedited. `completed` marks a
+   * baseline proposal describing code that already exists; on v2 it creates
+   * no change, as on Accept.
+   */
+  status?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: string;
@@ -219,8 +211,22 @@ function pickLoEFields(task: ProposalLoEFields): Partial<PRDItem> {
   return out;
 }
 
+/** An oversized proposal task's breakdown: its proposed subtasks. */
+interface ProposalDecomposition {
+  children: Array<{
+    title: string;
+    source?: string;
+    description?: string;
+    acceptanceCriteria?: string[];
+    priority?: string;
+    tags?: string[];
+    status?: string;
+  }>;
+}
+
 interface EditedProposalFeature {
   title: string;
+  source?: string;
   description?: string;
   /** If set, nest tasks under this existing feature instead of creating a new one. */
   existingId?: string;
@@ -229,7 +235,7 @@ interface EditedProposalFeature {
 }
 
 interface EditedProposal {
-  epic: { title: string; description?: string; existingId?: string };
+  epic: { title: string; source?: string; description?: string; existingId?: string };
   features: EditedProposalFeature[];
   selected: boolean;
 }
@@ -307,12 +313,21 @@ const BATCH_FORMAT_EXT: Record<string, string> = {
 // Route dispatcher
 // ---------------------------------------------------------------------------
 
+/** POST routes in {@link routeProposals} that spawn the rex CLI. */
+const TRUST_GATED_PROPOSAL_POSTS = new Set(["analyze", "smart-add-preview", "smart-add-accept", "batch-import"]);
+
 /** Analysis and proposal routes: analyze, proposals, smart-add, batch-import. */
 export function routeProposals(
   path: string, method: string,
   req: IncomingMessage, res: ServerResponse, ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
+  // The routes that spawn rex on this repository wait until its execution
+  // config has been accepted (see trust-gate.ts).
+  if (method === "POST" && TRUST_GATED_PROPOSAL_POSTS.has(path) && refuseWhileRestricted(res, ctx.projectDir)) {
+    return true;
+  }
+
   // POST /api/rex/analyze — start analysis as a background job
   if (path === "analyze" && method === "POST") {
     return handleAnalyze(req, res, ctx, broadcast);
@@ -744,6 +759,85 @@ function handleGetProposals(
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Accepting proposals on a v2 tree
+// ---------------------------------------------------------------------------
+
+/** A proposed task as either accept route reads it. */
+interface ProposalTaskFields {
+  title: string;
+  source?: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  priority?: string;
+  tags?: string[];
+  status?: string;
+  decomposition?: ProposalDecomposition;
+}
+
+/** A proposal task as rex's mapper reads it, its decomposition as proposed subtasks. */
+function proposedTask(t: ProposalTaskFields, source?: string): ProposedWork {
+  const subtasks = t.decomposition?.children?.map((c) => proposedTask(c, c.source ?? source));
+  return {
+    title: t.title,
+    ...(t.description ? { description: t.description } : {}),
+    ...(t.acceptanceCriteria?.length ? { acceptanceCriteria: t.acceptanceCriteria } : {}),
+    ...(t.priority && isPriority(t.priority) ? { priority: t.priority } : {}),
+    ...(t.tags?.length ? { tags: t.tags } : {}),
+    ...(t.status ? { status: t.status } : {}),
+    ...((t.source ?? source) ? { source: t.source ?? source } : {}),
+    ...(subtasks?.length ? { subtasks } : {}),
+  };
+}
+
+/** What a v2 accept created: the changes, the tasks under them, and the baseline it skipped. */
+interface V2AcceptOutcome {
+  changeCount: number;
+  taskCount: number;
+  /** Proposals describing code that already exists: on v2 that is the product layer, not a change. */
+  skippedCount: number;
+}
+
+/**
+ * Accept proposals into a v2 tree the way `rex analyze --accept` does.
+ *
+ * rex's own mapping makes one Inbox change per proposed leaf — the epic and
+ * feature above it are containers the change layer has none of — with its
+ * criteria, tags, priority and source, and the leaf's proposed subtasks as
+ * tasks under it. The adds run in one model transaction, so rex's add rule
+ * refusing any of them writes none.
+ */
+async function acceptAsChanges(
+  ctx: ServerContext,
+  store: PRDStore,
+  work: ProposedWork[],
+): Promise<V2AcceptOutcome> {
+  const inputs = changeInputsFromProposals(work);
+  const taskCount = inputs.reduce((n, input) => n + (input.tasks?.length ?? 0), 0);
+  const skippedCount = countLeaves(work) - inputs.length;
+  if (inputs.length > 0 && isChangeLayerStore(store)) {
+    await store.withModelTransaction((model) => {
+      const out = addProposedChanges(model.tree, inputs, { now: new Date() });
+      return { tree: out.tree, result: out.nodes };
+    });
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  }
+  return { changeCount: inputs.length, taskCount, skippedCount };
+}
+
+/** Every leaf of `work`, closed ones included — the denominator for what was skipped. */
+function countLeaves(work: readonly ProposedWork[]): number {
+  return work.reduce((n, node) => n + (node.children?.length ? countLeaves(node.children) : 1), 0);
+}
+
+/** The log line and response fields of a v2 accept. */
+function v2AcceptSummary(outcome: V2AcceptOutcome): string {
+  const { changeCount, taskCount, skippedCount } = outcome;
+  return `${changeCount} change${changeCount === 1 ? "" : "s"} to the Inbox` +
+    (taskCount ? `, ${taskCount} proposed subtask${taskCount === 1 ? "" : "s"} as their tasks` : "") +
+    (skippedCount ? `; ${skippedCount} describing existing code not created` : "");
+}
+
 /** Handle POST /api/rex/proposals/accept — accept pending proposals */
 async function handleAcceptProposals(
   req: IncomingMessage,
@@ -772,11 +866,12 @@ async function handleAcceptProposals(
 
     const raw = readFileSync(pendingPath, "utf-8");
     const allProposals = JSON.parse(raw) as Array<{
-      epic: { title: string; source: string; description?: string };
+      epic: { title: string; source: string; description?: string; status?: string };
       features: Array<{
         title: string;
         source: string;
         description?: string;
+        status?: string;
         tasks: Array<{
           title: string;
           source: string;
@@ -785,9 +880,11 @@ async function handleAcceptProposals(
           acceptanceCriteria?: string[];
           priority?: string;
           tags?: string[];
+          status?: string;
           loe?: number;
           loeRationale?: string;
           loeConfidence?: string;
+          decomposition?: ProposalDecomposition;
         }>;
       }>;
     }>;
@@ -807,49 +904,66 @@ async function handleAcceptProposals(
     // the legacy prd.md that the watcher overwrites.
     const store = await resolveStore(ctx.rexDir);
     let addedCount = 0;
+    let v2Outcome: V2AcceptOutcome | undefined;
 
-    for (const p of toAccept) {
-      const epicId = randomUUID();
-      const epicItem: PRDItem = {
-        id: epicId,
+    if (isChangeLayerStore(store)) {
+      const outcome = await acceptAsChanges(ctx, store, toAccept.map((p) => ({
         title: p.epic.title,
-        level: "epic",
-        status: "pending",
         source: p.epic.source,
-      };
-      if (p.epic.description) epicItem.description = p.epic.description;
-      await store.addItem(epicItem);
-      addedCount++;
-
-      for (const f of p.features) {
-        const featureId = randomUUID();
-        const featureItem: PRDItem = {
-          id: featureId,
+        status: p.epic.status,
+        children: p.features.map((f) => ({
           title: f.title,
-          level: "feature",
-          status: "pending",
           source: f.source,
+          status: f.status,
+          children: f.tasks.map((t) => proposedTask(t)),
+        })),
+      })));
+      addedCount = outcome.changeCount + outcome.taskCount;
+      v2Outcome = outcome;
+    } else {
+      for (const p of toAccept) {
+        const epicId = randomUUID();
+        const epicItem: PRDItem = {
+          id: epicId,
+          title: p.epic.title,
+          level: "epic",
+          status: "pending",
+          source: p.epic.source,
         };
-        if (f.description) featureItem.description = f.description;
-        await store.addItem(featureItem, epicId);
+        if (p.epic.description) epicItem.description = p.epic.description;
+        await store.addItem(epicItem);
         addedCount++;
 
-        for (const t of f.tasks) {
-          const taskId = randomUUID();
-          const taskItem: PRDItem = {
-            id: taskId,
-            title: t.title,
-            level: "task",
+        for (const f of p.features) {
+          const featureId = randomUUID();
+          const featureItem: PRDItem = {
+            id: featureId,
+            title: f.title,
+            level: "feature",
             status: "pending",
-            source: t.source,
+            source: f.source,
           };
-          if (t.description) taskItem.description = t.description;
-          if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
-          if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
-          if (t.tags) taskItem.tags = t.tags;
-          Object.assign(taskItem, pickLoEFields(t));
-          await store.addItem(taskItem, featureId);
+          if (f.description) featureItem.description = f.description;
+          await store.addItem(featureItem, epicId);
           addedCount++;
+
+          for (const t of f.tasks) {
+            const taskId = randomUUID();
+            const taskItem: PRDItem = {
+              id: taskId,
+              title: t.title,
+              level: "task",
+              status: "pending",
+              source: t.source,
+            };
+            if (t.description) taskItem.description = t.description;
+            if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
+            if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
+            if (t.tags) taskItem.tags = t.tags;
+            Object.assign(taskItem, pickLoEFields(t));
+            await store.addItem(taskItem, featureId);
+            addedCount++;
+          }
         }
       }
     }
@@ -874,7 +988,9 @@ async function handleAcceptProposals(
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
       event: "analyze_accept",
-      detail: `Accepted ${toAccept.length} proposals (${addedCount} items) via web`,
+      detail: v2Outcome
+        ? `Accepted ${toAccept.length} proposals via web: ${v2AcceptSummary(v2Outcome)}`
+        : `Accepted ${toAccept.length} proposals (${addedCount} items) via web`,
     });
 
     if (broadcast) {
@@ -884,7 +1000,18 @@ async function handleAcceptProposals(
       });
     }
 
-    jsonResponse(res, 200, { ok: true, acceptedCount: toAccept.length, addedCount });
+    // On v2 the counts say why an accept may add nothing: every proposal
+    // described code that already exists (skippedCount).
+    jsonResponse(res, 200, {
+      ok: true,
+      acceptedCount: toAccept.length,
+      addedCount,
+      ...(v2Outcome ? {
+        changeCount: v2Outcome.changeCount,
+        taskCount: v2Outcome.taskCount,
+        skippedCount: v2Outcome.skippedCount,
+      } : {}),
+    });
   } catch (err) {
     errorResponse(res, 400, errorMessage(err));
   }
@@ -933,6 +1060,9 @@ async function handleAcceptEditedProposals(
     // `existingId` on epic/feature so smart-placement nests under the
     // matched container instead of creating a duplicate.
     const store = await resolveStore(ctx.rexDir);
+    if (isChangeLayerStore(store)) {
+      return await acceptEditedAsChanges(res, ctx, store, input.proposals, broadcast);
+    }
     const knownIds = new Set(collectAllIds((await store.loadDocument()).items));
     // Parents whose status may need reverting from `completed` to `pending`
     // after we nest a new task underneath them. Deduped so we only cascade
@@ -1054,6 +1184,67 @@ async function handleAcceptEditedProposals(
   } catch (err) {
     errorResponse(res, 400, errorMessage(err));
   }
+  return true;
+}
+
+/**
+ * accept-edited on a v2 tree: the selected proposals as Inbox changes.
+ *
+ * `existingId` names a v1 epic or feature to nest under; the change layer has
+ * no containers, so it means nothing here and is ignored. The proposal's own
+ * source is kept when the editor sent it; an editor that did not falls back
+ * to the v1 path's `web-proposal-editor`.
+ */
+async function acceptEditedAsChanges(
+  res: ServerResponse,
+  ctx: ServerContext,
+  store: PRDStore,
+  proposals: EditedProposal[],
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const selected = proposals.filter((p) => p.selected);
+  const work: ProposedWork[] = selected.map((p) => ({
+    title: p.epic.title.trim(),
+    children: p.features.filter((f) => f.selected).map((f) => ({
+      title: f.title.trim(),
+      children: f.tasks.filter((t) => t.selected).map((t) => proposedTask({
+        ...t,
+        title: t.title.trim(),
+        description: t.description?.trim() || undefined,
+      }, t.source ?? f.source ?? p.epic.source ?? "web-proposal-editor")),
+    })),
+  }));
+  // A feature whose tasks were all deselected proposes no work of its own here:
+  // the editor's unit of acceptance is the task.
+  for (const epic of work) {
+    epic.children = epic.children?.filter((f) => f.children?.length);
+  }
+  const outcome = await acceptAsChanges(ctx, store, work.filter((e) => e.children?.length));
+  // Selected baseline proposals are an accept that adds nothing, answered
+  // with its counts as Accept does; only an empty selection is refused.
+  if (outcome.changeCount === 0 && outcome.skippedCount === 0) {
+    errorResponse(res, 400, "No items selected for acceptance");
+    return true;
+  }
+
+  const pendingPath = join(ctx.rexDir, "pending-proposals.json");
+  if (existsSync(pendingPath)) {
+    try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
+  }
+  appendLog(ctx, {
+    timestamp: new Date().toISOString(),
+    event: "proposals_edited_accept",
+    detail: `Accepted ${selected.length} edited proposals via proposal editor: ${v2AcceptSummary(outcome)}`,
+  });
+  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  jsonResponse(res, 200, {
+    ok: true,
+    acceptedCount: selected.length,
+    addedCount: outcome.changeCount + outcome.taskCount,
+    changeCount: outcome.changeCount,
+    taskCount: outcome.taskCount,
+    skippedCount: outcome.skippedCount,
+  });
   return true;
 }
 

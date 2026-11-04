@@ -3,14 +3,15 @@
  *
  * Renders a lightweight form below a parent node, auto-inferring the child
  * type from the parent. Supports title, description, and priority fields
- * with keyboard shortcuts (Enter to submit, Escape to cancel).
+ * with keyboard shortcuts (Enter to submit, Escape to cancel). No priority is
+ * offered or sent for a child that carries none (a v2 subtask).
  */
 
 import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef, useEffect } from "preact/hooks";
 import type { Priority } from "./types.js";
-import { type ItemType, childTypeOf, itemTypeLabel } from "../../external.js";
+import { type ItemType, childCarriesPriority, childTypeOf, itemTypeLabel } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -19,6 +20,11 @@ export interface InlineAddFormProps {
   parentType: ItemType;
   /** The ID of the parent item. */
   parentId: string;
+  /**
+   * The type of the parent's own parent; null for a root parent. A task under
+   * a change is a v2 task, whose subtasks carry no priority.
+   */
+  grandparentType?: ItemType | null;
   /** Tree depth for indentation alignment. */
   depth: number;
   /** Called when the form is submitted. */
@@ -47,7 +53,7 @@ const PRIORITY_OPTIONS: Array<{ value: Priority | ""; label: string }> = [
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel }: InlineAddFormProps) {
+export function InlineAddForm({ parentType, parentId, grandparentType = null, depth, onSubmit, onCancel }: InlineAddFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<string>("");
@@ -66,6 +72,7 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
 
   const childType = childTypeOf(parentType);
   if (!childType) return null; // nothing nests under this type
+  const offerPriority = childCarriesPriority(parentType, grandparentType);
 
   const childLabel = itemTypeLabel(childType);
   const indent = (depth + 1) * 24;
@@ -90,14 +97,14 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
           parentId,
           type: childType,
           description: description.trim() || undefined,
-          priority: priority || undefined,
+          priority: offerPriority ? priority || undefined : undefined,
         });
       } catch (err) {
         setError(String(err));
         setSubmitting(false);
       }
     },
-    [title, description, priority, parentId, childType, onSubmit],
+    [title, description, priority, offerPriority, parentId, childType, onSubmit],
   );
 
   const handleKeyDown = useCallback(
@@ -167,7 +174,7 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
         type: "button",
         class: `prd-inline-add-more${showExtra ? " active" : ""}`,
         onClick: () => setShowExtra(!showExtra),
-        title: showExtra ? "Hide extra fields" : "Show description & priority",
+        title: showExtra ? "Hide extra fields" : offerPriority ? "Show description & priority" : "Show description",
         "aria-label": showExtra ? "Hide extra fields" : "Show extra fields",
         disabled: submitting,
       }, h(ActionIcon, { name: "more" })),
@@ -193,7 +200,7 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
       }, h(ActionIcon, { name: "close" })),
     ),
 
-    // Extra fields (description + priority) — shown when expanded
+    // Extra fields (description, and priority where the child keeps one) — shown when expanded
     showExtra
       ? h("div", { class: "prd-inline-add-extra" },
           // Description
@@ -208,8 +215,8 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
             "aria-label": "Description",
           }),
 
-          // Priority selector
-          h("div", { class: "prd-inline-add-priority-row" },
+          // Priority selector — not for a child that carries no priority
+          offerPriority && h("div", { class: "prd-inline-add-priority-row" },
             h("span", { class: "prd-inline-add-priority-label" }, "Priority:"),
             h("select", {
               class: "prd-inline-add-priority",

@@ -1,3 +1,5 @@
+import { FloatingNotice } from "../components/index.js";
+import { useToast } from "../hooks/index.js";
 /**
  * Templates — the template section of the Workflow page.
  *
@@ -248,10 +250,10 @@ function SaveTemplateForm({ onSave, saving, blocked }: {
 
 function Toast({ message }: { message: string | null }) {
   if (!message) return null;
-  return h("div", { class: "hench-template-toast" },
+  return h(FloatingNotice, null, h("div", { class: "hench-template-toast", role: "status", "aria-live": "polite" },
     h("span", { class: "hench-template-toast-icon" }, "\u2714"),
     h("span", null, message),
-  );
+  ));
 }
 
 // ── Section ──────────────────────────────────────────────────────────
@@ -270,12 +272,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  }, []);
+  const { toast, showToast } = useToast();
 
   const fetchTemplates = useCallback(async () => {
     try {

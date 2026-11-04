@@ -1,3 +1,4 @@
+import { checkBranchGuard } from "../rex-gateway.js";
 /**
  * Prune routes: preview and execute pruning of completed subtrees.
  *
@@ -11,7 +12,7 @@ import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog, parentIdOf } from "./rex-route-helpers.js";
+import { findItemById, appendLog, parentIdOf, dashboardBranchRefusal } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
 
@@ -397,6 +398,11 @@ async function handlePruneExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const guard = checkBranchGuard(ctx.projectDir, {});
+  if (guard.blocked) {
+    errorResponse(res, 409, dashboardBranchRefusal("prune", guard.branch, "rex prune --allow-on-branch"));
+    return true;
+  }
   if (!loadPRDSync(ctx.rexDir)) {
     errorResponse(res, 404, "No PRD data found");
     return true;

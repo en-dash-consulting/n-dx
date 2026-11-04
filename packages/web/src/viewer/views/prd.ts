@@ -1,3 +1,4 @@
+import { FloatingNotice } from "../components/index.js";
 /**
  * PRD view — displays Rex PRD hierarchy with interactive tree.
  *
@@ -40,12 +41,12 @@ import {
   useFacetState,
   useClaims,
   useSidecarProposals,
+  useProductRead,
 } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { ghostRowsByParent } from "../components/prd-tree/ghost-rows.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
-import { useProductRead } from "./product-pages.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -429,11 +430,11 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
     // Toast notification (success = green, error = red)
     toast
-      ? h("div", {
+      ? h(FloatingNotice, null, h("div", {
           class: `rex-toast${toastType === "error" ? " rex-toast-error" : ""}`,
           role: toastType === "error" ? "alert" : "status",
           "aria-live": toastType === "error" ? "assertive" : "polite",
-        }, toast)
+        }, toast))
       : null,
 
     // Delete confirmation modal

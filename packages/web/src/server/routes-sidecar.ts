@@ -125,6 +125,7 @@ import {
   type SidecarRegistryOptions,
   type SidecarSessionRecord,
   type SidecarTurnOutcome,
+  type WorktreeSidecarRegistryOptions,
 } from "./sidecar/session-registry.js";
 import { hubVendorRefusal, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
@@ -135,8 +136,10 @@ import {
   HUB_SESSION_ROUTES,
   HUB_SIDECAR_API_PREFIX,
   SIDECAR_SESSION_ENDED_REASON,
+  injectSessionScript,
+  applySameOriginFramePolicy,
 } from "../shared/index.js";
-import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, resolveHubHome } from "../hub/index.js";
+import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, recordHubUsage, resolveHubHome } from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -273,8 +276,13 @@ export interface HubSidecarRouteOptions {
   pid?: number;
   /** Injected for tests: whether a lock holder's pid is alive. */
   isAlive?: (pid: number) => boolean;
-  /** The registry over `dir`, built each time this server takes the host lock. Defaults to {@link createHubSidecarRegistry}. */
-  registryFor?: (dir: string) => SidecarSessionRegistry;
+  /**
+   * The registry over `dir`, built each time this server takes the host lock.
+   * Defaults to {@link createHubSidecarRegistry}. `defaults` are the options
+   * production builds it with (context, idle TTL, spend recorder), so a test
+   * that swaps the vendor connection still runs the production ones.
+   */
+  registryFor?: (dir: string, defaults: WorktreeSidecarRegistryOptions) => SidecarSessionRegistry;
   /** The broker over `dir`. Defaults to an announcing broker, built with the registry. */
   brokerFor?: (dir: string) => SidecarBroker;
   /** What an approved broker call does. Defaults to {@link hubSidecarActions}. */
@@ -463,6 +471,28 @@ export function sidecarTurnSpendRecorder(ctx: ServerContext): NonNullable<Sideca
       calls: 1,
       outcome: status === "completed" ? "success" : "error",
       ...(record.lens && { lens: record.lens }),
+    });
+  };
+}
+
+/**
+ * Appends each finished hub turn to `<ndx home>/hub/usage.jsonl`, never to the
+ * host project's ledger: the hub session is the machine's, and whichever
+ * project happens to host it did not spend this.
+ */
+export function hubTurnSpendRecorder(ctx: ServerContext, homeDir?: string): NonNullable<SidecarRegistryOptions["onTurnSpend"]> {
+  return ({ record, status, tokens }) => {
+    if (status === "interrupted" && tokens.input === 0 && tokens.output === 0) return;
+    recordHubUsage(resolveHubHome(homeDir), {
+      timestamp: new Date().toISOString(),
+      command: SIDECAR_COMMAND,
+      vendor: record.vendor,
+      model: record.model ?? "unknown",
+      ...tokenFields(tokens),
+      calls: 1,
+      outcome: status === "completed" ? "success" : "error",
+      ...(record.lens && { lens: record.lens }),
+      host: ctx.projectDir,
     });
   };
 }
@@ -739,16 +769,19 @@ function hubHostState(
   const key = `${dir}\0${pid}`;
   let state = hubHosts.get(key);
   if (!state || acquired) {
+    const defaults: WorktreeSidecarRegistryOptions = {
+      context: hubSidecarContextOptions(ctx, dir, opts),
+      ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
+      onTurnSpend: hubTurnSpendRecorder(ctx, opts.homeDir),
+    };
     state = {
       registry: opts.registryFor
-        ? opts.registryFor(dir)
+        ? opts.registryFor(dir, defaults)
         : createHubSidecarRegistry({
+            ...defaults,
             dir,
             hostProjectDir: ctx.projectDir,
             broker: (id) => hubSidecarBrokerEndpoint(ctx, id),
-            context: hubSidecarContextOptions(ctx, dir, opts),
-            ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
-            onTurnSpend: sidecarTurnSpendRecorder(ctx),
           }),
       broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast, hubLedgerTarget(opts.homeDir), hubDraftsDir(resolveHubHome(opts.homeDir))),
     };
@@ -951,8 +984,12 @@ async function handleHubSidecarRoute(
     }
     const html = opts.drawerHtml?.() ?? null;
     if (html === null) return refuse(res, 404, "The hub session drawer is not built; run the web package's build");
+    // The hub home docks this page in an iframe; the gate's DENY would blank it.
+    // The hub forwards these headers over its own.
+    applySameOriginFramePolicy(res);
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-    res.end(withHubSessionPageConfig(html));
+    // The session script signs the frame in from its tab, so its fetches carry the credential and its socket a ticket.
+    res.end(injectSessionScript(withHubSessionPageConfig(html)));
     return true;
   }
   if (!ctx.port) return refuse(res, 503, "This server has no port, so it cannot host the hub session");

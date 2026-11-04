@@ -20,8 +20,10 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { VendorSessionOptions } from "@n-dx/llm-client";
-import { HUB_PID_FILE, hubLedgerPath, hubSessionHostLockPath, hubSidecarDir, readHubSessionHostLock } from "../../../src/hub/index.js";
+import { HUB_PID_FILE, hubLedgerPath, hubSessionHostLockPath, hubSidecarDir, hubUsagePath, readHubSessionHostLock } from "../../../src/hub/index.js";
+import { dashboardUsagePath, readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import { enforceRouteFeatureGate } from "../../../src/server/route-feature-gates.js";
+import { BROWSER_SESSION_SCRIPT } from "../../../src/shared/index.js";
 import {
   createAnnouncingBroker,
   handleSidecarRoute,
@@ -122,10 +124,11 @@ async function startHost(pid: number, port: number, drawerHtml?: () => string | 
         isAlive: (p) => alive.has(p),
         fetch: fakeHubFetch,
         ...(drawerHtml && { drawerHtml }),
-        registryFor: (dir) => new SidecarSessionRegistry({
+        // Production's context, idle TTL and spend recorder; only the vendor CLI is faked.
+        registryFor: (dir, defaults) => new SidecarSessionRegistry({
+          ...defaults,
           dir,
           connect: () => ({ spawn: fakeSpawn }),
-          context: hubSidecarContextOptions(hostCtx, dir, { homeDir: home, fetch: fakeHubFetch }),
         }),
       },
     });
@@ -248,6 +251,20 @@ describe("one hub session per machine", () => {
   });
 });
 
+describe("hub session spend", () => {
+  it("records a turn through the route in <ndx home>/hub/usage.jsonl and not in the host project's ledger", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    await turn(host, session.id, "spend something");
+
+    const lines = readFileSync(hubUsagePath(home), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ command: "sidecar", lens: "hub", inputTokens: 100, outputTokens: 4, host: ctx.projectDir });
+    expect(existsSync(dashboardUsagePath(ctx.projectDir))).toBe(false);
+    expect(readDashboardUsage(ctx.projectDir)).toEqual([]);
+  });
+});
+
 describe("the hub lens packet", () => {
   it("opens every turn with a snapshot rebuilt for it, marking what changed since the last turn", async () => {
     const host = await startHost(1001, 4321);
@@ -311,8 +328,14 @@ describe("what the hub home and its drawer read", () => {
     const page = await get(built, "/drawer");
     expect(page.status).toBe(200);
     expect(page.headers.get("content-type")).toContain("text/html");
+    // The hub home frames it; nothing of another origin may.
+    expect(page.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+    expect(page.headers.get("content-security-policy")).not.toContain("frame-ancestors 'none'");
     const html = await page.text();
     expect(html).toContain("<title>Hub session</title>");
+    // Signed in from its tab: fetches carry the session credential, the socket a ticket.
+    expect(html.startsWith(`<script>${BROWSER_SESSION_SCRIPT}</script>`)).toBe(true);
     // The page's paths ride in with it, every one through the hub, ahead of the app root.
     const config = /<body class="hub-session-page"><script type="application\/json" id="hub-session-config">(.*?)<\/script><div id="app">/.exec(html);
     expect(JSON.parse(config![1])).toEqual({

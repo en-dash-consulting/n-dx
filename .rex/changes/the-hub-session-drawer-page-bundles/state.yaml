@@ -1,5 +1,22 @@
 schema: "rex/v2"
 items:
   "348b34e6-db4d-4ceb-b316-c3fe950276fb":
-    lastModified: "2026-11-03T00:53:35.515Z"
+    status: "completed"
+    startedAt: "2026-11-03T17:23:38.189Z"
+    completedAt: "2026-11-03T17:23:38.189Z"
+    endedAt: "2026-11-03T17:23:38.189Z"
+    activeIntervals: [{"end":"2026-11-03T17:23:38.189Z","start":"2026-11-03T17:23:38.189Z"}]
+    appliedAt: "2026-11-03T17:23:38.189Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-03T17:23:38.189Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4841fb59-8f6b-41d5-97bf-461e46396e26":
+    status: "completed"
+    startedAt: "2026-11-03T17:08:21.596Z"
+    completedAt: "2026-11-03T17:23:38.189Z"
+    endedAt: "2026-11-03T17:23:38.189Z"
+    activeIntervals: [{"end":"2026-11-03T17:23:38.189Z","start":"2026-11-03T17:08:21.596Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Narrow sidecar/ + hooks/sidecar.ts barrels; hub-session.html 545 KB → 88 KB; bundle test + named boundary-check exemptions."
+    lastModified: "2026-11-03T17:23:38.189Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

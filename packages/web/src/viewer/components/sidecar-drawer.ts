@@ -19,8 +19,8 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/index.js";
-import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
+import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/sidecar.js";
+import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
 import { useHubProjects } from "./project-switcher.js";
@@ -101,7 +101,7 @@ export function summarizeToolInput(input: Record<string, unknown>): string {
 
 /**
  * The result of each tool call, by the call's `seq`. A result that names its
- * call (Claude's `tool_use_id`, as `callId`) belongs to the open call with that
+ * call (Claude's `tool_use_id`, as `id`) belongs to the open call with that
  * id, or to none. A result without one — Codex's — belongs to the earliest
  * still-unanswered call to the same tool when it names one, else to the
  * earliest still-unanswered call: vendor CLIs answer calls in order.
@@ -115,7 +115,7 @@ export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, To
     if (event.type === "tool_use" && event.toolCall) {
       open.push({ seq: frame.seq, tool: event.toolCall.tool, id: event.toolCall.id });
     } else if (event.type === "tool_result" && event.toolResult) {
-      const { callId, tool } = event.toolResult;
+      const { id: callId, tool } = event.toolResult;
       const named = open.findIndex((c) => c.tool === tool);
       const index = callId
         ? open.findIndex((c) => c.id === callId)

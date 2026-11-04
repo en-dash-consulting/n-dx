@@ -121,6 +121,8 @@ export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
 export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
+export { StrengthChip } from "./strength-chip.js";
+export type { GuessStrength } from "./strength-chip.js";
 export { HubSessionDrawer, HubCeilingMeter, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
 export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
 export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
@@ -179,3 +181,5 @@ export type { RepoTrustStripProps, RepoTrustView, RepoTrustNotice, RepoTrustFind
 export { RunCommandControl } from "./run-command-control.js";
 export { ServerUnavailableNotice, serverUnavailableCopy } from "./server-unavailable.js";
 export type { ServerUnavailableNoticeProps, ServerUnavailableCopy } from "./server-unavailable.js";
+
+export { FloatingNotice } from "./floating-notice.js";

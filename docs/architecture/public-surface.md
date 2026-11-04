@@ -45,7 +45,7 @@ registration order and complete schemas are pinned by
 | `append_log` | Structured execution-log entry |
 | `get_recommendations` | Sourcevision-based recommendations |
 | `verify_criteria` | Map acceptance criteria to tests; `runTests: false` avoids execution |
-| `reorganize` | Detect or apply structural repairs |
+| `reorganize` | Detect or apply structural repairs; `accept` refuses off the default branch unless `allowOnBranch: true` |
 | `health` | Structure health |
 | `facets` | Configured facet distributions |
 | `get_token_usage` | Per-item and descendant usage, plus orphans |

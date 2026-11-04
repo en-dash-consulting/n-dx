@@ -764,14 +764,20 @@ describe("commands route — ndx binary resolution ladder", () => {
     expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(preferred);
   });
 
-  it("prefers the project-local .bin/ndx when present", async () => {
+  it("never resolves ndx from the analyzed project's node_modules/.bin", async () => {
+    // The project is what the dashboard serves, not what it runs: a binary it
+    // ships must not be the one spawned.
     const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
     const binDir = join(tmpDir, "node_modules", ".bin");
     await md(binDir, { recursive: true });
     await wf(join(binDir, "ndx"), "#!/bin/sh\n");
 
     await runRefresh();
-    expect(spawnManagedMock.mock.calls[0][0]).toBe(join(binDir, "ndx"));
+    const [bin, args] = spawnManagedMock.mock.calls[0] as [string, string[]];
+    expect(bin).not.toBe(join(binDir, "ndx"));
+    // Neither the executable nor the script it runs lives in the project.
+    expect(bin.startsWith(tmpDir)).toBe(false);
+    expect(args[0]?.startsWith(tmpDir)).toBe(false);
   });
 
   it("uses N_DX_CLI_PATH when set and no local bin exists", async () => {
@@ -1820,7 +1826,7 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
 
   it("auth reports ok when the credential check exits cleanly", async () => {
     execMock.mockResolvedValue({ stdout: "claude: credentials OK", stderr: "", error: null, exitCode: 0 });
-    const res = await fetch(`http://127.0.0.1:${port}/api/commands/auth`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
@@ -1832,13 +1838,13 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     execMock.mockResolvedValueOnce({
       stdout: "\u001b[32m✓ Credentials valid\u001b[39m\n", stderr: "", error: null, exitCode: 0,
     });
-    const ok = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    const ok = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
     expect(ok.output).toBe("✓ Credentials valid");
 
     execMock.mockResolvedValueOnce({
       stdout: "", stderr: "\u001b[31mNo API key found\u001b[39m", error: new Error("exit 1"), exitCode: 1,
     });
-    const bad = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`)).json();
+    const bad = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`, { method: "POST" })).json();
     expect(bad.error).toBe("No API key found");
   });
 
@@ -1847,7 +1853,7 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
       stdout: "", stderr: "No API key found for vendor claude",
       error: new Error("exit 1"), exitCode: 1,
     });
-    const body = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
     expect(body.ok).toBe(false);
     expect(String(body.error)).toContain("No API key found");
   });
@@ -1856,8 +1862,8 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     // The settings page mounts the chip on every navigation — each visit
     // must not cost a 60s-budget subprocess.
     execMock.mockResolvedValue({ stdout: "claude: credentials OK", stderr: "", error: null });
-    const first = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
-    const second = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    const first = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
+    const second = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
 
     expect(execMock).toHaveBeenCalledTimes(1);
     expect(first.cached).toBe(false);
@@ -1869,10 +1875,10 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
     execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
 
-    const stale = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    const stale = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
     expect(stale.ok).toBe(false);
 
-    const fresh = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`)).json();
+    const fresh = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`, { method: "POST" })).json();
     expect(execMock).toHaveBeenCalledTimes(2);
     expect(fresh.ok).toBe(true);
     expect(fresh.cached).toBe(false);
@@ -1882,8 +1888,8 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     let release!: (r: { stdout: string; stderr: string; error: null }) => void;
     execMock.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
 
-    const a = fetch(`http://127.0.0.1:${port}/api/commands/auth`);
-    const b = fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`);
+    const a = fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" });
+    const b = fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`, { method: "POST" });
     await new Promise((r) => setTimeout(r, 20));
     release({ stdout: "claude: credentials OK", stderr: "", error: null });
 
@@ -1899,7 +1905,7 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
     execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
 
-    expect((await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json()).ok).toBe(false);
+    expect((await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json()).ok).toBe(false);
 
     const put = await fetch(`http://127.0.0.1:${port}/api/llm/config`, {
       method: "PUT",
@@ -1909,7 +1915,7 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(put.status).toBe(200);
 
     // No ?refresh needed: the save itself must drop the stale verdict.
-    const after = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    const after = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
     expect(execMock).toHaveBeenCalledTimes(2);
     expect(after.ok).toBe(true);
   });

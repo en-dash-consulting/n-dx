@@ -8,6 +8,7 @@ import {
   hubPidPath,
   isPidAlive,
   loadRegistry,
+  loadRegistryHealing,
   parseRegisterInput,
   readHubPidFile,
   registryPath,
@@ -88,12 +89,29 @@ describe("registry load/save", () => {
     expect(loadRegistry(path)).toEqual(emptyRegistry());
   });
 
+  it("strips a recorded ndxBin from an older registry and reports it", () => {
+    const path = registryPath(home);
+    writeFileSync(path, JSON.stringify({
+      version: 1,
+      projects: {
+        old: { id: "old", name: "old", repoRoot: "/repos/old", worktrees: ["/repos/old"], ndxBin: "/somewhere/else.js", port: null, pid: null, lastSeen: null },
+        current: { id: "current", name: "current", repoRoot: "/repos/current", worktrees: ["/repos/current"], port: null, pid: null, lastSeen: null },
+      },
+    }));
+    const { registry, healed } = loadRegistryHealing(path);
+    expect(healed).toEqual([{ id: "old", ndxBin: "/somewhere/else.js" }]);
+    expect(Object.keys(registry.projects).sort()).toEqual(["current", "old"]);
+    expect(registry.projects.old).not.toHaveProperty("ndxBin");
+    expect(registry.projects.old).toMatchObject({ repoRoot: "/repos/old" });
+    expect(loadRegistry(path).projects.old).not.toHaveProperty("ndxBin");
+  });
+
   it("round-trips records and drops entries missing their essentials", () => {
     const path = registryPath(home);
     const registry = emptyRegistry();
     registry.projects.alpha = {
       id: "alpha", name: "alpha", repoRoot: "/repos/alpha", worktrees: ["/repos/alpha"],
-      ndxBin: "/bin/ndx-web.js", port: 4321, pid: 999999, lastSeen: null,
+      port: 4321, pid: 999999, lastSeen: null,
     };
     saveRegistry(path, registry);
     expect(loadRegistry(path)).toEqual(registry);
@@ -155,28 +173,38 @@ describe("parseRegisterInput", () => {
     mkdirSync(join(home, "web", "dist", "cli"), { recursive: true });
     writeFileSync(ndxBin, "");
     writeFileSync(join(home, "web", "package.json"), JSON.stringify({ name: "@n-dx/web" }));
+    const ok = parseRegisterInput({ id: "proj-1", repoRoot: home, name: "  Proj " }, ndxBin);
+    expect(ok).toEqual({ input: { id: "proj-1", repoRoot: home, worktree: undefined, name: "Proj" } });
+
+    expect(parseRegisterInput(null, ndxBin)).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "../etc", repoRoot: home }, ndxBin)).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "p", repoRoot: "relative" }, ndxBin)).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "p", repoRoot: join(home, "missing") }, ndxBin)).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "p", repoRoot: home, worktree: "rel" }, ndxBin)).toHaveProperty("problem");
+  });
+
+  it("drops whatever ndxBin the body names — the hub spawns its own", () => {
+    const ndxBin = join(home, "web", "dist", "cli", "index.js");
+    mkdirSync(join(home, "web", "dist", "cli"), { recursive: true });
+    writeFileSync(ndxBin, "");
+    writeFileSync(join(home, "web", "package.json"), JSON.stringify({ name: "@n-dx/web" }));
     const other = join(home, "evil.js");
     writeFileSync(other, "");
-    expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin: other })).toHaveProperty("problem");
-    // Same shape, no package behind it: refused.
+    const parsed = parseRegisterInput({ id: "p", repoRoot: home, ndxBin: other }, ndxBin);
+    expect(parsed).toHaveProperty("input");
+    expect((parsed as { input: object }).input).not.toHaveProperty("ndxBin");
+    expect(parseRegisterInput({ id: "x", repoRoot: home }, ndxBin)).toEqual({
+      problem: 'id "x" is reserved: /x/ is where the hub mounts extension sidecars',
+    });
+    expect(parseRegisterInput({ id: "X", repoRoot: home }, ndxBin)).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "x1", repoRoot: home }, ndxBin)).toHaveProperty("input");
+  });
+
+  it("refuses to register when the hub has no acceptable binary of its own", () => {
     const impostor = join(home, "impostor", "web", "dist", "cli", "index.js");
     mkdirSync(join(home, "impostor", "web", "dist", "cli"), { recursive: true });
     writeFileSync(impostor, "");
-    expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin: impostor })).toHaveProperty("problem");
-    const ok = parseRegisterInput({ id: "proj-1", repoRoot: home, ndxBin, name: "  Proj " });
-    expect(ok).toEqual({ input: { id: "proj-1", repoRoot: home, ndxBin, worktree: undefined, name: "Proj" } });
-
-    expect(parseRegisterInput(null)).toHaveProperty("problem");
-    expect(parseRegisterInput({ id: "../etc", repoRoot: home, ndxBin })).toHaveProperty("problem");
-    // `/x/` mounts extension sidecars, so no project may be called x.
-    expect(parseRegisterInput({ id: "x", repoRoot: home, ndxBin })).toEqual({
-      problem: 'id "x" is reserved: /x/ is where the hub mounts extension sidecars',
-    });
-    expect(parseRegisterInput({ id: "X", repoRoot: home, ndxBin })).toHaveProperty("problem");
-    expect(parseRegisterInput({ id: "x1", repoRoot: home, ndxBin })).toHaveProperty("input");
-    expect(parseRegisterInput({ id: "p", repoRoot: "relative", ndxBin })).toHaveProperty("problem");
-    expect(parseRegisterInput({ id: "p", repoRoot: join(home, "missing"), ndxBin })).toHaveProperty("problem");
-    expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin: join(home, "nope.js") })).toHaveProperty("problem");
-    expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin, worktree: "rel" })).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "p", repoRoot: home }, impostor)).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "p", repoRoot: home }, "")).toHaveProperty("problem");
   });
 });

@@ -47,3 +47,4 @@ export * from "./use-tick.js";
 export * from "./use-toast.js";
 export * from "./use-zone-drag.js";
 export * from "./use-sidecar-sessions.js";
+export * from "./use-product-read.js";

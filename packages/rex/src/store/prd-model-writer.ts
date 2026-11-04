@@ -49,7 +49,7 @@
 
 import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, rmdir } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import {
   AreaIntentSchema,
   CapabilityIntentSchema,
@@ -183,6 +183,7 @@ export async function writePrdModel(
     await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan, isInboxChange);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
+  await assertNoStrandedFiles(plan, productDir);
 
   const result: WritePrdModelResult = { written: [], removed: [], deletedFiles: [] };
   const rel = (path: string): string => relative(rexDir, path).split("\\").join("/");
@@ -542,8 +543,21 @@ async function assertStaleRemovable(
 }
 
 /**
+ * Files an operating system drops into a folder once it has been shown
+ * (Finder's `.DS_Store`, Explorer's `Thumbs.db` and `desktop.ini`). They are
+ * nobody's content: a stale folder loses them with its tree files, so they
+ * never keep it alive. Matched case-insensitively.
+ */
+const OS_JUNK_FILES: ReadonlySet<string> = new Set([".ds_store", "thumbs.db", "ehthumbs.db", "desktop.ini"]);
+
+function isOsJunk(entry: Dirent): boolean {
+  return entry.isFile() && OS_JUNK_FILES.has(entry.name.toLowerCase());
+}
+
+/**
  * Delete a stale entry. A folder loses only its tree files (`.md`, `state.yaml`)
- * and is removed once empty, so anything else kept there survives and the
+ * and any OS junk ({@link OS_JUNK_FILES}, deleted but not reported), and is
+ * removed once empty, so anything else kept there survives and the
  * folder stays. `removed` is the folder itself when it went, else the files;
  * `files` is every file deleted.
  */
@@ -564,8 +578,12 @@ interface Removal {
 async function removeTreeFiles(dir: string): Promise<Removal> {
   const out: Removal = { removed: [], files: [] };
   for (const entry of (await listDir(dir)) ?? []) {
-    if (entry.name.startsWith(".")) continue;
     const path = join(dir, entry.name);
+    if (isOsJunk(entry)) {
+      await rm(path, { force: true });
+      continue;
+    }
+    if (entry.name.startsWith(".")) continue;
     if (entry.isDirectory()) {
       const inner = await removeTreeFiles(path);
       out.removed.push(...((await removeIfEmpty(path)) ? [path] : inner.removed));
@@ -575,6 +593,45 @@ async function removeTreeFiles(dir: string): Promise<Removal> {
       out.removed.push(path);
       out.files.push(path);
     }
+  }
+  return out;
+}
+
+/**
+ * A product folder that goes stale (its node became a leaf or was removed)
+ * loses its tree files, but anything else in it stays, leaving a folder with
+ * no `index.md` that every later read warns about and skips. Refuse, naming
+ * those files, before anything is written. Files a moved folder carries along
+ * do not count. Product layer only: a change is always a folder.
+ */
+async function assertNoStrandedFiles(plan: Plan, productDir: string): Promise<void> {
+  const carried = new Set(plan.carried.map((c) => c.from));
+  const inProduct = (path: string): boolean => path.startsWith(productDir + sep);
+  for (const { path, isDir } of plan.stale) {
+    if (!isDir || !inProduct(path)) continue;
+    const stranded = (await nonTreeFilesUnder(path)).filter((file) => !carried.has(file));
+    if (stranded.length === 0) continue;
+    throw new Error(
+      `Refusing to write the PRD: the folder ${path} would lose its node (it becomes a leaf or is removed), ` +
+        `but it also holds ${stranded.map((f) => relative(path, f).split(sep).join("/")).join(", ")}, ` +
+        `which would be left in a folder with no index.md. Nothing was written. Move or delete those files by hand first.`,
+    );
+  }
+}
+
+/**
+ * Every entry under `dir` that would keep it from being removed: files that
+ * are not tree files (`.md`, `state.yaml`) or OS junk, and any dot entry
+ * (`.gitkeep`, `.notes/`), which the removal leaves alone.
+ */
+async function nonTreeFilesUnder(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of (await listDir(dir)) ?? []) {
+    if (isOsJunk(entry)) continue;
+    const path = join(dir, entry.name);
+    if (entry.name.startsWith(".")) out.push(path);
+    else if (entry.isDirectory()) out.push(...(await nonTreeFilesUnder(path)));
+    else if (!entry.name.endsWith(".md") && entry.name !== STATE_FILE_NAME) out.push(path);
   }
   return out;
 }

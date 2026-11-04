@@ -31,8 +31,8 @@
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
 import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, laneSteps, stepRunOptions, workCommandArgs } from "../external.js";
-import { useCliName } from "../hooks/index.js";
-import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
+import { useCliName } from "../hooks/sidecar.js";
+import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/sidecar.js";
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
 import { CopyTextButton } from "./copy-text-button.js";
 import { PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";

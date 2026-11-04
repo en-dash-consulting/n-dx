@@ -2,6 +2,8 @@
  * Shared types for the zone diagram view and its extracted hooks.
  */
 
+import type { CallGraph } from "../external.js";
+
 export interface CallRef {
   funcName: string;
   file: string;
@@ -9,7 +11,7 @@ export interface CallRef {
 }
 
 export interface FuncInfo {
-  fn: import("../../schema/v1.js").FunctionNode;
+  fn: CallGraph["functions"][number];
   outgoing: CallRef[];
   incoming: CallRef[];
 }

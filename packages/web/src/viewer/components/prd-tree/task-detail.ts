@@ -13,11 +13,11 @@ import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCat
 import type { NavigateTo } from "../../types.js";
 import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
-import { findItemById } from "./tree-utils.js";
+import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
-import { type ItemType, canAddChildType, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
+import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { useFeatureToggle, useIndexMd } from "../../hooks/index.js";
 import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-verdict-banner.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
@@ -464,15 +464,26 @@ export interface AddChildData {
   priority?: string;
 }
 
+/**
+ * Whether the child the add form makes keeps a priority: the shared rule
+ * (`childCarriesPriority`), asked with this item's own parent type.
+ */
+function addedChildCarriesPriority(item: PRDItemData, itemType: ItemType, allItems: PRDItemData[]): boolean {
+  return childCarriesPriority(itemType, parentTypeIn(allItems, item.id));
+}
+
 /** Inline form for adding a child item within the detail panel. */
 function AddChildForm({
   parentId,
   parentType,
+  offerPriority,
   onSubmit,
   onCancel,
 }: {
   parentId: string;
   parentType: ItemType;
+  /** False when the child carries no priority (a v2 subtask), so none is offered. */
+  offerPriority: boolean;
   onSubmit: (data: AddChildData) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -488,6 +499,7 @@ function AddChildForm({
   if (!childType) return null;
 
   const childLabel = itemTypeLabel(childType);
+  const extraLabel = offerPriority ? "Show description, criteria & priority" : "Show description & criteria";
 
   const handleSubmit = useCallback(async () => {
     const trimmedTitle = title.trim();
@@ -508,13 +520,13 @@ function AddChildForm({
         type: childType,
         description: description.trim() || undefined,
         ...(acceptanceCriteria.length ? { acceptanceCriteria } : {}),
-        priority: priority || undefined,
+        priority: offerPriority ? priority || undefined : undefined,
       });
     } catch (err) {
       setError(String(err));
       setSubmitting(false);
     }
-  }, [title, description, criteria, priority, parentId, childType, onSubmit]);
+  }, [title, description, criteria, priority, offerPriority, parentId, childType, onSubmit]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -575,8 +587,8 @@ function AddChildForm({
         type: "button",
         class: `task-add-child-more${showExtra ? " active" : ""}`,
         onClick: () => setShowExtra(!showExtra),
-        title: showExtra ? "Hide extra fields" : "Show description, criteria & priority",
-        "aria-label": showExtra ? "Hide extra fields" : "Show description, criteria & priority",
+        title: showExtra ? "Hide extra fields" : extraLabel,
+        "aria-label": showExtra ? "Hide extra fields" : extraLabel,
         disabled: submitting,
       }, h(ActionIcon, { name: "more" })),
       h("button", {
@@ -617,7 +629,8 @@ function AddChildForm({
             rows: 2,
             disabled: submitting,
           }),
-          h("div", { class: "task-add-child-priority-row" },
+          offerPriority
+            ? h("div", { class: "task-add-child-priority-row" },
             h("span", { class: "task-add-child-priority-label" }, "Priority:"),
             h("select", {
               class: "task-add-child-priority",
@@ -630,7 +643,8 @@ function AddChildForm({
                 h("option", { key: opt.value, value: opt.value }, opt.label),
               ),
             ),
-          ),
+          )
+            : null,
         )
       : null,
   );
@@ -1121,6 +1135,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
   // Determine if this item can have children added
   const canAddChild = onAddChild != null && canAddChildType(itemType);
+  const offerChildPriority = addedChildCarriesPriority(item, itemType, allItems);
 
   // A change in the Inbox: its tasks won't run until it is placed. The
   // placement section reports it, on mount and whenever it changes.
@@ -1446,6 +1461,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
               ? h(AddChildForm, {
                   parentId: item.id,
                   parentType: itemType,
+                  offerPriority: offerChildPriority,
                   onSubmit: async (data) => {
                     await onAddChild!(data);
                     setShowAddChild(false);

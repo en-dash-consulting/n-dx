@@ -12,8 +12,8 @@
  * - **The pick** is the hub's side: the lock's holder while it is a healthy
  *   registered project, else the first healthy registered project. A host
  *   the proxy could not reach, or whose route gate refused for web.sidecar,
- *   is skipped until its next health check succeeds, so the next request
- *   moves on to another one.
+ *   is skipped until its next health check succeeds. The proxy retries a
+ *   web.sidecar refusal on the next healthy host in the same request.
  *
  * @module web/hub/session-host
  */

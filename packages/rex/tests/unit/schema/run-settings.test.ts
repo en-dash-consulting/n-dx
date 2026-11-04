@@ -7,7 +7,7 @@ const FULL = {
   tier: "heavy",
   models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol", google: "g", local: "l" },
   provider: "api",
-  permissionMode: "bypassPermissions",
+  permissionMode: "acceptEdits",
   review: false,
   reviewMode: "pair",
   reviewVendor: "codex",
@@ -81,6 +81,20 @@ describe("validateRunSettings", () => {
 
   it("drops an empty models object but keeps the rest of the block", () => {
     expect(validateRunSettings({ tier: "light", models: {} })).toEqual({ ok: true, value: { tier: "light" } });
+  });
+
+  it("refuses bypassPermissions on an item, naming where the mode belongs", () => {
+    // A PRD item is repository content the agent can write through the MCP
+    // tools; the one mode that skips every confirmation is never saved on one.
+    const r = validateRunSettings({ permissionMode: "bypassPermissions" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("run.permissionMode");
+      expect(r.error).toContain("hench.permissionMode");
+    }
+    for (const mode of ["default", "acceptEdits"]) {
+      expect(validateRunSettings({ permissionMode: mode })).toEqual({ ok: true, value: { permissionMode: mode } });
+    }
   });
 
   it("rejects wrong types and out-of-range values", () => {

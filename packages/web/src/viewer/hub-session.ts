@@ -26,9 +26,9 @@ import {
   useHubSessionInfo,
   useSidecar,
   type HubSessionPageConfig,
+  HubSessionDrawer,
   type HubSnapshotWorktree,
-} from "./hooks/index.js";
-import { HubSessionDrawer } from "./components/index.js";
+} from "./sidecar/index.js";
 
 const NO_PAGE = { view: "home", zone: null, taskId: null } as const;
 const THEME_KEY = "sv-theme";

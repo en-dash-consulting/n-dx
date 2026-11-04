@@ -192,6 +192,14 @@ describe("Rex item routes on a v2 project", () => {
     expect(task.children?.find((c) => c.id === created.id)).toMatchObject({ type: "subtask", title: "Check the button" });
   });
 
+  it("POST /items refuses a priority on a subtask rather than dropping it, and writes nothing", async () => {
+    const before = JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items);
+    const res = await send("POST", "items", { title: "Check the button", parentId: TASK_ID, priority: "high" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("A subtask does not carry priority");
+    expect(JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items)).toBe(before);
+  });
+
   it("POST /items refuses a child under a subtask and writes nothing", async () => {
     const subtask = await (await send("POST", "items", { title: "Leaf", parentId: TASK_ID })).json();
     const before = JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items);
