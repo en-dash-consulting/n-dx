@@ -206,7 +206,11 @@ user's local config; the shared config's `true` applies only in a trusted
 checkout (`network-reads` trust finding). The packet runs gh
 only under it; `github_read` runs without a card under it and raises a
 network-read card otherwise. `github_read` is `per-project` in the broker
-policy, so an allow-list rule for it is ignored. `draft_github_post` is never
+policy, so an allow-list rule for it is ignored. A `pr` read also sits behind
+`git.branchHealth`: while it is off the broker answers "Nothing was read" before
+raising a card. A `check` read names the class "failing on main" only when its
+base is origin's default branch, else "failing on the base (<base>)".
+`draft_github_post` is never
 allowed without its card: Approve posts the card's own input under the
 operator's gh login (`gh pr comment` or `gh pr review --comment`, body on
 stdin); Copy and Discard deny it.

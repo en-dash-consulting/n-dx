@@ -48,6 +48,8 @@ export interface SidecarActions {
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
   /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
   githubReadsAllowed(): boolean;
+  /** `git.branchHealth`, read per call: off, a `pr` read reads nothing and raises no card. */
+  branchHealthEnabled(): boolean;
   /** A `github_read`, run with gh. Never throws. */
   githubRead(read: GithubRead, signal?: AbortSignal): Promise<CarryOutResult>;
   /** An approved draft, posted under the operator's gh login. Never throws. */

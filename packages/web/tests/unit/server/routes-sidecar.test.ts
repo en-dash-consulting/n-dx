@@ -127,6 +127,7 @@ const noEffects: SidecarActions = {
   writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
   readRunPlan: async () => "this test plans nothing",
   githubReadsAllowed: () => false,
+  branchHealthEnabled: () => true,
   githubRead: async () => ({ ok: true, text: "Read it." }),
   postGithub: async () => ({ ok: true, text: "Posted it." }),
 };
