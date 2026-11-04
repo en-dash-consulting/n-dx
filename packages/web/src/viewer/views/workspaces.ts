@@ -62,7 +62,13 @@ export interface WorktreeEntry {
   branch: string | null;
   dirty: boolean | null;
   dirtyFiles: number | null;
-  runs: { total: number; running: number; lastFinishedAt: string | null };
+  runs: {
+    total: number;
+    running: number;
+    lastFinishedAt: string | null;
+    /** The newest run; `claimLostTo` is the worktree root that took its task over. */
+    latest?: { claimLostTo: string | null } | null;
+  };
   server: { pidFile: boolean; pid: number | null; port: number | null };
 }
 
@@ -125,6 +131,8 @@ export interface WorkspaceCard {
   isCurrent: boolean;
   dirtyFiles: number | null;
   runs: { total: number; running: number; lastFinishedAt: string | null };
+  /** Name of the worktree that took the latest run's task over mid-run, or null. */
+  claimLostTo: string | null;
   /** Null for the anchor (there is nothing to compare it against) and until the delta loads. */
   delta: PrdDeltaCounts | null;
   /** The execution to show live, or null when nothing is running here. */
@@ -166,6 +174,12 @@ export function pickLiveExecution(executions: readonly ExecutionStatus[]): Execu
   return live.reduce((newest, e) => (Date.parse(e.startedAt) > Date.parse(newest.startedAt) ? e : newest));
 }
 
+/** A worktree root as the board names it: its workspace key, else the directory's name. */
+function worktreeLabel(root: string | null, keyByPath: ReadonlyMap<string, string>): string | null {
+  if (root === null) return null;
+  return keyByPath.get(root) ?? (root.split(/[\\/]/).filter(Boolean).pop() ?? root);
+}
+
 /**
  * Join the registry's workspaces with git state, PRD deltas and live runs.
  *
@@ -183,6 +197,7 @@ export function buildWorkspaceCards(
   currentKey: string | null,
 ): WorkspaceCard[] {
   const byPath = new Map(worktrees.map((w) => [w.path, w]));
+  const keyByPath = new Map(workspaces.map((ws) => [ws.path, ws.key]));
   const cards = workspaces.map((ws): WorkspaceCard => {
     const wt = byPath.get(ws.path);
     return {
@@ -193,6 +208,7 @@ export function buildWorkspaceCards(
       isCurrent: currentKey === null ? ws.isAnchor : ws.key === currentKey,
       dirtyFiles: wt?.dirtyFiles ?? null,
       runs: wt?.runs ?? { total: 0, running: 0, lastFinishedAt: null },
+      claimLostTo: worktreeLabel(wt?.runs.latest?.claimLostTo ?? null, keyByPath),
       delta: ws.isAnchor ? null : deltas.get(ws.key) ?? null,
       live: pickLiveExecution(executions.get(ws.key) ?? []),
       nextTask: nextTasks.get(ws.key) ?? null,
@@ -508,6 +524,11 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
       : h("p", { class: "workspace-card-last-run" },
           since ? `Last run · ${since}` : "No runs recorded here yet",
         ),
+
+    card.claimLostTo
+      ? h("p", { class: "workspace-card-claim-lost", role: "status" },
+          `Task taken over by ${card.claimLostTo}`)
+      : null,
 
     error ? h("p", { class: "workspace-card-error", role: "alert" }, error) : null,
 
