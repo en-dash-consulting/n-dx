@@ -1,0 +1,18 @@
+schema: "rex/v2"
+items:
+  "5af6db8a-4de4-416a-9a0c-3ad31e638a9c":
+    lastModified: "2026-11-04T19:25:48.384Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6ded6a40-3201-4a0f-ba10-7c3653cbeddb":
+    issues: ["https://github.com/en-dash-consulting/n-dx/pull/930#pullrequestreview-5770574908"]
+    lastModified: "2026-11-04T19:26:27.708Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ab81b682-f37c-4fcd-9f26-422dd376b659":
+    lastModified: "2026-11-04T19:25:29.485Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c9a0e430-c671-451b-8188-7454c936499f":
+    lastModified: "2026-11-04T19:26:02.821Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cf457468-5ec5-4a59-8de8-3edab986760d":
+    lastModified: "2026-11-04T19:26:13.769Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
