@@ -63,7 +63,7 @@ import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardS
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
-import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -243,11 +243,13 @@ export function prepareReads(
     preview: typeof previewTaskRun;
     diagnose: typeof diagnoseTaskRun;
     queuePlan: typeof readQueuePlan;
+    runTargets: typeof resolveRunTargets;
   } = {
     resolve: resolveTaskRun,
     preview: previewTaskRun,
     diagnose: diagnoseTaskRun,
     queuePlan: readQueuePlan,
+    runTargets: resolveRunTargets,
   },
   workspaces?: SidecarWorkspaces,
 ): SpawnedReads {
@@ -259,10 +261,13 @@ export function prepareReads(
       const read = await reads.queuePlan(ctx, signal).catch(() => null);
       return read?.ok ? read.plan : null;
     },
-    async diagnose(runId, signal) {
-      const read = await reads.diagnose(ctx, runId, signal).catch(() => null);
+    async diagnose(runId, dir, signal) {
+      const read = await reads.diagnose(ctx, runId, dir, signal).catch(() => null);
       return read?.ok ? readDiagnosis(read.diagnosis) ?? null : null;
     },
+    // Runs (`?scope=repo`) and Live read these same worktrees and judge with the same mirror.
+    runTargets: () => reads.runTargets(ctx),
+    judgeRun: (target, run) => judgeRunInTarget(target, run, Date.now()),
     async resolve(taskId, signal) {
       const read = await reads.resolve(ctx, taskId, {}, signal).catch(() => null);
       return read?.ok ? readResolution(read.resolution) : null;

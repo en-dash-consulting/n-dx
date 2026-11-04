@@ -598,18 +598,21 @@ export async function previewTaskRun(
  * `hench runs diagnose <run-id> --format=json` through `ndx hench`, for a
  * caller inside this server that renders it: the Sidecar Diagnose run lens,
  * for a run whose record carries no verdict. Hench prints the verdict but does
- * not write it. A refusal (the run is running or completed) or a timeout is
- * the failure.
+ * not write it. A refusal (the run is completed, or running with its process
+ * alive) or a timeout is the failure. `dir` is the worktree the run was made
+ * in, whose `.hench/runs/` holds it: one of the repository's worktrees, as
+ * the Runs and Live sweep lists them.
  */
 export async function diagnoseTaskRun(
   ctx: ServerContext,
   runId: string,
+  dir: string,
   signal?: AbortSignal,
 ): Promise<{ ok: true; diagnosis: Record<string, unknown> } | { ok: false; failure: string }> {
   if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
   const run = await runNdx(
     ctx,
-    ["hench", "runs", "diagnose", runId, "--format=json", ctx.projectDir],
+    ["hench", "runs", "diagnose", runId, "--format=json", dir],
     PREP_RESOLVE_TIMEOUT_MS,
     signal,
   );

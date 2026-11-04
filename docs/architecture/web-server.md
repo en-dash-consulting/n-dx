@@ -169,13 +169,22 @@ verdict (`RunRecord.diagnosis`), the review's unrepaired findings and the
 run's last events, each read from disk in `sidecar/packet-sources.ts`; web
 still imports nothing from hench.
 
+The newest run is the task's newest in any worktree of the repository: the
+packet reads the worktrees Runs (`?scope=repo`) and Live read
+(`resolveRunTargets`, injected as `SpawnedReads.runTargets`), and the run
+section names the worktree. A record at `running` is judged with Live's
+liveness mirror (`judgeRunInTarget`, as `SpawnedReads.judgeRun`).
+
 A run from a hench that predates the classifier records no verdict. When the
 newest run has ended without completing, the verdict comes from
-`hench runs diagnose <id> --format=json`, spawned through `SpawnedReads`
-(`diagnoseTaskRun` in `routes-hench-prep.ts`, beside the resolve and preview
-spawns) and named as the section's provenance. A failed or timed-out spawn
-leaves a gap naming the command; a running or completed run is never
-classified. The verdict section also lists the failed run's settings (`model`
+`hench runs diagnose <id> --format=json <worktree>`, spawned in the run's
+worktree through `SpawnedReads` (`diagnoseTaskRun` in `routes-hench-prep.ts`,
+beside the resolve and preview spawns) and named as the section's
+provenance. A failed or timed-out spawn leaves a gap naming the command. A
+running record whose process is gone (`orphaned`) has ended too: it is
+classified, and the verdict section says it is recorded as running and that
+ending it from Live records the end. A completed run, or a running one whose
+process may be alive, is never classified. The verdict section also lists the failed run's settings (`model`
 when a flag chose it, `review` and `reviewModel` when it had a review plan; a
 pair review repeats as `reviewMode: "pair"` with its `reviewVendor`) for the
 model to pass to `start_work` on a re-run or `--fresh`. The spawned verdict
