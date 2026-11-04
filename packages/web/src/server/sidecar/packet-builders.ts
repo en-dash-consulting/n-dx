@@ -245,17 +245,46 @@ function criteriaBody(node: RuleNode, report: ReturnType<typeof capabilityReport
   ].join("\n");
 }
 
+function statusSection(report: ReturnType<typeof capabilityReport>, now: string): PacketSection {
+  return prdSection(
+    "status",
+    "Derived status and health",
+    `status ${report.status.status}, health ${report.status.health} (rex's derivation, not stored)`,
+    now,
+  );
+}
+
+function v2ConstraintSections(tree: V2Tree, node: RuleNode, now: string): { sections: PacketSection[]; ids: string[] } {
+  const report = capabilityReport(tree, node.id, { status: "all", limit: 10 });
+  const requirements = (Array.isArray(node.requirements) ? node.requirements : []) as Array<{ title?: string; id: string; description?: string }>;
+  const appliesTo = node.appliesTo === "all" || node.appliesTo === undefined ? "all" : strings(node.appliesTo).join(", ") || "(none)";
+  const sections: PacketSection[] = [
+    prdSection(
+      "constraint",
+      "Constraint",
+      [
+        label(node),
+        `Statement: ${text(node.statement) ?? "(none)"}`,
+        `Applies to: ${appliesTo}`,
+        "Requirements (standing, not done-when):",
+        bullets(
+          requirements.map((r) => `${oneLine(r.title ?? r.id, 120)}${text(r.description) ? `: ${oneLine(r.description!, 200)}` : ""}`),
+          "(none)",
+        ),
+      ].join("\n"),
+      now,
+    ),
+    statusSection(report, now),
+  ];
+  return { sections, ids: [node.id] };
+}
+
 function v2CapabilitySections(tree: V2Tree, node: RuleNode, now: string): { sections: PacketSection[]; ids: string[] } {
   const report = capabilityReport(tree, node.id, { status: "all", limit: 10 });
   const sections: PacketSection[] = [
     prdSection("capability", "Capability", [label(node), `Statement: ${text(node.statement) ?? "(none)"}`].join("\n"), now),
     prdSection("criteria", "Capability criteria (standing requirements)", criteriaBody(node, report), now),
-    prdSection(
-      "status",
-      "Derived status and health",
-      `status ${report.status.status}, health ${report.status.health} (rex's derivation, not stored)`,
-      now,
-    ),
+    statusSection(report, now),
     prdSection(
       "changes",
       "Linked changes",
@@ -377,6 +406,10 @@ export async function buildExplainPacket(sources: PacketSources, target: PacketT
     if (product?.type === "area") return done(areaSections(prd.tree, { node: product, chain: [], siblings: [] }, now));
     if (product?.type === "capability") {
       const built = v2CapabilitySections(prd.tree, product, now);
+      return done([...built.sections, ...(await evidenceSections(sources, built.ids, now))]);
+    }
+    if (product?.type === "constraint") {
+      const built = v2ConstraintSections(prd.tree, product, now);
       return done([...built.sections, ...(await evidenceSections(sources, built.ids, now))]);
     }
     const found = findNode([...prd.tree.product, ...prd.tree.changes], target.ref);

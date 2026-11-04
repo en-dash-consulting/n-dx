@@ -97,8 +97,11 @@ export interface ClaudeTurnFlags {
 export interface CodexTurnFlags {
   /**
    * Sandbox and approval flags for a fresh `codex exec`
-   * (see `compileCodexPolicyFlags`). Dropped on resume: the resumed thread
-   * keeps its own policy, and `exec resume` rejects the flags.
+   * (see `compileCodexPolicyFlags`). Dropped on resume, where `exec resume`
+   * rejects them. A resumed turn does not keep the thread's starting policy:
+   * `exec resume` reads sandbox and approval from the invocation's config, so
+   * the user's `~/.codex/config.toml` decides. Re-applying the policy on
+   * resume is PRD item 31307b89.
    */
   readonly policyFlags?: readonly string[];
 }
@@ -538,7 +541,9 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
   // Codex cannot fork, so a resume always appends to the thread. Two
   // differences from a fresh exec, both dictated by `codex exec resume`:
   //   1. No policy flags — resume rejects `-s/--sandbox` and
-  //      `--approve-for-me`; the thread keeps the policy it started with.
+  //      `--approve-for-me`. The thread does not keep its starting policy:
+  //      resume takes sandbox and approval from this invocation's config, so
+  //      the user's ~/.codex/config.toml decides (PRD item 31307b89).
   //   2. The id is always explicit, never `--last`, which picks the newest
   //      session on the machine and would let any other codex run capture it.
   if (input.resume) {

@@ -72,6 +72,14 @@ describe("bottom bar working-tree chip", () => {
     expect(rule![1]).not.toMatch(/left:/);
   });
 
+  it("anchors the panel to the viewport above the bar at narrow widths", () => {
+    const media = /@media \(max-width: 700px\)\s*\{\s*\.git-status-chip \.git-status-panel\s*\{([^}]*)\}/.exec(read("styles/git-status.css"));
+    expect(media).not.toBeNull();
+    expect(media![1]).toMatch(/position:\s*fixed/);
+    expect(media![1]).toMatch(/right:\s*1rem/);
+    expect(media![1]).toMatch(/bottom:\s*calc\(var\(--bottombar-h\)/);
+  });
+
   it("shows nothing when the tree is clean", () => {
     bar(CLEAN);
     expect(root.querySelector(".git-status-chip")).toBeNull();

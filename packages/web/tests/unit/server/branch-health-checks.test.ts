@@ -53,6 +53,46 @@ describe("classifyFailingCheck", () => {
     expect(verdict.class).toBe("behind-base");
   });
 
+  it("reads behind-base wording only from ##[error] annotations, not ordinary log lines", () => {
+    const verdict = classify({
+      rollup: checkRun("test (ubuntu-latest)"),
+      log: [
+        "test (ubuntu-latest)\tRun tests\t FAIL  tests/e2e/iso-skill-drift.test.js > bundled script",
+        "test (ubuntu-latest)\tRun tests\tAssertionError: .claude/skills/iso-map/scripts/iso-map.mjs is out of date with packages/sourcevision/src/export/",
+        "",
+      ].join("\n"),
+    });
+    expect(verdict.class).not.toBe("behind-base");
+  });
+
+  it("ignores a test failure that vitest's github-actions reporter raised as an annotation", () => {
+    // In CI vitest emits `::error file=…::<error output>`, which the log shows as ##[error].
+    const verdict = classify({
+      rollup: checkRun("test (ubuntu-latest)"),
+      log: [
+        "test (ubuntu-latest)\tRun tests\t FAIL  tests/e2e/iso-skill-drift.test.js > iso-map skill > the committed bundle matches",
+        "test (ubuntu-latest)\tRun tests\t##[error]AssertionError: The committed iso-map skill script is out of date with packages/sourcevision/src/export/.",
+        "test (ubuntu-latest)\tRun tests\t##[error]Error: Snapshot `x` mismatched: the cache is behind the base snapshot",
+        "",
+      ].join("\n"),
+    });
+    expect(verdict.class).not.toBe("behind-base");
+  });
+
+  it("touched-test: a changed test whose name says 'is behind' is not behind-base", () => {
+    const verdict = classify({
+      rollup: checkRun("test (ubuntu-latest)"),
+      log: "test (ubuntu-latest)\tRun tests\tpackages/web test:  FAIL  tests/unit/base-ref.test.ts > prefers origin/main over a local main that is behind it\n",
+      changedFiles: ["packages/web/tests/unit/base-ref.test.ts"],
+    });
+    expect(verdict.class).toBe("touched-test");
+  });
+
+  it("behind-base: the check name says the branch is behind", () => {
+    const verdict = classify({ rollup: checkRun("branch is behind base"), log: "exit 1\n" });
+    expect(verdict.class).toBe("behind-base");
+  });
+
   it("policy-test: the log names a policy suite", () => {
     const verdict = classify({
       rollup: checkRun("test (ubuntu-latest)"),

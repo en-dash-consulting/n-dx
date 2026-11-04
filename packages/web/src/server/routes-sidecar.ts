@@ -70,6 +70,7 @@
  * @module web/server/routes-sidecar
  */
 
+import { realpathSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { exec as llmExec, isAuthError, redactSecrets, vendorSessionDriver } from "@n-dx/llm-client";
@@ -442,8 +443,8 @@ export function sidecarActions(
       const read = await readQueuePlan(ctx, signal).catch((err: unknown) => ({ ok: false as const, failure: errorMessage(err) }));
       return read.ok ? read.plan : read.failure;
     },
-    runCommand(argv, signal) {
-      const started = startSidecarCommand(ctx, argv, broadcast);
+    async runCommand(argv, signal) {
+      const started = await startSidecarCommand(ctx, argv, broadcast);
       return started.started
         ? awaitSidecarCommand(started, commandWaitMs, signal)
         : { ok: false, text: `Nothing ran: ${started.reason}.` };
@@ -536,6 +537,24 @@ function defaultRegistryFor(ctx: ServerContext, workspaces: SidecarWorkspaces | 
   return registry;
 }
 
+/** `path` as one spelling per directory: symlinks and, where the filesystem folds case, case resolved. */
+function canonicalPath(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * Whether a session stored with `worktree` belongs to `checkout`. The
+ * stored spelling is whatever the creating process was started with, so a
+ * restart from a symlinked or differently cased path must still match.
+ */
+function heldBy(checkout: string, worktree: string): boolean {
+  return canonicalPath(worktree) === canonicalPath(checkout);
+}
+
 /** Build a broker for `dir` that announces its cards through `broadcast`; `ledger` defaults to a worktree's. */
 export function createAnnouncingBroker(
   dir: string,
@@ -569,6 +588,17 @@ function defaultBrokerFor(projectDir: string, broadcast: WebSocketBroadcaster): 
   }
   return broker;
 }
+
+/**
+ * Why a Codex Sidecar session is refused. `codex exec resume` takes its
+ * sandbox and approval policy from the invocation's config, not the thread,
+ * so from the second turn the user's `~/.codex/config.toml` would decide and
+ * the session could write the worktree with no card. Re-applying the policy
+ * on resume is PRD item 31307b89; until it lands, Codex is refused at create
+ * and at every turn.
+ */
+export const CODEX_SIDECAR_UNAVAILABLE =
+  "Codex Sidecar sessions are unavailable until a resumed turn keeps the read-only sandbox";
 
 /** Answer an error; true, so a handler can `return refuse(…)`. */
 function refuse(res: ServerResponse, status: number, message: string): true {
@@ -1247,7 +1277,8 @@ const SNAPSHOT_NOTE_TYPES = ["unfinished", "decision"] as const;
 /** `GET /api/sidecar/ledger/latest`: each open session's latest unfinished and decision notes, sessions with neither left out. */
 function latestSessionNotes(registry: SidecarSessionRegistry, worktree: string): SidecarLedgerLatestResponse {
   const dir = worktreeSidecarDir(worktree);
-  const sessions = registry.list({ scope: "worktree", worktree })
+  const sessions = registry.list({ scope: "worktree" })
+    .filter((session) => heldBy(worktree, session.worktree))
     .filter((session) => !session.endedAt)
     .flatMap((session) => {
       const latest = latestLedgerEntries(readLedger(dir, session.id), SNAPSHOT_NOTE_TYPES);
@@ -1258,7 +1289,8 @@ function latestSessionNotes(registry: SidecarSessionRegistry, worktree: string):
 
 /** The open session a handoff resumes: the worktree's most recently active one that has not ended. */
 function latestOpenSession(registry: SidecarSessionRegistry, worktree: string): SidecarSessionRecord | undefined {
-  return registry.list({ scope: "worktree", worktree })
+  return registry.list({ scope: "worktree" })
+    .filter((session) => heldBy(worktree, session.worktree))
     .filter((session) => !session.endedAt)
     .sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))[0];
 }
@@ -1332,8 +1364,9 @@ function readNameAndModel(body: Record<string, unknown>): { name?: string; model
 function createWorktreeSession(registry: SidecarSessionRegistry, worktree: string, body: Record<string, unknown>): CreateAnswer {
   const vendor = optionalString(body, "vendor");
   if (!vendor || vendor instanceof Error || !vendorSessionDriver(vendor)) {
-    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude, codex)` };
+    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude)` };
   }
+  if (vendor === "codex") return { status: 400, error: CODEX_SIDECAR_UNAVAILABLE };
   const fields = readNameAndModel(body);
   if (fields instanceof Error) return { status: 400, error: fields.message };
   const lens = optionalString(body, "lens");
@@ -1357,7 +1390,8 @@ async function handleSessionRoutes(
   const { prefix, registry, broker, broadcast } = scope;
   if (pathname === prefix) {
     if (method === "GET") {
-      const sessions = registry.list({ worktree: scope.worktree })
+      const sessions = registry.list()
+        .filter((session) => heldBy(scope.worktree, session.worktree))
         .map((session) => sessionResponse(registry, session));
       jsonResponse(res, 200, { sessions });
       return true;
@@ -1382,7 +1416,7 @@ async function handleSessionRoutes(
   const session = registry.get(id);
   // One answer for a session this worktree does not hold, whether it does not
   // exist or belongs to another worktree's checkout.
-  if (!session || session.worktree !== scope.worktree) return refuse(res, 404, `No Sidecar session ${id}`);
+  if (!session || !heldBy(scope.worktree, session.worktree)) return refuse(res, 404, `No Sidecar session ${id}`);
 
   if (action === undefined && method === "PATCH") {
     const body = await readJsonObject(req, res);
@@ -1434,6 +1468,8 @@ async function handleSessionRoutes(
       const prompt = body.prompt;
       if (typeof prompt !== "string" || !prompt.trim()) return refuse(res, 400, `"prompt" must be a non-empty string`);
       if (session.endedAt) return refuse(res, 409, `Sidecar session ${id} has ended`);
+      // A Codex session indexed before the create refusal must not resume without its sandbox.
+      if (session.vendor === "codex") return refuse(res, 409, CODEX_SIDECAR_UNAVAILABLE);
       if (registry.isRunning(id)) return refuse(res, 409, `A turn is already running in Sidecar session ${id}`);
       startTurn(registry, broker, id, prompt, broadcast);
       const started = registry.get(id) ?? session;

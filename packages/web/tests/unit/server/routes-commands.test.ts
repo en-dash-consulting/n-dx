@@ -31,6 +31,7 @@ import {
   handleCommandsRoute,
   invalidateAuthCheckCache,
   invalidateCommandEffectsCache,
+  startSidecarCommand,
 } from "../../../src/server/routes-commands.js";
 import { handleLlmRoute } from "../../../src/server/routes-llm.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -702,6 +703,68 @@ describe("commands route — shared .sourcevision write lock", () => {
     stubManagedRun({ stdout: "[refresh] ok" });
     expect((await post("refresh", {})).status).toBe(202);
     await waitForFinish("refresh");
+  });
+
+  describe("Sidecar commands", () => {
+    // What `ndx help --effects --format=json` declares: analyze writes .sourcevision/, status writes nothing.
+    beforeEach(() => {
+      invalidateCommandEffectsCache();
+      const declared = (command: string, writes: Array<{ path: string; what: string }>) =>
+        ({ command, summary: "", reads: [], writes, llm: [], network: [], duration: "", next: "" });
+      execMock.mockResolvedValue({
+        stdout: JSON.stringify({ effects: {
+          analyze: declared("analyze", [{ path: "{sourcevision}/", what: "analysis" }]),
+          status: declared("status", []),
+        } }),
+        stderr: "",
+        exitCode: 0,
+        error: null,
+        started: true,
+      });
+    });
+
+    it("refuses a Sidecar ndx analyze while sv-analyze holds the lock, naming the holder", async () => {
+      const child = stubManagedChild();
+      expect((await post("sv-analyze", { full: true })).status).toBe(202);
+
+      const started = await startSidecarCommand(ctx, ["ndx", "analyze", "."]);
+      expect(started).toEqual({ started: false, reason: expect.stringContaining("full analysis") });
+      expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+
+      child.finish({ exitCode: 0, stdout: "", stderr: "" });
+      await waitForFinish("sv-analyze");
+    });
+
+    it("holds the lock against dashboard writers while it runs and releases it when the job ends", async () => {
+      const child = stubManagedChild();
+      const started = await startSidecarCommand(ctx, ["ndx", "analyze", "."]);
+      if (!started.started) throw new Error(started.reason);
+
+      for (const path of ["refresh", "ci"]) {
+        const res = await post(path, {});
+        expect(res.status).toBe(409);
+        expect(((await res.json()) as { runningJob: string }).runningJob).toBe(`Sidecar command ${started.jobId} (ndx analyze .)`);
+      }
+
+      child.finish({ exitCode: 0, stdout: "", stderr: "" });
+      await started.settled;
+
+      stubManagedRun({ stdout: "[refresh] ok" });
+      expect((await post("refresh", {})).status).toBe(202);
+      await waitForFinish("refresh");
+    });
+
+    it("a Sidecar command that writes nothing to .sourcevision/ leaves the lock free", async () => {
+      const child = stubManagedChild();
+      const started = await startSidecarCommand(ctx, ["ndx", "status", "."]);
+      if (!started.started) throw new Error(started.reason);
+
+      expect((await post("sv-analyze", { full: true })).status).toBe(202);
+
+      child.finish({ exitCode: 0, stdout: "", stderr: "" });
+      await started.settled;
+      await waitForFinish("sv-analyze");
+    });
   });
 });
 

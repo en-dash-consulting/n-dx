@@ -8,6 +8,8 @@
  * a URL, an `aria-*` state, a mounted element, a persisted preference.
  */
 
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import {
   createFixtureProject,
@@ -255,10 +257,6 @@ test("floating notices and expanded panels share vertical space at phone width",
       notice.textContent = "A status message with enough text to wrap on a narrow screen";
       stack.append(notice);
     }
-    const tray = document.createElement("div");
-    tray.className = "sessions-panel";
-    tray.innerHTML = '<button class="sessions-toggle">Sessions</button><ul class="sessions-list"><li>Running a task</li></ul>';
-    stack.append(tray);
   });
   const boxes = await page.locator(".status-dock > *").evaluateAll((items) => items.map((item) => {
     const rect = item.getBoundingClientRect();
@@ -270,4 +268,19 @@ test("floating notices and expanded panels share vertical space at phone width",
     expect(boxes[i]!.bottom).toBeLessThan(804);
     if (i > 0) expect(boxes[i]!.bottom).toBeLessThanOrEqual(boxes[i - 1]!.top);
   }
+});
+
+test("the uncommitted-files panel stays inside the viewport at phone width", async ({ page }) => {
+  await writeFile(join(fixture.dir, "uncommitted-panel-probe.txt"), "probe\n");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoView(page, "home");
+  await page.locator(".bottombar .git-status-toggle").click({ timeout: 30_000 });
+  const panel = page.locator(".bottombar .git-status-panel");
+  await expect(panel).toBeVisible();
+  const box = await panel.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(844);
 });

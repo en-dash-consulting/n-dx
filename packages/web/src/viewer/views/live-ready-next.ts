@@ -66,6 +66,10 @@ export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navi
             ? h("ol", { key: "l", class: "live-ready-lanes" }, plan.lanes.map((lane, i) =>
               h("li", { key: lane.changeId, class: "live-ready-lane" },
                 h("span", { class: "live-side-title" }, `Lane ${i + 1}`),
+                // Every command targets `.`; two runs in one checkout collide.
+                lane.ownWorktree
+                  ? h("p", { class: "live-ready-worktree" }, "Run in its own worktree: this command targets the current checkout, and two runs in one checkout collide.")
+                  : null,
                 h("code", { class: "live-ready-command" }, lane.command),
                 h("ul", null, lane.tasks.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))))
             : null,
