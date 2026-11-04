@@ -19,6 +19,7 @@ import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
+  CODEX_SIDECAR_UNAVAILABLE,
   createAnnouncingBroker,
   handleSidecarRoute,
   type SidecarCardMessage,
@@ -157,6 +158,15 @@ describe("sessions", () => {
     expect((await api("", { method: "POST", body: {} })).status).toBe(400);
   });
 
+  // #901 F1: `codex exec resume` drops the read-only sandbox, so Codex is refused until 31307b89.
+  it("refuses a Codex session without writing a record", async () => {
+    const res = await api("", { method: "POST", body: { vendor: "codex", name: "Plan" } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
+    expect(registry.list({ worktree: root })).toEqual([]);
+    expect((await (await api("")).json()).sessions).toEqual([]);
+  });
+
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
     expect((await api("/nope/frames")).status).toBe(404);
     const id = await createSession();
@@ -201,6 +211,15 @@ describe("turns", () => {
     expect((await api(`/${id}/turns`, { method: "POST", body: { prompt: "again" } })).status).toBe(409);
     await api(`/${id}/interrupt`, { method: "POST" });
     await turnClosed(id);
+  });
+
+  it("refuses a turn on a Codex session already in the index rather than resuming it", async () => {
+    const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
+    const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
+    expect(spawns).toBe(0);
+    expect(registry.get(id)?.cursor).toBe(0);
   });
 
   it("refuses a turn on an ended session", async () => {

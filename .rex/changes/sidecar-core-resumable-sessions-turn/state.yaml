@@ -165,7 +165,14 @@ items:
     lastModified: "2026-10-28T04:34:54.908Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b054ee8e-054a-4e91-bda8-36d8aceff063":
-    lastModified: "2026-11-04T19:03:33.370Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:01:20.545Z"
+    completedAt: "2026-11-04T20:22:17.303Z"
+    endedAt: "2026-11-04T20:22:17.303Z"
+    activeIntervals: [{"end":"2026-11-04T20:22:17.303Z","start":"2026-11-04T20:01:20.545Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "POST /api/sidecar/sessions refuses vendor codex (400, CODEX_SIDECAR_UNAVAILABLE, no record); turns on an indexed Codex session refused (409, same reason, no spawn); driver + spawn-policy comments corrected to point at 31307b89; route tests cover both."
+    lastModified: "2026-11-04T20:22:17.303Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9161bd9-3d30-46d4-b54b-bd9b1e81f544":
     lastModified: "2026-11-04T19:03:53.881Z"

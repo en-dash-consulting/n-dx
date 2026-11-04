@@ -195,6 +195,17 @@ function defaultBrokerFor(projectDir: string, broadcast: WebSocketBroadcaster): 
   return broker;
 }
 
+/**
+ * Why a Codex Sidecar session is refused. `codex exec resume` takes its
+ * sandbox and approval policy from the invocation's config, not the thread,
+ * so from the second turn the user's `~/.codex/config.toml` would decide and
+ * the session could write the worktree with no card. Re-applying the policy
+ * on resume is PRD item 31307b89; until it lands, Codex is refused at create
+ * and at every turn.
+ */
+export const CODEX_SIDECAR_UNAVAILABLE =
+  "Codex Sidecar sessions are unavailable until a resumed turn keeps the read-only sandbox";
+
 /** Answer an error; true, so a handler can `return refuse(…)`. */
 function refuse(res: ServerResponse, status: number, message: string): true {
   errorResponse(res, status, message);
@@ -321,8 +332,9 @@ export async function handleSidecarRoute(
       if (typeof body === "string") return refuse(res, 400, body);
       const vendor = optionalString(body, "vendor");
       if (!vendor || vendor instanceof Error || !vendorSessionDriver(vendor)) {
-        return refuse(res, 400, `"vendor" must be a vendor with a resumable CLI session (claude, codex)`);
+        return refuse(res, 400, `"vendor" must be a vendor with a resumable CLI session (claude)`);
       }
+      if (vendor === "codex") return refuse(res, 400, CODEX_SIDECAR_UNAVAILABLE);
       const fields: Record<string, string | undefined> = {};
       for (const key of ["model", "name", "lens"] as const) {
         const value = optionalString(body, key);
@@ -374,6 +386,8 @@ export async function handleSidecarRoute(
       const prompt = body.prompt;
       if (typeof prompt !== "string" || !prompt.trim()) return refuse(res, 400, `"prompt" must be a non-empty string`);
       if (session.endedAt) return refuse(res, 409, `Sidecar session ${id} has ended`);
+      // A Codex session indexed before the create refusal must not resume without its sandbox.
+      if (session.vendor === "codex") return refuse(res, 409, CODEX_SIDECAR_UNAVAILABLE);
       if (registry.isRunning(id)) return refuse(res, 409, `A turn is already running in Sidecar session ${id}`);
       startTurn(registry, broker, id, prompt, broadcast);
       const started = registry.get(id) ?? session;
