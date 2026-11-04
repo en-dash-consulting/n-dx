@@ -267,7 +267,7 @@ export async function fetchCodexTokenUsage(
       ok: false,
       error: {
         kind: "auth",
-        message: "No Codex API key available: set OPENAI_API_KEY or llm.codex.api_key in .n-dx.json",
+        message: "No Codex API key available: export OPENAI_API_KEY or store one with 'ndx config credentials.codex' (storing it does not switch modes; 'ndx config llm.codex.auth api' does)",
       },
     };
   }

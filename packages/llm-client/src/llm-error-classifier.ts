@@ -439,7 +439,7 @@ export function classifyLLMError(
     return {
       message: "Claude CLI not found on your system.",
       suggestion:
-        "Install it (npm install -g @anthropic-ai/claude-cli) or set an API key: n-dx config claude.apiKey <key>",
+        "Install it (npm install -g @anthropic-ai/claude-code) and run 'claude login', or store an API key with 'ndx config credentials.claude' (storing it does not switch modes; 'ndx config llm.claude.auth api' does).",
       category: "unknown",
       code: CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     };
@@ -489,7 +489,7 @@ export function classifyLLMError(
     vendor === LLM_VENDOR.CODEX
       ? "Check Codex CLI login (codex login) and your network connection, then try again."
       : vendor === LLM_VENDOR.GOOGLE
-        ? "Check your Google API key (GEMINI_API_KEY) and network connection, then retry."
+        ? "Check your Google API key (store it with 'ndx config credentials.google' or export GEMINI_API_KEY) and network connection, then retry."
         : vendor === LLM_VENDOR.LOCAL
           ? "Check that your local LLM server (LM Studio) is running at the configured host/port."
           : "Check your API key and network connection, then try again.";

@@ -7,11 +7,19 @@
 
 import { readFile, access } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
+import { warn } from "./output.js";
 import { deepMerge } from "./project-config.js";
 import { isRepoRestricted, isLocalConfigTracked, type RepoTrustStoreOptions } from "./repo-trust.js";
 import { stripTrackedExecutionConfig } from "./tracked-config-clamp.js";
 import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import type { ClaudeConfig } from "./types.js";
+import { resolveVendorKey } from "./vendor-auth.js";
+import {
+  resolveCredential,
+  TYPESAFE_API_KEY_ENV,
+  TYPESAFE_CREDENTIAL,
+  type CredentialStoreOptions,
+} from "./credential-store.js";
 import {
   LLM_VENDOR,
   DEFAULT_LLM_VENDOR,
@@ -684,8 +692,9 @@ export const JUDGMENT_ROUTE_TYPESAFE = "typesafe" as const;
 /** The judgment routes a call site can be sent to. */
 export type JudgmentRoute = typeof JUDGMENT_ROUTE_TYPESAFE;
 
-/** Environment variable holding the TypeSafe API key; its presence is the opt-in. */
-export const TYPESAFE_API_KEY_ENV = "TYPESAFE_API_KEY";
+// The TypeSafe key's env var is owned by the credential store, which reads it
+// before its own file; re-exported here where callers have always found it.
+export { TYPESAFE_API_KEY_ENV, TYPESAFE_CREDENTIAL };
 
 /**
  * Task classes that go to Jev whenever the key is present and `llm.routes`
@@ -703,23 +712,57 @@ export const DEFAULT_JUDGMENT_ROUTES: ReadonlySet<string> = new Set([
  * Decide whether a task class should be answered by a judgment model.
  *
  * Returns `"typesafe"` when all of:
- * 1. `TYPESAFE_API_KEY` is non-blank in `env` — without it the helper is
- *    inert, so an exported key is the only thing that changes behavior;
- * 2. `llm.routes[<class>]` (exact match, then longest glob prefix, the same
- *    rules as `resolveTaskModel`) is `"typesafe"`, **or** the class is in
- *    {@link DEFAULT_JUDGMENT_ROUTES} and `llm.routes` does not send it to a
- *    tier. An explicit tier always wins, so `llm.routes["*"] = "standard"`
- *    opts a whole project out.
+ * 1. the `typesafe` credential resolves (`TYPESAFE_API_KEY` in `options.env`,
+ *    then the per-user credential store) — without a key the helper is inert;
+ * 2. {@link configuredJudgmentRoute} says the class wants Jev.
  *
  * Returns `undefined` otherwise; the caller then resolves a completion model
- * through `resolveTaskModel` exactly as before.
+ * through `resolveTaskModel` exactly as before. `options` locates the key
+ * (`env`, `ndxHome`); tests inject both.
  */
 export function resolveJudgmentRoute(
   taskClass: string,
   config?: LLMConfig,
-  env: NodeJS.ProcessEnv = process.env,
+  options: CredentialStoreOptions = {},
 ): JudgmentRoute | undefined {
-  if (!env[TYPESAFE_API_KEY_ENV]?.trim()) return undefined;
+  if (!resolveCredential(TYPESAFE_CREDENTIAL, options)) {
+    if (config?.typesafe?.required && configuredJudgmentRoute(taskClass, config)) {
+      warnJevUnavailableOnce(taskClass, options.warn);
+    }
+    return undefined;
+  }
+  return configuredJudgmentRoute(taskClass, config);
+}
+
+let jevFallbackWarned = false;
+
+/** `llm.typesafe.required`: one warning per process, however many calls fall back. */
+function warnJevUnavailableOnce(taskClass: string, emit: ((message: string) => void) | undefined): void {
+  if (jevFallbackWarned) return;
+  jevFallbackWarned = true;
+  (emit ?? warn)(
+    `[llm] ${taskClass} is routed to TypeSafe Jev but no TypeSafe key is available (llm.typesafe.required is set), ` +
+      `so the text model answers. Store a key: ndx config credentials.typesafe`,
+  );
+}
+
+/** Forget that the fallback warning was shown (tests). */
+export function resetJevFallbackWarning(): void {
+  jevFallbackWarned = false;
+}
+
+/**
+ * The judgment route `config` asks for, whether or not a key is available:
+ * `llm.routes[<class>]` (exact match, then longest glob prefix, the same rules
+ * as `resolveTaskModel`) is `"typesafe"`, **or** the class is in
+ * {@link DEFAULT_JUDGMENT_ROUTES} and `llm.routes` does not send it to a tier.
+ * An explicit tier always wins, so `llm.routes["*"] = "standard"` opts a whole
+ * project out. A caller uses it to explain a fallback when the key is missing.
+ */
+export function configuredJudgmentRoute(
+  taskClass: string,
+  config?: LLMConfig,
+): JudgmentRoute | undefined {
   const configured = matchTaskClass(taskClass, config?.routes);
   if (configured === JUDGMENT_ROUTE_TYPESAFE) return JUDGMENT_ROUTE_TYPESAFE;
   if (configured !== undefined) return undefined;
@@ -878,6 +921,9 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
   if (typeof claude.reviewModel === "string" && claude.reviewModel) {
     result.reviewModel = claude.reviewModel;
   }
+  if (claude.auth === "cli" || claude.auth === "api" || claude.auth === "auto") {
+    result.auth = claude.auth;
+  }
   return Object.keys(result).length > 0 ? result : null;
 }
 
@@ -965,9 +1011,13 @@ export async function loadClaudeConfig(dir: string, options: LoadProjectConfigOp
 }
 
 /**
- * Resolve the API key with the following priority:
+ * Resolve the Claude API key ({@link resolveVendorKey}):
  * 1. claude.api_key from unified config (.n-dx.json)
  * 2. Environment variable specified by apiKeyEnv (default: ANTHROPIC_API_KEY)
+ * 3. The per-user credential store's `claude` entry
+ *
+ * Whether a key may be used is `llm.claude.auth`'s decision
+ * ({@link resolveVendorAuth}); this only finds one.
  *
  * @returns The resolved API key, or undefined if not found.
  */
@@ -975,7 +1025,7 @@ export function resolveApiKey(
   claudeConfig: ClaudeConfig,
   apiKeyEnv = "ANTHROPIC_API_KEY",
 ): string | undefined {
-  return claudeConfig.api_key ?? process.env[apiKeyEnv];
+  return resolveVendorKey(LLM_VENDOR.CLAUDE, { claude: claudeConfig }, { apiKeyEnv })?.value;
 }
 
 /**

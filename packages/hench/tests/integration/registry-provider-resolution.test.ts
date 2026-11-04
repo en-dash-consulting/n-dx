@@ -157,7 +157,7 @@ describe("registry-based provider resolution", () => {
   // ── API key validation parity ──────────────────────────────────────────────
 
   describe("API key validation is identical", () => {
-    it("legacy path fails with 'API key not found' without credentials", async () => {
+    it("legacy path fails naming the credential store without credentials", async () => {
       const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { loadConfig } = await import("../../src/store/config.js");
@@ -173,13 +173,13 @@ describe("registry-based provider resolution", () => {
       try {
         await expect(
           agentLoop({ config, store, projectDir, henchDir }),
-        ).rejects.toThrow("API key not found");
+        ).rejects.toThrow("ndx config credentials.claude");
       } finally {
         if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
       }
     });
 
-    it("registry path fails with 'API key not found' without credentials", async () => {
+    it("registry path fails naming the credential store without credentials", async () => {
       const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { loadConfig } = await import("../../src/store/config.js");
@@ -195,7 +195,7 @@ describe("registry-based provider resolution", () => {
       try {
         await expect(
           agentLoop({ config, store, projectDir, henchDir }),
-        ).rejects.toThrow("API key not found");
+        ).rejects.toThrow("ndx config credentials.claude");
       } finally {
         if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
       }

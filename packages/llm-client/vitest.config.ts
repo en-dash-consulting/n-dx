@@ -25,6 +25,8 @@ export default defineConfig({
       // so without this an ambient key turns any test that forgets to pass
       // `env` into a live, billed request. Moved here with the Jev client.
       "../../tests/setup-judgment-env.js",
+      // Temp ndx home, so no test reads the developer's credential store.
+      "../../tests/setup-ndx-home.js",
     ],
     include: ["tests/**/*.test.ts"],
     // Two projects over the same files: the ones that mock modules or globals
