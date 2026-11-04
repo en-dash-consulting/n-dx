@@ -269,10 +269,14 @@ items:
     lastModified: "2026-11-04T18:55:11.296Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee87336f-2945-4507-a90d-c92f36923c31":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T18:56:00.178Z"
-    activeIntervals: [{"start":"2026-11-04T18:56:00.178Z"}]
-    lastModified: "2026-11-04T18:56:03.167Z"
+    completedAt: "2026-11-04T19:47:10.790Z"
+    endedAt: "2026-11-04T19:47:10.790Z"
+    activeIntervals: [{"end":"2026-11-04T19:19:51.589Z","start":"2026-11-04T18:56:00.178Z"},{"end":"2026-11-04T19:47:10.790Z","start":"2026-11-04T19:47:10.790Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "6a9c364ac (run f83bec8c): a committed llm.<vendor>.auth stays in .n-dx.json and the local value overrides it (SHARED_COPY_KEPT_SUFFIXES). Review: no findings. Gate failed only on root e2e files under load average 40-55 with two other ndx work gates running (cli-ci, cli-init-readme, cli-tool-resolution, mcp-transport, verify-script-ci-step, vitest-timeout-failure: timeouts and ndx ci exit 13). cli-ci's exit-13 cases fail identically with the pre-change config.js (377bc5687), so they are not caused by this change. tests/e2e/cli-config.test.js passes alone (227/227)."
+    lastModified: "2026-11-04T19:47:10.790Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5330af8-f470-4d06-bf27-55c21e9f2efc":
     lastModified: "2026-11-04T17:25:53.374Z"
