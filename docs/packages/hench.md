@@ -273,14 +273,16 @@ A lane's command runs its tasks one after another in the current checkout
 (`ndx work --task=a --auto . && ndx work --task=b --auto .`). Every lane's
 command targets `.`, so lane 1 runs here and **each later lane must run in its
 own worktree**: two lanes in one checkout collide, the later one meeting the
-earlier one's uncommitted edits. The summary, each later lane's text block and
-Live's Ready next say so. An explicit
+earlier one's uncommitted edits. While a run is live in this worktree, lane 1
+needs its own worktree too. The summary, each such lane's text block and Live's
+Ready next say so. An explicit
 `--task` ignores blockers, and a run can exit 0 without completing its task (a
 transient vendor error), so the step for a blocked task adds
 `--require-unblocked`: it refuses to start while any blocker is not completed.
 The JSON has
 `lanes [{command, changeId, ownWorktree, tasks [{id, title, reason}]}]`
-(`ownWorktree` is true for every lane after the first), `excluded
+(`ownWorktree` is true for every lane after the first, and for lane 1 while a
+run is live in this worktree), `excluded
 [{id, title, reason}]`, `activeRuns`, `activeRunsByWorktree [{path, runs}]`,
 `runLimit` and `summary`; every ready task
 appears once, with its reason. Live shows the plan as Ready next behind the

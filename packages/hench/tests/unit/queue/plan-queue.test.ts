@@ -173,7 +173,7 @@ describe("planQueue", () => {
     expect(p.activeRuns).toBe(2);
     expect(p.activeRunsByWorktree).toEqual(byWorktree);
     expect(p.lanes).toHaveLength(1);
-    expect(p.summary).toMatch(/\(2 active of 3\)\. 1 live run in other worktrees\.$/);
+    expect(p.summary).toMatch(/\(2 active of 3\)\..* 1 live run in other worktrees\.$/);
   });
 
   it("says when git could not list the worktrees, so only this one was counted", () => {
@@ -215,6 +215,34 @@ describe("lanes after the first need their own worktree", () => {
     const text = formatPlan(p).join("\n");
     expect(text).toContain(`Lane 1 (change A):\n  Runs in this worktree.\n  ndx work --task=t-a1 --auto .`);
     expect(text).toContain(`Lane 2 (change B):\n  ${OWN_WORKTREE_NOTE}\n  ndx work --task=t-b1 --auto .`);
+  });
+
+  it("sends lane 1 to its own worktree too while a run is live in this one", () => {
+    const busy = (runs: number): ActiveRunCount => ({
+      scope: "repository",
+      worktreePath: "/repo",
+      byWorktree: [{ path: "/repo", runs }, { path: "/repo-y", runs: 0 }],
+    });
+    const changes = [
+      change("A", [task("a1")], { touches: ["cap-1"], priority: "high" }),
+      change("B", [task("b1")], { touches: ["cap-2"], priority: "low" }),
+    ];
+    const two = plan(changes, { activeRunCount: busy(1) });
+    expect(two.lanes.map((l) => l.ownWorktree)).toEqual([true, true]);
+    expect(two.summary).toContain("A run is live in this worktree, so every lane must run in its own worktree.");
+    const text = formatPlan(two).join("\n");
+    expect(text).toContain(`Lane 1 (change A):\n  ${OWN_WORKTREE_NOTE}`);
+    expect(text).not.toContain("Runs in this worktree.");
+
+    const one = plan([changes[0]], { activeRunCount: busy(1) });
+    expect(one.lanes.map((l) => l.ownWorktree)).toEqual([true]);
+    expect(formatPlan(one)).toContain(`  ${OWN_WORKTREE_NOTE}`);
+
+    // A run in another worktree does not take this checkout.
+    const elsewhere = plan(changes, {
+      activeRunCount: { scope: "repository", worktreePath: "/repo", byWorktree: [{ path: "/repo", runs: 0 }, { path: "/repo-y", runs: 1 }] },
+    });
+    expect(elsewhere.lanes.map((l) => l.ownWorktree)).toEqual([false, true]);
   });
 
   it("leaves a one-lane plan's text and summary as they were, with the field false", () => {

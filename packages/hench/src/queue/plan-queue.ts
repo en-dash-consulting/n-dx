@@ -94,15 +94,17 @@ export interface PlannedLane {
   changeId: string;
   /**
    * The lane must run in a worktree of its own: true for every lane after the
-   * first. Each command targets `.`, and two lanes in one checkout collide —
-   * the later one meets the earlier one's uncommitted edits.
+   * first, and for lane 1 too while a run is live in this worktree. Each
+   * command targets `.`, and two runs in one checkout collide — the later one
+   * meets the earlier one's uncommitted edits.
    */
   ownWorktree: boolean;
   tasks: PlannedTask[];
 }
 
-/** What a lane after the first is told, in the text plan and on Live. */
-export const OWN_WORKTREE_NOTE = "Run this lane in its own worktree: its command targets the current checkout, which lane 1 uses.";
+/** What a lane that needs its own worktree is told, in the text plan. */
+export const OWN_WORKTREE_NOTE =
+  "Run this lane in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
 
 export interface QueuePlan {
   lanes: PlannedLane[];
@@ -215,10 +217,12 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
     else chosen.push(lane);
   }
 
+  // A run live in this worktree already has the checkout, so lane 1 cannot run here either.
+  const hereBusy = activeRunsByWorktree.some((w) => w.path === input.activeRuns.worktreePath && w.runs > 0);
   const lanes: PlannedLane[] = chosen.map((lane, i) => ({
     command: input.command(lane.tasks.map((t) => t.id)),
     changeId: lane.change.id,
-    ownWorktree: i > 0,
+    ownWorktree: i > 0 || hereBusy,
     tasks: lane.tasks.map((t, j) => ({
       id: t.id,
       title: t.title,
@@ -246,7 +250,13 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
           ? "No lanes: every ready task is excluded."
           : `${lanes.length} lane${lanes.length === 1 ? "" : "s"} for ${free} free run slot${free === 1 ? "" : "s"} (${activeRuns} active of ${runLimit}).`;
   const worktreeNote =
-    lanes.length > 1 ? " Lane 1 runs in this worktree; every later lane must run in its own worktree." : "";
+    lanes.length === 0
+      ? ""
+      : hereBusy
+        ? " A run is live in this worktree, so every lane must run in its own worktree."
+        : lanes.length > 1
+          ? " Lane 1 runs in this worktree; every later lane must run in its own worktree."
+          : "";
   const summary = verdict + worktreeNote + scopeNote;
 
   return { lanes, excluded, activeRuns, activeRunsByWorktree, runLimit, summary };
