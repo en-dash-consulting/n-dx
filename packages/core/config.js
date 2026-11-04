@@ -1829,10 +1829,21 @@ export async function loadVendorCliPath(dir, vendor) {
   return configured || vendor;
 }
 
+/**
+ * `-c` overrides for every `codex exec` core spawns: they blank the Codex
+ * credentials in the commands the agent runs, whatever the user's Codex
+ * config allows (llm-client `codexShellEnvFlags`).
+ * @returns {Promise<string[]>}
+ */
+export async function loadCodexShellEnvFlags() {
+  const { codexShellEnvFlags } = await import("@n-dx/llm-client");
+  return codexShellEnvFlags();
+}
+
 /** The auth preflight's arguments for a CLI vendor. */
-function vendorAuthPreflightArgs(vendor) {
+async function vendorAuthPreflightArgs(vendor) {
   return vendor === LLM_VENDOR.CODEX
-    ? ["exec", "--skip-git-repo-check", "Reply with exactly: ok"]
+    ? ["exec", ...(await loadCodexShellEnvFlags()), "--skip-git-repo-check", "Reply with exactly: ok"]
     : ["-p", "Reply with exactly: ok", "--output-format", "json"];
 }
 
@@ -1858,7 +1869,7 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
 
   const cliVendor = vendor === LLM_VENDOR.CODEX ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE;
   const binary = await loadVendorCliPath(dir, cliVendor);
-  const args = vendorAuthPreflightArgs(vendor);
+  const args = await vendorAuthPreflightArgs(vendor);
   // The agent loop's vendor environment: no credential outside the vendor's mode.
   let env;
   try {

@@ -8,6 +8,9 @@ items:
     activeIntervals: [{"end":"2026-11-04T22:22:13.282Z","start":"2026-11-04T22:11:00.255Z"}]
     lastModified: "2026-11-04T22:22:13.282Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "054e2c9c-61a9-4ab8-9fb6-908f29fba024":
+    lastModified: "2026-11-04T22:33:30.428Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0e7c49f6-104a-4db7-83f1-7c1397cc7ba7":
     lastModified: "2026-11-04T20:36:30.385Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -153,7 +156,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T22:14:40.008Z"
+    lastModified: "2026-11-04T22:33:38.733Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -284,6 +287,9 @@ items:
     resolutionDetail: "Stale-lock takeover in llm-client credential-store.ts now uses a per-lock O_EXCL guard file and removes the lock only if its identity (ino, mtime, content) is unchanged and it is still stale; a lock left empty is stale after 5 s."
     lastModified: "2026-11-04T20:25:34.641Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bd53209a-99f9-4ad6-863d-7512e66a1c2e":
+    lastModified: "2026-11-04T22:33:38.733Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfee741f-343a-4a2c-b12f-50aa262811ef":
     status: "completed"
     startedAt: "2026-11-03T16:24:28.530Z"
@@ -298,7 +304,14 @@ items:
     lastModified: "2026-11-04T22:05:43.565Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "db3c0066-8696-45bd-a77a-1c518bfe0221":
-    lastModified: "2026-11-04T18:04:24.255Z"
+    status: "completed"
+    startedAt: "2026-11-04T22:22:22.472Z"
+    completedAt: "2026-11-04T22:46:56.949Z"
+    endedAt: "2026-11-04T22:46:56.949Z"
+    activeIntervals: [{"end":"2026-11-04T22:46:56.949Z","start":"2026-11-04T22:22:22.472Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Every codex exec spawn passes -c shell_environment_policy.set.{OPENAI_API_KEY,CODEX_API_KEY,CODEX_ACCESS_TOKEN}='' (llm-client codexShellEnvFlags via compileCodexPolicyFlags; hench resume via {resume:true}; core reviewer + auth check via config.js loadCodexShellEnvFlags). Docs updated."
+    lastModified: "2026-11-04T22:46:56.949Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dbc9c046-3fcc-43bc-a290-87d7ab5f4565":
     status: "completed"

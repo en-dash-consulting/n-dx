@@ -23,6 +23,13 @@ import {
 } from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import { isProgressTool } from "../../../src/agent/analysis/livelock.js";
 import { NDX_WORKFLOW } from "@n-dx/rex";
+
+/** The overrides that blank the Codex credentials in the agent's commands. */
+const SHELL_ENV = [
+  "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
+  "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
+  "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
+];
 import type { VendorAdapter, SpawnConfig } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import {
   DEFAULT_EXECUTION_POLICY,
@@ -189,6 +196,7 @@ describe("CodexCliAdapter: snapshot parity", () => {
       "workspace-write",
       "-c",
       "approval_policy=never",
+      ...SHELL_ENV,
       "--json",
       "--skip-git-repo-check",
       "-",
@@ -204,6 +212,7 @@ describe("CodexCliAdapter: snapshot parity", () => {
       "workspace-write",
       "-c",
       "approval_policy=never",
+      ...SHELL_ENV,
       "--json",
       "--skip-git-repo-check",
       "-m", "gpt-5-codex",

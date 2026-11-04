@@ -1851,6 +1851,8 @@ describe("n-dx config", () => {
       const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("exec");
       expect(args).toContain("--skip-git-repo-check");
+      // The check is a Codex agent run too: its commands get no Codex key.
+      expect(args).toContain("shell_environment_policy.set.OPENAI_API_KEY=''");
     });
 
     it("handles auth preflight failure with deterministic error path", async () => {

@@ -7,11 +7,20 @@ import {
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
   compileCodexPolicyFlags,
+  codexShellEnvFlags,
+  CODEX_AGENT_HIDDEN_ENV,
   createCodexCliClient,
 } from "../../src/codex-cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import { DEFAULT_EXECUTION_POLICY } from "../../src/runtime-contract.js";
 import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "../../src/runtime-contract.js";
+
+/** Spelled out, not derived: the exact argv codex receives. */
+const SHELL_ENV = [
+  "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
+  "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
+  "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
+];
 
 describe("Codex policy flag compilation", () => {
   describe("mapSandboxToCodexFlag", () => {
@@ -66,10 +75,39 @@ describe("Codex policy flag compilation", () => {
     });
   });
 
+  describe("codexShellEnvFlags", () => {
+    it("blanks each Codex credential in the agent's commands with a dotted set override", () => {
+      expect(codexShellEnvFlags()).toEqual(SHELL_ENV);
+    });
+
+    it("covers the key resolveVendorCliEnv writes and the tokens codex accepts", () => {
+      const names = codexShellEnvFlags()
+        .filter((arg) => arg !== "-c")
+        .map((arg) => /^shell_environment_policy\.set\.([A-Z_]+)=''$/.exec(arg)?.[1]);
+      expect(names).toEqual([...CODEX_AGENT_HIDDEN_ENV]);
+      expect(names).toContain("OPENAI_API_KEY");
+    });
+  });
+
   describe("compileCodexPolicyFlags", () => {
     it("states sandbox and approvals explicitly for the default unattended policy", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", ...SHELL_ENV]);
+    });
+
+    it("ends every policy with the shell-environment overrides", () => {
+      for (const sandbox of ["read-only", "workspace-write", "danger-full-access"] as SandboxMode[]) {
+        for (const approvals of ["on-request", "never"] as ApprovalPolicy[]) {
+          const flags = compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, sandbox, approvals });
+          expect(flags.slice(-SHELL_ENV.length)).toEqual(SHELL_ENV);
+        }
+      }
+    });
+
+    it("gives a resumed spawn only the shell-environment overrides", () => {
+      // codex exec resume takes no --sandbox or approval flag, but reads config
+      // per process, so the overrides must still reach it.
+      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true })).toEqual(SHELL_ENV);
     });
 
     it("never emits --full-auto, which codex exec no longer accepts", () => {
@@ -92,7 +130,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request"]);
+      expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", ...SHELL_ENV]);
     });
 
     it("compiles workspace-write + on-request policy to a plain sandbox flag", () => {
@@ -101,7 +139,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=on-request"]);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=on-request", ...SHELL_ENV]);
     });
 
     it("compiles danger-full-access + never policy", () => {
@@ -111,7 +149,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "never",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox"]);
+      expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...SHELL_ENV]);
     });
 
     it("compiles danger-full-access + on-request to an explicit sandbox flag", () => {
@@ -126,6 +164,7 @@ describe("Codex policy flag compilation", () => {
         "danger-full-access",
         "-c",
         "approval_policy=on-request",
+        ...SHELL_ENV,
       ]);
     });
 
@@ -138,16 +177,16 @@ describe("Codex policy flag compilation", () => {
           sandbox: "danger-full-access",
           approvals: "never",
         }),
-      ).toEqual(["--dangerously-bypass-approvals-and-sandbox"]);
+      ).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...SHELL_ENV]);
 
       // Everything else is the explicit sandbox + approval_policy pair.
-      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(4);
+      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(4 + SHELL_ENV.length);
       expect(
         compileCodexPolicyFlags({
           ...DEFAULT_EXECUTION_POLICY,
           approvals: "on-request",
         }),
-      ).toHaveLength(4);
+      ).toHaveLength(4 + SHELL_ENV.length);
     });
   });
 });

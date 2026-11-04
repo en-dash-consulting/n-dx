@@ -261,6 +261,7 @@ export {
   DEFAULT_CODEX_MODEL,
   createCodexCliClient,
   compileCodexPolicyFlags,
+  codexShellEnvFlags,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "./codex-cli-provider.js";
