@@ -8,6 +8,9 @@ items:
     activeIntervals: [{"end":"2026-11-03T19:07:11.767Z","start":"2026-11-03T18:34:02.653Z"},{"end":"2026-11-03T19:36:04.383Z","start":"2026-11-03T19:36:04.383Z"}]
     lastModified: "2026-11-03T19:36:04.383Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0fa67da8-bc41-44c8-9584-7aabe786e413":
+    lastModified: "2026-11-04T17:25:56.257Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "10730d82-59f1-4ea2-9594-667318da70d2":
     status: "completed"
     startedAt: "2026-11-03T15:33:50.948Z"
@@ -69,9 +72,15 @@ items:
     resolutionDetail: "Helper backend in llm-client's credential store (setHelperCredential, shell-less runner, per-process cache, quiet failures); set-helper and status --check in the credentials CLI; ndx config --helper parsing with refusals; hench guard and Claude CLI deny rules for the Keychain read and helper commands via agentCredentialDenials (gateway count unchanged at 226)."
     lastModified: "2026-11-02T20:51:36.470Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5a0e4b05-12bc-46a3-ad63-36d74d54b9d3":
+    lastModified: "2026-11-04T17:25:49.140Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "68b2709d-174e-4ec2-bf3f-163fdda6115c":
     status: "deferred"
     lastModified: "2026-10-30T14:44:19.737Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6c539e7a-ae0b-4a82-955d-313f596add75":
+    lastModified: "2026-11-04T17:25:43.889Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6d70bab8-a6c6-4839-9520-08d407116c79":
     status: "completed"
@@ -94,7 +103,16 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T17:23:54.671Z"
+    lastModified: "2026-11-04T17:25:56.257Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "82ff7e46-365c-4284-a74d-83753ed94067":
+    lastModified: "2026-11-04T17:25:45.237Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8f7cb2f8-9389-46e7-a092-384e3ccbc31a":
+    lastModified: "2026-11-04T17:25:47.816Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94a33e07-b483-4b90-9b37-34911b54f084":
+    lastModified: "2026-11-04T17:25:46.529Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
@@ -126,6 +144,12 @@ items:
     resolutionDetail: "Interpreter helpers deny argv through the script; scriptless interpreters refused at --helper; failed helpers retried after 60 s with one warning per streak."
     lastModified: "2026-11-02T21:20:50.706Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "aba3a023-d594-4962-9d63-a0be5775bb20":
+    lastModified: "2026-11-04T17:25:54.539Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "afd1638b-3f09-4e88-b50b-f09ecdd7b774":
+    lastModified: "2026-11-04T17:25:42.527Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b52513b3-58a0-4a2b-9e36-d116bdcf6a54":
     status: "completed"
     startedAt: "2026-11-03T17:37:09.499Z"
@@ -141,6 +165,9 @@ items:
     endedAt: "2026-10-30T15:44:38.472Z"
     activeIntervals: [{"end":"2026-10-30T15:44:38.472Z","start":"2026-10-30T15:40:16.396Z"}]
     lastModified: "2026-10-30T15:44:38.472Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bb93e6fd-fe6a-418e-975c-746b0afacbd0":
+    lastModified: "2026-11-04T17:25:41.135Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfee741f-343a-4a2c-b12f-50aa262811ef":
     status: "completed"
@@ -171,6 +198,15 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "ndx status jev line, jev {available, source} in get_capabilities and manifest lastAnalysis, llm.typesafe.required warn-once, credentials.typesafe --test via mocked fetch"
     lastModified: "2026-11-03T17:28:25.718Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e97d3394-f0a1-4199-935f-7c7ca4636a87":
+    lastModified: "2026-11-04T17:25:50.732Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ee87336f-2945-4507-a90d-c92f36923c31":
+    lastModified: "2026-11-04T17:25:52.134Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f5330af8-f470-4d06-bf27-55c21e9f2efc":
+    lastModified: "2026-11-04T17:25:53.374Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5efde56-48b6-4a78-a891-fcda1d312e46":
     status: "completed"
