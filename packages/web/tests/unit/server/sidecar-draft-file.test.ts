@@ -31,7 +31,7 @@ describe("resolveDraftPath", () => {
     expect(resolveDraftPath("../escape.md", drafts).ok).toBe(false);
   });
 
-  it.each([".git", ".GIT", ".Git", ".git.", ".git ", ".git. ."])("refuses a path through %j", (segment) => {
+  it.each([".git", ".GIT", ".Git", ".git.", ".git ", ".git. .", ".git::$INDEX_ALLOCATION", ".GIT .::$INDEX_ALLOCATION"])("refuses a path through %j", (segment) => {
     const result = resolveDraftPath(join(root, "repo", segment, "hooks", "pre-commit"), drafts);
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining(".git") });
   });

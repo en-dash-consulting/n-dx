@@ -6,8 +6,9 @@
  * operator change it; a relative path lands under the hub's drafts directory.
  * An existing file is never overwritten, and a path inside a `.git`
  * directory is refused: a segment counts as `.git` compared case-insensitively
- * after trailing dots and spaces are stripped (`.GIT`, `.git.` and `.git ` name
- * the same directory on NTFS and default APFS), and the nearest existing
+ * after an NTFS stream suffix and trailing dots and spaces are stripped
+ * (`.GIT`, `.git.`, `.git ` and `.git::$INDEX_ALLOCATION` name the same
+ * directory on NTFS, and `.GIT` on default APFS), and the nearest existing
  * ancestor's real path is checked the same way, so a symlink or an 8.3 short
  * name into `.git` is refused too.
  *
@@ -43,9 +44,13 @@ export function resolveDraftPath(path: unknown, draftsDir: string): { ok: true; 
 
 const GIT_REFUSAL = "a draft is never saved inside a .git directory";
 
-/** Whether any segment of `path` names `.git` as a case-insensitive filesystem would read it. */
+/**
+ * Whether any segment of `path` names `.git` as NTFS or a case-insensitive APFS
+ * would read it: case folded, an NTFS stream suffix (`.git::$INDEX_ALLOCATION`)
+ * dropped, then trailing dots and spaces stripped.
+ */
 function hasGitSegment(path: string): boolean {
-  return path.split(/[\\/]/).some((segment) => segment.replace(/[. ]+$/, "").toLowerCase() === ".git");
+  return path.split(/[\\/]/).some((segment) => segment.replace(/:.*$/, "").replace(/[. ]+$/, "").toLowerCase() === ".git");
 }
 
 /** The real path of `path`'s nearest existing ancestor (or `path` itself), symlinks and short names resolved. */

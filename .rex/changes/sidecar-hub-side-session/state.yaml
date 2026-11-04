@@ -50,7 +50,14 @@ items:
     lastModified: "2026-11-03T00:02:34.404Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4704cdf5-d927-44d5-aea8-0147a5bce9f1":
-    lastModified: "2026-11-04T19:10:30.450Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:26:16.726Z"
+    completedAt: "2026-11-04T20:36:49.938Z"
+    endedAt: "2026-11-04T20:36:49.938Z"
+    activeIntervals: [{"end":"2026-11-04T20:36:49.938Z","start":"2026-11-04T20:26:16.726Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "resolveDraftPath refuses .git segments case-insensitively after stripping trailing dots/spaces, and checks the nearest existing ancestor's realpathSync.native path; unit + broker tests cover .GIT, .git., '.git ', symlink into .git."
+    lastModified: "2026-11-04T20:36:49.938Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "702e743b-b4b4-4956-b7c3-9672a024963f":
     status: "completed"

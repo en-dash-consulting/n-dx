@@ -255,8 +255,8 @@ The hub session's broker is scoped (`BROKER_SCOPE_TOOLS` in
   (a relative one lands in `<ndx home>/hub/drafts/`), the operator can change
   it, an existing file is never overwritten, and it is never allow-listable.
   A path is refused when any segment, or any segment of its nearest existing
-  ancestor's real path, is `.git` compared case-insensitively after trailing
-  dots and spaces are stripped.
+  ancestor's real path, is `.git` compared case-insensitively after an NTFS
+  stream suffix and trailing dots and spaces are stripped.
 
 ## Sidecar Guide and the run-plan card
 
