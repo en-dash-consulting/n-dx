@@ -1,7 +1,12 @@
 schema: "rex/v2"
 items:
   "03dd62b9-6298-4938-b35e-70e3394c6b28":
-    lastModified: "2026-11-04T18:06:23.682Z"
+    status: "completed"
+    startedAt: "2026-11-04T22:11:00.255Z"
+    completedAt: "2026-11-04T22:22:13.282Z"
+    endedAt: "2026-11-04T22:22:13.282Z"
+    activeIntervals: [{"end":"2026-11-04T22:22:13.282Z","start":"2026-11-04T22:11:00.255Z"}]
+    lastModified: "2026-11-04T22:22:13.282Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0e7c49f6-104a-4db7-83f1-7c1397cc7ba7":
     lastModified: "2026-11-04T20:36:30.385Z"
@@ -148,7 +153,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T22:05:43.565Z"
+    lastModified: "2026-11-04T22:14:40.008Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -229,6 +234,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "The guard resolves a security subcommand the way SecurityTool does (getopt hilp:qvR, then the first table entry the word is a prefix of, with case folded), so every abbreviation of find-generic-password is refused."
     lastModified: "2026-11-04T22:10:35.789Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a10f7f31-5218-41df-bb48-9d02da2bbad0":
+    lastModified: "2026-11-04T22:14:40.008Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aba3a023-d594-4962-9d63-a0be5775bb20":
     status: "completed"

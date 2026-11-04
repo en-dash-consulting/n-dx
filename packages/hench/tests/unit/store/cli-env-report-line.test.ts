@@ -39,4 +39,10 @@ describe("cliEnvReportLine", () => {
     expect(cliEnvReportLine("codex reviewer environment", ["GITHUB_TOKEN"], "stripped"))
       .toBe("codex reviewer environment: stripped GITHUB_TOKEN");
   });
+
+  it("says the agent's commands will not see a scrubbed name", () => {
+    const line = cliEnvReportLine("CLI environment", ["DB_PASSWORD"], "scrubbed");
+    expect(line).toMatch(/^CLI environment: .*will not see DB_PASSWORD/);
+    expect(line).not.toContain("stripped");
+  });
 });

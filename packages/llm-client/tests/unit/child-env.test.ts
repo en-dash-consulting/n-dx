@@ -263,6 +263,32 @@ describe("resolveVendorCliEnv", () => {
     });
     expect(env).toEqual({ ANTHROPIC_API_KEY: "configured", CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" });
   });
+
+  describe("scrub report for allowed credential-shaped names", () => {
+    const source = { ANTHROPIC_API_KEY: "sk-exported", DB_PASSWORD: "pw", SSH_AUTH_SOCK: "/sock", PATH: "/bin" };
+    const allow = { allow: ["DB_PASSWORD"] };
+    const reports = (claude: Record<string, unknown>) => {
+      const out: Array<[string[], string]> = [];
+      resolveVendorCliEnv({ vendor: "claude", claude } as never, allow, source, (names, kind) => out.push([names, kind]));
+      return out;
+    };
+
+    it("names an allowed DB_PASSWORD, never its value, under auth api", () => {
+      const out = reports({ auth: "api" });
+      expect(out).toContainEqual([["DB_PASSWORD"], "scrubbed"]);
+      expect(out.flatMap(([names]) => names)).not.toContain("pw");
+    });
+
+    it("stays silent under auth cli, where nothing turns the scrub on", () => {
+      expect(reports({ auth: "cli" }).filter(([, kind]) => kind === "scrubbed")).toEqual([]);
+    });
+
+    it("stays silent under auth api when the allowlist passes nothing credential-shaped", () => {
+      const out: string[] = [];
+      resolveVendorCliEnv({ vendor: "claude", claude: { auth: "api" } }, undefined, source, (_n, kind) => out.push(kind));
+      expect(out).not.toContain("scrubbed");
+    });
+  });
 });
 
 /** The subset of `names` a real child spawned with `env` can read. */

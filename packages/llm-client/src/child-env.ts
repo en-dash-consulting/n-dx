@@ -133,8 +133,12 @@ export function strippedEnvNames(env: NodeJS.ProcessEnv, policy: EnvPolicy): str
   return Object.keys(env).filter((name) => env[name] !== undefined && !envNameAllowed(name, policy)).sort();
 }
 
-/** What `onStripped` is reporting: names removed, or a vendor mode whose credentials never arrived. */
-export type EnvReportKind = "stripped" | "missing-credentials";
+/**
+ * What `onStripped` is reporting: names removed, a vendor mode whose
+ * credentials never arrived, or credential-shaped names the operator allowed
+ * that Claude Code's subprocess scrub keeps from the agent's commands.
+ */
+export type EnvReportKind = "stripped" | "missing-credentials" | "scrubbed";
 
 /** Bedrock names that address or trust-anchor the endpoint but are not credentials. */
 const BEDROCK_PLUMBING = ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_CA_BUNDLE"];
@@ -281,11 +285,30 @@ function scrubAgentSubprocesses(env: NodeJS.ProcessEnv): void {
   env[CLAUDE_SUBPROCESS_ENV_SCRUB] = "1";
 }
 
+const DEFAULT_DENY_RES = compile(DEFAULT_ENV_DENY);
+const DEFAULT_ALLOW_RES = compile(DEFAULT_ENV_ALLOW);
+
+/**
+ * Names in `env` kept only by an operator allow entry: credential-shaped by
+ * the default deny list, and neither default plumbing nor the vendor's auth.
+ * Claude Code's scrub removes credential-looking names from the commands the
+ * agent runs, so these reach Claude Code but not those commands.
+ */
+function scrubbedAllowedNames(env: NodeJS.ProcessEnv, authSet: ReadonlySet<string>): string[] {
+  return Object.keys(env)
+    .filter((name) => !authSet.has(name.toUpperCase()))
+    .filter((name) => DEFAULT_DENY_RES.some((re) => re.test(name)))
+    .filter((name) => !DEFAULT_ALLOW_RES.some((re) => re.test(name)))
+    .sort();
+}
+
 /**
  * Filter a vendor CLI's environment without exposing unrelated credentials.
  * `onStripped` receives names only, never values: once for the names removed,
- * and once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
- * on but none of that mode's credential names reached the child.
+ * once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
+ * on but none of that mode's credential names reached the child, and once
+ * (kind `scrubbed`) when the Claude scrub is on and the allowlist kept a
+ * credential-shaped name, which the agent's commands will then lack.
  *
  * `llm.<vendor>.auth` decides the vendor key ({@link vendorAuthSetting}):
  * `cli` removes it, so the CLI uses its own login; `api` sets it from config,
@@ -368,5 +391,9 @@ export function resolveVendorCliEnv(
     .filter((mode) => !mode.credentials.some((name) => present.has(name.toUpperCase())))
     .flatMap((mode) => mode.credentials);
   if (missing.length > 0) onStripped?.(missing, "missing-credentials");
+  if (env[CLAUDE_SUBPROCESS_ENV_SCRUB] === "1") {
+    const scrubbed = scrubbedAllowedNames(env, authSet);
+    if (scrubbed.length > 0) onStripped?.(scrubbed, "scrubbed");
+  }
   return env;
 }
