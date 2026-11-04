@@ -193,6 +193,27 @@ describe("allowlist-union", () => {
     expect(adds("allow.json", entry("b.js"), entry("a.js")).class).toBe("allowlist-union");
   });
 
+  /** The lines the offered diff adds to this branch's copy, for an `adds` verdict. */
+  const added = (path: string, baseLines: string[], branchLines: string[]) => {
+    const diff = (adds(path, baseLines, branchLines).fix as { diff: string }).diff;
+    return diff.split("\n").slice(2).filter((l) => l.startsWith("+")).map((l) => l.slice(1));
+  };
+
+  it("lists an entry both sides added once, ignoring whitespace and a trailing comma", () => {
+    expect(added("ids.ts", ['  "shared",', '  "theirs",'], ['"shared"', '  "mine",'])).toEqual(['  "theirs",']);
+  });
+
+  it("drops a multi-line JSON element both sides added as a whole, never its brace lines alone", () => {
+    const entry = (p: string) => ["    {", `      "path": "${p}",`, '      "reason": "x"', "    },"];
+    expect(added("allow.json", [...entry("same.js"), ...entry("b.js")], [...entry("same.js"), ...entry("a.js")])).toEqual(entry("b.js"));
+  });
+
+  it("offers this branch's copy, not an empty diff, when every base entry is one this branch added", () => {
+    const c = adds("ids.ts", ['  "shared",'], ['    "shared"']);
+    expect(c.class).toBe("allowlist-union");
+    expect(c.fix).toEqual({ steps: [["git", "checkout", "--ours", "--", "ids.ts"], ["git", "add", "--", "ids.ts"]] });
+  });
+
   it("is source when a side adds a code block, a function or a mapping", () => {
     const fn = ["function added() {", "  return 1;", "}"];
     expect(adds("a.ts", ["const b = 2;"], fn)).toMatchObject({ class: "source", fix: null });

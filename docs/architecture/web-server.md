@@ -421,8 +421,9 @@ is on; the route gate refuses it with 403 while the toggle is off.
   merges in the object store and returns the conflicted paths with their index
   stages. It leaves the worktree, the index and HEAD untouched, so a `GET` that
   predicts a merge stays read-only where it matters; the only trace is
-  unreferenced objects that `git gc` collects. A git older than 2.38 cannot do
-  this, and the answer says so in `conflictsUnavailable`.
+  unreferenced objects that `git gc` collects. When merge-tree gives no
+  prediction, `conflictsUnavailable` says why: a timeout as a timeout, and the
+  git 2.38 hint only when git exits 129 or its stderr names `--write-tree`.
 - **Each conflict is classified, with a fix a person runs.**
   `branch-health/conflicts.ts` is a pure function over each file's stages and
   the diff3-style conflicted result merge-tree wrote, plus the project config:
@@ -436,11 +437,15 @@ is on; the route gate refuses it with 403 while the toggle is off.
   | `prd-state` | a v2 `state.yaml` while `merge.rex-state.driver` is unset | register the driver, `checkout --merge`, `git diff --check HEAD` (stops on markers the driver left, since `checkout --merge` exits 0 regardless), `git add`. With the driver set it is `source` |
   | `duplicate-capture` | add/add on a PRD item file, same title, different ids | keep the base's id (`checkout --theirs`), `git add`, `rex validate --post-merge --repair` (prunes the state row and `blockedBy` refs naming the dropped id), `git add -u` on the rex directory, `rex validate --post-merge` |
   | `prd-children-table` | a v1 `prd_tree` `index.md` whose hunks are all `## Children` rows, and the base changed nothing above the table (else `source`: keeping this branch's copy would drop it) | `checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate` |
-  | `allowlist-union` | every hunk only adds list entries on both sides: each line a YAML `- ` scalar item, a quoted string, a number or literal, or a one-line `[…]`/`{…}` element, or the lines together a run of JSON array elements. Never a lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`); an added code block or mapping is `source` | a unified diff against this branch's copy: ours, then theirs |
+  | `allowlist-union` | every hunk only adds list entries on both sides: each line a YAML `- ` scalar item, a quoted string, a number or literal, or a one-line `[…]`/`{…}` element, or the lines together a run of JSON array elements. Never a lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`); an added code block or mapping is `source` | a unified diff against this branch's copy: ours, then theirs; an entry both sides added (ignoring whitespace and a trailing comma) is listed once, and when that leaves the base nothing to add the fix is `git checkout --ours` then `git add` |
   | `source` | everything else | none; names the other local worktrees whose branch changed the path (the API lists all; the Workspaces expansion shows three and counts the rest) |
 
   Stage blobs and other worktrees' diffs are read at most eight git processes
   at a time, and other worktrees only when a `source` conflict needs naming.
+  Each other-worktree diff is kept server-wide, keyed by the base and branch
+  tip commits (`branch-health/diff-cache.ts`, the 1024 most recently used), so
+  a board of W cards runs each diff once rather than W times, and a moved base
+  or tip is a new key, never a stale answer. A failed diff is not kept.
   `web.generatedFiles` is `[{ "paths": [globs], "command": [argv] }]`; with no
   declaration nothing is `generated`. This repository declares the prompt
   baseline, the iso-map skill script and `pnpm-lock.yaml`
@@ -459,8 +464,10 @@ is on; the route gate refuses it with 403 while the toggle is off.
   way on mount and adds `?github=1` when a card's strip is first expanded, so
   opening a board of many worktrees runs no gh command. A GitHub read
   remembers each PR base it finds, per worktree and branch, in the server's
-  memory; later local-only answers use it for the base (`baseSource:
-  "pr-cached"`) and the stack. Before any GitHub read, a local-only answer
+  memory; later local-only answers, and GitHub reads whose `gh pr view` fails
+  (offline, an expired token), use it for the base (`baseSource:
+  "pr-cached"`) and each stack layer. A branch gh reports has no PR never uses
+  it, since that PR may have merged or closed. Before any GitHub read, a local-only answer
   falls back to upstreams and origin's default branch, and `baseNote` says the
   PR base is not read yet, so a stacked branch's strip does not pass off
   `origin/main` as its base.
@@ -469,7 +476,12 @@ is on; the route gate refuses it with 403 while the toggle is off.
   escape as the 0x1b byte or as literal `^[` text. policy-test needs a policy
   suite among the failing test files: a log names passing suites on its ✓
   lines too. A failing-file line may carry a vitest project label between
-  `FAIL` and the path (`FAIL  llm-client:shared tests/x.test.ts`). When no
+  `FAIL` and the path (`FAIL  llm-client:shared tests/x.test.ts`).
+  Behind-base wording ("out of date with", "is behind", …) counts only on
+  `##[error]` annotation lines and in the check name: a failing test's own
+  output can say the same words. An annotation that opens with an error
+  name (`##[error]AssertionError: …`, vitest's github-actions reporter in CI)
+  is a test failure and does not count. When no
   policy suite or touched test explains the failure, behind-base also fires when the PR's
   `mergeStateStatus` is `BEHIND` or a stack layer is not contained, and the
   evidence names which. A test path printed by a package's

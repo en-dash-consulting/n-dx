@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -19,6 +19,7 @@ import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
+  CODEX_SIDECAR_UNAVAILABLE,
   createAnnouncingBroker,
   handleSidecarRoute,
   readWorktreeBranchHealth,
@@ -211,6 +212,23 @@ describe("sessions", () => {
     expect((await (await api(`/${id}`)).json()).session.id).toBe(id);
   });
 
+  // #901 F3: a restart from a symlinked or differently spelled path is the same checkout.
+  it("finds a session through a differently spelled projectDir for the same directory", async () => {
+    const id = await createSession();
+    const link = `${root}-link`;
+    symlinkSync(root, link);
+    try {
+      ctx.projectDir = link;
+      const list = await (await api("")).json();
+      expect(list.sessions.map((s: { session: { id: string } }) => s.session.id)).toEqual([id]);
+      expect((await api(`/${id}`)).status).toBe(200);
+      expect((await api(`/${id}/frames?after=0`)).status).toBe(200);
+    } finally {
+      ctx.projectDir = root;
+      await removeTestDir(link);
+    }
+  });
+
   it("refuses a vendor without a resumable CLI session", async () => {
     expect((await api("", { method: "POST", body: { vendor: "openai" } })).status).toBe(400);
     expect((await api("", { method: "POST", body: {} })).status).toBe(400);
@@ -254,6 +272,15 @@ describe("sessions", () => {
     await api(`/${id}/end`, { method: "POST" });
     expect((await api(`/${id}`, { method: "PATCH", body: { lens: "plan" } })).status).toBe(409);
     expect((await api(`/${id}`, { method: "PATCH", body: { name: "Done" } })).status).toBe(200);
+    });
+
+  // #901 F1: `codex exec resume` drops the read-only sandbox, so Codex is refused until 31307b89.
+  it("refuses a Codex session without writing a record", async () => {
+    const res = await api("", { method: "POST", body: { vendor: "codex", name: "Plan" } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
+    expect(registry.list({ worktree: root })).toEqual([]);
+    expect((await (await api("")).json()).sessions).toEqual([]);
   });
 
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
@@ -437,6 +464,15 @@ describe("turns", () => {
     expect((await api(`/${id}/turns`, { method: "POST", body: { prompt: "again" } })).status).toBe(409);
     await api(`/${id}/interrupt`, { method: "POST" });
     await turnClosed(id);
+  });
+
+  it("refuses a turn on a Codex session already in the index rather than resuming it", async () => {
+    const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
+    const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
+    expect(spawns).toBe(0);
+    expect(registry.get(id)?.cursor).toBe(0);
   });
 
   it("refuses a turn on an ended session", async () => {

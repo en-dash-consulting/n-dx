@@ -647,8 +647,11 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       const action = cardShortcut(e);
       // A page control that already took the key (the PRD forms submit on
       // ⌘↵ from any of their fields, selects included) must not also decide
-      // the agent's card.
-      if (!action || e.defaultPrevented || isTextField(e.target)) return;
+      // the agent's card. A held key's auto-repeat would decide the next card
+      // the moment it is read back, and an open modal (Settings, search, …)
+      // hides the drawer: only a fresh press on a visible card counts.
+      if (!action || e.repeat || e.defaultPrevented || isTextField(e.target)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
       void answerRef.current(action === "approve" ? { approve: true } : { approve: false, reason: noteRef.current });
     };

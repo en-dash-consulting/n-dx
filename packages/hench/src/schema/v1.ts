@@ -2155,7 +2155,6 @@ export type RunVerdictActionKind =
   | "follow-up-run"
   | "re-run"
   | "verify-on-main"
-  | "close-verified"
   | "fresh"
   | "hand-fix"
   | "release-claim"
@@ -2163,6 +2162,7 @@ export type RunVerdictActionKind =
   | "split-task"
   | "raise-tier"
   | "retry-later"
+  | "re-authenticate"
   | "tighten-done-when";
 
 /** One ranked next action. */

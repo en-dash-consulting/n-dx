@@ -238,17 +238,24 @@ function managedChildError(
  */
 const svWriteJobs = new WorkspaceScoped<{ job: string | null }>(() => ({ job: null }));
 
+/** Take the workspace's lock for `jobName`; returns the holder's label when another job has it. */
+function takeSvWriteLock(ctx: ServerContext, jobName: string): string | null {
+  const lock = svWriteJobs.get(ctx);
+  if (lock.job) return lock.job;
+  lock.job = jobName;
+  return null;
+}
+
 /** Take the workspace's lock or answer 409 naming the in-flight job. */
 function acquireSvWriteLock(res: ServerResponse, ctx: ServerContext, jobName: string): boolean {
-  const lock = svWriteJobs.get(ctx);
-  if (lock.job) {
+  const holder = takeSvWriteLock(ctx, jobName);
+  if (holder) {
     jsonResponse(res, 409, {
-      error: `Cannot start ${jobName}: ${lock.job} is already running`,
-      runningJob: lock.job,
+      error: `Cannot start ${jobName}: ${holder} is already running`,
+      runningJob: holder,
     });
     return false;
   }
-  lock.job = jobName;
   return true;
 }
 
@@ -1404,24 +1411,30 @@ export type SidecarCommandStart =
  * job, so it shows in the job tray and on Live with Stop like any dashboard
  * job. Only `ndx` (or the project's CLI name) and `git` run: argv, never a
  * shell. One at a time per workspace; a second while one runs is refused.
+ * An `ndx` subcommand that writes `.sourcevision/` takes the shared writer
+ * lock for the job's life, so it and the dashboard's analyze, CI and refresh
+ * refuse each other rather than write at once.
  * `settled` resolves once the job ends, with its exit code and everything it
  * printed, for the session's tool result.
  */
-export function startSidecarCommand(
+export async function startSidecarCommand(
   ctx: ServerContext,
   argv: readonly string[],
   broadcast?: WebSocketBroadcaster,
-): SidecarCommandStart {
+): Promise<SidecarCommandStart> {
+  const [program = "", ...rest] = argv;
+  const isNdx = program === "ndx" || program === readCliName(ctx.projectDir);
+  // Read before any check: nothing below awaits, so the checks and the start are one step.
+  const writesSv = isNdx && await ndxSubcommandWritesSv(ctx, rest);
   const job = sidecarCommandJobs.get(ctx);
   const command = argv.join(" ");
   if (job.status.running) {
     return { started: false, reason: `Sidecar command ${job.status.jobId} (${job.status.command}) is still running` };
   }
-  const [program = "", ...rest] = argv;
   let bin: string;
   let args: string[];
   let timeout: number;
-  if (program === "ndx" || program === readCliName(ctx.projectDir)) {
+  if (isNdx) {
     const ndx = resolveNdxBin(ctx);
     bin = ndx.bin;
     args = [...ndx.args, ...rest];
@@ -1434,12 +1447,18 @@ export function startSidecarCommand(
     return { started: false, reason: `Sidecar runs ndx and git commands only, not "${program}"` };
   }
   const jobId = `sidecar-command-${randomUUID().slice(0, 8)}`;
+  if (writesSv) {
+    const holder = takeSvWriteLock(ctx, `Sidecar command ${jobId} (${command})`);
+    if (holder) return { started: false, reason: `${holder} is already running and writes .sourcevision/` };
+  }
   job.status.jobId = jobId;
   job.status.command = command;
   let ended!: (end: SidecarCommandEnd) => void;
   const settled = new Promise<SidecarCommandEnd>((resolve) => { ended = resolve; });
   try {
+    // A spawn that throws settles first, so this releases the lock on that path too.
     const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status, result) => {
+      if (writesSv) releaseSvWriteLock(ctx);
       broadcast?.({ type: "commands:sidecar-command-finished", jobId, ok: !status.error, timestamp: status.finishedAt });
       const stdout = (result?.stdout ?? "").trimEnd();
       const stderr = (result?.stderr ?? "").trimEnd();
@@ -2030,6 +2049,20 @@ function loadCommandEffects(ctx: ServerContext): Promise<EffectsLoad> {
     effectsCache.set(key, pending);
   }
   return pending;
+}
+
+/**
+ * Whether `ndx <args>` can write `.sourcevision/`, by the subcommand's declared
+ * effects — conditional writes included, and a passthrough (`ndx sv …`) counts
+ * because its subcommand decides. Errs toward true: a subcommand without a
+ * declaration, or declarations the CLI cannot report, is treated as a writer.
+ */
+async function ndxSubcommandWritesSv(ctx: ServerContext, args: readonly string[]): Promise<boolean> {
+  const subcommand = args.find((arg) => !arg.startsWith("-"));
+  if (!subcommand) return false;
+  const declared = (await loadCommandEffects(ctx)).effects?.[subcommand];
+  if (!declared) return true;
+  return declared.writes.some((write) => write.path.startsWith("{sourcevision}"));
 }
 
 /** GET /api/commands/manifest — grouped command reference with availability and effects. */

@@ -18,6 +18,7 @@ import type {
   RunVerdictClass,
 } from "../../schema/index.js";
 import type { RunEvent } from "../../store/run-events.js";
+import { classifyVendorError } from "../../prd/llm-gateway.js";
 import { classifyUnresolved, type ReviewReport } from "./adversarial-review.js";
 
 /** How many attempts a task gets before the verdict stops recommending a re-run. */
@@ -69,7 +70,7 @@ const DIRTY_TREE_REFUSAL = /Refusing to mark this task completed: .*uncommitted/
 const OVERSIZED = /Brief too large for configured context window/;
 
 /** Vendor failure categories that mean "the vendor, not the task". */
-const VENDOR_CATEGORIES = new Set(["auth", "rate_limit"]);
+const VENDOR_CATEGORIES = new Set(["auth", "rate_limit", "transient_exhausted"]);
 
 /**
  * File-like tokens in a failure digest: a path ending in a source extension.
@@ -122,8 +123,28 @@ function collapseSuffixPaths(paths: readonly string[]): string[] {
   return paths.filter((p) => !paths.some((q) => q !== p && q.endsWith(`/${p}`)));
 }
 
+/** A test file by name (`*.test.*`, `*.spec.*`) or by directory (`test/`, `tests/`, `__tests__/`). */
+function isTestFile(path: string): boolean {
+  return /\.(?:test|spec)\.[^/]+$/.test(path) || /(?:^|\/)(?:tests?|__tests__)\//.test(path);
+}
+
+/**
+ * Vendor categories from the event pipeline's failure events and from
+ * `run.error`. The events are filled only with `hench.useEventPipeline` on, so
+ * `run.error` is the signal a default-config run carries. Only its first line
+ * is the failure: later lines hold free text appended after it (a review
+ * refusal's detail, the protected-config finding), which must not read as a
+ * vendor error.
+ */
 function vendorFailureCategories(run: RunRecord): string[] {
-  return [...new Set((run.events ?? []).map((e) => e.failure?.category).filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
+  const categories = (run.events ?? []).map((e) => e.failure?.category);
+  if (run.error) categories.push(classifyVendorError(run.error.split("\n")[0]));
+  return [...new Set(categories.filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
+}
+
+/** Tool calls the agent made: the recorded calls, or the summary's count. */
+function toolCallCount(run: RunRecord): number {
+  return Math.max(run.toolCalls?.length ?? 0, run.structuredSummary?.counts.toolCallsTotal ?? 0);
 }
 
 function list(paths: readonly string[], max = 3): string {
@@ -142,30 +163,23 @@ interface Verdict {
 
 type Rule = (input: RunVerdictInput, changed: string[]) => Verdict | null;
 
+/**
+ * Only another worktree's claim. `readOnlyRefusal` is not a class: cli-loop
+ * sets it when the forked attempt made no edits and then retries cold, so the
+ * record's other signals describe what the retry did. It is evidence only
+ * (see {@link classifyRun}).
+ */
 const claimLost: Rule = ({ run }) => {
-  if (run.claimLost) {
-    return {
-      class: "claim-lost",
-      summary: `Another worktree took the task over mid-run (${run.claimLost.holderWorktree}).`,
-      evidence: [`claimLost: held by ${run.claimLost.holderWorktree} since ${run.claimLost.at}`],
-      actions: [
-        { kind: "release-claim", label: "Release the claim, or let the other worktree finish the task" },
-        { kind: "re-run", label: "Re-run the task" },
-      ],
-    };
-  }
-  if (run.readOnlyRefusal) {
-    return {
-      class: "claim-lost",
-      summary: "The agent refused to edit and made no changes.",
-      evidence: [`readOnlyRefusal: ${run.readOnlyRefusal.reason}`],
-      actions: [
-        { kind: "release-claim", label: "Release the claim or clean the tree" },
-        { kind: "re-run", label: "Re-run the task" },
-      ],
-    };
-  }
-  return null;
+  if (!run.claimLost) return null;
+  return {
+    class: "claim-lost",
+    summary: `Another worktree took the task over mid-run (${run.claimLost.holderWorktree}).`,
+    evidence: [`claimLost: held by ${run.claimLost.holderWorktree} since ${run.claimLost.at}`],
+    actions: [
+      { kind: "release-claim", label: "Release the claim, or let the other worktree finish the task" },
+      { kind: "re-run", label: "Re-run the task" },
+    ],
+  };
 };
 
 /** The completion gate refused on uncommitted work: a held completion, not a lost claim. */
@@ -186,9 +200,14 @@ const uncommittedRefusal: Rule = ({ run }) => {
   };
 };
 
+/**
+ * The vendor, not the task. An auth failure does not pass with time: its
+ * action is to log the vendor CLI back in, not to wait.
+ */
 const vendorTransient: Rule = ({ run }) => {
   const categories = vendorFailureCategories(run);
   if (run.status !== "error_transient" && categories.length === 0) return null;
+  const auth = categories.includes("auth");
   return {
     class: "vendor-transient",
     summary: categories.length > 0
@@ -199,7 +218,9 @@ const vendorTransient: Rule = ({ run }) => {
       ...categories.map((c) => `failure category: ${c}`),
       ...(run.error ? [`error: ${run.error.split("\n")[0]}`] : []),
     ],
-    actions: [{ kind: "retry-later", label: "Retry later, once the vendor recovers" }],
+    actions: auth
+      ? [{ kind: "re-authenticate", label: "Re-authenticate the vendor CLI, then re-run the task" }]
+      : [{ kind: "retry-later", label: "Retry later, once the vendor recovers" }],
   };
 };
 
@@ -264,17 +285,21 @@ const testGate: Rule = ({ run }, changed) => {
       ],
     };
   }
-  const unchanged = collapseSuffixPaths(named);
+  // No baseline was run, so this cannot claim the failure predates the run: a
+  // run usually breaks a test by changing the source under it. It says where
+  // the failure is and leaves the main-branch check to the operator.
+  const tests = named.filter(isTestFile);
+  const shown = collapseSuffixPaths(tests.length > 0 ? tests : named);
+  const where = tests.length > 0 ? "tests" : "files";
   return {
     class: "test-gate-preexisting",
-    summary: `The test gate failed only in files this run did not change: ${list(unchanged)}.`,
+    summary: `The test gate failed in ${where} this run did not edit (${list(shown)}); not checked on main.`,
     evidence: [
-      `Gate failure names only unchanged file(s): ${list(unchanged)}`,
-      "Not verified on main",
+      `Gate failure names only unedited ${where}: ${list(shown)}`,
+      "Not checked on main",
     ],
     actions: [
-      { kind: "verify-on-main", label: "Run the failing tests on main to confirm they fail there" },
-      { kind: "close-verified", label: "Then close the task as verified" },
+      { kind: "verify-on-main", label: "Run the failing tests on main to see whether they fail there" },
     ],
   };
 };
@@ -298,10 +323,11 @@ const completionHeld: Rule = ({ run }) => {
 };
 
 const noChanges: Rule = ({ run, rexDir }, changed) => {
-  // A record written before `commits` existed says nothing about them, and a
-  // run the operator cancelled made no commits because it was stopped — not
-  // because the task was too vague to act on.
-  if (!run.commits || run.status === "cancelled") return null;
+  // A record written before `commits` existed says nothing about them; a run
+  // the operator cancelled made no commits because it was stopped; and an
+  // agent that made no tool call died before it acted (a vendor or CLI error
+  // on turn 1). None of them failed because the task was too vague.
+  if (!run.commits || run.status === "cancelled" || toolCallCount(run) === 0) return null;
   const isPrd = (p: string): boolean => isUnder(normalizePath(p, run.worktreeRoot), rexDir);
   const commits = run.commits;
   const leftBehind = (run.uncommittedPaths ?? []).filter((p) => !isPrd(p));
@@ -332,7 +358,8 @@ const RERUN_KINDS = new Set(["re-run", "fresh", "retry-later"]);
 function lastAttemptActions(actions: RunVerdictAction[]): RunVerdictAction[] {
   const kept = actions.filter((a) => !RERUN_KINDS.has(a.kind));
   const first = kept[0]?.kind;
-  if (first === "follow-up-run" || first === "split-task") return kept;
+  // A logged-out vendor CLI fails every attempt alike; no follow-up fixes it.
+  if (first === "follow-up-run" || first === "split-task" || first === "re-authenticate") return kept;
   return [{ kind: "follow-up-run", label: "Follow-up run that fixes the cause above; do not re-run as is" }, ...kept];
 }
 
@@ -347,11 +374,12 @@ export function classifyRun(input: RunVerdictInput): RunDiagnosis {
     evidence: [`status: ${input.run.status}`, ...(input.run.error ? [`error: ${input.run.error.split("\n")[0]}`] : [])],
     actions: [{ kind: "hand-fix", label: "Read the run log and decide by hand" }],
   };
+  const refusal = input.run.readOnlyRefusal;
   const n = Math.min(Math.max(input.attempt, 1), MAX_VERDICT_ATTEMPTS);
   return {
     class: verdict.class,
     summary: verdict.summary,
-    evidence: verdict.evidence,
+    evidence: refusal ? [...verdict.evidence, `readOnlyRefusal: ${refusal.reason}`] : verdict.evidence,
     actions: n >= MAX_VERDICT_ATTEMPTS ? lastAttemptActions(verdict.actions) : verdict.actions,
     attempt: { n, of: MAX_VERDICT_ATTEMPTS },
   };

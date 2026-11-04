@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, type ExecOptions } from "@n-dx/llm-client";
-import { collectBranchHealth, type PredictedConflict } from "../../src/server/branch-health/index.js";
+import { collectBranchHealth, WorktreeDiffCache, type PredictedConflict } from "../../src/server/branch-health/index.js";
 
 const REX_CLI = resolve(dirname(fileURLToPath(import.meta.url)), "../../../rex/dist/cli/index.js");
 const V2_FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../rex/tests/fixtures/v2-tree");
@@ -249,6 +249,21 @@ describe("allowlist-union on a real merge", () => {
     expect(readFileSync(join(repo, "gates.test.ts"), "utf-8")).toBe(gates(FEAT_ROW, MAIN_ROW));
   });
 
+  it("lists an entry both sides added once, keeping ours then theirs (Hal's #930 F4 fixture)", async () => {
+    const list = (...entries: string[]) => ["[", ...entries.map((e) => `  "${e}",`), '  "z"', "]", ""].join("\n");
+    diverge("allow.json", list("a", "b"), list("a", "b", "shared", "mine"), list("a", "b", "shared", "theirs"));
+
+    const [conflict] = await predict();
+    expect(conflict.class).toBe("allowlist-union");
+
+    mergeBase();
+    runSteps([["git", "checkout", "--ours", "--", "allow.json"]]);
+    const patch = join(root, "fix.diff");
+    writeFileSync(patch, (conflict.fix as { diff: string }).diff);
+    runSteps([["git", "apply", patch]]);
+    expect(readFileSync(join(repo, "allow.json"), "utf-8")).toBe(list("a", "b", "shared", "mine", "theirs"));
+  });
+
   it("is source when both sides add a code block", async () => {
     const fn = (name: string) => [`export function ${name}() {`, "  return 1;", "}"].join("\n");
     diverge("code.ts", "// start\n// end\n", `// start\n${fn("feat")}\n// end\n`, `// start\n${fn("main")}\n// end\n`);
@@ -305,6 +320,91 @@ describe("source conflicts and other worktrees", () => {
     // The path as git reports it: on Windows that is C:/… with long names, not tmpdir()'s RUNNER~1 form.
     const sidePath = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: join(root, "side"), encoding: "utf-8" }).trim();
     expect(conflict.otherWorktrees).toEqual([{ path: sidePath, branch: "side" }]);
+  });
+
+  /** Real git, counting the per-worktree diffs (`git diff --name-only`). */
+  function countingExec(): { run: (cmd: string, args: string[], opts: ExecOptions) => ReturnType<typeof exec>; diffs: () => number } {
+    let diffs = 0;
+    return {
+      run: (cmd, args, opts) => {
+        if (cmd === "git" && args.includes("diff") && args.includes("--name-only")) diffs++;
+        return exec(cmd, args, opts);
+      },
+      diffs: () => diffs,
+    };
+  }
+
+  /** feat and main conflict on src.ts; worktrees `side` (edits src.ts) and `quiet` (does not). */
+  function twoWorktreesAndAConflict(): void {
+    write("src.ts", "one\ntwo\n");
+    write("other.ts", "x\n");
+    commitAll("base");
+    publishMain();
+    for (const [branch, file, text] of [["side", "src.ts", "one\nTWO-side\n"], ["quiet", "other.ts", "y\n"]]) {
+      git("branch", branch);
+      git("worktree", "add", "-q", join(root, branch), branch);
+      writeFileSync(join(root, branch, file), text);
+      execFileSync("git", ["commit", "-q", "-am", `${branch} edits`], { cwd: join(root, branch), stdio: "ignore" });
+    }
+    git("checkout", "-q", "-b", "feat");
+    write("src.ts", "one\nTWO-feat\n");
+    commitAll("feat edits");
+    git("checkout", "-q", "main");
+    write("src.ts", "one\nTWO-main\n");
+    commitAll("main edits");
+    publishMain();
+    git("checkout", "-q", "feat");
+  }
+
+  it("runs each worktree's diff once across requests, concurrent or not", async () => {
+    twoWorktreesAndAConflict();
+    const cache = new WorktreeDiffCache();
+    const { run, diffs } = countingExec();
+    const read = () => collectBranchHealth(repo, { githubReads: false, worktreeDiffs: cache, exec: run });
+
+    const [first, second] = await Promise.all([read(), read()]);
+    const third = await read();
+
+    expect(diffs()).toBe(2);
+    for (const health of [first, second, third]) {
+      expect(health.conflicts[0].otherWorktrees.map((w) => w.branch)).toEqual(["side"]);
+    }
+  });
+
+  it("diffs again when a worktree's branch tip moves, and never serves the old answer", async () => {
+    twoWorktreesAndAConflict();
+    const cache = new WorktreeDiffCache();
+    const { run, diffs } = countingExec();
+    const read = () => collectBranchHealth(repo, { githubReads: false, worktreeDiffs: cache, exec: run });
+    await read();
+    expect(diffs()).toBe(2);
+
+    // quiet now edits src.ts too.
+    writeFileSync(join(root, "quiet", "src.ts"), "one\nTWO-quiet\n");
+    execFileSync("git", ["commit", "-q", "-am", "quiet edits src"], { cwd: join(root, "quiet"), stdio: "ignore" });
+
+    const after = await read();
+    expect(diffs()).toBe(3);
+    expect(after.conflicts[0].otherWorktrees.map((w) => w.branch).sort()).toEqual(["quiet", "side"]);
+  });
+
+  it("diffs every worktree again when the base moves", async () => {
+    twoWorktreesAndAConflict();
+    const cache = new WorktreeDiffCache();
+    const { run, diffs } = countingExec();
+    const read = () => collectBranchHealth(repo, { githubReads: false, worktreeDiffs: cache, exec: run });
+    await read();
+
+    // main moves on (still conflicting with feat); the base commit is new.
+    git("checkout", "-q", "main");
+    write("other.ts", "z\n");
+    commitAll("main moves");
+    publishMain();
+    git("checkout", "-q", "feat");
+
+    const after = await read();
+    expect(diffs()).toBe(4);
+    expect(after.conflicts[0].otherWorktrees.map((w) => w.branch)).toEqual(["side"]);
   });
 });
 

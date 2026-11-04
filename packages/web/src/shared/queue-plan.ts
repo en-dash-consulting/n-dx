@@ -17,6 +17,8 @@ export interface PlannedLane {
   /** The whole lane: one `work` step per task, joined by `&&`. */
   command: string;
   changeId: string;
+  /** The lane must run in a worktree of its own (every lane after the first, and lane 1 while a run is live here). */
+  ownWorktree?: boolean;
   tasks: PlannedTask[];
 }
 
