@@ -71,6 +71,7 @@ function spyActions(): SidecarActions & { ran: Array<{ argv: string[]; project?:
     writePlacement: async () => refused,
     readRunPlan: async () => "no",
     githubReadsAllowed: () => false,
+    branchHealthEnabled: () => false,
     githubRead: async () => refused,
     postGithub: async (draft) => { posted.push(draft); return { ok: true, text: "posted" }; },
     projectRepoRoot: async (project) => (project === "app" ? { ok: true, repoRoot: "/r/app" } : { ok: false, error: `the hub has no project "${project}"` }),

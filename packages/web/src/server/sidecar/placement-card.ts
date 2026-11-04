@@ -13,7 +13,9 @@
  * the function `POST …/place` and `…/propose` write through, under the PRD
  * model transaction, and only the placement the card's dry run described: if
  * its target, relation, area or the target's spec hash moved while the card
- * waited, nothing is written. A proposed node is recorded only as the change's added
+ * waited, nothing is written. A card raised with a refusal writes nothing at
+ * all. An edited card is pinned to the dry run the operator reviewed
+ * ({@link readPlacementEdit}). A proposed node is recorded only as the change's added
  * amendment: it reaches the product layer when the change is applied, and
  * nothing here applies it.
  *
@@ -21,11 +23,11 @@
  */
 
 import { ChangePlacementError } from "../rex-gateway.js";
-import { checkPlacementOnDisk, parsePlacementRequest, PlacementMovedError, writePlacement } from "../routes-rex/placement.js";
+import { checkPlacementOnDisk, movedSince, parsePlacementRequest, PlacementMovedError, writePlacement } from "../routes-rex/placement.js";
 import { errorMessage } from "../response-utils.js";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import type { SidecarPlacement } from "../../shared/index.js";
+import type { SidecarPlacement, SidecarPlacementCheck } from "../../shared/index.js";
 import type { CarryOutResult } from "./carry-out.js";
 
 /** The most reasons one card carries, and the longest each may be. */
@@ -55,28 +57,74 @@ export async function readPlacementCall(rexDir: string, input: Record<string, un
   return { change: change.trim(), request, reasons: (reasons as string[]).map((r) => r.trim()), check };
 }
 
+type AcceptedCheck = Extract<SidecarPlacementCheck, { ok: true }>;
+
+/** Why an edited placement cannot be approved: 400 for an unreadable or refused edit, 409 for one the PRD moved under. */
+export interface PlacementEditRefusal {
+  status: 400 | 409;
+  error: string;
+}
+
+/** The accepted dry run the operator reviewed, as an approval sends it, or why it is unreadable. */
+function parseReviewedCheck(reviewed: unknown): AcceptedCheck | string {
+  const missing = "an edited placement's approval needs the dry run the operator reviewed (reviewed: the edit's accepted check)";
+  if (!reviewed || typeof reviewed !== "object" || Array.isArray(reviewed)) return missing;
+  const r = reviewed as Record<string, unknown>;
+  const str = (k: string) => typeof r[k] === "string";
+  if (r.ok !== true || !str("title")) return missing;
+  if (r.action === "place" && str("target") && (r.relation === "touches" || r.relation === "amends") && (r.base === undefined || str("base"))) {
+    return { ok: true, action: "place", target: r.target as string, title: r.title as string, relation: r.relation, ...(r.base !== undefined && { base: r.base as string }), warnings: [] };
+  }
+  if (r.action === "propose" && str("under") && (r.type === "capability" || r.type === "constraint")) {
+    return { ok: true, action: "propose", type: r.type, under: r.under as string, title: r.title as string, warnings: [] };
+  }
+  return missing;
+}
+
 /**
  * The operator's edit of a placement card, as the body `POST …/placement/check`
  * takes, read and dry-run on the PRD as loaded. Approval writes this placement
- * in place of the card's own; a string says why the edit cannot be approved
- * (unreadable, or refused by rex), and nothing is changed.
+ * in place of the card's own, pinned to the re-check made here. A refusal says
+ * why the edit cannot be approved, and nothing is changed:
+ *
+ * - 400: the edit or `reviewed` is unreadable, or rex refuses the edit;
+ * - 409: the re-check is not the dry run the operator `reviewed` (target,
+ *   relation or spec hash moved since), or the edit keeps the card's target
+ *   and relation but the target's spec is no longer the one the card was
+ *   raised on.
  */
 export async function readPlacementEdit(
   rexDir: string,
-  change: string,
+  card: SidecarPlacement,
   edits: unknown,
-): Promise<Pick<SidecarPlacement, "request" | "check"> | string> {
-  if (!edits || typeof edits !== "object" || Array.isArray(edits)) return "a placement card's edit must be a placement object";
+  reviewed: unknown,
+): Promise<Pick<SidecarPlacement, "request" | "check"> | PlacementEditRefusal> {
+  const bad = (error: string): PlacementEditRefusal => ({ status: 400, error });
+  if (!edits || typeof edits !== "object" || Array.isArray(edits)) return bad("a placement card's edit must be a placement object");
   const request = parsePlacementRequest(edits as Record<string, unknown>);
-  if (typeof request === "string") return request;
-  let check: SidecarPlacement["check"];
+  if (typeof request === "string") return bad(request);
+  let check: SidecarPlacementCheck;
   try {
-    check = await checkPlacementOnDisk(rexDir, change, request);
+    check = await checkPlacementOnDisk(rexDir, card.change, request);
   } catch (err) {
-    return errorMessage(err);
+    return bad(errorMessage(err));
   }
-  if (!check.ok) return `Rex would refuse the edited placement (kind: ${check.kind}): ${check.error}`;
+  if (!check.ok) return bad(`Rex would refuse the edited placement (kind: ${check.kind}): ${check.error}`);
+  const seen = parseReviewedCheck(reviewed);
+  if (typeof seen === "string") return bad(seen);
+  const moved = movedSince(seen, check);
+  if (moved) return { status: 409, error: `Nothing was written: ${moved}. Check the placement again before approving.` };
+  // Checking again cannot help here: the card itself was drafted on a spec that is gone.
+  const stale = movedFromCard(card.check, check);
+  if (stale) return { status: 409, error: `Nothing was written: ${stale}. Leave the card in the Inbox and have the agent raise a new one.` };
   return { request, check };
+}
+
+/** An edit that keeps the card's target and relation still answers the card's spec hash. */
+function movedFromCard(cardCheck: SidecarPlacementCheck, now: AcceptedCheck): string | undefined {
+  if (!cardCheck.ok || cardCheck.action !== "place" || now.action !== "place") return undefined;
+  if (cardCheck.target !== now.target || cardCheck.relation !== now.relation) return undefined;
+  return movedSince(cardCheck, now);
 }
 
 /** An approved placement card's write and its tool result. Never throws. */
@@ -86,10 +134,13 @@ export async function writePlacementCard(
   sessionId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<CarryOutResult> {
+  // A card raised with a refusal writes nothing, even if rex would accept it now: the operator never saw that placement.
+  if (!placement.check.ok) {
+    return { ok: false, text: `Rex refused the placement (kind: ${placement.check.kind}): ${placement.check.error}. Nothing was written.` };
+  }
   try {
     // The operator approved the dry run on the card: write only that placement, never one the PRD has moved to since.
-    const expect = placement.check.ok ? placement.check : undefined;
-    const { change, check } = await writePlacement(ctx, placement.change, placement.request, "Sidecar", broadcast, expect, { sessionId, reasons: placement.reasons });
+    const { change, check } = await writePlacement(ctx, placement.change, placement.request, "Sidecar", broadcast, placement.check, { sessionId, reasons: placement.reasons });
     const warnings = check.warnings.length ? ` Warnings: ${check.warnings.join(" ")}` : "";
     const text = check.action === "place"
       ? `Placed change ${change}: it ${check.relation} ${check.title} (${check.target}).${warnings}`

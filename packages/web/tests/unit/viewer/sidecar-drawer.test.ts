@@ -1059,7 +1059,7 @@ describe("permission cards", () => {
         render(h(SidecarCards, {
           cards: [card("w", 1, { kind: "work", tool: "start_work", input, runOptions })],
           manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
-          decide: vi.fn(async () => {}),
+          decide: vi.fn(async () => true),
         }), host);
       });
       return host.querySelector(".sidecar-card-title")?.textContent ?? "";
@@ -1083,7 +1083,7 @@ describe("permission cards", () => {
         render(h(SidecarCards, {
           cards: [card("x", 1, { kind, tool, input, ...over })],
           manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
-          decide: vi.fn(async () => {}),
+          decide: vi.fn(async () => true),
         }), host);
       });
       const el = host.querySelector<HTMLElement>(".sidecar-card")!;
@@ -1107,7 +1107,7 @@ describe("permission cards", () => {
             effects: { status: { reads, writes: writes.map((path) => ({ path })), llm: [], duration: "fast" } },
             layoutPaths,
           },
-          decide: vi.fn(async () => {}),
+          decide: vi.fn(async () => true),
         }), host);
       });
       const text = host.querySelector(".sidecar-card-effects")!.textContent!;
@@ -1136,7 +1136,7 @@ describe("permission cards", () => {
       render(h(SidecarCards, {
         cards: [card("x", 1, { status: "withdrawn", reason: "session ended" })],
         manifest: null,
-        decide: vi.fn(async () => {}),
+        decide: vi.fn(async () => true),
       }), host);
     });
     const el = host.querySelector(".sidecar-card")!;

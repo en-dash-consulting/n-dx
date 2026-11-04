@@ -12,6 +12,7 @@
 import { loadRun } from "../../store/runs.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { diagnoseRun } from "../../agent/lifecycle/run-diagnosis.js";
+import { endedRecord, judgeRunRecord } from "./check-runs.js";
 import type { RunDiagnosis, RunRecord } from "../../schema/index.js";
 import { CLIError } from "../errors.js";
 import { result } from "../output.js";
@@ -57,8 +58,17 @@ export async function cmdRuns(
   } catch {
     throw new CLIError(`Run not found: ${runId}`, "Run 'hench status' to list recent runs.");
   }
-  if (run.status === "completed" || run.status === "running") {
-    throw new CLIError(`Run ${runId} is ${run.status}; only a run that did not complete has a verdict.`);
+  if (run.status === "completed") {
+    throw new CLIError(`Run ${runId} is completed; only a run that did not complete has a verdict.`);
+  }
+  if (run.status === "running") {
+    // A record left running by a process that died is classified as ending it
+    // (`hench check-runs --fix`, or End in Live) would record it; nothing is saved.
+    const verdict = judgeRunRecord(run, henchDir);
+    if (verdict.liveness !== "orphaned") {
+      throw new CLIError(`Run ${runId} is running; only a run that did not complete has a verdict.`, verdict.reason);
+    }
+    run = endedRecord(run, verdict, run.lastActivityAt ?? run.startedAt);
   }
 
   const out: RunDiagnoseOutput = { runId: run.id, taskId: run.taskId, ...(await diagnoseRun(dir, henchDir, run)) };
