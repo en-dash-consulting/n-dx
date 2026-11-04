@@ -7,7 +7,7 @@ import {
   formatReviewRepairsUncommittedRefusal,
   formatUncommittedWorkRefusal,
 } from "../../../src/agent/lifecycle/uncommitted-work-gate.js";
-import type { ReviewReport } from "../../../src/agent/analysis/adversarial-review.js";
+import { formatUnresolvedMustFixRefusal, type ReviewReport } from "../../../src/agent/analysis/adversarial-review.js";
 import type { RunEvent } from "../../../src/store/run-events.js";
 import { RUN_VERDICT_CLASSES, type RunRecord, type TestGateResult } from "../../../src/schema/index.js";
 
@@ -293,6 +293,17 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.class).toBe("vendor-transient");
     expect(d.evidence).toContain("failure category: auth");
     expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
+  });
+
+  it("an auth failure still leads with re-authenticate on the last attempt", () => {
+    const d = classify(run({ error: "HTTP 401 Unauthorized" }), { attempt: 2 });
+    expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
+  });
+
+  it("only run.error's first line is read as a vendor error, so a review refusal's detail does not shadow review-blocked", () => {
+    const record = { failed: "must-fix-unresolved", detail: "must-fix: rate limit 429 handling is missing", reportPath: "/r.json" } as const;
+    const d = classify(run({ error: formatUnresolvedMustFixRefusal(record), review: record }));
+    expect(d.class).toBe("review-blocked");
   });
 
   it("a turn-1 vendor failure with no tool calls and no commits is not no-changes", () => {

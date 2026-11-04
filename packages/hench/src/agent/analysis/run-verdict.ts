@@ -131,11 +131,14 @@ function isTestFile(path: string): boolean {
 /**
  * Vendor categories from the event pipeline's failure events and from
  * `run.error`. The events are filled only with `hench.useEventPipeline` on, so
- * `run.error` is the signal a default-config run carries.
+ * `run.error` is the signal a default-config run carries. Only its first line
+ * is the failure: later lines hold free text appended after it (a review
+ * refusal's detail, the protected-config finding), which must not read as a
+ * vendor error.
  */
 function vendorFailureCategories(run: RunRecord): string[] {
   const categories = (run.events ?? []).map((e) => e.failure?.category);
-  if (run.error) categories.push(classifyVendorError(run.error));
+  if (run.error) categories.push(classifyVendorError(run.error.split("\n")[0]));
   return [...new Set(categories.filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
 }
 
@@ -355,7 +358,8 @@ const RERUN_KINDS = new Set(["re-run", "fresh", "retry-later"]);
 function lastAttemptActions(actions: RunVerdictAction[]): RunVerdictAction[] {
   const kept = actions.filter((a) => !RERUN_KINDS.has(a.kind));
   const first = kept[0]?.kind;
-  if (first === "follow-up-run" || first === "split-task") return kept;
+  // A logged-out vendor CLI fails every attempt alike; no follow-up fixes it.
+  if (first === "follow-up-run" || first === "split-task" || first === "re-authenticate") return kept;
   return [{ kind: "follow-up-run", label: "Follow-up run that fixes the cause above; do not re-run as is" }, ...kept];
 }
 
