@@ -12,7 +12,14 @@ items:
     lastModified: "2026-11-04T22:33:30.428Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0e7c49f6-104a-4db7-83f1-7c1397cc7ba7":
-    lastModified: "2026-11-04T20:36:30.385Z"
+    status: "completed"
+    startedAt: "2026-11-04T22:47:14.808Z"
+    completedAt: "2026-11-04T22:59:46.256Z"
+    endedAt: "2026-11-04T22:59:46.256Z"
+    activeIntervals: [{"end":"2026-11-04T22:59:46.256Z","start":"2026-11-04T22:47:14.808Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "importLocalApiKeys returns early (exit 1) naming storeProblem when any status entry has one; POSIX e2e covers 0644 store with a different file key."
+    lastModified: "2026-11-04T22:59:46.256Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
     status: "completed"

@@ -4462,8 +4462,16 @@ async function importLocalApiKeys(dir, confirm) {
     console.error(`Could not read the credential store; nothing imported: ${status.stderr.trim()}`);
     return false;
   }
+  const statuses = JSON.parse(status.stdout);
+  // A store that was not read reports no entries, so the helper and
+  // different-key guards below would pass and `set` would replace what it holds.
+  const storeProblem = statuses.find((s) => s.storeProblem)?.storeProblem;
+  if (storeProblem) {
+    console.error(`The credential store was not read; nothing imported. ${storeProblem}`);
+    return false;
+  }
   const { credentialFingerprint } = await import("@n-dx/llm-client");
-  const stored = new Map(JSON.parse(status.stdout).map((s) => [s.name, s]));
+  const stored = new Map(statuses.map((s) => [s.name, s]));
   let allMoved = true;
   for (const { vendor, value } of await localFileApiKeys(dir)) {
     const entry = stored.get(vendor);

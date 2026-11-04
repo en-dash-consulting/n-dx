@@ -456,4 +456,28 @@ describe.skipIf(isWin)("ndx config credentials with a store readable by others",
       expect(text).not.toContain(VENDOR_KEY);
     }
   }, DEFAULT_TIMEOUT);
+
+  it("imports nothing, naming the problem and the chmod fix, so a stored key is never replaced unseen", async () => {
+    // The store must be refused before the import: set it 0600, then 0644 again.
+    expect(config(["credentials.claude", "--stdin"], VENDOR_KEY).code).toBe(0);
+    await chmod(storePath(), 0o644);
+    const before = await readFile(storePath(), "utf-8");
+    const FILE_KEY = "sk-ant-placeholder-file-9876543210";
+    const localPath = join(cwd, ".n-dx.local.json");
+    await writeFile(localPath, JSON.stringify({ llm: { claude: { api_key: FILE_KEY } } }));
+
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code).toBe(1);
+    expect(await readFile(storePath(), "utf-8")).toBe(before);
+    expect(await readFile(localPath, "utf-8")).toContain(FILE_KEY);
+    expect(r.err).toContain("nothing imported");
+    expect(r.err).toContain(`Refusing to read the credential store ${storePath()}`);
+    expect(r.err).toContain(`chmod 600 ${storePath()}`);
+    expect(r.out + r.err).not.toMatch(/Moved the claude key/);
+    for (const text of [r.out, r.err]) {
+      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain(VENDOR_KEY);
+      expect(text).not.toContain(FILE_KEY);
+    }
+  }, DEFAULT_TIMEOUT);
 });
