@@ -195,12 +195,14 @@ const DOUBLE_QUOTE_ESCAPABLE = new Set(["$", "`", '"', "\\", "\n"]);
  * unquoted backslash dropped before the character it escapes, and inside
  * double quotes a backslash dropped only before a character sh lets it escape
  * there. So `find\-generic-password` reads as the word sh hands the program.
+ * Under cmd.exe a backslash is a path separator, not an escape, so it is kept.
  */
-function commandWords(command: string): string[] {
+function commandWords(command: string, shellKind: ShellKind): string[] {
   const words: string[] = [];
   let word: string | null = null;
   let quote: string | null = null;
   let escaped = false;
+  const backslashEscapes = shellKind !== "cmd";
   for (const ch of command) {
     if (escaped) {
       escaped = false;
@@ -212,9 +214,9 @@ function commandWords(command: string): string[] {
       else word += ch;
     } else if (quote === '"') {
       if (ch === '"') quote = null;
-      else if (ch === "\\") escaped = true;
+      else if (ch === "\\" && backslashEscapes) escaped = true;
       else word += ch;
-    } else if (ch === "\\") {
+    } else if (ch === "\\" && backslashEscapes) {
       word ??= "";
       escaped = true;
     } else if (/\s/.test(ch)) {
@@ -245,10 +247,16 @@ function commandWords(command: string): string[] {
  * still read the credential store or run a helper from inside it. Only the OS
  * keystore backends close that.
  *
+ * @param shellKind - Which shell will interpret the command; decides whether a
+ *   backslash escapes. Defaults to POSIX, like {@link validateCommand}.
  * @throws {GuardError} when the command matches a denied prefix.
  */
-export function assertNotCredentialCommand(command: string, deniedPrefixes: readonly (readonly string[])[]): void {
-  const words = commandWords(command.trim());
+export function assertNotCredentialCommand(
+  command: string,
+  deniedPrefixes: readonly (readonly string[])[],
+  shellKind: ShellKind = "posix",
+): void {
+  const words = commandWords(command.trim(), shellKind);
   if (words.length === 0) return;
   for (const prefix of deniedPrefixes) {
     if (prefix.length === 0 || words.length < prefix.length) continue;

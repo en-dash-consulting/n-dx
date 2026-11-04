@@ -215,7 +215,7 @@ export class GuardRails {
   }
 
   checkCommand(command: string): void {
-    assertNotCredentialCommand(command, this.deniedCommands);
+    assertNotCredentialCommand(command, this.deniedCommands, this.shellKind);
     validateCommand(command, this.config.allowedCommands, this.shellKind);
     this.policy.checkPolicy("command", command);
   }

@@ -240,6 +240,19 @@ describe("the agent may not run a command that reads a stored credential", () =>
     expect(() => widenedGuard().checkCommand(command)).toThrow(/reads a stored credential/);
   });
 
+  // cmd.exe has no backslash escape: a Windows path keeps its separators.
+  it.each([
+    "C:\\Tools\\bw.exe get password x",
+    "\"C:\\Tools\\bw.exe\" list items",
+  ])("refuses %j under cmd.exe", (command) => {
+    const base = DEFAULT_HENCH_CONFIG().guard;
+    const guard = new GuardRails(repo, { ...base, allowedCommands: [...base.allowedCommands, "bw"] }, {
+      shellKind: "cmd",
+      credentialDenials: agentCredentialDenials({ ndxHome }),
+    });
+    expect(() => guard.checkCommand(command)).toThrow(/reads a stored credential/);
+  });
+
   it("still allows other subcommands of security and other allowed commands", () => {
     const guard = widenedGuard();
     expect(() => guard.checkCommand("security list-keychains")).not.toThrow();
