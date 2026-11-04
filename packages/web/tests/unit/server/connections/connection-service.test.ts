@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { setCredential } from "@n-dx/llm-client";
+import { credentialFingerprint, setCredential } from "@n-dx/llm-client";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ConnectionService,
@@ -161,6 +161,46 @@ describe("ConnectionService", () => {
     const [docs] = await svc.listConnections();
     expect(docs.status.state).toBe("needs-sign-in");
     expect(docs.status).not.toMatchObject({ reason: expect.stringContaining("stored token") });
+  });
+
+  it("keeps the stored token out of a connect failure's reason but names the HTTP status", async () => {
+    const http = await httpServer();
+    http.echoErrors = "all";
+    const { svc, ndxHome } = service({ docs: { transport: "http", url: http.url, auth: "token" } });
+    setCredential("connection:docs", "tok-echoed-secret-1234", { ndxHome });
+
+    const [docs] = await svc.listConnections();
+    expect(docs.status.state).toBe("unavailable");
+    const reason = (docs.status as { reason: string }).reason;
+    expect(http.authorizations).toContain("Bearer tok-echoed-secret-1234");
+    expect(reason).not.toContain("tok-echoed-secret-1234");
+    expect(reason).toContain("HTTP 500");
+    expect(reason).toContain(`[token ${credentialFingerprint("tok-echoed-secret-1234")}]`);
+  });
+
+  it("keeps the stored token out of a failed call's ConnectionUnavailableError", async () => {
+    const http = await httpServer();
+    http.echoErrors = "calls";
+    const { svc, ndxHome } = service({ docs: { transport: "http", url: http.url, auth: "token" } });
+    setCredential("connection:docs", "tok-echoed-secret-1234", { ndxHome });
+
+    const failure = await svc.callTool("docs", "read_item", { id: "1" }).catch((err: unknown) => err);
+    expect(failure).toBeInstanceOf(ConnectionUnavailableError);
+    const message = (failure as Error).message;
+    expect(message).not.toContain("tok-echoed-secret-1234");
+    expect(message).toContain("HTTP 500");
+    const [docs] = await svc.listConnections();
+    expect(JSON.stringify(docs.status)).not.toContain("tok-echoed-secret-1234");
+  });
+
+  it("caps a long reason", async () => {
+    const http = await httpServer();
+    http.echoErrors = "all";
+    const { svc, ndxHome } = service({ docs: { transport: "http", url: http.url, auth: "token" } });
+    setCredential("connection:docs", "x".repeat(2_000), { ndxHome });
+
+    const [docs] = await svc.listConnections();
+    expect((docs.status as { reason: string }).reason.length).toBeLessThanOrEqual(301);
   });
 
   it("reads needs-sign-in for an oauth connection until the sign-in lands", async () => {

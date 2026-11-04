@@ -26,10 +26,15 @@ import {
   type CallToolResult,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { compileEnvPolicy, sanitizeChildEnv, type CredentialStoreOptions } from "@n-dx/llm-client";
+import {
+  compileEnvPolicy,
+  redactSecrets,
+  sanitizeChildEnv,
+  type CredentialStoreOptions,
+} from "@n-dx/llm-client";
 import { errorMessage } from "../response-utils.js";
 import { loadConnections, type ConnectionConfig } from "./connection-config.js";
-import { connectionToken } from "./connection-credentials.js";
+import { connectionToken, withoutConnectionToken } from "./connection-credentials.js";
 import { resolveToolPolicies, type ToolPolicy } from "./tool-policy.js";
 
 /** The longest tool name the Claude and OpenAI tool APIs accept. */
@@ -127,16 +132,8 @@ function isConnectionFailure(err: unknown): boolean {
   return !(err instanceof Error && err.name === "AbortError");
 }
 
-/** Why a connection failed: a 401 means sign in (again), anything else unavailable. */
-function failureStatus(config: ConnectionConfig, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
-  if (err instanceof StreamableHTTPError && err.code === 401) {
-    return {
-      state: "needs-sign-in",
-      reason: config.auth === "none" ? "the server requires sign-in; set auth to \"token\" or \"oauth\"" : "the server refused the stored token",
-    };
-  }
-  return { state: "unavailable", reason: errorMessage(err) };
-}
+/** The longest reason kept: a status line plus a short server message. */
+const MAX_REASON_LENGTH = 300;
 
 export class ConnectionService {
   private readonly slots = new Map<string, Slot>();
@@ -255,6 +252,33 @@ export class ConnectionService {
     return slot.connecting;
   }
 
+  /** Why a connection failed: a 401 means sign in (again), anything else unavailable. */
+  private failureStatus(config: ConnectionConfig, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
+    if (err instanceof StreamableHTTPError && err.code === 401) {
+      return {
+        state: "needs-sign-in",
+        reason: config.auth === "none" ? "the server requires sign-in; set auth to \"token\" or \"oauth\"" : "the server refused the stored token",
+      };
+    }
+    // The SDK's message may not carry the status, so name it first.
+    const status = err instanceof StreamableHTTPError && err.code !== undefined ? `HTTP ${err.code}: ` : "";
+    return { state: "unavailable", reason: this.scrubReason(config, status + errorMessage(err)) };
+  }
+
+  /**
+   * A reason reaches listings and logs, and a server's error body can echo the
+   * request headers. The connection's token becomes its fingerprint, anything
+   * else secret-shaped is redacted and the length is capped; the leading
+   * "HTTP <status>" survives, so the operator can still diagnose the failure.
+   */
+  private scrubReason(config: ConnectionConfig, reason: string): string {
+    const withoutToken = config.transport === "http" && config.auth === "token"
+      ? withoutConnectionToken(config.id, reason, this.options.credentials)
+      : reason;
+    const scrubbed = redactSecrets(withoutToken);
+    return scrubbed.length > MAX_REASON_LENGTH ? `${scrubbed.slice(0, MAX_REASON_LENGTH)}…` : scrubbed;
+  }
+
   private transportFor(config: ConnectionConfig): Transport | ConnectionState {
     if (config.transport === "stdio") {
       return new StdioClientTransport({
@@ -300,7 +324,7 @@ export class ConnectionService {
           live.tools = await this.readTools(config.id, client);
           if (slot.live === live) slot.known = live.tools;
         } catch (err) {
-          this.fail(slot, live, errorMessage(err));
+          this.fail(slot, live, err);
         }
       });
       if (this.closed) {
@@ -313,7 +337,7 @@ export class ConnectionService {
       return live;
     } catch (err) {
       await client.close().catch(() => undefined);
-      slot.status = failureStatus(config, err);
+      slot.status = this.failureStatus(config, err);
       return undefined;
     }
   }
@@ -322,7 +346,7 @@ export class ConnectionService {
   private fail(slot: Slot, live: Live, failure: unknown): void {
     if (slot.live !== live) return;
     slot.live = undefined;
-    slot.status = typeof failure === "string" ? { state: "unavailable", reason: failure } : failureStatus(slot.config, failure);
+    slot.status = typeof failure === "string" ? { state: "unavailable", reason: failure } : this.failureStatus(slot.config, failure);
     live.client.onclose = undefined;
     void live.client.close().catch(() => undefined);
   }

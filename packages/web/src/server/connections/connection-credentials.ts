@@ -25,6 +25,16 @@ export function connectionToken(id: string, options: CredentialStoreOptions = {}
   return storedCredential(connectionCredentialName(id), options)?.value;
 }
 
+/**
+ * `text` with every occurrence of connection `id`'s token replaced by its
+ * fingerprint, for text that may echo it (a server's error body) before it is
+ * stored or shown.
+ */
+export function withoutConnectionToken(id: string, text: string, options: CredentialStoreOptions = {}): string {
+  const token = connectionToken(id, options);
+  return token ? text.split(token).join(`[token ${credentialFingerprint(token)}]`) : text;
+}
+
 /** An 8-character fingerprint of connection `id`'s token, or null when none is stored. */
 export function connectionTokenFingerprint(id: string, options: CredentialStoreOptions = {}): string | null {
   const token = connectionToken(id, options);
