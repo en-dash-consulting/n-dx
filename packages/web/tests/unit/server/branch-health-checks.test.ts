@@ -65,6 +65,20 @@ describe("classifyFailingCheck", () => {
     expect(verdict.class).not.toBe("behind-base");
   });
 
+  it("ignores a test failure that vitest's github-actions reporter raised as an annotation", () => {
+    // In CI vitest emits `::error file=…::<error output>`, which the log shows as ##[error].
+    const verdict = classify({
+      rollup: checkRun("test (ubuntu-latest)"),
+      log: [
+        "test (ubuntu-latest)\tRun tests\t FAIL  tests/e2e/iso-skill-drift.test.js > iso-map skill > the committed bundle matches",
+        "test (ubuntu-latest)\tRun tests\t##[error]AssertionError: The committed iso-map skill script is out of date with packages/sourcevision/src/export/.",
+        "test (ubuntu-latest)\tRun tests\t##[error]Error: Snapshot `x` mismatched: the cache is behind the base snapshot",
+        "",
+      ].join("\n"),
+    });
+    expect(verdict.class).not.toBe("behind-base");
+  });
+
   it("touched-test: a changed test whose name says 'is behind' is not behind-base", () => {
     const verdict = classify({
       rollup: checkRun("test (ubuntu-latest)"),

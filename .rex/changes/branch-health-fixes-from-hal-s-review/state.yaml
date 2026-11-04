@@ -8,7 +8,14 @@ items:
     lastModified: "2026-11-04T19:26:27.708Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ab81b682-f37c-4fcd-9f26-422dd376b659":
-    lastModified: "2026-11-04T19:25:29.485Z"
+    status: "completed"
+    startedAt: "2026-11-04T22:21:09.735Z"
+    completedAt: "2026-11-04T22:27:02.663Z"
+    endedAt: "2026-11-04T22:27:02.663Z"
+    activeIntervals: [{"end":"2026-11-04T22:27:02.663Z","start":"2026-11-04T22:21:09.735Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "checks.ts: BEHIND_BASE matched only on ##[error] annotation lines (behindAnnotation) and the check name. 3 new unit tests (iso-skill-drift wording, touched 'is behind' test, name match); existing behind-base cases pass. Docs + changeset updated."
+    lastModified: "2026-11-04T22:27:02.663Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c9a0e430-c671-451b-8188-7454c936499f":
     lastModified: "2026-11-04T19:26:02.821Z"

@@ -326,7 +326,9 @@ is on; the route gate refuses it with 403 while the toggle is off.
   `FAIL` and the path (`FAIL  llm-client:shared tests/x.test.ts`).
   Behind-base wording ("out of date with", "is behind", …) counts only on
   `##[error]` annotation lines and in the check name: a failing test's own
-  output can say the same words. When no
+  output can say the same words. An annotation that opens with an error
+  name (`##[error]AssertionError: …`, vitest's github-actions reporter in CI)
+  is a test failure and does not count. When no
   policy suite or touched test explains the failure, behind-base also fires when the PR's
   `mergeStateStatus` is `BEHIND` or a stack layer is not contained, and the
   evidence names which. A test path printed by a package's

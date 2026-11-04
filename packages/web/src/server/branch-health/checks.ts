@@ -103,10 +103,15 @@ export interface CheckClassInput {
 // not the branch lacking its base.
 const BEHIND_BASE = /\b(?:out of date with|is behind|not up to date with|behind (?:the )?base|must be rebased|needs? (?:a )?rebase)\b/i;
 const ANNOTATION_LINE = /##\[error\].*$/gm;
+// In CI vitest's github-actions reporter raises each test failure as an
+// annotation that opens with the error's name (`##[error]AssertionError: …`).
+// That is a failing test speaking, so it never says the branch is behind.
+const TEST_ERROR_ANNOTATION = /^##\[error\]\s*[\w$.]*(?:Error|Exception)\b/;
 
 /** The BEHIND_BASE match in the log's `##[error]` annotation lines, or null. */
 function behindAnnotation(log: string): RegExpExecArray | null {
   for (const [line] of log.matchAll(ANNOTATION_LINE)) {
+    if (TEST_ERROR_ANNOTATION.test(line)) continue;
     const match = BEHIND_BASE.exec(line);
     if (match) return match;
   }
