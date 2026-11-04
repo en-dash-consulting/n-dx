@@ -223,6 +223,13 @@ describe("the agent may not run a command that reads a stored credential", () =>
   it.each([
     "security find-generic-password -s ndx -w",
     "/usr/bin/security find-generic-password -w",
+    // A global option before the subcommand, or an escape sh strips, still names it.
+    "security -q find-generic-password -s X -w",
+    "security -v -q find-generic-password -w",
+    "security find\\-generic-password -s X -w",
+    "security 'find-generic'-password -w",
+    "security \"find-generic-password\" -w",
+    "secur\\ity find-generic-password -w",
     "op read op://vault/item/field",
     "/opt/homebrew/bin/op read x",
     "'/opt/homebrew/bin/op' item list",
@@ -236,6 +243,10 @@ describe("the agent may not run a command that reads a stored credential", () =>
   it("still allows other subcommands of security and other allowed commands", () => {
     const guard = widenedGuard();
     expect(() => guard.checkCommand("security list-keychains")).not.toThrow();
+    expect(() => guard.checkCommand("security -q find-certificate -c x")).not.toThrow();
+    expect(() => guard.checkCommand("security find-internet-password -s x")).not.toThrow();
+    // Inside double quotes sh keeps a backslash before `-`, so this is not the subcommand.
+    expect(() => guard.checkCommand("security \"find\\-generic-password\"")).not.toThrow();
     expect(() => guard.checkCommand("npm test")).not.toThrow();
     // The documented gap: an allowed interpreter is not a command this list can see.
     expect(() => guard.checkCommand("node -e 'process.exit(0)'")).not.toThrow();

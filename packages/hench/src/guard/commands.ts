@@ -179,15 +179,44 @@ function programName(token: string): string {
   return base.replace(/\.(exe|cmd|bat|com)$/i, "").toLowerCase();
 }
 
-/** Whitespace-separated words with their quotes removed (POSIX-style, no escapes). */
+/** Whether `run` appears in `words` as consecutive entries; an empty run always does. */
+function containsRun(words: readonly string[], run: readonly string[]): boolean {
+  for (let start = 0; start + run.length <= words.length; start++) {
+    if (run.every((token, i) => words[start + i] === token)) return true;
+  }
+  return false;
+}
+
+/** Characters a backslash escapes inside POSIX double quotes. */
+const DOUBLE_QUOTE_ESCAPABLE = new Set(["$", "`", '"', "\\", "\n"]);
+
+/**
+ * Whitespace-separated words as POSIX `sh` would pass them: quotes removed, an
+ * unquoted backslash dropped before the character it escapes, and inside
+ * double quotes a backslash dropped only before a character sh lets it escape
+ * there. So `find\-generic-password` reads as the word sh hands the program.
+ */
 function commandWords(command: string): string[] {
   const words: string[] = [];
   let word: string | null = null;
   let quote: string | null = null;
+  let escaped = false;
   for (const ch of command) {
-    if (quote) {
+    if (escaped) {
+      escaped = false;
+      // Inside double quotes sh keeps the backslash unless it escapes one of these.
+      if (quote === '"' && !DOUBLE_QUOTE_ESCAPABLE.has(ch)) word += "\\";
+      word = (word ?? "") + ch;
+    } else if (quote === "'") {
       if (ch === quote) quote = null;
       else word += ch;
+    } else if (quote === '"') {
+      if (ch === '"') quote = null;
+      else if (ch === "\\") escaped = true;
+      else word += ch;
+    } else if (ch === "\\") {
+      word ??= "";
+      escaped = true;
     } else if (/\s/.test(ch)) {
       if (word !== null) words.push(word);
       word = null;
@@ -203,17 +232,20 @@ function commandWords(command: string): string[] {
 }
 
 /**
- * Refuse a command that reads a credential: one starting with any of
- * `deniedPrefixes` (token lists; the first compared by program name, so a
- * path or `.exe` spelling still matches). Checked before the allowlist, so it
- * holds even when a user widens `guard.allowedCommands` to include `op` or
- * `security`.
+ * Refuse a command that reads a credential: one matching any of
+ * `deniedPrefixes` (token lists). The first token is compared by program name,
+ * so a path or `.exe` spelling still matches. The rest must appear as a run
+ * anywhere among the later words, not only right after the program, so a
+ * global option (`security -q find-generic-password`) cannot slip one past.
+ * Words are unescaped as sh would (`find\-generic-password`). Checked before
+ * the allowlist, so it holds even when a user widens `guard.allowedCommands`
+ * to include `op` or `security`.
  *
  * Not a complete barrier: an allowed interpreter (`node -e`, `python -c`) can
  * still read the credential store or run a helper from inside it. Only the OS
  * keystore backends close that.
  *
- * @throws {GuardError} when the command starts with a denied prefix.
+ * @throws {GuardError} when the command matches a denied prefix.
  */
 export function assertNotCredentialCommand(command: string, deniedPrefixes: readonly (readonly string[])[]): void {
   const words = commandWords(command.trim());
@@ -221,7 +253,7 @@ export function assertNotCredentialCommand(command: string, deniedPrefixes: read
   for (const prefix of deniedPrefixes) {
     if (prefix.length === 0 || words.length < prefix.length) continue;
     if (programName(words[0]!) !== programName(prefix[0]!)) continue;
-    if (prefix.slice(1).every((token, i) => words[i + 1] === token)) {
+    if (containsRun(words.slice(1), prefix.slice(1))) {
       throw new GuardError(
         `Command "${prefix.join(" ")}" reads a stored credential; the agent may not run it, ` +
           `whatever guard.allowedCommands lists.`,
