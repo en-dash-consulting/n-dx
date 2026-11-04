@@ -239,6 +239,55 @@ describe("resolveVendorCliEnv", () => {
     expect(resolveVendorCliEnv(withAuth("claude", "cli"), undefined, source(vertex))).toMatchObject(vertex);
   });
 
+  describe("no exported token the CLI ranks above the chosen credential reaches the child", () => {
+    // Claude Code ranks ANTHROPIC_AUTH_TOKEN above ANTHROPIC_API_KEY and the
+    // login; codex exec honours CODEX_API_KEY. Every casing goes.
+    const OUTRANKING = {
+      claude: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+      codex: ["OPENAI_API_KEY", "CODEX_API_KEY"],
+    } as const;
+    const LOGIN = {
+      claude: { CLAUDE_CODE_OAUTH_TOKEN: "placeholder-oauth", CLAUDE_CONFIG_DIR: "/claude" },
+      codex: { CODEX_ACCESS_TOKEN: "placeholder-access", CODEX_HOME: "/codex" },
+    } as const;
+    const tokens = (vendor: "claude" | "codex") => ({
+      ...Object.fromEntries(OUTRANKING[vendor].flatMap((name) => [[name, `placeholder-${name}`], [name.toLowerCase(), `placeholder-lower-${name}`]])),
+      ...LOGIN[vendor],
+    });
+    const namesOf = (env: NodeJS.ProcessEnv, list: readonly string[]) =>
+      Object.keys(env).filter((name) => list.includes(name.toUpperCase()));
+
+    it.each(CLI_VENDORS)("cli: the %s child gets no API key or token in any casing, and keeps its login plumbing", (vendor) => {
+      store(vendor);
+      const env = resolveVendorCliEnv(withAuth(vendor, "cli"), undefined, source(tokens(vendor)));
+      expect(namesOf(env, OUTRANKING[vendor])).toEqual([]);
+      expect(env).toMatchObject(LOGIN[vendor]);
+    });
+
+    it.each(CLI_VENDORS)("api: the %s child gets the chosen key and no token that outranks it", (vendor) => {
+      store(vendor);
+      const keyName = KEY_ENV[vendor];
+      const exported = tokens(vendor);
+      for (const name of Object.keys(exported)) if (name.toUpperCase() === keyName) delete exported[name];
+      const env = resolveVendorCliEnv(withAuth(vendor, "api"), undefined, { PATH: "/bin", NDX_HOME: home, ...exported });
+      expect(namesOf(env, OUTRANKING[vendor])).toEqual([keyName]);
+      expect(env[keyName]).toBe(STORED);
+      expect(env).toMatchObject(LOGIN[vendor]);
+    });
+
+    it("auto with nothing configured passes an exported token through", () => {
+      const env = resolveVendorCliEnv({ vendor: "claude" }, undefined, { PATH: "/bin", ANTHROPIC_AUTH_TOKEN: "placeholder-gateway" });
+      expect(env.ANTHROPIC_AUTH_TOKEN).toBe("placeholder-gateway");
+    });
+
+    it("cli: Bedrock and Vertex still get their credentials beside a dropped token", () => {
+      const bedrock = { CLAUDE_CODE_USE_BEDROCK: "1", AWS_BEARER_TOKEN_BEDROCK: "placeholder-bedrock" };
+      const env = resolveVendorCliEnv(withAuth("claude", "cli"), undefined, source({ ...bedrock, ANTHROPIC_AUTH_TOKEN: "placeholder-gateway" }));
+      expect(env).toMatchObject(bedrock);
+      expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    });
+  });
+
   it.each(CLI_VENDORS)("api: the %s CLI child gets the stored key under its own name only", (vendor) => {
     store(vendor);
     store(vendor === "claude" ? "codex" : "claude", "placeholder-other-vendor");
