@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "The built-in CAOS profile asks list_epics for its maximum page (pageSize 100), and a fake list_epics with more than 25 epics yields more than 25 picker options (test)"
   - "The profile check refuses a hint argument the read tool's input does not declare, naming it (test)"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
