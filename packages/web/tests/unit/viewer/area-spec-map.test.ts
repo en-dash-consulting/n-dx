@@ -6,6 +6,8 @@
  *
  * @see src/viewer/views/area-spec-map.ts
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
@@ -101,5 +103,20 @@ describe("appliesToLabel", () => {
   it("names all nodes or lists the ones bound", () => {
     expect(appliesToLabel("all")).toBe("all product nodes");
     expect(appliesToLabel(["A", "B"])).toBe("A, B");
+  });
+});
+
+describe("selected and focused blocks look different", () => {
+  const css = readFileSync(join(process.cwd(), "src/viewer/styles/product.css"), "utf8");
+  const declarations = (selector: string): string => {
+    const start = css.indexOf(`${selector} {`);
+    return start < 0 ? "" : css.slice(start, css.indexOf("}", start));
+  };
+
+  it("keeps the outline for focus and draws selection another way", () => {
+    expect(declarations(".pam-block:focus-visible")).toContain("outline");
+    const selected = declarations('.pam-block[aria-pressed="true"]');
+    expect(selected).toContain("box-shadow");
+    expect(selected).not.toContain("outline");
   });
 });
