@@ -46,7 +46,10 @@ items:
     lastModified: "2026-11-05T05:30:17.723Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3044e7b8-703d-48ae-a651-acf4fdad8305":
-    lastModified: "2026-11-05T02:10:47.442Z"
+    startedAt: "2026-11-05T08:16:11.213Z"
+    activeIntervals: [{"end":"2026-11-05T08:28:40.891Z","start":"2026-11-05T08:16:11.213Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (28):\n- finds no NUL outside the known list\n- shows Ready next with each lane's command and reasons in place of Up next when on\n- tells every lane after the first to run in its own worktree, and lane 1 nothing\n- links each task title to its task, as Up next items do\n- tests/e2e/source-nul-bytes.test.js > tracked source holds no NUL byte > finds no NUL outside the known list\n  Error: ENOENT: no such file or directory, open '/Users/ryankeith/ndx-core/n-dx/.claude/worktrees/plan-lane-a/packages/web/src/viewer/components/throttle-controls.ts'\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n… and 20 more"
+    lastModified: "2026-11-05T08:28:41.457Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4416ae7e-eba6-4013-9ce8-5201a4b68a10":
     status: "completed"
@@ -70,6 +73,9 @@ items:
   "6a77921e-d047-41a8-be72-ed1729555dd7":
     lastModified: "2026-11-05T05:19:33.667Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "71c475ec-6c18-413a-b98e-b4dae67c8bd3":
+    lastModified: "2026-11-05T08:21:09.399Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "95300e23-699c-4649-8aa2-af95a1d4b6a0":
     status: "completed"
     startedAt: "2026-11-05T06:53:31.131Z"
@@ -78,6 +84,9 @@ items:
     activeIntervals: [{"end":"2026-11-05T07:09:22.667Z","start":"2026-11-05T06:53:31.131Z"},{"end":"2026-11-05T07:10:10.193Z","start":"2026-11-05T07:10:10.193Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
     lastModified: "2026-11-05T07:10:10.193Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a0c1e9e5-20c2-4d91-9c09-5d813241a2f3":
+    lastModified: "2026-11-05T08:21:14.244Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a520e32b-17c3-41a8-a192-2f5784b2765d":
     lastModified: "2026-11-05T01:01:56.305Z"
@@ -93,5 +102,5 @@ items:
     lastModified: "2026-11-05T07:45:51.116Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5c7b061-22b2-4b84-93cd-55793d328d68":
-    lastModified: "2026-11-05T07:35:34.916Z"
+    lastModified: "2026-11-05T08:21:14.244Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
