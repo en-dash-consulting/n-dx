@@ -106,6 +106,8 @@ export {
 } from "./session-host.js";
 export type { ClaimHubSessionHostInput, HubLensProbeOptions, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";
 export { hubUsagePath, recordHubUsage, readHubUsageTotals } from "./usage-ledger.js";
+export { TrackerSyncClock, hasActiveTrackerRule, proxiedTickPost, TRACKER_TICK_INTERVAL_MS, TRACKER_TICK_PATH } from "./tracker-sync.js";
+export type { TrackerSyncClockOptions, TrackerTickOutcome, TrackerTickPost } from "./tracker-sync.js";
 export type { HubUsageRecord, HubUsageTotals } from "./usage-ledger.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
 export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

@@ -126,9 +126,42 @@ untracked `.n-dx.local.json` only, as connections do:
   `result` one of `would`, `ok`, `duplicate`, `refused`, `card`, `unavailable`,
   `needs-sign-in`.
 
+### Events and the clock
+
+The project server collects events at each tick from what it already records
+(`src/server/tracker/event-sources.ts`), reading only the sources whose rule
+is not off:
+
+| Event | Source | Cursor |
+|-------|--------|--------|
+| `run-started` | hench run records (`<henchDir>/runs/`) | `startedAt` |
+| `run-failed-twice` | a run that ends a task's second hard failure in a row (hench's stuck rule), with its diagnosis class | `finishedAt` |
+| `pr-opened`, `pr-merged` | `gh pr list`, PRs whose description or commits carry `N-DX-Item`; only while `web.sidecarGithubReads` is on | `createdAt`, `mergedAt` |
+| `release-published` | a change stamped `shippedIn` a version that has a git tag (`v1.2.3`, `<pkg>@1.2.3`) | each change and version once |
+
+- An event is about the nearest item that links to a work item (the item,
+  else its parent, and so on) and carries that item's first ref; an event no
+  item links for is dropped.
+- Cursors are saved per source in `<henchDir>/sidecar/tracker-cursors.json`,
+  so a restarted server queues nothing twice. A source's first read is a
+  baseline and queues nothing: turning a rule on never replays history. A
+  source that cannot be read (gh failing, reads off) reports why in the
+  tick's `collected.problems` and keeps its cursor. An event queued but
+  still unreachable when the server stops is not queued again.
+- The hub (`src/hub/tracker-sync.ts`) ticks each registered project whose
+  `.n-dx.local.json` sets a rule to `dry-run` or `on`: once when its server is
+  seen healthy after a start or an outage, then every five minutes, after the
+  health check. It POSTs `/p/<id>/api/tracker/sync/tick` through its own
+  proxy with the per-user token, and skips a server that is not healthy. It
+  reads only the rule modes; the project server decides what a tick does.
+  The hub ticks the repository root's server; a linked worktree's own
+  `trackerSync` is not ticked by it.
+
 Routes, governed by `web.sidecar`:
 
-- `POST /api/tracker/sync/tick` runs the queued events. It answers the
+- `POST /api/tracker/sync/tick` collects the events since the last tick and
+  runs the queue, answering the tick's result plus
+  `collected: { queued, problems }`. It answers the
   per-user token itself only: a browser session is refused with 403, and a
   Sidecar broker credential never passes the request gate on it.
 - `GET /api/tracker/activity` answers `{ entries }`, the newest 200.

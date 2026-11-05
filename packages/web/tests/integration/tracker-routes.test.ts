@@ -6,9 +6,9 @@
  * back as written.
  */
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
@@ -16,12 +16,14 @@ import { enforceRouteFeatureGate } from "../../src/server/route-feature-gates.js
 import { handleTrackerRoute } from "../../src/server/routes-tracker.js";
 import { isSidecarBrokerRequest, SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "../../src/server/sidecar/broker-credential.js";
 import { appendTrackerActivity, type TrackerActivityEntry } from "../../src/server/tracker/activity-log.js";
+import { changeItemLink } from "../../src/server/tracker/item-links.js";
 import { enqueueTrackerEvent } from "../../src/server/tracker/sync-engine.js";
 import type { ServerContext } from "../../src/server/types.js";
 import { CredentialStore } from "../../src/shared/index.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 
 const TOKEN = "dashboard-token-0123456789abcdef";
+const TASK = "c0000000-0000-4000-8000-000000000002";
 const auth = { "X-Ndx-Token": TOKEN };
 
 let root: string;
@@ -83,6 +85,23 @@ describe("POST /api/tracker/sync/tick", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ state: "ran", queued: 0, entries: [{ result: "would", requestId: "ndx:ndx:rex-1:run-started" }] });
     expect((await fetch(`${server.baseUrl}/api/tracker/sync/tick`, { headers: auth })).status).toBe(405);
+  });
+
+  it("collects the ndx events since the last tick and runs them", async () => {
+    cpSync(resolve(__dirname, "../../../rex/tests/fixtures/v2-tree"), join(root, ".rex"), { recursive: true });
+    expect(await changeItemLink(join(root, ".rex"), TASK, "WM-2", "link")).toMatchObject({ ok: true });
+    // The first tick takes the baseline.
+    expect(await (await tick()).json()).toMatchObject({ state: "ran", entries: [], collected: { queued: 0, problems: [] } });
+
+    const runsDir = join(root, ".hench", "runs");
+    mkdirSync(runsDir, { recursive: true });
+    writeFileSync(join(runsDir, "r-1.json"), JSON.stringify({ id: "r-1", taskId: TASK, status: "running", startedAt: "2026-11-05T10:00:00.000Z" }));
+    expect(await (await tick()).json()).toMatchObject({
+      state: "ran",
+      collected: { queued: 1, problems: [] },
+      entries: [{ result: "would", requestId: `ndx:ndx:${TASK}:run-started`, call: { args: { workItemId: "WM-2" } } }],
+    });
+    expect(await (await tick()).json()).toMatchObject({ entries: [], collected: { queued: 0 } });
   });
 
   it("is off with web.sidecar", async () => {

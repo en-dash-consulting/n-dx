@@ -19,7 +19,7 @@
  * here and are never overridden by a value.
  */
 
-import type { TrackerEvent, TrackerMapping } from "./server-profiles.js";
+import type { FactSource, TrackerEvent, TrackerMapping } from "./server-profiles.js";
 import type { TrackerRuleMode, TrackerSyncConfig } from "./sync-config.js";
 
 export type TrackerRuleKind = "create" | "move" | "blocked";
@@ -42,6 +42,11 @@ export interface TrackerEventRecord {
   ref?: string;
   /** Input values the collector already knows, by property (dotted for nested). */
   values?: Record<string, unknown>;
+  /**
+   * What the event itself says, by fact source (`pr-url`, `release`,
+   * `run-diagnosis`), for the profile's facts to draw on; not sent as is.
+   */
+  sources?: Partial<Record<FactSource, string>>;
 }
 
 export interface PlannedCall {

@@ -50,6 +50,8 @@ import { ndxCliLister } from "./extensions.js";
 import type { ListExtensions } from "./extensions.js";
 import type { SidecarManagerOptions } from "./sidecars.js";
 import { HubSessionHostPicker } from "./session-host.js";
+import { proxiedTickPost, TrackerSyncClock } from "./tracker-sync.js";
+import type { TrackerSyncClockOptions } from "./tracker-sync.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 
 export const DEFAULT_HUB_PORT = 3117;
@@ -116,6 +118,8 @@ export interface HubOptions {
   listExtensions?: ListExtensions;
   /** Overrides for the {@link FrameKeys} store (tests inject the clock). */
   frameKeys?: FrameKeyOptions;
+  /** Overrides for the tracker sync clock (tests inject the interval, the clock and `post`). */
+  trackerSync?: Partial<Omit<TrackerSyncClockOptions, "projects">>;
   log?: (message: string) => void;
 }
 
@@ -269,6 +273,8 @@ export class Hub {
   readonly listExtensions: ListExtensions;
   /** Keys a Sidecar drawer tab is served through at `/x/<name>/~f/<key>/`; memory only. */
   readonly frameKeys: FrameKeys;
+  /** Ticks tracker sync on each project with a rule on, after each health check. */
+  readonly trackerSync: TrackerSyncClock;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -320,6 +326,12 @@ export class Hub {
       ...options.sidecars,
     });
     this.frameKeys = new FrameKeys(options.frameKeys);
+    this.trackerSync = new TrackerSyncClock({
+      post: proxiedTickPost(() => this.port, this.token),
+      log: this.log,
+      ...options.trackerSync,
+      projects: () => this.listProjects(),
+    });
     this.listExtensions = options.listExtensions
       ?? (options.ndxCli ? ndxCliLister(options.ndxCli, this.hubHome) : async () => ({ ok: false, error: NO_NDX_CLI }));
   }
@@ -686,9 +698,11 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   }
 
   await hub.attachAll();
+  // Tracker sync follows health: a tick goes only to a server just seen healthy.
+  void hub.trackerSync.sweep();
 
   const healthTimer = setInterval(() => {
-    void hub.healthCheckAll();
+    void hub.healthCheckAll().then(() => hub.trackerSync.sweep());
   }, healthIntervalMs);
   healthTimer.unref();
   const sidecarTimer = setInterval(() => {
