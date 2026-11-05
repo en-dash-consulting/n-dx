@@ -76,8 +76,8 @@ wire name, after the broker's own tools. A hub session gets none.
   tool (only the connection it names), so a slow server never holds up the
   broker's own tools or another connection's calls. Without connections the
   request path is as before.
-- **One per project.** The routes keep one `ConnectionService` per project for
-  the server's life; a connection added to `.n-dx.local.json` takes effect on
+- **One per project.** The server keeps one `ConnectionService` per project for
+  its life (`workspaceConnectionService`); a connection added to `.n-dx.local.json` takes effect on
   restart until the Settings page manages connections.
 - **Vendors.** The broker is the only MCP server a Sidecar spawn names, so an
   external server never reaches a vendor's own MCP config. The external tools
@@ -86,6 +86,35 @@ wire name, after the broker's own tools. A hub session gets none.
   the SDK client. Claude's spawn is given that endpoint (`--mcp-config`).
   Codex's spawn does not name the broker yet, so a Codex session has neither
   the broker's tools nor the external ones until it does.
+
+## Settings and sign-in
+
+`routes-connections.ts` serves Settings > Project, which shows a Connections
+section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
+
+| Route | Answer |
+|-------|--------|
+| `GET /api/connections` | `{ connections }`: id, label, transport, auth, state, reason, tool count |
+| `POST /api/connections/:id/oauth/start` `{ redirectUrl }` | `{ authorizationUrl }` |
+| `POST /api/connections/:id/oauth/finish` `{ code, state }` | `{ connection }` |
+| `POST /api/connections/:id/sign-out` | `{ connection }` |
+
+- **Never public.** Every route needs the per-user token or a browser session,
+  directly and through the hub; `web.sidecar` gates the family
+  (`route-feature-gates.ts`), because listing a connection connects it. No
+  answer carries a token, refresh token, code or fingerprint.
+- **The return is a page, not a route.** Sign in sends the tab (the same tab,
+  whose `sessionStorage` holds the session) to the authorization URL, which
+  returns to `<origin><base>/project?connection=<id>`, under the hub's `/p/<id>/`
+  when the page is. That address is the public page shell and the server acts
+  on nothing in its query. The page removes `connection`, `code` and `state`
+  from the address bar, then posts the code and state to `oauth/finish` with
+  its session in the header, and shows the result above the list.
+- **Loopback only.** `oauth/start` refuses a `redirectUrl` that is not http(s)
+  on `127.0.0.1`, `localhost` or `[::1]`, or that carries credentials or a
+  fragment.
+- **One service per project.** The routes and the broker share
+  `workspaceConnectionService`, so a sign-in reaches the next Sidecar turn.
 
 ## Decisions
 

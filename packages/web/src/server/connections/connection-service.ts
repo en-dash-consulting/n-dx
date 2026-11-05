@@ -67,6 +67,8 @@ export interface ConnectionInfo {
   transport: ConnectionConfig["transport"];
   auth: ConnectionConfig["auth"];
   status: ConnectionState;
+  /** How many tools it offers: those listed while connected, kept while unavailable. */
+  tools: number;
 }
 
 /** One external tool, as the broker offers it. */
@@ -190,13 +192,13 @@ export class ConnectionService {
   /** Every connection with its state, connecting any that is not live. */
   async listConnections(): Promise<ConnectionInfo[]> {
     await Promise.all([...this.slots.values()].map((slot) => this.ensure(slot)));
-    return [...this.slots.values()].map(({ config, status }) => ({
-      id: config.id,
-      label: config.label,
-      transport: config.transport,
-      auth: config.auth,
-      status,
-    }));
+    return [...this.slots.values()].map((slot) => this.info(slot));
+  }
+
+  /** One connection with its state, without connecting it; undefined for an unknown id. */
+  connection(id: string): ConnectionInfo | undefined {
+    const slot = this.slots.get(id);
+    return slot ? this.info(slot) : undefined;
   }
 
   /** Whether any connection is declared. */
@@ -307,6 +309,17 @@ export class ConnectionService {
       return live ? [live] : [];
     });
     await Promise.all(lives.map((live) => live.client.close().catch(() => undefined)));
+  }
+
+  private info({ config, status, live, known }: Slot): ConnectionInfo {
+    return {
+      id: config.id,
+      label: config.label,
+      transport: config.transport,
+      auth: config.auth,
+      status,
+      tools: (live?.tools ?? known ?? []).length,
+    };
   }
 
   private oauthConfig(connection: string): HttpConnectionConfig {
@@ -521,4 +534,21 @@ export class ConnectionService {
     this.warnedNames.add(message);
     this.warn(message);
   }
+}
+
+const workspaceServices = new Map<string, ConnectionService>();
+
+/**
+ * The workspace's connections, read from its `.n-dx.local.json` on first use
+ * and kept for the server's life: one service per workspace, shared by the
+ * Sidecar broker and the connections routes, so a sign-in reaches the broker.
+ * A connection added later needs a restart until the Settings page manages them.
+ */
+export function workspaceConnectionService(projectDir: string): ConnectionService {
+  let service = workspaceServices.get(projectDir);
+  if (!service) {
+    service = new ConnectionService({ projectDir });
+    workspaceServices.set(projectDir, service);
+  }
+  return service;
 }

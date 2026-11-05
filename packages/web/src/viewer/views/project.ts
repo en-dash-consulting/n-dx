@@ -1,7 +1,7 @@
 /**
  * Project — the settings page for what belongs to the project rather than to a
- * command: analyze and plan settings, and feature flags. One SettingsFrame for
- * all of it.
+ * command: analyze and plan settings, feature flags and, while the Sidecar is
+ * on, its connections. One SettingsFrame for all of it.
  *
  * Exactly one frame for the whole page: the leave guard holds a single
  * module-level registration, and unmounting any frame clears it, so a frame
@@ -19,9 +19,10 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { ProjectSettingsSection, useProjectSettingsForm } from "./project-settings.js";
 import { FeatureTogglesSection, useFeatureTogglesForm } from "./feature-toggles.js";
+import { ConnectionsSection } from "./connections.js";
 
 /** What the page needs from one section's form. */
 interface SettingsPart {
@@ -43,6 +44,7 @@ function Section({ id, title, children }: { id: string; title: string; children?
 
 export function ProjectView() {
   const cliName = useCliName();
+  const sidecarOn = useFeatureToggle("web.sidecar", false);
 
   const settings = useProjectSettingsForm();
   const features = useFeatureTogglesForm();
@@ -114,6 +116,13 @@ export function ProjectView() {
         ),
         h(FeatureTogglesSection, { form: features }),
       ),
+
+      // Read-only: nothing here makes the page dirty. Only the Sidecar uses connections.
+      sidecarOn
+        ? h(Section, { id: "connections", title: "Connections" },
+          h(ConnectionsSection, null),
+        )
+        : null,
     ),
   );
 }

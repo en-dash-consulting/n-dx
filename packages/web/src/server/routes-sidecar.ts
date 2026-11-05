@@ -79,10 +79,10 @@ import { SIDECAR_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-
 import { estimateCostFromTotals, prdLayout, type CostEstimate } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
+import { errorMessage, errorResponse, jsonResponse, readJsonObject } from "./response-utils.js";
 import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/broker-credential.js";
 import { handleBrokerMcpRequest, type BrokerConnections } from "./sidecar/broker-mcp.js";
-import { ConnectionService } from "./connections/connection-service.js";
+import { workspaceConnectionService } from "./connections/connection-service.js";
 import type { BrokerScope } from "./sidecar/broker-policy.js";
 import { createHubActions } from "./sidecar/hub-actions.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
@@ -281,7 +281,7 @@ export interface SidecarRouteOptions {
   actionsFor?: (ctx: ServerContext) => SidecarActions;
   /**
    * The servers the operator connected, whose tools a worktree session's
-   * broker re-exposes. Defaults to one {@link ConnectionService} per
+   * broker re-exposes. Defaults to {@link workspaceConnectionService}, one per
    * directory over its `.n-dx.local.json`, kept for the server's life.
    */
   connectionsFor?: (projectDir: string) => BrokerConnections;
@@ -535,21 +535,6 @@ export function hubTurnSpendRecorder(ctx: ServerContext, homeDir?: string): NonN
 
 const registries = new Map<string, SidecarSessionRegistry>();
 const brokers = new Map<string, SidecarBroker>();
-const connectionServices = new Map<string, ConnectionService>();
-
-/**
- * The workspace's connections, read from its `.n-dx.local.json` on first use
- * and kept for the server's life: a connection added later needs a restart
- * until the Settings page manages them.
- */
-function defaultConnectionsFor(projectDir: string): ConnectionService {
-  let service = connectionServices.get(projectDir);
-  if (!service) {
-    service = new ConnectionService({ projectDir });
-    connectionServices.set(projectDir, service);
-  }
-  return service;
-}
 
 function defaultRegistryFor(ctx: ServerContext, workspaces: SidecarWorkspaces | undefined): SidecarSessionRegistry {
   let registry = registries.get(ctx.projectDir);
@@ -632,23 +617,6 @@ export const CODEX_SIDECAR_UNAVAILABLE =
 function refuse(res: ServerResponse, status: number, message: string): true {
   errorResponse(res, status, message);
   return true;
-}
-
-/** The body as a JSON object (empty body: `{}`), else the reason it is not one. */
-async function readJsonObject(
-  req: IncomingMessage,
-  res: ServerResponse,
-): Promise<Record<string, unknown> | string> {
-  let parsed: unknown;
-  try {
-    const body = await readBody(req, res);
-    parsed = body.trim() ? JSON.parse(body) : {};
-  } catch (err) {
-    return `Invalid request body: ${errorMessage(err)}`;
-  }
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : "Request body must be a JSON object";
 }
 
 function optionalString(body: Record<string, unknown>, key: string): string | undefined | Error {
@@ -1294,7 +1262,7 @@ export async function handleSidecarRoute(
     broker,
     broadcast,
     actions: () => (opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces })),
-    connections: () => (opts.connectionsFor ? opts.connectionsFor(ctx.projectDir) : defaultConnectionsFor(ctx.projectDir)),
+    connections: () => (opts.connectionsFor ? opts.connectionsFor(ctx.projectDir) : workspaceConnectionService(ctx.projectDir)),
     create: (body) => createWorktreeSession(registry, ctx.projectDir, body),
     readPlacementEdit: (placement, edits, reviewed) => readPlacementEdit(ctx.rexDir, placement, edits, reviewed),
   });

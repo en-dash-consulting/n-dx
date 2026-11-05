@@ -105,6 +105,14 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
       "The Sidecar command job's status and stop routes too: only an approved Sidecar call starts that job, and the job tray skips a refused status.",
   },
   {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/connections",
+    reason:
+      "The operator's connections and their OAuth sign-in. Only the Sidecar uses them, and listing one connects it, " +
+      "which spawns a stdio server.",
+  },
+  {
     feature: "rex.placementDraft",
     // Documents the endpoint; it carries a change id, so no exact path matches
     // it here and routes-rex/placement.ts refuses with this module's body.

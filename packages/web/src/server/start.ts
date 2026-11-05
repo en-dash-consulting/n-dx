@@ -56,6 +56,7 @@ import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
+import { handleConnectionsRoute } from "./routes-connections.js";
 import {
   handleSidecarRoute,
   isHubSidecarPath,
@@ -929,6 +930,7 @@ async function handleApiRoutes(
     workspaces: sidecarWorkspacesOf(registry),
     hub: { drawerHtml: () => assets?.getHubSessionHtml() ?? null },
   }))) return true;
+  if (await handleScopedRoute(true, () => handleConnectionsRoute(req, res, ctx))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
   if (assets && handleStaticRoute(req, res, ctx, assets)) return true;
   return false;
