@@ -261,6 +261,21 @@ describe("a selected capability", () => {
     expect(onDocumentEscape).not.toHaveBeenCalled();
   });
 
+  it("closing the area on Plan with a capability selected gives Plan its address back", async () => {
+    stubRoutes({
+      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
+      [CAP_URL]: { layout: "v2", capability: DETAIL },
+    });
+    history.replaceState({ view: "plan" }, "", "/plan?x=1");
+    await mount(h(AreaInPlace, { slug: AREA_DETAIL_FIXTURE.slug, onOpenPage: vi.fn() }));
+    act(() => block().click());
+    await settle();
+    expect(location.pathname).toBe(areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, CAP_ID));
+    act(() => { render(null, root); });
+    expect(`${location.pathname}${location.search}`).toBe("/plan?x=1");
+    expect(history.state).toEqual({ view: "plan" });
+  });
+
   it("opened at the capability's address, selects it, and Esc goes back to the area's address", async () => {
     history.replaceState(null, "", areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, CAP_ID));
     stubRoutes({

@@ -71,7 +71,11 @@ export function useInPlaceAddress(path: string | null, restoreTo?: string): void
     const stateBefore: unknown = history.state;
     replaceAppHistory({ ...(stateBefore as object | null), [IN_PLACE]: path }, path);
     return () => {
-      if ((history.state as Record<string, unknown> | null)?.[IN_PLACE] === path) {
+      // An address nested under this one (a capability selected in the area)
+      // is undone with it: preact runs a parent's cleanup before its child's,
+      // so the nested one has not given this address back yet.
+      const current = (history.state as Record<string, unknown> | null)?.[IN_PLACE];
+      if (current === path || (typeof current === "string" && current.startsWith(`${path}/`))) {
         history.replaceState(stateBefore, "", locationBefore);
       }
     };
