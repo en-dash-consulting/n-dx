@@ -14,7 +14,7 @@ import type { ChangeApply, ChangeRow, ChangeStage } from "../../../src/viewer/vi
 const ID = "c1";
 
 function row(stage: ChangeStage): ChangeRow {
-  return { id: ID, title: "Add Apple Pay", stage, amends: [], touches: [], taskCount: 1, completedTaskCount: 1 };
+  return { id: ID, title: "Add Apple Pay", stage, amends: [], touches: [], taskCount: 1, completedTaskCount: 1, criteriaGap: false, openBlockers: 0 };
 }
 
 const PREVIEW: ChangeApply = {
