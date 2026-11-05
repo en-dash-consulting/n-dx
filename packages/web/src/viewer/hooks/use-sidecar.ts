@@ -509,6 +509,10 @@ export interface SidecarState {
    */
   chooseAgent: (vendor: string, model?: string) => Promise<void>;
   send: (prompt: string) => Promise<boolean>;
+  /** Start a new session on the current agent and attachment and follow it; false, with the error set, when the server refuses. */
+  newSession: () => Promise<boolean>;
+  /** Put a message on the drawer's error line. */
+  reportError: (message: string) => void;
   stop: () => Promise<void>;
   /**
    * The page item attached as the session's target, and the lens it asks
@@ -811,6 +815,19 @@ export function useSidecar(
     }
   }, [createSession, fetchFrames]);
 
+  const newSession = useCallback(async (): Promise<boolean> => {
+    setSending(true);
+    setError(null);
+    try {
+      const vendor = endpointRef.current.fixed?.vendor ?? await defaultVendor();
+      return (await createSession(pickedRef.current ?? { vendor, model: "" })) !== null;
+    } finally {
+      if (mountedRef.current) setSending(false);
+    }
+  }, [createSession]);
+
+  const reportError = useCallback((message: string) => setError(message), []);
+
   const stop = useCallback(async () => {
     const id = tailRef.current.sessionId;
     if (!id) return;
@@ -918,7 +935,7 @@ export function useSidecar(
   return {
     session, frames, running, sending, waiting, sessionWaiting, cards, commandManifest, decide,
     readOnly: session?.endedAt !== undefined, sessions, openSession,
-    lastTurn, error, agent, catalog, chooseAgent, send, stop, attachment,
+    lastTurn, error, agent, catalog, chooseAgent, send, newSession, reportError, stop, attachment,
   };
 }
 

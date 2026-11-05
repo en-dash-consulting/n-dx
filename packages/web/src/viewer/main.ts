@@ -1,6 +1,6 @@
 import { h, render, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
+import { useState, useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import type { DetailItem, ViewId } from "./types.js";
 import { ALL_DATA_FILES } from "./external.js";
 import {
@@ -31,7 +31,7 @@ import {
   SidecarDock,
   PlaceWithSidecarContext,
   PlanWithSidecarContext,
-  planFirstTurnReady,
+  planFirstTurn,
   DescribeInSidecarContext,
   DiagnoseInSidecarContext,
   GhostCardsContext,
@@ -214,17 +214,28 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const { sidecar, drawer } = sidecarShell;
   useEffect(() => {
     if (planText === null || !planWith) return;
-    if (!planFirstTurnReady({
+    const next = planFirstTurn({
       drawerOpen: drawer.open,
       ready: sidecar.attachment.ready,
       lens: sidecar.attachment.lens.running,
       busy: sidecar.running || sidecar.sending,
       session: sidecar.session,
       area: planWith.area,
-    })) return;
+      error: sidecar.error,
+    });
+    if (next.action === "wait") return;
+    if (next.action === "new-session") {
+      // The open session has ended: the first turn goes to a fresh one. Once per click.
+      if (planSessionStarted.current) return;
+      planSessionStarted.current = true;
+      void sidecar.newSession().then((ok) => { if (!ok) setPlanText(null); });
+      return;
+    }
     setPlanText(null);
-    void sidecar.send(planText);
-  }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending]);
+    if (next.action === "fail") sidecar.reportError(next.reason);
+    else void sidecar.send(planText);
+  }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending, sidecar.error]);
+  const planSessionStarted = useRef(false);
   // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar". A change sent to
   // Place or a run sent to Diagnose would outrank the Plan lens, so a click lets both go.
   const planWithSidecar = useMemo(
@@ -234,6 +245,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
         setDiagnoseTask(null);
         setDescribeChange(null);
         setPlanWith((prev) => ({ area: area ?? null, seq: (prev?.seq ?? 0) + 1 }));
+        planSessionStarted.current = false;
         setPlanText(text);
         showSidecar();
       },

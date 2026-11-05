@@ -28,18 +28,35 @@ export interface PlanFirstTurnState {
   session: { endedAt?: string; lens?: string; target?: { ref?: string } } | null;
   /** The area the capture targets; null for the whole plan. */
   area: string | null;
+  /** The drawer's error line: set when the PATCH re-lensing the open session failed. */
+  error: string | null;
 }
+
+/** What to do with the waiting text. */
+export type PlanFirstTurn =
+  | { action: "wait" }
+  | { action: "send" }
+  /** The open session has ended: start a new one on the Plan lens, then send. */
+  | { action: "new-session" }
+  /** The turn cannot go; say why and drop the text. */
+  | { action: "fail"; reason: string };
 
 /**
  * The text goes once the attachment runs Plan and the open session (when
  * there is one) has followed it to Plan and the target. Before that the turn
- * would open with the old lens or target.
+ * would open with the old lens or target. When it can never get there (the
+ * lens is unavailable, or the session refused to follow) the answer is a
+ * reason, not a wait.
  */
-export function planFirstTurnReady(s: PlanFirstTurnState): boolean {
-  if (!s.drawerOpen || !s.ready || s.busy || s.lens !== "plan") return false;
+export function planFirstTurn(s: PlanFirstTurnState): PlanFirstTurn {
+  if (!s.drawerOpen || !s.ready || s.busy) return { action: "wait" };
+  if (s.lens !== "plan") return { action: "fail", reason: "Plan with Sidecar could not start: the Plan lens is not available." };
   const held = s.session;
-  if (!held) return true;
-  return !held.endedAt && held.lens === "plan" && (held.target?.ref ?? "") === (s.area ?? "");
+  if (!held) return { action: "send" };
+  if (held.endedAt) return { action: "new-session" };
+  if (held.lens === "plan" && (held.target?.ref ?? "") === (s.area ?? "")) return { action: "send" };
+  if (s.error) return { action: "fail", reason: `Plan with Sidecar could not start: ${s.error}` };
+  return { action: "wait" };
 }
 
 /** Null while `web.sidecar` is off. */

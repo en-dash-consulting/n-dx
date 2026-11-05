@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { PlanWithSidecarButton, PlanWithSidecarContext, planFirstTurnReady } from "../../../src/viewer/components/plan-with-sidecar.js";
+import { PlanWithSidecarButton, PlanWithSidecarContext, planFirstTurn } from "../../../src/viewer/components/plan-with-sidecar.js";
 import { SmartAddInput } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
 import { pageItemFor, pageItemKey, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 
@@ -94,27 +94,40 @@ describe("Plan with Sidecar attachment", () => {
 });
 
 describe("Plan with Sidecar first turn", () => {
-  const base = { drawerOpen: true, ready: true, lens: "plan", busy: false, session: null, area: null };
+  const base = { drawerOpen: true, ready: true, lens: "plan", busy: false, session: null, area: null, error: null };
+  const wait = { action: "wait" };
+  const send = { action: "send" };
 
   it("goes at once when there is no session yet", () => {
-    expect(planFirstTurnReady(base)).toBe(true);
+    expect(planFirstTurn(base)).toEqual(send);
   });
 
   it("waits for the drawer, the registry and an idle session", () => {
-    expect(planFirstTurnReady({ ...base, drawerOpen: false })).toBe(false);
-    expect(planFirstTurnReady({ ...base, ready: false })).toBe(false);
-    expect(planFirstTurnReady({ ...base, busy: true })).toBe(false);
+    expect(planFirstTurn({ ...base, drawerOpen: false })).toEqual(wait);
+    expect(planFirstTurn({ ...base, ready: false })).toEqual(wait);
+    expect(planFirstTurn({ ...base, busy: true })).toEqual(wait);
   });
 
-  it("waits while the attachment runs another lens", () => {
-    expect(planFirstTurnReady({ ...base, lens: "general" })).toBe(false);
+  it("says why when the registry reports the Plan lens unavailable", () => {
+    const next = planFirstTurn({ ...base, lens: "general" });
+    expect(next).toMatchObject({ action: "fail" });
+    expect((next as { reason: string }).reason).toContain("Plan lens is not available");
   });
 
   it("waits until the open session has followed to the Plan lens and the area", () => {
     const area = "area-1";
-    expect(planFirstTurnReady({ ...base, area, session: { lens: "general" } })).toBe(false);
-    expect(planFirstTurnReady({ ...base, area, session: { lens: "plan" } })).toBe(false);
-    expect(planFirstTurnReady({ ...base, area, session: { lens: "plan", target: { ref: area } } })).toBe(true);
-    expect(planFirstTurnReady({ ...base, session: { lens: "plan", target: { ref: area } } })).toBe(false);
+    expect(planFirstTurn({ ...base, area, session: { lens: "general" } })).toEqual(wait);
+    expect(planFirstTurn({ ...base, area, session: { lens: "plan" } })).toEqual(wait);
+    expect(planFirstTurn({ ...base, area, session: { lens: "plan", target: { ref: area } } })).toEqual(send);
+    expect(planFirstTurn({ ...base, session: { lens: "plan", target: { ref: area } } })).toEqual(wait);
+  });
+
+  it("starts a new session when the open one has ended", () => {
+    expect(planFirstTurn({ ...base, session: { lens: "plan", endedAt: "2026-11-05T00:00:00Z" } })).toEqual({ action: "new-session" });
+  });
+
+  it("says why when the open session could not follow the attachment", () => {
+    const next = planFirstTurn({ ...base, session: { lens: "general" }, error: "Request failed (500)" });
+    expect(next).toEqual({ action: "fail", reason: "Plan with Sidecar could not start: Request failed (500)" });
   });
 });

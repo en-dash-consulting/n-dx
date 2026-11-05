@@ -126,7 +126,7 @@ export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
 export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
 export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
 export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
-export { PlanWithSidecarContext, PlanWithSidecarButton, planFirstTurnReady } from "./plan-with-sidecar.js";
+export { PlanWithSidecarContext, PlanWithSidecarButton, planFirstTurn } from "./plan-with-sidecar.js";
 export type { PlanWithSidecar } from "./plan-with-sidecar.js";
 export { DescribeInSidecarContext, DescribeInSidecarButton } from "./describe-in-sidecar.js";
 export type { DescribeInSidecar } from "./describe-in-sidecar.js";
