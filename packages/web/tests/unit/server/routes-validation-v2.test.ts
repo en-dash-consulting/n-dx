@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cp, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -66,6 +66,20 @@ describe("GET /api/rex/validate on a v2 tree", () => {
     const body = await validate();
     expect(body.checks.find((c) => c.name === "release plans")).toMatchObject({ pass: true, errors: [] });
     expect(Number.isNaN(Date.parse(body.ranAt))).toBe(false);
+  });
+
+  it("fails only the release-plans check, and keeps the others, when the v2 tree cannot be read", async () => {
+    const header = join(tmpDir, ".rex", "product", "index.md");
+    await writeFile(header, (await readFile(header, "utf-8")).replace('schema: "rex/v2"', 'schema: "rex/v99"'));
+    const res = await fetch(`${base}/api/rex/validate`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Awaited<ReturnType<typeof validate>>;
+    const check = body.checks.find((c) => c.name === "release plans")!;
+    expect(check.pass).toBe(false);
+    expect(check.severity).toBeUndefined();
+    expect(check.errors[0]!.message).toContain("Could not read the v2 tree");
+    expect(body.checks.find((c) => c.name === "blockedBy cycles")).toMatchObject({ pass: true });
+    expect(body.ok).toBe(false);
   });
 
   it("warns, without failing, for an open change planned for a shipped release", async () => {

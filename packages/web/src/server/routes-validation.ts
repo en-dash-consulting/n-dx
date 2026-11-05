@@ -496,9 +496,13 @@ export function handleValidationRoute(
             errors: stale.map((f) => ({ message: f.message, itemId: f.nodeId })),
           });
         } catch (err) {
-          // An unreadable tree must not read as "no stale plans".
-          errorResponse(res, 500, (err as Error).message);
-          return true;
+          // An unreadable tree must not read as "no stale plans", nor take the
+          // other checks down with it: the check fails and says why.
+          extra.push({
+            name: "release plans",
+            pass: false,
+            errors: [{ message: `Could not read the v2 tree: ${(err as Error).message}` }],
+          });
         }
       }
       jsonResponse(res, 200, { ...runValidation(doc.items, extra), ranAt: new Date().toISOString() });
