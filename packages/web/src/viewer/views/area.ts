@@ -150,6 +150,13 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
   const [capturing, setCapturing] = useState(false);
   const openChange = navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined;
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
+  // A selection the loaded area does not list (a display id or alias in the
+  // address, or a capability retired since) is no selection: clearing it also
+  // gives the address back to the area's.
+  const listed = selectedId === null || load.state !== "ready" || load.data.capabilities.some((c) => c.id === selectedId);
+  useEffect(() => {
+    if (!listed) setSelectedId(null);
+  }, [listed]);
   const back = onBack
     ? h("button", { type: "button", class: "cap-back", onClick: onBack }, "Product")
     : null;

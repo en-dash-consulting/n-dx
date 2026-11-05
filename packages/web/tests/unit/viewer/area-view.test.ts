@@ -290,4 +290,33 @@ describe("a selected capability", () => {
     pressEscape(root.querySelector(".area-capability")!);
     expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
   });
+
+  it("opened at an address naming a capability the area does not list, shows the cards at the area's address", async () => {
+    history.replaceState(null, "", areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, "A1.1"));
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug, initialCapabilityId: "A1.1" }));
+    await settle();
+    // Clearing the selection is a second render, after the read's own.
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    expect(root.querySelector(".area-capability")).toBeNull();
+    expect(root.querySelector(".area-cards")).not.toBeNull();
+    expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+  });
+
+  it("clears the selection and the address when a refresh stops listing the capability", async () => {
+    await open();
+    act(() => block().click());
+    await settle();
+    expect(location.pathname).toBe(areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, CAP_ID));
+    const retired = { ...AREA_DETAIL_FIXTURE, capabilities: AREA_DETAIL_FIXTURE.capabilities.slice(1) };
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: retired }, [CAP_URL]: { layout: "v2", capability: DETAIL } });
+    const { createWSPipeline } = await import("../../../src/viewer/hooks/use-gateway.js");
+    // Every live read subscribes; the batch reaches them all, as the socket's would.
+    const flushes = vi.mocked(createWSPipeline).mock.calls.map(([o]) => (o as { onFlush: (batch: { types: Set<string> }) => void }).onFlush);
+    act(() => { for (const flush of flushes) flush({ types: new Set(["rex:prd-changed"]) }); });
+    await settle();
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    expect(root.querySelector(".area-capability")).toBeNull();
+    expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+  });
 });
