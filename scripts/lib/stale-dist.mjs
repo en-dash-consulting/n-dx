@@ -17,69 +17,18 @@
  *    stamp from the earlier full build still matches.
  */
 
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { BUILD_STAMP_FILE, isBuildCurrent, sourceHash } from "../../packages/core/build-identity.mjs";
 
-/** Source extensions that a build turns into dist/ output. */
-export const SOURCE_EXTENSIONS = /\.(ts|tsx|js|jsx|mts|cts)$/;
-
-/** File name of the stamp inside a package's dist/. */
-export const BUILD_STAMP_FILE = ".build-stamp.json";
-
-/**
- * Source files under `dir` that a build compiles, as sorted absolute paths.
- * Skips node_modules and nested dist so vendored or generated files never
- * masquerade as sources.
- */
-function sourceFiles(dir) {
-  const out = [];
-  const walk = (current) => {
-    let entries;
-    try {
-      entries = readdirSync(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name === "node_modules" || entry.name === "dist") continue;
-      const full = join(current, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (SOURCE_EXTENSIONS.test(entry.name)) out.push(full);
-    }
-  };
-  if (existsSync(dir)) walk(dir);
-  return out.sort();
-}
-
-/** Hash of every compiled source file's path and content under `srcDir`. */
-export function sourceHash(srcDir) {
-  const hash = createHash("sha256");
-  for (const file of sourceFiles(srcDir)) {
-    hash.update(relative(srcDir, file).split(sep).join("/"));
-    hash.update("\0");
-    hash.update(readFileSync(file));
-    hash.update("\0");
-  }
-  return hash.digest("hex");
-}
+// The hash and the stamp format are defined once, in core, because `ndx start`
+// reads them at run time too (a source-linked install warns when the web
+// package's dist/ lags its source). Re-exported so the gates keep one import.
+export { BUILD_STAMP_FILE, SOURCE_EXTENSIONS, isBuildCurrent, sourceHash } from "../../packages/core/build-identity.mjs";
 
 /** Record that `distDir` was fully built from the current content of `srcDir`. */
 export function writeBuildStamp(srcDir, distDir) {
   writeFileSync(join(distDir, BUILD_STAMP_FILE), JSON.stringify({ sourceHash: sourceHash(srcDir) }) + "\n");
-}
-
-/**
- * Whether `distDir` is a build of the current `srcDir`: false when the stamp is
- * missing, unreadable, or records different source content.
- */
-export function isBuildCurrent(srcDir, distDir) {
-  try {
-    const stamp = JSON.parse(readFileSync(join(distDir, BUILD_STAMP_FILE), "utf8"));
-    return stamp.sourceHash === sourceHash(srcDir);
-  } catch {
-    return false;
-  }
 }
 
 /**

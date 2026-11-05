@@ -22,6 +22,7 @@ const NDX_BIN = join(WEB_PKG, "dist/cli/index.js");
 
 let home: string;
 let repo: string;
+let repoB: string;
 let hub: HubHandle;
 let token: string;
 let tokenFile: string;
@@ -52,6 +53,7 @@ beforeAll(async () => {
   assertFreshServerBuild();
   home = mkdtempSync(join(tmpdir(), "ndx-hub-auth-home-"));
   repo = mkdtempSync(join(tmpdir(), "ndx-hub-auth-repo-"));
+  repoB = mkdtempSync(join(tmpdir(), "ndx-hub-auth-repo-b-"));
   tokenFile = join(home, "auth.token");
   hub = await startHub({ port: 0, selfBin: NDX_BIN, homeDir: home, tokenFile, healthIntervalMs: 60_000, supervisor: { portFileTimeoutMs: 30_000, stopGraceMs: 3_000 } });
   token = readFileSync(tokenFile, "utf-8").trim();
@@ -60,7 +62,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await hub?.close({ stopChildren: true });
   // Retry: on Windows a stopped child's handles on the repo dir are not always released when close() resolves (EBUSY).
-  for (const dir of [home, repo]) await removeTempDir(dir);
+  for (const dir of [home, repo, repoB]) await removeTempDir(dir);
 }, 30_000);
 
 describe("hub with a per-user token", () => {
@@ -211,4 +213,29 @@ describe("hub with a per-user token", () => {
     expect(await wsHandshake(`/p/alpha/?ndx_ticket=${ticket}`, "")).toMatch(/^HTTP\/1\.1 401/);
     expect(await wsHandshake("/p/alpha/", `X-Ndx-Token: ${token}\r\n`)).toMatch(/^HTTP\/1\.1 101/);
   }, 30_000);
+
+  it("mints a landing nonce at the root with several projects registered, rather than proxying it (409)", async () => {
+    // A hub built before landing nonces sent the root request to its project
+    // proxy, which answers 409 once two projects are registered — and `ndx
+    // start` printed no sign-in link. The current hub answers it itself.
+    const res = await fetch(`${base()}/api/hub/projects`, withToken({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "beta", repoRoot: repoB, ndxBin: NDX_BIN }),
+    }));
+    expect([200, 201]).toContain(res.status);
+    const health = await (await fetch(`${base()}/api/hub/health`, withToken())).json();
+    expect(health.projects).toBeGreaterThanOrEqual(2);
+
+    const minted = await fetch(`${base()}/api/auth/nonce`, withToken({ method: "POST" }));
+    expect(minted.status).toBe(200);
+    expect(typeof (await minted.json()).nonce).toBe("string");
+  }, 60_000);
+
+  it("reports the build it runs on /api/hub/health, so ndx start can tell an older hub from its own", async () => {
+    const pkg = JSON.parse(readFileSync(join(WEB_PKG, "package.json"), "utf-8"));
+    const health = await (await fetch(`${base()}/api/hub/health`, withToken())).json();
+    expect(health.build.version).toBe(pkg.version);
+    expect(health.build).toHaveProperty("sourceHash");
+  });
 });

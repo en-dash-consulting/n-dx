@@ -152,6 +152,31 @@ describe("ndx start — per-user token (e2e)", { timeout: 180_000 }, () => {
     expect((await served.json()).projectDir).toBe(repo);
   });
 
+  it("a second project: status names the running hub it is not registered with, and start prints a sign-in link", async () => {
+    if (!canBindPorts) return;
+    const second = join(tmpRoot, "delta-app");
+    mkdirSync(second);
+    git(second, "init", "--quiet", "--initial-branch=main");
+    await setupRexDir(second, { project: "Delta App" });
+    git(second, "add", "-A");
+    git(second, "commit", "--quiet", "-m", "init");
+
+    // Before registering, the hub is this user's own process on the port —
+    // not "another process", and not "no server".
+    const before = runStart(["status", second]);
+    expect(before.code, before.stderr + before.stdout).toBe(0);
+    expect(before.stdout).toContain(`hub is running on port ${hubPort}`);
+    expect(before.stdout).toContain("not registered");
+    expect(before.stdout).not.toContain("another process");
+
+    // With two projects registered, the root nonce is the hub's own to mint;
+    // a hub that proxied it answered 409 and the link went missing.
+    const result = runStart([`--port=${hubPort}`, second]);
+    expect(result.code, result.stderr + result.stdout).toBe(0);
+    expect(result.stdout).toMatch(new RegExp(`http://127.0.0.1:${hubPort}/p/delta-app/\\?ndx_nonce=[A-Za-z0-9_%-]+`));
+    expect(result.stdout).not.toMatch(/no sign-in link|could not get a sign-in link/);
+  });
+
   it("ndx start status and stop still work: the CLI sends the token itself", async () => {
     if (!canBindPorts) return;
     const status = runStart(["status", repo]);
