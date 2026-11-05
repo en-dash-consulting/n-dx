@@ -22,6 +22,14 @@ describe("ownerOfFiles", () => {
     expect(ownerOfFiles(rules, ["docs/deep/guide.md"])).toBe("@docs");
   });
 
+  it("matches a leading **/ at the root and ? as one character", () => {
+    const more = parseCodeowners("*  @core\n**/build.mjs  @build\nv?.txt  @v\n");
+    expect(ownerOfFiles(more, ["build.mjs"])).toBe("@build");
+    expect(ownerOfFiles(more, ["scripts/deep/build.mjs"])).toBe("@build");
+    expect(ownerOfFiles(more, ["v1.txt"])).toBe("@v");
+    expect(ownerOfFiles(more, ["v12.txt"])).toBe("@core");
+  });
+
   it("treats a rule with no owner as un-owning its paths", () => {
     expect(ownerOfFiles(rules, ["packages/web/vendor/x.js"])).toBeUndefined();
   });

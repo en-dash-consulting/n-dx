@@ -25,9 +25,11 @@ function patternToRegExp(raw: string): RegExp {
   const body = raw.replace(/^\/+/, "").replace(/\/+$/, "");
   const source = body
     .split("/")
-    .map((segment) => (segment === "**" ? ".*" : segment.replace(/[.+^${}()|[\]\\?]/g, "\\$&").replace(/\*/g, "[^/]*")))
+    .map((segment) => (segment === "**" ? ".*" : segment.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]")))
     .join("/")
-    .replace(/\/\.\*\//g, "/(?:.*/)?");
+    .replace(/\/\.\*\//g, "/(?:.*/)?")
+    // A leading `**/` matches at the root as well as at any depth.
+    .replace(/^\.\*\//, "(?:.*/)?");
   const prefix = anchored ? "^" : "^(?:.*/)?";
   return new RegExp(`${prefix}${source}${directory ? "/.*" : "(?:/.*)?"}$`);
 }

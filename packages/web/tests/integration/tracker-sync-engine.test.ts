@@ -146,6 +146,17 @@ describe("cards", () => {
     expect(toolCalls()).toEqual([]);
   });
 
+  it("logs a move missing a required fact as a card naming it, and makes no call", async () => {
+    settings({ "pr-opened": "on" });
+    const { entries } = await tick({ ...prOpened, values: {} });
+    expect(entries).toEqual([expect.objectContaining({
+      rule: "move",
+      result: "card",
+      problems: [{ message: expect.stringContaining("missing reviewer") }],
+    })]);
+    expect(toolCalls()).toEqual([]);
+  });
+
   it("skips creation for an item that already links to a work item, and a move for one that links to none", async () => {
     settings({ "change-captured": "on", "run-started": "on" });
     const { entries } = await tick({ event: "change-captured", rexId: "rex-2", ref: "WM-9" }, { event: "run-started", rexId: "rex-3" });
