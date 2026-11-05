@@ -12,7 +12,8 @@ import { NODE_TYPES } from "../../src/rex-gateway.js";
 const KIND_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const FIELD_NAME = /^[a-z][A-Za-z0-9]*$/;
 const EDGE_NAME = /^(?:[a-z][a-z0-9]*(?:-[a-z0-9]+)*|[a-z][A-Za-z0-9]*)$/;
-const REQUIRED_LENSES = ["columns", "timeline", "coverage", "calendar", "blocks"];
+// No timeline: Graview lays one out in numbers (minutes of a day), and runs span dates, which are a calendar's.
+const REQUIRED_LENSES = ["columns", "coverage", "calendar", "blocks"];
 
 describe("n-dx.graview.json", () => {
   const doc = loadDocument();

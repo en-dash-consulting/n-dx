@@ -7,7 +7,7 @@
  * stays above without its places (`without: ["places"]`): the face switch,
  * Find, the standing and the person are its; the places are this rail's.
  */
-import { placesOf } from "@graview/core";
+import { placesOf } from "@graview/core/seat";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";

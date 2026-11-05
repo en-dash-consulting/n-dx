@@ -248,4 +248,18 @@ describe("two-way sync with rex as the system of record", () => {
     expect(door.rex.get(change.id)?.status).toBe(was);
     expect((store.graph.getNode(change.id) as unknown as Item).status).toBe(was);
   });
+
+  it("offers no act on a synced kind that rex could not take: no archive, merge or tidying, which would change the face and never reach rex", async () => {
+    const { store, change } = await setUp();
+    const other = (store.graph.nodesOfKind("change" as never) as unknown as Item[]).find((c) => c.id !== change.id)!;
+    for (const [name, args] of [
+      ["archive-change", { id: change.id }],
+      ["merge-change", { id: change.id, into: other.id }],
+      ["leave-alone-change", { id: change.id }],
+      ["archive-task", { id: change.id }],
+    ] as const) {
+      expect(() => store.apply({ name, args } as never, { author: SEAT }), name).toThrow();
+    }
+    expect(store.graph.getNode(change.id)).toBeTruthy();
+  });
 });

@@ -10,7 +10,8 @@ the rex tree, sourcevision's output and hench's run records.
 ndx graview emit .            # writes document.json and snapshot.json under the layout's graview dir
 ndx graview check .           # graview check on the emitted declaration
 ndx graview describe .        # a text readout of the graph, or one place with --place <slug>
-ndx graview serve .           # graview serve: the store over HTTP and its live WebSocket wire, for a Graview face to connect to
+ndx graview serve .           # the product face on the fresh projection; with --no-face, graview serve: the store over HTTP and its
+                              # live WebSocket wire, for a Graview face holding the key it prints (--allow-origin for another origin)
 ndx graview mcp .             # graview mcp --read-only: search_graph, get_node, describe_place, …
 ndx graview info .            # where the projection lands, which binary, and the hub's rex endpoint a face writes back through
 ```

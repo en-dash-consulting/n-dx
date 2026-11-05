@@ -5,7 +5,8 @@
 constraints), the change layer (changes, tasks, releases), the code
 (zones, components, files) and the work (agent runs, commits).
 Graview's declaration names every kind, field, relation, lens and rule once;
-`graview check` holds it, `graview serve` serves it to any Graview face,
+`graview check` holds it, `graview serve` serves it to a Graview face
+(holding the key it prints, since 0.1.59),
 `graview mcp` derives an agent tool surface from it. The face n-dx ships is
 `@n-dx/graview-face`, a separately published package that `ndx graview serve`
 runs when it is installed.
@@ -29,7 +30,9 @@ ndx graview describe .  →  emit, then  graview describe document.json --seed s
 ndx graview serve .     →  emit, then the product face's own server on the fresh projection
                            (or, with --no-face or no face installed: sync-seed the store, then
                            graview serve --data <graviewDir>/data, the store over HTTP plus its live
-                           WebSocket wire that a Graview face connects to)
+                           WebSocket wire that a Graview face connects to with the
+                           ?graview_key= the command prints; a face on another origin
+                           also needs --allow-origin <origin>)
 ndx graview mcp .       →  emit, sync-seed the store, then  graview mcp --read-only
 ```
 
@@ -130,13 +133,16 @@ projections of an unchanged checkout are byte-identical.
 | Lens | Over |
 |---|---|
 | `columns` "Changes by status" | changes in columns by `status` |
-| `timeline` "Runs" | runs by `startedAt`/`finishedAt` |
+| `calendar` "When runs ran" | runs spanning `startedAt` to `finishedAt`, a week at a time |
 | `coverage` "Where capabilities live in code" | capabilities × zones through `realizedIn` |
 | `calendar` "When changes closed" | changes by `completedAt` |
 | `blocks` "Needs attention" | the Inbox, blocked changes, defective capabilities |
 
 Graview's `board` and `plan` lenses are spatial (slots and regions) and do not
-fit this graph; the status board is the `columns` lens.
+fit this graph; the status board is the `columns` lens. Nor does a
+`timeline`: it lays spans out in numbers (minutes of a day), and since
+Graview 0.1.63 one over dates is `lens-cannot-draw`, so runs, which span
+dates, are a calendar.
 
 ## Two-way writes: where the RemoteSystem runs, and why
 

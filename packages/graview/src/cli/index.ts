@@ -82,7 +82,8 @@ function parse(argv: string[]): ParsedArgs {
     else if (arg.startsWith("-")) {
       passthrough.push(arg);
       // A flag's value: the next token when it is not a flag and the flag takes one.
-      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite"].includes(arg);
+      // The value flags of the graview subcommands this CLI passes on: check, describe, serve and mcp (graview 0.1.67).
+      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite", "--allow-origin", "--remote-url", "--views", "--face", "--previous"].includes(arg);
       if (takesValue && i + 1 < rest.length) passthrough.push(rest[++i]!);
     } else if (dir === undefined) dir = arg;
     else passthrough.push(arg);

@@ -468,6 +468,8 @@
       "plural": "Changes",
       "description": "A unit of intent: why something is changing, what it amends or touches, and when it is planned to ship.",
       "figure": "task",
+      "archives": false,
+      "tidying": "never",
       "label": "{title}",
       "glance": [
         "status",
@@ -713,6 +715,8 @@
       "plural": "Tasks",
       "description": "A piece of a change small enough to run: the unit ndx work picks up.",
       "figure": "task",
+      "archives": false,
+      "tidying": "never",
       "label": "{title}",
       "glance": [
         "status",
@@ -1327,14 +1331,16 @@
       }
     },
     {
-      "name": "timeline",
-      "title": "Runs, by outcome",
+      "name": "calendar",
+      "title": "When runs ran",
       "bindings": {
         "run": {
           "start": "startedAt",
-          "end": "finishedAt",
-          "column": "status"
+          "end": "finishedAt"
         }
+      },
+      "options": {
+        "range": "week"
       }
     },
     {

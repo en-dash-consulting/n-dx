@@ -34,7 +34,7 @@ export function pages(app: App) {
     if (!own.record.has(kind)) registry = registry.register(kind, "record", page(({ context }) => <KindRecord context={context} app={app} kind={kind} />));
   }
   registry = registry
-    // Our rail lists the places; the bar keeps the face switch, Find, the standing and the person.
+    // Our rail lists the places; the bar keeps Find, the standing and the person (the face switch sits in the app name's menu since Graview 0.1.66).
     .surface("shell", shell(app), { without: ["undo", "places"] })
     .surface("home", page(({ context }) => <HomeScreen context={context} app={app} />))
     .route("/attention", page(({ context }) => <AttentionScreen context={context} />))
