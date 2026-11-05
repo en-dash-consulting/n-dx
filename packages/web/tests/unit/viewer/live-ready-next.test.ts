@@ -48,6 +48,10 @@ describe("Live Ready next", () => {
     vi.stubGlobal("WebSocket", class { onmessage = null; onopen = null; onclose = null; close() {} });
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       urls.push(String(url));
+      // Live's Memory and Concurrency panels poll these; not under test here.
+      if (String(url).startsWith("/api/hench/memory") || String(url).startsWith("/api/hench/concurrency")) {
+        return { ok: false, status: 503, json: async () => ({}) };
+      }
       const body = String(url).startsWith("/api/features")
         ? { toggles: [{ key: "hench.readyNext", enabled: readyNext }] }
         : String(url).includes("/api/live")

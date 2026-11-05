@@ -46,10 +46,12 @@ items:
     lastModified: "2026-11-05T05:30:17.723Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3044e7b8-703d-48ae-a651-acf4fdad8305":
+    status: "completed"
     startedAt: "2026-11-05T08:16:11.213Z"
-    activeIntervals: [{"end":"2026-11-05T08:28:40.891Z","start":"2026-11-05T08:16:11.213Z"}]
-    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (28):\n- finds no NUL outside the known list\n- shows Ready next with each lane's command and reasons in place of Up next when on\n- tells every lane after the first to run in its own worktree, and lane 1 nothing\n- links each task title to its task, as Up next items do\n- tests/e2e/source-nul-bytes.test.js > tracked source holds no NUL byte > finds no NUL outside the known list\n  Error: ENOENT: no such file or directory, open '/Users/ryankeith/ndx-core/n-dx/.claude/worktrees/plan-lane-a/packages/web/src/viewer/components/throttle-controls.ts'\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n… and 20 more"
-    lastModified: "2026-11-05T08:28:41.457Z"
+    completedAt: "2026-11-05T08:43:21.588Z"
+    endedAt: "2026-11-05T08:43:21.588Z"
+    activeIntervals: [{"end":"2026-11-05T08:28:40.891Z","start":"2026-11-05T08:16:11.213Z"},{"end":"2026-11-05T08:43:21.588Z","start":"2026-11-05T08:33:04.405Z"}]
+    lastModified: "2026-11-05T08:43:23.782Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4416ae7e-eba6-4013-9ce8-5201a4b68a10":
     status: "completed"
