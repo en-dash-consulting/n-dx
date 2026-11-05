@@ -222,6 +222,16 @@ export function ndxDoor(): Plugin {
             res.setHeader("content-type", "text/html; charset=utf-8");
             res.setHeader("cache-control", "no-store");
             res.setHeader("x-ndx-iso-map", "1");
+            // Framed by this origin's pages only. The hub sets X-Frame-Options: DENY and frame-ancestors 'none'
+            // on everything it serves and keeps an upstream's own headers over them, so without these the face
+            // could not frame its map under /x/graview-face/; and under a bare `ndx graview serve` no other
+            // site may frame the map to steer it or probe which zones it draws. The map is self-contained:
+            // inline script and style, data and blob images, nothing fetched.
+            res.setHeader("x-frame-options", "SAMEORIGIN");
+            res.setHeader(
+              "content-security-policy",
+              "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+            );
             return void createReadStream(file).pipe(res);
           }
           if (graviewDir && (url === "/data/document.json" || url === "/data/snapshot.json")) {

@@ -65,6 +65,8 @@ function writeIsoMap(root: string, graviewDir: string, title: string, warn: Warn
     writeAtomically(path, renderIsoMap(buildIsoModel(input), { embed: true, title: `${title} — code map` }));
     return path;
   } catch (error) {
+    // The map on disk is of an earlier analysis, if any: take it away rather than frame it as this one.
+    rmSync(path, { force: true });
     warn?.(`The code map was not written: ${error instanceof Error ? error.message : String(error)}`);
     return undefined;
   }

@@ -174,6 +174,9 @@ describe("bin/serve.js with an explicitly injected project projection", () => {
       const map = await sidecarFetch(`${origin}${MOUNT}data/iso-map.html`);
       expect(map.status).toBe(200);
       expect(map.headers.get("x-ndx-iso-map")).toBe("1");
+      // Framed by this origin only: the hub's DENY would otherwise stand, and no other site may frame it.
+      expect(map.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+      expect(map.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
       expect(await map.text()).toContain('class="embed"');
     } finally {
       rmSync(join(scratch, "iso-map.html"), { force: true });
