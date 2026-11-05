@@ -5,6 +5,17 @@
 ## Features
 
 - **Plan as tiles** — after the capture bar, Plan lays out tiles: Product map (full width), Inbox, Open changes and Validation. Open changes carries two tabs: **List** (the Changes view) and **Tree** (the PRD tree, with Sidecar ghost rows). Select a tile to open it full-screen in place, with the detail panel beside it; **Open ↗** goes to the tile's own page. On a v1 project a Tasks tile stands in for the v2 tiles.
+- **Plan's glance panels** — three panels read from one fast summary route, `GET /api/rex/changes/summary`, so they load on large PRDs.
+  - **Lifecycle strip.** Under the capture bar, five counts in rex's change stages. Each opens the list it counts: Inbox opens the Inbox page, the rest open Open changes filtered to that stage.
+    - **Inbox** — changes awaiting placement.
+    - **Proposed** — placed changes that are not yet Ready.
+    - **Ready** — rex's `ready` flag: the change has an automated or metric requirement and no open blocker. A change becomes Ready by gaining such a requirement and clearing its blockers. At 0 the strip says "needs an automated requirement" (`rex ready` sets the flag).
+    - **In progress** — work has started.
+    - **Awaiting apply** — completed, but a steward has not yet applied its amendments to the product layer.
+
+    After the counts, **Next** shows rex's next pick: its title and why rex chose it, linking to Work with it selected. The strip never starts a run. On v1 it shows Pending and In progress only.
+  - **Product area map.** Full width under the strip: one block per area, sized by capability count and tinted by computed status (Met, Changing, Proposed, Defective; defective outranks the rest). A count marks open changes that touch the area. A block opens `/product/area/<slug>`; until the area view lands it opens the Product page at that area. Past 12 areas, the smallest fold into one `+N smaller areas` block.
+  - **Open-changes glance.** On the Open changes tile: placed open changes grouped by planned release (newest first, Unscheduled last), each with a progress bar, a stage chip and at most one gap chip — **Blocked**, else **No criteria**. A change with no tasks is not a gap on v2; it runs as its own unit. The glance shows 12 rows, then `N more`, which opens Open changes.
 - **SourceVision zone maps** — interactive visualization of architectural zones
 - **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage (see [The Changes page](#the-changes-page-v2)). Both pages appear in the navigation on a v2 project. On a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
 - **Unified MCP server** — single HTTP endpoint serving both Rex and SourceVision MCP tools
