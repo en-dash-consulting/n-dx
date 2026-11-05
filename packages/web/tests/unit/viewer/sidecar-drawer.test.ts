@@ -928,7 +928,7 @@ describe("tool calls", () => {
     server.frames = [call(1, "mcp__ndx-sidecar__fake__create_ticket", { title: "t" })];
     server.cards = [card("c1", 1, {
       tool: "external_call", kind: "external-call",
-      input: { connection: "fake", tool: "create_ticket", arguments: { title: "t" } },
+      input: { connection: "fake", tool: "fake.create_ticket", class: "write", arguments: { title: "t" } },
       externalCall: { label: "CAOS", inputSchema: {} },
     })];
     await mount();
@@ -938,6 +938,22 @@ describe("tool calls", () => {
     expect(tool.querySelector(".sidecar-tool-name")!.textContent).toBe("CAOS · create ticket");
     expect(tool.querySelector(".sidecar-tool-status")!.textContent).toBe("Waiting for you");
     expect(tool.querySelector(".sidecar-tool-dot")!.getAttribute("data-status")).toBe("waiting");
+  });
+
+  it("leaves a call that raised no card without one, so the next call keeps its own", async () => {
+    server.sessions = [{ session: session(), running: true }];
+    server.frames = [
+      // Allow-listed: ran without a card.
+      call(1, "mcp__ndx-sidecar__run_command", { argv: ["ndx", "status", "."] }),
+      result(2, "mcp__ndx-sidecar__run_command", "ok"),
+      call(3, "mcp__ndx-sidecar__run_command", { argv: ["pnpm", "test"] }),
+    ];
+    server.cards = [card("c1", 1, { input: { argv: ["pnpm", "test"] } })];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-status")!.textContent)).toEqual(["Done", "Waiting for you"]);
   });
 });
 

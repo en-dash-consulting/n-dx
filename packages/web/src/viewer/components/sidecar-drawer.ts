@@ -135,7 +135,7 @@ export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, To
 
 /**
  * The card each tool call raised, by the call's `seq`: the earliest card of
- * the same tool not yet claimed by an earlier call.
+ * the same tool and input not yet claimed by an earlier call.
  */
 export function pairToolCards<C extends ToolLineCard>(frames: readonly SidecarFrame[], cards: readonly C[]): Map<number, C> {
   const free = [...cards];
@@ -145,7 +145,7 @@ export function pairToolCards<C extends ToolLineCard>(frames: readonly SidecarFr
     const { event } = frame;
     if (event.type !== "tool_use" || !event.toolCall) continue;
     const parsed = parseToolName(event.toolCall.tool);
-    const index = free.findIndex((card) => cardIsForCall(card, parsed));
+    const index = free.findIndex((card) => cardIsForCall(card, parsed, event.toolCall!.input));
     if (index >= 0) paired.set(frame.seq, free.splice(index, 1)[0]!);
   }
   return paired;

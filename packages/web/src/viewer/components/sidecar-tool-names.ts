@@ -92,14 +92,39 @@ export interface ToolLineCard {
   status: "pending" | "approved" | "denied" | "withdrawn";
   carriedOut?: { ok: boolean };
   externalCall?: { label: string };
+  /** The operator edited the call before approving it, so its input no longer matches the agent's. */
+  edited?: true;
 }
 
-/** Whether a card is the one a call raised: the broker tool by name, an external call by connection and tool. */
-export function cardIsForCall(card: Pick<ToolLineCard, "tool" | "input">, parsed: ParsedToolName): boolean {
-  if (parsed.broker) return card.tool === parsed.broker;
+/** Structural equality of two JSON values, key order ignored. */
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) => Object.hasOwn(b, k) && sameJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+/**
+ * Whether a card is the one a call raised: the broker tool by name, an
+ * external call by connection and tool (the card names it `<connection>.<tool>`),
+ * and in both cases the same input. Many calls raise no card (an allow-listed
+ * command, a refused call, an external tool the connection allows), so the
+ * input keeps a later call's card from being claimed by an earlier one. An
+ * edited card's input is the operator's, so it matches by tool alone.
+ */
+export function cardIsForCall(
+  card: Pick<ToolLineCard, "tool" | "input" | "edited">,
+  parsed: ParsedToolName,
+  input: Record<string, unknown>,
+): boolean {
+  if (parsed.broker) return card.tool === parsed.broker && (card.edited === true || sameJson(card.input, input));
   if (!parsed.connection || card.tool !== "external_call") return false;
-  const named = String(card.input.tool ?? "");
-  return card.input.connection === parsed.connection && (named === parsed.tool || spaced(named) === spaced(parsed.tool ?? ""));
+  return card.input.connection === parsed.connection
+    && card.input.tool === `${parsed.connection}.${parsed.tool}`
+    && (card.edited === true || sameJson(card.input.arguments, input));
 }
 
 /** Connection id → label, from the external-call cards the viewer holds. */

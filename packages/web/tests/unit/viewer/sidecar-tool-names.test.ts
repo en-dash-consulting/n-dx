@@ -35,18 +35,29 @@ describe("parseToolName", () => {
 });
 
 describe("tool line status and cards", () => {
+  // The shape broker-mcp.ts writes: the tool is the connection's displayName, `<connection>.<tool>`.
   const external = {
     tool: "external_call",
-    input: { connection: "fake", tool: "create ticket" },
+    input: { connection: "fake", tool: "fake.create_ticket", class: "write", arguments: { title: "t" } },
     status: "pending" as const,
     externalCall: { label: "CAOS" },
   };
+  const wire = parseToolName("mcp__ndx-sidecar__fake__create_ticket");
 
-  it("matches a card to its call", () => {
-    expect(cardIsForCall(external, parseToolName("mcp__ndx-sidecar__fake__create_ticket"))).toBe(true);
-    expect(cardIsForCall(external, parseToolName("mcp__ndx-sidecar__other__create_ticket"))).toBe(false);
-    expect(cardIsForCall({ tool: "run_command", input: {} }, parseToolName("mcp__ndx-sidecar__run_command"))).toBe(true);
-    expect(cardIsForCall({ tool: "run_command", input: {} }, parseToolName("Bash"))).toBe(false);
+  it("matches an external-call card to its call by connection, tool and arguments", () => {
+    expect(cardIsForCall(external, wire, { title: "t" })).toBe(true);
+    expect(cardIsForCall(external, wire, { title: "other" })).toBe(false);
+    expect(cardIsForCall({ ...external, edited: true }, wire, { title: "other" })).toBe(true);
+    expect(cardIsForCall(external, parseToolName("mcp__ndx-sidecar__other__create_ticket"), { title: "t" })).toBe(false);
+  });
+
+  it("matches a broker card by tool and input, so a call that raised no card claims none", () => {
+    const run = parseToolName("mcp__ndx-sidecar__run_command");
+    const card = { tool: "run_command", input: { argv: ["pnpm", "test"] } };
+    expect(cardIsForCall(card, run, { argv: ["pnpm", "test"] })).toBe(true);
+    expect(cardIsForCall(card, run, { argv: ["ndx", "status"] })).toBe(false);
+    expect(cardIsForCall(card, parseToolName("Bash"), { argv: ["pnpm", "test"] })).toBe(false);
+    expect(cardIsForCall({ tool: "x", input: { a: 1, b: [1, { c: 2 }] } }, parseToolName("mcp__ndx-sidecar__x"), { b: [1, { c: 2 }], a: 1 })).toBe(true);
   });
 
   it("reads connection labels from external-call cards", () => {

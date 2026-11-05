@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-05T01:46:23.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "80e80636-1733-4ade-a6b4-a1d4a3cce8cb":
-    lastModified: "2026-11-05T01:38:06.420Z"
+    status: "completed"
+    startedAt: "2026-11-05T02:07:31.381Z"
+    completedAt: "2026-11-05T02:17:12.466Z"
+    endedAt: "2026-11-05T02:17:12.466Z"
+    activeIntervals: [{"end":"2026-11-05T02:17:12.466Z","start":"2026-11-05T02:07:31.381Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Tool lines are now pills (status dot, readable name, short status); one pure parser in sidecar-tool-names.ts; wire name only in expanded details."
+    lastModified: "2026-11-05T02:17:12.466Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c6cba43b-b23d-4602-9986-cbf53e54fa6e":
     status: "completed"
