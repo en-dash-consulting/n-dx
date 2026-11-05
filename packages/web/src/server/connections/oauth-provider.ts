@@ -45,9 +45,24 @@ export const NOT_SIGNED_IN = "not signed in yet; sign in from the dashboard";
 export const SIGN_IN_AGAIN = "the sign-in expired or was revoked; sign in again";
 export const URL_CHANGED = "the connection's URL changed since sign-in; sign in again";
 
+/**
+ * Whether a connection needs its first sign-in or lost one it had. The
+ * dashboard words its badge from this, never from the reason text.
+ */
+export type SignInKind = "first" | "again";
+
+/** Why a connection needs a sign-in: the text for the operator and the kind the badge reads. */
+export interface SignInNeeded {
+  reason: string;
+  signIn: SignInKind;
+}
+
+/** The sign-in a connection had is gone: expired, revoked or refused. */
+export const SIGN_IN_LOST: SignInNeeded = { reason: SIGN_IN_AGAIN, signIn: "again" };
+
 /** A headless caller reached the point where a user would have to sign in. */
 export class ConnectionSignInRequiredError extends Error {
-  constructor(readonly reason: string) {
+  constructor(readonly reason: string, readonly signIn: SignInKind) {
     super(`sign-in required: ${reason}`);
     this.name = "ConnectionSignInRequiredError";
   }
@@ -107,7 +122,7 @@ export interface ConnectionOAuthOptions {
 export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
 /** A provider and the fetch its transport must use, so a refused refresh token is noted. */
-export type PreparedOAuth = { provider: OAuthClientProvider; fetch: FetchLike } | { needsSignIn: string };
+export type PreparedOAuth = { provider: OAuthClientProvider; fetch: FetchLike } | { needsSignIn: SignInNeeded };
 
 function isRecord(value: Record<string, unknown> | undefined): value is Record<string, unknown> & OAuthRecord {
   const client = value?.client as { client_id?: unknown } | undefined;
@@ -278,10 +293,10 @@ export class ConnectionOAuth {
   }
 
   /** Why a headless caller cannot use `record` for `config`, or undefined when it can. */
-  signInReason(config: HttpConnectionConfig, record: OAuthRecord | undefined): string | undefined {
-    if (!record) return NOT_SIGNED_IN;
-    if (record.url !== config.url) return URL_CHANGED;
-    if (!record.tokens) return SIGN_IN_AGAIN;
+  signInReason(config: HttpConnectionConfig, record: OAuthRecord | undefined): SignInNeeded | undefined {
+    if (!record) return { reason: NOT_SIGNED_IN, signIn: "first" };
+    if (record.url !== config.url) return { reason: URL_CHANGED, signIn: "again" };
+    if (!record.tokens) return SIGN_IN_LOST;
     return undefined;
   }
 
@@ -309,11 +324,11 @@ export class ConnectionOAuth {
         await auth(prepared.provider, { serverUrl: config.url, fetchFn: prepared.fetch });
         return prepared;
       } catch (err) {
-        if (err instanceof ConnectionSignInRequiredError) return { needsSignIn: err.reason };
+        if (err instanceof ConnectionSignInRequiredError) return { needsSignIn: { reason: err.reason, signIn: err.signIn } };
         failure = err;
       }
     }
-    if (failure instanceof InvalidGrantError && this.forgetRefusedTokens(config.id)) return { needsSignIn: SIGN_IN_AGAIN };
+    if (failure instanceof InvalidGrantError && this.forgetRefusedTokens(config.id)) return { needsSignIn: SIGN_IN_LOST };
     throw new ConnectionRefreshError(`could not refresh the sign-in: ${errorMessage(failure)}`);
   }
 
@@ -367,7 +382,8 @@ class HeadlessProvider implements OAuthClientProvider {
     }
     // An access token with no way to refresh it is spent.
     this.owner.forgetTokens(this.config.id);
-    throw new ConnectionSignInRequiredError(this.owner.signInReason(this.config, this.owner.storedRecord(this.config.id)) ?? SIGN_IN_AGAIN);
+    const needed = this.owner.signInReason(this.config, this.owner.storedRecord(this.config.id)) ?? SIGN_IN_LOST;
+    throw new ConnectionSignInRequiredError(needed.reason, needed.signIn);
   }
 
   saveCodeVerifier(): void {
@@ -375,7 +391,7 @@ class HeadlessProvider implements OAuthClientProvider {
   }
 
   codeVerifier(): never {
-    throw new ConnectionSignInRequiredError(SIGN_IN_AGAIN);
+    throw new ConnectionSignInRequiredError(SIGN_IN_LOST.reason, SIGN_IN_LOST.signIn);
   }
 
   invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier" | "discovery"): void {

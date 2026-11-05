@@ -46,6 +46,8 @@ export interface ConnectionView {
   auth: ConnectionInfo["auth"];
   state: ConnectionInfo["status"]["state"];
   reason?: string;
+  /** On a needs-sign-in row: a first sign-in, or one that was lost. The badge reads this, not the reason. */
+  signIn?: "first" | "again";
   tools: number;
 }
 
@@ -57,6 +59,7 @@ function view(info: ConnectionInfo): ConnectionView {
     auth: info.auth,
     state: info.status.state,
     ...("reason" in info.status && { reason: info.status.reason }),
+    ...("signIn" in info.status && { signIn: info.status.signIn }),
     tools: info.tools,
   };
 }

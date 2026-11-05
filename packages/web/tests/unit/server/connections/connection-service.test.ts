@@ -138,7 +138,7 @@ describe("ConnectionService", () => {
     const { svc } = service({ docs: { transport: "http", url: http.url, auth: "token" } });
 
     const [docs] = await svc.listConnections();
-    expect(docs.status).toMatchObject({ state: "needs-sign-in" });
+    expect(docs.status).toMatchObject({ state: "needs-sign-in", signIn: "first" });
     expect(await svc.listTools()).toEqual([]);
     await expect(svc.callTool("docs", "read_item", { id: "1" })).rejects.toThrow(/needs sign-in/);
     expect(http.authorizations).toEqual([]);
@@ -151,7 +151,7 @@ describe("ConnectionService", () => {
     setCredential("connection:docs", "a-wrong-one", { ndxHome });
 
     const [docs] = await svc.listConnections();
-    expect(docs.status).toEqual({ state: "needs-sign-in", reason: "the server refused the stored token" });
+    expect(docs.status).toEqual({ state: "needs-sign-in", reason: "the server refused the stored token", signIn: "again" });
   });
 
   it("reads needs-sign-in, not a refused token, when an auth-none server answers 401", async () => {
@@ -159,7 +159,7 @@ describe("ConnectionService", () => {
     http.requireToken = "anything";
     const { svc } = service({ docs: { transport: "http", url: http.url } });
     const [docs] = await svc.listConnections();
-    expect(docs.status.state).toBe("needs-sign-in");
+    expect(docs.status).toMatchObject({ state: "needs-sign-in", signIn: "first" });
     expect(docs.status).not.toMatchObject({ reason: expect.stringContaining("stored token") });
   });
 

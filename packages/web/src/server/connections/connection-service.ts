@@ -42,6 +42,8 @@ import {
   type FetchLike,
   ConnectionSignInRequiredError,
   SIGN_IN_AGAIN,
+  SIGN_IN_LOST,
+  type SignInKind,
 } from "./oauth-provider.js";
 import { resolveToolPolicies, type ToolPolicy } from "./tool-policy.js";
 
@@ -59,7 +61,7 @@ export const MAX_LIST_RETRY_MS = 300_000;
 export type ConnectionState =
   | { state: "connected" }
   | { state: "unavailable"; reason: string }
-  | { state: "needs-sign-in"; reason: string };
+  | { state: "needs-sign-in"; reason: string; signIn: SignInKind };
 
 export interface ConnectionInfo {
   id: string;
@@ -317,7 +319,7 @@ export class ConnectionService {
   async signOut(connection: string): Promise<ConnectionState> {
     this.oauth.signOut(this.oauthConfig(connection));
     const slot = this.slots.get(connection)!;
-    this.reset(slot, { state: "needs-sign-in", reason: "signed out" });
+    this.reset(slot, { state: "needs-sign-in", reason: "signed out", signIn: "first" });
     return slot.status;
   }
 
@@ -379,19 +381,21 @@ export class ConnectionService {
   /** Why a connection failed: a 401 means sign in (again), anything else unavailable. */
   private failureStatus(slot: Slot, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
     const { config } = slot;
-    if (err instanceof ConnectionSignInRequiredError) return { state: "needs-sign-in", reason: err.reason };
+    if (err instanceof ConnectionSignInRequiredError) return { state: "needs-sign-in", reason: err.reason, signIn: err.signIn };
     if (err instanceof InvalidGrantError && config.auth === "oauth") {
       // Refused on the retry too. When the stored token is the refused one,
       // only a sign-in recovers; when a concurrent refresh rotated in a new
       // one meanwhile, this call lost the race and the next one uses it.
-      if (this.oauth.forgetRefusedTokens(config.id)) return { state: "needs-sign-in", reason: SIGN_IN_AGAIN };
+      if (this.oauth.forgetRefusedTokens(config.id)) return { state: "needs-sign-in", ...SIGN_IN_LOST };
       return { state: "unavailable", reason: "a concurrent refresh replaced the token; retry" };
     }
     if (err instanceof StreamableHTTPError && err.code === 401) {
-      const reason = config.auth === "none"
-        ? "the server requires sign-in; set auth to \"token\" or \"oauth\""
-        : config.auth === "oauth" ? `the server refused the signed-in token; ${SIGN_IN_AGAIN}` : "the server refused the stored token";
-      return { state: "needs-sign-in", reason };
+      // Only a connection that never carried a credential is a first sign-in; a refused token was one.
+      if (config.auth === "none") {
+        return { state: "needs-sign-in", reason: "the server requires sign-in; set auth to \"token\" or \"oauth\"", signIn: "first" };
+      }
+      const reason = config.auth === "oauth" ? `the server refused the signed-in token; ${SIGN_IN_AGAIN}` : "the server refused the stored token";
+      return { state: "needs-sign-in", reason, signIn: "again" };
     }
     if (err instanceof ConnectionRefreshError) return { state: "unavailable", reason: this.scrubReason(slot, err.message) };
     // The SDK's message may not carry the status, so name it first.
@@ -448,12 +452,12 @@ export class ConnectionService {
       // Headless: refreshes an expired token, never asks for a sign-in. The
       // transport also refreshes through the provider on a 401.
       const prepared = await this.oauth.prepare(config);
-      if ("needsSignIn" in prepared) return { state: "needs-sign-in", reason: prepared.needsSignIn };
+      if ("needsSignIn" in prepared) return { state: "needs-sign-in", ...prepared.needsSignIn };
       return new StreamableHTTPClientTransport(url, { authProvider: prepared.provider, fetch: this.recordingFetch(slot, prepared.fetch) });
     }
     if (config.auth === "token") {
       const token = connectionToken(config.id, this.options.credentials);
-      if (!token) return { state: "needs-sign-in", reason: `no token stored as connection:${config.id}` };
+      if (!token) return { state: "needs-sign-in", reason: `no token stored as connection:${config.id}`, signIn: "first" };
       if (!slot.sent.includes(token)) slot.sent.push(token);
       return new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
     }

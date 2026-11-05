@@ -87,7 +87,7 @@ describe("connections routes", () => {
 
   it("start then finish stores tokens and reads connected, and no response carries a secret", async () => {
     const before = await (await fetch(`${server.baseUrl}/api/connections`, { headers: auth })).json();
-    expect(before.connections[0]).toMatchObject({ id: "docs", state: "needs-sign-in" });
+    expect(before.connections[0]).toMatchObject({ id: "docs", state: "needs-sign-in", signIn: "first" });
     expect(before.configFile).toBe(".n-dx.local.json");
 
     const started = await post("/api/connections/docs/oauth/start", { redirectUrl: REDIRECT() });
@@ -120,7 +120,7 @@ describe("connections routes", () => {
 
     const out = await post("/api/connections/docs/sign-out", {});
     expect(out.status).toBe(200);
-    expect((await out.json()).connection).toMatchObject({ state: "needs-sign-in" });
+    expect((await out.json()).connection).toMatchObject({ state: "needs-sign-in", signIn: "first" });
     expect(storedCredential("connection:docs", { ndxHome })).toBeUndefined();
   });
 
@@ -132,7 +132,7 @@ describe("connections routes", () => {
     await service.close();
     service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {} });
     const docs = (await (await fetch(`${server.baseUrl}/api/connections`, { headers: auth })).json()).connections[0];
-    expect(docs).toMatchObject({ state: "needs-sign-in", reason: SIGN_IN_AGAIN });
+    expect(docs).toMatchObject({ state: "needs-sign-in", reason: SIGN_IN_AGAIN, signIn: "again" });
   });
 
   it("refuses a sign-in for an unknown or non-OAuth connection, and a redirect off loopback", async () => {

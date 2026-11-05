@@ -24,6 +24,8 @@ export interface ConnectionRow {
   auth: "none" | "token" | "oauth";
   state: "connected" | "unavailable" | "needs-sign-in";
   reason?: string;
+  /** On a needs-sign-in row: the first sign-in, or one the connection had and lost. */
+  signIn?: "first" | "again";
   tools: number;
 }
 
@@ -39,12 +41,11 @@ const CONNECTION_PARAM = "connection";
 const RETURN_PARAMS = [CONNECTION_PARAM, "code", "state", "error", "error_description", "error_uri", "iss"];
 
 /** The state as Settings words it. */
-export function connectionStateLabel(row: Pick<ConnectionRow, "state" | "reason">): string {
+export function connectionStateLabel(row: Pick<ConnectionRow, "state" | "reason" | "signIn">): string {
   if (row.state === "connected") return "connected";
   if (row.state === "unavailable") return `connection unavailable: ${row.reason ?? "unknown reason"}`;
-  // The server words a lost or refused token "…; sign in again" and a connection that never had one
-  // "not signed in yet; …" (or "signed out" after a deliberate sign-out), so the reason tells them apart.
-  return row.reason?.includes("sign in again") ? "sign in again" : "sign in";
+  // The server says whether the connection lost a sign-in it had; the reason text is only shown.
+  return row.signIn === "again" ? "sign in again" : "sign in";
 }
 
 async function readError(res: Response): Promise<string> {

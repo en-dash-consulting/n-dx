@@ -20,7 +20,7 @@ interface Request { method: string; url: string; body: Json | null }
 const DOCS: ConnectionRow = { id: "docs", label: "Docs", transport: "http", auth: "oauth", state: "connected", tools: 3 };
 const WIKI: ConnectionRow = {
   id: "wiki", label: "Wiki", transport: "http", auth: "oauth", state: "needs-sign-in",
-  reason: "the sign-in expired or was revoked; sign in again", tools: 2,
+  reason: "the sign-in expired or was revoked; sign in again", signIn: "again", tools: 2,
 };
 const LOCAL: ConnectionRow = { id: "local", label: "Local", transport: "stdio", auth: "none", state: "unavailable", reason: "the server closed the connection", tools: 0 };
 
@@ -43,7 +43,7 @@ function stubApi(opts: { sidecar?: boolean; connections?: ConnectionRow[] } = {}
       const row = connections.find((c) => c.id === id)!;
       if (what === "oauth/start") return respond({ authorizationUrl: `https://auth.example/authorize?for=${id}` });
       if (what === "oauth/finish") return respond({ connection: { ...row, state: "connected", reason: undefined } });
-      if (what === "sign-out") return respond({ connection: { ...row, state: "needs-sign-in", reason: "signed out" } });
+      if (what === "sign-out") return respond({ connection: { ...row, state: "needs-sign-in", reason: "signed out", signIn: "first" } });
     }
     return respond({});
   }));
@@ -109,13 +109,16 @@ describe("Connections section", () => {
   });
 
   it("reads 'sign in' for a connection that never signed in and 'sign in again' for one whose token was refused", async () => {
-    const never: ConnectionRow = { ...WIKI, id: "fresh", reason: "not signed in yet; sign in from the dashboard" };
-    const refused: ConnectionRow = { ...WIKI, id: "lost", reason: "the server refused the signed-in token; the sign-in expired or was revoked; sign in again" };
-    stubApi({ connections: [never, refused] });
+    const never: ConnectionRow = { ...WIKI, id: "fresh", reason: "not signed in yet; sign in from the dashboard", signIn: "first" };
+    const refused: ConnectionRow = { ...WIKI, id: "lost", reason: "the sign-in expired or was revoked; sign in again", signIn: "again" };
+    // A token-auth connection's refused token carries no "sign in again" text; the field decides.
+    const token: ConnectionRow = { ...WIKI, id: "tok", auth: "token", reason: "the server refused the stored token", signIn: "again" };
+    stubApi({ connections: [never, refused, token] });
     act(() => { render(h(ConnectionsSection, null), root); });
     await settle();
     expect(state("fresh")).toBe("sign in");
     expect(state("lost")).toBe("sign in again");
+    expect(state("tok")).toBe("sign in again");
   });
 
   it("Sign in asks for an authorization URL that returns to this dashboard's Project page", async () => {

@@ -228,13 +228,13 @@ describe("OAuth connections", () => {
     fake.revokeRefreshTokens();
     const again = service(fake.url, browser);
     const [docs] = await again.svc.listConnections();
-    expect(docs.status).toEqual({ state: "needs-sign-in", reason: expect.stringContaining("sign in again") });
+    expect(docs.status).toEqual({ state: "needs-sign-in", reason: expect.stringContaining("sign in again"), signIn: "again" });
     expect(fake.hits["/authorize"]).toBeUndefined();
 
     // Never signed in at all: needs-sign-in before any request is sent.
     const fresh = await oauthServer();
     const never = service(fresh.url);
-    expect((await never.svc.listConnections())[0].status).toEqual({ state: "needs-sign-in", reason: NOT_SIGNED_IN });
+    expect((await never.svc.listConnections())[0].status).toEqual({ state: "needs-sign-in", reason: NOT_SIGNED_IN, signIn: "first" });
     expect(fresh.mcp.authorizations).toEqual([]);
     expect(fresh.hits).toEqual({});
   });
@@ -252,6 +252,7 @@ describe("OAuth connections", () => {
     expect((failure as ConnectionUnavailableError).status).toEqual({
       state: "needs-sign-in",
       reason: expect.stringContaining("sign in again"),
+      signIn: "again",
     });
     expect(stored(ndxHome)).toEqual({ kind: "oauth", url: fake.url, redirectUrl: REDIRECT, client });
 
@@ -268,7 +269,7 @@ describe("OAuth connections", () => {
 
     const moved = await oauthServer();
     const { svc } = service(moved.url, signedIn);
-    expect((await svc.listConnections())[0].status).toEqual({ state: "needs-sign-in", reason: URL_CHANGED });
+    expect((await svc.listConnections())[0].status).toEqual({ state: "needs-sign-in", reason: URL_CHANGED, signIn: "again" });
     await expect(svc.callTool("docs", "read_item", { id: "1" })).rejects.toBeInstanceOf(ConnectionUnavailableError);
     expect(moved.mcp.authorizations).toEqual([]);
     expect(moved.hits).toEqual({});

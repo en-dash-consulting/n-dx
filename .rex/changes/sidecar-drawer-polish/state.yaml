@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-05T01:46:23.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "77cd6136-39b4-4992-9153-126cc513704b":
-    lastModified: "2026-11-05T04:37:24.124Z"
+    status: "completed"
+    startedAt: "2026-11-05T05:49:10.952Z"
+    completedAt: "2026-11-05T05:57:47.783Z"
+    endedAt: "2026-11-05T05:57:47.783Z"
+    activeIntervals: [{"end":"2026-11-05T05:57:47.783Z","start":"2026-11-05T05:49:10.952Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Needs-sign-in rows carry signIn: first|again from the server; the badge reads it, not the reason text."
+    lastModified: "2026-11-05T05:57:47.783Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "80e80636-1733-4ade-a6b4-a1d4a3cce8cb":
     status: "completed"
@@ -54,5 +61,12 @@ items:
     lastModified: "2026-11-05T02:24:04.768Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eed75eaf-9a45-483e-978a-34410fb2894c":
-    lastModified: "2026-11-05T02:22:12.183Z"
+    status: "completed"
+    startedAt: "2026-11-05T05:57:47.783Z"
+    completedAt: "2026-11-05T05:57:47.783Z"
+    endedAt: "2026-11-05T05:57:47.783Z"
+    activeIntervals: [{"end":"2026-11-05T05:57:47.783Z","start":"2026-11-05T05:57:47.783Z"}]
+    appliedAt: "2026-11-05T05:57:47.783Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-05T05:57:47.783Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
