@@ -81,6 +81,8 @@ export interface TrackerMapping {
   /** The create tool's initial status property, when it has one. */
   createStatusProperty?: string;
   moveStatusProperty: string;
+  /** Where the read tool's reply holds the item's status (dotted for nested); the change detail's live state reads it. */
+  readStatusProperty?: string;
   statusMap: Record<TrackerEvent, string>;
   facts: Partial<Record<TrackerEvent, TrackerFact[]>>;
   defaults: { reviewer?: string; estimateScale?: string[] };
@@ -207,7 +209,7 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
   }
   const required = ["createTool", "moveTool", "readTool", "requestIdProperty", "itemIdProperty", "moveStatusProperty"] as const;
   for (const key of required) if (!isString(raw[key])) problems.push(`tracker.${key} must be a non-empty string`);
-  for (const key of ["editTool", "createStatusProperty"] as const) {
+  for (const key of ["editTool", "createStatusProperty", "readStatusProperty"] as const) {
     if (raw[key] !== undefined && !isString(raw[key])) problems.push(`tracker.${key} must be a non-empty string when set`);
   }
 
@@ -270,6 +272,7 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
     itemIdProperty: raw.itemIdProperty as string,
     ...(isString(raw.createStatusProperty) && { createStatusProperty: raw.createStatusProperty }),
     moveStatusProperty: raw.moveStatusProperty as string,
+    ...(isString(raw.readStatusProperty) && { readStatusProperty: raw.readStatusProperty }),
     statusMap: statusMap as Record<TrackerEvent, string>,
     facts,
     defaults: defaults as TrackerMapping["defaults"],

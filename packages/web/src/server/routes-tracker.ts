@@ -10,6 +10,12 @@
  *   GET  /api/tracker/cards/form?requestId=   -> { externalCall } the form a waiting card's call is drawn from
  *   POST /api/tracker/cards/decide { requestId, action: "dismiss" | "approve", args? }
  *                                 -> { entry } approve makes the call once with the operator's args
+ *   GET  /api/tracker/changes     -> { tracker, changes } each change's chip: its refs and the state ndx
+ *                                 last set, from the activity log; makes no tracker call
+ *   GET  /api/tracker/changes/:id/state  -> { ref, state, readAt } | { ref, state: null, problem } the
+ *                                 linked work item's current state, one readTool call kept a minute
+ *                                 (tracker/item-state.ts); the change detail asks when it opens
+ *   POST /api/tracker/changes/:id/create  raise the change's create card
  *
  * The tick is the hub's clock: it is answered only on the per-user token
  * itself. A browser session is refused here, and a Sidecar broker credential
@@ -34,6 +40,7 @@ import { loadTrackerSync } from "./tracker/sync-config.js";
 import { decideTrackerCard, enqueueTrackerEvent, prepareTrackerSync, raiseCreateCard, runTrackerSyncTick, type CardDecision, type TrackerSyncService } from "./tracker/sync-engine.js";
 import { changeChips } from "./tracker/change-chips.js";
 import { findItemByRef } from "./tracker/item-links.js";
+import { readTrackerItemState } from "./tracker/item-state.js";
 import { itemLinkRefs, type LinkFields } from "./tracker/link-refs.js";
 import { resolveStore, type PRDItem } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
@@ -45,6 +52,7 @@ const FORM_PATH = `${TRACKER_PREFIX}/cards/form`;
 const DECIDE_PATH = `${TRACKER_PREFIX}/cards/decide`;
 const CHANGES_PATH = `${TRACKER_PREFIX}/changes`;
 const CREATE_PATH = new RegExp(`^${TRACKER_PREFIX}/changes/([^/]+)/create$`);
+const STATE_PATH = new RegExp(`^${TRACKER_PREFIX}/changes/([^/]+)/state$`);
 
 /** The most entries the activity route answers, newest kept. */
 export const MAX_ACTIVITY_ENTRIES = 200;
@@ -152,6 +160,23 @@ export async function handleTrackerRoute(
       tracker: { label: ready.profile.label },
       changes: changeChips(items, readTrackerActivity(ctx.projectDir), ready.mapping),
     });
+    return true;
+  }
+
+  const live = STATE_PATH.exec(pathname);
+  if (live) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
+    const ready = prepareTrackerSync({ projectDir: ctx.projectDir, service });
+    if ("state" in ready) return refuse(res, 422, "tracker sync is not configured");
+    const store = await resolveStore(ctx.rexDir);
+    const { items } = await store.loadDocument();
+    const found = findItemByRef(items, decodeURIComponent(live[1]));
+    if (!found || found.type !== "change") return refuse(res, 404, `Change "${live[1]}" not found`);
+    const [ref] = itemLinkRefs(found as PRDItem & LinkFields);
+    if (!ref) return refuse(res, 409, `Change "${found.id}" links to no work item`);
+    const options = { projectDir: ctx.projectDir, service, connection: ready.config.connection, mapping: ready.mapping };
+    jsonResponse(res, 200, await readTrackerItemState(options, ref));
     return true;
   }
 

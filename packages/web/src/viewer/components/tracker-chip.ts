@@ -2,8 +2,10 @@
  * A change's tracker chip and "Create in tracker" (Sidecar tracker sync, SP8),
  * on Plan's Open changes rows and in the change detail.
  *
- * A linked change shows the tracker's label, the state sync last put it in,
- * and a link when its ref is a URL. An unlinked one offers "Create in tracker":
+ * A linked change shows the tracker's label, the state ndx last put it in
+ * (labelled so: someone may have moved it since) or "linked · state unknown",
+ * and a link when its ref is a URL. Rows never call the tracker; the change
+ * detail reads the item's current state once when it opens. An unlinked one offers "Create in tracker":
  * it raises the create card (`POST /api/tracker/changes/:id/create`, which
  * makes no tracker call) and draws the card's form inline; Run sends it, and
  * until then nothing is written but the waiting card, which Live also lists.
@@ -15,7 +17,7 @@
 
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
-import { useFeatureToggle } from "../hooks/index.js";
+import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { TrackerCardForm, errorOf } from "./tracker-card-form.js";
 import { linkHref, linkText } from "./tracker-links.js";
 
@@ -62,6 +64,7 @@ export function useTrackerChips(refreshKey?: unknown): { read: TrackerChipRead; 
 
 /** The chip for a change that links to a work item; nothing otherwise. */
 export function TrackerChip({ changeId, read }: { changeId: string; read: TrackerChipRead }) {
+  const cli = useCliName();
   const chip = read.changes[changeId];
   if (!read.label || !chip) return null;
   return h("span", { class: "tracker-chip", "data-tracker-chip": changeId },
@@ -74,15 +77,48 @@ export function TrackerChip({ changeId, read }: { changeId: string; read: Tracke
         ? h("a", { key: ref, class: "tracker-link", href, target: "_blank", rel: "noopener noreferrer", title: ref }, text)
         : h("span", { key: ref, class: "tracker-link" }, text);
     }),
-    chip.state ? h("span", { class: "tracker-chip-state" }, chip.state) : null,
+    chip.state
+      ? h("span", { class: "tracker-chip-state", title: `The state ${cli} last set; the item may have moved in the tracker since` }, `${chip.state} · set by ${cli}`)
+      : h("span", { class: "tracker-chip-state tracker-chip-unknown" }, "linked · state unknown"),
   );
 }
 
-/** The chip, or "Create in tracker", for one change: the detail panel's form of the row's pair. `refreshKey` re-reads after the item reloaded. */
+/** What the change detail's live read answered; null while it is on its way. */
+type LiveState = { state: string } | { state: null; problem?: string } | null;
+
+/**
+ * The linked work item's current state, read once when the detail opens
+ * (`GET /api/tracker/changes/:id/state`, kept a minute on the server). Rows
+ * never read it; an unreachable connection reads as unknown.
+ */
+function TrackerLiveState({ changeId, workRef, label }: { changeId: string; workRef: string; label: string }) {
+  const [live, setLive] = useState<LiveState>(null);
+  useEffect(() => {
+    let current = true;
+    setLive(null);
+    fetch(`/api/tracker/changes/${encodeURIComponent(changeId)}/state`)
+      .then(async (res): Promise<LiveState> => {
+        if (!res.ok) return { state: null, problem: await errorOf(res, "Could not read the tracker") };
+        const body = (await res.json()) as { state?: unknown; problem?: unknown };
+        return typeof body.state === "string" ? { state: body.state } : { state: null, ...(typeof body.problem === "string" && { problem: body.problem }) };
+      })
+      .catch((err: unknown): LiveState => ({ state: null, problem: err instanceof Error ? err.message : undefined }))
+      .then((next) => { if (current) setLive(next); });
+    return () => { current = false; };
+  }, [changeId, workRef]);
+  if (!live) return h("span", { class: "tracker-live-state", "aria-busy": "true" }, `Reading ${label}…`);
+  return live.state !== null
+    ? h("span", { class: "tracker-live-state" }, `Now in ${label}: `, h("strong", null, live.state))
+    : h("span", { class: "tracker-live-state tracker-chip-unknown", ...(live.problem && { title: live.problem }) }, `${label} state unknown`);
+}
+
+/** The chip, or "Create in tracker", for one change: the detail panel's form of the row's pair, plus the linked item's current state. `refreshKey` re-reads after the item reloaded. */
 export function ChangeTrackerChip({ changeId, refreshKey }: { changeId: string; refreshKey?: unknown }) {
   const { read, reload } = useTrackerChips(refreshKey);
+  const workRef = read.changes[changeId]?.refs[0];
   return h("div", { class: "change-tracker-chip" },
     h(TrackerChip, { changeId, read }),
+    read.label && workRef ? h(TrackerLiveState, { changeId, workRef, label: read.label }) : null,
     h(CreateInTrackerButton, { changeId, read, onCreated: reload }),
   );
 }

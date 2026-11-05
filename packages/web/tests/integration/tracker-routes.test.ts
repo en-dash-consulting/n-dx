@@ -316,6 +316,64 @@ describe("change chips and Create in tracker (SP8)", () => {
     expect((await create(CHANGE)).status).toBe(409);
   });
 
+  describe("the linked item's state against the fake CAOS server", () => {
+    let fake: FakeMcpHttpServer;
+    let status: string;
+    const liveState = async (id = CHANGE) => fetch(`${server.baseUrl}/api/tracker/changes/${encodeURIComponent(id)}/state`, { headers: auth });
+    const reads = () => fake.calls.filter((c) => c.name === "get_work_item");
+
+    beforeEach(async () => {
+      status = "inReview";
+      fake = await startFakeMcpHttpServer({
+        extraTools: (s) => addCaosTools(s, {
+          get_work_item: ({ workItemId }: { workItemId: string }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status }) }] }),
+        }),
+      });
+      await service.close();
+      const caos = { id: "caos", label: "CAOS", auth: "none", transport: "http", url: fake.url, profile: "caos" } as ConnectionConfig;
+      service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {}, connections: [caos] });
+    });
+
+    afterEach(async () => {
+      await fake.close();
+    });
+
+    it("chips a hand-linked change sync never moved with no state, making no tracker call", async () => {
+      expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+      expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: null } });
+      expect(fake.calls).toEqual([]);
+    });
+
+    it("reads the current state once with the profile's readTool, and keeps it for the next open", async () => {
+      // A URL the profile's template built reads back as the tracker's id.
+      const url = "https://www.notion.so/0123456789abcdef0123456789abcdef";
+      expect(await changeItemLink(rexDir(), CHANGE, url, "link")).toMatchObject({ ok: true });
+      const first = await liveState();
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({ ref: url, state: "inReview" });
+      expect(reads()).toEqual([{ name: "get_work_item", arguments: { workItemId: "01234567-89ab-cdef-0123-456789abcdef" } }]);
+      status = "done";
+      expect(await (await liveState()).json()).toMatchObject({ state: "inReview" });
+      expect(reads()).toHaveLength(1);
+    });
+
+    it("refuses a change with no link, and one that is not a change", async () => {
+      expect((await liveState()).status).toBe(409);
+      expect((await liveState(TASK)).status).toBe(404);
+      expect(fake.calls).toEqual([]);
+    });
+  });
+
+  it("answers the state unknown, keeping the ref, while the connection is unreachable", async () => {
+    expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+    const res = await fetch(`${server.baseUrl}/api/tracker/changes/${CHANGE}/state`, { headers: auth });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ref: "WM-9", state: null });
+    expect(body.problem).toMatch(/caos/);
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: null } });
+  });
+
   it("needs a credential, and is off with web.sidecar", async () => {
     expect((await create(CHANGE, {})).status).toBe(401);
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { web: { sidecar: false } } }));

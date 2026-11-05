@@ -23,6 +23,7 @@
     "itemUrlTemplate": "https://www.notion.so/{compactId}",
     "createStatusProperty": "initialStatus",
     "moveStatusProperty": "toStatus",
+    "readStatusProperty": "status",
     "statusMap": {
       "change-captured": "backlog",
       "run-started": "inProgress",

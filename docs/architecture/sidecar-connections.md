@@ -62,6 +62,8 @@ no code path knows any server. It carries:
   `estimateScale`) and an optional `itemUrlTemplate`: an http(s) URL holding
   one `{id}` (the id as given) or `{compactId}` (the id without dashes). CAOS
   items are Notion pages, so its template is `https://www.notion.so/{compactId}`.
+  An optional `readStatusProperty` (dotted for nested) names where the
+  `readTool` reply holds the item's status; CAOS's is `status`.
 - `oauth` (optional): `readScopes`, `writeScopes` and the `writeTools` that
   need the write scopes. See [Scopes](#scopes).
 
@@ -134,6 +136,15 @@ untracked `.n-dx.local.json` only, as connections do:
   read back out of the URL. The entry records `workItemId`; a link that cannot
   be written, including an opaque id under a profile with no template, leaves
   the entry `ok` with a problem naming the failure.
+- A change's tracker chip (Plan's Open changes rows, `GET /api/tracker/changes`)
+  never calls the tracker. Its state is the one ndx last set, from the activity
+  log, and reads "set by ndx" because someone may have moved the item since; a
+  linked change sync never moved reads "linked · state unknown". The change
+  detail reads the item's current state once when it opens
+  (`GET /api/tracker/changes/:id/state`): one `readTool` call on the change's
+  first ref, its `readStatusProperty` taken from the reply and kept for a
+  minute. A failed read, an unreachable connection included, answers the state
+  unknown with the reason and is not kept.
 - A refusal logs its problems list and settles the event: it is never planned
   again, with the same arguments or other ones. So do `ok`, `duplicate` and
   `card`. An unreachable connection, or one that needs sign-in, logs that once

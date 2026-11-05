@@ -68,6 +68,16 @@ describe("built-in profiles", () => {
     expect(caos.label).toBe("CAOS");
     expect(Object.keys(caos.tracker!.statusMap).sort()).toEqual([...TRACKER_EVENTS].sort());
     expect(caos.fieldHints.create_work_item.epicId).toEqual({ optionsFrom: { tool: "list_epics", path: "items", arguments: { pageSize: 100 } } });
+    expect(caos.tracker!.readStatusProperty).toBe("status");
+  });
+});
+
+describe("readStatusProperty", () => {
+  it("is optional, and refused when it is not a non-empty string", () => {
+    userProfile("desk", deskProfile);
+    expect((loadServerProfile("desk", { ndxHome }) as ServerProfile).tracker!.readStatusProperty).toBeUndefined();
+    userProfile("desk", { ...deskProfile, tracker: { ...deskProfile.tracker, readStatusProperty: 3 } });
+    expect(loadServerProfile("desk", { ndxHome })).toEqual({ problems: ["tracker.readStatusProperty must be a non-empty string when set"] });
   });
 });
 
