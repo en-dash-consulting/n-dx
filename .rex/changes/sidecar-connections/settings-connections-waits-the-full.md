@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "A stdio connection whose command fails is not spawned again by a listing inside its retry interval"
   - "A connection that was never tried is still connected by the first listing"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
