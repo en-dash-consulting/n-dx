@@ -4,6 +4,7 @@
 
 ## Features
 
+- **Plan as tiles** — after the capture bar, Plan lays out tiles: Product map (full width), Inbox, Open changes and Validation. Open changes carries two tabs: **List** (the Changes view) and **Tree** (the PRD tree, with Sidecar ghost rows). Select a tile to open it full-screen in place, with the detail panel beside it; **Open ↗** goes to the tile's own page. On a v1 project a Tasks tile stands in for the v2 tiles.
 - **SourceVision zone maps** — interactive visualization of architectural zones
 - **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage (see [The Changes page](#the-changes-page-v2)). Both pages appear in the navigation on a v2 project. On a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
 - **Unified MCP server** — single HTTP endpoint serving both Rex and SourceVision MCP tools
@@ -69,10 +70,10 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 
 **Find them.**
 
-- **Plan.** An Inbox section sits right after the capture bar and is always present. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero it is collapsed and reads "Inbox is empty".
+- **Plan.** An Inbox tile sits beside Open changes, below the capture bar and the full-width Product map tile, and is always present. Its badge shows the open count. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero the tile keeps its place and reads "Inbox is empty".
 - **Counts.** The open count shows on the Plan tab and the bottom bar. It counts only open changes that need placement.
 - **Applied history.** Changes applied before they were placed (migrated history) show as a collapsed line ("N applied changes were never placed") under the list. Expanding it lists each with its title, applied date and best guess. Open one to place it: the panel offers **touches** only, with a note, and Place & next walks that list. Amends is not offered, because the change's amendments have already reached the map.
-- **Tasks tree.** An Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.
+- **Tasks tree.** In the Tree tab of Open changes, an Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.
 - **Changes page.** An open change awaiting placement is tagged **Needs placement**; selecting the tag opens it.
 
 **Place one.** A row, badge or tag opens the change's detail panel. Its **Where it goes** section shows rex's shortlist, each entry with a strength and its reasons.
@@ -86,7 +87,7 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 
 **Place at capture.** The capture Preview lists rex's shortlist for each new change as a choice, with strength, area and a Touches or Amends relation. The top pick is pre-selected only when it is strong and untied; otherwise the default is **Leave it in the Inbox**. The primary button names what Add will do: **Add to Inbox**, **Add 1 change & place it** (**Add N changes & place M** for several), or **Add & amend…**, which opens the change's placement form on Amends once it is added. Most new changes never enter the Inbox.
 
-**Clear a backlog.** **Open ↗** on the Inbox section, or the bottom-bar Inbox pill, opens the full Inbox page: the queue on the left in the section's order, the change's **Where it goes** section on the right. The breadcrumb counts changes still to place and changes placed this visit. **Place & next** is the default action. Shortcuts are inactive while typing in a field, with a modifier held, or while a dialog is open:
+**Clear a backlog.** **Open ↗** on the Inbox tile, or the bottom-bar Inbox pill, opens the full Inbox page: the queue on the left in the section's order, the change's **Where it goes** section on the right. The breadcrumb counts changes still to place and changes placed this visit. **Place & next** is the default action. Shortcuts are inactive while typing in a field, with a modifier held, or while a dialog is open:
 
 | Key | Action |
 |-----|--------|

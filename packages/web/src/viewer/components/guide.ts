@@ -32,9 +32,9 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
     actions: "Open a section to see it here, or \"Open\" to give it the whole page. The side buttons step on to Plan, or back to Tune.",
   },
   plan: {
-    description: "Rex's planning views on one page: add or import items, the Inbox, the task tree, the product and the PRD's structural checks. Requirements are a tab of Product; All Commands is the Reference tab under Settings › Commands; run history and the PRD Graph (Shipped) moved to Tune.",
+    description: "Rex's planning views on one page: the capture bar, then tiles for the Product map, the Inbox, Open changes and Validation. The PRD tree is the Tree tab of Open changes (the List tab is the Changes view); on a v1 project a Tasks tile stands in for the v2 tiles. Requirements are a tab of Product; All Commands is the Reference tab under Settings › Commands; run history and the PRD Graph (Shipped) moved to Tune.",
     lookFor: "Proposals worth accepting, tasks without acceptance criteria, and validation warnings.",
-    actions: "Add items from a description or a file, then open Tasks to arrange them. The side buttons step on to Work, or back to Analysis.",
+    actions: "Add items from a description or a file, then open a tile to see it full-screen with its detail panel beside it, or \"Open ↗\" for its own page. Arrange items in the Tree tab of Open changes. The side buttons step on to Work, or back to Analysis.",
   },
   work: {
     description: "Hench's views on one page: the next task with its run button, PRD progress, the audit and workspaces. The Execution Log, Token Usage, Optimization and Adaptive moved to Tune.",
