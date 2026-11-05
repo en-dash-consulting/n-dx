@@ -254,3 +254,72 @@ describe("GET /api/tracker/activity", () => {
     expect(await sources()).toEqual([]);
   });
 });
+
+describe("change chips and Create in tracker (SP8)", () => {
+  const CHANGE = "c0000000-0000-4000-8000-000000000001";
+  const createdId = `ndx:ndx:${CHANGE}:change-captured`;
+  const chips = async () => (await fetch(`${server.baseUrl}/api/tracker/changes`, { headers: auth })).json();
+  const create = (id: string, headers: Record<string, string> = auth) =>
+    fetch(`${server.baseUrl}/api/tracker/changes/${encodeURIComponent(id)}/create`, { method: "POST", headers });
+  const activityLog = async () => (await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth })).json();
+  const rexDir = () => join(root, ".rex");
+
+  beforeEach(() => {
+    cpSync(resolve(__dirname, "../../../rex/tests/fixtures/v2-tree"), rexDir(), { recursive: true });
+  });
+
+  it("answers no tracker, and refuses Create, while no trackerSync settings name a connection", async () => {
+    writeFileSync(join(root, ".n-dx.local.json"), "{}");
+    expect(await chips()).toEqual({ tracker: null, changes: {} });
+    expect((await create(CHANGE)).status).toBe(422);
+    expect((await activityLog()).cards).toEqual([]);
+  });
+
+  it("chips a linked change with its refs, and the state sync last set", async () => {
+    expect(await chips()).toEqual({ tracker: { label: "CAOS" }, changes: {} });
+    expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: null } });
+    appendTrackerActivity(root, {
+      at: "2026-11-05T12:00:00.000Z", event: "pr-opened", rexId: CHANGE, rule: "move", mode: "on",
+      requestId: `ndx:ndx:${CHANGE}:pr-opened`, call: { tool: "move_work_item", args: {} }, result: "ok",
+    });
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: "readyForReview" } });
+  });
+
+  it("raises one waiting card for an unlinked change, writing nothing to the PRD or the tracker", async () => {
+    const res = await create(CHANGE);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      requestId: createdId,
+      entry: { result: "card", rule: "create", call: { tool: "create_work_item", args: { requestId: createdId, initialStatus: "backlog" } } },
+    });
+    expect((await activityLog()).cards).toEqual([createdId]);
+    // The change is not linked: still offered Create, never chipped.
+    expect((await chips()).changes).toEqual({});
+    // Asked again while it waits: the same card, not a second one.
+    expect((await (await create(CHANGE)).json()).requestId).toBe(createdId);
+    const log = await activityLog();
+    expect(log.entries.filter((e: TrackerActivityEntry) => e.requestId === createdId)).toHaveLength(1);
+  });
+
+  it("refuses a task, an unknown id, a change sync already created, and a linked change", async () => {
+    expect((await create("c0000000-0000-4000-8000-000000000002")).status).toBe(404);
+    expect((await create("no-such-change")).status).toBe(404);
+    appendTrackerActivity(root, {
+      at: "2026-11-05T12:00:00.000Z", event: "change-captured", rexId: CHANGE, rule: "create", mode: "on",
+      requestId: createdId, call: { tool: "create_work_item", args: {} }, result: "ok",
+    });
+    expect((await create(CHANGE)).status).toBe(409);
+    // Created but not linked yet: chipped as created, so Create is not offered again.
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: [], state: "backlog" } });
+    expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+    expect((await create(CHANGE)).status).toBe(409);
+  });
+
+  it("needs a credential, and is off with web.sidecar", async () => {
+    expect((await create(CHANGE, {})).status).toBe(401);
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { web: { sidecar: false } } }));
+    expect((await create(CHANGE)).status).toBe(403);
+    expect((await fetch(`${server.baseUrl}/api/tracker/changes`, { headers: auth })).status).toBe(403);
+  });
+});
