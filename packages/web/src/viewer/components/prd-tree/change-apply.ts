@@ -6,6 +6,8 @@
  * and lists each amendment with the product node it creates, edits or retires.
  * Only Apply in that preview writes, through `…/apply`: rex's apply, the one
  * MCP `apply_change` runs. A refusal from either shows rex's message.
+ * Apply sends the preview's hash; when the change or a node it amends was
+ * edited since (409 `moved`), the panel re-reads the preview and says so.
  *
  * @module viewer/components/prd-tree/change-apply
  */
@@ -15,20 +17,26 @@ import { useState } from "preact/hooks";
 import { useRefetchableProductRead } from "../../hooks/index.js";
 import type { AppliedAmendment, ChangeApply, ChangeRow } from "../../views/product-model.js";
 
-type Answer = { ok: true; result: ChangeApply } | { ok: false; message: string };
+type Answer = { ok: true; result: ChangeApply } | { ok: false; message: string; moved?: boolean };
 
-async function post(changeId: string, action: "apply" | "apply/preview"): Promise<Answer> {
+/** Apply sends the preview's hash: rex refuses (409 `moved`) when the change or its targets were edited since. */
+async function post(changeId: string, action: "apply" | "apply/preview", hash?: string): Promise<Answer> {
   try {
-    const res = await fetch(`/api/rex/changes/${encodeURIComponent(changeId)}/${action}`, { method: "POST" });
+    const res = await fetch(`/api/rex/changes/${encodeURIComponent(changeId)}/${action}`, {
+      method: "POST",
+      ...(hash !== undefined ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hash }) } : {}),
+    });
     const json = await res.json().catch(() => null) as Record<string, unknown> | null;
     if (res.ok) return { ok: true, result: json as unknown as ChangeApply };
-    return { ok: false, message: typeof json?.error === "string" ? json.error : `HTTP ${res.status}` };
+    return { ok: false, message: typeof json?.error === "string" ? json.error : `HTTP ${res.status}`, ...(json?.moved === true ? { moved: true } : {}) };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
 }
 
 const label = (node: { id: string; displayId?: string; title: string }) => `${node.displayId ?? node.id.slice(0, 8)} ${node.title}`;
+
+export const MOVED_NOTICE = "Nothing was applied: this change or a product node it amends was edited since the preview. This is what applying would do now; review it and apply again.";
 
 const EFFECT: Record<AppliedAmendment["delta"], string> = { added: "Adds", modified: "Edits", removed: "Retires" };
 
@@ -41,7 +49,8 @@ export function effectLine(a: AppliedAmendment): string {
 type Step =
   | { kind: "idle" }
   | { kind: "busy" }
-  | { kind: "preview"; preview: ChangeApply }
+  /** `moved`: an Apply was refused because this preview replaced the one it was approved on. */
+  | { kind: "preview"; preview: ChangeApply; moved?: boolean }
   | { kind: "refused"; message: string }
   | { kind: "applied"; result: ChangeApply };
 
@@ -64,15 +73,20 @@ export function ChangeApplySection({ changeId, onWritten }: ChangeApplySectionPr
   }
   if (row?.stage !== "awaiting-apply") return null;
 
-  const preview = async () => {
+  const preview = async (moved?: boolean) => {
     setStep({ kind: "busy" });
     const answer = await post(changeId, "apply/preview");
-    setStep(answer.ok ? { kind: "preview", preview: answer.result } : { kind: "refused", message: answer.message });
+    setStep(answer.ok ? { kind: "preview", preview: answer.result, ...(moved ? { moved } : {}) } : { kind: "refused", message: answer.message });
   };
-  const apply = async () => {
+  const apply = async (hash: string) => {
     setStep({ kind: "busy" });
-    const answer = await post(changeId, "apply");
-    if (!answer.ok) { setStep({ kind: "refused", message: answer.message }); return; }
+    const answer = await post(changeId, "apply", hash);
+    if (!answer.ok) {
+      // Someone else edited it since: show what applying would do now, and say why.
+      if (answer.moved) await preview(true);
+      else setStep({ kind: "refused", message: answer.message });
+      return;
+    }
     setStep({ kind: "applied", result: answer.result });
     refetch();
     onWritten?.();
@@ -83,16 +97,19 @@ export function ChangeApplySection({ changeId, onWritten }: ChangeApplySectionPr
     h("div", { class: "cp-note", role: "note" }, "Its work is done. Applying puts its amendments on the product map."),
     step.kind === "preview"
       ? h("div", { class: "ca-preview" },
+          step.moved
+            ? h("div", { class: "cp-refusal ca-moved", role: "alert" }, h("div", { class: "cp-refusal-message" }, MOVED_NOTICE))
+            : null,
           step.preview.applied.length
             ? h("ul", { class: "ca-effects" }, step.preview.applied.map((a) => h("li", { key: `${a.delta}:${a.node.id}`, class: "ca-effect", "data-delta": a.delta }, effectLine(a))))
             : h("div", { class: "ca-effects-empty" }, "It carries no amendments: applying records it as applied and changes no node."),
           h("div", { class: "cp-actions" },
-            h("button", { type: "button", class: "btn btn-sm ca-confirm", onClick: apply }, "Apply"),
+            h("button", { type: "button", class: "btn btn-sm ca-confirm", onClick: () => apply(step.preview.hash) }, "Apply"),
             h("button", { type: "button", class: "ch-change-link ca-cancel", onClick: () => setStep({ kind: "idle" }) }, "Cancel"),
           ),
         )
       : h("div", { class: "cp-actions" },
-          h("button", { type: "button", class: "btn btn-sm ca-open", disabled: busy, onClick: preview }, busy ? "Checking…" : "Apply…"),
+          h("button", { type: "button", class: "btn btn-sm ca-open", disabled: busy, onClick: () => preview() }, busy ? "Checking…" : "Apply…"),
         ),
     step.kind === "refused"
       ? h("div", { class: "cp-refusal", role: "alert" }, h("div", { class: "cp-refusal-message" }, step.message))

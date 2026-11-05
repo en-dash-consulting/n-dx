@@ -286,6 +286,8 @@ export interface ChangeApply {
   change: string;
   appliedAt: string;
   applied: AppliedAmendment[];
+  /** What the preview was judged on; Apply sends it back, and a moved change answers 409. */
+  hash: string;
 }
 
 // ── Inbox placement ──────────────────────────────────────────────────

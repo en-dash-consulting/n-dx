@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { ChangeApplySection, effectLine } from "../../../src/viewer/components/prd-tree/change-apply.js";
+import { ChangeApplySection, effectLine, MOVED_NOTICE } from "../../../src/viewer/components/prd-tree/change-apply.js";
 import type { ChangeApply, ChangeRow, ChangeStage } from "../../../src/viewer/views/product-model.js";
 
 const ID = "c1";
@@ -25,19 +25,28 @@ const PREVIEW: ChangeApply = {
     { delta: "modified", summary: "Wallets count as cards", node: { id: "cap-card", displayId: "A1.1", title: "Pay by card", type: "capability" } },
     { delta: "added", summary: "Wallets", node: { id: "cap-wallet", title: "Wallets", type: "capability" }, under: { id: "area-pay", displayId: "A1", title: "Checkout" } },
   ],
+  hash: "h1",
 };
+
+type Answer = { status: number; body: unknown };
 
 let root: HTMLDivElement;
 let posts: string[];
-let answers: Record<string, { status: number; body: unknown }>;
+/** Each POST's JSON body, undefined when it sent none. */
+let bodies: unknown[];
+/** Per URL, one answer for every call or a queue answered in order. */
+let answers: Record<string, Answer | Answer[]>;
 
 function serve(stage: ChangeStage): void {
   posts = [];
+  bodies = [];
   answers = {};
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") {
       posts.push(url);
-      const a = answers[url] ?? { status: 200, body: PREVIEW };
+      bodies.push(init.body === undefined ? undefined : JSON.parse(String(init.body)));
+      const queued = answers[url];
+      const a = (Array.isArray(queued) ? queued.shift() : queued) ?? { status: 200, body: PREVIEW };
       return new Response(JSON.stringify(a.body), { status: a.status, headers: { "Content-Type": "application/json" } });
     }
     const body = url === "/api/rex/changes" ? { layout: "v2", changes: [row(stage)] } : undefined;
@@ -103,6 +112,7 @@ describe("ChangeApplySection", () => {
 
     await click(button("Apply"));
     expect(posts).toEqual([PREVIEW_URL, APPLY_URL]);
+    expect(bodies).toEqual([undefined, { hash: "h1" }]);
     expect(onWritten).toHaveBeenCalledTimes(1);
     expect(root.querySelector("[data-change-apply='applied']")?.textContent).toBe("Applied. 2 amendments on the product map.");
   });
@@ -135,6 +145,27 @@ describe("ChangeApplySection", () => {
     await click(button("Apply"));
     expect(root.querySelector("[role='alert']")?.textContent).toContain("already applied");
     expect(onWritten).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChangeApplySection when the change moved since the preview", () => {
+  it("re-reads the preview, says why, and applies on the new preview's hash", async () => {
+    serve("awaiting-apply");
+    const moved: ChangeApply = { ...PREVIEW, applied: [PREVIEW.applied[0]], hash: "h2" };
+    answers[PREVIEW_URL] = [{ status: 200, body: PREVIEW }, { status: 200, body: moved }];
+    answers[APPLY_URL] = [{ status: 409, body: { error: "Cannot apply change c1: it or a product node it amends changed since the preview.", moved: true } }];
+    const onWritten = await mount();
+    await click(button("Apply…"));
+    await click(button("Apply"));
+
+    expect(posts).toEqual([PREVIEW_URL, APPLY_URL, PREVIEW_URL]);
+    expect(onWritten).not.toHaveBeenCalled();
+    expect(root.querySelector(".ca-moved")?.textContent).toBe(MOVED_NOTICE);
+    expect(root.querySelectorAll(".ca-effect")).toHaveLength(1);
+
+    await click(button("Apply"));
+    expect(bodies.at(-1)).toEqual({ hash: "h2" });
+    expect(onWritten).toHaveBeenCalledTimes(1);
   });
 });
 

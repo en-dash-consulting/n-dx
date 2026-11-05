@@ -7,6 +7,12 @@
  * and writes the result. A preview is the same call with the same refusals, so
  * a change that previews clean applies clean unless the tree moves between.
  *
+ * Each outcome carries {@link applyPreviewHash}: the change's amends and the
+ * specs of the nodes they target. An apply given `expectHash` (the preview's
+ * hash) re-reads it inside the transaction and refuses with `moved`, writing
+ * nothing, when another writer edited either in between. Without it (MCP
+ * `apply_change`) the apply runs on whatever the tree holds.
+ *
  * Rex's refusal comes back as `{ ok: false }` carrying rex's message, not as a
  * thrown error, so a caller across the package boundary needs no error class.
  * Logging the apply is the caller's: each names its own source.
@@ -14,7 +20,7 @@
  * @module rex/core/apply-change
  */
 
-import { applyAmendments, ApplyAmendmentsError, type AppliedAmendment } from "./apply-amendments.js";
+import { applyAmendments, ApplyAmendmentsError, applyPreviewHash, type AppliedAmendment } from "./apply-amendments.js";
 import { indexTree, type V2Tree } from "../schema/v2-rules.js";
 import { loadPrdModel } from "../store/prd-model-reader.js";
 import { PrdLayoutError, withPrdModelTransaction } from "../store/prd-model-transaction.js";
@@ -24,6 +30,12 @@ export interface ApplyChangeOptions {
   force?: boolean;
   /** Judge the apply and describe it, writing nothing. */
   preview?: boolean;
+  /**
+   * The `hash` of the preview this apply was approved on. When the change's
+   * amends or a targeted node's spec no longer hash to it, the apply is refused
+   * with `moved` and writes nothing. Omitted, nothing is compared.
+   */
+  expectHash?: string;
   /**
    * Clock for `appliedAt`, History dates and the rules. An apply reads it
    * inside the PRD lock, so a call that waits behind another writer is stamped
@@ -46,6 +58,8 @@ export type ApplyChangeOutcome =
       change: string;
       appliedAt: string;
       applied: AppliedAmendmentEffect[];
+      /** {@link applyPreviewHash} of the tree this was judged on: an apply sends it back as `expectHash`. */
+      hash: string;
       /** False for a preview. */
       written: boolean;
     }
@@ -54,7 +68,12 @@ export type ApplyChangeOutcome =
       /** Rex's refusal, naming every problem. */
       message: string;
       problems: readonly string[];
+      /** Set when `expectHash` no longer matched: the change or its targets moved since the preview. */
+      moved?: true;
     };
+
+/** Thrown inside the transaction so it writes nothing; never leaves this module. */
+class ChangeMovedError extends Error {}
 
 /** Preview or apply the change `ref` (id, display id or alias) on the v2 tree in `rexDir`. */
 export async function applyChange(rexDir: string, ref: string, options: ApplyChangeOptions = {}): Promise<ApplyChangeOutcome> {
@@ -63,15 +82,20 @@ export async function applyChange(rexDir: string, ref: string, options: ApplyCha
   const run = (tree: V2Tree) => {
     now = clock();
     const appliedAt = now.toISOString();
+    // Rex's own refusal (already applied, open work) names more than "moved" would, so it comes first.
     const out = applyAmendments(tree, ref, { appliedAt, now, force: options.force });
-    return { tree: out.tree, change: indexTree(out.tree).resolve(ref)!.id, appliedAt, applied: describeEffects(out.tree, out.applied) };
+    const hash = applyPreviewHash(tree, ref)!;
+    if (options.expectHash !== undefined && hash !== options.expectHash) {
+      throw new ChangeMovedError(`Cannot apply change ${ref}: it or a product node it amends changed since the preview. Review the new preview before applying.`);
+    }
+    return { tree: out.tree, change: indexTree(out.tree).resolve(ref)!.id, appliedAt, applied: describeEffects(out.tree, out.applied), hash };
   };
   try {
     if (options.preview) {
       const model = await loadPrdModel(rexDir);
       if (model.layout !== "v2") throw new PrdLayoutError(rexDir, model.layout);
-      const { change, appliedAt, applied } = run(model.tree);
-      return { ok: true, change, appliedAt, applied, written: false };
+      const { change, appliedAt, applied, hash } = run(model.tree);
+      return { ok: true, change, appliedAt, applied, hash, written: false };
     }
     const { result } = await withPrdModelTransaction(rexDir, (model) => {
       const { tree, ...result } = run(model.tree);
@@ -80,6 +104,7 @@ export async function applyChange(rexDir: string, ref: string, options: ApplyCha
     return { ok: true, ...result, written: true };
   } catch (err) {
     if (err instanceof ApplyAmendmentsError) return { ok: false, message: err.message, problems: err.problems };
+    if (err instanceof ChangeMovedError) return { ok: false, message: err.message, problems: [err.message], moved: true };
     throw err;
   }
 }

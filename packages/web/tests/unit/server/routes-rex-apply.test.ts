@@ -55,7 +55,21 @@ describe("apply routes on a v2 project", () => {
   let base: string;
   let frames: unknown[];
 
-  const post = (path: string) => fetch(`${base}/${path}`, { method: "POST" });
+  const post = (path: string, body?: unknown) =>
+    fetch(`${base}/${path}`, { method: "POST", ...(body !== undefined ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}) });
+
+  /** The preview's hash, as the detail panel sends it back on Apply. */
+  async function previewHash(): Promise<string> {
+    const res = await post(`changes/CH-1/apply/preview`);
+    expect(res.status).toBe(200);
+    return ((await res.json()) as ChangeApplyWire).hash;
+  }
+
+  function edit(file: string, from: string, to: string): void {
+    const text = readFileSync(file, "utf-8");
+    expect(text).toContain(from);
+    writeFileSync(file, text.replace(from, to));
+  }
 
   /** Close CH-1's task and the change: completed, not applied — awaiting apply. */
   function finishChange(): void {
@@ -88,6 +102,7 @@ describe("apply routes on a v2 project", () => {
     const body = (await res.json()) as ChangeApplyWire;
     expect(body.layout).toBe("v2");
     expect(body.change).toBe(CHANGE_ID);
+    expect(body.hash).toMatch(/^[0-9a-f]{64}$/);
     expect(body.applied).toEqual([
       { delta: "modified", summary: "Wallets count as cards", node: { id: CAPABILITY_ID, displayId: "A1.1", title: "Pay by card", type: "capability" } },
     ]);
@@ -97,7 +112,8 @@ describe("apply routes on a v2 project", () => {
 
   it("apply writes through rex's apply, logs it and broadcasts rex:prd-changed", async () => {
     finishChange();
-    const res = await post(`changes/${CHANGE_ID}/apply`);
+    const hash = await previewHash();
+    const res = await post(`changes/${CHANGE_ID}/apply`, { hash });
     expect(res.status).toBe(200);
     const body = (await res.json()) as ChangeApplyWire;
     expect(body.applied.map((a) => a.node.id)).toEqual([CAPABILITY_ID]);
@@ -113,9 +129,36 @@ describe("apply routes on a v2 project", () => {
     expect(frames).toEqual([{ type: "rex:prd-changed", timestamp: body.appliedAt }]);
   });
 
+  it.each([
+    ["an edited amendment", () => join(rexDir, "changes", "add-apple-pay", "index.md"), `"summary":"Wallets count as cards"`, `"summary":"Wallets and cards"`],
+    ["an edited target node", () => join(rexDir, "product", "checkout", "pay-by-card.md"), `A shopper can pay for a basket with a card.`, `A shopper can pay with a card or wallet.`],
+  ])("apply answers 409 moved and writes nothing after %s since the preview", async (_name, file, from, to) => {
+    finishChange();
+    const hash = await previewHash();
+    edit(file(), from, to);
+    const before = snapshot(rexDir);
+    const res = await post(`changes/CH-1/apply`, { hash });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({ moved: true });
+    expect(body.error).toMatch(/changed since the preview/);
+    expect(snapshot(rexDir)).toEqual(before);
+    expect(frames).toEqual([]);
+    expect(await previewHash()).not.toBe(hash);
+  });
+
+  it.each([undefined, {}, { hash: 7 }])("apply without the preview's hash (%j) answers 400 and writes nothing", async (body) => {
+    finishChange();
+    const before = snapshot(rexDir);
+    const res = await post(`changes/CH-1/apply`, body);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("preview");
+    expect(snapshot(rexDir)).toEqual(before);
+  });
+
   it.each(["apply/preview", "apply"])("%s refuses with rex's message and writes nothing when the change's work is open", async (action) => {
     const before = snapshot(rexDir);
-    const res = await post(`changes/CH-1/${action}`);
+    const res = await post(`changes/CH-1/${action}`, action === "apply" ? { hash: "h" } : undefined);
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.error).toMatch(/^Cannot apply change CH-1: .*not completed/);
@@ -126,8 +169,10 @@ describe("apply routes on a v2 project", () => {
 
   it("refuses an already applied change with rex's message", async () => {
     finishChange();
-    expect((await post(`changes/CH-1/apply`)).status).toBe(200);
-    const res = await post(`changes/CH-1/apply`);
+    const hash = await previewHash();
+    expect((await post(`changes/CH-1/apply`, { hash })).status).toBe(200);
+    // The same approval again: rex's refusal names why, ahead of "moved".
+    const res = await post(`changes/CH-1/apply`, { hash });
     expect(res.status).toBe(422);
     expect((await res.json()).error).toContain("already applied");
   });
