@@ -39,9 +39,10 @@ describe("Run verdict chip", () => {
 });
 
 describe("failed and newest runs", () => {
-  it("counts failed and error as failures", () => {
-    expect(["failed", "error"].every(isFailedRun)).toBe(true);
-    expect(["completed", "running"].some(isFailedRun)).toBe(false);
+  it("counts every run that ended without completing as failed", () => {
+    // hench's RunStatus failures, each of which the classifier gives a verdict.
+    expect(["failed", "timeout", "budget_exceeded", "error_transient", "error"].every(isFailedRun)).toBe(true);
+    expect(["completed", "running", "in_progress", "cancelled"].some(isFailedRun)).toBe(false);
   });
 
   it("picks each task's newest run", () => {

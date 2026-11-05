@@ -23,9 +23,16 @@ export interface DiagnoseInSidecar {
 /** Null while `web.sidecar` is off. */
 export const DiagnoseInSidecarContext = createContext<DiagnoseInSidecar | null>(null);
 
-/** A run as failed: the statuses the Runs tile paints as failures. */
+/** Statuses of a run that has not ended in failure: still going, done, or stopped by the operator. */
+const NOT_FAILED = new Set(["completed", "running", "in_progress", "cancelled"]);
+
+/**
+ * A run that ended without completing: `failed`, and also hench's `timeout`,
+ * `budget_exceeded` and `error_transient`, which the classifier gives verdicts
+ * of their own (budget-timeout, vendor-transient).
+ */
 export function isFailedRun(status: string): boolean {
-  return status === "failed" || status === "error";
+  return !NOT_FAILED.has(status);
 }
 
 /** The id of each task's newest run (by start time), the run a Diagnose run packet reads. */
