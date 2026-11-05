@@ -544,6 +544,8 @@ export class SidecarManager {
     const handle = s.handle;
     // Let go first, so the exit is not read as a crash.
     this.letGo(s);
+    // A stop on purpose overrides an earlier crash, so revalidate() does not restart it.
+    s.crashed = null;
     if (handle) await killWithFallback(handle, this.opts.stopGraceMs ?? 5_000);
   }
 }

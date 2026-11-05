@@ -351,6 +351,41 @@ describe("SidecarManager", () => {
     expect(m.list()[0]).toMatchObject({ state: "stopped", pid: null, recentCrashes: 0 });
   });
 
+  it("leaves a sidecar that crashes and is then stopped on purpose while a request revalidates its plan stopped", async () => {
+    const exited = logGate("exited with code 1");
+    let hold: Promise<void> | null = null;
+    let release!: () => void;
+    let resolveAsked!: () => void;
+    const asked = new Promise<void>((resolve) => {
+      resolveAsked = resolve;
+    });
+    const { m } = manager("ok", {
+      log: exited.log,
+      plan: async (name): Promise<PlanResult> => {
+        if (hold) {
+          resolveAsked();
+          await hold;
+        }
+        return { ok: true, plan: planFor(name) };
+      },
+    });
+    const first = await m.ensure("recon");
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const revalidating = m.ensure("recon");
+    await asked;
+    hold = null;
+    await fetch(`http://127.0.0.1:${(first as { port: number }).port}/die`, { headers: { "X-Ndx-Sidecar-Secret": m.secret("recon")! } }).then((r) => r.text());
+    await exited.seen;
+    await m.stop("recon");
+    release();
+
+    expect(await revalidating).toMatchObject({ ok: false, status: 404, reason: "refused" });
+    expect(m.list()[0]).toMatchObject({ state: "stopped", pid: null });
+  });
+
   it("backs off after three crashes in five minutes, and starts again once they age out", async () => {
     let now = 5_000_000;
     const { m, asked } = manager("crash", { now: () => now });
