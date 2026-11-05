@@ -29,7 +29,7 @@ The hub keeps a stdin pipe open for the lifetime of each sidecar. Exit when stdi
 
 - **Hub home:** one card per enabled extension that declares `hub`, linking to `/x/<name>/`. Unapproved and incompatible extensions are shown greyed out with their reason.
 - **Project dashboards:** each `projectLinks` entry becomes a link in the dashboard header, resolved to `/x/<name>/<path>` with `{projectId}` and `{repoRoot}` filled in. A dashboard served without the hub shows no links. No extension code ever reaches the dashboard bundle.
-- **Sidecar drawer:** an extension that declares `sidecarTab` gets one tab. The hub reports it per project as `tab` on `GET /api/hub/extensions?project=<id>`, and serves it only through a frame key (below). The drawer lists the tabs after Sidecar in the hub's order, asks for the key and creates the iframe on a tab's first open, and fetches the keyed page once first so a cold start shows "Starting <label>…", a 503 shows its message and log file, and a 401 shows "Expired · Reload". A dashboard without the hub, or with `web.sidecar` off, shows no tabs; the hub-home drawer has none in v1.
+- **Sidecar drawer:** an extension that declares `sidecarTab` gets one tab. The hub reports it per project as `tab` on `GET /api/hub/extensions?project=<id>`, and serves it only through a frame key (below). The drawer lists the tabs after Sidecar in the hub's order, asks for the key and creates the iframe on a tab's first open, and fetches the keyed page once first so a cold start shows "Starting `<label>`…", a 503 shows its message and log file, and a 401 shows "Expired · Reload". A dashboard without the hub, or with `web.sidecar` off, shows no tabs; the hub-home drawer has none in v1.
 
 ## Frame keys
 
