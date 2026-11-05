@@ -118,5 +118,12 @@ describe("selected and focused blocks look different", () => {
     const selected = declarations('.pam-block[aria-pressed="true"]');
     expect(selected).toContain("box-shadow");
     expect(selected).not.toContain("outline");
+    // The status tint (.pam-met, .pam-defective …) must survive selection.
+    expect(selected).not.toContain("background");
+  });
+
+  it("keeps selection visible when forced colours drop box-shadow", () => {
+    const forced = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(forced).toMatch(/\.pam-block\[aria-pressed="true"\]\s*\{[^}]*border:[^}]*Highlight/);
   });
 });

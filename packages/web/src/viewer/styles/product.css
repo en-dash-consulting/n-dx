@@ -845,11 +845,13 @@
 
 .asm { display: flex; flex-direction: column; gap: var(--space-2); }
 .asm .pam { padding: 0; }
-/* Selected is a filled block with an inset ring; the outline stays for keyboard
-   focus alone, so a selected block and a focused one never look the same. */
-.pam-block[aria-pressed="true"] {
-  background: var(--bg-active, var(--bg-hover));
-  box-shadow: inset 0 0 0 3px var(--accent);
+/* Selected is an inset ring; the outline stays for keyboard focus alone, so a
+   selected block and a focused one never look the same. No background: the
+   status tint must survive selection. Forced colours drop box-shadow, so the
+   ring becomes a thick system-colour border there. */
+.pam-block[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--accent); }
+@media (forced-colors: active) {
+  .pam-block[aria-pressed="true"] { border: 3px solid Highlight; }
 }
 .asm-bands { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
 .asm-band {
