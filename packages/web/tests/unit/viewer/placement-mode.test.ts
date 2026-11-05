@@ -15,9 +15,14 @@ import {
   candidateNote,
   candidatesByArea,
   mapLevelNote,
+  nearNotes,
+  otherAreaCandidates,
   placementStart,
   placingLabel,
+  sharedWords,
+  targetOfRow,
 } from "../../../src/viewer/views/placement-mode.js";
+import { amendsEffect, relationQuestion, touchesEffect } from "../../../src/viewer/components/prd-tree/change-placement.js";
 import { ProductPage } from "../../../src/viewer/views/product-pages.js";
 import { parsePathnameRoute, placeChangeOfTab, placementTab, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -140,6 +145,31 @@ describe("labels", () => {
     expect(mapLevelNote(null)).toBe("rex found no candidate. Pick an area, or search in the panel.");
     expect(mapLevelNote(placement("a", [candidate("x"), candidate("y")], true))).toContain("tie");
     expect(mapLevelNote(placement("a", [candidate("x", { strength: "possible" })]))).toBe("None strong: the best is possible. Pick an area to compare its candidates in place.");
+  });
+});
+
+describe("near blocks, map picks and other-area candidates", () => {
+  it("shares only words of four letters or more that are not common ones", () => {
+    expect(sharedWords("Print gift receipts with the refund", "Gift cards: refund to the card")).toEqual(["gift", "refund"]);
+    expect(sharedWords("Add a tax line", "Tax on a line")).toEqual(["line"]);
+  });
+
+  it("marks capabilities off the shortlist that share words with the change, never a lit one", () => {
+    const rows = [cap("cap-refund", "Refund receipts"), cap("cap-gift", "Gift cards"), { ...cap("cap-x", "Other"), statement: "Prints receipts" }];
+    const near = nearNotes(rows, "Print gift receipts", new Set(["cap-refund"]));
+    expect([...near]).toEqual([["cap-gift", "near · gift"], ["cap-x", "near · receipts"]]);
+  });
+
+  it("takes a block's shortlist row when it has one, and the capability itself otherwise", () => {
+    const row = candidate("cap-refund", { strength: "possible" });
+    expect(targetOfRow(cap("cap-refund", "Refunds"), "Payments", [row])).toBe(row);
+    expect(targetOfRow({ ...cap("cap-gift", "Gift cards"), statement: "Sells them" }, "Payments", [row]))
+      .toEqual({ target: "cap-gift", type: "capability", title: "Gift cards", area: "Payments", statement: "Sells them" });
+  });
+
+  it("lists the candidates outside the zoomed area, constraints included, with their rank", () => {
+    const others = otherAreaCandidates([candidate("cap-refund"), candidate("cap-label"), candidate("con-pci", { type: "constraint" })], MAP, "payments");
+    expect(others.map((o) => [o.candidate.target, o.rank, o.area?.slug ?? null])).toEqual([["cap-label", 2, "shipping"], ["con-pci", 3, null]]);
   });
 });
 
@@ -267,6 +297,112 @@ describe("PlacementMode", () => {
     expect($('.placing-container [role="status"]')?.textContent).toBe("This change is not waiting in the Inbox.");
     await act(async () => { $<HTMLButtonElement>(".placing-container .ch-change-link")!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "a" });
+  });
+
+  it("shows one card per candidate with its area, strength, matched words, statement and what Touches and Amends do", async () => {
+    serve([change("a")], [placement("a", [
+      candidate("cap-label", { title: "Shipping labels", area: "Shipping", statement: "Prints a label per parcel.", reasons: ["words: label, parcel"] }),
+      candidate("cap-refund", { title: "Refunds", area: "Payments", strength: "possible", score: 2 }),
+    ])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    expect($(".placing-panel .cp-section")?.dataset.layout).toBe("wide");
+    expect($$(".placing-panel .cp-card").map((el) => el.dataset.target)).toEqual(["cap-label", "cap-refund"]);
+    const card = $('.cp-card[data-target="cap-label"]')!;
+    expect(card.querySelector(".cp-target-title")?.textContent).toBe("Shipping labels");
+    expect(card.querySelector(".cp-card-area")?.textContent).toBe("Shipping");
+    expect(card.querySelector(".strength-chip, [data-strength]")?.textContent).toContain("strong");
+    expect(card.querySelector(".cp-card-words")?.textContent).toBe("matched label, parcel");
+    expect(card.querySelector(".cp-card-statement")?.textContent).toBe("Prints a label per parcel.");
+    expect([...card.querySelectorAll(".cp-card-effects dd")].map((el) => el.textContent))
+      .toEqual([touchesEffect("Shipping labels"), amendsEffect("Shipping labels")]);
+  });
+
+  it("a card lights its block, and a lit block selects its card", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-refund", { score: 9 }), candidate("cap-gift", { strength: "possible", score: 2 })])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    const pressed = () => $$('.pam-block[aria-pressed="true"]').map((el) => el.dataset.block);
+    expect(pressed()).toEqual([]);
+
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-gift"] input[type="radio"]')!.click(); });
+    await settle();
+    expect(pressed()).toEqual(["cap-gift"]);
+
+    await act(async () => { $<HTMLButtonElement>('.pam-block[data-block="cap-refund"]')!.click(); });
+    await settle();
+    expect(pressed()).toEqual(["cap-refund"]);
+    expect($$(".cp-card.is-checked").map((el) => el.dataset.target)).toEqual(["cap-refund"]);
+    expect($<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.checked).toBe(true);
+  });
+
+  it("picking another area's candidate, as chip or card, moves the map and keeps the panel's edits", async () => {
+    serve([change("a")], [placement("a", [
+      candidate("cap-label", { score: 9 }),
+      candidate("cap-refund", { strength: "possible", score: 2 }),
+      candidate("con-pci", { type: "constraint", strength: "weak", score: 1 }),
+    ])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    expect(crumb()).toEqual(["Plan", "Product map", "Shipping"]);
+    expect($$(".placing-chip").map((el) => el.dataset.target)).toEqual(["cap-refund", "con-pci"]);
+
+    // Edit the panel: choose the strong pick, Amends, and a summary.
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-label"] input[type="radio"]')!.click(); });
+    await settle();
+    await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="amends"]')!.click(); });
+    await settle();
+    const summary = $<HTMLInputElement>(".cp-amends input.cp-input")!;
+    await act(async () => { summary.value = "Labels carry the return address"; summary.dispatchEvent(new Event("input")); });
+
+    await act(async () => { $<HTMLButtonElement>('.placing-chip[data-target="cap-refund"]')!.click(); });
+    await settle();
+    expect(crumb()).toEqual(["Plan", "Product map", "Payments"]);
+    expect($$('.pam-block[aria-pressed="true"]').map((el) => el.dataset.block)).toEqual(["cap-refund"]);
+    expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-refund");
+    expect($<HTMLInputElement>(".cp-amends input.cp-input")?.value).toBe("Labels carry the return address");
+    expect($$(".placing-chip").map((el) => el.dataset.target)).toEqual(["cap-label", "con-pci"]);
+
+    // A card in another area moves the map too.
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-label"] input[type="radio"]')!.click(); });
+    await settle();
+    expect(crumb()).toEqual(["Plan", "Product map", "Shipping"]);
+    expect($<HTMLInputElement>(".cp-amends input.cp-input")?.value).toBe("Labels carry the return address");
+  });
+
+  it("pre-selects rex's relation for a strong, untied pick", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-label", { score: 9 })])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-label"] input[type="radio"]')!.click(); });
+    await settle();
+    expect($('.cp-card.is-checked .cp-relation')?.dataset.relation).toBe("touches");
+    expect($<HTMLButtonElement>(".cp-place")!.disabled).toBe(false);
+  });
+
+  it.each([
+    ["possible", [candidate("cap-label", { strength: "possible" })], false],
+    ["tied", [candidate("cap-label"), candidate("cap-vat")], true],
+  ] as const)("selects no relation for a %s pick and asks whether the change alters the promise", async (_, shortlist, tied) => {
+    serve([change("a")], [placement("a", [...shortlist], tied)]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-label"] input[type="radio"]')!.click(); });
+    await settle();
+    const fieldset = $('.cp-card.is-checked .cp-relation')!;
+    expect(fieldset.dataset.relation).toBe("unset");
+    expect(fieldset.querySelector("legend")?.textContent).toBe(relationQuestion("Home cap-label"));
+    expect([...fieldset.querySelectorAll<HTMLInputElement>("input")].some((i) => i.checked)).toBe(false);
+    expect($<HTMLButtonElement>(".cp-place")!.disabled).toBe(true);
+
+    await act(async () => { fieldset.querySelector<HTMLInputElement>('input[value="touches"]')!.click(); });
+    await settle();
+    expect($<HTMLButtonElement>(".cp-place")!.disabled).toBe(false);
+  });
+
+  it("dims blocks off the shortlist and marks the ones sharing words with the change near", async () => {
+    serve([change("a", { title: "Print gift receipts" })], [placement("a", [candidate("cap-refund", { score: 9 })])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    expect(lit()).toEqual([["cap-refund", "#1 · strong"]]);
+    const gift = $('.pam-block[data-block="cap-gift"]')!;
+    expect(gift.classList.contains("pam-near")).toBe(true);
+    expect(gift.querySelector(".pam-near-note")?.textContent).toBe("near · gift");
+    expect(gift.getAttribute("aria-label")).toContain("; near · gift");
   });
 
   it("is what the Product page shows at /product/place/<id>", async () => {

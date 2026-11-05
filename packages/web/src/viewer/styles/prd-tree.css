@@ -1805,9 +1805,63 @@ a.tracker-link {
   cursor: pointer;
 }
 
-.cp-target.is-checked {
+.cp-target.is-checked,
+.cp-card.is-checked {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Placement mode's wide panel: one card per candidate. */
+.cp-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.cp-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.cp-card-area,
+.cp-card-words,
+.cp-relation-effect {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-card-statement {
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.cp-card-effects {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-card-effects dt { font-weight: 600; }
+.cp-card-effects dd { margin: 0; }
+
+.cp-relation-body {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.cp-relation-question {
+  font-size: var(--font-sm);
+  font-weight: 600;
 }
 
 .cp-target-body {

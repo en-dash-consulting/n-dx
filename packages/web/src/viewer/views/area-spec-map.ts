@@ -81,6 +81,8 @@ export interface SpecMapProps {
   onSelect: (capabilityId: string) => void;
   /** Placement mode: the candidate capabilities to light, each with its note. */
   lit?: ReadonlyMap<string, string>;
+  /** Placement mode: capabilities off the shortlist that share words with the change, each with its note. */
+  near?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -91,7 +93,7 @@ export function liveCapabilities(rows: readonly CapabilityRow[]): CapabilityRow[
   return rows.filter((row) => row.status !== "retired");
 }
 
-export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit }: SpecMapProps) {
+export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit, near }: SpecMapProps) {
   const capabilities = liveCapabilities(allCapabilities);
   return h("section", { class: "asm", "aria-label": "Spec map" },
     h(ConstraintBands, { constraints }),
@@ -110,6 +112,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
                 selected: row.id === selectedId,
                 onOpen: () => onSelect(row.id),
                 lit: lit?.get(row.id),
+                near: near?.get(row.id),
               }))),
           h(BlockLegend, null)));
 }

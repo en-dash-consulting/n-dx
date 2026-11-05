@@ -10,9 +10,17 @@
  * choosing an area zooms in. The breadcrumb names the change and its place in
  * the Inbox ("Placing N of M").
  *
- * The panel beside the map is "Where it goes" (change-placement.ts): every
- * write goes through its `/place` and `/propose` routes, and Next or Place &
- * next opens the next change here, in placement mode.
+ * The panel beside the map is "Where it goes" (change-placement.ts) in its
+ * wide layout: one card per candidate (WF3). Every write goes through its
+ * `/place` and `/propose` routes, and Next or Place & next opens the next
+ * change here, in placement mode.
+ *
+ * The map and the panel share one selection. A card lights its block; a
+ * block selects its card (or, off the shortlist, becomes the panel's pick).
+ * Candidates in other areas show as chips above the zoomed map, and picking
+ * one, as chip or card, moves the map there. The panel stays mounted, so its
+ * edits survive the move. Blocks off the shortlist dim, except those sharing
+ * words with the change, which are marked near.
  *
  * @module viewer/views/placement-mode
  */
@@ -22,12 +30,18 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
-import { ChangePlacementSection, inboxPosition } from "../components/prd-tree/change-placement.js";
+import {
+  ChangePlacementSection,
+  inboxPosition,
+  strongUntiedPick,
+  type PlacementTarget,
+} from "../components/prd-tree/change-placement.js";
+import { StrengthChip } from "../components/index.js";
 import { useInbox, type InboxRow } from "./inbox.js";
 import { AreaBlock, BlockLegend, areaBlock } from "./product-area-map.js";
-import { SpecMap } from "./area-spec-map.js";
+import { SpecMap, liveCapabilities } from "./area-spec-map.js";
 import { Pending } from "./product-pages.js";
-import type { AreaDetail, AreaSection, ChangePlacement, PlacementCandidate, ProductMap } from "./product-model.js";
+import type { AreaDetail, AreaSection, CapabilityRow, ChangePlacement, PlacementCandidate, ProductMap } from "./product-model.js";
 
 // ── Model ────────────────────────────────────────────────────────────
 
@@ -69,7 +83,7 @@ export type PlacementStart =
  */
 export function placementStart(placement: ChangePlacement, map: ProductMap): PlacementStart {
   const top = placement.shortlist[0];
-  if (!top || placement.tied || top.strength !== "strong") return { level: "map" };
+  if (!top || !strongUntiedPick(placement)) return { level: "map" };
   const area = areaOfTarget(map, top.target);
   return area ? { level: "area", slug: area.slug, target: top.target } : { level: "map" };
 }
@@ -93,6 +107,55 @@ export function mapLevelNote(placement: ChangePlacement | null): string {
   if (placement.tied) return "The top candidates tie. Pick an area to compare its candidates in place.";
   if (top.strength === "strong") return "The strong pick sits under no area. Pick an area, or place it from the panel.";
   return `None strong: the best is ${top.strength}. Pick an area to compare its candidates in place.`;
+}
+
+/** Words too common to say two texts are about the same thing. */
+const COMMON_WORDS = new Set([
+  "about", "also", "after", "before", "does", "each", "every", "from", "have", "into", "more", "only", "shall",
+  "should", "than", "that", "their", "them", "then", "there", "they", "this", "what", "when", "where", "which",
+  "while", "will", "with", "without",
+]);
+
+function words(text: string): Set<string> {
+  return new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !COMMON_WORDS.has(w)));
+}
+
+/** The words of four letters or more, not common ones, that both texts use; in `a`'s order. */
+export function sharedWords(a: string, b: string): string[] {
+  const other = words(b);
+  return [...words(a)].filter((w) => other.has(w));
+}
+
+/**
+ * The capabilities off the shortlist that share words with the change, each
+ * with its note ("near · refund, card"). Lit blocks are never near.
+ */
+export function nearNotes(rows: readonly CapabilityRow[], changeText: string, lit: ReadonlySet<string>): Map<string, string> {
+  const near = new Map<string, string>();
+  for (const row of rows) {
+    if (lit.has(row.id)) continue;
+    const shared = sharedWords(changeText, `${row.title} ${row.statement ?? ""}`);
+    if (shared.length) near.set(row.id, `near · ${shared.join(", ")}`);
+  }
+  return near;
+}
+
+/** A block chosen on the map as the panel's target: its shortlist row, or the capability itself. */
+export function targetOfRow(row: CapabilityRow, areaTitle: string, shortlist: readonly PlacementCandidate[]): PlacementTarget {
+  return shortlist.find((c) => c.target === row.id) ?? {
+    target: row.id, type: "capability", title: row.title, area: areaTitle, ...(row.statement ? { statement: row.statement } : {}),
+  };
+}
+
+/** The shortlist's candidates outside the zoomed area (constraints included), best first, with their rank. */
+export function otherAreaCandidates(shortlist: readonly PlacementCandidate[], map: ProductMap, slug: string): Array<{
+  candidate: PlacementCandidate;
+  rank: number;
+  area: AreaSection | null;
+}> {
+  return shortlist
+    .map((candidate, index) => ({ candidate, rank: index + 1, area: areaOfTarget(map, candidate.target) }))
+    .filter(({ area }) => area?.slug !== slug);
 }
 
 /** The breadcrumb's placing label: the change's place in the Inbox, then its title. */
@@ -122,20 +185,58 @@ function AreaLevel({ map, groups, onZoom }: { map: ProductMap; groups: readonly 
     h(BlockLegend, null));
 }
 
-/** The zoomed area's spec map, its candidates lit with their rank. */
-function ZoomedArea({ slug, group, tied }: { slug: string; group: AreaCandidates | undefined; tied: boolean }) {
+/**
+ * The zoomed area's spec map: its candidates lit with their rank, blocks
+ * sharing words with the change marked near, and the panel's pick selected.
+ */
+function ZoomedArea({ slug, group, tied, changeText, selectedId, onSelect }: {
+  slug: string;
+  group: AreaCandidates | undefined;
+  tied: boolean;
+  /** What the change says, for the near marks. */
+  changeText: string;
+  selectedId: string | null;
+  onSelect: (row: CapabilityRow, areaTitle: string) => void;
+}) {
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   if (load.state === "v1") return null;
   if (load.state !== "ready") return h(Pending, { load });
+  const { capabilities, constraints, title } = load.data;
   const lit = new Map((group?.candidates ?? []).map(({ candidate, rank }) => [candidate.target, candidateNote(rank, candidate, tied)]));
   return h(SpecMap, {
-    capabilities: load.data.capabilities,
-    constraints: load.data.constraints,
+    capabilities,
+    constraints,
     selectedId,
-    onSelect: setSelectedId,
+    onSelect: (id: string) => {
+      const row = capabilities.find((c) => c.id === id);
+      if (row) onSelect(row, title);
+    },
     lit,
+    near: nearNotes(liveCapabilities(capabilities), changeText, new Set(lit.keys())),
   });
+}
+
+/** The candidates outside the zoomed area, as chips above its map. Picking one moves the map to it. */
+function OtherAreaChips({ others, selectedId, onPick }: {
+  others: ReturnType<typeof otherAreaCandidates>;
+  selectedId: string | null;
+  onPick: (candidate: PlacementCandidate) => void;
+}) {
+  if (others.length === 0) return null;
+  return h("ul", { class: "placing-chips", "aria-label": "Candidates in other areas" },
+    others.map(({ candidate, rank, area }) =>
+      h("li", { key: candidate.target },
+        h("button", {
+          type: "button",
+          class: "placing-chip",
+          "data-target": candidate.target,
+          "aria-pressed": String(candidate.target === selectedId),
+          onClick: () => onPick(candidate),
+        },
+          h("span", { class: "placing-chip-rank" }, `#${rank}`),
+          h("span", { class: "placing-chip-title" }, candidate.title),
+          h("span", { class: "placing-chip-area" }, area?.title ?? (candidate.type === "constraint" ? "constraint" : "no area")),
+          h(StrengthChip, { strength: candidate.strength })))));
 }
 
 // ── View ─────────────────────────────────────────────────────────────
@@ -168,6 +269,14 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
 
   // undefined: not decided yet; null: the area level; a slug: zoomed into it.
   const [zoom, setZoom] = useState<string | null | undefined>(undefined);
+  // The target the panel and the map share.
+  const [selection, setSelection] = useState<PlacementTarget | null>(null);
+  /** A pick from the panel, a chip or a block: select it and move the map to its area. */
+  const choose = (target: PlacementTarget) => {
+    setSelection(target);
+    const area = map ? areaOfTarget(map, target.target) : null;
+    if (area) setZoom(area.slug);
+  };
   useEffect(() => {
     if (zoom !== undefined || !map || !read) return;
     const start = placement ? placementStart(placement, map) : { level: "map" as const };
@@ -190,6 +299,8 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const position = inboxPosition(order, changeId);
   const groups = map && placement ? candidatesByArea(placement.shortlist, map) : [];
   const zoomedArea = zoom && map ? map.areas.find((a) => a.slug === zoom) : undefined;
+  const shortlist = placement?.shortlist ?? [];
+  const selectedId = selection?.target ?? null;
 
   return h("div", { class: "placing-container", "data-placing": changeId, "data-level": zoom ? "area" : zoom === null ? "map" : "pending" },
     h("nav", { class: "placing-crumb", "aria-label": "Breadcrumb" },
@@ -213,8 +324,19 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
               h(AreaLevel, { key: "areas", map, groups, onZoom: setZoom }),
             ]
           : null,
+        zoom && map
+          ? h(OtherAreaChips, { key: "chips", others: otherAreaCandidates(shortlist, map, zoom), selectedId, onPick: choose })
+          : null,
         zoom
-          ? h(ZoomedArea, { key: zoom, slug: zoom, group: groups.find((g) => g.area.slug === zoom), tied: !!placement?.tied })
+          ? h(ZoomedArea, {
+              key: zoom,
+              slug: zoom,
+              group: groups.find((g) => g.area.slug === zoom),
+              tied: !!placement?.tied,
+              changeText: shown.change.title,
+              selectedId,
+              onSelect: (row: CapabilityRow, areaTitle: string) => choose(targetOfRow(row, areaTitle, shortlist)),
+            })
           : null,
       ),
       h("aside", { class: "placing-panel", "aria-label": "Where it goes" },
@@ -223,6 +345,9 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           changeId,
           changeTitle: shown.change.title,
           onOpenChange: (id: string) => navigateTo?.("product", { tab: placementTab(id) }),
+          layout: "wide",
+          selection,
+          onChoose: choose,
         })),
     ),
   );

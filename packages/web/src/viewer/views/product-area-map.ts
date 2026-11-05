@@ -126,7 +126,7 @@ export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" 
  * One block of the map. Reusable: the area view passes a capability's title,
  * size and status. A native button, so Enter and Space open it.
  */
-export function AreaBlock({ block, onOpen, selected, basisRem, lit }: {
+export function AreaBlock({ block, onOpen, selected, basisRem, lit, near }: {
   block: AreaBlockModel;
   onOpen: () => void;
   selected?: boolean;
@@ -141,10 +141,16 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit }: {
    * candidates", "#1 · strong"); the note joins the accessible name.
    */
   lit?: string;
+  /**
+   * Placement mode marks a block that shares words with the change but is not
+   * on the shortlist ("near · refund"); a lit block is never also near.
+   */
+  near?: string;
 }) {
+  const note = lit ?? near;
   return h("button", {
     type: "button",
-    class: `pam-block pam-${block.status}${lit ? " pam-lit" : ""}`,
+    class: `pam-block pam-${block.status}${lit ? " pam-lit" : near ? " pam-near" : ""}`,
     // Only blocks that can be selected carry a pressed state.
     "aria-pressed": selected === undefined ? undefined : String(selected),
     "data-status": block.status,
@@ -155,11 +161,11 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit }: {
       flexGrow: String(Math.max(1, block.size)),
       ...(basisRem === undefined ? {} : { flexBasis: `${basisRem}rem` }),
     },
-    "aria-label": lit ? `${blockName(block)}; ${lit}` : blockName(block),
+    "aria-label": note ? `${blockName(block)}; ${note}` : blockName(block),
     onClick: onOpen,
   },
     h("span", { class: "pam-label", "aria-hidden": "true" }, block.label),
-    lit ? h("span", { class: "pam-lit-note", "aria-hidden": "true" }, lit) : null,
+    note ? h("span", { class: lit ? "pam-lit-note" : "pam-near-note", "aria-hidden": "true" }, note) : null,
     h("span", { class: "pam-size", "aria-hidden": "true" }, String(block.size)),
     block.openChanges > 0
       ? h("span", { class: "pam-open", "aria-hidden": "true", title: plural(block.openChanges, "open change", "open changes") },
