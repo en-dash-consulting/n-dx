@@ -291,9 +291,17 @@ function stageFacts(stage: StageId, status: Partial<ProjectStatus> | null): Fact
     if (!rex?.exists || !rex.stats) return [["—", "no PRD yet"]];
     return [[rex.stats.total.toLocaleString(), "items"], [`${Math.round(rex.percentComplete)}%`, "complete"], [String(rex.stats.pending), "pending"]];
   }
-  const hench = status.hench;
-  if (!hench) return [];
-  return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
+  if (stage === "work") {
+    const hench = status.hench;
+    if (!hench) return [];
+    return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
+  }
+  // Tune has no number of its own yet (S5 adds Outcomes by tier). Repeating
+  // Work's run counts here would read as a bug, so the card shows none.
+  // Every stage is named above, so a new one cannot fall through to hench.
+  const _exhaustive: "tune" = stage;
+  void _exhaustive;
+  return [];
 }
 
 // ── Next-step panel ────────────────────────────────────────────
