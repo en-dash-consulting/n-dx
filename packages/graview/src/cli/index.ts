@@ -33,7 +33,7 @@ type Subcommand = (typeof SUBCOMMANDS)[number];
 const USAGE = `ndx graview <command> [dir] [flags]
 
   emit [dir] [--no-files]         write document.json and snapshot.json under the graview dir
-  check [dir] [--json]            graview check on the emitted declaration
+  check [dir] [--json]            graview check on the emitted declaration, and the snapshot held to it
   describe [dir] [--place <slug>] graview describe over the emitted snapshot
   serve [dir] [--port <n>]        the product face (the graview-face extension, @n-dx/graview-face) on the
                                   fresh projection; --no-face, or no face enabled: graview serve, the bare store

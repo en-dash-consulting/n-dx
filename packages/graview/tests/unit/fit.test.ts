@@ -124,6 +124,34 @@ describe("the snapshot fits the declaration", () => {
     }
   });
 
+  it("agrees with validateGraph at each of Graview's caps, both ways: the cap passes both, one past it fails both", () => {
+    // If a Graview bump moves a cap, one side of this fails: fit would pass what the face rejects, or reject valid data.
+    const compiled = compileDocument(documentFor("n-dx"));
+    if (!compiled.ok || !compiled.app) throw new Error(JSON.stringify(compiled.findings));
+    const at = (n: number) => "x".repeat(n);
+    const cases: [string, GraphSnapshot, GraphSnapshot][] = [
+      ["string", { nodes: [{ ...change, title: at(STRING_MAX) }], edges: [] }, { nodes: [{ ...change, title: at(STRING_MAX + 1) }], edges: [] }],
+      ["text", { nodes: [{ ...zone, description: at(TEXT_MAX) }], edges: [] }, { nodes: [{ ...zone, description: at(TEXT_MAX + 1) }], edges: [] }],
+      ["list", { nodes: [{ ...task, tags: Array.from({ length: LIST_MAX }, (_, i) => `t${i}`) }], edges: [] }, { nodes: [{ ...task, tags: Array.from({ length: LIST_MAX + 1 }, (_, i) => `t${i}`) }], edges: [] }],
+      ["list item", { nodes: [{ ...task, tags: [at(STRING_MAX)] }], edges: [] }, { nodes: [{ ...task, tags: [at(STRING_MAX + 1)] }], edges: [] }],
+    ];
+    for (const [what, fits, over] of cases) {
+      expect(validateGraph(compiled.app, structuredClone(fits)), `${what} at the cap: validateGraph`).toEqual([]);
+      expect(fitSnapshot(doc, fits), `${what} at the cap: fit`).toEqual([]);
+      expect(validateGraph(compiled.app, structuredClone(over)).length, `${what} past the cap: validateGraph`).toBeGreaterThan(0);
+      expect(fitSnapshot(doc, over).length, `${what} past the cap: fit`).toBeGreaterThan(0);
+    }
+  });
+
+  it("cuts a string at the cap without splitting a surrogate pair", () => {
+    const nodes = [{ id: "c11", kind: "change", title: `${"t".repeat(STRING_MAX - 2)}\u{1F600}tail`, status: "pending" }];
+    clampToCaps(doc, nodes);
+    const title = nodes[0]!.title;
+    expect(title.length).toBeLessThanOrEqual(STRING_MAX);
+    expect(title.endsWith("…")).toBe(true);
+    expect(title.isWellFormed()).toBe(true);
+  });
+
   it("admits a run or a commit for the area a v1 epic becomes, and leaves out a blocker that names one", async () => {
     const root = makeProject({ prd: "v1" });
     roots.push(root);

@@ -1406,7 +1406,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     examples: [
       { command: "ndx graview emit .", description: "Write document.json and snapshot.json" },
-      { command: "ndx graview check .", description: "Validate the declaration with graview check" },
+      { command: "ndx graview check .", description: "Validate the declaration with graview check, and hold the emitted snapshot to it" },
       { command: "ndx graview serve .", description: "Run the product face on the fresh projection (http://localhost:5188)" },
       { command: "ndx graview serve --no-face .", description: "Serve the bare store for a Graview face to connect to" },
       { command: "ndx graview mcp . --list", description: "List the read tools an agent would get" },

@@ -176,7 +176,14 @@ export function clampToCaps(doc: GraviewDocumentData, nodes: Iterable<Record<str
   const kinds = doc.kinds as unknown as Record<string, KindSpec>;
   const cut = new Map<string, number>();
   const count = (kind: string, field: string) => cut.set(`${kind}.${field}`, (cut.get(`${kind}.${field}`) ?? 0) + 1);
-  const shorten = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+  // Cut on a code point: a high surrogate left before the ellipsis would make the text ill-formed.
+  const shorten = (text: string, max: number) => {
+    if (text.length <= max) return text;
+    let end = max - 1;
+    const last = text.charCodeAt(end - 1);
+    if (last >= 0xd800 && last <= 0xdbff) end--;
+    return `${text.slice(0, end)}…`;
+  };
   for (const node of nodes) {
     const fields = kinds[node.kind]?.fields;
     if (!fields) continue;
