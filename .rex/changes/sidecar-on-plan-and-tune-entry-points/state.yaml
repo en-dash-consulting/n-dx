@@ -4,7 +4,13 @@ items:
     lastModified: "2026-11-05T01:08:22.989Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "248f45d1-ae88-4c44-bdad-50c76cc37c4c":
-    lastModified: "2026-11-05T01:08:27.142Z"
+    status: "completed"
+    startedAt: "2026-11-05T07:46:34.952Z"
+    completedAt: "2026-11-05T08:16:01.385Z"
+    endedAt: "2026-11-05T08:16:01.385Z"
+    activeIntervals: [{"end":"2026-11-05T08:08:49.073Z","start":"2026-11-05T07:46:34.952Z"},{"end":"2026-11-05T08:16:01.385Z","start":"2026-11-05T08:16:01.385Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- every test file that asserts straight after a real sleep is in the inventory\n- tests/e2e/wall-clock-inventory-policy.test.js > wall-clock assertion inventory completeness > every test file that asserts straight after a real sleep is in the inventory\n  AssertionError: Test file(s) assert immediately after a real-timer sleep but have no entry in tests/wall-clock-assertion-inventory.md:\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T08:16:01.385Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3323ffdb-0675-4e30-8bc0-e65ffbfddb53":
     lastModified: "2026-11-05T01:08:24.437Z"
