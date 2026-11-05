@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "A token-auth connection whose stored token the server refused reads \"sign in again\" in Settings > Project > Connections (viewer test)"
   - "The badge is decided by a structured field on the connection row, not by matching the reason text (route test asserts the field for never-signed-in, refused and signed-out rows)"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
