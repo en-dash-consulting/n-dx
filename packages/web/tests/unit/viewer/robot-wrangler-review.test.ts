@@ -247,3 +247,46 @@ describe("Robot Wrangler review section", () => {
     expect(root.textContent).toContain("Save the vendor change to set up review for Codex");
   });
 });
+
+describe("Robot Wrangler ?section= deep link", () => {
+  let root: HTMLDivElement;
+  let scrolled: string[];
+
+  beforeEach(() => {
+    clearProjectMetadataCache();
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    scrolled = [];
+    // jsdom has no layout, so record which element the page asked to scroll to.
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.id); };
+  });
+
+  afterEach(() => {
+    act(() => { render(null, root); });
+    root.remove();
+    history.replaceState(null, "", "/");
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+    vi.unstubAllGlobals();
+  });
+
+  async function mountAt(search: string) {
+    history.replaceState(null, "", `/robot-wrangler${search}`);
+    stubApi(config());
+    act(() => { render(h(RobotWranglerView, null), root); });
+    await settle();
+  }
+
+  it.each([
+    ["models", "llm-models-section"],
+    ["review", "llm-review-section"],
+  ])("scrolls to the %s section once the config loads", async (section, id) => {
+    await mountAt(`?section=${section}`);
+    expect(root.querySelector(`#${id}`)).not.toBeNull();
+    expect(scrolled).toEqual([id]);
+  });
+
+  it("does not scroll for an unknown section", async () => {
+    await mountAt("?section=nope");
+    expect(scrolled).toEqual([]);
+  });
+});
