@@ -9,7 +9,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
 import { isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, viewPathname } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
-import { resolveViewAlias } from "../external.js";
+import { resolveViewAliasRoute } from "../external.js";
 import { guardedLeave } from "./use-leave-guard.js";
 
 export interface RouteState {
@@ -110,7 +110,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     // A caller may still pass an old id (the bottom-bar's freshness/completion
     // indicators do, via INDICATOR_VIEWS) — resolve it to the stage that
     // absorbed it so the URL and the lit tab both land on the current view.
-    const resolved = resolveViewAlias(targetView, validViews) ?? targetView;
+    const resolved = resolveViewAliasRoute(targetView, validViews)?.view ?? targetView;
     const entry: HistoryEntry = {
       view: resolved,
       file: opts?.file ?? null,
@@ -123,7 +123,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
   }, [validViews, applyEntry]);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
-    const resolved = resolveViewAlias(id, validViews) ?? id;
+    const resolved = resolveViewAliasRoute(id, validViews)?.view ?? id;
     const entry: HistoryEntry = { view: resolved, file: null, zone: null, runId: null, taskId: null, askSeed: null };
     guardedLeave(() => applyEntry(entry, true));
   }, [validViews, applyEntry]);

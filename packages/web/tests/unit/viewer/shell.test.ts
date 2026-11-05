@@ -127,9 +127,9 @@ describe("stages.ts", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
-  it("puts CLI help above Validation on Plan", () => {
-    const plan = STAGES.plan.sections.map((s) => s.view);
-    expect(plan.indexOf("command-reference")).toBeLessThan(plan.indexOf("validation"));
+  it("keeps All Commands off Plan: it is the Reference tab of Settings › Commands", () => {
+    expect(stageViews("plan")).not.toContain("command-reference");
+    expect(isSettingsView("commands")).toBe(true);
   });
 
   it("finds a view's stage, honouring the viewer's scope", () => {

@@ -67,6 +67,17 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     }
   });
 
+  it("redirects /command-reference to the Reference tab of /commands", async () => {
+    const { baseUrl, close } = await startFor(baseCtx());
+    try {
+      const res = await fetch(`${baseUrl}/command-reference`, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("commands/reference");
+    } finally {
+      await close();
+    }
+  });
+
   it("redirects the renamed /llm-provider to /robot-wrangler", async () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {

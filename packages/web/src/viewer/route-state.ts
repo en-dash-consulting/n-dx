@@ -1,12 +1,12 @@
 import type { ViewId } from "./types.js";
-import { stripBasePath, resolveViewAlias } from "./external.js";
+import { stripBasePath, resolveViewAliasRoute } from "./external.js";
 
 export interface ParsedRoute {
   view: ViewId;
   subId: string | null;
 }
 
-const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs"]);
+const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs", "commands"]);
 
 /**
  * Views whose `subId` is a task id (the rest of `/<view>/<subId>` is a run id or unused).
@@ -112,9 +112,9 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   // viewers that keep them as their own page. Any trailing sub-path rides
   // along unexamined, same as an unrecognised sub-path does today, so it is
   // preserved in the address bar rather than dropped.
-  const movedAlias = resolveViewAlias(base, validViews);
-  if (movedAlias === "work") return parseWorkPath("work", sub);
-  if (movedAlias) return { view: movedAlias, subId: sub || null };
+  const moved = resolveViewAliasRoute(base, validViews);
+  if (moved?.view === "work") return parseWorkPath("work", sub);
+  if (moved) return { view: moved.view, subId: sub || moved.sub };
 
   const work = parseWorkPath(base, sub);
   if (work && validViews.has("work")) return work;

@@ -104,7 +104,7 @@ function placementsOf(view: ViewId): string[] {
     }
     if (STAGES[stage].alsoOwns?.includes(view)) places.push(`owned:${stage}`);
   }
-  if (SETTINGS_ENTRIES.some((e) => e.view === view)) places.push("settings");
+  if (SETTINGS_ENTRIES.some((e) => e.view === view || e.tabs?.includes(view))) places.push("settings");
   return places;
 }
 

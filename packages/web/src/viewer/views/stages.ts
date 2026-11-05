@@ -188,7 +188,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "prd", open: true, fill: true },
       { view: "product", requiresServer: true },
       { view: "changes", requiresServer: true },
-      { view: "command-reference" },
       { view: "validation" },
       { view: "requirements" },
     ],
@@ -234,6 +233,8 @@ export function stageProduct(stage: StageId): StageProduct {
 export interface SettingsEntry {
   /** Label and glyph come from this view's entry in `view-meta.ts`. */
   view: ViewId;
+  /** Views the page shows as tabs beside its own content; they open in the overlay too. */
+  tabs?: readonly ViewId[];
 }
 
 /** Robot Wrangler → Project → Workflow, then Commands (which moves to the Commands sheet in #464). */
@@ -241,10 +242,10 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   { view: "robot-wrangler" },
   { view: "project" },
   { view: "workflow" },
-  { view: "commands" },
+  { view: "commands", tabs: ["command-reference"] },
 ];
 
-const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => e.view));
+const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.flatMap((e) => [e.view, ...(e.tabs ?? [])]));
 
 /** True for views that open in the settings overlay rather than the page. */
 export function isSettingsView(view: ViewId): boolean {
