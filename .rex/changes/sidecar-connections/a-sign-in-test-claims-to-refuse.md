@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "A test starts a sign-in for connection A, calls finishSignIn for connection B with A's code and state, and expects ConnectionSignInError with nothing stored for B"
   - "That test fails when the flow.connection !== config.id check in ConnectionOAuth.finishSignIn is removed"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
