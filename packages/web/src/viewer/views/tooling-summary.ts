@@ -58,8 +58,15 @@ function vendorState(
   entry: ToolingCatalogEntry | undefined,
   auth: ToolingAuth,
   isActiveCli: boolean,
+  isActiveApi: boolean,
 ): { state: ToolingState; detail: string } {
   if (!entry) return { state: "unknown", detail: "Status unavailable" };
+  // On the API provider the CLI is not used; the catalog's readiness judges the key.
+  if (isActiveApi) {
+    return entry.readiness?.state === "ready"
+      ? { state: "connected", detail: entry.readiness.summary }
+      : { state: "signed-out", detail: entry.readiness?.summary ?? "API key missing" };
+  }
   if (id === "local") {
     return entry.readiness?.state === "ready"
       ? { state: "connected", detail: entry.readiness.summary }
@@ -93,7 +100,13 @@ export function summarizeTooling(config: ToolingConfig, catalog: ToolingCatalog 
       id,
       label,
       active: id === active,
-      ...vendorState(id, catalog?.[id], auth, id === active && activeProvider === "cli"),
+      ...vendorState(
+        id,
+        catalog?.[id],
+        auth,
+        id === active && activeProvider === "cli",
+        id === active && id !== "local" && activeProvider === "api",
+      ),
       tiers: config.vendorTiers?.[id] ?? [],
     })),
     routes: (config.routeOverrides ?? []).map(({ label, tier }) => ({ label, tier })),

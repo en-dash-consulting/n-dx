@@ -142,6 +142,18 @@ describe("summarizeTooling", () => {
     expect(s.vendors.find((v) => v.id === "codex")).toMatchObject({ state: "signed-out", active: true });
   });
 
+  it("judges an active vendor on the API provider by its key, not a missing CLI", () => {
+    const catalog = { claude: { cli: { found: false, version: null }, readiness: { state: "ready" as const, summary: "Ready · API key set" } } };
+    const ready = summarizeTooling({ effective: { vendor: "claude", provider: "api" } }, catalog, null);
+    expect(ready.vendors.find((v) => v.id === "claude")?.state).toBe("connected");
+    const noKey = summarizeTooling(
+      { effective: { vendor: "claude", provider: "api" } },
+      { claude: { cli: { found: true, version: "2" }, readiness: { state: "needs-setup", summary: "API key missing" } } },
+      null,
+    );
+    expect(noKey.vendors.find((v) => v.id === "claude")).toMatchObject({ state: "signed-out", detail: "API key missing" });
+  });
+
   it("names review off and self without a reviewer", () => {
     expect(summarizeTooling({ review: { mode: { value: "off" }, vendor: { value: null }, rounds: { value: 1 }, models: {} } }, null, null).review)
       .toBe("Review off");
