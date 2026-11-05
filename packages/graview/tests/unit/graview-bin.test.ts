@@ -41,15 +41,19 @@ describe("resolveGraviewCommand", () => {
     expect(command.detail).toContain(GRAVIEW_NPX_ENV);
   });
 
-  it("falls back to npx pinned to the checked release only when the project or the environment opts in", () => {
-    for (const env of [{ ...noPath, [GRAVIEW_NPX_ENV]: "1" }, { ...noPath, [GRAVIEW_NPX_ENV]: "true" }]) {
+  it("falls back to npx pinned to the checked release only when the user or the environment opts in", () => {
+    for (const env of ["1", "true", "yes", "on", " On "].map((v) => ({ ...noPath, [GRAVIEW_NPX_ENV]: v }))) {
       expect(resolveGraviewCommand(resolveLayout(root), { env, platform: "linux" })).toMatchObject({ cmd: "npx", prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx" });
     }
     expect(resolveGraviewCommand(resolveLayout(root), { env: { ...noPath, [GRAVIEW_NPX_ENV]: "0" }, platform: "linux" }).source).toBe("none");
+    // A committed opt-in would download for every clone, unasked: the shared config's is not read.
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { allowNpx: true } }));
+    expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "linux" }).source).toBe("none");
+    // The user's own local config opts in.
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { allowNpx: true } }));
     expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "linux" }).source).toBe("npx");
-    // The environment's no wins over a committed yes.
-    for (const no of ["0", "false"]) expect(resolveGraviewCommand(resolveLayout(root), { env: { ...noPath, [GRAVIEW_NPX_ENV]: no }, platform: "linux" }).source).toBe("none");
+    // The environment's no wins over the config's yes, in any of its spellings.
+    for (const no of ["0", "false", "no", "off"]) expect(resolveGraviewCommand(resolveLayout(root), { env: { ...noPath, [GRAVIEW_NPX_ENV]: no }, platform: "linux" }).source).toBe("none");
     expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "win32" }).cmd).toBe("npx.cmd");
   });
 

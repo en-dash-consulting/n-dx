@@ -21,7 +21,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
-import { resolveNdxHome, trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
+import { isLocalConfigTracked, resolveNdxHome, trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
 import { GRAVIEW_VERSION } from "./document.js";
 
 export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx" | "none";
@@ -96,11 +96,14 @@ export function readGraviewConfig(layout: Layout): GraviewConfig {
     trustedProjectConfig(layout.root, readConfigFile(layout.configFile)),
     trustedLocalConfig(layout.root, readConfigFile(layout.localConfigFile)),
   ];
-  for (const config of configs) {
+  // A download is the user's to allow: `allowNpx` counts only from their own, untracked local config.
+  // In the shared config, or a local one the repository commits, it would opt every clone in unasked.
+  const ownLocal = !isLocalConfigTracked(layout.root);
+  for (const [i, config] of configs.entries()) {
     const section = config?.graview;
     if (section === null || typeof section !== "object") continue;
     const { bin, includeFiles, app, mainRef, proposeProductLayer, allowNpx } = section as Record<string, unknown>;
-    if (typeof allowNpx === "boolean") out.allowNpx = allowNpx;
+    if (i === 1 && ownLocal && typeof allowNpx === "boolean") out.allowNpx = allowNpx;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();
     if (typeof includeFiles === "boolean") out.includeFiles = includeFiles;
     if (typeof mainRef === "string" && mainRef.trim().length > 0) out.mainRef = mainRef.trim();
@@ -175,9 +178,9 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
   const fromFace = faceBin(options.face, platform);
   if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
-  // The environment wins either way, so NDX_GRAVIEW_NPX=0 refuses a download a committed config allows (CI, say).
+  // The environment wins either way: NDX_GRAVIEW_NPX=0 (false, no, off) refuses a download the local config allows.
   const npxEnv = env[GRAVIEW_NPX_ENV]?.trim().toLowerCase();
-  const envAllows = npxEnv === "1" || npxEnv === "true" ? true : npxEnv === "0" || npxEnv === "false" ? false : undefined;
+  const envAllows = npxEnv === undefined || npxEnv === "" ? undefined : ["1", "true", "yes", "on"].includes(npxEnv) ? true : ["0", "false", "no", "off"].includes(npxEnv) ? false : undefined;
   if (envAllows ?? readGraviewConfig(layout).allowNpx === true) {
     const npx = platform === "win32" ? "npx.cmd" : "npx";
     return {

@@ -797,6 +797,14 @@ describe("n-dx config", () => {
       expect(shared.graview).toEqual({ includeFiles: false });
     });
 
+    it("refuses a graview.allowNpx that is not true or false, which the reader would ignore", async () => {
+      for (const value of ["yes", "1"]) {
+        const result = spawnSync(process.execPath, [CLI_PATH, "config", "graview.allowNpx", value, tmpDir], { encoding: "utf-8", env: isolatedEnv(), timeout: DEFAULT_TIMEOUT });
+        expect(result.status, value).not.toBe(0);
+        expect(result.stderr, value).toContain("expected true or false");
+      }
+    });
+
     it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
       // The trust review reads a non-default apiKeyEnv in .hench/config.json
       // or .n-dx.json as the repository's credential routing: written there,

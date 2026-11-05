@@ -79,8 +79,10 @@ describe("the npx opt-in", () => {
     expect(await source()).toBe("npx");
   });
 
-  it("graview.allowNpx in the config brings npx back, and a local false vetoes a shared true", async () => {
+  it("graview.allowNpx in the user's local config brings npx back; in the shared config it is not read", async () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { allowNpx: true } }));
+    expect(await source()).toBe("none");
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { allowNpx: true } }));
     expect(await source()).toBe("npx");
     writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { allowNpx: false } }));
     expect(await source()).toBe("none");

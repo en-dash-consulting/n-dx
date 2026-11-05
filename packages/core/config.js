@@ -1235,7 +1235,13 @@ function getValidator(pkg, settingPath) {
   }
   if (pkg === "selfHeal") return SELF_HEAL_VALIDATORS[settingPath] ?? null;
   if (pkg === "hench") return HENCH_VALIDATORS[settingPath] ?? null;
+  if (pkg === "graview" && settingPath === "allowNpx") return validateBooleanSetting;
   return null;
+}
+
+/** A setting the reader takes only as true or false: `yes` or `1` would be stored and then ignored. */
+function validateBooleanSetting(value) {
+  if (typeof value !== "boolean") throw new Error(`expected true or false, got ${JSON.stringify(value)}`);
 }
 
 const REVIEW_MODES = ["off", "self", "pair"];

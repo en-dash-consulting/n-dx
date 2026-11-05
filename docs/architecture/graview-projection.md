@@ -42,7 +42,8 @@ project config, `NDX_GRAVIEW_BIN`, PATH, a product face checkout's own
 `graview` (it pins the same release; the monorepo's face, or one under
 `extensions.paths` — the published face installs none), then, only when the
 user opts in with
-`graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1`, `npx -y graview@<pinned>`
+`graview.allowNpx: true` in their own untracked local config or
+`NDX_GRAVIEW_NPX=1`, `npx -y graview@<pinned>`
 (`packages/graview/src/graview-bin.ts`). Without the opt-in nothing is
 downloaded: `check`, `describe`, `mcp` and `serve` with no face to run stop
 with a sentence on how to install graview, `emit` and a face's `serve` need
