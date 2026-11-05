@@ -30,6 +30,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
+import { OWN_WORKTREE_NOTE } from "../utils/own-worktree-note.js";
 import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, laneSteps, stepRunOptions, workCommandArgs } from "../external.js";
 import { useCliName } from "../hooks/sidecar.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/sidecar.js";
@@ -338,6 +339,7 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
                   }, "Start lane")
                 : laneBadge(runPlanLaneState(card, index, cards)),
           ),
+          lane.ownWorktree ? h("p", { class: "sidecar-run-plan-worktree" }, OWN_WORKTREE_NOTE) : null,
           h("ol", { class: "sidecar-run-plan-tasks" },
             lane.tasks.map((task, i) => h("li", { class: "sidecar-run-plan-task", key: task.id },
               h("span", { class: "sidecar-run-plan-task-title" }, `${task.title}${i === 0 ? " (starts first)" : ""}`),

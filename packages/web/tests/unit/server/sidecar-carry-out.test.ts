@@ -374,25 +374,6 @@ describe("start_work", () => {
     await client.close();
   });
 
-  it("starts nothing at guard.maxConcurrentProcesses, and says the limit is reached", async () => {
-    writeFileSync(join(root, ".hench", "config.json"), JSON.stringify({ guard: { maxConcurrentProcesses: 1 } }));
-    const client = await brokerClient();
-
-    const first = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
-    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
-    expect((await first).isError).toBeFalsy();
-    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
-
-    cardMessages = [];
-    const second = client.callTool({ name: "start_work", arguments: { taskId: "task-2" } });
-    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
-    const result = await second;
-    expect(result.isError).toBe(true);
-    expect(resultText(result)).toMatch(/Nothing started: the concurrent run limit is reached \(1 of 1 runs/);
-    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
-    await client.close();
-  });
-
   it("reports the execute route's refusal and starts nothing", async () => {
     const client = await brokerClient();
     const call = client.callTool({ name: "start_work", arguments: { taskId: "missing" } });
@@ -473,29 +454,24 @@ describe("work card run slots", () => {
     await serve();
   });
 
-  it("shows active runs against the limit of three, and refuses the approval that would make a fourth", async () => {
+  it("shows active runs, and refuses a second start while the first still runs in this checkout", async () => {
     const client = await brokerClient();
-    const starts: string[] = [];
-    for (const n of [1, 2, 3]) {
-      cardMessages = [];
-      const call = client.callTool({ name: "start_work", arguments: { taskId: `task-${n}` } });
-      const { cardId } = await cardAnnounced("pending");
-      expect(broker.cards(SESSION).find((c) => c.id === cardId)?.preview).toMatch(new RegExp(`\\nActive runs: ${n - 1} of 3$`));
-      await decide(cardId, { decision: "approve" });
-      starts.push(resultText(await call));
-    }
-    expect(spawnManagedMock).toHaveBeenCalledTimes(3);
+    const first = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const firstCard = await cardAnnounced("pending");
+    expect(broker.cards(SESSION).find((c) => c.id === firstCard.cardId)?.preview).toMatch(/\nActive runs: 0 of 3$/);
+    await decide(firstCard.cardId, { decision: "approve" });
+    expect(resultText(await first)).toMatch(/Started run exec-\w+ on task task-1/);
 
     cardMessages = [];
-    const fourth = client.callTool({ name: "start_work", arguments: { taskId: "task-4" } });
+    const second = client.callTool({ name: "start_work", arguments: { taskId: "task-2" } });
     const { cardId } = await cardAnnounced("pending");
     const preview = broker.cards(SESSION).find((c) => c.id === cardId)!.preview!;
-    expect(preview).toMatch(/\nActive runs: 3 of 3 \(the limit: approving now starts nothing, the concurrent run limit is reached \(3 of 3 runs across the repository, guard\.maxConcurrentProcesses\); held by task task-1 in .+, task task-2 in .+, task task-3 in .+\)$/);
+    expect(preview).toMatch(/\nActive runs: 1 of 3\nApproving now starts nothing: task task-1 is already running in this checkout, and two runs in one checkout collide/);
     await decide(cardId, { decision: "approve" });
-    const result = await fourth;
+    const result = await second;
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toMatch(/Nothing started: the concurrent run limit is reached \(3 of 3 runs across the repository, guard\.maxConcurrentProcesses\)/);
-    expect(spawnManagedMock).toHaveBeenCalledTimes(3);
+    expect(resultText(result)).toMatch(/Nothing started: task task-1 is already running in this checkout/);
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
     await client.close();
   });
 
@@ -529,13 +505,38 @@ describe("work card run slots", () => {
       await client.close();
     });
 
-    it("starts nothing when the repository has three live runs, and names the runs that hold the limit", async () => {
-      holdLock(sibling, "elsewhere-1", "a");
-      holdLock(sibling, "elsewhere-2", "b");
-      holdLock(root, "elsewhere-3", "c");
+    it("refuses a start while a run is live in this checkout, naming it, on the card and on approval; a run only in the sibling does not", async () => {
+      holdLock(root, "here-1", "h");
       const client = await brokerClient();
       const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
       const { cardId } = await cardAnnounced("pending");
+      expect(broker.cards(SESSION).find((c) => c.id === cardId)?.preview).toMatch(/\nActive runs: 1 of 3\nApproving now starts nothing: task here-1 is already running in this checkout/);
+      await decide(cardId, { decision: "approve" });
+      const result = await call;
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toMatch(/Nothing started: task here-1 is already running in this checkout/);
+      expect(spawnManagedMock).not.toHaveBeenCalled();
+      await removeTestDir(join(root, ".hench", "locks"));
+
+      cardMessages = [];
+      holdLock(sibling, "elsewhere-1", "a");
+      const other = client.callTool({ name: "start_work", arguments: { taskId: "task-2" } });
+      const next = await cardAnnounced("pending");
+      expect(broker.cards(SESSION).find((c) => c.id === next.cardId)?.preview).toMatch(/\nActive runs: 1 of 3$/);
+      await decide(next.cardId, { decision: "approve" });
+      expect(resultText(await other)).toMatch(/Started run exec-\w+ on task task-2/);
+      await client.close();
+    });
+
+    it("starts nothing when the repository has three live runs, and names the runs that hold the limit", async () => {
+      holdLock(sibling, "elsewhere-1", "a");
+      holdLock(sibling, "elsewhere-2", "b");
+      holdLock(sibling, "elsewhere-3", "c");
+      const client = await brokerClient();
+      const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+      const { cardId } = await cardAnnounced("pending");
+      const preview = broker.cards(SESSION).find((c) => c.id === cardId)!.preview!;
+      expect(preview).toMatch(/\nActive runs: 3 of 3 \(the limit: approving now starts nothing, the concurrent run limit is reached/);
       await decide(cardId, { decision: "approve" });
       const result = await call;
       expect(result.isError).toBe(true);
@@ -682,6 +683,19 @@ describe("propose_run_plan", () => {
     const result = await start;
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('Nothing started: Task is waiting on unfinished work: "Carry it out" (task-1, pending).');
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("will not start a lane that must run in its own worktree, and tells the agent to have the operator run it from a terminal", async () => {
+    plan = { ...PLAN, lanes: [PLAN.lanes[0], { ...PLAN.lanes[1], ownWorktree: true }] };
+    const client = await brokerClient();
+    const call = client.callTool({ name: "propose_run_plan", arguments: {} });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve", lane: 1 });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain("must run in a worktree of its own");
+    expect(resultText(result)).toContain("from a terminal in a worktree of its own");
     expect(spawnManagedMock).not.toHaveBeenCalled();
     await client.close();
   });

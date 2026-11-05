@@ -32,6 +32,10 @@ export interface QueuePlan {
   summary: string;
 }
 
+/** Hench's wording (`OWN_WORKTREE_NOTE` in plan-queue.ts) for a lane with `ownWorktree`; mirrored, as web never imports hench. */
+export const OWN_WORKTREE_NOTE =
+  "Run this lane in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
+
 const STEP_SEPARATOR = " && ";
 
 /**

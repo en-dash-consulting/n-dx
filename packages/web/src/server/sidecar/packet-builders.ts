@@ -13,6 +13,7 @@
 
 import { capabilityReport, indexTree, isAppliedChange, productReport } from "../rex-gateway.js";
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
+import { OWN_WORKTREE_NOTE } from "../../shared/index.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
 import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS, GUIDE_INSTRUCTIONS } from "./lens-instructions.js";
 import type {
@@ -823,6 +824,7 @@ export async function buildGuidePacket(
             .map((lane, i) =>
               [
                 `Lane ${i + 1} (change ${lane.changeId}): ${lane.command}`,
+                ...(lane.ownWorktree ? [`  ${OWN_WORKTREE_NOTE}`] : []),
                 ...lane.tasks.map((t) => `  - ${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`),
               ].join("\n"),
             )

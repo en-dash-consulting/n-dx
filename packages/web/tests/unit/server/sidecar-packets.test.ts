@@ -909,6 +909,17 @@ describe("lens registry", () => {
       expect(packet.sections.every((s) => s.provenance.source === "`ndx work --plan-queue --format=json`")).toBe(true);
     });
 
+    it("says a lane with ownWorktree must run in its own worktree, in hench's wording, and leaves other lanes as they were", async () => {
+      const plan: QueuePlan = { ...PLAN, lanes: [PLAN.lanes[0], { command: "ndx work --task=t5 --auto .", changeId: "ch2", ownWorktree: true, tasks: [{ id: "t5", title: "Other", reason: "ready" }] }] };
+      const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => plan }), NOW);
+      if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
+      const note = "Run this lane in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
+      const lines = result.packet.text.split("\n");
+      const lane2 = lines.findIndex((l) => l.startsWith("Lane 2 (change ch2)"));
+      expect(lines[lane2 + 1]).toBe(`  ${note}`);
+      expect(result.packet.text.split(note)).toHaveLength(2);
+    });
+
     it("needs no task: an empty ready list says so, and the instructions forbid a run-plan card", async () => {
       const empty: QueuePlan = { lanes: [], excluded: [], activeRuns: 0, runLimit: 3, summary: "Nothing is ready." };
       const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => empty }), NOW);

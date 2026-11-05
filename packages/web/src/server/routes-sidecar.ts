@@ -188,6 +188,10 @@ const CONCURRENT_LIMIT_REASON = (
     ? `; held by ${holders.map((h) => `${h.taskId ? `task ${h.taskId}` : "an untagged run"} in ${h.worktree}`).join(", ")}`
     : "");
 
+/** Why a start is refused while a run is live in this checkout: two runs in one checkout collide. */
+const RUN_HERE_REASON = (here: ReadonlyArray<{ taskId: string | null }>): string =>
+  `${here.map((h) => (h.taskId ? `task ${h.taskId}` : "an untagged run")).join(", ")} is already running in this checkout, and two runs in one checkout collide; run the task in a worktree of its own or wait for that run to end`;
+
 /** Announces that a card was raised or settled; fetch `…/cards` for it. */
 export interface SidecarCardMessage {
   type: "sidecar:card";
@@ -433,9 +437,10 @@ export function sidecarActions(
     postGithub: (draft) => postGithubDraft(exec, ctx.projectDir, draft),
     async previewWork(taskId, options) {
       const read = await resolveTaskRun(ctx, taskId, options);
-      const { inUse, max, holders } = await repositoryRunSlotUsage(ctx);
-      // The limit is where approving is refused (see startWork), so the card says how near it is.
-      const slots = `Active runs: ${inUse} of ${max}${inUse >= max ? ` (the limit: approving now starts nothing, ${CONCURRENT_LIMIT_REASON(inUse, max, holders)})` : ""}`;
+      const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);
+      // Both refusals are in startWork, so the card says before Approve how near the limit is and whether this checkout is taken.
+      const slots = `Active runs: ${inUse} of ${max}${inUse >= max ? ` (the limit: approving now starts nothing, ${CONCURRENT_LIMIT_REASON(inUse, max, holders)})` : ""}` +
+        (here.length > 0 ? `\nApproving now starts nothing: ${RUN_HERE_REASON(here)}` : "");
       return `${read.ok ? renderWorkPreview(read.resolution, openTaskBlockers(ctx, taskId)) : `ndx work --resolve did not answer: ${read.failure}`}\n${slots}`;
     },
     async readRunPlan(signal) {
@@ -467,7 +472,8 @@ export function sidecarActions(
       return writePlacementCard(ctx, placement, sessionId, broadcast);
     },
     async startWork(taskId, options) {
-      const { inUse, max, holders } = await repositoryRunSlotUsage(ctx);
+      const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);
+      if (here.length > 0) return { ok: false, text: `Nothing started: ${RUN_HERE_REASON(here)}.` };
       if (inUse >= max) return { ok: false, text: `Nothing started: ${CONCURRENT_LIMIT_REASON(inUse, max, holders)}.` };
       const answer = await startTaskExecution(ctx, { taskId, ...(options && { options }) }, broadcast);
       if (answer.status !== 202) return { ok: false, text: `Nothing started: ${String(answer.body.error ?? `the execute route answered ${answer.status}`)}.` };

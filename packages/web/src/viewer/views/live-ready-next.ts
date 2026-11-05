@@ -13,6 +13,7 @@
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { OWN_WORKTREE_NOTE } from "../utils/own-worktree-note.js";
 import type { PlannedTask as PlanTask, QueuePlan } from "../external.js";
 import type { NavigateTo } from "../types.js";
 
@@ -68,7 +69,7 @@ export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navi
                 h("span", { class: "live-side-title" }, `Lane ${i + 1}`),
                 // Every command targets `.`; two runs in one checkout collide.
                 lane.ownWorktree
-                  ? h("p", { class: "live-ready-worktree" }, "Run in its own worktree: this command targets the current checkout, and two runs in one checkout collide.")
+                  ? h("p", { class: "live-ready-worktree" }, OWN_WORKTREE_NOTE)
                   : null,
                 h("code", { class: "live-ready-command" }, lane.command),
                 h("ul", null, lane.tasks.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))))

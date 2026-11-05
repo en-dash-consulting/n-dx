@@ -3600,7 +3600,13 @@ export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
  */
 export async function repositoryRunSlotUsage(
   ctx: ServerContext,
-): Promise<{ inUse: number; max: number; holders: Array<{ taskId: string | null; worktree: string }> }> {
+): Promise<{
+  inUse: number;
+  max: number;
+  holders: Array<{ taskId: string | null; worktree: string }>;
+  /** The holders in `ctx.projectDir` itself: a run there is in the checkout a new run would start in. */
+  here: Array<{ taskId: string | null; worktree: string }>;
+}> {
   const self = ctx.projectDir;
   const listed = (await listWorktrees(self).catch(() => [])).filter((wt) => !wt.bare).map((wt) => wt.path);
   const canonicalOf = (p: string): string => {
@@ -3622,7 +3628,9 @@ export async function repositoryRunSlotUsage(
   for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
     if (!locked.has(taskId)) holders.push({ taskId, worktree: self });
   }
-  return { inUse: holders.length, max: getEffectiveMaxConcurrent(self), holders };
+  const selfKey = canonicalOf(self);
+  const here = holders.filter((h) => canonicalOf(h.worktree) === selfKey);
+  return { inUse: holders.length, max: getEffectiveMaxConcurrent(self), holders, here };
 }
 
 /** How full `inUse` of `max` slots is. */

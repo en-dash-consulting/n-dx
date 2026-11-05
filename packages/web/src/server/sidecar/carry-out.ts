@@ -222,6 +222,12 @@ function runPlanResult(card: SidecarCard | undefined): CarryOutResult {
   const { runPlan, lane: chosen } = card;
   const lane = runPlan && chosen !== undefined ? runPlan.lanes[chosen] : undefined;
   if (!runPlan || !lane || chosen === undefined || lane.tasks.length === 0) return { ok: false, text: "The card carried no lane; nothing started." };
+  if (lane.ownWorktree) {
+    return {
+      ok: false,
+      text: `Lane ${chosen + 1} was chosen, but it must run in a worktree of its own: its command targets the current checkout, and two runs in one checkout collide. Nothing started; tell the operator to run the lane's command from a terminal in a worktree of its own.`,
+    };
+  }
   const steps = laneSteps(lane);
   const [first, ...rest] = lane.tasks;
   const { unmapped } = stepRunOptions(steps[0] ?? "");

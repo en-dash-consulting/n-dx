@@ -10,6 +10,8 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { SidecarCards, cardTurnSender, runPlanCommands, runPlanRestartPrompt } from "../../../src/viewer/components/sidecar-cards.js";
 import type { SidecarCard, SidecarCardDecision } from "../../../src/viewer/hooks/use-sidecar.js";
+import { OWN_WORKTREE_NOTE } from "../../../src/viewer/utils/own-worktree-note.js";
+import { OWN_WORKTREE_NOTE as SHARED_NOTE } from "../../../src/shared/index.js";
 import type { QueuePlan } from "../../../src/shared/index.js";
 
 const PLAN: QueuePlan = {
@@ -92,6 +94,18 @@ describe("the run-plan card", () => {
       "Style the button",
     ]);
     expect([...lanes[1].querySelectorAll(".sidecar-run-plan-command")].map((c) => c.textContent)).toEqual(["ndx work --task=t3 --auto ."]);
+  });
+
+  it("keeps the viewer's worktree line equal to the shared one the Guide packet uses", () => {
+    expect(OWN_WORKTREE_NOTE).toBe(SHARED_NOTE);
+  });
+
+  it("shows Ready next's worktree line under a lane with ownWorktree, and under no other", async () => {
+    const plan: QueuePlan = { ...PLAN, lanes: [PLAN.lanes[0], { ...PLAN.lanes[1], ownWorktree: true }] };
+    const { el } = await draw(planCard({ runPlan: plan }));
+    const lanes = el.querySelectorAll(".sidecar-run-plan-lane");
+    expect(lanes[0].querySelector(".sidecar-run-plan-worktree")).toBeNull();
+    expect(lanes[1].querySelector(".sidecar-run-plan-worktree")?.textContent).toBe(OWN_WORKTREE_NOTE);
   });
 
   it("Copy commands copies every lane command, makes no broker call and decides nothing", async () => {
