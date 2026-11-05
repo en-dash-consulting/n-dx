@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { ViewId } from "../types.js";
 import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
+import { useCliName, resolveCliLabel } from "../hooks/index.js";
 import { LiveBadge } from "./stage-badge.js";
 
 /** What a panel can ask of the grid: open (or switch the modal to) another tile, by key. */
@@ -181,6 +182,8 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   const idBase = `stage-tile-${stage}-${key}`;
   const title = tileTitle(tile);
   const span = `stage-tile--c${tile.cols ?? 4} stage-tile--r${tile.rows ?? 1}`;
+  // Called before the chromeless return so the hook order never depends on the tile.
+  const cliName = useCliName();
 
   if (tile.chromeless && tile.panel) {
     return h("section", { class: `stage-tile stage-tile--chromeless ${span}`, "data-tile": key, "aria-label": title },
@@ -202,7 +205,7 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
       h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
       h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
       tile.badge ? h(LiveBadge, { badge: tile.badge, id: `${idBase}-badge` }) : null,
-      tile.panel ? null : h("span", { class: "stage-tile-blurb" }, viewBlurb(tile.view)),
+      tile.panel ? null : h("span", { class: "stage-tile-blurb" }, resolveCliLabel(viewBlurb(tile.view), cliName)),
       h("span", { class: "stage-tile-open", "aria-hidden": "true" }, h(ActionIcon, { name: "expand" })),
     ),
     h("div", { class: `stage-tile-body${summary === null && !tile.panel ? " stage-tile-body--view" : ""}` },

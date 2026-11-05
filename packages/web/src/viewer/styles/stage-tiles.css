@@ -79,6 +79,24 @@
   min-height: 0;
 }
 
+/* The Tasks tree sizes its virtual scroller from its container, so a tile
+   holding it (Plan's Tree tab, a v1 Tasks tile) gives it a bounded flex
+   column, as the old Tasks section's fill body did. Unbounded, the scroller
+   measures the whole tree and renders every row. */
+.stage-tile-body:has(.prd-view),
+.stage-tile-fullscreen-body:has(.prd-view) {
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-tile-content:has(.prd-view),
+.stage-tile-content:has(.prd-view) > div:has(> .prd-view) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .iso-hero--hosted {
   flex: 1;
   min-height: 0;

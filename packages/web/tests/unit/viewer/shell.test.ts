@@ -480,7 +480,8 @@ describe("StagePage", () => {
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
     expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);
     act(() => { tabs[1]!.click(); });
-    expect(full.querySelector('[data-rendered="prd"]')).not.toBeNull();
+    // Directly inside the tab panel: stage-tiles.css bounds the tree through `.stage-tile-content > div > .prd-view`.
+    expect(full.querySelector('.stage-tile-content > div > [data-rendered="prd"]')).not.toBeNull();
   });
 
   it("a v1 project shows a Tasks tile in place of the Product, Inbox and Open changes tiles", async () => {
