@@ -284,9 +284,8 @@ describe("a selected capability", () => {
     });
     await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug, initialCapabilityId: CAP_ID }));
     expect(root.querySelector(".area-capability")).not.toBeNull();
-    // Both reads were in flight together; let the capability's land inside act.
-    await settle();
-    expect(root.querySelector(".area-capability .cap-statement-text")).not.toBeNull();
+    // Both reads were in flight together; wait for the capability's to land.
+    await vi.waitFor(() => expect(root.querySelector(".area-capability .cap-statement-text")).not.toBeNull());
     pressEscape(root.querySelector(".area-capability")!);
     expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
   });
@@ -296,11 +295,12 @@ describe("a selected capability", () => {
     stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
     await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug, initialCapabilityId: "A1.1" }));
     await settle();
-    // Clearing the selection is a second render, after the read's own.
-    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
-    expect(root.querySelector(".area-capability")).toBeNull();
-    expect(root.querySelector(".area-cards")).not.toBeNull();
-    expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+    // Clearing the selection is a second render, after the read's own: wait for it, not for a time.
+    await vi.waitFor(() => {
+      expect(root.querySelector(".area-capability")).toBeNull();
+      expect(root.querySelector(".area-cards")).not.toBeNull();
+      expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+    });
   });
 
   it("clears the selection and the address when a refresh stops listing the capability", async () => {
@@ -315,8 +315,9 @@ describe("a selected capability", () => {
     const flushes = vi.mocked(createWSPipeline).mock.calls.map(([o]) => (o as { onFlush: (batch: { types: Set<string> }) => void }).onFlush);
     act(() => { for (const flush of flushes) flush({ types: new Set(["rex:prd-changed"]) }); });
     await settle();
-    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
-    expect(root.querySelector(".area-capability")).toBeNull();
-    expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".area-capability")).toBeNull();
+      expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+    });
   });
 });
