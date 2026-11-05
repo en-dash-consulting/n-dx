@@ -202,6 +202,25 @@ export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaC
     at?: string;
   }>;
   code: Array<{ path: string; role?: string }>;
+  /** Open changes amending this capability, with what each would change. */
+  pendingAmendments: PendingAmendmentWire[];
+}
+
+/** One open change's edit to a capability: replacement statement and criterion deltas. */
+export interface PendingAmendmentWire {
+  changeId: string;
+  changeDisplayId?: string;
+  changeTitle: string;
+  stage: ChangeStageWire;
+  delta: AmendmentDeltaWire;
+  summary: string;
+  /** The replacement statement, when the amendment carries one. */
+  proposed?: string;
+  criteria?: {
+    add: Array<{ id: string; text: string }>;
+    replace: Array<{ id: string; text: string }>;
+    remove: string[];
+  };
 }
 
 /** An Inbox change whose top placement candidate sits in the area: rex's best guess, not a placement. */
@@ -583,6 +602,32 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
     });
 }
 
+/** Open changes' amendments to one node, in tree order. */
+function pendingAmendments(index: TreeIndex, nodeId: string): PendingAmendmentWire[] {
+  const out: PendingAmendmentWire[] = [];
+  for (const change of changesOf(index)) {
+    if (!isOpenChange(change)) continue;
+    for (const a of change.amends ?? []) {
+      if (index.resolve(a.target)?.id !== nodeId) continue;
+      const slim = (cs: ReadonlyArray<{ id: string; text: string }> | undefined) =>
+        (cs ?? []).map((c) => ({ id: c.id, text: c.text }));
+      out.push({
+        changeId: change.id,
+        ...(change.displayId ? { changeDisplayId: change.displayId } : {}),
+        changeTitle: change.title,
+        stage: stageOf(change),
+        delta: a.delta,
+        summary: a.summary,
+        ...(a.proposed ? { proposed: a.proposed } : {}),
+        ...(a.criteria
+          ? { criteria: { add: slim(a.criteria.add), replace: slim(a.criteria.replace), remove: [...(a.criteria.remove ?? [])] } }
+          : {}),
+      });
+    }
+  }
+  return out;
+}
+
 /** One live capability, or `undefined` when `ref` names none. */
 export function buildCapabilityDetail(tree: V2Tree, ref: string): CapabilityDetailWire | undefined {
   const index = indexTree(tree);
@@ -634,6 +679,7 @@ export function buildCapabilityDetail(tree: V2Tree, ref: string): CapabilityDeta
     history,
     // Rex reports no code sites: realizedBy comes from git, which the reports do not read.
     code: [],
+    pendingAmendments: pendingAmendments(index, node.id),
   };
 }
 

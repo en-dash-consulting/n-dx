@@ -488,6 +488,10 @@ describe("v2 product reads", () => {
       { id: "c2", text: "A declined card shows why" },
     ]);
     expect(capability.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
+    // The open change amends it, so what it would change rides along for the area view's diff.
+    expect(capability.pendingAmendments).toEqual([
+      expect.objectContaining({ changeId: CHANGE_ID, changeDisplayId: "CH-1", stage: "in-progress", delta: "modified", summary: expect.any(String) }),
+    ]);
   });
 
   describe("met and specChangedSinceMet", () => {

@@ -29,12 +29,21 @@ export function routeTab(view: ViewId, subId: string | null): string | null {
   return view === "commands" && subId && COMMANDS_PATH_TABS.has(subId) ? subId : null;
 }
 
-/** An area's page, `/product/area/<slug>`; its sub-path rides in the route's tab. */
-const AREA_PATH = /^area\/[^/]+$/;
+/**
+ * An area's page, `/product/area/<slug>`, or with a capability selected,
+ * `/product/area/<slug>/capability/<id>`; its sub-path rides in the route's tab.
+ */
+const AREA_PATH = /^area\/([^/]+)(?:\/capability\/([^/]+))?$/;
 
 /** The slug an `area/<slug>` tab names, or null when the tab is not an area's. */
 export function areaSlugOfTab(tab: string | null): string | null {
-  return tab && AREA_PATH.test(tab) ? tab.slice("area/".length) : null;
+  return (tab && AREA_PATH.exec(tab)?.[1]) || null;
+}
+
+/** The capability `area/<slug>/capability/<id>` selects in the area, or null. */
+export function areaCapabilityOfTab(tab: string | null): string | null {
+  const id = tab && AREA_PATH.exec(tab)?.[2];
+  return id ? decodeURIComponent(id) : null;
 }
 
 /**

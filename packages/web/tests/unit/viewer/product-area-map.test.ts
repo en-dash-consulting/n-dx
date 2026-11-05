@@ -10,7 +10,7 @@ import {
   blockName,
   blockStatus,
 } from "../../../src/viewer/views/product-area-map.js";
-import { areaSlugOfTab, parsePathnameRoute, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
+import { areaCapabilityOfTab, areaSlugOfTab, parsePathnameRoute, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
 import type { AreaSection, CapabilityRow, ProductMap } from "../../../src/viewer/views/product-model.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
@@ -79,6 +79,14 @@ describe("area routes", () => {
     expect(routeTab("product", route!.subId)).toBe("area/define-the-product");
     expect(areaSlugOfTab("area/define-the-product")).toBe("define-the-product");
     expect(viewPathname("product", "area/define-the-product")).toBe("/product/area/define-the-product");
+  });
+  it("reads /product/area/<slug>/capability/<id> as that area with the capability selected", () => {
+    const route = parsePathnameRoute("/product/area/define-the-product/capability/cap-placement", valid);
+    expect(route).toEqual({ view: "product", subId: "area/define-the-product/capability/cap-placement" });
+    expect(routeTab("product", route!.subId)).toBe("area/define-the-product/capability/cap-placement");
+    expect(areaSlugOfTab(route!.subId)).toBe("define-the-product");
+    expect(areaCapabilityOfTab(route!.subId)).toBe("cap-placement");
+    expect(areaCapabilityOfTab("area/define-the-product")).toBeNull();
   });
   it("leaves other product sub-paths alone", () => {
     expect(parsePathnameRoute("/product/other", valid)).toBeNull();

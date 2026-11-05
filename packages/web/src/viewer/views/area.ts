@@ -21,11 +21,17 @@ import type { AreaDetail } from "./product-model.js";
 import type { NavigateTo } from "../types.js";
 import { SpecMap } from "./area-spec-map.js";
 import { AreaCards } from "./area-cards.js";
+import { AreaCapability } from "./area-capability.js";
 import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
 
 /** The area's address. */
 export function areaPath(slug: string): string {
   return `/product/area/${slug}`;
+}
+
+/** The address of a capability selected in the area. */
+export function areaCapabilityPath(slug: string, capabilityId: string): string {
+  return `${areaPath(slug)}/capability/${encodeURIComponent(capabilityId)}`;
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -56,9 +62,12 @@ const IN_PLACE = "ndxInPlaceAddress";
  * entry (and so Back), then put the previous address back on unmount. A
  * navigation made meanwhile writes its own entry, which is left alone.
  */
-export function useInPlaceAddress(path: string): void {
+export function useInPlaceAddress(path: string | null, restoreTo?: string): void {
   useEffect(() => {
-    const locationBefore = `${location.pathname}${location.search}${location.hash}`;
+    if (path === null) return undefined;
+    // `restoreTo` is for an address the page was opened at (a reload), which
+    // is not the one to go back to.
+    const locationBefore = restoreTo ?? `${location.pathname}${location.search}${location.hash}`;
     const stateBefore: unknown = history.state;
     replaceAppHistory({ ...(stateBefore as object | null), [IN_PLACE]: path }, path);
     return () => {
@@ -66,7 +75,7 @@ export function useInPlaceAddress(path: string): void {
         history.replaceState(stateBefore, "", locationBefore);
       }
     };
-  }, [path]);
+  }, [path, restoreTo]);
 }
 
 interface AreaHeaderProps {
@@ -121,11 +130,19 @@ export interface AreaViewProps {
   onBack?: () => void;
   /** Opens a change's panel in the Tasks tree; the cards' change links and Place use it. */
   navigateTo?: NavigateTo;
+  /** The capability the address names (a reload at its URL): selected on open. */
+  initialCapabilityId?: string | null;
 }
 
-/** The area: its header, its spec map, and the column of four cards beside it. */
-export function AreaView({ slug, onOpenPage, onBack, navigateTo }: AreaViewProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+/**
+ * The area: its header, its spec map, and the column beside it: four cards,
+ * or the selected capability's detail. Esc in the detail steps back to the cards.
+ */
+export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabilityId = null }: AreaViewProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialCapabilityId);
+  // The address names the selection; leaving it returns to the area's. Opened at
+  // the capability's URL, the area's is where Esc goes back to as well.
+  useInPlaceAddress(selectedId ? areaCapabilityPath(slug, selectedId) : null, areaPath(slug));
   const [capturing, setCapturing] = useState(false);
   const openChange = navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined;
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
@@ -143,6 +160,8 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo }: AreaViewProps
     return h("div", { class: "area-container" }, back, h("div", { class: "empty-state", role: "alert" }, `Could not load the area: ${load.message}`));
   }
   const area = load.data;
+  // A selection the area no longer lists (retired since, or a stale address) is no selection.
+  const selected = area.capabilities.find((c) => c.id === selectedId) ?? null;
   return h("div", { class: "area-container", "data-area": area.slug },
     back,
     onBack
@@ -158,8 +177,10 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo }: AreaViewProps
     capturing ? h(AreaCapture, { area, onClose: () => setCapturing(false), onOpenChange: openChange }) : null,
     h("div", { class: "area-body" },
       h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
-      // Place opens the change's placement panel until placement mode (S7) lands.
-      h(AreaCards, { area, onOpenChange: openChange, onPlace: openChange }),
+      selected
+        ? h(AreaCapability, { key: selected.id, capabilityId: selected.id, title: selected.title, onClose: () => setSelectedId(null) })
+        // Place opens the change's placement panel until placement mode (S7) lands.
+        : h(AreaCards, { area, onOpenChange: openChange, onPlace: openChange }),
     ),
   );
 }

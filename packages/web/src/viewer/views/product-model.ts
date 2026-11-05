@@ -468,6 +468,25 @@ export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
   dependsOn: Array<{ id: string; title: string }>;
   history: CapabilityHistoryEntry[];
   code: CodeSite[];
+  /** Open changes amending this capability, with what each would change. */
+  pendingAmendments: PendingAmendment[];
+}
+
+/** One open change's edit to a capability: a replacement statement and criterion deltas. */
+export interface PendingAmendment {
+  changeId: string;
+  changeDisplayId?: string;
+  changeTitle: string;
+  stage: ChangeStage;
+  delta: AmendmentDelta;
+  summary: string;
+  /** The replacement statement, when the amendment carries one. */
+  proposed?: string;
+  criteria?: {
+    add: Array<{ id: string; text: string }>;
+    replace: Array<{ id: string; text: string }>;
+    remove: string[];
+  };
 }
 
 /** An Inbox change whose top placement candidate sits in the area: rex's best guess, not a placement. */

@@ -386,6 +386,22 @@ export const CAPABILITY_DETAIL_FIXTURE: CapabilityDetail = {
     { path: "packages/hench/src/agent/loop.ts", role: "agent loop" },
     { path: "packages/hench/tests/integration/run-loop.test.ts", role: "tests" },
   ],
+  pendingAmendments: [
+    {
+      changeId: "change-run-field",
+      changeDisplayId: "CH-160",
+      changeTitle: "A run field on PRD items",
+      stage: "ready",
+      delta: "modified",
+      summary: "Runs honour a per-item run block.",
+      proposed: "An agent picks the next actionable task and implements it unattended, using the task's saved run settings.",
+      criteria: {
+        add: [{ id: "c5", text: "A saved run block overrides the project defaults." }],
+        replace: [{ id: "c3", text: "The run is recorded with its token spend and the settings it used." }],
+        remove: ["c2", "c4"],
+      },
+    },
+  ],
 };
 
 const DEFINE_AREA = PRODUCT_MAP_FIXTURE.areas[0]!;

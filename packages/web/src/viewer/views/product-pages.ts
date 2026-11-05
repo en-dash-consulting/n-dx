@@ -144,7 +144,9 @@ function ProductTabs({ tab, onTab, children }: {
  * project, which has no product layer, the same tabs show: Map says to
  * migrate, Requirements reads v1 data and renders the requirements view.
  */
-export function ProductPage({ areaSlug = null, onLeaveArea, navigateTo, ...rest }: ProductMapPageProps & {
+export function ProductPage({ areaSlug = null, areaCapabilityId = null, onLeaveArea, navigateTo, ...rest }: ProductMapPageProps & {
+  /** The capability `/product/area/<slug>/capability/<id>` selects in the area. */
+  areaCapabilityId?: string | null;
   /** Opens a change's panel from the area's cards. */
   navigateTo?: NavigateTo;
   /** The area `/product/area/<slug>` names: the page is that area's view. */
@@ -153,7 +155,7 @@ export function ProductPage({ areaSlug = null, onLeaveArea, navigateTo, ...rest 
   onLeaveArea?: () => void;
 }) {
   return areaSlug
-    ? h(AreaView, { slug: areaSlug, onBack: onLeaveArea, navigateTo })
+    ? h(AreaView, { slug: areaSlug, onBack: onLeaveArea, navigateTo, initialCapabilityId: areaCapabilityId })
     : h(ProductMapPage, rest);
 }
 
