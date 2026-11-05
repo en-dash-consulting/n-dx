@@ -125,7 +125,17 @@ export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" 
  * One block of the map. Reusable: the area view passes a capability's title,
  * size and status. A native button, so Enter and Space open it.
  */
-export function AreaBlock({ block, onOpen, selected }: { block: AreaBlockModel; onOpen: () => void; selected?: boolean }) {
+export function AreaBlock({ block, onOpen, selected, basisRem }: {
+  block: AreaBlockModel;
+  onOpen: () => void;
+  selected?: boolean;
+  /**
+   * The block's flex-basis in rem. Without it every block starts from the
+   * stylesheet's fixed basis and only free space in its row tells sizes
+   * apart, which a full, wrapping map barely has.
+   */
+  basisRem?: number;
+}) {
   return h("button", {
     type: "button",
     class: `pam-block pam-${block.status}`,
@@ -133,8 +143,12 @@ export function AreaBlock({ block, onOpen, selected }: { block: AreaBlockModel; 
     "aria-pressed": selected === undefined ? undefined : String(selected),
     "data-status": block.status,
     "data-block": block.key,
-    // Bigger areas grow wider; the basis keeps a one-capability block legible.
-    style: { flexGrow: String(Math.max(1, block.size)) },
+    // Bigger blocks grow wider; the stylesheet's basis keeps a one-unit block
+    // legible unless the caller sizes the basis itself.
+    style: {
+      flexGrow: String(Math.max(1, block.size)),
+      ...(basisRem === undefined ? {} : { flexBasis: `${basisRem}rem` }),
+    },
     "aria-label": blockName(block),
     onClick: onOpen,
   },

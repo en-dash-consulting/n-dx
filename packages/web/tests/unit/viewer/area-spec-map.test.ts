@@ -13,6 +13,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import {
   SpecMap, appliesToLabel, capabilityBlock, orderCapabilities,
+  specBlockBasis, SPEC_BLOCK_FLOOR_REM, SPEC_BLOCK_REM_PER_CRITERION,
 } from "../../../src/viewer/views/area-spec-map.js";
 import { blockName } from "../../../src/viewer/views/product-area-map.js";
 import { AREA_DETAIL_FIXTURE } from "../../fixtures/v2-product-map.js";
@@ -61,6 +62,15 @@ describe("capabilityBlock", () => {
   });
 });
 
+describe("specBlockBasis", () => {
+  it("grows with criteria above a readable floor, so 10x the criteria is at least 3x the width", () => {
+    expect(specBlockBasis(0)).toBe(SPEC_BLOCK_FLOOR_REM);
+    expect(specBlockBasis(1)).toBe(SPEC_BLOCK_FLOOR_REM);
+    expect(specBlockBasis(20)).toBe(20 * SPEC_BLOCK_REM_PER_CRITERION);
+    for (const n of [1, 2, 4, 5]) expect(specBlockBasis(10 * n) / specBlockBasis(n)).toBeGreaterThanOrEqual(3);
+  });
+});
+
 describe("SpecMap", () => {
   it("draws one block per capability, changing first, with status and open-change markers", () => {
     const el = mount();
@@ -68,6 +78,13 @@ describe("SpecMap", () => {
     expect(blocks.map((b) => b.dataset.block)).toEqual(["cap-placement", "cap-natural-language-authoring", "cap-spec-review"]);
     expect(blocks.map((b) => b.dataset.status)).toEqual(["changing", "met", "proposed"]);
     expect(blocks.map((b) => b.style.flexGrow)).toEqual(["2", "3", "1"]);
+    // The basis comes from the criteria count too, so a wrapped row cannot
+    // flatten every block to the same width; one criterion keeps the floor.
+    expect(blocks.map((b) => b.style.flexBasis)).toEqual([
+      `${SPEC_BLOCK_FLOOR_REM}rem`,
+      `${3 * SPEC_BLOCK_REM_PER_CRITERION}rem`,
+      `${SPEC_BLOCK_FLOOR_REM}rem`,
+    ]);
     expect(blocks[0]!.querySelector(".pam-open")?.textContent).toBe("1");
     expect(blocks[1]!.querySelector(".pam-open")).toBeNull();
     expect(blocks[0]!.getAttribute("aria-label")).toBe("Automatic placement: 2 criteria, changing, 1 open change");

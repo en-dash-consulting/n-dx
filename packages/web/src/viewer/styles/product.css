@@ -718,8 +718,10 @@
 .pam { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
 .pam-blocks { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-/* Width follows capability count (flex-grow, set inline); the basis keeps a
- * one-capability block readable. */
+/* Width follows the block's size (flex-grow, set inline); the basis keeps a
+ * one-unit block readable. The spec map also sets the basis inline from the
+ * criteria count (area-spec-map.ts specBlockBasis), because a full wrapping
+ * row leaves flex-grow almost no free space to share. */
 .pam-block {
   flex-basis: 8rem;
   min-width: 6rem;

@@ -43,6 +43,20 @@ export function capabilityBlock(row: CapabilityRow): AreaBlockModel {
   };
 }
 
+/** The narrowest a capability block starts, so a one-criterion title stays readable. */
+export const SPEC_BLOCK_FLOOR_REM = 6;
+/** Width each criterion adds to a block's basis. */
+export const SPEC_BLOCK_REM_PER_CRITERION = 2.5;
+
+/**
+ * A capability block's flex-basis in rem: proportional to its criteria count
+ * above the floor. Blocks in a row share its height, so width carries the
+ * size; a block wider than the map wraps onto its own row and shrinks to fit.
+ */
+export function specBlockBasis(criteriaCount: number): number {
+  return Math.max(SPEC_BLOCK_FLOOR_REM, criteriaCount * SPEC_BLOCK_REM_PER_CRITERION);
+}
+
 /** What a constraint binds, as its band reads it. */
 export function appliesToLabel(appliesTo: ConstraintRow["appliesTo"]): string {
   return appliesTo === "all" ? "all product nodes" : appliesTo.join(", ");
@@ -90,6 +104,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
               h(AreaBlock, {
                 key: row.id,
                 block: capabilityBlock(row),
+                basisRem: specBlockBasis(row.criteriaCount),
                 selected: row.id === selectedId,
                 onOpen: () => onSelect(row.id),
               }))),

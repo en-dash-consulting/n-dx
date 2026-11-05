@@ -139,6 +139,8 @@ describe("ProductAreaMap", () => {
     await mount({ layout: "v2", map });
     const blocks = [...root.querySelectorAll<HTMLButtonElement>(".pam-block")];
     expect(blocks.map((b) => b.dataset.status)).toEqual(["changing", "defective"]);
+    // Area blocks keep the stylesheet's basis; only the spec map sizes it inline.
+    expect(blocks.map((b) => b.style.flexBasis)).toEqual(["", ""]);
     expect(root.querySelector(".pam-legend")?.textContent).toContain("Defective");
     blocks[1]!.click();
     expect(onOpenArea).toHaveBeenCalledWith("b", "B");
