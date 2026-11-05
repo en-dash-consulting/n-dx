@@ -51,7 +51,8 @@ interface CliTimeoutsPutBody {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_TIMEOUT_MS = 1_800_000; // 30 minutes
-const NO_DEFAULT_TIMEOUT_COMMANDS = ["start", "web", "dev"];
+// tests/unit/cli-timeout.test.js holds this list to core's NO_DEFAULT_TIMEOUT_COMMANDS.
+const NO_DEFAULT_TIMEOUT_COMMANDS = ["start", "web", "dev", "mcp"];
 /** Per-command code defaults overriding DEFAULT_TIMEOUT_MS (mirrors core's COMMAND_TIMEOUT_DEFAULTS). */
 const COMMAND_TIMEOUT_DEFAULTS: Record<string, number> = {
   work: 14_400_000, // 4 hours — bounded by vendor session limits
@@ -126,11 +127,12 @@ export function resolveEffectiveCliTimeoutMs(projectDir: string, command: string
   if (command in timeouts) {
     return timeouts[command];
   }
-  if (timeoutMs !== null) {
-    return timeoutMs;
-  }
+  // A server is bounded only by its own key, never by the global limit: core's order.
   if (noDefaultTimeoutCommands.includes(command)) {
     return 0;
+  }
+  if (timeoutMs !== null) {
+    return timeoutMs;
   }
   const commandDefault = COMMAND_TIMEOUT_DEFAULTS[command];
   if (commandDefault !== undefined) {

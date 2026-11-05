@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_TIMEOUT_MS,
+  NO_DEFAULT_TIMEOUT_COMMANDS,
   resolveCommandTimeout,
   withCommandTimeout,
 } from "../../packages/core/cli-timeout.js";
@@ -67,6 +69,13 @@ describe("resolveCommandTimeout", () => {
     }
     expect(resolveCommandTimeout("rex", cfg, "status")).toBe(3000);
     expect(resolveCommandTimeout("sv", {}, "analyze")).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("the dashboard's copy of the server list matches core's", () => {
+    const web = readFileSync(new URL("../../packages/web/src/server/routes-cli-timeout.ts", import.meta.url), "utf-8");
+    const list = /const NO_DEFAULT_TIMEOUT_COMMANDS = (\[[^\]]*\]);/.exec(web)?.[1];
+    expect(list, "routes-cli-timeout.ts no longer declares NO_DEFAULT_TIMEOUT_COMMANDS").toBeDefined();
+    expect(JSON.parse(list).sort()).toEqual([...NO_DEFAULT_TIMEOUT_COMMANDS].sort());
   });
 
   it("the global cli.timeoutMs does not bound a server", () => {

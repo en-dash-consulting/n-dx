@@ -35,7 +35,8 @@ const COMMAND_TIMEOUT_DEFAULTS = new Map([
  * bound them either — they can only be bounded if the user explicitly sets
  * cli.timeouts.<command> in .n-dx.json.
  */
-const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev", "mcp"]);
+// Exported so the dashboard's copy (packages/web/src/server/routes-cli-timeout.ts) is pinned to it by tests/unit/cli-timeout.test.js.
+export const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev", "mcp"]);
 
 /**
  * Subcommands that serve indefinitely under a command that otherwise runs

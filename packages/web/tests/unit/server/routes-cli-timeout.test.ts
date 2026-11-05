@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleCliTimeoutRoute } from "../../../src/server/routes-cli-timeout.js";
+import { handleCliTimeoutRoute, resolveEffectiveCliTimeoutMs } from "../../../src/server/routes-cli-timeout.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs CLI timeout routes. */
@@ -298,5 +298,23 @@ describe("CLI timeout API routes on the legacy layout name the root file", () =>
       await closeRouteTestServer(server);
       await rm(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("resolveEffectiveCliTimeoutMs, in core's order", () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "cli-timeout-order-"));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("does not bound a server by the global limit, only by its own key", async () => {
+    await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 5000, timeouts: { web: 60000 } } }));
+    expect(resolveEffectiveCliTimeoutMs(dir, "start")).toBe(0);
+    expect(resolveEffectiveCliTimeoutMs(dir, "mcp")).toBe(0);
+    expect(resolveEffectiveCliTimeoutMs(dir, "web")).toBe(60000);
+    expect(resolveEffectiveCliTimeoutMs(dir, "analyze")).toBe(5000);
   });
 });
