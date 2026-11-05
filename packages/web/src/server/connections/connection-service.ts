@@ -33,8 +33,15 @@ import {
   type CredentialStoreOptions,
 } from "@n-dx/llm-client";
 import { errorMessage } from "../response-utils.js";
-import { loadConnections, type ConnectionConfig } from "./connection-config.js";
+import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import { loadConnections, type ConnectionConfig, type HttpConnectionConfig } from "./connection-config.js";
 import { connectionToken, withoutConnectionToken } from "./connection-credentials.js";
+import {
+  ConnectionOAuth,
+  ConnectionRefreshError,
+  ConnectionSignInRequiredError,
+  SIGN_IN_AGAIN,
+} from "./oauth-provider.js";
 import { resolveToolPolicies, type ToolPolicy } from "./tool-policy.js";
 
 /** The longest tool name the Claude and OpenAI tool APIs accept. */
@@ -154,6 +161,7 @@ export class ConnectionService {
   private readonly listRetryMs: number;
   private readonly now: () => number;
   private readonly warnedNames = new Set<string>();
+  private readonly oauth: ConnectionOAuth;
   private closed = false;
 
   constructor(private readonly options: ConnectionServiceOptions) {
@@ -162,6 +170,7 @@ export class ConnectionService {
     this.callTimeoutMs = options.callTimeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
     this.listRetryMs = options.listRetryMs ?? DEFAULT_LIST_RETRY_MS;
     this.now = options.now ?? Date.now;
+    this.oauth = new ConnectionOAuth({ credentials: options.credentials, now: this.now });
     const configs = options.connections ?? loadConnections(options.projectDir, { warn: this.warn });
     for (const config of configs) {
       this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" }, failures: 0 });
@@ -250,6 +259,35 @@ export class ConnectionService {
     }
   }
 
+  /**
+   * Start an OAuth sign-in for `connection`: the authorization URL to send the
+   * user to, which returns to `redirectUrl`. The server opens no browser.
+   */
+  async beginSignIn(connection: string, redirectUrl: string): Promise<string> {
+    return this.oauth.beginSignIn(this.oauthConfig(connection), redirectUrl);
+  }
+
+  /**
+   * Finish `connection`'s sign-in with the redirect's `code` and `state`, then
+   * reconnect it. Throws ConnectionSignInError, storing nothing, for a state
+   * that is wrong, reused or expired.
+   */
+  async finishSignIn(connection: string, code: string, state: string): Promise<ConnectionState> {
+    await this.oauth.finishSignIn(this.oauthConfig(connection), code, state);
+    const slot = this.slots.get(connection)!;
+    this.reset(slot, { state: "unavailable", reason: "not connected yet" });
+    await this.ensure(slot);
+    return slot.status;
+  }
+
+  /** Forget `connection`'s OAuth registration and tokens and drop its client. */
+  async signOut(connection: string): Promise<ConnectionState> {
+    this.oauth.signOut(this.oauthConfig(connection));
+    const slot = this.slots.get(connection)!;
+    this.reset(slot, { state: "needs-sign-in", reason: "signed out" });
+    return slot.status;
+  }
+
   /** Close every client (and stop every stdio server). */
   async close(): Promise<void> {
     this.closed = true;
@@ -259,6 +297,26 @@ export class ConnectionService {
       return live ? [live] : [];
     });
     await Promise.all(lives.map((live) => live.client.close().catch(() => undefined)));
+  }
+
+  private oauthConfig(connection: string): HttpConnectionConfig {
+    const config = this.slots.get(connection)?.config;
+    if (!config) throw new Error(`No connection named ${connection}`);
+    if (config.transport !== "http" || config.auth !== "oauth") throw new Error(`Connection ${connection} does not use OAuth`);
+    return config;
+  }
+
+  /** Drop a slot's client and backoff, so the next use connects afresh. */
+  private reset(slot: Slot, status: ConnectionState): void {
+    const live = slot.live;
+    slot.live = undefined;
+    slot.status = status;
+    slot.failures = 0;
+    slot.retryAt = undefined;
+    if (live) {
+      live.client.onclose = undefined;
+      void live.client.close().catch(() => undefined);
+    }
   }
 
   private backingOff(slot: Slot): boolean {
@@ -276,12 +334,19 @@ export class ConnectionService {
 
   /** Why a connection failed: a 401 means sign in (again), anything else unavailable. */
   private failureStatus(config: ConnectionConfig, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
-    if (err instanceof StreamableHTTPError && err.code === 401) {
-      return {
-        state: "needs-sign-in",
-        reason: config.auth === "none" ? "the server requires sign-in; set auth to \"token\" or \"oauth\"" : "the server refused the stored token",
-      };
+    if (err instanceof ConnectionSignInRequiredError) return { state: "needs-sign-in", reason: err.reason };
+    if (err instanceof InvalidGrantError && config.auth === "oauth") {
+      // The refresh token was refused twice over; only a sign-in recovers.
+      this.oauth.forgetTokens(config.id);
+      return { state: "needs-sign-in", reason: SIGN_IN_AGAIN };
     }
+    if (err instanceof StreamableHTTPError && err.code === 401) {
+      const reason = config.auth === "none"
+        ? "the server requires sign-in; set auth to \"token\" or \"oauth\""
+        : config.auth === "oauth" ? `the server refused the signed-in token; ${SIGN_IN_AGAIN}` : "the server refused the stored token";
+      return { state: "needs-sign-in", reason };
+    }
+    if (err instanceof ConnectionRefreshError) return { state: "unavailable", reason: this.scrubReason(config, err.message) };
     // The SDK's message may not carry the status, so name it first.
     const status = err instanceof StreamableHTTPError && err.code !== undefined ? `HTTP ${err.code}: ` : "";
     return { state: "unavailable", reason: this.scrubReason(config, status + errorMessage(err)) };
@@ -294,14 +359,14 @@ export class ConnectionService {
    * "HTTP <status>" survives, so the operator can still diagnose the failure.
    */
   private scrubReason(config: ConnectionConfig, reason: string): string {
-    const withoutToken = config.transport === "http" && config.auth === "token"
+    const withoutToken = config.transport === "http" && config.auth !== "none"
       ? withoutConnectionToken(config.id, reason, this.options.credentials)
       : reason;
     const scrubbed = redactSecrets(withoutToken);
     return scrubbed.length > MAX_REASON_LENGTH ? `${scrubbed.slice(0, MAX_REASON_LENGTH)}…` : scrubbed;
   }
 
-  private transportFor(config: ConnectionConfig): Transport | ConnectionState {
+  private async transportFor(config: ConnectionConfig): Promise<Transport | ConnectionState> {
     if (config.transport === "stdio") {
       return new StdioClientTransport({
         command: config.command,
@@ -316,8 +381,11 @@ export class ConnectionService {
     }
     const url = new URL(config.url);
     if (config.auth === "oauth") {
-      // The OAuth sign-in (discovery, PKCE, refresh) arrives with task 49a.
-      return { state: "needs-sign-in", reason: "OAuth sign-in is not available yet" };
+      // Headless: refreshes an expired token, never asks for a sign-in. The
+      // transport also refreshes through the provider on a 401.
+      const prepared = await this.oauth.prepare(config);
+      if ("needsSignIn" in prepared) return { state: "needs-sign-in", reason: prepared.needsSignIn };
+      return new StreamableHTTPClientTransport(url, { authProvider: prepared.provider });
     }
     if (config.auth === "token") {
       const token = connectionToken(config.id, this.options.credentials);
@@ -329,13 +397,13 @@ export class ConnectionService {
 
   private async connect(slot: Slot): Promise<Live | undefined> {
     const { config } = slot;
-    const transport = this.transportFor(config);
-    if (!("start" in transport)) {
-      slot.status = transport;
-      return undefined;
-    }
     const client = new Client({ name: "n-dx-connections", version: "1.0.0" }, { capabilities: {} });
     try {
+      const transport = await this.transportFor(config);
+      if (!("start" in transport)) {
+        slot.status = transport;
+        return undefined;
+      }
       await client.connect(transport, { timeout: this.connectTimeoutMs });
       const live: Live = { client, tools: await this.readTools(config.id, client) };
       // Any close after this point — the server exited, the stream dropped —

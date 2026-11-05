@@ -119,9 +119,32 @@ wire name, after the broker's own tools. A hub session gets none.
 - **Vendor-neutral.** The gateway sits behind the broker's MCP surface, so a
   Claude and a Codex session see the same tools. Nothing in it names a
   particular tracker, tool or status.
-- **OAuth** (`auth: "oauth"`) reads `needs-sign-in` until the sign-in flow —
-  discovery, PKCE, token storage and silent refresh — lands. Its redirect
-  returns to a dashboard page that finishes the sign-in through an
-  authenticated route; no new public route.
+- **OAuth on the SDK's own flow.** `oauth-provider.ts` implements the SDK's
+  `OAuthClientProvider` and lets `auth()` do discovery (protected-resource,
+  then authorization-server metadata), dynamic client registration,
+  authorization code with S256 PKCE, and refresh; nothing is hand-rolled.
+  `beginSignIn(id, redirectUrl)` returns the authorization URL,
+  `finishSignIn(id, code, state)` exchanges the code and reconnects, and
+  `signOut(id)` forgets the entry. The redirect returns to a dashboard page that
+  finishes the sign-in through an authenticated route (no new public route).
+- **One record, bound to its URL.** The client registration and tokens are one
+  JSON value in `connection:<id>`, with the URL they were issued for. When the
+  configured URL no longer matches, nothing is sent and the connection reads
+  `needs-sign-in`. A new registration is stored only with the tokens it earns,
+  so a sign-in that is never finished stores nothing.
+- **State and verifier stay in memory.** Each is single-use and expires after
+  10 minutes; a wrong, reused, expired or other connection's state is refused
+  and stores nothing. A state is spent by its first use, right or wrong.
+- **Headless by default.** The server never opens a browser. Every connect,
+  the hub's automation included, uses a provider that throws where the SDK
+  would send a user to sign in, so a caller with no valid refresh token gets
+  `needs-sign-in` at once instead of waiting.
+- **Silent refresh, re-reading the store.** An access token within 30 s of its
+  expiry is refreshed before it is sent, and a 401 refreshes through the
+  transport. The provider reads the store on every call, since another process
+  may have rotated the tokens. A refresh that fails is retried once after
+  re-reading; a refused refresh token left unrotated clears the tokens, keeps
+  the client registration, and reads "sign in again". A refresh that fails for
+  any other reason keeps the tokens and reads `unavailable`.
 - **Nothing is on by default.** With no `connections` block the broker's tool
   list is unchanged, and nothing here turns on `web.sidecar`.

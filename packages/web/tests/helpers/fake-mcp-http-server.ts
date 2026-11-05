@@ -5,7 +5,7 @@
  * was sent and whether a call reached the server at all.
  */
 
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createFakeMcpServer } from "../fixtures/connections/fake-mcp-tools.mjs";
@@ -29,7 +29,16 @@ export interface FakeMcpHttpServer {
   close(): Promise<void>;
 }
 
-export async function startFakeMcpHttpServer(): Promise<FakeMcpHttpServer> {
+export interface FakeMcpHttpServerOptions {
+  /**
+   * Answers a request before the MCP endpoint sees it (an authorization
+   * server's routes, a bearer check); returns true when it did. Requests it
+   * answers are not recorded in `authorizations`.
+   */
+  route?: (req: IncomingMessage, res: ServerResponse) => boolean | Promise<boolean>;
+}
+
+export async function startFakeMcpHttpServer(options: FakeMcpHttpServerOptions = {}): Promise<FakeMcpHttpServer> {
   const fake: FakeMcpHttpServer = {
     url: "",
     authorizations: [],
@@ -41,6 +50,7 @@ export async function startFakeMcpHttpServer(): Promise<FakeMcpHttpServer> {
       }),
   };
   const server: Server = createServer(async (req, res) => {
+    if (options.route && (await options.route(req, res))) return;
     fake.authorizations.push(req.headers.authorization);
     if (fake.silent) return;
     if (fake.requireToken && req.headers.authorization !== `Bearer ${fake.requireToken}`) {
@@ -79,7 +89,7 @@ export async function startFakeMcpHttpServer(): Promise<FakeMcpHttpServer> {
   return fake;
 }
 
-async function readAll(req: IncomingMessage): Promise<string> {
+export async function readAll(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks).toString("utf-8");
