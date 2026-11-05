@@ -28,7 +28,7 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
 | [`ndx-reshape`](#ndx-reshape) | Restructure the PRD — regroup, reparent, merge overlaps and place changes | `/ndx-reshape` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
-| [`ndx-graview`](#ndx-graview) | Run the product map (the Graview face) and report what is wrong | `/ndx-graview` |
+| [`ndx-graview`](#ndx-graview) | Run the product map and report what is wrong | `/ndx-graview` |
 | [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, and capture only what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 
 ::: info The PRD skills work on v1 and v2 PRDs
