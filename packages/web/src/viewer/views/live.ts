@@ -158,7 +158,7 @@ interface ThrottleLimit {
 }
 
 /** Sets the runtime concurrency override for this session; Reset returns to the config value. */
-function SlotsStepper({ refresh }: { refresh: () => Promise<void> }) {
+function SlotsStepper({ scope, refresh }: { scope: LiveSnapshot["machine"]["slots"]["scope"]; refresh: () => Promise<void> }) {
   const [limit, setLimit] = useState<ThrottleLimit | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,7 +206,9 @@ function SlotsStepper({ refresh }: { refresh: () => Promise<void> }) {
       type: "button", class: "cmd-btn cmd-btn-secondary", "aria-label": "Fewer slots",
       disabled: now <= SLOTS_MIN, onClick: () => set(now - 1),
     }, "−"),
-    h("span", { class: "live-slots-limit", "aria-live": "polite" }, `limit ${now}`),
+    // Under the hub the tile counts the machine; the override caps this repository only.
+    h("span", { class: "live-slots-limit", "aria-live": "polite" },
+      scope === "machine" ? `repository limit ${now}` : `limit ${now}`),
     h("button", {
       type: "button", class: "cmd-btn cmd-btn-secondary", "aria-label": "More slots",
       disabled: now >= SLOTS_MAX, onClick: () => set(now + 1),
@@ -228,7 +230,7 @@ function MachineStrip({ snapshot, refresh }: { snapshot: LiveSnapshot; refresh: 
       h("span", { class: "live-tile-label" }, t.label),
       h("span", { class: "live-tile-value" }, t.value),
       t.detail ? h("span", { class: "live-tile-detail" }, t.detail) : null,
-      t.key === "slots" ? h(SlotsStepper, { refresh }) : null,
+      t.key === "slots" ? h(SlotsStepper, { scope: snapshot.machine.slots.scope, refresh }) : null,
     )),
   );
 }

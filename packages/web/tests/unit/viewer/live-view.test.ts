@@ -279,6 +279,14 @@ describe("the rendered page", () => {
     expect(JSON.parse(String(last.init!.body))).toEqual({ maxConcurrent: null });
   });
 
+  it("names the stepper's limit as the repository's when the tile counts the machine", async () => {
+    const base = snapshot();
+    body = { ...base, machine: { ...base.machine, slots: { scope: "machine", inUse: 2, max: 4, available: 2, queued: 0 } } };
+    await mount();
+    await act(async () => { await flush(); });
+    expect(root.querySelector(".live-slots-stepper")!.textContent).toContain("repository limit 3");
+  });
+
   it("shows idle with Start working and both analysis options when nothing runs", async () => {
     await mount();
     expect(root.querySelector(".live-idle")).not.toBeNull();
