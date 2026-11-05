@@ -48,6 +48,8 @@ describe("resolveGraviewCommand", () => {
     expect(resolveGraviewCommand(resolveLayout(root), { env: { ...noPath, [GRAVIEW_NPX_ENV]: "0" }, platform: "linux" }).source).toBe("none");
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { allowNpx: true } }));
     expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "linux" }).source).toBe("npx");
+    // The environment's no wins over a committed yes.
+    for (const no of ["0", "false"]) expect(resolveGraviewCommand(resolveLayout(root), { env: { ...noPath, [GRAVIEW_NPX_ENV]: no }, platform: "linux" }).source).toBe("none");
     expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "win32" }).cmd).toBe("npx.cmd");
   });
 

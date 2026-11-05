@@ -259,6 +259,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     return 0;
   }
 
+  // A command that needs graview and has none stops before it writes anything; serve asks for
+  // a product face first, which needs no binary, so it is judged after the face plan below.
+  const needsBinary = parsed.sub !== "emit" && !(parsed.sub === "serve" && parsed.face);
+  const early = needsBinary ? resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(layout.root)) }) : undefined;
+  if (early?.source === "none") {
+    console.error(`ndx graview ${parsed.sub}: ${early.detail}`);
+    return 1;
+  }
+
   const emitted = await emitProjection(parsed.dir, {
     files: parsed.files ?? config.includeFiles ?? true,
     ref: config.mainRef,
@@ -282,7 +291,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     say(`product face: ${face.detail}`);
   }
 
-  const command = resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
+  const command = early ?? resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
   // Everything past a product face needs a graview binary, and none is downloaded unasked.
   if (command.source === "none") {
     console.error(`ndx graview ${parsed.sub}: ${command.detail}`);

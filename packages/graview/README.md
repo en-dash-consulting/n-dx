@@ -28,7 +28,7 @@ Config keys (`.ndx/config.json` or `.n-dx.json`):
 | Key | Meaning |
 |-----|---------|
 | `graview.bin` | Path to the graview binary or its `cli.js`; a `.js` path runs under the current Node |
-| `graview.allowNpx` | When no graview binary is found, let `npx -y graview@<pinned>` download one (default `false`; `NDX_GRAVIEW_NPX=1` does the same) |
+| `graview.allowNpx` | When no graview binary is found, let `npx -y graview@<pinned>` download one (default `false`; `NDX_GRAVIEW_NPX=1` does the same, and `NDX_GRAVIEW_NPX=0` refuses the download whatever the config says) |
 | `graview.includeFiles` | Project file nodes (default `true`); `false` leaves them out, the same as `--no-files` |
 | `graview.proposeProductLayer` | On a v1 tree, draw the areas, capabilities and constraints rex's migration plan proposes, each marked `proposed` (default `true`); `false` projects the tree as changes only |
 | `graview.mainRef` | The branch commits, landings and releases are read from (`main`, `upstream/main`). Unset, rex's default: the first of `origin/HEAD`, `origin/main`, `main` that resolves |

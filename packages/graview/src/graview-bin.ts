@@ -69,7 +69,7 @@ export interface GraviewConfig {
 }
 
 export const GRAVIEW_BIN_ENV = "NDX_GRAVIEW_BIN";
-/** Set to 1 (or true) to let npx download the pinned graview when none is installed. */
+/** Set to 1 (or true) to let npx download the pinned graview when none is installed; 0 (or false) refuses it whatever the config says. */
 export const GRAVIEW_NPX_ENV = "NDX_GRAVIEW_NPX";
 
 function readConfigFile(path: string): Record<string, unknown> {
@@ -174,8 +174,10 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
   const fromFace = faceBin(options.face, platform);
   if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
+  // The environment wins either way, so NDX_GRAVIEW_NPX=0 refuses a download a committed config allows (CI, say).
   const npxEnv = env[GRAVIEW_NPX_ENV]?.trim().toLowerCase();
-  if (readGraviewConfig(layout).allowNpx === true || npxEnv === "1" || npxEnv === "true") {
+  const envAllows = npxEnv === "1" || npxEnv === "true" ? true : npxEnv === "0" || npxEnv === "false" ? false : undefined;
+  if (envAllows ?? readGraviewConfig(layout).allowNpx === true) {
     const npx = platform === "win32" ? "npx.cmd" : "npx";
     return {
       cmd: npx,

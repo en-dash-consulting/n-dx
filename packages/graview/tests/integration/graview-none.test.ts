@@ -7,7 +7,8 @@
  * to ask for a face, so nothing real is found or run.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { resolveLayout } from "../../src/llm-gateway.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { main } from "../../src/cli/index.js";
@@ -53,8 +54,9 @@ describe("no graview binary and no opt-in", () => {
     expect(await main(["emit", root, "--quiet"])).toBe(0);
   });
 
-  it.each(["check", "describe", "mcp"])("%s stops with exit 1 and says how to install graview", async (sub) => {
+  it.each(["check", "describe", "mcp"])("%s stops with exit 1 and says how to install graview, before it writes anything", async (sub) => {
     expect(await main([sub, root, "--quiet"])).toBe(1);
+    expect(existsSync(join(resolveLayout(root).graviewDir, "snapshot.json")), "nothing was emitted").toBe(false);
     const said = err.join("\n");
     expect(said).toContain(`ndx graview ${sub}: no graview binary found`);
     expect(said).toContain(`npm i -g graview@${GRAVIEW_VERSION}`);
