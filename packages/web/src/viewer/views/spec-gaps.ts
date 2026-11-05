@@ -13,6 +13,7 @@
 
 import { h } from "preact";
 import { useChangesSummary } from "./changes-summary-context.js";
+import { DescribeInSidecarButton } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import type { ChangeSummary } from "./product-model.js";
 import { GAP_LABELS, gapFilter, hasGap, stageFilter, storeFilter, type GapKind } from "./changes.js";
@@ -26,6 +27,8 @@ export interface SpecGapRow {
   count: number;
   /** The Open changes filter to store before opening it; absent for the Product page's tab. */
   filter?: string;
+  /** The first open change the line counts: what "Tighten with Sidecar" describes. Absent when the line counts none. */
+  changeId?: string;
 }
 
 export interface SpecGaps {
@@ -41,12 +44,19 @@ export function specGaps(summary: ChangeSummary): SpecGaps {
     label: GAP_LABELS[g],
     count: summary.open.filter((c) => hasGap(c, g)).length,
     filter: gapFilter(g),
+    changeId: summary.open.find((c) => hasGap(c, g))?.id,
   });
   const rows: SpecGapRow[] = [
     gap("no-criteria"),
     gap("task-criteria"),
     gap("blocked"),
-    { key: "review", label: "Amendments awaiting review", count: summary.stages["awaiting-apply"], filter: stageFilter("awaiting-apply") },
+    {
+      key: "review",
+      label: "Amendments awaiting review",
+      count: summary.stages["awaiting-apply"],
+      filter: stageFilter("awaiting-apply"),
+      changeId: summary.open.find((c) => c.stage === "awaiting-apply")?.id,
+    },
   ];
   const { total, uncovered } = summary.requirements;
   if (total > 0) rows.push({ key: "requirements", label: "Open changes without an automated requirement", count: uncovered });
@@ -78,6 +88,9 @@ export function SpecGapsPanel({ navigateTo }: { navigateTo: NavigateTo }) {
               h("span", { class: "sg-count" }, row.count.toLocaleString()),
               h("span", { class: "sg-label" }, row.label),
             ),
+            row.changeId
+              ? h(DescribeInSidecarButton, { changeId: row.changeId, label: "Tighten with Sidecar", class: "sg-tighten" })
+              : null,
           )))
       : null,
     readyLine

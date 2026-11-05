@@ -128,6 +128,8 @@ export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
 export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
 export { PlanWithSidecarContext, PlanWithSidecarButton, planFirstTurnReady } from "./plan-with-sidecar.js";
 export type { PlanWithSidecar } from "./plan-with-sidecar.js";
+export { DescribeInSidecarContext, DescribeInSidecarButton } from "./describe-in-sidecar.js";
+export type { DescribeInSidecar } from "./describe-in-sidecar.js";
 export { DiagnoseInSidecarContext, DiagnoseInSidecarButton, RunVerdictChip, isFailedRun, newestRunIds } from "./diagnose-in-sidecar.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";

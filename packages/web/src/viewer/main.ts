@@ -32,6 +32,7 @@ import {
   PlaceWithSidecarContext,
   PlanWithSidecarContext,
   planFirstTurnReady,
+  DescribeInSidecarContext,
   DiagnoseInSidecarContext,
 } from "./components/index.js";
 import {
@@ -170,6 +171,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [planWith, setPlanWith] = useState<{ area: string | null; seq: number } | null>(null);
   // The text that bar typed, waiting to go as the session's first turn once the session holds that lens and target.
   const [planText, setPlanText] = useState<string | null>(null);
+  // The change "Describe in Sidecar" / "Tighten with Sidecar" attached (Describe lens); dropped with the page.
+  const [describeChange, setDescribeChange] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -198,10 +201,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, plan: planWith },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, plan: planWith },
   );
   const showSidecar = sidecarShell.drawer.show;
-  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setPlanWith(null); setPlanText(null); }, [pageView]);
+  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setDescribeChange(null); setPlanWith(null); setPlanText(null); }, [pageView]);
   // Send the typed text once the open session has followed the attachment (a PATCH answers
   // the change), so the turn opens with the Plan lens and its target rather than racing them.
   const { sidecar, drawer } = sidecarShell;
@@ -225,6 +228,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       plan: (text: string, area?: string) => {
         setOpenChange(null);
         setDiagnoseTask(null);
+        setDescribeChange(null);
         setPlanWith((prev) => ({ area: area ?? null, seq: (prev?.seq ?? 0) + 1 }));
         setPlanText(text);
         showSidecar();
@@ -232,14 +236,30 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     } : null),
     [sidecarShell.button !== null, showSidecar],
   );
+  // Null while Sidecar is off, so no change offers "Describe in Sidecar". Describe on a change
+  // outranks the Plan lens, Diagnose and Place, so a click lets them go.
+  const describeInSidecar = useMemo(
+    () => (sidecarShell.button ? {
+      describe: (id: string) => {
+        setOpenChange(null);
+        setDiagnoseTask(null);
+        setPlanWith(null);
+        setPlanText(null);
+        setDescribeChange(id);
+        showSidecar();
+      },
+      attached: describeChange,
+    } : null),
+    [sidecarShell.button !== null, showSidecar, describeChange],
+  );
   // Null while Sidecar is off, so no failed run offers "Diagnose in Sidecar".
   const diagnoseInSidecar = useMemo(
-    () => (sidecarShell.button ? { diagnose: (taskId: string) => { setDiagnoseTask(taskId); showSidecar(); }, attached: diagnoseTask } : null),
+    () => (sidecarShell.button ? { diagnose: (taskId: string) => { setDescribeChange(null); setDiagnoseTask(taskId); showSidecar(); }, attached: diagnoseTask } : null),
     [sidecarShell.button !== null, showSidecar, diagnoseTask],
   );
   // Null while Sidecar is off, so no change offers "Place with Sidecar".
   const placeWithSidecar = useMemo(
-    () => (sidecarShell.button ? { place: (id: string) => { setOpenChange(id); showSidecar(); }, attached: openChange } : null),
+    () => (sidecarShell.button ? { place: (id: string) => { setDescribeChange(null); setOpenChange(id); showSidecar(); }, attached: openChange } : null),
     [sidecarShell.button !== null, showSidecar, openChange],
   );
   // Null while Sidecar is off, so the Workspaces cards offer no attach control.
@@ -323,7 +343,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
+  return h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -402,7 +422,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  ))));
+  )))));
 }
 
 const root = document.getElementById("app");

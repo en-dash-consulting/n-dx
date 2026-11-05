@@ -60,6 +60,8 @@ export interface SidecarPageSelection {
   changeId?: string | null;
   /** The task whose failed run "Diagnose in Sidecar" attached, by id; asks with Diagnose run on any page. */
   diagnoseTaskId?: string | null;
+  /** The change "Describe in Sidecar" / "Tighten with Sidecar" attached, by id; asks with Describe. */
+  describeChangeId?: string | null;
   /**
    * "Plan with Sidecar" on a capture bar: asks with the Plan lens, aimed at
    * `area` when the capture was area-scoped. `seq` counts the clicks, so each
@@ -73,6 +75,9 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
   if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
   if (page.diagnoseTaskId) return { kind: "task", ref: page.diagnoseTaskId, label: page.diagnoseTaskId, lens: "diagnose-run" };
+  if (page.describeChangeId) {
+    return { kind: "change", ref: page.describeChangeId, label: page.describeChangeId, lens: "describe", key: `describe:${page.describeChangeId}` };
+  }
   if (page.plan) {
     const key = `plan-with:${page.plan.area ?? ""}:${page.plan.seq}`;
     return page.plan.area

@@ -13,7 +13,7 @@
 
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, DescribeInSidecarButton } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
@@ -120,6 +120,7 @@ function Change({ change, onSelect }: {
         : h("span", { class: "ch-change-title" }, change.title),
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
+      isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
     ),
     change.intent ? h(Intent, { intent: change.intent }) : null,

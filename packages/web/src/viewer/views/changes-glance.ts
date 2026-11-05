@@ -12,6 +12,7 @@
  */
 
 import { h } from "preact";
+import { DescribeInSidecarButton } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useChangesSummary } from "./changes-summary-context.js";
 import {
@@ -57,6 +58,7 @@ function Row({ change, navigateTo }: { change: GlanceChange; navigateTo: Navigat
       ),
     h("span", { class: `cg-chip cg-stage cg-stage-${change.stage}` }, CHANGE_STAGE_LABELS[change.stage]),
     gap ? h("span", { class: `cg-chip cg-gap cg-gap-${gap}` }, GAP_LABELS[gap]) : null,
+    h(DescribeInSidecarButton, { changeId: change.id, class: "cg-describe" }),
   );
 }
 
