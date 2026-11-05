@@ -75,7 +75,7 @@ export async function cmdAddChange(
     ...(flags.priority ? { priority: flags.priority as Priority } : {}),
     ...(flags.blockedBy ? { blockedBy: parseCsvList(flags.blockedBy) } : {}),
   };
-  const [added] = await addChanges(dir, [input]);
+  const [added] = await addChanges(dir, [input], flags.area?.trim() || undefined);
   report([added], flags.format === "json");
 }
 

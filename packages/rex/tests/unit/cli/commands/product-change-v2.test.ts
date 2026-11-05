@@ -415,6 +415,13 @@ describe("rex add on a v2 tree", () => {
       .rejects.toThrow(/--area: "no-such-area" is not a live area/);
   });
 
+  it("honours --area on a manual add too, refusing one that names no area before writing", async () => {
+    const before = (await changes()).length;
+    await expect(cmdAddChange(tmp, undefined, { title: "Support refunds when paying by card", format: "json", area: "no-such-area" }))
+      .rejects.toThrow(/--area: "no-such-area" is not a live area/);
+    expect((await changes()).length).toBe(before);
+  });
+
   it("previews a long description's cut title with the full text as its description", async () => {
     const long = `${"Shoppers paying by card want refunds ".repeat(4).trim()}.\n\nSecond paragraph.`;
     await cmdAddChangesFromDescriptions(tmp, [long], { format: "json" });

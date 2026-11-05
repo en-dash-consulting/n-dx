@@ -13,7 +13,14 @@ items:
     lastModified: "2026-11-05T13:49:21.418Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0987fa69-e981-4318-b940-cadc8540fc25":
-    lastModified: "2026-11-05T01:06:00.527Z"
+    status: "completed"
+    startedAt: "2026-11-05T14:53:35.583Z"
+    completedAt: "2026-11-05T15:17:49.542Z"
+    endedAt: "2026-11-05T15:17:49.542Z"
+    activeIntervals: [{"end":"2026-11-05T15:17:49.542Z","start":"2026-11-05T14:53:35.583Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex suggestPlacement takes { area } and rex add takes --area; POST /api/rex/smart-add-preview takes area (id/slug, 400 otherwise), forwards --area and drops non-area rows; SmartAddInput area prop limits shortlist legend and search to the area; area view header \"+ Change in this area\" opens it (Esc closes only the capture). Tests: rex change-place + product-change-v2, web smart-add-v2-changes route tests, smart-add-input, area-view."
+    lastModified: "2026-11-05T15:17:49.542Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0a8a9c7c-6e0a-4717-a428-0dbd836584a6":
     lastModified: "2026-11-05T14:07:38.107Z"
