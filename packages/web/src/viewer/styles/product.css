@@ -809,6 +809,23 @@
 .area-steward-none { color: var(--text-muted); font-style: italic; }
 .area-actions { display: flex; gap: var(--space-2); margin-left: auto; }
 
+/* ── Area cards (views/area-cards.ts) ──────────────────────────── */
+
+.area-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); gap: var(--space-3); align-items: start; }
+@media (max-width: 800px) { .area-body { grid-template-columns: minmax(0, 1fr); } }
+.area-cards { display: flex; flex-direction: column; gap: var(--space-2); }
+.area-card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); }
+.area-card-title { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.area-card-count { color: var(--text-muted); font-size: var(--font-sm); font-weight: 400; }
+.area-card-list, .area-card-files { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.area-card-files { padding-left: var(--space-3); }
+.area-card-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.area-card-title-text, .area-card-group-title { overflow-wrap: anywhere; }
+.area-card-group-title { font-weight: 600; }
+.area-card-empty { margin: 0; padding: var(--space-2); font-size: var(--font-sm); }
+.area-link-code { margin-top: var(--space-1); }
+.area-link-code summary { cursor: pointer; color: var(--accent); }
+
 /* ── Area spec map (views/area-spec-map.ts) ────────────────────── */
 
 .asm { display: flex; flex-direction: column; gap: var(--space-2); }

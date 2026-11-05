@@ -18,7 +18,9 @@ import { useEffect, useState } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
 import { replaceAppHistory } from "../base-path.js";
 import type { AreaDetail } from "./product-model.js";
+import type { NavigateTo } from "../types.js";
 import { SpecMap } from "./area-spec-map.js";
+import { AreaCards } from "./area-cards.js";
 
 /** The area's address. */
 export function areaPath(slug: string): string {
@@ -88,11 +90,14 @@ export interface AreaViewProps {
   onOpenPage?: () => void;
   /** Shown as the Product page: titles the page and offers the way back to the map. */
   onBack?: () => void;
+  /** Opens a change's panel in the Tasks tree; the cards' change links and Place use it. */
+  navigateTo?: NavigateTo;
 }
 
-/** The area: its header, its spec map, then (in a later slice) the side column. */
-export function AreaView({ slug, onOpenPage, onBack }: AreaViewProps) {
+/** The area: its header, its spec map, and the column of four cards beside it. */
+export function AreaView({ slug, onOpenPage, onBack, navigateTo }: AreaViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const openChange = navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined;
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
   const back = onBack
     ? h("button", { type: "button", class: "cap-back", onClick: onBack }, "Product")
@@ -119,12 +124,16 @@ export function AreaView({ slug, onOpenPage, onBack }: AreaViewProps) {
       ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not refresh: ${load.refreshError}. Showing the last loaded data.`)
       : null,
     h(AreaHeader, { area, onOpenPage }),
-    h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
+    h("div", { class: "area-body" },
+      h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
+      // Place opens the change's placement panel until placement mode (S7) lands.
+      h(AreaCards, { area, onOpenChange: openChange, onPlace: openChange }),
+    ),
   );
 }
 
 /** The area in Plan's Product tile: the address names it while it is open. */
-export function AreaInPlace({ slug, onOpenPage }: { slug: string; onOpenPage: () => void }) {
+export function AreaInPlace({ slug, onOpenPage, navigateTo }: { slug: string; onOpenPage: () => void; navigateTo?: NavigateTo }) {
   useInPlaceAddress(areaPath(slug));
-  return h(AreaView, { slug, onOpenPage });
+  return h(AreaView, { slug, onOpenPage, navigateTo });
 }

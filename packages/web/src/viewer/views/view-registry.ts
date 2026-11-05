@@ -204,7 +204,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       }
       const slug = grid.focus?.id;
       return slug
-        ? h(AreaInPlace, { slug, onOpenPage: () => ctx.navigateTo("product", { tab: `area/${slug}` }) })
+        ? h(AreaInPlace, { slug, onOpenPage: () => ctx.navigateTo("product", { tab: `area/${slug}` }), navigateTo: ctx.navigateTo })
         : h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability });
     }
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
@@ -301,6 +301,7 @@ const REGISTRY: Record<string, ViewRenderer> = {
       onCapabilityChange: setOpenCapability,
       areaSlug: areaSlugOfTab(selectedTab ?? null),
       onLeaveArea: () => navigateTo("product"),
+      navigateTo,
     }),
 
   "changes": ({ navigateTo }) =>
