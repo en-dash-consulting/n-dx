@@ -253,7 +253,8 @@ describe("TopNav", () => {
       if (String(input) === "/api/run-commands") {
         return jsonResponse({
           commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
-          status: { running: false, exitCode: 1, label: "npm run dev" },
+          // The shape routes-run-commands.ts settles a non-zero exit into.
+          status: { running: false, exitCode: 1, error: "Exited with code 1", stopped: false, label: "npm run dev" },
         });
       }
       return fallback(input);
@@ -261,7 +262,28 @@ describe("TopNav", () => {
     await mount(nav("home"));
     const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
     expect(btn.classList.contains("runcmd-btn--error")).toBe(true);
-    expect(btn.title).toContain("Failed (exit 1)");
+    expect(btn.title).toContain("Exited with code 1");
+  });
+
+  it.each([
+    [{ exitCode: 0, stopped: false }, "runcmd-btn--finished", "Finished"],
+    [{ exitCode: 143, stopped: true }, null, "Stopped"],
+  ])("shows a settled run's state %o on the button and in its title", async (settled, cls, text) => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          status: { running: false, error: null, label: "npm run dev", ...settled },
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn.classList.contains("runcmd-btn--error")).toBe(false);
+    if (cls) expect(btn.classList.contains(cls)).toBe(true);
+    expect(btn.title).toContain(text);
   });
 
   it("keeps the run-project control, disabled, in a static export", async () => {
