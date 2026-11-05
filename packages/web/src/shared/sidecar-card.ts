@@ -93,3 +93,32 @@ export interface SidecarChangeSetEdit {
   description?: string;
   acceptanceCriteria?: string[];
 }
+
+/** One choice of a picker an external-call card draws for a property. */
+export interface SidecarFieldOption {
+  value: string | number | boolean;
+  label: string;
+}
+
+/**
+ * What an external-call card shows beside the agent's arguments: where the
+ * call goes, the tool's input schema the form is drawn from, and the choices
+ * a field hint read from the connection's own read tools.
+ */
+export interface SidecarExternalCall {
+  /** The connection's label. */
+  label: string;
+  /** The host of an http connection's url; unset for a stdio server. */
+  host?: string;
+  /** The tool's JSON input schema, as its server lists it. */
+  inputSchema: Record<string, unknown>;
+  /** Picker choices by top-level property name; a property with none is a plain field. */
+  options?: Record<string, SidecarFieldOption[]>;
+}
+
+/** One problem a server's validation error lists. */
+export interface SidecarCallProblem {
+  /** The property or path it concerns, when the server names one. */
+  field?: string;
+  message: string;
+}

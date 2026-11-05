@@ -21,7 +21,11 @@
  * posted, with Post / Copy / Discard: only Post posts, and Copy settles the
  * card as denied. A network-read card names what gh would read, with "Allow
  * GitHub reads for this project", which approves it and turns
- * `web.sidecarGithubReads` on. Rich edit bodies come later.
+ * `web.sidecarGithubReads` on. An external-call card (story 43) names the
+ * connection and workspace host and draws the tool's input schema as a form
+ * (sidecar-external-call.ts), editable while it is the first waiting card and
+ * sent with the approval; a validation error's problems list shows under it.
+ * Rich edit bodies come later.
  *
  * A card withdrawn because its session ended draws as denied with the note
  * "session ended" (UX8); one withdrawn because the turn stopped draws as
@@ -37,6 +41,7 @@ import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } 
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
 import { CopyTextButton } from "./copy-text-button.js";
 import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
+import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "./sidecar-external-call.js";
 
 /** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
 export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
@@ -483,15 +488,27 @@ interface CardProps {
   /** The first waiting placement card's edit and its re-check. */
   placementEdit: PlacementEdit | null;
   onPlacementEdit: (edit: PlacementEdit | null) => void;
+  /** The first waiting external-call card's arguments as edited; null while a field's text is not a value, undefined before any edit. */
+  externalEdit: ExternalCallEdit | undefined;
+  onExternalEdit: (edit: ExternalCallEdit) => void;
   onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
   const editable = first && state === "pending";
   // A change-set card's body is its items; the raw input stays behind a disclosure.
-  const body = card.changeSet
+  const body = card.externalCall
+    ? [
+        h(ExternalCallBody, {
+          call: card.externalCall, editable, onEdit: onExternalEdit,
+          args: (card.input.arguments && typeof card.input.arguments === "object" ? card.input.arguments : {}) as Record<string, unknown>,
+        }),
+        h(ProblemList, { problems: card.carriedOut?.problems }),
+        h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+      ]
+    : card.changeSet
     ? [
         h(ChangeSetBody, { card, editable, drafts: editable ? drafts : {}, onDraft }),
         h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
@@ -544,8 +561,8 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                 ? null
                 : h("button", {
                     type: "button", class: "sidecar-card-approve",
-                    // Place waits for the dry-run line of the placement as edited.
-                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)),
+                    // Place waits for the dry-run line of the placement as edited; a call waits for every field to hold a value.
+                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)) || externalEdit === null,
                     onClick: () => onDecide({ approve: true }),
                   },
                     card.changeSet
@@ -607,11 +624,12 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [placementEdit, setPlacementEdit] = useState<PlacementEdit | null>(null);
   const [deciding, setDeciding] = useState(false);
   const [path, setPath] = useState("");
+  const [externalEdit, setExternalEdit] = useState<ExternalCallEdit | undefined>(undefined);
   const firstId = first?.id ?? null;
   const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
 
   // A note, a change set's or placement's edits, and a draft's path belong to the card they were typed on.
-  useEffect(() => { setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); }, [firstId]);
+  useEffect(() => { setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined); }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
@@ -619,6 +637,8 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     if (first.runPlan && decision.approve && decision.lane === undefined) return;
     // Nor of a placement until the dry-run line for the placement shown is back.
     if (first.placement && decision.approve && !placementDecidable(first, placementEdit)) return;
+    // Nor of a call while a field's text is not a value of its type.
+    if (first.kind === "external-call" && decision.approve && externalEdit === null) return;
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
@@ -636,6 +656,11 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];
       // The path the operator left on a draft-file card is where an approval saves it.
       const edited = edits.length > 0 ? { ...decision, edits } : decision;
+      // The arguments the operator left on an external-call card are what an approval calls the tool with.
+      if (decision.approve && first.kind === "external-call" && externalEdit) {
+        await decide(first.id, { ...edited, arguments: externalEdit });
+        return;
+      }
       await decide(first.id, decision.approve && first.kind === "draft-file" && path.trim() ? { ...edited, path } : edited);
     } finally {
       setDeciding(false);
@@ -680,6 +705,8 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       drafts,
       placementEdit: card.id === firstId ? placementEdit : null,
       onPlacementEdit: setPlacementEdit,
+      externalEdit: card.id === firstId ? externalEdit : undefined,
+      onExternalEdit: setExternalEdit,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
       path,
       onPath: setPath,

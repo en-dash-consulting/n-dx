@@ -19,11 +19,25 @@ export const CONNECTION_ID_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
 
 export type ConnectionAuth = "none" | "token" | "oauth";
 
+/**
+ * How an external-call card fills a picker for one property: from the
+ * `path` (dotted keys; empty for the result itself) of a read tool's result,
+ * or, with `auto`, from the connection's read tool the property's name points
+ * at (`ownerId` → `list_owners`, `list_owner` or `owners`). With no hint a
+ * property is a plain field.
+ */
+export type FieldHint = { optionsFrom: { tool: string; path: string } } | { auto: true };
+
+/** Hints by the property name of a write tool's input. */
+export type FieldHints = Record<string, FieldHint>;
+
 interface ConnectionBase {
   id: string;
   /** What the operator calls it; the id when unset. */
   label: string;
   auth: ConnectionAuth;
+  /** Pickers for write-card properties; unset when the connection has none. */
+  fieldHints?: FieldHints;
   /**
    * Per-tool class and policy overrides, as written. tool-policy.ts checks them
    * against the server's tool list and warns about each bad entry.
@@ -90,14 +104,39 @@ function stringRecord(value: unknown): Record<string, string> | undefined {
   return out;
 }
 
+/** `raw` as hints; an entry that is not one is left out and named in `skipped`. */
+function parseFieldHints(raw: unknown, skipped: string[]): FieldHints | undefined {
+  if (raw === undefined) return undefined;
+  const block = asRecord(raw);
+  if (!block) {
+    skipped.push("fieldHints must be an object keyed by property name");
+    return undefined;
+  }
+  const out: FieldHints = {};
+  for (const [property, value] of Object.entries(block)) {
+    const hint = asRecord(value);
+    const from = asRecord(hint?.optionsFrom);
+    if (hint?.auto === true) out[property] = { auto: true };
+    else if (from && typeof from.tool === "string" && from.tool && (from.path === undefined || typeof from.path === "string")) {
+      out[property] = { optionsFrom: { tool: from.tool, path: from.path ?? "" } };
+    } else {
+      skipped.push(`the field hint for ${JSON.stringify(property)} must be { "auto": true } or { "optionsFrom": { "tool", "path" } }`);
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** One entry as a connection, or the reason it is not one. */
-function parseConnection(id: string, raw: unknown): ConnectionConfig | string {
+function parseConnection(id: string, raw: unknown, warnHint: (message: string) => void): ConnectionConfig | string {
   if (!CONNECTION_ID_PATTERN.test(id)) return `its id must match ${CONNECTION_ID_PATTERN}`;
   const entry = asRecord(raw);
   if (!entry) return "it is not an object";
   const auth = entry.auth ?? "none";
   if (auth !== "none" && auth !== "token" && auth !== "oauth") return `auth must be "none", "token" or "oauth"`;
   const label = typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : id;
+  const skippedHints: string[] = [];
+  const fieldHints = parseFieldHints(entry.fieldHints, skippedHints);
+  for (const reason of skippedHints) warnHint(reason);
 
   if (entry.transport === "http") {
     if (typeof entry.url !== "string") return "an http connection needs a url";
@@ -109,7 +148,7 @@ function parseConnection(id: string, raw: unknown): ConnectionConfig | string {
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return "its url must be http or https";
     if (url.username || url.password) return "its url must not carry credentials; use auth \"token\"";
-    return { id, label, auth, tools: entry.tools, transport: "http", url: url.href };
+    return { id, label, auth, tools: entry.tools, ...(fieldHints && { fieldHints }), transport: "http", url: url.href };
   }
 
   if (entry.transport === "stdio") {
@@ -120,7 +159,7 @@ function parseConnection(id: string, raw: unknown): ConnectionConfig | string {
     if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string")) return "args must be a list of strings";
     const env = entry.env === undefined ? {} : stringRecord(entry.env);
     if (!env) return "env must map names to string values";
-    return { id, label, auth: "none", tools: entry.tools, transport: "stdio", command: entry.command, args, env };
+    return { id, label, auth: "none", tools: entry.tools, ...(fieldHints && { fieldHints }), transport: "stdio", command: entry.command, args, env };
   }
 
   return `transport must be "http" or "stdio"`;
@@ -163,7 +202,8 @@ export function loadConnections(projectDir: string, options: LoadConnectionsOpti
 
   const out: ConnectionConfig[] = [];
   for (const [id, raw] of Object.entries(block)) {
-    const parsed = parseConnection(id, raw);
+    const parsed = parseConnection(id, raw, (reason) =>
+      warnOnce(`${localConfigFile}\0${id}\0${reason}`, `[connections] Connection "${id}": ${reason}; ignored.`, warn));
     if (typeof parsed === "string") {
       warnOnce(`${localConfigFile}\0${id}\0${parsed}`, `[connections] Skipping connection "${id}": ${parsed}.`, warn);
     } else {

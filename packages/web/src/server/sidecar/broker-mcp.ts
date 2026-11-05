@@ -48,6 +48,7 @@ import {
   workOptions,
   type SidecarActions,
 } from "./carry-out.js";
+import { buildExternalCall, callProblems } from "./external-call.js";
 import { BRANCH_HEALTH_OFF_READ, CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 import { LEDGER_ENTRY_MAX_CHARS, type LedgerEntryType } from "./ledger.js";
 
@@ -220,7 +221,7 @@ function text(message: string, isError = false): CallToolResult {
 }
 
 /** The connection gateway as the broker uses it. */
-export type BrokerConnections = Pick<ConnectionService, "hasConnections" | "listTools" | "check" | "callTool">;
+export type BrokerConnections = Pick<ConnectionService, "hasConnections" | "listTools" | "check" | "callTool" | "callContext">;
 
 /** The external tools one broker server re-exposes, and the gateway that carries out their calls. */
 export interface BrokerExternalTools {
@@ -266,18 +267,20 @@ function registerExternalTools(
         ...(tool.annotations && { annotations: tool.annotations }),
       },
       async (args, extra) => {
-        const input = args as Record<string, unknown>;
+        // What the call is made with: the agent's arguments, or the operator's edit of them on the card.
+        let input = args as Record<string, unknown>;
         let cardId: string | undefined;
         if (tool.policy.policy === "ask") {
           // A connection that cannot carry the call out raises no card for the operator to approve in vain.
           const status = await connections.check(tool.connection, extra.signal);
           if (status.state !== "connected") return unavailableText(tool, status);
+          const externalCall = await buildExternalCall(tool, external.tools, connections, extra.signal);
           const outcome = await broker.request(sessionId, EXTERNAL_CALL_TOOL, {
             connection: tool.connection,
             tool: tool.displayName,
             class: tool.policy.class,
             arguments: input,
-          }, extra.signal);
+          }, extra.signal, { externalCall });
           if (outcome.decidedBy === "allow-list") throw new Error("An external call is never allow-listed");
           const { card } = outcome;
           const note = card.reason ? ` Operator's note: ${card.reason}` : "";
@@ -286,13 +289,19 @@ function registerExternalTools(
           }
           if (!outcome.approved) return text(`The operator denied card ${card.id}. ${tool.displayName} did not run.${note}`, true);
           cardId = card.id;
+          // The approval carries the operator's edit; the card's input is what was approved.
+          input = card.input.arguments as Record<string, unknown>;
         }
         // A stopped turn ends the wait on the external server, as it does a command's.
         const carrying = broker.carryOutSignal(sessionId, extra.signal);
         try {
           // The server's own result, isError included, goes back unchanged.
           const result = await connections.callTool(tool.connection, tool.tool, input, carrying.signal);
-          if (cardId) broker.recordCarriedOut(sessionId, cardId, { ok: !result.isError });
+          if (cardId) {
+            // The card shows a validation error's problems; nothing retries with altered arguments.
+            const problems = callProblems(result);
+            broker.recordCarriedOut(sessionId, cardId, { ok: !result.isError, ...(problems.length > 0 && { problems }) });
+          }
           return result;
         } catch (err) {
           if (!(err instanceof ConnectionUnavailableError)) throw err;

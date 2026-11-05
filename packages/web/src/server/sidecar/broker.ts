@@ -20,6 +20,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { writeRunFileAtomic } from "../run-end.js";
 import {
   allowListKey,
@@ -29,8 +30,9 @@ import {
   type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { QueuePlan, SidecarChangeSet, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarPlacement } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
+import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
 import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { resolveDraftPath } from "./draft-file.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -55,6 +57,8 @@ export interface SidecarCard {
   runPlan?: QueuePlan;
   /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
   placement?: SidecarPlacement;
+  /** An external-call card's connection, workspace, input schema and picker choices. */
+  externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator chose to start on a run-plan card. */
   lane?: number;
   status: SidecarCardStatus;
@@ -64,10 +68,14 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow": its rule went onto the allow-list. */
   remembered?: true;
-  /** The operator edited the change set, the placement, or a draft file's path before approving it. */
+  /** The operator edited the change set, the placement, a draft file's path or an external call's arguments before approving it. */
   edited?: true;
-  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
-  carriedOut?: { ok: boolean; ids?: string[] };
+  /**
+   * How the approved call's effect ended; `ids` are the PRD items a change-set
+   * card wrote, `problems` the list an external server's validation error
+   * returned (the session got the result unchanged).
+   */
+  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
 }
 
 /** What the broker reads before raising a card, for the operator to see on it. */
@@ -77,6 +85,7 @@ export interface CardAnnex {
   changeSet?: SidecarChangeSet;
   runPlan?: QueuePlan;
   placement?: SidecarPlacement;
+  externalCall?: SidecarExternalCall;
 }
 
 /** How a broker call was settled. */
@@ -101,6 +110,13 @@ export interface CardDecision {
   lane?: number;
   /** A draft-file card's path as the operator edited it; the approval saves there. Only on a draft-file approval. */
   path?: string;
+  /**
+   * An external-call card's arguments as the operator edited them; the
+   * approval calls the tool with these. Only on an external-call approval. An
+   * idempotency key is read-only: the agent's value is kept, and one the agent
+   * did not send cannot be added.
+   */
+  arguments?: unknown;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -134,6 +150,10 @@ export interface SidecarLedgerTarget {
 interface PendingCard {
   card: SidecarCard;
   settle: (outcome: BrokerOutcome) => void;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 const ALLOW_LIST_SCHEMA = "ndx/sidecar-allow-list/v1";
@@ -200,6 +220,7 @@ export class SidecarBroker {
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
       ...(annex.placement !== undefined && { placement: annex.placement }),
+      ...(annex.externalCall !== undefined && { externalCall: annex.externalCall }),
       status: "pending",
       raisedAt: this.iso(),
     };
@@ -296,6 +317,20 @@ export class SidecarBroker {
       if (!resolved.ok) throw new BrokerDecisionError(400, resolved.error);
       editedPath = resolved.path;
     }
+    let editedArguments: Record<string, unknown> | undefined;
+    if (decision.arguments !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries arguments");
+      if (card.kind !== "external-call") throw new BrokerDecisionError(409, `A ${card.kind} card takes no arguments`);
+      if (!isPlainObject(decision.arguments)) throw new BrokerDecisionError(400, `"arguments" must be an object`);
+      const agent = isPlainObject(card.input.arguments) ? card.input.arguments : {};
+      const next = { ...decision.arguments };
+      // An idempotency key is the agent's: the form shows it read-only and approval cannot change it.
+      for (const name of IDEMPOTENCY_KEY_PROPERTIES) {
+        if (name in agent) next[name] = agent[name];
+        else delete next[name];
+      }
+      if (!isDeepStrictEqual(next, agent)) editedArguments = next;
+    }
     if (decision.remember) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval can be remembered");
       if (card.allowListKey === null) {
@@ -314,6 +349,10 @@ export class SidecarBroker {
     }
     if (decision.placement && card.placement) {
       card.placement = { ...card.placement, ...decision.placement };
+      card.edited = true;
+    }
+    if (editedArguments) {
+      card.input = { ...card.input, arguments: editedArguments };
       card.edited = true;
     }
     if (decision.lane !== undefined) card.lane = decision.lane;

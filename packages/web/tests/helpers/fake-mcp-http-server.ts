@@ -36,6 +36,8 @@ export interface FakeMcpHttpServerOptions {
    * answers are not recorded in `authorizations`.
    */
   route?: (req: IncomingMessage, res: ServerResponse) => boolean | Promise<boolean>;
+  /** Registers more tools on each request's server, e.g. `addCallCardTools`. */
+  extraTools?: (server: ReturnType<typeof createFakeMcpServer>) => void;
 }
 
 export async function startFakeMcpHttpServer(options: FakeMcpHttpServerOptions = {}): Promise<FakeMcpHttpServer> {
@@ -75,7 +77,7 @@ export async function startFakeMcpHttpServer(options: FakeMcpHttpServerOptions =
       echoError();
       return;
     }
-    const mcp = createFakeMcpServer("fake-http");
+    const mcp = createFakeMcpServer("fake-http", options.extraTools);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
       void transport.close();

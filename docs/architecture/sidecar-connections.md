@@ -35,6 +35,9 @@ class, the run/ask/never policy and the form card for writes.
 - An invalid entry is skipped with a warning naming it.
 - `tools` (optional) overrides one tool at a time:
   `"tools": { "delete_item": { "class": "write", "policy": "never" } }`.
+- `fieldHints` (optional) fills pickers on a write card; see
+  [Through the broker](#through-the-broker). A malformed hint is skipped with
+  a warning naming it.
 
 ## Tool class and policy
 
@@ -67,6 +70,35 @@ wire name, after the broker's own tools. A hub session gets none.
   class and the arguments; the server is called only on Approve. Deny or a
   withdrawn card calls nothing. External calls are never allow-listable: the
   broker cannot know what another server's write does.
+- **The card is a form.** The card carries `externalCall`: the connection's
+  label, the host of an http connection's url (shown `CAOS · caos.endash.us`;
+  the label alone for stdio) and the tool's input schema. The drawer draws a
+  field per property (string, number, integer, boolean, enum, a list of
+  scalars one per line, an object one level deep), prefilled with the agent's
+  arguments, required ones marked; anything else, and any argument the schema
+  does not name, is a JSON field for that property alone. Approve sends the
+  edited `arguments` (`POST …/cards/:id` with `arguments`, an approval only) and
+  the server is called with those; an unedited approval calls with the agent's.
+  An idempotency key (`requestId` or `idempotencyKey`) is shown read-only and
+  the server keeps the agent's value whatever is sent. A field that holds text
+  that is not a value of its type (a non-integer, malformed JSON) holds Approve.
+- **Field hints.** A connection may carry `fieldHints`, a map from a write
+  tool's property name to `{ "optionsFrom": { "tool": "<read tool>", "path":
+  "<dotted path>" } }` or `{ "auto": true }`. When the card is raised the broker
+  calls that read tool (no arguments, five-second limit) and the property
+  becomes a picker over the array at `path` of the result (structured content,
+  else JSON text): scalars as they are, objects by `id`/`value`/`key` and
+  `name`/`title`/`label`. `auto` reads the read tool the property's name
+  points at (`ownerId` → `list_owners`, `list_owner` or `owners`) and takes the
+  result's first list. Only a read-class tool of the same connection whose policy
+  is `run` is called (a hint never makes a call the operator would be asked about); a hint that finds no choices leaves a plain field, and the
+  card is never held up on it. With no hints the plain schema form renders. A
+  profile ships its own hints; none live in the broker.
+- **Problems.** When an approved call's result is an error carrying a
+  `problems` list (structured content, or JSON text such as
+  `{"error":"validation_failed","problems":[…]}`), the card shows each problem
+  (string, or an object with `field`/`path` and `message`). The session gets
+  the result unchanged, and nothing retries with altered arguments.
 - **Unavailable.** A call to a connection that is down returns `isError` text
   `connection unavailable: <reason>`, or `sign in again: …` when the server
   refuses the token, with no card. The broker's own tools keep answering.

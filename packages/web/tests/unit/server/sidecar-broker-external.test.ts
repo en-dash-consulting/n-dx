@@ -58,6 +58,7 @@ const connections: BrokerConnections = {
   hasConnections: () => true,
   listTools: async () => [tool("read_item", "run"), tool("update_item", "ask"), tool("delete_item", "never")],
   check: async () => ({ state: "connected" }),
+  callContext: () => ({ label: "Docs", host: "docs.example.test", fieldHints: {} }),
   callTool: async (_connection, name) => ({ content: [{ type: "text", text: `called ${name}` }] }),
 };
 

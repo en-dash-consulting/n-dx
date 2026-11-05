@@ -36,6 +36,41 @@ describe("loadConnections", () => {
     ]);
   });
 
+  it("reads field hints, and skips a malformed hint with a warning that names it", () => {
+    const dir = project({
+      local: {
+        connections: {
+          docs: {
+            transport: "http",
+            url: "https://example.test/mcp",
+            fieldHints: {
+              ownerId: { optionsFrom: { tool: "list_owners", path: "owners" } },
+              teamId: { auto: true },
+              rootList: { optionsFrom: { tool: "list_all" } },
+              bad: { optionsFrom: { path: "x" } },
+              worse: "yes",
+            },
+          },
+        },
+      },
+    });
+    const warnings: string[] = [];
+    const [connection] = loadConnections(dir, { warn: (m) => warnings.push(m) });
+    expect(connection.fieldHints).toEqual({
+      ownerId: { optionsFrom: { tool: "list_owners", path: "owners" } },
+      teamId: { auto: true },
+      rootList: { optionsFrom: { tool: "list_all", path: "" } },
+    });
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain('"bad"');
+    expect(warnings[1]).toContain('"worse"');
+  });
+
+  it("leaves fieldHints unset when the connection has none", () => {
+    const dir = project({ local: { connections: { docs: { transport: "http", url: "https://example.test/mcp" } } } });
+    expect(loadConnections(dir, { warn: () => undefined })[0]).not.toHaveProperty("fieldHints");
+  });
+
   it("ignores a tracked .n-dx.json connections block and warns once", () => {
     const dir = project({
       shared: { connections: { evil: { transport: "stdio", command: "sh", args: ["-c", "id"] } } },

@@ -34,7 +34,7 @@ import {
 } from "@n-dx/llm-client";
 import { errorMessage } from "../response-utils.js";
 import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
-import { loadConnections, type ConnectionConfig, type HttpConnectionConfig } from "./connection-config.js";
+import { loadConnections, type ConnectionConfig, type FieldHints, type HttpConnectionConfig } from "./connection-config.js";
 import { connectionToken, withoutConnectionToken, withoutSecrets } from "./connection-credentials.js";
 import {
   ConnectionOAuth,
@@ -209,6 +209,22 @@ export class ConnectionService {
   /** Whether any connection is declared. */
   hasConnections(): boolean {
     return this.slots.size > 0;
+  }
+
+  /**
+   * What a call card names about `connection`: its label, the host of an http
+   * server's url (never the url, which a path or query could carry more in)
+   * and the field hints the operator configured. Reads config only; undefined
+   * for an unknown id.
+   */
+  callContext(connection: string): { label: string; host?: string; fieldHints: FieldHints } | undefined {
+    const config = this.slots.get(connection)?.config;
+    if (!config) return undefined;
+    return {
+      label: config.label,
+      ...(config.transport === "http" && { host: new URL(config.url).host }),
+      fieldHints: config.fieldHints ?? {},
+    };
   }
 
   /**

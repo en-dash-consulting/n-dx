@@ -146,6 +146,20 @@ export interface SidecarPlacement {
   check: SidecarPlacementCheck;
 }
 
+/** One choice of an external-call card's picker; mirrors `SidecarFieldOption` in shared/sidecar-card.ts. */
+export interface SidecarFieldOption { value: string | number | boolean; label: string }
+
+/** An external-call card's connection, host, input schema and picker choices; mirrors `SidecarExternalCall` in shared/sidecar-card.ts. */
+export interface SidecarExternalCall {
+  label: string;
+  host?: string;
+  inputSchema: Record<string, unknown>;
+  options?: Record<string, SidecarFieldOption[]>;
+}
+
+/** One problem of a server's validation error; mirrors `SidecarCallProblem` in shared/sidecar-card.ts. */
+export interface SidecarCallProblem { field?: string; message: string }
+
 /** A permission card; mirrors `SidecarCard` in server/sidecar/broker.ts. */
 export interface SidecarCard {
   id: string;
@@ -165,6 +179,8 @@ export interface SidecarCard {
   runPlan?: QueuePlan;
   /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
   placement?: SidecarPlacement;
+  /** An external-call card's connection, workspace host, input schema and picker choices. */
+  externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */
   lane?: number;
   status: "pending" | "approved" | "denied" | "withdrawn";
@@ -173,10 +189,10 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow". */
   remembered?: true;
-  /** The operator edited the change set before approving it. */
+  /** The operator edited the change set, placement, path or call arguments before approving it. */
   edited?: true;
-  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
-  carriedOut?: { ok: boolean; ids?: string[] };
+  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote, `problems` an external server's validation errors. */
+  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
 }
 
 /** A placement as one body: the shape `POST /api/rex/changes/:id/placement/check` takes, and a placement approval's edits. */
@@ -197,6 +213,8 @@ export interface SidecarCardDecision {
   lane?: number;
   /** A draft-file approval's path as edited on the card; the draft is saved there. */
   path?: string;
+  /** An external-call approval's arguments as edited on the card; the tool is called with these. */
+  arguments?: Record<string, unknown>;
 }
 
 /**
@@ -837,6 +855,7 @@ export function useSidecar(
         ...(decision.approve && decision.reviewed && { reviewed: decision.reviewed }),
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
         ...(decision.approve && decision.path !== undefined && { path: decision.path }),
+        ...(decision.approve && decision.arguments !== undefined && { arguments: decision.arguments }),
       },
     );
     if (!mountedRef.current) return res.ok;

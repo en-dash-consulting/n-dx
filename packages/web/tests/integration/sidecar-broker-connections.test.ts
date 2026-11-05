@@ -33,6 +33,7 @@ import { SidecarSessionRegistry, sidecarSessionConnect } from "../../src/server/
 import type { ServerContext } from "../../src/server/types.js";
 import { startFakeMcpHttpServer, type FakeMcpHttpServer } from "../helpers/fake-mcp-http-server.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
+import { addCallCardTools } from "../fixtures/connections/fake-mcp-tools.mjs";
 
 const TOKEN = "dashboard-token-0123456789abcdef";
 
@@ -268,5 +269,187 @@ describe("a worktree session's broker and the operator's connections", () => {
       expect(text(result)).not.toContain("tok-");
     }
     expect(broker.cards(id)).toEqual([]);
+  });
+});
+
+describe("an external-call card's form, hints and problems", () => {
+  const ticket = (extra: Record<string, unknown> = {}) => ({ transport: "http", url: fake.url, ...extra });
+
+  beforeEach(async () => {
+    // The default fake lists only the base tools; these tests need the call-card tools.
+    await fake.close();
+    fake = await startFakeMcpHttpServer({ extraTools: addCallCardTools });
+  });
+
+  /** Decide the waiting card through the real route, as the drawer does. */
+  async function decideOverHttp(id: string, cardId: string, body: Record<string, unknown>): Promise<Response> {
+    return fetch(`${server.baseUrl}/api/sidecar/sessions/${id}/cards/${cardId}`, {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("carries the connection, workspace host and the tool's input schema, with no choices when there are no hints", async () => {
+    await startDashboard({ desk: ticket({ label: "Help desk" }) });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t", requestId: "r-1" } });
+    const card = await pendingCard(id);
+    expect(card.externalCall).toMatchObject({
+      label: "Help desk",
+      host: new URL(fake.url).host,
+      inputSchema: { type: "object", properties: { title: { type: "string" }, estimate: { type: "integer" } }, required: ["title"] },
+    });
+    expect(card.externalCall).not.toHaveProperty("options");
+    // Only the card's own tool is asked of the server: no hint, no read.
+    expect(fake.calls).toEqual([]);
+
+    broker.decide(id, card.id, { approve: false });
+    await call;
+  });
+
+  it("calls the server with the arguments the operator edited, but never a changed idempotency key", async () => {
+    await startDashboard({ desk: ticket() });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t", requestId: "r-1" } });
+    const card = await pendingCard(id);
+    const res = await decideOverHttp(id, card.id, {
+      decision: "approve",
+      arguments: { title: "edited", estimate: 4, requestId: "r-other", idempotencyKey: "added" },
+    });
+    expect(res.status).toBe(200);
+
+    expect(text(await call)).toBe("created edited for nobody in no team (r-1)");
+    expect(fake.calls).toEqual([{ name: "create_ticket", arguments: { title: "edited", estimate: 4, requestId: "r-1" } }]);
+    expect(broker.cards(id)[0]).toMatchObject({
+      status: "approved",
+      edited: true,
+      input: { arguments: { title: "edited", estimate: 4, requestId: "r-1" } },
+      carriedOut: { ok: true },
+    });
+  });
+
+  it("calls the server with the agent's arguments when the operator edits nothing", async () => {
+    await startDashboard({ desk: ticket() });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t", requestId: "r-1" } });
+    const card = await pendingCard(id);
+    expect((await decideOverHttp(id, card.id, { decision: "approve", arguments: { requestId: "r-1", title: "t" } })).status).toBe(200);
+    await call;
+    expect(fake.calls[0].arguments).toEqual({ title: "t", requestId: "r-1" });
+    expect(broker.cards(id)[0].edited).toBeUndefined();
+  });
+
+  it("refuses arguments that are not an object, and arguments on a denial", async () => {
+    await startDashboard({ desk: ticket() });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t" } });
+    const card = await pendingCard(id);
+    expect((await decideOverHttp(id, card.id, { decision: "approve", arguments: ["x"] })).status).toBe(400);
+    expect((await decideOverHttp(id, card.id, { decision: "deny", arguments: { title: "x" } })).status).toBe(409);
+    expect(broker.cards(id)[0].status).toBe("pending");
+
+    broker.decide(id, card.id, { approve: false });
+    await call;
+  });
+
+  it("fills a picker from a read tool named by a hint (structured content or JSON text), and ignores a hint it cannot honour", async () => {
+    await startDashboard({
+      desk: ticket({
+        fieldHints: {
+          ownerId: { optionsFrom: { tool: "list_owners", path: "owners" } },
+          teamId: { optionsFrom: { tool: "find_teams", path: "data.teams" } },
+          // A write tool, an unknown tool and a property the schema lacks are not read.
+          estimate: { optionsFrom: { tool: "create_ticket", path: "" } },
+          title: { optionsFrom: { tool: "nope", path: "" } },
+          missing: { optionsFrom: { tool: "list_owners", path: "owners" } },
+        },
+      }),
+    });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t", ownerId: "u-2" } });
+    const card = await pendingCard(id);
+    expect(card.externalCall!.options).toEqual({
+      ownerId: [{ value: "u-1", label: "Ada" }, { value: "u-2", label: "Grace" }],
+      teamId: [{ value: "t-a", label: "Alpha" }, { value: "t-b", label: "t-b" }],
+    });
+    expect(fake.calls.map((c) => c.name).sort()).toEqual(["find_teams", "list_owners"]);
+
+    broker.decide(id, card.id, { approve: false });
+    await call;
+  });
+
+  it("fills an auto hint from the read tool the property's name points at", async () => {
+    await startDashboard({ desk: ticket({ fieldHints: { ownerId: { auto: true }, teamId: { auto: true } } }) });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t" } });
+    const card = await pendingCard(id);
+    // ownerId -> list_owners; teamId has no list_teams, list_team or teams tool, so it stays a plain field.
+    expect(card.externalCall!.options).toEqual({ ownerId: [{ value: "u-1", label: "Ada" }, { value: "u-2", label: "Grace" }] });
+
+    broker.decide(id, card.id, { approve: false });
+    await call;
+  });
+
+  it("never reads a hint's tool the operator set to ask or never", async () => {
+    await startDashboard({
+      desk: ticket({
+        tools: { list_owners: { policy: "ask" }, find_teams: { policy: "never" } },
+        fieldHints: {
+          ownerId: { optionsFrom: { tool: "list_owners", path: "owners" } },
+          teamId: { optionsFrom: { tool: "find_teams", path: "data.teams" } },
+        },
+      }),
+    });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t" } });
+    const card = await pendingCard(id);
+    expect(card.externalCall).not.toHaveProperty("options");
+    expect(fake.calls).toEqual([]);
+
+    broker.decide(id, card.id, { approve: false });
+    await call;
+  });
+
+  it("raises the card with a plain form when a hint's read finds no choices", async () => {
+    await startDashboard({ desk: ticket({ fieldHints: { ownerId: { optionsFrom: { tool: "list_owners", path: "no.such.path" } } } }) });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__create_ticket", arguments: { title: "t" } });
+    const card = await pendingCard(id);
+    expect(card.externalCall).not.toHaveProperty("options");
+
+    broker.decide(id, card.id, { approve: false });
+    await call;
+  });
+
+  it("shows a validation_failed result's problems on the card, hands the session the result unchanged, and calls the server once", async () => {
+    await startDashboard({ desk: ticket() });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "desk__reject_ticket", arguments: { title: "t" } });
+    const card = await pendingCard(id);
+    broker.decide(id, card.id, { approve: true });
+    const result = await call;
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(text(result))).toEqual({
+      error: "validation_failed",
+      problems: [{ field: "title", message: "too long" }, "estimate is required"],
+    });
+    expect(broker.cards(id)[0].carriedOut).toEqual({
+      ok: false,
+      problems: [{ field: "title", message: "too long" }, { message: "estimate is required" }],
+    });
+    // No retry with altered arguments, and no second card.
+    expect(fake.calls).toEqual([{ name: "reject_ticket", arguments: { title: "t" } }]);
+    expect(broker.cards(id)).toHaveLength(1);
   });
 });

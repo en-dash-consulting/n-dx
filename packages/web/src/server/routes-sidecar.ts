@@ -25,7 +25,7 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane? }`; `edits` only on a change-set approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments? }`; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | GET  | `/api/sidecar/ledger/latest` | each open session's latest `unfinished` and `decision` notes, which the hub snapshot shows per worktree |
  * | POST | `/api/sidecar/handoff` | the hub's drill-down (`{ question, vendor }`): resume the latest open session or create one, leave a `handoff` entry naming the question, carry the ledger on its next turn |
@@ -1506,6 +1506,9 @@ async function handleSessionRoutes(
       }
       if (body.lane !== undefined && typeof body.lane !== "number") return refuse(res, 400, `"lane" must be a number`);
       if (body.path !== undefined && typeof body.path !== "string") return refuse(res, 400, `"path" must be a string`);
+      if (body.arguments !== undefined && (typeof body.arguments !== "object" || body.arguments === null || Array.isArray(body.arguments))) {
+        return refuse(res, 400, `"arguments" must be an object`);
+      }
       // A placement card's edit is a placement: dry-run it, against the dry run the operator reviewed, before the card is touched.
       const waiting = broker.cards(id).find((c) => c.id === cardId);
       let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, PlacementEditRefusal> | undefined;
@@ -1522,6 +1525,7 @@ async function handleSessionRoutes(
           ...(placementEdit ? { placement: placementEdit } : body.edits !== undefined && { edits: body.edits }),
           ...(body.lane !== undefined && { lane: body.lane }),
           ...(body.path !== undefined && { path: body.path }),
+          ...(body.arguments !== undefined && { arguments: body.arguments }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {
