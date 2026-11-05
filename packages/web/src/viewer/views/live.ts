@@ -36,7 +36,7 @@ import { useFeatureToggle } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { READY_NEXT_FEATURE, ReadyNext } from "./live-ready-next.js";
 import { TrackerActivitySection } from "./live-tracker.js";
-import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
+import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget, ConcurrencyPanel, MemoryPanel } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
   attentionReason,
@@ -535,6 +535,11 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
             h(Queue, { snapshot, navigateTo }),
             h(Worktrees, { snapshot }),
             h(Recent, { snapshot, navigateTo }),
+            h("section", { class: "live-side-section", "aria-labelledby": "live-machine-h" },
+              h("h3", { id: "live-machine-h", class: "live-side-title" }, "Memory and concurrency"),
+              h(MemoryPanel, {}),
+              h(ConcurrencyPanel, {}),
+            ),
           ),
         ),
       ],
