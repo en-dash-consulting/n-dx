@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "product-map" | "changes-glance" | "plan-health" | "outcomes" | "tooling";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "product-map" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -235,6 +235,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
       // The last check as lights; full-screen and "Open" show the whole Validation view.
       { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 6 },
+      // Gaps in the open changes, each a link to the filtered list. Open changes is placed by its own tile.
+      { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 6, v2Only: true, requiresServer: true },
     ],
     // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
     // Product stays, because its tablist is how a v1 project reaches Requirements.

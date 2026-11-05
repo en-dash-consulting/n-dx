@@ -382,6 +382,8 @@ describe("v2 product reads", () => {
             reason: expect.any(String),
             summary: expect.any(String),
           },
+          // The fixture's one capability holds no requirement.
+          requirements: { total: 0, uncovered: 1 },
         },
       });
       const summary = (body as { summary: ChangeSummary }).summary;

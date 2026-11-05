@@ -204,6 +204,36 @@ export function stageFilter(stage: OpenChangeStage): string {
   return `${STAGE_PREFIX}${stage}`;
 }
 
+/** The gaps Plan's Specs to tighten tile counts; each opens this page on its changes. */
+export type GapKind = "no-criteria" | "task-criteria" | "blocked";
+
+export const GAP_LABELS: Readonly<Record<GapKind, string>> = {
+  "no-criteria": "No acceptance criteria",
+  "task-criteria": "Tasks without criteria",
+  blocked: "Waiting on a blocker",
+};
+
+const GAP_PREFIX = "gap:";
+const GAP_KINDS = Object.keys(GAP_LABELS) as GapKind[];
+
+export function gapFilter(gap: GapKind): string {
+  return `${GAP_PREFIX}${gap}`;
+}
+
+function gapOfFilter(filter: string): GapKind | null {
+  const name = filter.startsWith(GAP_PREFIX) ? filter.slice(GAP_PREFIX.length) : "";
+  return GAP_KINDS.find((g) => g === name) ?? null;
+}
+
+/**
+ * Whether an open, placed change has the gap. `criteriaGap` on a task-less change
+ * is its own missing criteria; on one with tasks it is an open task's.
+ */
+export function hasGap(change: Pick<ChangeRow, "criteriaGap" | "openBlockers" | "taskCount">, gap: GapKind): boolean {
+  if (gap === "blocked") return change.openBlockers > 0;
+  return change.criteriaGap && (change.taskCount === 0) === (gap === "no-criteria");
+}
+
 function stageOfFilter(filter: string): OpenChangeStage | null {
   const name = filter.startsWith(STAGE_PREFIX) ? filter.slice(STAGE_PREFIX.length) : "";
   return OPEN_STAGES.find((s) => s === name) ?? null;
@@ -261,12 +291,15 @@ export function ChangesView({ changes, onSelectChange }: {
   // A remembered release that no longer exists falls back to the default.
   const known = new Set(groups.map(filterOf));
   const stage = stageOfFilter(stored);
-  const filter = stage || stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
+  const gap = gapOfFilter(stored);
+  const filter = stage || gap || stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
   const pick = (value: string) => { setStored(value); storeFilter(value); };
 
   // A stage counts placed changes only: one rex holds for placement is the Inbox's.
-  const staged = stage ? changes.filter((c) => c.stage === stage && !c.awaitsPlacement) : null;
-  const mode: GroupMode = stage || filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
+  const staged = stage ? changes.filter((c) => c.stage === stage && !c.awaitsPlacement)
+    : gap ? changes.filter((c) => !isAppliedStage(c.stage) && !c.awaitsPlacement && hasGap(c, gap))
+    : null;
+  const mode: GroupMode = stage || gap || filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
   const shown = (staged ? groupChangesByRelease(staged) : groups).filter((g) =>
     mode === "open" ? g.appliedCount < g.changeCount
     : mode === "applied" ? g.appliedCount > 0
@@ -287,8 +320,8 @@ export function ChangesView({ changes, onSelectChange }: {
           h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
             h(FilterChip, { value: "open", label: "Open", count: openTotal, active: filter === "open", onPick: pick }),
             h(FilterChip, { value: "applied", label: "Applied", count: appliedTotal, active: filter === "applied", onPick: pick }),
-            stage && staged
-              ? h(FilterChip, { value: filter, label: CHANGE_STAGE_LABELS[stage], count: staged.length, active: true, onPick: pick })
+            (stage || gap) && staged
+              ? h(FilterChip, { value: filter, label: stage ? CHANGE_STAGE_LABELS[stage] : GAP_LABELS[gap!], count: staged.length, active: true, onPick: pick })
               : null,
             groups.map((g) => h(FilterChip, {
               key: filterOf(g), value: filterOf(g), label: g.label, count: g.changeCount,

@@ -73,6 +73,7 @@ import { LifecycleStrip } from "./lifecycle-strip.js";
 import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
+import { SpecGapsPanel } from "./spec-gaps.js";
 import { ProductAreaMap } from "./product-area-map.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
@@ -196,6 +197,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability })
       : h(ProductAreaMap, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
+    case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);
     case "outcomes": return h(OutcomesPanel, null);
     case "tooling": return h(ToolingPanel, { navigateTo: ctx.navigateTo });

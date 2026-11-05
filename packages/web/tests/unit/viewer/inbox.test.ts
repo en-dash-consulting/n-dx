@@ -114,7 +114,7 @@ afterEach(() => {
 describe("the Plan tile", () => {
   it("sits after the product map, server-backed, with the Inbox badge", () => {
     // The lifecycle strip leads, above the grid; it is a band, not a view tile.
-    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["product", "inbox", "changes", "validation"]);
+    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["product", "inbox", "changes", "validation", "changes"]);
     expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true });
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
