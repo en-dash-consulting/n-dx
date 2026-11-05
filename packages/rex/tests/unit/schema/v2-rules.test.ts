@@ -1108,6 +1108,12 @@ describe("stale-release-plan", () => {
     expect(findings[0].message).toContain("older than 0.10.0");
   });
 
+  it("orders prerelease identifiers numerically", () => {
+    const later = node("change", { plannedRelease: "1.0.0-beta.10" });
+    const earlier = node("change", { plannedRelease: "1.0.0-beta.1" });
+    expect(ids(check("stale-release-plan", { changes: [shipped("1.0.0-beta.2"), later, earlier] }))).toEqual([earlier.id]);
+  });
+
   it("counts a completed but unapplied change as open", () => {
     const awaiting = node("change", { status: "completed", plannedRelease: "0.9.0" });
     expect(ids(check("stale-release-plan", { changes: [shipped("0.10.0"), awaiting] }))).toEqual([awaiting.id]);

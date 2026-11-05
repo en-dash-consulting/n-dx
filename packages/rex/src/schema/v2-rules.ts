@@ -901,13 +901,23 @@ function parseRelease(release: string): Release | undefined {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4]] : undefined;
 }
 
-/** Semver order of two parsed releases; a prerelease sorts before its release, prereleases by string. */
+/**
+ * Semver order of two parsed releases. A prerelease sorts before its release;
+ * prereleases compare identifier by identifier, digits numerically
+ * (`beta.2` < `beta.10`), and a shorter list of equal identifiers first.
+ */
 function compareReleases(a: Release, b: Release): number {
   for (const i of [0, 1, 2] as const) if (a[i] !== b[i]) return a[i] - b[i];
   if (a[3] === b[3]) return 0;
   if (a[3] === undefined) return 1;
   if (b[3] === undefined) return -1;
-  return a[3] < b[3] ? -1 : 1;
+  const pa = a[3].split(".");
+  const pb = b[3].split(".");
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    const diff = pa[i].localeCompare(pb[i], "en", { numeric: true });
+    if (diff !== 0) return diff;
+  }
+  return pa.length - pb.length;
 }
 
 /**
