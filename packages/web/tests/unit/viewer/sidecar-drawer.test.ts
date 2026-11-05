@@ -41,6 +41,11 @@ import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
+/** `text` with every regular-expression metacharacter escaped, for building a pattern from a CSS selector. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 const VALID = buildValidViews(null);
 
 // ── Stub server ────────────────────────────────────────────────────────────
@@ -660,7 +665,7 @@ describe("the agent picker", () => {
 
   it("styles the header controls and pickers from tokens only", () => {
     const css = readFileSync(join(process.cwd(), "src/viewer/styles/sidecar.css"), "utf8");
-    const rule = (sel: string) => css.match(new RegExp(`${sel.replace(/[.]/g, "\\.")}\\s*\\{([^}]*)\\}`))![1]!;
+    const rule = (sel: string) => css.match(new RegExp(`${escapeRegExp(sel)}\\s*\\{([^}]*)\\}`))![1]!;
     expect(rule(".sidecar-tab.active")).toMatch(/background: var\(--bg-active\)[\s\S]*color: var\(--text\)/);
     expect(rule(".sidecar-tab")).toMatch(/color: var\(--text-dim\)/);
     expect(rule(".sidecar-sessions-toggle.active")).toMatch(/background: var\(--bg-active\)/);
@@ -685,7 +690,7 @@ describe("the agent picker", () => {
 
   it("styles the composer card, lens pill and Send from tokens only", () => {
     const css = readFileSync(join(process.cwd(), "src/viewer/styles/sidecar.css"), "utf8");
-    const rule = (sel: string) => css.match(new RegExp(`${sel.replace(/[.:]/g, "\\$&")}\\s*\\{([^}]*)\\}`))![1]!;
+    const rule = (sel: string) => css.match(new RegExp(`${escapeRegExp(sel)}\\s*\\{([^}]*)\\}`))![1]!;
     expect(rule(".sidecar-composer-card")).toMatch(/var\(--bg-surface\)[\s\S]*var\(--border\)[\s\S]*var\(--radius-xl\)/);
     expect(rule(".sidecar-composer-card:focus-within")).toMatch(/var\(--accent\)/);
     expect(rule(".sidecar-input")).toMatch(/background: transparent[\s\S]*font-size: 14px/);
