@@ -12,11 +12,18 @@ items:
   "0987fa69-e981-4318-b940-cadc8540fc25":
     lastModified: "2026-11-05T01:06:00.527Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0a8a9c7c-6e0a-4717-a428-0dbd836584a6":
+    lastModified: "2026-11-05T14:07:38.107Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "18fc7905-b4e4-4e8a-8dbe-b541ea9a671f":
+    status: "completed"
     startedAt: "2026-11-05T13:49:27.119Z"
-    activeIntervals: [{"end":"2026-11-05T14:03:16.048Z","start":"2026-11-05T13:49:27.119Z"}]
-    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (22):\n- /product/area/<slug> shows that area's view as the page, with the way back to the map\n- shows field-level error styling after blur on empty title\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n… and 14 more"
-    lastModified: "2026-11-05T14:03:16.552Z"
+    completedAt: "2026-11-05T14:19:29.675Z"
+    endedAt: "2026-11-05T14:19:29.675Z"
+    activeIntervals: [{"end":"2026-11-05T14:03:16.048Z","start":"2026-11-05T13:49:27.119Z"},{"end":"2026-11-05T14:19:29.675Z","start":"2026-11-05T14:06:19.192Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "views/area-spec-map.ts: SpecMap (one AreaBlock per capability sized by criteriaCount, tinted by status, open-change count marker, ConstraintBands above, order changing/defective then size). AreaBlock gains optional selected/aria-pressed. Tests: area-spec-map (7)."
+    lastModified: "2026-11-05T14:19:40.585Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "50c98ea3-d30c-4eea-8df7-fece3958d327":
     status: "completed"
@@ -32,7 +39,7 @@ items:
     lastModified: "2026-11-05T01:05:53.642Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b5e6519-b13e-4ca2-a70a-40988f4dcea8":
-    lastModified: "2026-11-05T13:53:52.847Z"
+    lastModified: "2026-11-05T14:07:38.107Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c72e349-bf76-42ba-8274-2d40b7c3127e":
     lastModified: "2026-11-05T01:06:03.990Z"

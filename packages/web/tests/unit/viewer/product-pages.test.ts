@@ -438,7 +438,10 @@ describe("the Requirements tab", () => {
     expect(fetched).toEqual([`/api/rex/product/area/${area.slug}`]);
     expect(root.querySelector("h2")?.textContent).toContain(AREA_DETAIL_FIXTURE.title);
     // On its own page the area offers no "Open on Product page": it is that page.
-    expect([...root.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Product"]);
+    // The spec map's capability blocks are buttons too; only the non-map buttons carry this claim.
+    const nonMap = [...root.querySelectorAll("button")].filter((b) => !b.closest(".asm"));
+    expect(nonMap.map((b) => b.textContent)).toEqual(["Product"]);
+    expect(root.querySelectorAll(".asm .pam-block")).toHaveLength(AREA_DETAIL_FIXTURE.capabilities.length);
     act(() => root.querySelector<HTMLButtonElement>(".cap-back")!.click());
     expect(navigateTo).toHaveBeenCalledWith("product");
   });
