@@ -21,6 +21,7 @@ import {
   startVendorSession,
 } from "../../src/vendor-session.js";
 import type { RuntimeEvent } from "../../src/runtime-contract.js";
+import { codexShellEnvFlags } from "../../src/codex-cli-provider.js";
 
 function fakeScript(vendor: "claude" | "codex", log: string): string {
   return `
@@ -238,7 +239,13 @@ describe("codex sessions", () => {
     const [a, b] = calls();
     expect(a.argv).toEqual(["exec", "-s", "read-only", "--json", "--skip-git-repo-check", "-"]);
     expect(a.stdin).toBe("SYSTEM:\nsys\n\nTASK:\nhello");
-    expect(b.argv).toEqual(["exec", "resume", "thread-1", "--json", "--skip-git-repo-check", "-"]);
+    // A resumed turn drops the sandbox flag but keeps the overrides that
+    // blank the Codex key in the agent's commands: config is per process.
+    expect(b.argv).toEqual([
+      "exec", "resume", "thread-1", "--json", "--skip-git-repo-check",
+      ...codexShellEnvFlags(),
+      "-",
+    ]);
   });
 
   it("resumes a stored thread and refuses to fork", async () => {
