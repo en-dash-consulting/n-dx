@@ -15,7 +15,7 @@ import { workspaceConnectionService } from "../connections/connection-service.js
 import { resolveStore } from "../rex-gateway.js";
 import type { SidecarLink } from "../../shared/index.js";
 import type { ServerContext } from "../types.js";
-import { changeItemLink, linkRefProblem } from "./item-links.js";
+import { changeItemLink, findItemByRef, linkRefProblem } from "./item-links.js";
 import { itemLinkRefs } from "./link-refs.js";
 import { connectionsTrackerLabel } from "./tracker-label.js";
 
@@ -26,7 +26,7 @@ export async function readLinkCall(ctx: Pick<ServerContext, "rexDir" | "projectD
   if (!itemId) return "a link names the item (itemId)";
   const checked = linkRefProblem(input.ref);
   if ("error" in checked) return checked.error;
-  const item = await (await resolveStore(ctx.rexDir)).getItem(itemId);
+  const item = findItemByRef((await (await resolveStore(ctx.rexDir)).loadDocument()).items, itemId);
   if (!item) return `no item ${itemId}`;
   if (itemLinkRefs(item as { issues?: unknown; links?: unknown }).includes(checked.ref)) return `${itemId} already links to ${checked.ref}`;
   return { itemId: item.id, title: item.title, ref: checked.ref, label: connectionsTrackerLabel(workspaceConnectionService(ctx.projectDir)) };

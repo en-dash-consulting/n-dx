@@ -10,7 +10,7 @@
  */
 
 import { errorMessage } from "../response-utils.js";
-import { findItem, isChangeLayerStore, resolveStore, updateInTree, type PRDItem } from "../rex-gateway.js";
+import { findItem, isChangeLayerStore, resolveStore, updateInTree, walkTree, type PRDItem } from "../rex-gateway.js";
 import { refreshPRDCache } from "../prd-io.js";
 import { itemLinkRefs, linkPatch, normalizeWorkRef, unlinkPatch, type LinkFields } from "./link-refs.js";
 
@@ -24,6 +24,16 @@ export type ItemLinkResult =
 export function linkRefProblem(value: unknown): { ref: string } | { error: string } {
   const ref = normalizeWorkRef(value);
   return ref ? { ref } : { error: `"ref" must be a tracker key (WM-2054) or an http(s) URL` };
+}
+
+/** The item a UUID or a display id (CH-142) names, or undefined. The id wins over a display id. */
+export function findItemByRef(items: PRDItem[], ref: string): PRDItem | undefined {
+  const entry = findItem(items, ref);
+  if (entry) return entry.item;
+  for (const { item } of walkTree(items)) {
+    if ((item as PRDItem & { displayId?: string }).displayId === ref) return item;
+  }
+  return undefined;
 }
 
 /** Add or remove `ref` on the item. Linking a ref the item has, or unlinking one it lacks, writes nothing. */
@@ -41,14 +51,14 @@ export async function changeItemLink(
     const v2 = isChangeLayerStore(store);
     let outcome: { changed: boolean; title: string; refs: string[] } | undefined;
     await store.withTransaction(async (doc) => {
-      const entry = findItem(doc.items, itemId);
-      if (!entry) return;
-      const fields = entry.item as PRDItem & LinkFields;
+      const item = findItemByRef(doc.items, itemId);
+      if (!item) return;
+      const fields = item as PRDItem & LinkFields;
       const patch = action === "link" ? linkPatch(fields, ref, v2) : unlinkPatch(fields, ref);
-      if (patch && updateInTree(doc.items, itemId, patch as Partial<PRDItem>)) {
-        outcome = { changed: true, title: entry.item.title, refs: itemLinkRefs({ ...fields, ...patch }) };
+      if (patch && updateInTree(doc.items, item.id, patch as Partial<PRDItem>)) {
+        outcome = { changed: true, title: item.title, refs: itemLinkRefs({ ...fields, ...patch }) };
       } else {
-        outcome = { changed: false, title: entry.item.title, refs: itemLinkRefs(fields) };
+        outcome = { changed: false, title: item.title, refs: itemLinkRefs(fields) };
       }
     });
     if (!outcome) return { ok: false, status: 404, error: `Item "${itemId}" not found` };

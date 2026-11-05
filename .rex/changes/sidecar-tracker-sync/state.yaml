@@ -35,7 +35,14 @@ items:
     lastModified: "2026-11-05T05:08:12.703Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4986e450-9155-4152-a755-d6685c9679e0":
-    lastModified: "2026-11-05T05:09:06.272Z"
+    status: "completed"
+    startedAt: "2026-11-05T07:46:11.486Z"
+    completedAt: "2026-11-05T07:51:13.970Z"
+    endedAt: "2026-11-05T07:51:13.970Z"
+    activeIntervals: [{"end":"2026-11-05T07:51:13.970Z","start":"2026-11-05T07:46:11.486Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option B: findItemByRef in tracker/item-links.ts matches UUID or displayId; used by changeItemLink and readLinkCall. No gateway export."
+    lastModified: "2026-11-05T07:51:13.970Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "51b80946-412a-446f-8bee-8d35364784ba":
     lastModified: "2026-11-05T06:47:21.362Z"

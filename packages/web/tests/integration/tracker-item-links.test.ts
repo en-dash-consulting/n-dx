@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { resolveStore } from "@n-dx/rex";
 import { handleRexRoute } from "../../src/server/routes-rex/index.js";
+import { readLinkCall } from "../../src/server/tracker/link-card.js";
 import type { ServerContext } from "../../src/server/types.js";
 import type { PRDItem } from "../../src/server/rex-gateway.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
@@ -94,6 +95,16 @@ describe("on a v2 tree", () => {
     await send("DELETE", CHANGE, { ref: "WM-1" });
     expect((await readItem(CHANGE)).issues).toEqual([url]);
     expect(await send("DELETE", CHANGE, { ref: "WM-1" })).toMatchObject({ status: 200, json: { changed: false } });
+  });
+
+  it("takes a change's display id for its UUID, on the route and on the link card", async () => {
+    const card = await readLinkCall({ rexDir, projectDir: tmpDir }, { itemId: "CH-1", ref: "WM-1" });
+    expect(card).toMatchObject({ itemId: CHANGE, ref: "WM-1" });
+
+    expect(await send("POST", "CH-1", { ref: "WM-1" })).toMatchObject({ status: 200, json: { changed: true, refs: ["WM-1"] } });
+    expect((await readItem(CHANGE)).issues).toEqual(["WM-1"]);
+    expect(await readLinkCall({ rexDir, projectDir: tmpDir }, { itemId: "CH-1", ref: "WM-1" })).toBe("CH-1 already links to WM-1");
+    expect((await send("POST", "CH-999", { ref: "WM-1" })).status).toBe(404);
   });
 
   it("refuses a ref that is neither a tracker key nor a URL, and an item it does not have", async () => {
