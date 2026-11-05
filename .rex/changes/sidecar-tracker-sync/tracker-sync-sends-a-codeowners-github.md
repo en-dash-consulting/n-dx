@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "A PR-opened move whose reviewer comes only from CODEOWNERS sends the mapped tracker user id, never the raw @handle (test)"
   - "A CODEOWNERS handle with no mapping becomes a card naming the handle to map, and no call is made (test)"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
