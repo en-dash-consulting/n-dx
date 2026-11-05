@@ -7,7 +7,7 @@
  *   placement panel in the Tasks tree, as the Inbox page does.
  * - Recently applied: the last five.
  * - Where it lives in code: the files capabilities list, or an empty state
- *   that points at the analysis.
+ *   that says how code gets linked.
  *
  * Every card has an empty state. The server computes every list.
  *
@@ -26,11 +26,13 @@ import type {
 import { CHANGE_STAGE_LABELS } from "./product-model.js";
 
 /**
- * What names the analysis step. The dashboard has no code-linking action and
- * rex has no linking command: code sites are stamped from git by the changes
- * that build a capability, so the last analysis is the one thing to refresh.
+ * What the code card's action says. Neither the dashboard nor rex has a
+ * code-linking action: a capability's `realizedBy` files are written only by
+ * the v1-to-v2 migration, from that migration's analysis. Running a fresh
+ * analysis does not fill them, so the action names no command.
  */
-export const LINK_CODE_COMMAND = "ndx analyze .";
+export const LINK_CODE_HELP =
+  "Neither the dashboard nor rex can link code to a capability yet. A capability lists its files only when the v1-to-v2 migration wrote them from that analysis.";
 
 /** The empty state's text for the code card. */
 export const NO_CODE_MESSAGE = "No capability here lists its code files yet.";
@@ -135,7 +137,7 @@ function CodeEmpty() {
     NO_CODE_MESSAGE, " ",
     h("details", { class: "area-link-code" },
       h("summary", null, "Link code from the last analysis →"),
-      h("p", null, "Refresh the analysis from a terminal: ", h("code", null, LINK_CODE_COMMAND))));
+      h("p", null, LINK_CODE_HELP)));
 }
 
 function WhereItLives({ area }: { area: AreaDetail }) {

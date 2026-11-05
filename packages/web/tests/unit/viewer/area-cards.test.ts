@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { AreaCards, LINK_CODE_COMMAND, NO_CODE_MESSAGE, distinctChanges } from "../../../src/viewer/views/area-cards.js";
+import { AreaCards, LINK_CODE_HELP, NO_CODE_MESSAGE, distinctChanges } from "../../../src/viewer/views/area-cards.js";
 import type { AreaDetail } from "../../../src/viewer/views/product-model.js";
 import { AREA_DETAIL_FIXTURE } from "../../fixtures/v2-product-map.js";
 
@@ -35,7 +35,9 @@ describe("empty states", () => {
     const code = card("code");
     expect(code.textContent).toContain(NO_CODE_MESSAGE);
     expect(code.querySelector("summary")?.textContent).toBe("Link code from the last analysis →");
-    expect(code.querySelector("details code")?.textContent).toBe(LINK_CODE_COMMAND);
+    // No command fills realizedBy today, so the action must not name one.
+    expect(code.querySelector("details p")?.textContent).toBe(LINK_CODE_HELP);
+    expect(code.querySelector("details code")).toBeNull();
   });
 });
 
