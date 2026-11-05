@@ -213,6 +213,49 @@ export interface ChangeRow {
   completedTaskCount: number;
 }
 
+// ── Plan's glance read ───────────────────────────────────────────────
+
+/** The stages an open change can be in. */
+export type OpenChangeStage = Exclude<ChangeStage, "applied" | "shipped">;
+
+/** One placed open change, as Plan's open-changes glance shows it. */
+export interface GlanceChange {
+  id: string;
+  displayId?: string;
+  title: string;
+  stage: OpenChangeStage;
+  priority?: string;
+  plannedRelease?: string;
+  taskCount: number;
+  completedTaskCount: number;
+}
+
+/** The unit `ndx work` would run next, and why rex picked it. */
+export interface NextPick {
+  id: string;
+  displayId?: string;
+  title: string;
+  type: "change" | "task" | "subtask";
+  changeId: string;
+  changeDisplayId?: string;
+  changeTitle: string;
+  /** Rex's selection reason code. */
+  reason: "in_progress" | "ready_to_finalize" | "priority";
+  /** Rex's wording of that reason. Display only. */
+  summary: string;
+}
+
+/**
+ * `GET /api/rex/changes/summary`: stage counts over placed open changes,
+ * the Inbox counted apart, the placed open changes and rex's next pick.
+ */
+export interface ChangeSummary {
+  inbox: number;
+  stages: Record<OpenChangeStage, number>;
+  open: GlanceChange[];
+  next: NextPick | null;
+}
+
 // ── Inbox placement ──────────────────────────────────────────────────
 
 /** How a change relates to the node it is placed on: works on it, or edits its requirements. */

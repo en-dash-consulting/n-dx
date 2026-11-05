@@ -4,6 +4,7 @@
  *
  *   GET /api/rex/product                 → { layout: "v2", map }
  *   GET /api/rex/changes                 → { layout: "v2", changes }
+ *   GET /api/rex/changes/summary         → { layout: "v2", summary }
  *   GET /api/rex/product/capability/<id> → { layout: "v2", capability }
  *   POST /api/rex/product/edit           → { layout: "v2", outcome, drafts, capability }
  *
@@ -39,6 +40,9 @@ import {
   handleProductEdit,
   ProductEditError,
   withPrdModelTransaction,
+  findNextWorkTask,
+  openClaimsStore,
+  resolveClaimHolder,
 } from "../rex-gateway.js";
 import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
 
@@ -114,6 +118,50 @@ export interface ChangeRowWire {
   touches: Array<{ id: string; title: string }>;
   taskCount: number;
   completedTaskCount: number;
+}
+
+/** The stages an open change can be in. */
+export type OpenChangeStageWire = Exclude<ChangeStageWire, "applied" | "shipped">;
+
+/** One placed open change, with only the fields Plan's open-changes glance shows. */
+export interface GlanceChangeWire {
+  id: string;
+  displayId?: string;
+  title: string;
+  stage: OpenChangeStageWire;
+  priority?: string;
+  plannedRelease?: string;
+  taskCount: number;
+  completedTaskCount: number;
+}
+
+/** The unit `ndx work` would run next, and why rex picked it. */
+export interface NextPickWire {
+  id: string;
+  displayId?: string;
+  title: string;
+  type: "change" | "task" | "subtask";
+  changeId: string;
+  changeDisplayId?: string;
+  changeTitle: string;
+  /** Rex's selection reason code. */
+  reason: "in_progress" | "ready_to_finalize" | "priority";
+  /** Rex's wording of that reason. Display only. */
+  summary: string;
+}
+
+/**
+ * Plan's glance read: a few hundred bytes where the full change list is
+ * megabytes. Stage counts are over placed open changes; changes rex holds for
+ * placement count once, as Inbox, and are absent from `open`.
+ */
+export interface ChangeSummaryWire {
+  inbox: number;
+  stages: Record<OpenChangeStageWire, number>;
+  /** Placed open changes, in tree order. */
+  open: GlanceChangeWire[];
+  /** `null` when nothing is actionable outside another worktree's claims. */
+  next: NextPickWire | null;
 }
 
 export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaCount"> {
@@ -261,13 +309,66 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
   return { ...(body ? { statement: body } : {}), areas, constraints };
 }
 
+/** A change's live tasks. */
+const tasksOf = (change: ChangeRuleNode): RuleNode[] =>
+  (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
+
+/**
+ * Plan's glance read, from one model load: Inbox and stage counts, the placed
+ * open changes and rex's next pick. `excludeIds` are units another worktree
+ * has claimed, passed over as `ndx work` passes over them.
+ */
+export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set()): ChangeSummaryWire {
+  const index = indexTree(tree);
+  const stages: Record<OpenChangeStageWire, number> = { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 };
+  const open: GlanceChangeWire[] = [];
+  let inbox = 0;
+  for (const change of changesOf(index)) {
+    if (!isOpenChange(change)) continue;
+    if (awaitsPlacement(index, change)) {
+      inbox++;
+      continue;
+    }
+    const stage = stageOf(change);
+    if (stage === "applied" || stage === "shipped") continue;
+    stages[stage]++;
+    const tasks = tasksOf(change);
+    open.push({
+      id: change.id,
+      ...(change.displayId ? { displayId: change.displayId } : {}),
+      title: change.title,
+      stage,
+      ...(change.priority ? { priority: change.priority } : {}),
+      ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
+      taskCount: tasks.length,
+      completedTaskCount: tasks.filter((t) => t.status === "completed").length,
+    });
+  }
+
+  const pick = findNextWorkTask(tree, { excludeIds });
+  const next: NextPickWire | null = pick
+    ? {
+      id: pick.unit.node.id,
+      ...(pick.unit.node.displayId ? { displayId: pick.unit.node.displayId } : {}),
+      title: pick.unit.node.title,
+      type: pick.unit.node.type,
+      changeId: pick.unit.change.id,
+      ...(pick.unit.change.displayId ? { changeDisplayId: pick.unit.change.displayId } : {}),
+      changeTitle: pick.unit.change.title,
+      reason: pick.explanation.reason,
+      summary: pick.explanation.summary,
+    }
+    : null;
+  return { inbox, stages, open, next };
+}
+
 /** Every live, not cancelled change: open ones and applied ones. */
 export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
   return changesOf(index)
     .filter((change) => isOpenChange(change) || isAppliedChange(change))
     .map((change) => {
-      const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
+      const tasks = tasksOf(change);
       return {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
@@ -363,7 +464,7 @@ export function routeProductReads(
 ): boolean | Promise<boolean> {
   if (method !== "GET") return false;
   const capabilityRef = path.startsWith(CAPABILITY_PREFIX) ? decodeURIComponent(path.slice(CAPABILITY_PREFIX.length)) : undefined;
-  if (path !== "product" && path !== "changes" && !capabilityRef) return false;
+  if (path !== "product" && path !== "changes" && path !== "changes/summary" && !capabilityRef) return false;
 
   return (async () => {
     if ((await prdLayout(ctx.rexDir)) !== "v2") {
@@ -382,6 +483,10 @@ export function routeProductReads(
       jsonResponse(res, 200, { layout: "v2", map: buildProductMap(model.tree, model.header) });
     } else if (path === "changes") {
       jsonResponse(res, 200, { layout: "v2", changes: buildChangeRows(model.tree) });
+    } else if (path === "changes/summary") {
+      const holder = resolveClaimHolder(ctx.projectDir);
+      const claimed = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
+      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys())) });
     } else {
       const capability = buildCapabilityDetail(model.tree, capabilityRef!);
       if (capability) jsonResponse(res, 200, { layout: "v2", capability });

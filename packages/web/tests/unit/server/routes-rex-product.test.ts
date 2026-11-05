@@ -13,6 +13,7 @@ import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import type {
   CapabilityDetailWire,
   ChangeRowWire,
+  ChangeSummaryWire,
   ProductMapWire,
 } from "../../../src/server/routes-rex/product.js";
 import type {
@@ -30,6 +31,7 @@ import type {
   ChangePlacement,
   ChangePlacements,
   ChangeRow,
+  ChangeSummary,
   PlaceChangeRequest,
   PlaceChangeResult,
   PlacementDraft,
@@ -47,6 +49,7 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const sameMap: Same<ProductMapWire, ProductMap> = true;
 const sameChange: Same<ChangeRowWire, ChangeRow> = true;
 const sameCapability: Same<CapabilityDetailWire, CapabilityDetail> = true;
+const sameSummary: Same<ChangeSummaryWire, ChangeSummary> = true;
 const samePlacement: Same<ChangePlacementWire, ChangePlacement> = true;
 const samePlacements: Same<ChangePlacementsWire, ChangePlacements> = true;
 const samePlace:Same<PlaceChangeRequestWire, PlaceChangeRequest> = true;
@@ -56,12 +59,13 @@ const sameProposed: Same<ProposeChangeResultWire, ProposeChangeResult> = true;
 const sameDraft: Same<PlacementDraftWire, PlacementDraft> = true;
 // The refusal kinds the viewer words a hint for are rex's, which the 422 answer carries.
 const sameRefusalKind: Same<ChangePlacementErrorKind, PlacementRefusalKind> = true;
-void [sameMap, sameChange, sameCapability, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
+void [sameMap, sameChange, sameCapability, sameSummary, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const AREA_ID = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY_ID = "a0000000-0000-4000-8000-000000000002";
 const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+const TASK_ID = "c0000000-0000-4000-8000-000000000002";
 
 async function serve(ctx: ServerContext): Promise<{ server: Server; base: string }> {
   const server = createServer(async (req, res) => {
@@ -176,6 +180,70 @@ describe("v2 product reads", () => {
     applyChange();
     const { body } = await get("changes");
     expect((body.changes as ChangeRow[])[0]).toMatchObject({ stage: "shipped", shippedIn: "1.2.0" });
+  });
+
+  describe("GET /changes/summary", () => {
+    /** An unplaced change, as `rex add` files one into the Inbox. */
+    function addInboxChange(): void {
+      const id = "c0000000-0000-4000-8000-000000000009";
+      const dir = join(rexDir, "changes", "gift-cards");
+      mkdirSync(dir);
+      writeFileSync(join(dir, "index.md"), [
+        "---", `id: "${id}"`, 'type: "change"', 'title: "Gift cards"', 'slug: "gift-cards"', "---", "",
+      ].join("\n"));
+      writeFileSync(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${id}":`, "    needsPlacement: true", ""].join("\n"));
+    }
+
+    it("counts stages and Inbox, lists placed open changes and names rex's next pick", async () => {
+      const { status, body } = await get("changes/summary");
+      expect(status).toBe(200);
+      expect(body).toEqual({
+        layout: "v2",
+        summary: {
+          inbox: 0,
+          stages: { proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 },
+          open: [{
+            id: CHANGE_ID,
+            displayId: "CH-1",
+            title: "Add Apple Pay",
+            stage: "in-progress",
+            priority: "high",
+            plannedRelease: "1.2.0",
+            taskCount: 1,
+            completedTaskCount: 0,
+          }],
+          next: {
+            id: TASK_ID,
+            title: "Wire the button",
+            type: "task",
+            changeId: CHANGE_ID,
+            changeDisplayId: "CH-1",
+            changeTitle: "Add Apple Pay",
+            reason: expect.any(String),
+            summary: expect.any(String),
+          },
+        },
+      });
+      const summary = (body as { summary: ChangeSummary }).summary;
+      expect(["in_progress", "ready_to_finalize", "priority"]).toContain(summary.next!.reason);
+    });
+
+    it("counts an Inbox change apart from the stages and leaves it out of the open list", async () => {
+      addInboxChange();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.inbox).toBe(1);
+      expect(summary.stages).toEqual({ proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 });
+      expect(summary.open.map((c) => c.id)).toEqual([CHANGE_ID]);
+    });
+
+    it("reads the tree on every request, so a write shows on the next read", async () => {
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).stages["in-progress"]).toBe(1);
+      applyChange();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.stages["in-progress"]).toBe(0);
+      expect(summary.open).toEqual([]);
+      expect(summary.next).toBeNull();
+    });
   });
 
   it("GET /product/capability/<display id> returns the capability page", async () => {
@@ -373,7 +441,7 @@ describe("product reads on a v1 project", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it.each(["product", "changes", "product/capability/A1.1"])("GET /%s answers layout v1 and nothing else", async (path) => {
+  it.each(["product", "changes", "changes/summary", "product/capability/A1.1"])("GET /%s answers layout v1 and nothing else", async (path) => {
     const res = await fetch(`${base}/${path}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ layout: "v1" });
