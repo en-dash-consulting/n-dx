@@ -705,6 +705,10 @@ export type {
 export { withPrdModelTransaction, PrdLayoutError } from "./store/prd-model-transaction.js";
 export type { PrdModelEdit, PrdModelTransactionOptions, PrdModelTransactionResult } from "./store/prd-model-transaction.js";
 
+// Steward apply of an open change, or its preview (MCP apply_change, the dashboard's Apply)
+export { applyChange } from "./core/apply-change.js";
+export type { ApplyChangeOptions, ApplyChangeOutcome, AppliedAmendmentEffect } from "./core/apply-change.js";
+
 // Direct edit of a product node's spec (`rex product edit`, the dashboard's capability form)
 export { handleProductEdit, ProductEditError } from "./core/product-edit.js";
 

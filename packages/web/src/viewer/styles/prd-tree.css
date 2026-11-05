@@ -1855,6 +1855,19 @@ a.tracker-link {
   color: var(--text);
 }
 
+/* Apply… for a change awaiting apply (change-apply.ts) */
+.ca-effects {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-4);
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+.ca-effects-empty {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
 .cp-search-input,
 .cp-input {
   width: 100%;

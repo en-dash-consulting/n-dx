@@ -218,7 +218,7 @@ function stageOf(change: RuleNode): ChangeStageWire {
   if (change.shippedIn) return "shipped";
   if (isAppliedChange(change)) return "applied";
   // Completed but not applied: rex.applyOn is review or release, so only a steward's
-  // apply (MCP, CLI) or a release stamp moves it on. The dashboard has no apply action.
+  // apply (MCP, CLI, the detail panel's Apply…) or a release stamp moves it on.
   if (change.status === "completed") return "awaiting-apply";
   if (isActive(change) || liveWorkUnder(change).some((n) => isActive(n) || n.status === "completed")) {
     return "in-progress";

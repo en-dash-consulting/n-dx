@@ -269,6 +269,25 @@ export interface ChangeSummary {
   next: NextPick | null;
 }
 
+// ── Apply ────────────────────────────────────────────────────────────
+
+/** One amendment of an apply and the product node it creates, edits or retires. */
+export interface AppliedAmendment {
+  delta: AmendmentDelta;
+  summary: string;
+  node: { id: string; displayId?: string; title: string; type: string };
+  /** Where an added node lands. */
+  under?: { id: string; displayId?: string; title: string };
+}
+
+/** `POST /api/rex/changes/:id/apply/preview` and `…/apply` on a v2 project. */
+export interface ChangeApply {
+  layout: "v2";
+  change: string;
+  appliedAt: string;
+  applied: AppliedAmendment[];
+}
+
 // ── Inbox placement ──────────────────────────────────────────────────
 
 /** How a change relates to the node it is placed on: works on it, or edits its requirements. */

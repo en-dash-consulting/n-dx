@@ -24,6 +24,7 @@ import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-ve
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
+import { ChangeApplySection } from "./change-apply.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1250,6 +1251,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           onInboxState: setInInbox,
         })
       : null,
+
+    // Apply…: a change awaiting apply, previewed before it writes
+    isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, changeId: item.id, onWritten: onPrdChanged }) : null,
 
     // Status selector
     h(

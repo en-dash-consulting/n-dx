@@ -54,6 +54,9 @@ export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 // The capability page's edit form: rex decides what a spec edit does (editorial
 // re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
 export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
+// A change's Apply… in the detail panel: rex previews and applies, the entry MCP
+// apply_change runs, and returns its refusal as data (routes-rex/apply.ts).
+export { applyChange } from "@n-dx/rex";
 
 // ---- Rex trailer-commit evidence ---------------------------------------------
 // The commits whose `N-DX-Item` trailer names an item, and the files each
