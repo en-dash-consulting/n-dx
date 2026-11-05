@@ -1394,8 +1394,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       "Every command re-emits first, so the graph is never older than the tree.\n" +
       "The projection is read-only: nothing is written under the rex,\n" +
       "sourcevision or hench directories. No @graview/* dependency: the binary\n" +
-      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, the\n" +
-      "installed @n-dx/graview-face's own graview; npx -y graview@<pinned> only\n" +
+      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, a\n" +
+      "@n-dx/graview-face checkout's own graview; npx -y graview@<pinned> only\n" +
       "with graview.allowNpx: true or NDX_GRAVIEW_NPX=1.",
     options: [
       { flag: "--no-files", description: "Leave source files out (default: every file, with its zone, the commits that changed it and the capabilities living there)" },

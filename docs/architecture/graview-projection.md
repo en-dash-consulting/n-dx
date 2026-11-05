@@ -38,12 +38,15 @@ ndx graview mcp .       →  emit, sync-seed the store, then  graview mcp --read
 
 No n-dx package depends on `@graview/*`. The binary is a peer tool, the way
 the `claude` and `codex` CLIs are to hench, resolved from `graview.bin` in the
-project config, `NDX_GRAVIEW_BIN`, PATH, the product face's own `graview`
-(it pins the same release), then, only when the user opts in with
+project config, `NDX_GRAVIEW_BIN`, PATH, a product face checkout's own
+`graview` (it pins the same release; the monorepo's face, or one under
+`extensions.paths` — the published face installs none), then, only when the
+user opts in with
 `graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1`, `npx -y graview@<pinned>`
 (`packages/graview/src/graview-bin.ts`). Without the opt-in nothing is
-downloaded: every command but `emit` stops with a sentence on how to install
-graview, and `ndx graview info` says the source is `none`. A `.js` path runs
+downloaded: `check`, `describe`, `mcp` and `serve` with no face to run stop
+with a sentence on how to install graview, `emit` and a face's `serve` need
+none, and `ndx graview info` says the source is `none`. A `.js` path runs
 under the current Node, so a sibling framework checkout works without a global
 install. npx runs in `<ndx home>/graview/npx`, an empty private package n-dx
 owns, never the checkout, so a `graview` the repository installs in its

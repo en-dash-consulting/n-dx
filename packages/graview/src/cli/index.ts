@@ -47,7 +47,7 @@ const USAGE = `ndx graview <command> [dir] [flags]
   --quiet    print nothing but errors
 
 The graview binary comes from graview.bin in the project config, $NDX_GRAVIEW_BIN,
-PATH or the installed product face's own graview, in that order; npx -y graview@<pinned>
+PATH or a product face checkout's own graview, in that order; npx -y graview@<pinned>
 only when graview.allowNpx is true or $NDX_GRAVIEW_NPX=1. Nothing is downloaded unasked.
 `;
 

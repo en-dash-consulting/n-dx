@@ -2,8 +2,9 @@
  * Where the `graview` binary is. In order: `graview.bin` in the project
  * config (machine-local over shared; the repository's only once the checkout
  * is trusted), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
- * the product face's own `graview` (it pins the same release this package
- * checks against), then — only when the user opts in with
+ * a product face checkout's own `graview` (it pins the same release this
+ * package checks against; the published face lists graview as a dev
+ * dependency, so an npm install of it brings none), then — only when the user opts in with
  * `graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1` — `npx -y
  * graview@<pinned>`. Without the opt-in nothing is downloaded: npx fetches
  * and runs a package at command time and hangs offline, so the answer is

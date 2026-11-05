@@ -17,10 +17,11 @@ ndx graview info .            # where the projection lands, which binary, and th
 ```
 
 Nothing here depends on `@graview/*`. The `graview` binary is resolved from
-`graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, the installed
-`@n-dx/graview-face`'s own `graview` (it pins the same release). Nothing is
-downloaded unasked: with none of those, every command but `emit` stops and says
-how to install graview, unless `graview.allowNpx: true` (or `NDX_GRAVIEW_NPX=1`)
+`graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, a checkout of
+`@n-dx/graview-face`'s own `graview` (it pins the same release; the published
+face installs none). Nothing is downloaded unasked: with none of those,
+`check`, `describe`, `mcp` and `serve` with no face to run stop and say how to
+install graview, unless `graview.allowNpx: true` (or `NDX_GRAVIEW_NPX=1`)
 lets `npx -y graview@<pinned>` fetch it.
 
 Config keys (`.ndx/config.json` or `.n-dx.json`):
