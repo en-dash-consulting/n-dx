@@ -86,9 +86,13 @@ export async function handleTrackerRoute(
     const config = loadTrackerSync(ctx.projectDir);
     const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
     const log = readTrackerActivity(ctx.projectDir);
+    const recent = log.slice(-MAX_ACTIVITY_ENTRIES);
+    const cards = pendingCards(log);
+    // A card still waiting stays listed however many entries came after it.
+    const older = cards.filter((card) => !recent.includes(card));
     jsonResponse(res, 200, {
-      entries: log.slice(-MAX_ACTIVITY_ENTRIES),
-      cards: pendingCards(log).map((e) => e.requestId),
+      entries: [...older, ...recent],
+      cards: cards.map((e) => e.requestId),
       sources: currentSourceProblems(ctx.projectDir),
       connection: config && !("problems" in config) ? connectionView(service, config.connection) : null,
     });

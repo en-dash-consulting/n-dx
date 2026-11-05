@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
 import { enforceRouteFeatureGate } from "../../src/server/route-feature-gates.js";
-import { handleTrackerRoute } from "../../src/server/routes-tracker.js";
+import { handleTrackerRoute, MAX_ACTIVITY_ENTRIES } from "../../src/server/routes-tracker.js";
 import { isSidecarBrokerRequest, SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "../../src/server/sidecar/broker-credential.js";
 import { appendTrackerActivity, type TrackerActivityEntry } from "../../src/server/tracker/activity-log.js";
 import { changeItemLink } from "../../src/server/tracker/item-links.js";
@@ -132,6 +132,17 @@ describe("tracker cards", () => {
     const after = await activity();
     expect(after.cards).toEqual([]);
     expect(after.entries.map((e: TrackerActivityEntry) => e.result)).toEqual(["card", "dismissed"]);
+  });
+
+  it("keeps a waiting card listed after the newest entries have moved past it", async () => {
+    appendTrackerActivity(root, card);
+    for (let i = 0; i < MAX_ACTIVITY_ENTRIES + 5; i++) {
+      appendTrackerActivity(root, { ...card, rexId: `rex-${i}`, requestId: `ndx:ndx:rex-${i}:run-started`, result: "would" });
+    }
+    const answer = await activity();
+    expect(answer.entries).toHaveLength(MAX_ACTIVITY_ENTRIES + 1);
+    expect(answer.entries[0]).toMatchObject({ requestId, result: "card" });
+    expect(answer.cards).toEqual([requestId]);
   });
 
   it("refuses a decision for no waiting card, a bad body and a missing credential", async () => {

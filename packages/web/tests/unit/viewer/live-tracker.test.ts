@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { LiveView } from "../../../src/viewer/views/live.js";
+import { TrackerActivitySection } from "../../../src/viewer/views/live-tracker.js";
 import type { NavigateTo } from "../../../src/viewer/types.js";
 import {
   activityRows,
@@ -163,6 +164,26 @@ describe("Live Tracker activity", () => {
     // The card is closed and the list read again: no Approve left.
     expect(root.querySelector('[data-action="approve"]')).toBeNull();
     expect(root.querySelector(".live-tracker-form")).toBeNull();
+  });
+
+  it("keeps an open card form and its edits when a new entry arrives above it", async () => {
+    stub();
+    navigateTo = vi.fn<NavigateTo>();
+    const draw = (refreshKey: string) => act(() => { render(h(TrackerActivitySection, { refreshKey, navigateTo }), root); });
+    draw("1");
+    await settle();
+    await click(root.querySelector('[data-action="approve"]'));
+    const title = root.querySelector<HTMLInputElement>('input[data-field="title"]')!;
+    act(() => {
+      title.value = "Edited title";
+      title.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    activity = { ...activity!, entries: [...activity!.entries, entry({ rexId: "rex-9", requestId: "ndx:ndx:rex-9:run-started", at: "2026-11-05T12:05:00.000Z" })] };
+    draw("2");
+    await settle();
+    expect(rows()[0].textContent).toContain("rex-9");
+    expect(root.querySelector<HTMLInputElement>('input[data-field="title"]')?.value).toBe("Edited title");
   });
 
   it("dismisses a card without a form", async () => {

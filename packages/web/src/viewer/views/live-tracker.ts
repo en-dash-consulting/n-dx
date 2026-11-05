@@ -187,7 +187,9 @@ export function TrackerActivitySection({ refreshKey, navigateTo }: { refreshKey:
         : null),
     rows.length === 0
       ? h("p", { class: "live-muted" }, "No tracker calls yet.")
-      : h("ul", { class: "live-tracker-list" }, rows.map(({ entry, waiting }, i) =>
-        h(ActivityRow, { key: `${entry.requestId}:${entry.at}:${i}`, entry, waiting, onChanged: reread }))),
+      // Keyed by the entry, never its position: the list is newest first, so a
+      // new entry would shift every index and remount an open card form.
+      : h("ul", { class: "live-tracker-list" }, rows.map(({ entry, waiting }) =>
+        h(ActivityRow, { key: `${entry.requestId}:${entry.at}:${entry.result}`, entry, waiting, onChanged: reread }))),
   );
 }
