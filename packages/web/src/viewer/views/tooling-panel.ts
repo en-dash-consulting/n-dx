@@ -9,6 +9,7 @@ import { h } from "preact";
 import type { ComponentChild, ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { appUrl } from "../base-path.js";
+import { useCliName } from "../hooks/index.js";
 import { viewPathname } from "../route-state.js";
 import type { NavigateTo } from "../types.js";
 import { ROBOT_WRANGLER_SECTIONS, type RobotWranglerSection } from "./robot-wrangler-sections.js";
@@ -79,6 +80,7 @@ export function ToolingPanel({ navigateTo, extra }: {
   /** Where S8's Sidecar and connections lines join the tile. */
   extra?: ComponentChild;
 }): ComponentChild {
+  const cliName = useCliName();
   const [load, setLoad] = useState<Load>({ state: "loading" });
 
   useEffect(() => {
@@ -119,11 +121,11 @@ export function ToolingPanel({ navigateTo, extra }: {
             h("dt", null, TIER_LABEL[row.tier] ?? row.tier),
             h("dd", null, h("code", null, row.model)))))))),
     h("p", { class: "tooling-line tooling-routes" },
-      // No Settings field edits llm.routes; `ndx config` does.
+      // No Settings field edits llm.routes; the CLI's `config` command does.
       summary.routes.length === 0
         ? "No per-command route overrides"
         : `Route overrides: ${summary.routes.map((r) => `${r.label} → ${TIER_LABEL[r.tier] ?? r.tier}`).join(", ")}`,
-      " (change with ", h("code", null, "ndx config"), ")"),
+      " (change with ", h("code", null, `${cliName} config`), ")"),
     h("p", { class: "tooling-line tooling-review" },
       h(SettingsLink, { section: "review", navigateTo }, summary.review)),
     // Reserved for S8: the Sidecar's settings and C1's connections.

@@ -5,6 +5,7 @@ import { ToolingPanel } from "../../../src/viewer/views/tooling-panel.js";
 import type { NavigateTo } from "../../../src/viewer/types.js";
 import { robotWranglerSectionId } from "../../../src/viewer/views/robot-wrangler-sections.js";
 import { summarizeTooling } from "../../../src/viewer/views/tooling-summary.js";
+import { DEFAULT_CLI_NAME } from "../../../src/viewer/hooks/use-project-metadata.js";
 
 async function waitFor(fn: () => void, timeout = 2000) {
   const start = Date.now();
@@ -98,7 +99,7 @@ describe("ToolingPanel", () => {
 
     expect(root.querySelectorAll("input, select, textarea, button")).toHaveLength(0);
     const links = Array.from(root.querySelectorAll<HTMLAnchorElement>("a.tooling-link"));
-    // Three vendors and the review line; route overrides name `ndx config` instead.
+    // Three vendors and the review line; route overrides name the config command instead.
     expect(links.map((a) => a.dataset.section)).toEqual(["models", "models", "models", "review"]);
     for (const a of links) {
       expect(a.getAttribute("href")).toMatch(new RegExp(`/robot-wrangler\\?section=${a.dataset.section}$`));
@@ -111,11 +112,12 @@ describe("ToolingPanel", () => {
     expect(navigateTo).toHaveBeenLastCalledWith("robot-wrangler", { section: "review" });
   });
 
-  it("names ndx config as where route overrides change", async () => {
+  it("names the CLI's config command as where route overrides change", async () => {
     stub(CONFIG, CATALOG);
     mount();
     await waitFor(() => expect(text(".tooling-routes")).toContain("ndx plan → Heavy"));
-    expect(text(".tooling-routes")).toContain("ndx config");
+    // No project metadata in this test, so the CLI name is the default.
+    expect(text(".tooling-routes")).toContain(`${DEFAULT_CLI_NAME} config`);
     expect(root.querySelector(".tooling-routes a")).toBeNull();
   });
 
