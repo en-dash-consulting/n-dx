@@ -66,7 +66,8 @@ function Row({ change, navigateTo }: { change: GlanceChange; navigateTo: Navigat
 export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
   const load = useChangesSummary();
   const cards = useContext(GhostCardsContext);
-  const ghosts = useMemo(() => ghostChanges(cards), [cards]);
+  // Placed changes only, like the real rows: an Inbox-bound one is noted on the strip's Inbox count.
+  const ghosts = useMemo(() => ghostChanges(cards).filter((g) => g.target !== null), [cards]);
   if (load.state === "loading") return h("div", { class: "changes-glance", role: "status" }, "Loading...");
   if (load.state === "v1") return null;
   if (load.state === "error") return h("div", { class: "changes-glance", role: "alert" }, `Could not load open changes: ${load.message}`);

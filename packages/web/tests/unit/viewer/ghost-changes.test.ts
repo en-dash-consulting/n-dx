@@ -96,10 +96,10 @@ describe("the Plan surfaces", () => {
     await act(async () => {});
   }
 
-  it("Open changes draws a dashed row per waiting change", async () => {
+  it("Open changes draws a dashed row per waiting placed change, not Inbox-bound ones", async () => {
     await mount(h(ChangesGlance, { navigateTo }), [PLACED, INBOX], { summary: { ...SUMMARY, open: [] } });
     const rows = [...root.querySelectorAll(".cg-ghost")];
-    expect(rows.map((r) => r.querySelector(".cg-title")?.textContent)).toEqual(["Add refunds", "Loose idea"]);
+    expect(rows.map((r) => r.querySelector(".cg-title")?.textContent)).toEqual(["Add refunds"]);
     expect(rows[0].textContent).toContain("proposed · on a card");
   });
 
