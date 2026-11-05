@@ -22,11 +22,14 @@ items:
   "470bef87-90da-4345-932c-74e386314499":
     lastModified: "2026-11-05T01:16:50.798Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "532ac6eb-1c9c-4780-9044-248e61af82fd":
+    lastModified: "2026-11-05T13:29:15.628Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7441aa5c-1555-443d-8a95-5df1ac4903d1":
-    status: "in_progress"
     startedAt: "2026-11-05T13:16:10.491Z"
-    activeIntervals: [{"start":"2026-11-05T13:16:10.491Z"}]
-    lastModified: "2026-11-05T13:16:11.145Z"
+    activeIntervals: [{"end":"2026-11-05T13:37:01.833Z","start":"2026-11-05T13:16:10.491Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T13:37:02.354Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9156347e-7193-4d2e-9108-635e9e3705ad":
     status: "completed"
@@ -41,5 +44,5 @@ items:
     lastModified: "2026-10-28T18:50:02.560Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "99692891-d095-469e-aa09-1725b77e87de":
-    lastModified: "2026-11-05T07:21:16.054Z"
+    lastModified: "2026-11-05T13:29:15.628Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
