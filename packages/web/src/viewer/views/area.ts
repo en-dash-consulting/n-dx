@@ -21,6 +21,7 @@ import type { AreaDetail } from "./product-model.js";
 import type { NavigateTo } from "../types.js";
 import { SpecMap } from "./area-spec-map.js";
 import { AreaCards } from "./area-cards.js";
+import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
 
 /** The area's address. */
 export function areaPath(slug: string): string {
@@ -68,7 +69,15 @@ export function useInPlaceAddress(path: string): void {
   }, [path]);
 }
 
-function AreaHeader({ area, onOpenPage }: { area: AreaDetail; onOpenPage?: () => void }) {
+interface AreaHeaderProps {
+  area: AreaDetail;
+  onOpenPage?: () => void;
+  /** Whether the capture is open; "+ Change in this area" toggles it. */
+  capturing: boolean;
+  onCapture: () => void;
+}
+
+function AreaHeader({ area, onOpenPage, capturing, onCapture }: AreaHeaderProps) {
   const steward = stewardLabel(area.stewards);
   return h("header", { class: "area-head" },
     area.summary ? h("p", { class: "section-sub area-summary" }, area.summary) : null,
@@ -76,11 +85,31 @@ function AreaHeader({ area, onOpenPage }: { area: AreaDetail; onOpenPage?: () =>
       h("ul", { class: "area-counts", "aria-label": "Counts" },
         areaCountLabels(area.counts).map((label) => h("li", { key: label }, label))),
       h("span", { class: `tag area-steward${area.stewards.length === 0 ? " area-steward-none" : ""}` }, steward),
-      onOpenPage
-        ? h("div", { class: "area-actions" },
-            h("button", { type: "button", class: "btn btn-small", onClick: onOpenPage }, "Open on Product page"))
-        : null,
+      h("div", { class: "area-actions" },
+        h("button", { type: "button", class: "btn btn-small area-capture-toggle", "aria-expanded": capturing, onClick: onCapture }, "+ Change in this area"),
+        onOpenPage
+          ? h("button", { type: "button", class: "btn btn-small area-open-page", onClick: onOpenPage }, "Open on Product page")
+          : null),
     ),
+  );
+}
+
+/**
+ * AD6: capture with the placement shortlist and search limited to this area,
+ * so Add & place writes the change already placed; with nothing chosen it
+ * lands in the Inbox as any capture does.
+ */
+function AreaCapture({ area, onClose, onOpenChange }: { area: AreaDetail; onClose: () => void; onOpenChange?: (id: string) => void }) {
+  // Esc steps back one level: it closes the capture, not the full-screen tile around the area.
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
+  return h("section", { class: "area-capture", "aria-label": `Change in ${area.title}`, onKeyDown },
+    h(SmartAddInput, { layout: "v2", area, onPrdChanged: onClose, ...(onOpenChange ? { onOpenChange } : {}) }),
+    h("button", { type: "button", class: "btn btn-small area-capture-close", onClick: onClose }, "Close"),
   );
 }
 
@@ -97,6 +126,7 @@ export interface AreaViewProps {
 /** The area: its header, its spec map, and the column of four cards beside it. */
 export function AreaView({ slug, onOpenPage, onBack, navigateTo }: AreaViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const openChange = navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined;
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
   const back = onBack
@@ -123,7 +153,9 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo }: AreaViewProps
     load.refreshError
       ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not refresh: ${load.refreshError}. Showing the last loaded data.`)
       : null,
-    h(AreaHeader, { area, onOpenPage }),
+    h(AreaHeader, { area, onOpenPage, capturing, onCapture: () => setCapturing((open) => !open) }),
+    // The area read refreshes itself on the PRD-changed broadcast an Add sends.
+    capturing ? h(AreaCapture, { area, onClose: () => setCapturing(false), onOpenChange: openChange }) : null,
     h("div", { class: "area-body" },
       h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
       // Place opens the change's placement panel until placement mode (S7) lands.

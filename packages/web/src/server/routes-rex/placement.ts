@@ -236,14 +236,18 @@ export interface PreviewPlacementWire {
  * score and reasons, and strength when rex is current; strength comes from
  * rex's own band when it is absent, the area from `tree` (the project's tree:
  * the shortlisted targets exist there even though the change does not yet).
+ * With `only`, rows whose target is not in it are dropped first (an area's
+ * targets), so the tie is read from what the person is offered.
  * Anything that is not a placement passes through untouched.
  */
-export function completePreviewPlacement(placement: unknown, tree: V2Tree | null): unknown {
+export function completePreviewPlacement(placement: unknown, tree: V2Tree | null, only?: ReadonlySet<string>): unknown {
   const p = placement as { relation?: unknown; shortlist?: unknown } | null;
   if (!p || typeof p !== "object" || !Array.isArray(p.shortlist)) return placement;
   const index = tree ? indexTree(tree) : null;
   const areaOf = index ? areaTitles(index) : () => "";
-  const shortlist = (p.shortlist as Array<Record<string, unknown>>).map((c): PreviewPlacementCandidateWire => {
+  const rows = (p.shortlist as Array<Record<string, unknown>>)
+    .filter((c) => !only || (typeof c.target === "string" && only.has(index?.resolve(c.target)?.id ?? c.target)));
+  const shortlist = rows.map((c): PreviewPlacementCandidateWire => {
     const score = typeof c.score === "number" ? c.score : 0;
     const type = typeof c.target === "string" ? index?.resolve(c.target)?.type : undefined;
     return {

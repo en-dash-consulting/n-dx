@@ -136,6 +136,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--description=\"...\"", description: "Item description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion (done when) for this item, manual mode only (repeatable, one per flag); not a capability criterion" },
       { flag: "--type=<type>", description: "v2 only: change (default), task or subtask" },
+      { flag: "--area=<id|slug>", description: "v2 only: suggest placement among this area's capabilities and constraints only" },
       { flag: "--source=\"...\"", description: "Item source, manual mode only (e.g. ndx-capture)" },
       { flag: "--file=<path>", description: "Import from a freeform text file (repeatable)" },
       { flag: "--accept", description: "Auto-accept LLM proposals without review" },

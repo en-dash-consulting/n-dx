@@ -106,6 +106,62 @@ describe("suggestPlacement", () => {
     expect(s.shortlist.find((c) => c.target === "card")?.amendedBy).toEqual(["CH-2"]);
     for (const c of s.shortlist.filter((c) => c.target !== "card")) expect(c.amendedBy).toEqual([]);
   });
+
+  describe("limited to an area", () => {
+    // Two areas that both match "card"; a constraint binding each, and one binding everything.
+    const twoAreas = (): V2Tree => {
+      const t = tree();
+      t.product.push(
+        node({
+          id: "shop",
+          type: "area",
+          slug: "storefront",
+          displayId: "A2",
+          title: "Storefront",
+          children: [
+            node({ id: "gift", type: "capability", title: "Gift card balance", statement: "A shopper reads a gift card balance" }),
+            node({ id: "shop-rule", type: "constraint", title: "Card pages load fast", appliesTo: ["shop"] }),
+          ],
+        }),
+        node({ id: "pay-rule", type: "constraint", title: "Card data stays encrypted", appliesTo: ["card"] }),
+        node({ id: "everywhere", type: "constraint", title: "Card copy is plain English", appliesTo: "all" }),
+      );
+      return t;
+    };
+
+    it("ranks only the area's capabilities and the constraints binding it", () => {
+      const all = suggestPlacement(twoAreas(), "ch").shortlist.map((c) => c.target);
+      expect(all).toEqual(expect.arrayContaining(["card", "gift", "shop-rule", "pay-rule"]));
+
+      const shop = suggestPlacement(twoAreas(), "ch", undefined, { area: "shop" }).shortlist.map((c) => c.target);
+      expect(shop).toContain("gift");
+      for (const id of shop) expect(["gift", "shop-rule", "everywhere"]).toContain(id);
+    });
+
+    it("names the area by its frozen slug or display id", () => {
+      const bySlug = suggestPlacement(twoAreas(), "ch", undefined, { area: "storefront" });
+      const byDisplayId = suggestPlacement(twoAreas(), "ch", undefined, { area: "A2" });
+      expect(bySlug.shortlist.map((c) => c.target)).toContain("gift");
+      expect(byDisplayId.shortlist).toEqual(bySlug.shortlist);
+    });
+
+    it("ranks a target outside the global top five when it is the area's", () => {
+      const t = twoAreas();
+      const pay = t.product[0]!;
+      for (let i = 0; i < 6; i++) {
+        pay.children!.push(node({ id: `wallet-${i}`, type: "capability", title: `Add wallets to card payment ${i}` }));
+      }
+      expect(suggestPlacement(t, "ch").shortlist.map((c) => c.target)).not.toContain("gift");
+      expect(suggestPlacement(t, "ch", undefined, { area: "shop" }).shortlist.map((c) => c.target)).toContain("gift");
+    });
+
+    it("refuses a reference that names no live area", () => {
+      expect(() => suggestPlacement(twoAreas(), "ch", undefined, { area: "card" })).toThrow(
+        expect.objectContaining({ kind: "not-an-area" }) as unknown as Error,
+      );
+      expect(() => suggestPlacement(twoAreas(), "ch", undefined, { area: "nowhere" })).toThrow(ChangePlacementError);
+    });
+  });
 });
 
 describe("recordPlacement", () => {

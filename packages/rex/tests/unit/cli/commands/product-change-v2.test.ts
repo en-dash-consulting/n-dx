@@ -389,6 +389,32 @@ describe("rex add on a v2 tree", () => {
     expect((await changes()).length).toBe(before + 1);
   });
 
+  it("previews placement among one area's targets with --area, and refuses an --area that names none", async () => {
+    await cmdAddChangesFromDescriptions(tmp, ["Support refunds when paying by card"], { format: "json" });
+    const everywhere = JSON.parse(text()).changes[0].placement.shortlist as Array<{ target: string }>;
+    expect(everywhere.length).toBeGreaterThan(0);
+
+    out.length = 0;
+    const { tree } = await loadPrdModel(rexDir);
+    const area = tree.product.find((n) => n.type === "area")!;
+    await cmdAddChangesFromDescriptions(tmp, ["Support refunds when paying by card"], { format: "json", area: area.id });
+    const scoped = JSON.parse(text()).changes[0].placement.shortlist as Array<{ target: string }>;
+    const index = indexTree(tree);
+    const parentOf = new Map(index.entries.map((e) => [e.node.id, e.parent]));
+    const nearestArea = (id: string) => {
+      let p = parentOf.get(id);
+      while (p && p.type !== "area") p = parentOf.get(p.id);
+      return p?.id;
+    };
+    // A constraint may bind the area from elsewhere; a capability sits under it.
+    const capabilities = scoped.filter(({ target }) => index.resolve(target)?.type === "capability");
+    expect(capabilities.length).toBeGreaterThan(0);
+    for (const { target } of capabilities) expect(nearestArea(target)).toBe(area.id);
+
+    await expect(cmdAddChangesFromDescriptions(tmp, ["Support refunds"], { format: "json", area: "no-such-area" }))
+      .rejects.toThrow(/--area: "no-such-area" is not a live area/);
+  });
+
   it("previews a long description's cut title with the full text as its description", async () => {
     const long = `${"Shoppers paying by card want refunds ".repeat(4).trim()}.\n\nSecond paragraph.`;
     await cmdAddChangesFromDescriptions(tmp, [long], { format: "json" });

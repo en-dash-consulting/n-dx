@@ -438,10 +438,10 @@ describe("the Requirements tab", () => {
     expect(fetched).toEqual([`/api/rex/product/area/${area.slug}`]);
     expect(root.querySelector("h2")?.textContent).toContain(AREA_DETAIL_FIXTURE.title);
     // On its own page the area offers no "Open on Product page": it is that page.
-    // The spec map's capability blocks and the cards' change links are buttons too;
-    // only the header's buttons carry this claim.
+    // It still offers "+ Change in this area". The spec map's capability blocks and
+    // the cards' change links are buttons too; only the header's buttons carry this claim.
     const header = [...root.querySelectorAll("button")].filter((b) => !b.closest(".asm") && !b.closest(".area-cards"));
-    expect(header.map((b) => b.textContent)).toEqual(["Product"]);
+    expect(header.map((b) => b.textContent)).toEqual(["Product", "+ Change in this area"]);
     expect(root.querySelectorAll(".asm .pam-block")).toHaveLength(AREA_DETAIL_FIXTURE.capabilities.length);
     // The page passes navigateTo down, so a Moving now row opens the change's panel.
     const changeLink = root.querySelector<HTMLButtonElement>('[data-card="moving"] .ch-change-link')!;

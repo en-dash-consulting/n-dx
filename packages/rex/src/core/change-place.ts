@@ -42,6 +42,7 @@ import { randomUUID } from "node:crypto";
 import type { AddedNodeType, Amendment, ChangeNode, CriteriaDelta, Criterion } from "../schema/v2.js";
 import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
 import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { computeEdges } from "./product-edges.js";
 import {
   asProposal,
   PLACEMENT_SHORTLIST_SIZE,
@@ -130,17 +131,33 @@ export interface PlacementSuggestion {
   shortlist: SuggestedPlacementRow[];
 }
 
+export interface SuggestPlacementOptions {
+  /**
+   * Rank only this area's targets: the capabilities whose nearest area it is,
+   * and the constraints binding the area or one of them. An id, display id,
+   * alias or frozen slug; one naming no live area is refused (`not-an-area`).
+   */
+  area?: string;
+}
+
 /**
  * Rank the live capabilities and constraints the change `changeRef` could
  * amend or touch. An applied change only touches, so every candidate carries
  * touches for one.
  */
-export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize = PLACEMENT_SHORTLIST_SIZE): PlacementSuggestion {
+export function suggestPlacement(
+  tree: V2Tree,
+  changeRef: string,
+  shortlistSize = PLACEMENT_SHORTLIST_SIZE,
+  options: SuggestPlacementOptions = {},
+): PlacementSuggestion {
   const change = placeableChange(tree, changeRef);
   const input = placementInput(change);
   const { relation, rule } = defaultRelationRule(change);
+  const inArea = options.area === undefined ? undefined : areaTargets(tree, options.area);
+  const nodes = inArea ? placementNodes(tree).filter((n) => inArea.has(n.id)) : placementNodes(tree);
   // Rank at least two, so a tie shows even when the caller asks for one.
-  const ranked = rankPlacementCandidates(input, placementNodes(tree), Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
+  const ranked = rankPlacementCandidates(input, nodes, Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
   const [top, next] = ranked;
   const amendedBy = openAmenders(tree, change);
   return {
@@ -154,6 +171,30 @@ export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize 
       amendedBy: amendedBy.get(c.target) ?? [],
     })),
   };
+}
+
+/** The ids of the capabilities and constraints that are `areaRef`'s placement targets. */
+function areaTargets(tree: V2Tree, areaRef: string): Set<string> {
+  const index = indexTree(tree);
+  const resolved = index.resolve(areaRef);
+  const area = resolved?.type === "area"
+    ? resolved
+    : index.entries.find(({ node, root }) => root === "product" && node.type === "area" && node.slug === areaRef)?.node;
+  if (!area || area.type !== "area") {
+    const plain = `"${areaRef}" is not a live area`;
+    throw new ChangePlacementError(`${plain} (see get_product)`, "not-an-area", plain);
+  }
+  const parentOf = new Map(index.entries.map((e) => [e.node.id, e.parent]));
+  const nearestArea = (id: string): string | undefined => {
+    for (let p = parentOf.get(id); p; p = parentOf.get(p.id)) if (p.type === "area") return p.id;
+    return undefined;
+  };
+  const capabilities = index.entries
+    .filter(({ node, root }) => root === "product" && node.type === "capability" && nearestArea(node.id) === area.id)
+    .map(({ node }) => node.id);
+  const { boundBy } = computeEdges(tree);
+  const constraints = [area.id, ...capabilities].flatMap((id) => boundBy[id] ?? []);
+  return new Set([...capabilities, ...constraints]);
 }
 
 /** Per product node id, the open changes other than `change` that amend it (modified or removed), by display id or id. */

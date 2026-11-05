@@ -85,6 +85,29 @@ describe("AreaView", () => {
     expect(chip.classList.contains("area-steward-none")).toBe(true);
   });
 
+  it("+ Change in this area opens a capture limited to the area; Esc closes it and nothing around it", async () => {
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug }));
+    const toggle = [...root.querySelectorAll<HTMLButtonElement>(".area-actions button")]
+      .find((b) => b.textContent === "+ Change in this area")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    act(() => { toggle.click(); });
+    const capture = root.querySelector(".area-capture")!;
+    expect(capture.querySelector(".smart-add-title")?.textContent).toBe(`Change in ${AREA_DETAIL_FIXTURE.title}`);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    const onDocumentEscape = vi.fn();
+    document.addEventListener("keydown", onDocumentEscape);
+    act(() => {
+      capture.querySelector("textarea")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    document.removeEventListener("keydown", onDocumentEscape);
+    expect(root.querySelector(".area-capture")).toBeNull();
+    // The full-screen tile closes on a document-level Escape; this one stopped at the capture.
+    expect(onDocumentEscape).not.toHaveBeenCalled();
+  });
+
   it("reports an area the server cannot find", async () => {
     stubRoutes({});
     await mount(h(AreaView, { slug: "gone" }));
@@ -109,7 +132,7 @@ describe("AreaInPlace", () => {
     stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
     const onOpenPage = vi.fn(() => history.pushState({ view: "product" }, "", `/product/area/${AREA_DETAIL_FIXTURE.slug}`));
     await mount(h(AreaInPlace, { slug: AREA_DETAIL_FIXTURE.slug, onOpenPage }));
-    act(() => root.querySelector<HTMLButtonElement>(".area-actions button")!.click());
+    act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
     expect(onOpenPage).toHaveBeenCalledOnce();
     act(() => { render(null, root); });
     expect(location.pathname).toBe(`/product/area/${AREA_DETAIL_FIXTURE.slug}`);
@@ -166,7 +189,7 @@ describe("from Plan's product map", () => {
     await vi.waitFor(() => expect(root.querySelector(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)).not.toBeNull());
     act(() => root.querySelector<HTMLButtonElement>(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)!.click());
     await settle();
-    act(() => root.querySelector<HTMLButtonElement>(".area-actions button")!.click());
+    act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
     expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${AREA_DETAIL_FIXTURE.slug}` });
   });
 });
