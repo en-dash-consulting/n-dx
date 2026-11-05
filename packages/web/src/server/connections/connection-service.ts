@@ -189,9 +189,14 @@ export class ConnectionService {
     }
   }
 
-  /** Every connection with its state, connecting any that is not live. */
+  /**
+   * Every connection with its state, connecting any that is not live. One
+   * whose connect failed is not retried inside its retry interval (as in
+   * listTools), so a server that hangs delays the first listing by the connect
+   * timeout, not every one; the listing reads its last status.
+   */
   async listConnections(): Promise<ConnectionInfo[]> {
-    await Promise.all([...this.slots.values()].map((slot) => this.ensure(slot)));
+    await Promise.all([...this.slots.values()].map((slot) => (this.backingOff(slot) ? undefined : this.ensure(slot))));
     return [...this.slots.values()].map((slot) => this.info(slot));
   }
 

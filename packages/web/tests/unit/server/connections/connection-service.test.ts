@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -316,6 +316,50 @@ describe("ConnectionService", () => {
 
       await expect(svc.callTool("docs", "read_item", { id: "1" })).rejects.toBeInstanceOf(ConnectionUnavailableError);
       expect(http.authorizations.length).toBeGreaterThan(afterFirst);
+    });
+
+    it("listConnections connects a connection never tried, then does not retry it within the interval", async () => {
+      const http = await httpServer();
+      http.silent = true;
+      const { svc, advance } = clocked(http.url);
+
+      const first = await svc.listConnections();
+      expect(first[0]?.status).toMatchObject({ state: "unavailable", reason: expect.stringMatching(/timed out/i) });
+      const afterFirst = http.authorizations.length;
+      expect(afterFirst).toBeGreaterThan(0);
+
+      advance(RETRY_MS - 1);
+      expect((await svc.listConnections())[0]?.status.state).toBe("unavailable");
+      expect(http.authorizations.length).toBe(afterFirst);
+
+      http.silent = false;
+      advance(1);
+      expect((await svc.listConnections())[0]?.status.state).toBe("connected");
+    });
+
+    it("listConnections does not spawn a failed stdio command again within the interval", async () => {
+      const spawnLog = join(tempDir("ndx-connections-spawns-"), "spawns.log");
+      let time = 0;
+      const { svc } = service(
+        {
+          local: {
+            transport: "stdio",
+            command: process.execPath,
+            args: ["-e", `require("node:fs").appendFileSync(${JSON.stringify(spawnLog)}, "x"); process.exit(1)`],
+          },
+        },
+        { connectTimeoutMs: 5_000, callTimeoutMs: 5_000, listRetryMs: RETRY_MS, now: () => time },
+      );
+      const spawns = () => readFileSync(spawnLog, "utf8").length;
+
+      expect((await svc.listConnections())[0]?.status.state).toBe("unavailable");
+      expect(spawns()).toBe(1);
+      time += RETRY_MS - 1;
+      await svc.listConnections();
+      expect(spawns()).toBe(1);
+      time += 1;
+      await svc.listConnections();
+      expect(spawns()).toBe(2);
     });
 
     it("lists a server that recovers once the interval passes", async () => {
