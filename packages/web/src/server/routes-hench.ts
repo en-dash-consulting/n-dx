@@ -237,6 +237,17 @@ interface RunSummary {
    */
   diagnosis?: RunDiagnosisSummary;
   /**
+   * Tier of the model the run actually used (`RunRecord.weight`): "light",
+   * "standard", "heavy" or "custom". Absent on older records.
+   */
+  weight?: string;
+  /**
+   * The test gate's verdict (`RunRecord.testGate`): "passed" or "failed" when
+   * the suite ran, absent when it did not run (skipped, could not launch) or
+   * the record has no gate result.
+   */
+  gate?: "passed" | "failed";
+  /**
    * The worktree whose `.hench/runs/` this run was read from. Present only
    * for `?scope=repo` responses; the default (served-directory) listing is
    * unchanged and carries no worktree field.
@@ -369,7 +380,20 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
     invocationContext: run.invocationContext as RunSummary["invocationContext"],
     diagnosis: readDiagnosis(run.diagnosis),
+    weight: typeof run.weight === "string" ? run.weight : undefined,
+    gate: readGateVerdict(run.testGate),
   };
+}
+
+/**
+ * A verdict only when the gate executed: `ran: false` means skipped or
+ * inconclusive, and its `passed` is meaningless (see `TestGateResult`).
+ */
+function readGateVerdict(raw: unknown): RunSummary["gate"] {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const gate = raw as { ran?: unknown; passed?: unknown };
+  if (gate.ran !== true || typeof gate.passed !== "boolean") return undefined;
+  return gate.passed ? "passed" : "failed";
 }
 
 // ── Repo-scope runs (worktree aggregation) ──────────────────────────────────

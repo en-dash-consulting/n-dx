@@ -62,6 +62,7 @@ import {
 import {
   HenchRunsView,
   AdaptiveOptimizationView,
+  OutcomesPanel,
 } from "./domain-hench.js";
 
 import { WorkspacesView } from "./domain-workspaces.js";
@@ -193,6 +194,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability })
       : h(ProductAreaMap, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
+    case "outcomes": return h(OutcomesPanel, null);
   }
 }
 

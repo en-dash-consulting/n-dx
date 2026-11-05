@@ -67,6 +67,10 @@ interface RunSummary {
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /** Tier of the model the run used: "light", "standard", "heavy" or "custom". */
+  weight?: string;
+  /** The test gate's verdict; absent when the gate did not run or left no result. */
+  gate?: "passed" | "failed";
   /** Worktree this run was recorded in — present when the list was fetched with `scope=repo`. */
   worktree?: RunWorktree;
   /**

@@ -497,11 +497,11 @@ describe("StagePage", () => {
     expect(stageForView("prd")).toBe("plan");
   });
 
-  it("renders Tune as a tile grid after its lead, with Spend and Shipped beside Runs", async () => {
+  it("renders Tune as a tile grid after its lead, with Spend, Shipped and Outcomes beside Runs", async () => {
     await mount(page("tune"));
     expect(sectionViews()).toEqual(["tune"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph"]);
+    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes"]);
   });
 
   it("a Rex viewer's Tune draws the Execution Log (promoted from Runs' tab) and the PRD Graph, and no Spend", async () => {

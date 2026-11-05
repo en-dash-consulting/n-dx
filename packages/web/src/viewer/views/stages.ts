@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "product-map" | "changes-glance";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "product-map" | "changes-glance" | "outcomes";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -265,6 +265,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "token-usage", title: "Spend" },
       { view: "hench-optimization", title: "Suggestions", tabs: [{ view: "hench-adaptive" }] },
       { view: "merge-graph", title: "Shipped" },
+      // Panel tile: "Open" goes to the Runs view, whose records it summarises.
+      { view: "hench-runs", panel: "outcomes", title: "Outcomes by tier", rows: 2 },
     ],
   },
 };
