@@ -198,9 +198,25 @@ describe("the rendered page", () => {
       calls.push({ url: String(url), init });
       if (String(url).includes("/api/live")) return { ok: true, status: 200, json: async () => body };
       if (String(url).includes("/api/hench/throttle")) return { ok: true, status: 200, json: async () => ({ paused: false }) };
+      if (String(url).includes("/api/hench/memory")) return { ok: true, status: 200, json: async () => MEMORY };
+      if (String(url).includes("/api/hench/concurrency")) return { ok: true, status: 200, json: async () => CONCURRENCY };
       return { ok: true, status: 200, json: async () => ({}) };
     }));
   });
+
+  const MEMORY = {
+    system: { totalBytes: 16 * 1024 ** 3, freeBytes: 4 * 1024 ** 3, availableBytes: 4 * 1024 ** 3, usedBytes: 12 * 1024 ** 3, usedPercent: 75 },
+    server: { pid: 1, rssBytes: 1, heapUsedBytes: 1, heapTotalBytes: 2, externalBytes: 0 },
+    processes: [],
+    health: "healthy",
+    loadAvg: [1, 1, 1],
+    cpuCount: 8,
+    timestamp: "2026-10-01T12:00:00.000Z",
+  };
+  const CONCURRENCY = {
+    processCount: 1, maxConcurrent: 3, slotsAvailable: 2, level: "moderate", utilization: 0.33,
+    totalRunning: 1, dashboardActive: 1, diskRunning: 0, pendingTasks: 0, timestamp: "2026-10-01T12:00:00.000Z",
+  };
 
   afterEach(() => {
     render(null, root);
@@ -219,6 +235,14 @@ describe("the rendered page", () => {
     await act(async () => { await flush(); });
     return navigateTo;
   }
+
+  it("mounts the Memory and Concurrency panels in the side column", async () => {
+    await mount();
+    // The panels fetch only once the snapshot has mounted them.
+    await act(async () => { await flush(); });
+    expect(root.querySelector(".live-side .memory-panel")).not.toBeNull();
+    expect(root.querySelector(".live-side .concurrency-panel")).not.toBeNull();
+  });
 
   it("shows idle with Start working and both analysis options when nothing runs", async () => {
     await mount();
