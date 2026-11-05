@@ -10,6 +10,7 @@ import { h, render, type FunctionComponent } from "preact";
 import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
 import { STAGES, stageViews } from "../../../src/viewer/views/index.js";
+import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -400,6 +401,16 @@ describe("the Requirements tab", () => {
     expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
     expect(fetched).toContain("/api/rex/requirements/coverage");
     expect(root.querySelector(".pm-area")).toBeNull();
+  });
+
+  it("moving from /requirements to /product opens the map, not the previous route's tab", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    // The shell renders the active view in one slot, unkeyed, so the registry must key the two routes apart.
+    await mount(h("div", null, renderActiveView("requirements", {} as never)));
+    await vi.waitFor(() => expect(tabs()[1]?.getAttribute("aria-selected")).toBe("true"));
+    await mount(h("div", null, renderActiveView("product", {} as never)));
+    await vi.waitFor(() => expect(tabs()[0]?.getAttribute("aria-selected")).toBe("true"));
+    expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
   });
 
   it("the /requirements route opens on that tab on a v2 project", async () => {

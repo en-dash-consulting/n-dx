@@ -257,8 +257,11 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, setOpenTask, navigateTo }) =>
     h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, onSelectedItemChange: setOpenTask, navigateTo }),
 
+  // Keyed apart from "requirements", which renders the same page in the same
+  // slot: without the key, moving between the two routes would keep the
+  // previous route's tab.
   "product": ({ setOpenCapability }) =>
-    h(ProductPage, { onCapabilityChange: setOpenCapability }),
+    h(ProductPage, { key: "product", onCapabilityChange: setOpenCapability }),
 
   "changes": ({ navigateTo }) =>
     h(ChangesPage, { navigateTo }),
@@ -283,7 +286,7 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   // Requirements is a tab of the Product page; the route opens that tab.
   "requirements": ({ setOpenCapability }) =>
-    h(ProductPage, { onCapabilityChange: setOpenCapability, initialTab: "requirements" }),
+    h(ProductPage, { key: "requirements", onCapabilityChange: setOpenCapability, initialTab: "requirements" }),
 
   "activity": () =>
     h(ActivityView, null),
