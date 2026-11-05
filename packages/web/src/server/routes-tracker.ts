@@ -131,7 +131,7 @@ export async function handleTrackerRoute(
     else if (action === "approve" && args && typeof args === "object" && !Array.isArray(args)) decision = { action, args: args as Record<string, unknown> };
     else return refuse(res, 400, 'action is "dismiss", or "approve" with args');
     const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
-    const decided = await decideTrackerCard({ projectDir: ctx.projectDir, service }, requestId, decision);
+    const decided = await decideTrackerCard({ projectDir: ctx.projectDir, rexDir: ctx.rexDir, service }, requestId, decision);
     if (!decided.ok) return refuse(res, decided.status, decided.error);
     jsonResponse(res, 200, { entry: decided.entry });
     return true;

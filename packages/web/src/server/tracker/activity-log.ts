@@ -44,6 +44,8 @@ export interface TrackerActivityEntry {
   call: PlannedCall;
   result: TrackerResult;
   problems?: SidecarCallProblem[];
+  /** The work item an approved create made and the change was linked to; `problems` names a link that failed. */
+  workItemId?: string;
 }
 
 /** Where `projectDir`'s activity log lives. */

@@ -125,15 +125,19 @@ untracked `.n-dx.local.json` only, as connections do:
   `ndx:<project>:<rexId>:<event>`. A create reply, and any duplicate reply
   (`duplicate: true` or an `error` starting `duplicate`), is confirmed with the
   profile's `readTool` before it is logged.
+- An approved create card links the change to the confirmed work item (its
+  `issues`, under the PRD lock), so the move rules that follow find it. The
+  entry records `workItemId`; a link that cannot be written leaves the entry
+  `ok` with a problem naming the failure.
 - A refusal logs its problems list and settles the event: it is never planned
   again, with the same arguments or other ones. So do `ok`, `duplicate` and
   `card`. An unreachable connection, or one that needs sign-in, logs that once
   (again only when the result changes) and keeps the event queued, unchanged.
   One tick runs per project at a time; a second waits for the first.
 - The log is append-only JSONL, `<henchDir>/sidecar/tracker-activity.jsonl`:
-  `{ at, event, rexId, rule, mode, requestId, call, result, problems? }`, with
-  `result` one of `would`, `ok`, `duplicate`, `refused`, `card`, `unavailable`,
-  `needs-sign-in`.
+  `{ at, event, rexId, rule, mode, requestId, call, result, problems?, workItemId? }`,
+  with `result` one of `would`, `ok`, `duplicate`, `refused`, `card`,
+  `dismissed`, `unavailable`, `needs-sign-in`.
 
 ### Events and the clock
 

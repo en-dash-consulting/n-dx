@@ -11,6 +11,8 @@
  *   same arguments or other ones.
  * - A create or duplicate reply is confirmed with the profile's read tool
  *   before it is logged.
+ * - An approved create links the change to the work item it made, so the
+ *   move rules that follow find it.
  * - A refusal logs its problems list as the tracker gave it.
  * - An unreachable connection, or one that needs sign-in, logs that and keeps
  *   the event queued for the next tick, unchanged.
@@ -25,6 +27,7 @@ import { errorMessage } from "../response-utils.js";
 import { callProblems, IDEMPOTENCY_KEY_PROPERTIES, resultData } from "../sidecar/external-call.js";
 import { appendTrackerActivity, pendingCards, readTrackerActivity, SETTLED_RESULTS, type TrackerActivityEntry, type TrackerResult } from "./activity-log.js";
 import { planTrackerEvent, type PlannedCall, type TrackerEventRecord } from "./rules.js";
+import { changeItemLink } from "./item-links.js";
 import { checkServerProfile, loadServerProfile, type ProfileOptions, type ServerProfile, type TrackerMapping } from "./server-profiles.js";
 import { loadTrackerSync, type TrackerSyncConfig } from "./sync-config.js";
 
@@ -78,7 +81,12 @@ function requeue(projectDir: string, records: TrackerEventRecord[]): void {
   queues.set(projectDir, [...records, ...queued].slice(-MAX_QUEUED_EVENTS));
 }
 
-type Outcome = { result: TrackerResult; problems?: SidecarCallProblem[] };
+type Outcome = {
+  result: TrackerResult;
+  problems?: SidecarCallProblem[];
+  /** The work item a create or duplicate reply named, once a read confirmed it. */
+  workItemId?: string;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -147,7 +155,7 @@ export async function executeTrackerCall(
   if (read.reply.isError) {
     return { result: "refused", problems: [{ message: `${mapping.readTool} could not confirm ${itemId}: ${resultText(read.reply)}` }] };
   }
-  return { result: outcome };
+  return { result: outcome, workItemId: itemId };
 }
 
 interface Ready {
@@ -308,6 +316,11 @@ async function tickOnce(options: TrackerSyncOptions): Promise<TrackerTickResult>
   return { state: "ran", entries, queued: queuedTrackerEvents(projectDir).length };
 }
 
+export interface CardDecisionOptions extends TrackerSyncOptions {
+  /** The PRD an approved create links its change in. */
+  rexDir: string;
+}
+
 export type CardDecision =
   | { action: "dismiss" }
   /** `args`: the operator's edited arguments; the call's idempotency key stays as planned. */
@@ -323,11 +336,13 @@ const deciding = new Map<string, Promise<unknown>>();
 /**
  * Decide the waiting card `requestId`: dismiss it, or make its call with the
  * operator's arguments and record what became of it. The entry written closes
- * the card, so a second approval finds none. A call that finds the connection
+ * the card, so a second approval finds none. An approved create the tracker
+ * confirms links the change to its new work item; a link that cannot be
+ * written still records the entry, its problems naming the failure. A call that finds the connection
  * unreachable is logged and leaves the card waiting. Decisions for a project
  * run one at a time, so a double click makes one call.
  */
-export function decideTrackerCard(options: TrackerSyncOptions, requestId: string, decision: CardDecision): Promise<CardDecisionResult> {
+export function decideTrackerCard(options: CardDecisionOptions, requestId: string, decision: CardDecision): Promise<CardDecisionResult> {
   const { projectDir } = options;
   const prior = deciding.get(projectDir) ?? Promise.resolve();
   const run = prior.then(() => decideOnce(options, requestId, decision), () => decideOnce(options, requestId, decision));
@@ -339,7 +354,7 @@ export function decideTrackerCard(options: TrackerSyncOptions, requestId: string
   return run;
 }
 
-async function decideOnce(options: TrackerSyncOptions, requestId: string, decision: CardDecision): Promise<CardDecisionResult> {
+async function decideOnce(options: CardDecisionOptions, requestId: string, decision: CardDecision): Promise<CardDecisionResult> {
   const { projectDir, service } = options;
   const card = pendingCards(readTrackerActivity(projectDir)).find((e) => e.requestId === requestId);
   if (!card) return { ok: false, status: 409, error: `${requestId} is not a card waiting for a decision` };
@@ -358,6 +373,13 @@ async function decideOnce(options: TrackerSyncOptions, requestId: string, decisi
     for (const key of IDEMPOTENCY_KEY_PROPERTIES) if (key in card.call.args) call.args[key] = card.call.args[key];
     const outcome = await executeTrackerCall(service, ready.config.connection, ready.mapping, call);
     entry = { ...base, call, result: outcome.result, ...(outcome.problems && { problems: outcome.problems }) };
+    if (outcome.workItemId && call.tool === ready.mapping.createTool) {
+      entry.workItemId = outcome.workItemId;
+      const linked = await changeItemLink(options.rexDir, card.rexId, outcome.workItemId, "link");
+      if (!linked.ok) {
+        entry.problems = [...(entry.problems ?? []), { message: `created ${outcome.workItemId}, but could not link ${card.rexId} to it: ${linked.error}` }];
+      }
+    }
   }
   appendTrackerActivity(projectDir, entry);
   return { ok: true, entry };
