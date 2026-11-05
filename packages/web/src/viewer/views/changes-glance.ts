@@ -13,7 +13,15 @@
 
 import { h } from "preact";
 import { useContext, useMemo } from "preact/hooks";
-import { DescribeInSidecarButton, GhostCardsContext, ghostChanges } from "../components/index.js";
+import {
+  CreateInTrackerButton,
+  DescribeInSidecarButton,
+  GhostCardsContext,
+  TrackerChip,
+  ghostChanges,
+  useTrackerChips,
+  type TrackerChipRead,
+} from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useChangesSummary } from "./changes-summary-context.js";
 import {
@@ -43,7 +51,7 @@ export function limitGroups(groups: readonly GlanceGroup[], limit: number = MAX_
   return { groups: kept, more: total - (limit - left) };
 }
 
-function Row({ change, navigateTo }: { change: GlanceChange; navigateTo: NavigateTo }) {
+function Row({ change, navigateTo, tracker, onTrackerChanged }: { change: GlanceChange; navigateTo: NavigateTo; tracker: TrackerChipRead; onTrackerChanged: () => void }) {
   const gap = glanceGap(change);
   const done = change.taskCount === 0 ? 0 : Math.round((change.completedTaskCount / change.taskCount) * 100);
   return h("li", { class: "cg-row", "data-change": change.id },
@@ -59,13 +67,16 @@ function Row({ change, navigateTo }: { change: GlanceChange; navigateTo: Navigat
       ),
     h("span", { class: `cg-chip cg-stage cg-stage-${change.stage}` }, CHANGE_STAGE_LABELS[change.stage]),
     gap ? h("span", { class: `cg-chip cg-gap cg-gap-${gap}` }, GAP_LABELS[gap]) : null,
+    h(TrackerChip, { changeId: change.id, read: tracker }),
     h(DescribeInSidecarButton, { changeId: change.id, class: "cg-describe" }),
+    h(CreateInTrackerButton, { changeId: change.id, read: tracker, onCreated: onTrackerChanged }),
   );
 }
 
 export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
   const load = useChangesSummary();
   const cards = useContext(GhostCardsContext);
+  const { read: tracker, reload: reloadTracker } = useTrackerChips();
   // Placed changes only, like the real rows: an Inbox-bound one is noted on the strip's Inbox count.
   const ghosts = useMemo(() => ghostChanges(cards).filter((g) => g.target !== null), [cards]);
   if (load.state === "loading") return h("div", { class: "changes-glance", role: "status" }, "Loading...");
@@ -86,7 +97,7 @@ export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
     groups.map((group) =>
       h("section", { key: group.label, class: "cg-group", "aria-label": group.label },
         h("h4", { class: "cg-release" }, group.label),
-        h("ul", { class: "cg-rows" }, group.changes.map((change) => h(Row, { key: change.id, change, navigateTo }))),
+        h("ul", { class: "cg-rows" }, group.changes.map((change) => h(Row, { key: change.id, change, navigateTo, tracker, onTrackerChanged: reloadTracker }))),
       )),
     more > 0
       ? h("button", { type: "button", class: "cg-more", onClick: () => navigateTo("changes") }, `${more} more`)

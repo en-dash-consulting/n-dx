@@ -31,7 +31,11 @@ import { collectTrackerEvents, type TrackerEventExec } from "./tracker/event-sou
 import { readSourceProblems, type SourceProblem } from "./tracker/source-problems.js";
 import { TRACKER_EVENTS } from "./tracker/server-profiles.js";
 import { loadTrackerSync } from "./tracker/sync-config.js";
-import { decideTrackerCard, enqueueTrackerEvent, runTrackerSyncTick, type CardDecision, type TrackerSyncService } from "./tracker/sync-engine.js";
+import { decideTrackerCard, enqueueTrackerEvent, prepareTrackerSync, raiseCreateCard, runTrackerSyncTick, type CardDecision, type TrackerSyncService } from "./tracker/sync-engine.js";
+import { changeChips } from "./tracker/change-chips.js";
+import { findItemByRef } from "./tracker/item-links.js";
+import { itemLinkRefs, type LinkFields } from "./tracker/link-refs.js";
+import { resolveStore, type PRDItem } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 
 export const TRACKER_PREFIX = "/api/tracker";
@@ -39,6 +43,8 @@ const TICK_PATH = `${TRACKER_PREFIX}/sync/tick`;
 const ACTIVITY_PATH = `${TRACKER_PREFIX}/activity`;
 const FORM_PATH = `${TRACKER_PREFIX}/cards/form`;
 const DECIDE_PATH = `${TRACKER_PREFIX}/cards/decide`;
+const CHANGES_PATH = `${TRACKER_PREFIX}/changes`;
+const CREATE_PATH = new RegExp(`^${TRACKER_PREFIX}/changes/([^/]+)/create$`);
 
 /** The most entries the activity route answers, newest kept. */
 export const MAX_ACTIVITY_ENTRIES = 200;
@@ -128,6 +134,44 @@ export async function handleTrackerRoute(
     const decided = await decideTrackerCard({ projectDir: ctx.projectDir, service }, requestId, decision);
     if (!decided.ok) return refuse(res, decided.status, decided.error);
     jsonResponse(res, 200, { entry: decided.entry });
+    return true;
+  }
+
+  if (pathname === CHANGES_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
+    const ready = prepareTrackerSync({ projectDir: ctx.projectDir, service });
+    // No usable tracker connection: nothing to chip and nothing to create in.
+    if ("state" in ready) {
+      jsonResponse(res, 200, { tracker: null, changes: {} });
+      return true;
+    }
+    const store = await resolveStore(ctx.rexDir);
+    const { items } = await store.loadDocument();
+    jsonResponse(res, 200, {
+      tracker: { label: ready.profile.label },
+      changes: changeChips(items, readTrackerActivity(ctx.projectDir), ready.mapping),
+    });
+    return true;
+  }
+
+  const create = CREATE_PATH.exec(pathname);
+  if (create) {
+    if (method !== "POST") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const changeId = decodeURIComponent(create[1]);
+    const store = await resolveStore(ctx.rexDir);
+    const { items } = await store.loadDocument();
+    const found = findItemByRef(items, changeId);
+    if (!found || found.type !== "change") return refuse(res, 404, `Change "${changeId}" not found`);
+    const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
+    // A linked change plans nothing (rules.ts), so it is refused rather than created twice.
+    const [ref] = itemLinkRefs(found as PRDItem & LinkFields);
+    const raised = raiseCreateCard(
+      { projectDir: ctx.projectDir, service },
+      { event: "change-captured", rexId: found.id, ...(ref && { ref }), values: { title: found.title } },
+    );
+    if (!raised.ok) return refuse(res, raised.status, raised.error);
+    jsonResponse(res, 200, { requestId: raised.requestId, entry: raised.entry });
     return true;
   }
 

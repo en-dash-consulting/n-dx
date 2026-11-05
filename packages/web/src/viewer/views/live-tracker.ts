@@ -17,8 +17,8 @@
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { appUrl } from "../base-path.js";
-import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "../components/index.js";
-import { useFeatureToggle, type SidecarExternalCall } from "../hooks/index.js";
+import { ProblemList, TrackerCardForm, trackerErrorOf as errorOf } from "../components/index.js";
+import { useFeatureToggle } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { formatSince } from "../utils/format.js";
 import {
@@ -33,67 +33,6 @@ import {
 
 /** The registry key in routes-features.ts. */
 export const SIDECAR_FEATURE = "web.sidecar";
-
-async function errorOf(res: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error) return body.error;
-  } catch {
-    // Not JSON: the fallback says enough.
-  }
-  return `${fallback} (${res.status})`;
-}
-
-/** A waiting card's call as a form; Send runs it once with the edited arguments. */
-function CardForm({ entry, onDone, onCancel }: { entry: TrackerActivityRow; onDone: () => void; onCancel: () => void }) {
-  const [call, setCall] = useState<SidecarExternalCall | null>(null);
-  const [edit, setEdit] = useState<ExternalCallEdit>(entry.call.args);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/tracker/cards/form?requestId=${encodeURIComponent(entry.requestId)}`)
-      .then(async (res) => {
-        if (cancelled) return;
-        if (!res.ok) { setError(await errorOf(res, "Could not read the call's form")); return; }
-        setCall(((await res.json()) as { externalCall: SidecarExternalCall }).externalCall);
-      })
-      .catch((err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : "Could not read the call's form"); });
-    return () => { cancelled = true; };
-  }, [entry.requestId]);
-
-  const send = async (): Promise<void> => {
-    if (!edit) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/tracker/cards/decide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId: entry.requestId, action: "approve", args: edit }),
-      });
-      if (res.ok) onDone();
-      else setError(await errorOf(res, "Could not run the call"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not run the call");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return h("div", { class: "live-tracker-form" },
-    call
-      ? h(ExternalCallBody, { call, args: entry.call.args, editable: true, onEdit: setEdit })
-      : error ? null : h("p", { class: "live-muted", role: "status" }, "Reading the call's form…"),
-    error ? h("p", { class: "live-error", role: "alert" }, error) : null,
-    h("div", { class: "live-tracker-actions" },
-      h("button", { type: "button", class: "cmd-btn cmd-btn-primary", "data-action": "send", disabled: busy || !call || !edit, onClick: () => { void send(); } },
-        busy ? "Running…" : `Run ${entry.call.tool}`),
-      h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", disabled: busy, onClick: onCancel }, "Cancel"),
-    ),
-  );
-}
 
 function ActivityRow({ entry, waiting, onChanged }: { entry: TrackerActivityRow; waiting: boolean; onChanged: () => void }) {
   const [approving, setApproving] = useState(false);
@@ -139,7 +78,7 @@ function ActivityRow({ entry, waiting, onChanged }: { entry: TrackerActivityRow;
       )
       : null,
     waiting && approving
-      ? h(CardForm, { entry, onDone: () => { setApproving(false); onChanged(); }, onCancel: () => setApproving(false) })
+      ? h(TrackerCardForm, { entry, onDone: () => { setApproving(false); onChanged(); }, onCancel: () => setApproving(false) })
       : null,
     error ? h("p", { class: "live-error", role: "alert" }, error) : null,
   );

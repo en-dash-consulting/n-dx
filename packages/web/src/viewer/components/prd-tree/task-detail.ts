@@ -16,6 +16,7 @@ import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
 import { TrackerLinksEditor } from "../tracker-links.js";
+import { ChangeTrackerChip } from "../tracker-chip.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
@@ -1420,6 +1421,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           { class: "task-section", "data-section": "tracker-links" },
           h("div", { class: "task-section-label" }, "Tracker"),
           h(TrackerLinksEditor, { itemId: item.id, refreshKey: item, onChanged: onPrdChanged }),
+          itemType === "change" ? h(ChangeTrackerChip, { changeId: item.id, refreshKey: item }) : null,
         )
       : null,
 

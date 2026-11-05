@@ -171,6 +171,50 @@ function prepare(options: TrackerSyncOptions): Ready | Exclude<TrackerTickResult
   return { config, mapping: profile.tracker, profile };
 }
 
+/** The sync settings and profile mapping behind `options`, or why sync cannot run. */
+export const prepareTrackerSync = prepare;
+
+export type RaiseCardResult =
+  | { ok: true; requestId: string; entry: TrackerActivityEntry }
+  | { ok: false; status: 409 | 422; error: string };
+
+/**
+ * Raise the create card for `record`, the way a captured change raises one,
+ * for a person who asked for it. Makes no tracker call and writes no PRD: the
+ * card waits in the log until it is approved. The create rule is a card
+ * whatever its mode, so an `off` rule does not stop an explicit request.
+ * Raising again re-raises a dismissed card; a card already waiting is
+ * returned as is, and a request the log has made (ok or duplicate) is refused.
+ */
+export function raiseCreateCard(options: TrackerSyncOptions, record: TrackerEventRecord): RaiseCardResult {
+  const ready = prepare(options);
+  if ("state" in ready) {
+    return { ok: false, status: 422, error: ready.state === "invalid" ? ready.problems.join("; ") : "tracker sync is not configured" };
+  }
+  const config = { ...ready.config, rules: { ...ready.config.rules, [record.event]: "on" as const } };
+  const plan = planTrackerEvent(record, config, ready.mapping, ready.profile.label);
+  if (plan.action === "skip") return { ok: false, status: 409, error: plan.reason };
+  const logged = readTrackerActivity(options.projectDir).filter((e) => e.requestId === plan.requestId);
+  const waiting = pendingCards(logged)[0];
+  if (waiting) return { ok: true, requestId: plan.requestId, entry: waiting };
+  if (logged.some((e) => e.result === "ok" || e.result === "duplicate")) {
+    return { ok: false, status: 409, error: `${record.rexId} already has a work item created in the tracker` };
+  }
+  const entry: TrackerActivityEntry = {
+    at: (options.now ?? (() => new Date()))().toISOString(),
+    event: record.event,
+    rexId: record.rexId,
+    rule: plan.rule,
+    mode: plan.mode,
+    requestId: plan.requestId,
+    call: plan.call,
+    result: "card",
+    ...(plan.missing && { problems: plan.missing.map((message) => ({ message })) }),
+  };
+  appendTrackerActivity(options.projectDir, entry);
+  return { ok: true, requestId: plan.requestId, entry };
+}
+
 /** Each project's tick in progress; the next waits for it. */
 const ticking = new Map<string, Promise<TrackerTickResult>>();
 
