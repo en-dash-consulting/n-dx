@@ -318,6 +318,27 @@ describe("FileStore", () => {
       expect(entries[1].detail).toBe("second");
     });
 
+    it("reads an entry carrying a Sidecar placement's decision fields, written by the dashboard", async () => {
+      const decided = {
+        timestamp: "2024-01-03T00:00:00Z",
+        event: "change_placed",
+        itemId: "c1",
+        detail: "touches A1.1 (via Sidecar)",
+        decidedBy: "sidecar:s1",
+        approvedBy: "Ada <ada@example.com>",
+        reasons: ["The change retries a declined card."],
+      };
+      await store.appendLog({ timestamp: "2024-01-01T00:00:00Z", event: "test" });
+      const logPath = join(rexDir, "execution-log.jsonl");
+      await writeFile(logPath, (await readFile(logPath, "utf-8")) + JSON.stringify(decided) + "\n", "utf-8");
+      const entries = await store.readLog();
+      expect(entries).toHaveLength(2);
+      expect(entries[1]).toEqual(decided);
+      // And one written through the store keeps them too.
+      await store.appendLog({ ...decided, timestamp: "2024-01-04T00:00:00Z" });
+      expect((await store.readLog()).at(-1)).toMatchObject({ decidedBy: "sidecar:s1", reasons: decided.reasons });
+    });
+
     it("respects limit parameter", async () => {
       for (let i = 0; i < 5; i++) {
         await store.appendLog({

@@ -16,10 +16,10 @@
 
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { useProjectStatus } from "../components/index.js";
+import { StrengthChip, useProjectStatus } from "../components/index.js";
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
-import { AppliedHistory, StrengthChip, bestGuess, useInbox, type InboxRow } from "./inbox.js";
+import { AppliedHistory, bestGuess, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 
 // ── Shortcuts ────────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ import {
 import { useFeatureToggle } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { READY_NEXT_FEATURE, ReadyNext } from "./live-ready-next.js";
+import { TrackerActivitySection } from "./live-tracker.js";
 import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
@@ -528,6 +529,7 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
                     ? h(RunCard, { key: item.key, run: item.run, navigateTo })
                     : h(JobCard, { key: item.key, job: item.job, navigateTo }))))
                 : null,
+            h(TrackerActivitySection, { refreshKey: snapshot.generatedAt, navigateTo }),
           ),
           h("aside", { class: "live-side", "aria-label": "Queue and history" },
             h(Queue, { snapshot, navigateTo }),

@@ -269,7 +269,7 @@ function resetDeferredArgs(entry: PrdEntry | null): string[] {
  * been started yet. Named here rather than inferred from the absence of a rex
  * key so the 400 can say which key it refused and why.
  */
-const LAUNCH_ONLY_KEYS: ReadonlySet<string> = new Set(["fresh", "allowDirty", "resetDeferred"]);
+const LAUNCH_ONLY_KEYS: ReadonlySet<string> = new Set(["fresh", "allowDirty", "requireUnblocked", "resetDeferred"]);
 
 /**
  * A short fingerprint of a task's saved block, used to detect a save racing
@@ -592,6 +592,38 @@ export async function previewTaskRun(
   );
   if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
   return { ok: true, brief: run.stdout };
+}
+
+/**
+ * `hench runs diagnose <run-id> --format=json` through `ndx hench`, for a
+ * caller inside this server that renders it: the Sidecar Diagnose run lens,
+ * for a run whose record carries no verdict. Hench prints the verdict but does
+ * not write it. A refusal (the run is completed, or running with its process
+ * alive) or a timeout is the failure. `dir` is the worktree the run was made
+ * in, whose `.hench/runs/` holds it: one of the repository's worktrees, as
+ * the Runs and Live sweep lists them.
+ */
+export async function diagnoseTaskRun(
+  ctx: ServerContext,
+  runId: string,
+  dir: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; diagnosis: Record<string, unknown> } | { ok: false; failure: string }> {
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  const run = await runNdx(
+    ctx,
+    ["hench", "runs", "diagnose", runId, "--format=json", dir],
+    PREP_RESOLVE_TIMEOUT_MS,
+    signal,
+  );
+  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
+  try {
+    const parsed: unknown = JSON.parse(run.stdout);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    return { ok: true, diagnosis: parsed as Record<string, unknown> };
+  } catch {
+    return { ok: false, failure: "the diagnose output was not JSON" };
+  }
 }
 
 /** POST /api/hench/prep/:taskId/preview */

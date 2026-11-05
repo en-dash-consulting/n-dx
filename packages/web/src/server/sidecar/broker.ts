@@ -20,18 +20,21 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { writeRunFileAtomic } from "../run-end.js";
 import {
   allowListKey,
   BROKER_TOOL_POLICY,
   isBrokerTool,
   type AllowListRule,
-  type BrokerToolName,
+  type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { SidecarChangeSet } from "../../shared/index.js";
+import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarLink, SidecarPlacement } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
-import { appendLedgerEntry, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
+import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
+import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
+import { resolveDraftPath } from "./draft-file.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
 export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
@@ -39,15 +42,27 @@ export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
 export interface SidecarCard {
   id: string;
   sessionId: string;
-  tool: BrokerToolName;
+  tool: BrokerCardTool;
   kind: SidecarCardKind;
   input: Record<string, unknown>;
   /** The rule "always allow" would add; `null` when the call can never be allow-listed. */
   allowListKey: string | null;
   /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
   preview?: string;
+  /** A work card's run options as start uses them (`workOptions`), defaults applied; the viewer titles the card from these. */
+  runOptions?: Record<string, unknown>;
   /** A change-set card's items as approval writes them, read against the PRD before the card was raised. */
   changeSet?: SidecarChangeSet;
+  /** A run-plan card's plan as the planner printed it when the card was raised; its commands are never the model's. */
+  runPlan?: QueuePlan;
+  /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
+  placement?: SidecarPlacement;
+  /** A link card's item, work ref and tracker label as approval writes them, read when the card was raised. */
+  link?: SidecarLink;
+  /** An external-call card's connection, workspace, input schema and picker choices. */
+  externalCall?: SidecarExternalCall;
+  /** The lane (0-based) the operator chose to start on a run-plan card. */
+  lane?: number;
   status: SidecarCardStatus;
   raisedAt: string;
   decidedAt?: string;
@@ -55,16 +70,25 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow": its rule went onto the allow-list. */
   remembered?: true;
-  /** The operator edited the change set before approving it. */
+  /** The operator edited the change set, the placement, a draft file's path or an external call's arguments before approving it. */
   edited?: true;
-  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
-  carriedOut?: { ok: boolean; ids?: string[] };
+  /**
+   * How the approved call's effect ended; `ids` are the PRD items a change-set
+   * card wrote, `problems` the list an external server's validation error
+   * returned (the session got the result unchanged).
+   */
+  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
 }
 
 /** What the broker reads before raising a card, for the operator to see on it. */
 export interface CardAnnex {
   preview?: string;
+  runOptions?: Record<string, unknown>;
   changeSet?: SidecarChangeSet;
+  runPlan?: QueuePlan;
+  placement?: SidecarPlacement;
+  link?: SidecarLink;
+  externalCall?: SidecarExternalCall;
 }
 
 /** How a broker call was settled. */
@@ -79,6 +103,23 @@ export interface CardDecision {
   remember?: boolean;
   /** A change-set card's item edits, written by the approval. Refused on any other card or decision. */
   edits?: unknown;
+  /**
+   * A placement card's edited placement, already read and dry-run against the
+   * PRD (`readPlacementEdit`): approval writes it in place of the card's own.
+   * Only on a placement approval, and only a placement rex accepted.
+   */
+  placement?: Pick<SidecarPlacement, "request" | "check">;
+  /** A run-plan card's Start lane: the lane (0-based) whose first task is to be started. Only on a run-plan approval, and required there. */
+  lane?: number;
+  /** A draft-file card's path as the operator edited it; the approval saves there. Only on a draft-file approval. */
+  path?: string;
+  /**
+   * An external-call card's arguments as the operator edited them; the
+   * approval calls the tool with these. Only on an external-call approval. An
+   * idempotency key is read-only: the agent's value is kept, and one the agent
+   * did not send cannot be added.
+   */
+  arguments?: unknown;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -94,11 +135,28 @@ export interface SidecarBrokerOptions {
   /** Called when a card is raised or settled. */
   onCard?: (card: SidecarCard) => void;
   now?: () => number;
+  /**
+   * Where a session's ledger is and what its agent may write there. Defaults
+   * to a worktree's: `<dir>/<session>.ledger.jsonl`, {@link WORKTREE_LEDGER_TYPES}.
+   */
+  ledger?: SidecarLedgerTarget;
+  /** Where a draft-file card's relative path lands. Defaults to `<dir>/drafts`. */
+  draftsDir?: string;
+}
+
+export interface SidecarLedgerTarget {
+  path: (sessionId: string) => string;
+  /** The types `ledger_append` accepts. */
+  types: readonly LedgerEntryType[];
 }
 
 interface PendingCard {
   card: SidecarCard;
   settle: (outcome: BrokerOutcome) => void;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 const ALLOW_LIST_SCHEMA = "ndx/sidecar-allow-list/v1";
@@ -113,11 +171,25 @@ export class SidecarBroker {
   private readonly pending = new Map<string, PendingCard>();
   /** Per session, the decided calls still carrying out their effect; `withdraw` aborts them. */
   private readonly carrying = new Map<string, Set<AbortController>>();
+  private readonly ledger: SidecarLedgerTarget;
+  private readonly draftsDirPath: string;
 
   constructor(opts: SidecarBrokerOptions) {
     this.dir = opts.dir;
+    this.draftsDirPath = opts.draftsDir ?? join(opts.dir, "drafts");
     this.onCard = opts.onCard;
     this.now = opts.now ?? Date.now;
+    this.ledger = opts.ledger ?? { path: (sessionId) => sessionLedgerPath(opts.dir, sessionId), types: WORKTREE_LEDGER_TYPES };
+  }
+
+  /** Where a draft file's relative path lands. */
+  get draftsDir(): string {
+    return this.draftsDirPath;
+  }
+
+  /** The types a session's agent may write through `ledger_append`. */
+  get ledgerTypes(): readonly LedgerEntryType[] {
+    return this.ledger.types;
   }
 
   /**
@@ -128,7 +200,7 @@ export class SidecarBroker {
    */
   request(
     sessionId: string,
-    tool: BrokerToolName,
+    tool: BrokerCardTool,
     input: Record<string, unknown>,
     signal?: AbortSignal,
     annex: CardAnnex = {},
@@ -147,7 +219,12 @@ export class SidecarBroker {
       input,
       allowListKey: key,
       ...(annex.preview !== undefined && { preview: annex.preview }),
+      ...(annex.runOptions !== undefined && { runOptions: annex.runOptions }),
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
+      ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
+      ...(annex.placement !== undefined && { placement: annex.placement }),
+      ...(annex.link !== undefined && { link: annex.link }),
+      ...(annex.externalCall !== undefined && { externalCall: annex.externalCall }),
       status: "pending",
       raisedAt: this.iso(),
     };
@@ -222,6 +299,42 @@ export class SidecarBroker {
       if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
       edited = applied;
     }
+    if (decision.placement !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries an edited placement");
+      if (!card.placement) throw new BrokerDecisionError(409, `A ${card.kind} card takes no placement`);
+      if (!decision.placement.check.ok) throw new BrokerDecisionError(400, "An edited placement rex refuses cannot be approved");
+    }
+    if (card.kind === "run-plan" && decision.approve) {
+      const lanes = card.runPlan?.lanes.length ?? 0;
+      if (decision.lane === undefined) throw new BrokerDecisionError(400, "A run-plan card is approved by choosing a lane to start");
+      if (!Number.isInteger(decision.lane) || decision.lane < 0 || decision.lane >= lanes) {
+        throw new BrokerDecisionError(400, `"lane" must be a lane of the plan (0 to ${lanes - 1})`);
+      }
+    } else if (decision.lane !== undefined) {
+      throw new BrokerDecisionError(409, card.kind === "run-plan" ? "Only an approval chooses a lane" : `A ${card.kind} card takes no lane`);
+    }
+    let editedPath: string | undefined;
+    if (decision.path !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries a path");
+      if (card.kind !== "draft-file") throw new BrokerDecisionError(409, `A ${card.kind} card takes no path`);
+      const resolved = resolveDraftPath(decision.path, this.draftsDirPath);
+      if (!resolved.ok) throw new BrokerDecisionError(400, resolved.error);
+      editedPath = resolved.path;
+    }
+    let editedArguments: Record<string, unknown> | undefined;
+    if (decision.arguments !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries arguments");
+      if (card.kind !== "external-call") throw new BrokerDecisionError(409, `A ${card.kind} card takes no arguments`);
+      if (!isPlainObject(decision.arguments)) throw new BrokerDecisionError(400, `"arguments" must be an object`);
+      const agent = isPlainObject(card.input.arguments) ? card.input.arguments : {};
+      const next = { ...decision.arguments };
+      // An idempotency key is the agent's: the form shows it read-only and approval cannot change it.
+      for (const name of IDEMPOTENCY_KEY_PROPERTIES) {
+        if (name in agent) next[name] = agent[name];
+        else delete next[name];
+      }
+      if (!isDeepStrictEqual(next, agent)) editedArguments = next;
+    }
     if (decision.remember) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval can be remembered");
       if (card.allowListKey === null) {
@@ -234,6 +347,19 @@ export class SidecarBroker {
       card.changeSet = edited;
       card.edited = true;
     }
+    if (editedPath !== undefined && editedPath !== card.input.path) {
+      card.input = { ...card.input, path: editedPath };
+      card.edited = true;
+    }
+    if (decision.placement && card.placement) {
+      card.placement = { ...card.placement, ...decision.placement };
+      card.edited = true;
+    }
+    if (editedArguments) {
+      card.input = { ...card.input, arguments: editedArguments };
+      card.edited = true;
+    }
+    if (decision.lane !== undefined) card.lane = decision.lane;
     this.settle(cardId, decision.approve ? "approved" : "denied", decision.reason);
     return { ...card };
   }
@@ -285,8 +411,8 @@ export class SidecarBroker {
     return parsed.rules.filter((rule): rule is AllowListRule => {
       const r = rule as Partial<AllowListRule> | null;
       return !!r && typeof r.tool === "string" && isBrokerTool(r.tool) && typeof r.key === "string"
-        && BROKER_TOOL_POLICY[r.tool].allowList !== "never"
-        && (r.tool !== "run_command" || allowListKey("run_command", { argv: parseArgv(r.key) }) === r.key);
+        && BROKER_TOOL_POLICY[r.tool].allowList === "per-call"
+        && allowListKey(r.tool, ruleInput(r.key)) === r.key;
     });
   }
 
@@ -295,14 +421,14 @@ export class SidecarBroker {
    * editor. Refused for a call that can never be allow-listed (work, reset,
    * push, writes); returns the rule, which is already on the list if it was.
    */
-  allow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
+  allow(tool: BrokerCardTool, input: Record<string, unknown>): AllowListRule {
     const rule = this.checkAllow(tool, input);
     this.addRule(rule);
     return rule;
   }
 
   /** The rule {@link allow} would add, or the same refusal; writes nothing. */
-  checkAllow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
+  checkAllow(tool: BrokerCardTool, input: Record<string, unknown>): AllowListRule {
     const key = allowListKey(tool, input);
     if (key === null) throw new BrokerDecisionError(409, `A ${tool} call like this can never be allow-listed`);
     return { tool, key };
@@ -317,10 +443,25 @@ export class SidecarBroker {
     return true;
   }
 
-  /** Append a typed entry to the session's ledger. Raises no card: the ledger is session-local. */
+  /**
+   * The agent's `ledger_append`: a typed entry in the session's ledger.
+   * Raises no card, since the ledger is the session's own; throws on a type
+   * this scope's agent may not write.
+   */
   appendLedger(sessionId: string, type: LedgerEntryType, text: string): LedgerEntry {
+    if (!this.ledger.types.includes(type)) throw new Error(`A ${type} ledger entry is not one this session writes`);
+    return this.writeLedger(sessionId, type, text);
+  }
+
+  /** The hub's drill-down: a `handoff` entry naming the hub's question, which no agent can write. */
+  appendHandoff(sessionId: string, text: string): LedgerEntry {
+    return this.writeLedger(sessionId, "handoff", text);
+  }
+
+  private writeLedger(sessionId: string, type: LedgerEntryType, text: string): LedgerEntry {
     const entry: LedgerEntry = { at: this.iso(), type, text };
-    appendLedgerEntry(this.dir, sessionId, entry);
+    ensureSidecarDir(this.dir);
+    appendLedgerEntryAt(this.ledger.path(sessionId), entry);
     return entry;
   }
 
@@ -358,11 +499,15 @@ export class SidecarBroker {
   }
 }
 
-/** A rule key's argv; `undefined` for a key that is not JSON, which {@link allowListKey} then rejects. */
-function parseArgv(key: string): unknown {
+/**
+ * The call a rule key stands for: a bare argv, or a hub rule's `{ project, argv }`.
+ * A key that is not JSON stands for no call, which {@link allowListKey} then rejects.
+ */
+function ruleInput(key: string): Record<string, unknown> {
   try {
-    return JSON.parse(key);
+    const parsed: unknown = JSON.parse(key);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : { argv: parsed };
   } catch {
-    return undefined;
+    return { argv: undefined };
   }
 }

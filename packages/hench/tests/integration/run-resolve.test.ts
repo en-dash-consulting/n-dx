@@ -174,6 +174,7 @@ describe("the resolution report", () => {
       tokenBudget: { value: 0, source: "hench.tokenBudget" },
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
+      requireUnblocked: { value: false, source: "built-in" },
       resetDeferred: { value: false, source: "built-in" },
     });
     // llm.<vendor>.auth has no per-run flag, so it sits beside `resolved`.
@@ -212,6 +213,7 @@ describe("the resolution report", () => {
       "token-budget": "1000",
       fresh: "true",
       "allow-dirty": "true",
+      "require-unblocked": "true",
       "reset-deferred": "true",
     });
 
@@ -229,7 +231,7 @@ describe("the resolution report", () => {
     expect(codes(r)).toEqual(["provider-unsupported"]);
     expect(r.command).toBe(
       "ndx work --task=t-pending --auto --model=opus --provider=api --permission-mode=plan --review " +
-        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --reset-deferred ${projectDir}`,
+        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --require-unblocked --reset-deferred ${projectDir}`,
     );
   });
 
@@ -438,6 +440,7 @@ describe("refusals are reported, not thrown", () => {
       expect(r.refusals[0].message).toContain("t-deferred (deferred)");
       expect(r.refusals[0].message).not.toContain("t-done");
       expect(r.command).toContain("--require-unblocked");
+      expect(r.resolved.requireUnblocked).toEqual({ value: true, source: "cli-flag" });
     });
 
     it("is not reported without --require-unblocked", async () => {

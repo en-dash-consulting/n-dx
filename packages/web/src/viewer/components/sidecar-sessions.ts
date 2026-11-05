@@ -8,7 +8,7 @@
 
 import { h } from "preact";
 import { useState, useEffect } from "preact/hooks";
-import type { SidecarState, SidecarSessionRow } from "../hooks/index.js";
+import type { SidecarState, SidecarSessionRow } from "../hooks/sidecar.js";
 
 function SessionRow({ row, sidecar, onOpened }: { row: SidecarSessionRow; sidecar: SidecarState; onOpened: () => void }) {
   const { session, estimatedCost } = row.entry;

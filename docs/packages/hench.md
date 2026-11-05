@@ -227,6 +227,10 @@ Two fields on `run.json` say which model ran and why:
 A run that ends in any status other than completed gets a `diagnosis`: a
 verdict from fixed rules over the record, its events and its review report,
 with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
+A record still at `running` whose process is gone (`check-runs` verdict
+`orphaned`) is classified as ending it would record it: `failed`, with the
+run-end error. Nothing is saved; a completed run, or a running one whose
+process may be alive, is refused.
 
 | Class | Signal | First action |
 |-------|--------|--------------|

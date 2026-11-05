@@ -41,12 +41,12 @@ import {
   useFacetState,
   useClaims,
   useSidecarProposals,
+  useProductRead,
 } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { ghostRowsByParent } from "../components/prd-tree/ghost-rows.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
-import { useProductRead } from "./product-pages.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */

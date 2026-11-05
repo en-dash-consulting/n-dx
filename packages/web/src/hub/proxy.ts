@@ -23,7 +23,10 @@
  * from what the sidecar receives — extension code never sees the per-user
  * credential — and `X-Ndx-Base-Path` tells the app its mount.
  * The bare `/x/<name>` redirects to `/x/<name>/` so the app's relative links
- * resolve under the mount.
+ * resolve under the mount. `/x/<name>/~f/<key>/…` is the same sidecar reached
+ * by a Sidecar drawer tab: the key stood in for the token at the boundary
+ * (frame-keys.ts), the mount includes it, and every answer is sandboxed
+ * ({@link FRAME_CSP}).
  *
  * A browser cannot put a header on a page's scripts, styles and images, so
  * with the token on, a sidecar is also mounted under a key:
@@ -39,6 +42,11 @@
  * the sole project's dashboard with one registered, the chooser with several
  * — which leaves a dashboard no stable address to link back to.
  *
+ * `/hub/session/…` is the hub-scope Sidecar session: forwarded, HTTP and
+ * WebSocket alike, to `/api/sidecar/hub/…` on the project server hosting it
+ * (session-host.ts). Like everything here it is reached only past the hub's
+ * request guard, so the token and origin checks have already run.
+ *
  * Plain `node:http` and `node:net`: HTTP bodies stream in both directions;
  * a WebSocket upgrade is forwarded by writing the client's request head to
  * the upstream socket and piping the two sockets together.
@@ -47,13 +55,14 @@
  */
 
 import { request as httpRequest } from "node:http";
-import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from "node:http";
+import type { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, ServerResponse } from "node:http";
 import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   AUTH_HEADER_NAME,
+  FEATURE_DISABLED_HEADER,
   HUB_ADMISSION_HEADER,
   HUB_PATH,
   checkRunOptions,
@@ -66,6 +75,9 @@ import {
   stripBasePath,
   stripWorkspaceSlot,
   checkRunMode,
+  hubSessionUpstreamPath,
+  HUB_SESSION_ROUTES,
+  HUB_SIDECAR_API_PREFIX,
   splitQueryParam,
   authRequiredPage,
   wantsHtml,
@@ -85,7 +97,10 @@ import type { ExtensionView } from "./extensions.js";
 import { defaultParentDir } from "./new-project.js";
 import { hubRoutePath } from "./request-guard.js";
 import { SidecarManager } from "./sidecars.js";
+import { HUB_SESSION_FEATURE, probeHubLens } from "./session-host.js";
+import { readHubUsageTotals } from "./usage-ledger.js";
 import type { EnsureResult } from "./sidecars.js";
+import { FRAME_KEY_SEGMENT, parseKeyedPath } from "./frame-keys.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
@@ -94,6 +109,8 @@ const MAX_RELOAD_BODY_BYTES = 64 * 1024;
 /** The execute request the admission gate stands in front of. */
 const EXECUTE_PATH = "/api/hench/execute";
 const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
+/** A hub session request is buffered so it can be replayed on the next host; a larger body is refused with 413. */
+export const MAX_HUB_SESSION_BODY_BYTES = 1024 * 1024;
 /** Header telling the project server which prefix the client used, for anything that builds absolute links. */
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 /** The Live overview: its agent-slots tile reports the machine's admission state when served through the hub. */
@@ -107,6 +124,19 @@ const SIDECAR_PATH = /^\/x\/([^/]*)(\/.*)?$/;
 const MOUNT_KEY_SEGMENT = /^\/~([A-Za-z0-9_-]{16,})(\/.*)?$/;
 /** Tells a sidecar the mount it is served under, trailing slash included, so it can build links. */
 export const SIDECAR_BASE_PATH_HEADER = "x-ndx-base-path";
+/**
+ * On every frame-keyed response: an opaque origin even when the page is opened
+ * full-window, so it never runs same-origin with a dashboard or the hub. No
+ * `allow-same-origin`, no `allow-top-navigation`.
+ */
+export const FRAME_CSP = "sandbox allow-scripts allow-forms allow-popups allow-downloads";
+/** Headers a frame-keyed response carries; the key in the URL must not leave in a Referer. */
+const FRAME_RESPONSE_HEADERS = { "Content-Security-Policy": FRAME_CSP, "Referrer-Policy": "no-referrer" } as const;
+
+/** Put {@link FRAME_RESPONSE_HEADERS} on a keyed response before anything answers it, refusals included. */
+export function setFrameResponseHeaders(res: ServerResponse): void {
+  for (const [name, value] of Object.entries(FRAME_RESPONSE_HEADERS)) res.setHeader(name, value);
+}
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
@@ -114,9 +144,16 @@ export type ProxyDecision =
   /**
    * An extension sidecar, started on demand by the hub's {@link SidecarManager}.
    * `mountKey` is the key the path carried (`/x/<name>/~<key>/…`), not yet
-   * checked; {@link mountKeyAdmits} checks it.
+   * checked; {@link mountKeyAdmits} checks it. `frameKey` is set for
+   * `/x/<name>/~f/<key>/…`, and the prefix then ends with `/~f/<key>`; it is
+   * checked at the hub's boundary.
    */
-  | { kind: "sidecar"; name: string; path: string; prefix: string; mountKey?: string }
+  | { kind: "sidecar"; name: string; path: string; prefix: string; mountKey?: string; frameKey?: string }
+  /**
+   * `/hub/session/…`: the hub-scope Sidecar, on the project server the hub
+   * picks as its host (session-host.ts). `path` is the host's path for it.
+   */
+  | { kind: "hub-session"; path: string }
   /** The bare `/x/<name>`: the mount with its trailing slash. */
   | { kind: "redirect"; location: string }
   | { kind: "json"; status: number; body: unknown }
@@ -150,6 +187,14 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     if (!SidecarManager.isName(name)) {
       return { kind: "json", status: 404, body: { error: `No extension sidecar is named "${name}"`, reason: "none" } };
     }
+    // A drawer tab's page: the key is part of the mount, so the app's
+    // relative links keep it, and it is stripped before forwarding.
+    const framed = parseKeyedPath(pathname);
+    if (framed) {
+      const prefix = `${SIDECAR_PATH_PREFIX}${name}/${FRAME_KEY_SEGMENT}/${framed.key}`;
+      if (framed.rest === undefined && !upgrade) return { kind: "redirect", location: `${prefix}/${sidecarQuery}` };
+      return { kind: "sidecar", name, path: (framed.rest || "/") + sidecarQuery, prefix, frameKey: framed.key };
+    }
     const keyed = sidecar[2] === undefined ? null : MOUNT_KEY_SEGMENT.exec(sidecar[2]);
     if (keyed) {
       const mount = `${SIDECAR_PATH_PREFIX}${name}/~${keyed[1]}`;
@@ -174,6 +219,14 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
       return { kind: "json", status: 503, body: { error: `Project "${id}" has no running server`, status: project.status } };
     }
     return { kind: "proxy", project, path: stripBasePath(prefix, pathname) + query, prefix };
+  }
+
+  // The hub session, above every project like the chooser: forwarded to
+  // whichever project server hosts it, picked when the request is handled.
+  // An upgrade's ticket was spent by upgradeRefusal; the host gets the token.
+  const hubSession = hubSessionUpstreamPath(pathname);
+  if (hubSession !== null) {
+    return { kind: "hub-session", path: splitQueryParam(hubSession + withoutTokenParam(query), TICKET_QUERY_PARAM).url };
   }
 
   // The chooser's fixed address, checked before the project rules so it
@@ -274,15 +327,23 @@ export function matchProjectByDir(projects: ProjectView[], dir: string): Project
   return best?.project ?? null;
 }
 
-function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
+/**
+ * @param destroyOnLimit False keeps the socket open past the limit (the rest of
+ *   the body is drained and dropped) so the caller can still answer the client.
+ */
+function readBody(req: IncomingMessage, limit: number, destroyOnLimit = true): Promise<Buffer> {
   return new Promise((resolvePromise, reject) => {
     const chunks: Buffer[] = [];
     let bytes = 0;
+    let over = false;
     req.on("data", (chunk: Buffer) => {
+      if (over) return;
       bytes += chunk.length;
       if (bytes > limit) {
+        over = true;
+        chunks.length = 0;
         reject(new Error(`request body exceeds ${limit} bytes`));
-        req.destroy();
+        if (destroyOnLimit) req.destroy();
         return;
       }
       chunks.push(chunk);
@@ -367,6 +428,30 @@ export interface SidecarForward {
   token: string | null;
   /** Browser sessions belong to the hub and must not reach extension code. */
   credentials?: CredentialStore | null;
+  /** A frame-keyed request: the response gets {@link FRAME_CSP} and `Referrer-Policy: no-referrer`. */
+  frame?: boolean;
+}
+
+/**
+ * A frame-keyed response's headers. The sidecar's own CSP is kept beside the
+ * sandbox one — the browser enforces both, so it can only narrow — and its
+ * Referrer-Policy is replaced.
+ */
+function withFrameHeaders(headers: IncomingHttpHeaders, opaqueOrigin: boolean): OutgoingHttpHeaders {
+  const own = headers["content-security-policy"];
+  // A comma separates policies in one header value (CSP3, serialized-policy-list).
+  const policies = own ? `${FRAME_CSP}, ${own}` : FRAME_CSP;
+  const out: OutgoingHttpHeaders = { ...headers, "content-security-policy": policies, "referrer-policy": "no-referrer" };
+  if (!opaqueOrigin) return out;
+  // The hub owns CORS for a page with an opaque origin (guardFrameKeyRequest):
+  // the sidecar's own allow-origin and credentials headers are replaced.
+  const vary = headers.vary;
+  out["access-control-allow-origin"] = "null";
+  // `Vary: *` already covers Origin, and narrowing it would let a cache reuse
+  // an answer the sidecar declared unreusable.
+  out.vary = vary === "*" ? "*" : vary ? `${vary}, Origin` : "Origin";
+  delete out["access-control-allow-credentials"];
+  return out;
 }
 
 /**
@@ -397,6 +482,10 @@ export function sidecarHeaderValue(lowerName: string, value: string, forward: Si
  * @param body When the hub already consumed the request body (to route on it),
  *   it is sent upstream in place of piping the request.
  * @param sidecar Set when the upstream is an extension sidecar.
+ * @param onUpstreamError Called when the upstream cannot be reached.
+ * @param onUpstreamHeaders Called with the upstream's status line and headers
+ *   before anything is written to the client. Returning true takes the answer
+ *   over: the upstream's response is discarded and nothing is sent to `res`.
  */
 export function proxyHttp(
   req: IncomingMessage,
@@ -407,6 +496,8 @@ export function proxyHttp(
   body?: Buffer,
   extraHeaders: OutgoingHttpHeaders = {},
   sidecar?: SidecarForward,
+  onUpstreamError?: () => void,
+  onUpstreamHeaders?: (status: number, headers: IncomingHttpHeaders) => boolean | void,
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   // Only the hub states its admission state; a client's copy never reaches the child.
@@ -449,7 +540,11 @@ export function proxyHttp(
   const upstream = httpRequest(
     { host: UPSTREAM_HOST, port, method: req.method, path, headers },
     (upstreamRes) => {
-      const outHeaders = { ...upstreamRes.headers };
+      if (onUpstreamHeaders?.(upstreamRes.statusCode ?? 502, upstreamRes.headers) === true) {
+        upstreamRes.resume();
+        return;
+      }
+      const outHeaders = sidecar?.frame ? withFrameHeaders(upstreamRes.headers, req.headers.origin === "null") : { ...upstreamRes.headers };
       // A redirect the project server issues is root-relative from its point
       // of view; the client is under the prefix. A sidecar's may already be
       // under it, built from X-Ndx-Base-Path as the extension docs advise.
@@ -464,6 +559,7 @@ export function proxyHttp(
   );
 
   upstream.on("error", (err) => {
+    onUpstreamError?.();
     if (!res.headersSent) {
       const body = JSON.stringify({ error: `Project server unreachable: ${err.message}` });
       res.writeHead(502, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) });
@@ -477,6 +573,16 @@ export function proxyHttp(
   else req.pipe(upstream);
 }
 
+/**
+ * Lets the caller judge the upstream's answer to an upgrade before the client
+ * sees any of it. When `refuses` says yes, the upstream is dropped, the client's
+ * socket is left untouched, and `onRefused` runs.
+ */
+export interface UpgradeGate {
+  refuses(status: number, headers: IncomingHttpHeaders): boolean;
+  onRefused(): void;
+}
+
 /** Forward a WebSocket upgrade: replay the request head upstream, then pipe both sockets. */
 export function proxyUpgrade(
   req: IncomingMessage,
@@ -486,12 +592,15 @@ export function proxyUpgrade(
   path: string,
   prefix: string,
   credential: string | SidecarForward | null = null,
+  onUpstreamError?: () => void,
+  gate?: UpgradeGate,
 ): void {
   const sidecar = credential && typeof credential === "object" ? credential : undefined;
   const upstreamToken = typeof credential === "string" ? credential : null;
   const upstream = connect(port, UPSTREAM_HOST);
 
   const fail = (): void => {
+    onUpstreamError?.();
     if (socket.writable) {
       socket.write("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     }
@@ -528,19 +637,85 @@ export function proxyUpgrade(
     }
     upstream.write(`${lines.join("\r\n")}\r\n\r\n`);
     if (head.length > 0) upstream.write(head);
-    upstream.pipe(socket);
-    socket.pipe(upstream);
+    if (!gate) {
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+      return;
+    }
+    // Hold the upstream's answer until its head is complete: a refusal is
+    // swallowed, anything else is released to the client and piped from then on.
+    let buffered = Buffer.alloc(0);
+    const onData = (chunk: Buffer): void => {
+      buffered = Buffer.concat([buffered, chunk]);
+      const end = buffered.indexOf("\r\n\r\n");
+      if (end === -1 && buffered.length < MAX_UPGRADE_HEAD_BYTES) return;
+      upstream.off("data", onData);
+      upstream.pause();
+      const { status, headers } = end === -1 ? { status: 0, headers: {} } : parseResponseHead(buffered.subarray(0, end).toString("latin1"));
+      if (gate.refuses(status, headers)) {
+        refused = true;
+        upstream.destroy();
+        gate.onRefused();
+        return;
+      }
+      socket.write(buffered);
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+    };
+    upstream.on("data", onData);
   });
 
-  upstream.once("error", fail);
+  let refused = false;
+  upstream.once("error", () => {
+    if (!refused) fail();
+  });
   socket.once("error", () => upstream.destroy());
   socket.once("close", () => upstream.destroy());
-  upstream.once("close", () => socket.destroy());
+  upstream.once("close", () => {
+    if (!refused) socket.destroy();
+  });
 }
+
+/** Longest response head held back while waiting for its blank line. */
+const MAX_UPGRADE_HEAD_BYTES = 16 * 1024;
+
+/** The status code and lower-cased headers of a response head (without its closing blank line). */
+function parseResponseHead(text: string): { status: number; headers: IncomingHttpHeaders } {
+  const [statusLine, ...rest] = text.split("\r\n");
+  const headers: IncomingHttpHeaders = {};
+  for (const line of rest) {
+    const colon = line.indexOf(":");
+    if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+  }
+  return { status: Number(statusLine.split(" ")[1]) || 0, headers };
+}
+
+const NO_HUB_SESSION_HOST = "No registered project server is healthy to host the hub session";
 
 /** The credential an authenticated request carries on to a project server: the per-user token. */
 function upstreamAuth(hub: Hub): OutgoingHttpHeaders {
   return hub.token ? { "x-ndx-token": hub.token } : {};
+}
+
+/** The host's path for the drawer page: the one hub-session path a navigation may load without a credential. */
+const HUB_DRAWER_UPSTREAM = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.drawer}`;
+
+/**
+ * Route one `/hub/session/…` request: to the host the picker names, through
+ * {@link proxyHubSession} (which moves past a host whose web.sidecar is off),
+ * or a refusal when no project can host.
+ */
+async function routeHubSession(req: IncomingMessage, res: ServerResponse, hub: Hub, path: string): Promise<void> {
+  const host = hub.sessionHosts.pick(hub.listProjects());
+  if (!host) {
+    if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
+      writeSidecarOffEverywhere(res);
+      return;
+    }
+    writeJson(res, 503, { error: NO_HUB_SESSION_HOST });
+    return;
+  }
+  await proxyHubSession(req, res, hub, path, host);
 }
 
 /**
@@ -606,7 +781,8 @@ function refusePublic(req: IncomingMessage, res: ServerResponse): void {
 /**
  * A request the gate passed without a credential (a GET or HEAD). The hub's
  * own API, and any answer that names projects, needs a credential; the home
- * page is sent as a shell whose script signs in and then loads the cards; a
+ * page is sent as a shell whose script signs in and then loads the cards, and
+ * its drawer frame's page is fetched from the hub session's host; a
  * project path is proxied with no credential at all, so the project server
  * answers it with its own public shell or a 401.
  */
@@ -634,6 +810,19 @@ export async function handlePublicHubRequest(req: IncomingMessage, res: ServerRe
     res.end(req.method === "HEAD" ? undefined : sidecarBootstrapPage(sidecarName));
     return;
   }
+  // The hub home's drawer frame: a navigation carries no credential, and the
+  // page holds only its static paths config; its session script signs it in
+  // from the tab before it reads anything. The query is dropped, so only that
+  // one page is reachable this way.
+  if (
+    decision.kind === "hub-session"
+    && decision.path.split("?")[0] === HUB_DRAWER_UPSTREAM
+    && req.method === "GET"
+    && wantsHtml(req.headers)
+  ) {
+    await routeHubSession(req, res, hub, HUB_DRAWER_UPSTREAM);
+    return;
+  }
   if (decision.kind === "home") {
     const html = renderHomePage({ projects: [], generatedAt: new Date().toISOString() }, "", [], { deferred: true });
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
@@ -649,10 +838,99 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(text);
 }
 
+type SessionHost = NonNullable<ReturnType<Hub["sessionHosts"]["pick"]>>;
+
+function isSidecarRefusal(status: number, headers: IncomingHttpHeaders): boolean {
+  return status === 403 && headers[FEATURE_DISABLED_HEADER] === HUB_SESSION_FEATURE;
+}
+
+function writeSidecarOffEverywhere(res: ServerResponse): void {
+  writeJson(res, 403, {
+    error: `The feature "${HUB_SESSION_FEATURE}" is turned off in every healthy project, so the hub session has no host.`,
+    feature: HUB_SESSION_FEATURE,
+    kind: "feature_disabled",
+    suggestion: `Enable ${HUB_SESSION_FEATURE} in one project's feature flags, or set features.${HUB_SESSION_FEATURE} to true in its .n-dx.json.`,
+  });
+}
+
+/**
+ * Forward a hub session request. The body is buffered (up to
+ * {@link MAX_HUB_SESSION_BODY_BYTES}) so a host refusing for web.sidecar can be
+ * passed over and the same request replayed on the next healthy one: the client
+ * sees only the answer of the host that served it, or the 403 when none is left.
+ */
+async function proxyHubSession(req: IncomingMessage, res: ServerResponse, hub: Hub, path: string, first: SessionHost): Promise<void> {
+  const tooLarge = { error: `Hub session request bodies are limited to ${MAX_HUB_SESSION_BODY_BYTES} bytes` };
+  if (Number(req.headers["content-length"]) > MAX_HUB_SESSION_BODY_BYTES) {
+    req.resume();
+    writeJson(res, 413, tooLarge);
+    return;
+  }
+  let body: Buffer;
+  try {
+    body = await readBody(req, MAX_HUB_SESSION_BODY_BYTES, false);
+  } catch {
+    // A chunked body that outgrew the limit; the rest is drained and dropped.
+    writeJson(res, 413, tooLarge);
+    return;
+  }
+  // Each refusal marks one project, so the loop ends after at most one pass per project.
+  let host: SessionHost | null = first;
+  while (host) {
+    const target: SessionHost = host;
+    const refused = await new Promise<boolean>((settle) => {
+      proxyHttp(
+        req, res, target.port, path, "", body, upstreamAuth(hub), undefined,
+        () => {
+          hub.sessionHosts.markUnreachable(target.project);
+          settle(false);
+        },
+        (status, headers) => {
+          const refusal = isSidecarRefusal(status, headers);
+          if (refusal) hub.sessionHosts.markSidecarOff(target.project);
+          settle(refusal);
+          return refusal;
+        },
+      );
+    });
+    if (!refused) return;
+    host = hub.sessionHosts.pick(hub.listProjects());
+  }
+  writeSidecarOffEverywhere(res);
+}
+
+/** Forward a hub session WebSocket upgrade, retrying on the next healthy host while one refuses for web.sidecar. */
+async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buffer, hub: Hub, path: string): Promise<void> {
+  let host = hub.sessionHosts.pick(hub.listProjects());
+  while (host) {
+    const target: SessionHost = host;
+    const refused = await new Promise<boolean>((settle) => {
+      proxyUpgrade(req, socket, head, target.port, path, "", hub.token, () => hub.sessionHosts.markUnreachable(target.project), {
+        refuses: isSidecarRefusal,
+        onRefused: () => {
+          hub.sessionHosts.markSidecarOff(target.project);
+          settle(true);
+        },
+      });
+      // Settled false once the upgrade went through (or failed): the socket is the upstream's from here.
+      socket.once("close", () => settle(false));
+    });
+    if (!refused) return;
+    host = hub.sessionHosts.pick(hub.listProjects());
+  }
+  if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
+    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  } else {
+    socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  }
+}
+
 /** Handle any request that is not `/api/hub/*`. Always responds. */
 export async function handleProxyRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<void> {
   if (await handleReloadSignal(req, res, hub)) return;
   const decision = decideProxy(hub, req.url || "/");
+  // Every keyed answer — redirect, refusal or the sidecar's own — is sandboxed.
+  if (parseKeyedPath((req.url || "/").split("?")[0])) setFrameResponseHeaders(res);
   switch (decision.kind) {
     case "sidecar": {
       // A cold start can take seconds; a client gone by its end is neither
@@ -663,13 +941,22 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       const started = await hub.sidecars.ensure(decision.name);
       if (gone) return;
       if (!started.ok) {
+        revokeOnRefusal(hub, decision.name, started);
         writeJson(res, started.status, sidecarRefusalBody(started));
+        return;
+      }
+      // The key was live at the boundary; a disable during the start dropped it.
+      if (decision.frameKey !== undefined && !hub.frameKeys.isLive(decision.name, decision.frameKey)) {
+        writeJson(res, 401, { error: "The frame key is no longer valid" });
         return;
       }
       res.once("close", hub.sidecars.beginRequest(decision.name));
       proxyHttp(req, res, started.port, decision.path, decision.prefix, undefined, {}, sidecarForward(hub, decision));
       return;
     }
+    case "hub-session":
+      await routeHubSession(req, res, hub, decision.path);
+      return;
     case "redirect":
       res.writeHead(308, { Location: decision.location, "Content-Length": 0 });
       res.end();
@@ -691,13 +978,18 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       // `/api/hub/overview` does it: a child started with `--token-file`
       // answers 401 without it, and every card would render "unreachable"
       // until the page's first client-side refresh corrected itself.
-      const [overview, extensions] = await Promise.all([
+      const [overview, extensions, hubSession] = await Promise.all([
         buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token)),
         homeExtensionViews(hub),
+        // The Hub session toggle shows only when the host the session would go to can run the hub lens.
+        probeHubLens(hub.sessionHosts, projects, { token: hub.token }),
       ]);
       // Where the "New project" form offers to create: wherever most of the
       // registered projects already live, else the user's home.
-      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions);
+      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions, {
+        hubSession,
+        hubSpend: readHubUsageTotals(hub.hubHome),
+      });
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(html);
       return;
@@ -880,10 +1172,28 @@ async function handleExecuteAdmission(
 }
 
 function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
-  // The keyed mount whenever there is one, whichever address this request
-  // used: links the app builds from it must work in a browser, which has
-  // nothing else to authenticate a stylesheet or an image with.
-  return { basePath: hub.sidecars.mountBase(decision.name), token: hub.token, credentials: hub.credentials, secret: hub.sidecars.secret(decision.name) ?? "" };
+  // A drawer tab's page keeps its frame-keyed mount, so the links it builds
+  // stay under that key; it is never told the hub-lifetime mount key. Any
+  // other request gets the keyed mount whenever there is one, whichever
+  // address it used: links the app builds from it must work in a browser,
+  // which has nothing else to authenticate a stylesheet or an image with.
+  const framed = decision.frameKey !== undefined;
+  return {
+    basePath: framed ? `${decision.prefix}/` : hub.sidecars.mountBase(decision.name),
+    token: hub.token,
+    credentials: hub.credentials,
+    secret: hub.sidecars.secret(decision.name) ?? "",
+    ...(framed ? { frame: true } : {}),
+  };
+}
+
+/**
+ * n-dx refusing the plan (`none`, `refused`: removed, disabled, unapproved)
+ * means nothing may be mounted at the name, so its frame keys go too —
+ * which is how a revoked approval reaches a key no management command named.
+ */
+function revokeOnRefusal(hub: Hub, name: string, result: Extract<EnsureResult, { ok: false }>): void {
+  if (result.reason === "none" || result.reason === "refused") hub.frameKeys.revoke(name);
 }
 
 /** The JSON a refused `/x/<name>/` answers with: the message, core's reason, and the log file when there is one. */
@@ -919,8 +1229,13 @@ async function upgradeSidecar(
     return;
   }
   if (!started.ok) {
+    revokeOnRefusal(hub, decision.name, started);
     const reason = started.status === 404 ? "Not Found" : "Service Unavailable";
     socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    return;
+  }
+  if (decision.frameKey !== undefined && !hub.frameKeys.isLive(decision.name, decision.frameKey)) {
+    socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     return;
   }
   socket.once("close", hub.sidecars.openSocket(decision.name));
@@ -938,6 +1253,10 @@ export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: B
     // The ticket was spent by upgradeRefusal; the child gets the token instead.
     const path = splitQueryParam(decision.path, TICKET_QUERY_PARAM).url;
     proxyUpgrade(req, socket, head, decision.project.port!, path, decision.prefix, hub.token);
+    return;
+  }
+  if (decision.kind === "hub-session") {
+    void upgradeHubSession(req, socket, head, hub, decision.path);
     return;
   }
   const status = decision.kind === "json" ? decision.status : 404;

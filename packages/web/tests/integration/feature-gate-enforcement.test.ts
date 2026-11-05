@@ -43,6 +43,7 @@ const PROBES: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/capture-ask", "sourcevision.ask"],
   ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
   ["/api/sidecar/sessions", "web.sidecar"],
+  ["/api/branch-health", "git.branchHealth"],
 ];
 
 interface Probe {
@@ -148,5 +149,11 @@ describe("feature gate enforcement through the real dispatcher", () => {
     const sidecar = probes.find((p) => p.path === "/api/sidecar/sessions");
     expect(sidecar?.status).toBe(200);
     expect(JSON.parse(sidecar!.body)).toEqual({ sessions: [] });
+
+    // The fixture is not a git repository, so the branch health route itself
+    // answers — which is what proves it is dispatched.
+    const branchHealth = probes.find((p) => p.path === "/api/branch-health");
+    expect(branchHealth?.status).toBe(409);
+    expect(JSON.parse(branchHealth!.body).error).toMatch(/No branch to report on/);
   }, 90_000);
 });

@@ -107,8 +107,8 @@ describe("Live Ready next", () => {
     expect(lanes).toHaveLength(3);
     expect(lanes.map((l) => l.querySelector(".live-ready-worktree")?.textContent ?? null)).toEqual([
       null,
-      expect.stringContaining("Run in its own worktree"),
-      expect.stringContaining("Run in its own worktree"),
+      expect.stringContaining("Run this lane in its own worktree"),
+      expect.stringContaining("Run this lane in its own worktree"),
     ]);
   });
 

@@ -85,4 +85,10 @@ describe("GET /api/features", () => {
     expect(body.toggles.find((t) => t.key === "hench.runVerdict"))
       .toMatchObject({ package: "hench", stability: "experimental", defaultValue: false, enabled: false });
   });
+
+  it("lists git.branchHealth as an off-by-default experimental git toggle", async () => {
+    const body = await (await fetch(`${server.baseUrl}/api/features`)).json() as { toggles: Array<Record<string, unknown>> };
+    expect(body.toggles.find((t) => t.key === "git.branchHealth"))
+      .toMatchObject({ package: "git", stability: "experimental", defaultValue: false, enabled: false });
+  });
 });

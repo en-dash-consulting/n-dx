@@ -16,10 +16,10 @@ import { request as httpRequest, type Server } from "node:http";
 const { execMock } = vi.hoisted(() => ({ execMock: vi.fn() }));
 vi.mock("@n-dx/llm-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
-  // Only the `ndx work …` spawns are faked; git (worktree list) and the CLI
-  // version probes behind the catalog still run for real.
+  // Only the `ndx work …` and `ndx hench runs diagnose …` spawns are faked; git
+  // (worktree list) and the CLI version probes behind the catalog still run for real.
   const exec: typeof actual.exec = (cmd, args, opts) =>
-    args.includes("work") ? execMock(cmd, args, opts) : actual.exec(cmd, args, opts);
+    args.includes("work") || args.includes("diagnose") ? execMock(cmd, args, opts) : actual.exec(cmd, args, opts);
   return { ...actual, exec };
 });
 
@@ -41,9 +41,11 @@ import {
   PREP_MAX_IN_FLIGHT,
   PREP_PREVIEW_TIMEOUT_MS,
   PREP_RESOLVE_TIMEOUT_MS,
+  diagnoseTaskRun,
   previewTaskRun,
   resolveTaskRun,
 } from "../../../src/server/routes-hench-prep.js";
+import { renderWorkPreview, workOptions } from "../../../src/server/sidecar/carry-out.js";
 import { HUB_ADMISSION_HEADER, formatHubAdmissionHeader } from "../../../src/shared/index.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -136,6 +138,72 @@ describe("hench prep routes", () => {
       const [resolved, previewed] = await reads;
       expect(resolved.ok).toBe(false);
       expect(previewed.ok).toBe(false);
+    });
+
+    it("resolve a Sidecar --fresh start with --fresh, so the work card's preview shows it", async () => {
+      // hench prints the command its flags make; echo the spawned flags the same way.
+      execMock.mockImplementation(async (_cmd: string, args: string[]) => ({
+        stdout: JSON.stringify({ ...RESOLVE_JSON, command: `ndx work --task=task-1 --auto${args.includes("--fresh") ? " --fresh" : ""} .` }),
+        stderr: "",
+        exitCode: 0,
+        error: null,
+        started: true,
+      }));
+      const fresh = await resolveTaskRun(ctx, "task-1", workOptions({ taskId: "task-1", options: { fresh: true } }));
+      expect(execMock.mock.calls[0]![1]).toContain("--fresh");
+      expect(fresh.ok && renderWorkPreview(fresh.resolution).split("\n")[0]).toBe("ndx work --task=task-1 --auto --fresh .");
+
+      const plain = await resolveTaskRun(ctx, "task-1", workOptions({ taskId: "task-1" }));
+      expect(execMock.mock.calls[1]![1]).not.toContain("--fresh");
+      expect(plain.ok && renderWorkPreview(plain.resolution)).not.toContain("--fresh");
+    });
+  });
+
+  describe("in-process reads (Sidecar Diagnose run)", () => {
+    const DIAGNOSIS = { verdict: "test-gate-failed", reason: "tests failed" };
+
+    it("spawns `ndx hench runs diagnose <id> --format=json <dir>` in the run's worktree and returns the parsed object", async () => {
+      execMock.mockResolvedValue({ stdout: JSON.stringify(DIAGNOSIS), stderr: "", exitCode: 0, error: null, started: true });
+      const sibling = join(tmpDir, "sibling-worktree");
+      const result = await diagnoseTaskRun(ctx, "run-1", sibling);
+      expect(result).toEqual({ ok: true, diagnosis: DIAGNOSIS });
+      expect(execMock).toHaveBeenCalledTimes(1);
+      const [, args, opts] = execMock.mock.calls[0] as [string, string[], { cwd: string; timeout: number }];
+      expect(args.slice(-6)).toEqual(["hench", "runs", "diagnose", "run-1", "--format=json", sibling]);
+      expect(opts.timeout).toBe(PREP_RESOLVE_TIMEOUT_MS);
+    });
+
+    it("fails, naming the stderr tail, when ndx exits non-zero", async () => {
+      execMock.mockResolvedValue({ stdout: "", stderr: "Run not found", exitCode: 1, error: null, started: true });
+      const result = await diagnoseTaskRun(ctx, "run-1", tmpDir);
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.failure).toContain("Run not found");
+    });
+
+    it.each(["hello", "[1]", "null"])("fails when stdout is not a JSON object (%s)", async (stdout) => {
+      execMock.mockResolvedValue({ stdout, stderr: "", exitCode: 0, error: null, started: true });
+      expect(await diagnoseTaskRun(ctx, "run-1", tmpDir)).toEqual({ ok: false, failure: expect.any(String) });
+    });
+
+    it("refuses without spawning once the in-flight cap is reached", async () => {
+      const controller = new AbortController();
+      execMock.mockImplementation((_cmd: string, _args: string[], opts: { signal?: AbortSignal }) =>
+        new Promise((resolve) => {
+          opts.signal?.addEventListener("abort", () =>
+            resolve({ stdout: "", stderr: "", exitCode: null, error: new Error("killed"), started: true }));
+        }));
+      const held = Array.from({ length: PREP_MAX_IN_FLIGHT }, (_, i) =>
+        resolveTaskRun(ctx, `t${i}`, {}, controller.signal));
+      for (let i = 0; i < 50 && execMock.mock.calls.length < PREP_MAX_IN_FLIGHT; i++) await new Promise((r) => setImmediate(r));
+      expect(execMock).toHaveBeenCalledTimes(PREP_MAX_IN_FLIGHT);
+
+      const over = await diagnoseTaskRun(ctx, "run-1", tmpDir);
+      expect(over.ok).toBe(false);
+      expect(!over.ok && over.failure).toContain("too many");
+      expect(execMock).toHaveBeenCalledTimes(PREP_MAX_IN_FLIGHT);
+
+      controller.abort();
+      await Promise.all(held);
     });
   });
 

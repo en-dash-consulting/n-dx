@@ -480,8 +480,11 @@ describe("isolation", () => {
     // (core/change-next-task.ts), and v2 completion and apply-on-complete
     // behind update_task_status and `rex update --status`
     // (cli/v2-completion.ts), and the v1 deprecation notice, which reads the
-    // product folder name (cli/legacy-layout-notice.ts), and the callers that
-    // a name-matching check never saw: the analyzers and `rex recommend`,
+    // product folder name (cli/legacy-layout-notice.ts), and the v2 post-merge
+    // scan behind `rex validate --post-merge`, which reads raw state.yaml rows
+    // and node files so it can see a merge residue the store would reject
+    // (core/post-merge-validate-v2.ts), and the callers that a name-matching
+    // check never saw: the analyzers and `rex recommend`,
     // which tag code-health work with placement's CODE_HEALTH_TAG
     // (analyze/propose.ts, analyze/scanners.ts, cli/commands/recommend.ts),
     // the placement reason pass (analyze/place-reason.ts), the migration's
@@ -577,6 +580,7 @@ describe("isolation", () => {
         "core/change-next-task.ts",
         "cli/v2-completion.ts",
         "cli/legacy-layout-notice.ts",
+        "core/post-merge-validate-v2.ts",
         "analyze/place-draft.ts",
         "analyze/propose.ts",
         "analyze/scanners.ts",

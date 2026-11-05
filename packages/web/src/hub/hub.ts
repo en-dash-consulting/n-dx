@@ -40,13 +40,19 @@ import {
 } from "./registry.js";
 import type { HealedRecord, HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
-import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits } from "./proxy.js";
-import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
+import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
+import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
+import { answerOAuthCallback, type CallbackProjects } from "./oauth-callback.js";
 import { CredentialStore } from "../shared/index.js";
+import { FrameKeys, parseKeyedPath } from "./frame-keys.js";
+import type { FrameKeyOptions } from "./frame-keys.js";
 import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
 import { ndxCliLister } from "./extensions.js";
 import type { ListExtensions } from "./extensions.js";
 import type { SidecarManagerOptions } from "./sidecars.js";
+import { HubSessionHostPicker } from "./session-host.js";
+import { proxiedTickPost, TrackerSyncClock } from "./tracker-sync.js";
+import type { TrackerSyncClockOptions } from "./tracker-sync.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 
 export const DEFAULT_HUB_PORT = 3117;
@@ -111,6 +117,10 @@ export interface HubOptions {
   sidecarSweepMs?: number;
   /** Replaces asking `ndx extensions list --json` (tests). */
   listExtensions?: ListExtensions;
+  /** Overrides for the {@link FrameKeys} store (tests inject the clock). */
+  frameKeys?: FrameKeyOptions;
+  /** Overrides for the tracker sync clock (tests inject the interval, the clock and `post`). */
+  trackerSync?: Partial<Omit<TrackerSyncClockOptions, "projects">>;
   log?: (message: string) => void;
 }
 
@@ -199,6 +209,17 @@ function postExecute(
 }
 
 /** A response's JSON body when it is an object; null for anything else. */
+/** The registered projects, as the OAuth callback page reads them. */
+function callbackProjects(hub: Hub): CallbackProjects {
+  return {
+    has: (id) => hub.getProject(id) !== null,
+    sole: () => {
+      const projects = hub.listProjects();
+      return projects.length === 1 ? projects[0].id : null;
+    },
+  };
+}
+
 async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await res.json();
@@ -258,8 +279,14 @@ export class Hub {
   readonly credentials: CredentialStore | null;
   /** Extension sidecars mounted at `/x/<name>/`. */
   readonly sidecars: SidecarManager;
+  /** Which project server hosts the hub-scope Sidecar session, served at `/hub/session/`. */
+  readonly sessionHosts: HubSessionHostPicker;
   /** Installed extensions as n-dx reports them, for `GET /api/hub/extensions`. */
   readonly listExtensions: ListExtensions;
+  /** Keys a Sidecar drawer tab is served through at `/x/<name>/~f/<key>/`; memory only. */
+  readonly frameKeys: FrameKeys;
+  /** Ticks tracker sync on each project with a rule on, after each health check. */
+  readonly trackerSync: TrackerSyncClock;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -301,6 +328,7 @@ export class Hub {
       drainIntervalMs: options.drainIntervalMs,
       log: this.log,
     });
+    this.sessionHosts = new HubSessionHostPicker(this.hubHome);
     this.sidecars = new SidecarManager({
       plan: options.ndxCli ? ndxCliPlanner(options.ndxCli, this.hubHome) : null,
       memoryFloorBytes: this.admission.limits.memoryFloorBytes,
@@ -308,6 +336,13 @@ export class Hub {
       log: this.log,
       mountKeys: this.token !== null,
       ...options.sidecars,
+    });
+    this.frameKeys = new FrameKeys(options.frameKeys);
+    this.trackerSync = new TrackerSyncClock({
+      post: proxiedTickPost(() => this.port, this.token),
+      log: this.log,
+      ...options.trackerSync,
+      projects: () => this.listProjects(),
     });
     this.listExtensions = options.listExtensions
       ?? (options.ndxCli ? ndxCliLister(options.ndxCli, this.hubHome) : async () => ({ ok: false, error: NO_NDX_CLI }));
@@ -605,16 +640,27 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // The origin gate is the hub's outer boundary and runs before any routing:
     // registration spawns a process, and the project servers behind the proxy
     // see a rewritten Origin, so this is where a browser request is judged.
-    if (guardHubRequest(req, res, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url))) return;
-    // No credential: only what is public — the home page shell and proxied
-    // requests the project server answers with its own public shell or a 401.
-    if (isPublicOnlyHubRequest(req)) {
-      void handlePublicHubRequest(req, res, hub).catch((err: unknown) => {
-        console.error("[hub] request failed:", err);
-        if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
-      });
-      return;
+    // A frame-keyed sidecar path presents its key in place of the token.
+    const keyed = parseKeyedPath((req.url || "/").split("?")[0]);
+    if (keyed) {
+      // Before the guard, so its refusals are sandboxed and Referer-free too.
+      setFrameResponseHeaders(res);
+      if (guardFrameKeyRequest(req, res, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))) return;
+    } else {
+      if (guardHubRequest(req, res, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url))) return;
+      // The one public page the hub answers itself, with or without a
+      // credential: it forwards a sign-in's return to its project and reads nothing.
+      if (answerOAuthCallback(req, res, callbackProjects(hub))) return;
+      // No credential: only what is public — the home page shell and proxied
+      // requests the project server answers with its own public shell or a 401.
+      if (isPublicOnlyHubRequest(req)) {
+        void handlePublicHubRequest(req, res, hub).catch((err: unknown) => {
+          console.error("[hub] request failed:", err);
+          if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+          if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
+        });
+        return;
+      }
     }
     void handleHubRoute(req, res, hub)
       .then((handled) => {
@@ -636,7 +682,10 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // Each refusal keeps its own status line, as on the HTTP path and on the
     // project server's own upgrade path: a `Host` that does not name this hub
     // is 421 Misdirected Request, a missing token 401, a foreign `Origin` 403.
-    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url));
+    const keyed = parseKeyedPath((req.url || "/").split("?")[0]);
+    const refusal = keyed
+      ? frameKeyUpgradeRefusal(req, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))
+      : upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url));
     if (refusal !== null) {
       socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
@@ -664,9 +713,11 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   }
 
   await hub.attachAll();
+  // Tracker sync follows health: a tick goes only to a server just seen healthy.
+  void hub.trackerSync.sweep();
 
   const healthTimer = setInterval(() => {
-    void hub.healthCheckAll();
+    void hub.healthCheckAll().then(() => hub.trackerSync.sweep());
   }, healthIntervalMs);
   healthTimer.unref();
   const sidecarTimer = setInterval(() => {

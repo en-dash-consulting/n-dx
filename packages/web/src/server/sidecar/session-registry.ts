@@ -20,7 +20,9 @@
  * project with no ignore line for it still never commits a transcript.
  *
  * Sessions are keyed by `(scope, worktree, id)`: `worktree` is the checkout a
- * session runs in, `scope` is `worktree` or `hub`.
+ * session runs in, `scope` is `worktree` or `hub`. The hub session's registry
+ * is `<ndx home>/hub/sidecar/` and runs in that directory, in no checkout
+ * ({@link createHubSidecarRegistry}).
  */
 
 import { randomUUID } from "node:crypto";
@@ -49,7 +51,7 @@ import { renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
-import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
+import { hubVendorRefusal, sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
 
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
@@ -68,9 +70,10 @@ export interface SidecarSessionRecord {
   /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
   target?: PacketTarget;
   /**
-   * The next turn carries the packet even though it resumes: the lens or
-   * target changed, or the turn that carried it did not complete. A turn
-   * that opens a vendor session always carries it.
+   * The next turn carries the packet and the ledger even though it resumes:
+   * the lens or target changed, the hub handed the session off, or the turn
+   * that carried them did not complete. A turn that opens a vendor session
+   * always carries them.
    */
   packetDue?: true;
   /** Vendor session id the next turn resumes; absent before the first turn and after the TTL. */
@@ -136,10 +139,24 @@ export type SidecarSessionConnect = (
 export interface SidecarContextOptions {
   /** Tokens of context above which a turn checkpoints. */
   ceiling: (record: SidecarSessionRecord) => number;
-  /** The session's ledger, oldest first. */
+  /** The session's ledger, oldest first. A turn carrying the packet carries it too. */
   ledger: (record: SidecarSessionRecord) => LedgerEntry[];
+  /** What the checkpoint turn asks; defaults to a worktree session's {@link CHECKPOINT_PROMPT}. */
+  checkpointPrompt?: string;
   /** The lens packet rebuilt fresh; `undefined` for a lens that sends none. */
   packet?: (record: SidecarSessionRecord, signal: AbortSignal) => Promise<string | undefined>;
+  /**
+   * Every turn carries a freshly built packet, not only one that opens a
+   * vendor session or follows a lens change. The hub session's snapshot
+   * describes a machine that moves between turns.
+   */
+  packetEveryTurn?: boolean;
+  /**
+   * Called once a turn that carried a packet completes, so state the packet's
+   * build only proposed (the hub snapshot's fingerprints) is committed for
+   * what the model actually received. A failed or stopped turn never calls it.
+   */
+  packetDelivered?: (record: SidecarSessionRecord) => void;
 }
 
 /** What one finished turn spent, checkpoint included. */
@@ -196,17 +213,44 @@ export function createWorktreeSidecarRegistry(
 
 /**
  * What every Sidecar session's vendor CLI is opened with: the filtered
- * environment, the read-only spawn flags and a fresh MCP config naming only
- * the broker.
+ * environment, the read-only spawn flags for the session's scope and a fresh
+ * MCP config naming only the broker.
+ *
+ * @param envDir The project whose env policy and LLM config the session
+ *   takes; defaults to the session's own checkout. A hub session runs in no
+ *   checkout, so it takes its host project's.
  */
 export function sidecarSessionConnect(
   dir: string,
   broker?: WorktreeSidecarRegistryOptions["broker"],
+  envDir?: string,
 ): SidecarSessionConnect {
-  return (record) => ({
-    ...resolveSidecarSessionEnv(record.worktree),
-    ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id))),
-  });
+  return (record) => {
+    // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
+    const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
+    if (refusal) throw new Error(refusal);
+    return {
+      ...resolveSidecarSessionEnv(envDir ?? record.worktree),
+      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id)), record.scope),
+    };
+  };
+}
+
+export interface HubSidecarRegistryOptions extends WorktreeSidecarRegistryOptions {
+  /** `<ndx home>/hub/sidecar/`: the index, transcripts, ledger and cards, and the session's working directory. */
+  dir: string;
+  /** The host project: its env policy and LLM config are the session's. */
+  hostProjectDir: string;
+}
+
+/**
+ * The hub-scope registry: sessions under `<ndx home>/hub/sidecar/`, each
+ * vendor CLI spawned with no built-in tool and the broker as its only MCP
+ * server, in that directory rather than any repository.
+ */
+export function createHubSidecarRegistry(opts: HubSidecarRegistryOptions): SidecarSessionRegistry {
+  const { broker, dir, hostProjectDir, ...rest } = opts;
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir) });
 }
 
 /** An open vendor session, and where its running turn's events go. */
@@ -240,6 +284,8 @@ export class SidecarSessionRegistry {
   private readonly stopRequested = new Set<string>();
   /** One per running turn; a stop or an end aborts it, so a packet still building stops its reads. */
   private readonly turnAborts = new Map<string, AbortController>();
+  /** Callers of {@link whenIdle}, woken whenever a turn settles. */
+  private idleWaiters: Array<() => void> = [];
   private readonly records = new Map<string, SidecarSessionRecord>();
   private readonly live = new Map<string, LiveSession>();
   /** Sessions whose cursor has been checked against the transcript; see {@link reconcileCursor}. */
@@ -296,6 +342,20 @@ export class SidecarSessionRegistry {
     return this.view(record);
   }
 
+  /**
+   * Make the session's next turn carry its packet and ledger even though it
+   * resumes: the hub just left a handoff in the ledger. Bumps its activity,
+   * so the drawer opens it first. Returns undefined for an unknown session.
+   */
+  carryContextNext(id: string): SidecarSessionRecord | undefined {
+    const record = this.records.get(id);
+    if (!record) return undefined;
+    record.packetDue = true;
+    record.lastActivityAt = this.iso();
+    this.persist();
+    return this.view(record);
+  }
+
   /** Keep how a turn ended on the session. No-op for an unknown session. */
   recordTurnEnd(id: string, outcome: SidecarTurnOutcome): void {
     const record = this.records.get(id);
@@ -335,6 +395,9 @@ export class SidecarSessionRegistry {
       this.turnOpen.delete(id);
       this.turnAborts.delete(id);
       this.stopRequested.delete(id);
+      const waiters = this.idleWaiters;
+      this.idleWaiters = [];
+      for (const wake of waiters) wake();
     }
   }
 
@@ -357,9 +420,10 @@ export class SidecarSessionRegistry {
     const live = this.liveSession(record);
 
     this.reconcileCursor(record);
-    // The packet opens a fresh vendor session and the turn after a lens or
-    // target change; a refreshed turn carries it in its cold prompt.
-    const opening = !cold && !!context?.packet && (fresh || record.packetDue === true);
+    // The packet and the ledger open a fresh vendor session and the turn after
+    // a lens or target change or a handoff; a refreshed turn carries both in
+    // its cold prompt.
+    const opening = !cold && !!context && (fresh || record.packetDue === true || context.packetEveryTurn === true);
     // Consumed now, so a lens or target change made while this turn runs
     // stays due for the next one; restored below unless the turn completes.
     let delivered = false;
@@ -394,9 +458,10 @@ export class SidecarSessionRegistry {
         }
       }
 
-      if (opening) {
-        const packet = await context?.packet?.(record, signal);
-        if (packet) vendorPrompt = composeOpeningPrompt({ packet, prompt });
+      if (opening && context) {
+        const packet = await context.packet?.(record, signal);
+        const ledger = renderLedger(context.ledger(record)).text;
+        if (packet || ledger) vendorPrompt = composeOpeningPrompt({ packet, ledger, prompt });
         if (this.stopRequested.has(record.id)) {
           return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
         }
@@ -430,6 +495,8 @@ export class SidecarSessionRegistry {
       live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
+      // After the persist, so the turn is saved whatever the hook does.
+      if ((opening || cold) && delivered) context?.packetDelivered?.(record);
     }
   }
 
@@ -447,7 +514,7 @@ export class SidecarSessionRegistry {
     record.refresh = measured;
     this.persist();
     live.sink = (event) => append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
-    const result = await live.session.sendTurn(CHECKPOINT_PROMPT);
+    const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
   }
 
@@ -497,6 +564,13 @@ export class SidecarSessionRegistry {
     return this.turnOpen.has(id);
   }
 
+  /** Settles once no session has a turn running; at once when none has. */
+  async whenIdle(): Promise<void> {
+    while (this.turnOpen.size > 0) {
+      await new Promise<void>((resolve) => this.idleWaiters.push(resolve));
+    }
+  }
+
   /**
    * Stop the running turn; the session stays usable and its next turn
    * resumes. The turn settles as `interrupted`.
@@ -511,6 +585,11 @@ export class SidecarSessionRegistry {
     else this.stopRequested.add(id);
     this.turnAborts.get(id)?.abort();
     return true;
+  }
+
+  /** {@link interrupt} every session's running turn. */
+  async interruptAll(): Promise<void> {
+    await Promise.all([...this.turnOpen].map((id) => this.interrupt(id)));
   }
 
   /** Stop any running turn; the session keeps its record and transcript but never resumes. */

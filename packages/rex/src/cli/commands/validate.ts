@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../../schema/index.js";
 import { validateDocument, validateConfig } from "../../schema/validate.js";
 import { validateDAG } from "../../core/dag.js";
-import { detectPostMergeIssues, repairPostMergeIssues } from "../../core/post-merge-validate.js";
+import { detectPostMergeIssues, repairPostMergeIssues, type PostMergeIssue } from "../../core/post-merge-validate.js";
+import { detectV2PostMergeIssues, isV2Tree, repairV2PostMergeIssues } from "../../core/post-merge-validate-v2.js";
 import { validateStructure, findEpiclessFeatures } from "../../core/structural.js";
 import {
   resolveEpiclessFeatures,
@@ -476,9 +477,11 @@ export async function cmdValidate(
  *
  * Raw-tree scan for corruption a git merge of `.rex/prd_tree/` can leave
  * behind: duplicate ids, orphaned directories, level/nesting mismatches,
- * dangling blockedBy references, unresolved conflict markers. `--repair`
- * fixes the deterministic classes (see core/post-merge-validate.ts for the
- * per-class policy) and refuses the ambiguous ones.
+ * dangling blockedBy references, unresolved conflict markers. On v2 it scans
+ * `product/` and `changes/` instead and also reports state rows for items no
+ * file carries. `--repair` fixes the deterministic classes (see
+ * core/post-merge-validate{,-v2}.ts for the per-class policy) and refuses the
+ * ambiguous ones.
  *
  * Suitable as a git post-merge hook:
  *
@@ -489,17 +492,24 @@ export async function cmdValidate(
  * Exit codes: 0 = clean (including "no PRD tree in this repo"); 1 = issues remain.
  */
 async function runPostMergeValidation(rexDir: string, flags: Record<string, string>): Promise<void> {
-  const treeRoot = join(rexDir, "prd_tree");
   const isJson = flags.format === "json";
+  // v2 (product/ present) has its own residue: state rows and blockedBy refs
+  // naming an item a merge dropped. Paths are relative to the rex directory there.
+  const scanner = (await isV2Tree(rexDir))
+    ? { detect: () => detectV2PostMergeIssues(rexDir), repair: (issues: PostMergeIssue[]) => repairV2PostMergeIssues(rexDir, issues) }
+    : {
+        detect: () => detectPostMergeIssues(join(rexDir, PRD_TREE_DIRNAME)),
+        repair: (issues: PostMergeIssue[]) => repairPostMergeIssues(join(rexDir, PRD_TREE_DIRNAME), issues),
+      };
 
-  let report = await detectPostMergeIssues(treeRoot);
+  let report = await scanner.detect();
   let repairedCount = 0;
 
   if (flags.repair === "true" && report.issues.some((i) => i.repairable)) {
-    const { repaired } = await repairPostMergeIssues(treeRoot, report.issues);
+    const { repaired } = await scanner.repair(report.issues);
     repairedCount = repaired.length;
     // Re-detect: the repaired tree is the authoritative state.
-    report = await detectPostMergeIssues(treeRoot);
+    report = await scanner.detect();
   }
 
   if (isJson) {

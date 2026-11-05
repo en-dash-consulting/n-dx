@@ -29,6 +29,7 @@ import { heartbeatAgeMs, isRunStale } from "./run-staleness.js";
 import { isValidRunId, readLogTailLines, resolveRunLogFile } from "./run-tail.js";
 import { estimateCostFromTotals, walkTree, prdLayout } from "./rex-gateway.js";
 import { itemTypeOf } from "../shared/index.js";
+import { itemLinkRefs } from "./tracker/link-refs.js";
 import { loadPRDSync } from "./prd-io.js";
 import { readLiveReviewReport, type LiveReviewReport } from "./live-review-report.js";
 
@@ -48,6 +49,8 @@ export interface LiveTaskItem {
   status: string;
   priority: string | null;
   acceptanceCriteria: string[];
+  /** The tracker work refs the task links to: v2 issues, v1 links. */
+  links: string[];
   /** Ancestors, epic first. */
   epicChain: LiveTaskChainLink[];
 }
@@ -164,6 +167,7 @@ function findTask(rexDir: string, taskId: string): LiveTaskItem | null {
       status: item.status,
       priority: item.priority ?? null,
       acceptanceCriteria: [...(item.acceptanceCriteria ?? [])],
+      links: itemLinkRefs(item as { issues?: unknown; links?: unknown }),
       epicChain: parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })),
     };
   }

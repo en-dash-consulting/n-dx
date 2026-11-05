@@ -505,7 +505,7 @@ describe("package instruction surfaces", () => {
       "utf-8",
     );
     expect(server, "the seam table itself").toContain("| Injection site |");
-    for (const iface of ["RegisterSchedulerOptions", "WorkspaceHooks", "LiveSources"]) {
+    for (const iface of ["RegisterSchedulerOptions", "WorkspaceHooks", "LiveSources", "SidecarWorkspaces"]) {
       expect(server, `seam row for ${iface}`).toContain(iface);
     }
 

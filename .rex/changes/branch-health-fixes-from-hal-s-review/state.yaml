@@ -1,0 +1,49 @@
+schema: "rex/v2"
+items:
+  "09c386ce-7fe6-468e-9a85-2fe0daf1e15c":
+    lastModified: "2026-11-04T22:31:31.715Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5af6db8a-4de4-416a-9a0c-3ad31e638a9c":
+    status: "completed"
+    startedAt: "2026-11-04T22:27:08.802Z"
+    completedAt: "2026-11-04T22:33:22.907Z"
+    endedAt: "2026-11-04T22:33:22.907Z"
+    activeIntervals: [{"end":"2026-11-04T22:33:22.907Z","start":"2026-11-04T22:27:08.802Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "F2: cached PR base used for base and each stack layer when gh was not asked or failed, not when gh reports no PR (viewPr noPr flag, mayUseCachedBase). F5: Run carries exec's error; merge-tree exitCode null reports a 30 s timeout; git 2.38 hint only for exit 129 or stderr naming --write-tree."
+    lastModified: "2026-11-04T22:33:22.907Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6ded6a40-3201-4a0f-ba10-7c3653cbeddb":
+    issues: ["https://github.com/en-dash-consulting/n-dx/pull/930#pullrequestreview-5770574908"]
+    lastModified: "2026-11-04T22:31:31.715Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ab81b682-f37c-4fcd-9f26-422dd376b659":
+    status: "completed"
+    startedAt: "2026-11-04T22:21:09.735Z"
+    completedAt: "2026-11-04T22:27:02.663Z"
+    endedAt: "2026-11-04T22:27:02.663Z"
+    activeIntervals: [{"end":"2026-11-04T22:27:02.663Z","start":"2026-11-04T22:21:09.735Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "checks.ts: BEHIND_BASE matched only on ##[error] annotation lines (behindAnnotation) and the check name. 3 new unit tests (iso-skill-drift wording, touched 'is behind' test, name match); existing behind-base cases pass. Docs + changeset updated."
+    lastModified: "2026-11-04T22:27:02.663Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c9a0e430-c671-451b-8188-7454c936499f":
+    status: "completed"
+    startedAt: "2026-11-04T22:33:29.526Z"
+    completedAt: "2026-11-04T22:40:39.068Z"
+    endedAt: "2026-11-04T22:40:39.068Z"
+    activeIntervals: [{"end":"2026-11-04T22:40:39.068Z","start":"2026-11-04T22:33:29.526Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Other-worktree diffs cached server-wide in WorktreeDiffCache keyed by base and tip commit, LRU-capped at 1024; failed diffs not kept."
+    lastModified: "2026-11-04T22:40:39.068Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cf457468-5ec5-4a59-8de8-3edab986760d":
+    status: "completed"
+    startedAt: "2026-11-04T22:40:48.325Z"
+    completedAt: "2026-11-04T22:47:50.135Z"
+    endedAt: "2026-11-04T22:47:50.135Z"
+    activeIntervals: [{"end":"2026-11-04T22:47:50.135Z","start":"2026-11-04T22:40:48.325Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "unionResult skips base entries the branch also added (whitespace/trailing comma ignored, multi-line JSON elements compared whole)"
+    lastModified: "2026-11-04T22:47:50.135Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

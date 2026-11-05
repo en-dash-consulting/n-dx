@@ -23,9 +23,10 @@ export const SIDECAR_BROKER_KEY_HEADER = "x-ndx-sidecar-key";
 /**
  * The one request-target a credential is valid on. Matched against the raw
  * target, so a `/w/<key>/` slot, a dot segment or a percent-encoded slash
- * never matches; a query string is allowed.
+ * never matches; a query string is allowed. A hub session's broker is under
+ * `/api/sidecar/hub/sessions/`; session ids are unique across both scopes.
  */
-const BROKER_TARGET = /^\/api\/sidecar\/sessions\/([\w-]+)\/mcp(?:\?.*)?$/;
+const BROKER_TARGET = /^\/api\/sidecar\/(?:hub\/)?sessions\/([\w-]+)\/mcp(?:\?.*)?$/;
 
 const credentials = new Map<string, string>();
 

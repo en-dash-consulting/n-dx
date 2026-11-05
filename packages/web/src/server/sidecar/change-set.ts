@@ -36,7 +36,7 @@ import {
   type PRDItem,
 } from "../rex-gateway.js";
 import { refreshPRDCache } from "../prd-io.js";
-import { appendLog } from "../routes-rex/rex-route-helpers.js";
+import { appendLog, sidecarDecisionFields } from "../routes-rex/rex-route-helpers.js";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
@@ -55,7 +55,7 @@ import {
 export const CHANGE_SET_MAX_ITEMS = 50;
 
 /** Said on a card, and in its tool result, when a v2 change has no target. */
-export const INBOX_NOTE = "It lands in the Inbox awaiting placement; placing it from Sidecar comes with the Place lens (batch L2).";
+export const INBOX_NOTE = "It lands in the Inbox awaiting placement; place it from Sidecar with the Place lens, which raises a placement card.";
 
 type Raw = Record<string, unknown>;
 
@@ -220,6 +220,7 @@ export interface ChangeSetWritten {
 export async function writeChangeSet(
   ctx: ServerContext,
   changeSet: SidecarChangeSet,
+  sessionId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<ChangeSetWritten> {
   const layout = await prdLayout(ctx.rexDir);
@@ -233,7 +234,8 @@ export async function writeChangeSet(
     appendLog(ctx, { timestamp, event: "item_added", itemId: written.ids[i], detail: `Added ${item.type}: ${item.title} (via Sidecar)` });
   });
   if (changeSet.placement && "target" in changeSet.placement) {
-    appendLog(ctx, { timestamp, event: "change_placed", itemId: written.ids[0], detail: `touches ${changeSet.placement.target} (via Sidecar)` });
+    const decided = await sidecarDecisionFields(ctx.rexDir, written.ids[0], { sessionId });
+    appendLog(ctx, { timestamp, event: "change_placed", itemId: written.ids[0], detail: `touches ${changeSet.placement.target} (via Sidecar)`, ...decided });
   }
   broadcast?.({ type: "rex:prd-changed", timestamp });
   return written;

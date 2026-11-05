@@ -85,6 +85,7 @@ describe("Rex item routes on a v2 project", () => {
 
     const log = readFileSync(join(rexDir, "execution-log.jsonl"), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
     expect(log.filter((e) => e.itemId === created.id).map((e) => e.event)).toEqual(["item_added", "change_placed"]);
+    expect(Object.keys(log.find((e) => e.event === "change_placed")).sort()).toEqual(["detail", "event", "itemId", "timestamp"]);
   });
 
   it.each([

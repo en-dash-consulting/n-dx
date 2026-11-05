@@ -234,6 +234,8 @@ export interface PlacementCandidate {
   strength: PlacementStrength;
   /** Which rules fired. */
   reasons: string[];
+  /** Other open changes that already amend this candidate. */
+  amendedBy?: string[];
 }
 
 /** `GET /api/rex/changes/:id/placement` on a v2 project. */
@@ -242,6 +244,8 @@ export interface ChangePlacement {
   change: { id: string; title: string; intent?: string; status: string; taskCount: number; tags?: string[] };
   /** The rules' relation for this change; every candidate carries it. */
   relation: PlacementRelation;
+  /** The rule that set `relation`. */
+  relationRule: string;
   /** The top two candidates share a score, so their order is arbitrary. */
   tied: boolean;
   shortlist: PlacementCandidate[];

@@ -60,6 +60,18 @@ export function applySecurityHeaders(res: HeaderSink): void {
   res.setHeader("Referrer-Policy", "same-origin");
 }
 
+/**
+ * {@link PAGE_CSP} for the one document a page of this origin frames: the hub
+ * home docks the hub session's drawer page in an iframe. Same-origin only.
+ */
+export const SAME_ORIGIN_FRAME_PAGE_CSP = PAGE_CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+
+/** Let pages of this origin, and no other, frame this document response. */
+export function applySameOriginFramePolicy(res: HeaderSink): void {
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Content-Security-Policy", SAME_ORIGIN_FRAME_PAGE_CSP);
+}
+
 /** Replace the page policy with {@link STRICT_CSP} on a response that is data, not a document. */
 export function applyStrictContentPolicy(res: HeaderSink): void {
   res.setHeader("Content-Security-Policy", STRICT_CSP);

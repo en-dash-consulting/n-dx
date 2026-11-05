@@ -1,0 +1,143 @@
+schema: "rex/v2"
+items:
+  "0943b9b0-e71e-4bb2-ab30-7047910ffdf1":
+    status: "completed"
+    startedAt: "2026-11-05T09:37:11.545Z"
+    completedAt: "2026-11-05T09:37:11.545Z"
+    endedAt: "2026-11-05T09:37:11.545Z"
+    activeIntervals: [{"end":"2026-11-05T09:37:11.545Z","start":"2026-11-05T09:37:11.545Z"}]
+    appliedAt: "2026-11-05T09:37:11.545Z"
+    appliedAmendsHash: "8308e037dcbcaef27259e258eb9663609a1e7d236f23ff866ad265cb0aec61d7"
+    issues: ["https://www.notion.so/3f7a80b7192481948d5cc046d3a68c0a","https://www.notion.so/3f7a80b71924818487c7f0e1c2d5db03","https://www.notion.so/3f7a80b719248147aad1d64b44332ec6","https://www.notion.so/3f7a80b7192481b18321d6a2f010c472","https://www.notion.so/3f7a80b71924810aa352f54b4bbead6e"]
+    lastModified: "2026-11-05T09:37:11.545Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "38fce780-09ae-4f8f-842b-64321c23a839":
+    status: "completed"
+    startedAt: "2026-11-05T07:21:20.611Z"
+    completedAt: "2026-11-05T07:27:57.488Z"
+    endedAt: "2026-11-05T07:27:57.488Z"
+    activeIntervals: [{"end":"2026-11-05T07:27:57.488Z","start":"2026-11-05T07:21:20.611Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "FieldHint optionsFrom gains optional literal `arguments` passed to the read call (external-call.ts); caos.json sets list_epics pageSize 100; checkServerProfile refuses an argument the read tool's input does not declare. Tests: server-profiles unit, tracker-server-profiles (150 epics -> 100 options), sidecar-external-call-hints (records arguments). Option A; no cursor following."
+    lastModified: "2026-11-05T07:27:57.488Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "39667967-032d-49d8-bad5-d31af2df8b0e":
+    status: "completed"
+    startedAt: "2026-11-05T09:22:45.311Z"
+    completedAt: "2026-11-05T09:28:12.027Z"
+    endedAt: "2026-11-05T09:28:12.027Z"
+    activeIntervals: [{"end":"2026-11-05T09:28:12.027Z","start":"2026-11-05T09:22:45.311Z"}]
+    lastModified: "2026-11-05T09:28:12.027Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3b86452e-1829-499a-af72-1620953e00e7":
+    status: "completed"
+    startedAt: "2026-11-05T07:09:47.276Z"
+    completedAt: "2026-11-05T07:21:02.880Z"
+    endedAt: "2026-11-05T07:21:02.880Z"
+    activeIntervals: [{"end":"2026-11-05T07:21:02.880Z","start":"2026-11-05T07:09:47.276Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rules.ts resolves each profile fact from its named source (profile default, CODEOWNERS, PR URL, release version, run diagnosis, feature map); a missing fact or declared tracker limit becomes a card naming it, no call. Collector adds CODEOWNERS owner and diagnosis."
+    lastModified: "2026-11-05T07:21:02.880Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4700837f-49cb-43f1-8488-17dcc3b6e9dc":
+    status: "completed"
+    startedAt: "2026-11-05T02:24:35.163Z"
+    completedAt: "2026-11-05T05:08:12.703Z"
+    endedAt: "2026-11-05T05:08:12.703Z"
+    activeIntervals: [{"end":"2026-11-05T02:24:43.252Z","start":"2026-11-05T02:24:35.163Z"},{"end":"2026-11-05T05:08:12.703Z","start":"2026-11-05T04:37:27.560Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Link/unlink routes, link display on task/change/Live pages, propose_link card, v1 links[] to v2 issues migration"
+    lastModified: "2026-11-05T05:08:12.703Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4986e450-9155-4152-a755-d6685c9679e0":
+    status: "completed"
+    startedAt: "2026-11-05T07:46:11.486Z"
+    completedAt: "2026-11-05T07:51:13.970Z"
+    endedAt: "2026-11-05T07:51:13.970Z"
+    activeIntervals: [{"end":"2026-11-05T07:51:13.970Z","start":"2026-11-05T07:46:11.486Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option B: findItemByRef in tracker/item-links.ts matches UUID or displayId; used by changeItemLink and readLinkCall. No gateway export."
+    lastModified: "2026-11-05T07:51:13.970Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "51b80946-412a-446f-8bee-8d35364784ba":
+    status: "completed"
+    startedAt: "2026-11-05T07:51:20.122Z"
+    completedAt: "2026-11-05T08:03:27.750Z"
+    endedAt: "2026-11-05T08:03:27.750Z"
+    activeIntervals: [{"end":"2026-11-05T08:03:27.750Z","start":"2026-11-05T07:51:20.122Z"}]
+    lastModified: "2026-11-05T08:03:27.750Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "543791ca-c73f-45af-998d-6022109e3758":
+    status: "completed"
+    startedAt: "2026-11-05T09:28:18.019Z"
+    completedAt: "2026-11-05T09:37:11.545Z"
+    endedAt: "2026-11-05T09:37:11.545Z"
+    activeIntervals: [{"end":"2026-11-05T09:37:11.545Z","start":"2026-11-05T09:28:18.019Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "reload() keeps the live client when only tools, profile, fieldHints or label changed and re-resolves tool policies in place; transport/url/command/args/env/auth changes still reconnect. Tests: in-flight call completes, no new initialize, url/auth change reconnects."
+    lastModified: "2026-11-05T09:37:11.545Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5dc38be7-f9d3-4b0e-b45f-40f8e4a1435b":
+    status: "completed"
+    startedAt: "2026-11-05T08:43:27.065Z"
+    completedAt: "2026-11-05T08:49:14.227Z"
+    endedAt: "2026-11-05T08:49:14.227Z"
+    activeIntervals: [{"end":"2026-11-05T08:49:14.227Z","start":"2026-11-05T08:43:27.065Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tracker-routes test over the fake CAOS server: 200 externalCall (label, inputSchema, epicId options) and 422 naming an unlisted tool."
+    lastModified: "2026-11-05T08:49:14.227Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6aa7f142-e208-405d-98a8-e4cebb8f8c79":
+    status: "completed"
+    startedAt: "2026-11-05T01:52:20.740Z"
+    completedAt: "2026-11-05T02:07:18.224Z"
+    endedAt: "2026-11-05T02:07:18.224Z"
+    activeIntervals: [{"end":"2026-11-05T02:07:18.224Z","start":"2026-11-05T01:52:20.740Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tracker/server-profiles.ts + built-in profiles/caos.json; connections carry a profile name; external-call merges profile hints under the connection's; GET /api/connections reports profile ok/invalid/unchecked; unit + integration tests with fake CAOS server."
+    lastModified: "2026-11-05T02:07:18.224Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "825ee61b-61ee-4914-966b-6faa332d961c":
+    status: "completed"
+    startedAt: "2026-11-05T08:09:04.275Z"
+    completedAt: "2026-11-05T08:15:42.111Z"
+    endedAt: "2026-11-05T08:15:42.111Z"
+    activeIntervals: [{"end":"2026-11-05T08:15:42.111Z","start":"2026-11-05T08:09:04.275Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: trackerSync.reviewers maps CODEOWNERS handle to tracker user id; unmapped handle is a card naming it."
+    lastModified: "2026-11-05T08:15:42.111Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "920b0ec3-0de3-4197-941a-89a90608ef74":
+    status: "completed"
+    startedAt: "2026-11-05T08:54:24.324Z"
+    completedAt: "2026-11-05T09:22:01.452Z"
+    endedAt: "2026-11-05T09:22:01.452Z"
+    activeIntervals: [{"end":"2026-11-05T09:21:27.641Z","start":"2026-11-05T08:54:24.324Z"},{"end":"2026-11-05T09:22:01.452Z","start":"2026-11-05T09:22:01.452Z"}]
+    lastModified: "2026-11-05T09:22:01.452Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "97291b04-5d49-45d3-b7f7-7950e76f9ea4":
+    status: "completed"
+    startedAt: "2026-11-05T06:11:59.697Z"
+    completedAt: "2026-11-05T06:29:05.038Z"
+    endedAt: "2026-11-05T06:29:05.038Z"
+    activeIntervals: [{"end":"2026-11-05T06:29:05.038Z","start":"2026-11-05T06:11:59.697Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tracker/rules.ts (pure plan: create/blocked → card, move → call when on, dry-run → would), sync-config.ts (trackerSync from untracked local config, rules default off), sync-engine.ts (queue, tick, requestId ndx:<project>:<rexId>:<event>, create/duplicate confirmed by read, refusal settles), activity-log.ts (JSONL in <henchDir>/sidecar), routes-tracker.ts (POST tick per-user token only, GET activity), web.sidecar gate; unit + integration tests with fake CAOS server."
+    lastModified: "2026-11-05T06:29:05.038Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a294dc86-f527-475e-acd0-afbc4391493d":
+    status: "completed"
+    startedAt: "2026-11-05T08:15:48.364Z"
+    completedAt: "2026-11-05T08:37:13.607Z"
+    endedAt: "2026-11-05T08:37:13.607Z"
+    activeIntervals: [{"end":"2026-11-05T08:32:24.691Z","start":"2026-11-05T08:15:48.364Z"},{"end":"2026-11-05T08:37:13.607Z","start":"2026-11-05T08:37:13.607Z"}]
+    lastModified: "2026-11-05T08:37:13.607Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bce137b2-541b-4d20-b978-8518eec4838d":
+    status: "completed"
+    startedAt: "2026-11-05T06:29:11.627Z"
+    completedAt: "2026-11-05T06:47:02.280Z"
+    endedAt: "2026-11-05T06:47:02.280Z"
+    activeIntervals: [{"end":"2026-11-05T06:45:31.457Z","start":"2026-11-05T06:29:11.627Z"},{"end":"2026-11-05T06:47:02.280Z","start":"2026-11-05T06:47:02.280Z"}]
+    lastModified: "2026-11-05T06:47:02.280Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

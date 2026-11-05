@@ -51,7 +51,10 @@
 .ndx-deployed .task-tag-remove,
 .ndx-deployed .task-tag-edit,
 .ndx-deployed .task-criterion-add,
-.ndx-deployed .task-criterion-remove {
+.ndx-deployed .task-criterion-remove,
+.ndx-deployed .tracker-link-add,
+.ndx-deployed .tracker-unlink,
+.ndx-deployed .tracker-link-input-wrapper {
   display: none !important;
 }
 

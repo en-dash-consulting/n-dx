@@ -132,7 +132,8 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
+import { readDiagnosis, type RunDiagnosisSummary } from "./run-diagnosis.js";
+import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type QueuePlan, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -241,36 +242,6 @@ interface RunSummary {
    * unchanged and carries no worktree field.
    */
   worktree?: RunWorktree;
-}
-
-/** The verdict fields the dashboard shows. Mirrors hench's `RunDiagnosis`. */
-interface RunDiagnosisSummary {
-  class: string;
-  summary: string;
-  evidence: string[];
-  actions: Array<{ kind: string; label: string }>;
-  attempt: { n: number; of: number };
-}
-
-/** The run file's `diagnosis`, when it has the shape hench writes; otherwise absent. */
-function readDiagnosis(value: unknown): RunDiagnosisSummary | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const d = value as Record<string, unknown>;
-  const attempt = d.attempt as Record<string, unknown> | undefined;
-  if (typeof d.class !== "string" || typeof d.summary !== "string" || !Array.isArray(d.actions)
-    || typeof attempt?.n !== "number" || typeof attempt?.of !== "number") {
-    return undefined;
-  }
-  return {
-    class: d.class,
-    summary: d.summary,
-    evidence: Array.isArray(d.evidence) ? d.evidence.filter((e): e is string => typeof e === "string") : [],
-    actions: d.actions
-      .filter((a): a is { kind: string; label: string } =>
-        !!a && typeof (a as { kind?: unknown }).kind === "string" && typeof (a as { label?: unknown }).label === "string")
-      .map((a) => ({ kind: a.kind, label: a.label })),
-    attempt: { n: attempt.n, of: attempt.of },
-  };
 }
 
 /** Where a run file lives, for a dashboard serving one worktree of a repository. */
@@ -1076,23 +1047,38 @@ const PLAN_QUEUE_TIMEOUT_MS = 60_000;
  * nothing and writes nothing; its JSON is passed through as hench printed it.
  */
 async function handlePlanQueue(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const read = await readQueuePlan(ctx);
+  if (read.ok) jsonResponse(res, 200, read.plan);
+  else errorResponse(res, 500, read.failure);
+  return true;
+}
+
+/**
+ * The planner's plan, as `GET /api/hench/plan-queue` reads it: one spawn of
+ * `ndx work --plan-queue --format=json`, its JSON passed through as hench
+ * printed it. The Sidecar Guide lens reads it through here too, so there is
+ * one spawn and one parse. `signal` aborts the spawn.
+ */
+export async function readQueuePlan(
+  ctx: ServerContext,
+  signal?: AbortSignal,
+): Promise<{ ok: true; plan: QueuePlan } | { ok: false; failure: string }> {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cli = readCliName(ctx.projectDir);
   const result = await exec(
     bin,
     [...prefixArgs, "work", "--plan-queue", "--format=json", ctx.projectDir],
-    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS },
+    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS, ...(signal && { signal }) },
   );
   if (!result.launched || result.exitCode !== 0) {
     const detail = (result.stderr.trim() || result.stdout.trim() || "no output").slice(0, 2000);
-    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' did not complete: ${detail}`);
-    return true;
+    return { ok: false, failure: `'${cli} work --plan-queue' did not complete: ${detail}` };
   }
   try {
-    jsonResponse(res, 200, JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))));
+    return { ok: true, plan: JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))) as QueuePlan };
   } catch {
-    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}`);
+    return { ok: false, failure: `'${cli} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}` };
   }
-  return true;
 }
 
 /** Routes: concurrency */
@@ -1913,10 +1899,26 @@ function findPRDItem(
 }
 
 /** A blocking item as the blocked-task 409 names it. */
-interface BlockerSummary {
+export interface BlockerSummary {
   id: string;
   title: string;
   status: string;
+}
+
+/** `"Title" (id, status)` for each blocker, comma-separated. */
+export function nameBlockers(blockers: readonly BlockerSummary[]): string {
+  return blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ");
+}
+
+/**
+ * The task's blockers that are not completed, as `--require-unblocked` judges
+ * them (a blocker missing from the PRD counts as open). Empty when the PRD or
+ * the task cannot be read.
+ */
+export function openTaskBlockers(ctx: ServerContext, taskId: string): BlockerSummary[] {
+  const items = loadPRDForExecute(ctx)?.items as Array<Record<string, unknown>> | undefined;
+  const task = items ? findPRDItem(items, taskId) : null;
+  return items && task ? describeBlockers(items, task).filter((b) => b.status !== "completed") : [];
 }
 
 /** The task's `blockedBy` items, with titles; an id no longer in the PRD keeps its id as title. */
@@ -2121,14 +2123,24 @@ async function judgeExecuteRequest(
   const status = task.status as string;
   if (status === "blocked") {
     const blockers = describeBlockers(items, task);
-    const named = blockers.length > 0
-      ? blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ")
-      : "no recorded blockers";
+    const named = blockers.length > 0 ? nameBlockers(blockers) : "no recorded blockers";
     return refused(409, {
       error: `Task is blocked by ${named}. Finish or unblock ${blockers.length === 1 ? "it" : "them"} first.`,
       taskId,
       blockedBy: blockers,
     });
+  }
+  // The spawned run would refuse too, but only after this route answered 202:
+  // judged here, a refusal reaches the caller instead of a run that exits at once.
+  if (options.requireUnblocked) {
+    const open = describeBlockers(items, task).filter((b) => b.status !== "completed");
+    if (open.length > 0) {
+      return refused(409, {
+        error: `Task is waiting on unfinished work: ${nameBlockers(open)}. requireUnblocked refuses to start it until ${open.length === 1 ? "that blocker is" : "those blockers are"} completed.`,
+        taskId,
+        blockedBy: open,
+      });
+    }
   }
   if (!ACTIONABLE_STATUSES.has(status)) {
     return refused(409, {
@@ -2591,24 +2603,26 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
-/** One worktree's runs, for the routes that sweep every worktree. */
-interface RunTarget {
+/** One worktree's runs, for the routes that sweep every worktree and the Sidecar Diagnose run lens. */
+export interface RunTarget {
   root: string;
   runsDir: string;
   /** Absent outside a git repository, where the served directory is the only target. */
   worktree?: RunWorktree;
+  /** The worktree this server serves. */
+  served: boolean;
 }
 
 /** Every worktree of the repository, or the served directory alone outside one. */
-async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
+export async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
   const sources = await resolveRunSources(ctx);
   return sources.length > 0
-    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
-    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx) }];
+    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree, served: s.served }))
+    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx), served: true }];
 }
 
 /** Judge a run against its worktree's lock files and this dashboard's children, read now. */
-function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
+export function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
   const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
   return judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, dashboardExecutionsFor(target.root));
 }
@@ -3577,19 +3591,46 @@ export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
 }
 
 /**
- * Runs that count against `guard.maxConcurrentProcesses` now: live lock
- * holders, plus runs this server spawned that hold no lock yet (a run takes
- * its lock a moment after the spawn). An untagged lock cannot be matched to
- * its run, so the count errs toward full.
+ * Runs on the machine against `guard.maxConcurrentProcesses`: live lock holders
+ * in every worktree of the repository, as `GET /api/live` and the queue planner
+ * count them, plus runs this server spawned that hold no lock yet (a run takes
+ * its lock a moment after the spawn). An untagged lock cannot be matched to its
+ * run, so the count errs toward full. Outside a repository, or when git fails,
+ * only this worktree counts.
  */
-export function runSlotUsage(ctx: ServerContext): { inUse: number; max: number } {
-  const slots = readConcurrencySlots(ctx);
-  const locked = new Set(slots.locks.map((lock) => lock.taskId).filter(Boolean));
-  let unlocked = 0;
-  for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
-    if (!locked.has(taskId)) unlocked++;
+export async function repositoryRunSlotUsage(
+  ctx: ServerContext,
+): Promise<{
+  inUse: number;
+  max: number;
+  holders: Array<{ taskId: string | null; worktree: string }>;
+  /** The holders in `ctx.projectDir` itself: a run there is in the checkout a new run would start in. */
+  here: Array<{ taskId: string | null; worktree: string }>;
+}> {
+  const self = ctx.projectDir;
+  const listed = (await listWorktrees(self).catch(() => [])).filter((wt) => !wt.bare).map((wt) => wt.path);
+  const canonicalOf = (p: string): string => {
+    try {
+      return realpathSync.native(p);
+    } catch {
+      return p;
+    }
+  };
+  const paths = new Map(listed.map((p) => [canonicalOf(p), p]));
+  if (!paths.has(canonicalOf(self))) paths.set(canonicalOf(self), self);
+  const holders: Array<{ taskId: string | null; worktree: string }> = [];
+  for (const path of paths.values()) {
+    for (const lock of collectLiveLocks(locksDirOf(resolveLayout(path).henchDir))) {
+      holders.push({ taskId: lock.taskId ?? null, worktree: path });
+    }
   }
-  return { inUse: slots.processCount + unlocked, max: slots.maxConcurrent };
+  const locked = new Set(holders.map((h) => h.taskId).filter(Boolean));
+  for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
+    if (!locked.has(taskId)) holders.push({ taskId, worktree: self });
+  }
+  const selfKey = canonicalOf(self);
+  const here = holders.filter((h) => canonicalOf(h.worktree) === selfKey);
+  return { inUse: holders.length, max: getEffectiveMaxConcurrent(self), holders, here };
 }
 
 /** How full `inUse` of `max` slots is. */

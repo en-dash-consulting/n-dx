@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "c49072a8-15ef-40ad-8bf3-25105c34310b":
+    status: "completed"
+    startedAt: "2026-11-03T17:06:31.995Z"
+    completedAt: "2026-11-03T17:06:31.995Z"
+    endedAt: "2026-11-03T17:06:31.995Z"
+    activeIntervals: [{"end":"2026-11-03T17:06:31.995Z","start":"2026-11-03T17:06:31.995Z"}]
+    appliedAt: "2026-11-03T17:06:31.995Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-03T17:06:31.995Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ec5c370b-3010-49d3-aed5-5606217fa7fb":
+    status: "completed"
+    startedAt: "2026-11-03T16:55:13.563Z"
+    completedAt: "2026-11-03T17:06:31.995Z"
+    endedAt: "2026-11-03T17:06:31.995Z"
+    activeIntervals: [{"end":"2026-11-03T17:06:31.995Z","start":"2026-11-03T16:55:13.563Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extractImportPaths now uses extractModuleSpecifiers; the runtime variant strips import type/export type statements; self-tests cover every form; 3 surfaced viewer→schema inline import() types routed through external.ts"
+    lastModified: "2026-11-03T17:06:31.995Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

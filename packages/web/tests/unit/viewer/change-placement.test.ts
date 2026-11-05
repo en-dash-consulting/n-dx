@@ -61,6 +61,7 @@ function placement(id: string, shortlist: PlacementCandidate[], opts: { tied?: b
     layout: "v2",
     change: { id, title: `Change ${id}`, status: "pending", taskCount: 1 },
     relation: opts.relation ?? "touches",
+    relationRule: "a rule",
     tied: opts.tied ?? false,
     shortlist,
   };

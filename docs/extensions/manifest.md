@@ -14,6 +14,7 @@ The `ndx.extension` block of the package's `package.json`. It is the only thing 
       "sidecar": { "bin": "bin/serve.js", "health": "/healthz", "idleStopMinutes": 15 },
       "hub": { "label": "Hello", "description": "One line for the hub home" },
       "projectLinks": [{ "label": "Hello", "path": "/project/{projectId}" }],
+      "sidecarTab": { "label": "Hello", "path": "/tab?project={projectId}" },
       "configSchema": "schema/config.json"
     }
   }
@@ -31,8 +32,11 @@ The `ndx.extension` block of the package's `package.json`. It is the only thing 
 | `commands[]` | one of `commands` or `sidecar` | `name` becomes `ndx <name>` (same rules as `name` above). `bin` is a relative path inside the package. `summary` is one line, at most 100 characters, for `ndx --help` |
 | `sidecar` | one of `commands` or `sidecar` | `bin` is the web server the hub mounts at `/x/<name>/`. `health` is a path polled for 200 before proxying (default `/`). `idleStopMinutes` is an integer of at least 1 (default 15) |
 | `hub` | no, needs `sidecar` | `label` and optional `description` for the extension's card on the hub home |
-| `projectLinks[]` | no, needs `sidecar` | `label` and `path` for a link in every project's dashboard header. `path` starts with `/` and resolves under `/x/<name>/`. `{projectId}` and `{repoRoot}` are the only placeholders, each URL-encoded |
+| `projectLinks[]` | no, needs `sidecar` | `label` and `path` for a link in every project's dashboard header. `path` starts with `/`, has no `.` or `..` segment (raw or `%2e`), and resolves under `/x/<name>/`. `{projectId}` and `{repoRoot}` are the only placeholders, each URL-encoded |
+| `sidecarTab` | no, needs `sidecar` | One tab in the Sidecar drawer: `label` and `path`, with the same rules as a `projectLinks` entry (`path` starts with `/`, has no `.` or `..` segment, resolves under `/x/<name>/`, only `{projectId}` and `{repoRoot}` as placeholders, each URL-encoded). The hub reports it per project ([Hub API](./hub-api.md)). It is an object, not an array: an extension adds at most one tab. It stays under `apiVersion` 1 |
 | `configSchema` | no | Relative path inside the package to a JSON Schema for the extension's config section ([Config](./config.md)) |
+
+**Older n-dx releases refuse `sidecarTab`.** A release before the one that added it reports the field as `unknown-field` and lists the extension invalid. An extension that declares it should set `ndxVersion` to that release or later, so an older n-dx lists it as incompatible with a reason instead.
 
 Unknown fields are refused. A package path cannot be absolute or climb out of the package with `..`. No string, and not the package's own `name`, may contain a control character (newline, tab, escape sequence, or a bidi control such as U+202E that reorders the line), and the package's `version` must be a semver version such as `1.0.0`: both are shown on the approval prompt, and `list`, `info`, the prompt and the hint or refusal for an extension command print any control character from a package as a visible `\xNN` (`\uNNNN` for a bidi control) escape. Each problem is reported as one line that names the package, the JSON path, the rule and the fix.
 

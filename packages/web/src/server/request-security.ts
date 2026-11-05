@@ -95,6 +95,18 @@ export function isPublicOnlyRequest(req: object): boolean {
   return publicOnly.has(req);
 }
 
+/** Requests the gate passed on the per-user token itself (or on a server running without one). */
+const perUserToken = new WeakSet<object>();
+
+/**
+ * Whether the gate passed `req` on the per-user token itself: not a browser
+ * session, not a Sidecar broker credential. For a route only the operator's
+ * own tools (the hub, scripts) may call. False for a request the gate never saw.
+ */
+export function isPerUserTokenRequest(req: object): boolean {
+  return perUserToken.has(req);
+}
+
 /** Whether the request presents the per-user token in a header. */
 export function isAuthenticatedRequest(req: Pick<IncomingMessage, "headers">, token: string): boolean {
   return isAuthenticated(req.headers, token);
@@ -194,6 +206,7 @@ export function handleRequestSecurity(
   const access: RequestAccess = options.token && options.scopedCredential?.(req)
     ? "session"
     : requestAccess(req.headers, options.token, options.credentials);
+  if (access === "token") perUserToken.add(req);
   if (access === "public" && route === null) {
     // No credential. A navigation still gets the public shell — it is what
     // signs itself in — so a safe method is passed on, marked; anything else

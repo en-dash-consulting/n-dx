@@ -55,6 +55,8 @@ export interface RunOptions {
   tokenBudget?: number;
   fresh?: boolean;
   allowDirty?: boolean;
+  /** Refuse the run while any of the task's blockers is not completed (`--require-unblocked`). */
+  requireUnblocked?: boolean;
   contextNotes?: string;
 }
 
@@ -85,6 +87,7 @@ export const RUN_OPTION_SPECS: readonly RunOptionSpec[] = [
   { key: "tokenBudget", flag: "token-budget", type: "integer", min: 0, max: Number.MAX_SAFE_INTEGER },
   { key: "fresh", flag: "fresh", type: "boolean" },
   { key: "allowDirty", flag: "allow-dirty", type: "boolean" },
+  { key: "requireUnblocked", flag: "require-unblocked", type: "boolean" },
   { key: "contextNotes", flag: "context-file", type: "string", maxBytes: CONTEXT_NOTES_MAX_BYTES, via: "file" },
 ];
 

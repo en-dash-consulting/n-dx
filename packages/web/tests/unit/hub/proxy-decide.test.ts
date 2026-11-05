@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { HUB_PATH } from "../../../src/shared/index.js";
+import { HUB_PATH, TICKET_QUERY_PARAM } from "../../../src/shared/index.js";
 import { decideProxy } from "../../../src/hub/index.js";
 import type { Hub, ProjectView } from "../../../src/hub/index.js";
 
@@ -93,6 +93,26 @@ describe("decideProxy: a sidecar never sees ndx_token in the query", () => {
 
   it("leaves a query without it untouched", () => {
     expect(decideProxy(one, "/x/recon/p?a=%20b&c")).toMatchObject({ kind: "sidecar", path: "/p?a=%20b&c" });
+  });
+});
+
+describe("decideProxy: the hub session at /hub/session/", () => {
+  it("maps to the host's /api/sidecar/hub/ routes at every project count, for HTTP and upgrades alike", () => {
+    for (const hub of [none, one, several]) {
+      for (const upgrade of [false, true]) {
+        expect(decideProxy(hub, "/hub/session/sessions/s-1/turns", upgrade)).toEqual({ kind: "hub-session", path: "/api/sidecar/hub/sessions/s-1/turns" });
+      }
+      expect(decideProxy(hub, "/hub/session")).toEqual({ kind: "hub-session", path: "/api/sidecar/hub" });
+    }
+  });
+
+  it("drops the token and ticket parameters and leaves the chooser and look-alikes alone", () => {
+    expect(decideProxy(several, "/hub/session/sessions?ndx_token=T&a=1")).toEqual({ kind: "hub-session", path: "/api/sidecar/hub/sessions?a=1" });
+    expect(decideProxy(several, `/hub/session/ws?a=1&${TICKET_QUERY_PARAM}=spent&b=2`, true)).toEqual({ kind: "hub-session", path: "/api/sidecar/hub/ws?a=1&b=2" });
+    expect(decideProxy(several, `/hub/session/x?${TICKET_QUERY_PARAM}=spent&ndx_token=T`)).toEqual({ kind: "hub-session", path: "/api/sidecar/hub/x" });
+    expect(decideProxy(several, "/hub/").kind).toBe("home");
+    expect(decideProxy(several, "/hub/sessions").kind).not.toBe("hub-session");
+    expect(decideProxy(several, "/p/alpha/hub/session/x")).toMatchObject({ kind: "proxy", path: "/hub/session/x" });
   });
 });
 

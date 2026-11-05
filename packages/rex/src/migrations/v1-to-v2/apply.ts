@@ -67,7 +67,7 @@ import { checkV2TreeHealth } from "../../core/health.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
 import type { StructureHealthThresholds } from "../../schema/index.js";
 import type { PRDItem } from "../../schema/v1.js";
-import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
+import { SCHEMA_VERSION_V2, isWorkRef, type Amendment, type NodeType } from "../../schema/v2.js";
 import {
   CUT_CHANGE_BODY_PREFIX,
   CUT_CHANGE_TITLE,
@@ -491,6 +491,26 @@ function inboxOf(p: Placed): Placed {
 }
 
 /** The v1 item's fields as a v2 node of `p.type`: intent and state together, as the reader loads them. */
+/**
+ * A v1 item's `links[]` as v2 `issues`: each link is its URL when that is a
+ * work ref, else its `workItemId` when that is one (a tracker key); repeats
+ * drop. A link neither can hold (an opaque page id) stays in `links`, which v2
+ * reserves, so the migration loses nothing it can keep.
+ */
+function moveLinksToIssues(node: Record<string, unknown>, item: PRDItem): void {
+  if (!item.links?.length) return;
+  const issues = new Set<string>(Array.isArray(node.issues) ? (node.issues as string[]) : []);
+  const kept: unknown[] = [];
+  for (const link of item.links) {
+    const ref = [link.url, link.workItemId].find((v): v is string => typeof v === "string" && isWorkRef(v));
+    if (ref === undefined) kept.push(link);
+    else issues.add(ref);
+  }
+  if (issues.size > 0) node.issues = [...issues];
+  if (kept.length > 0) node.links = kept;
+  else delete node.links;
+}
+
 function toNode(p: Placed, slug: string, cutAt: string): RuleNode {
   const { item, entry, type } = p;
   const {
@@ -510,6 +530,8 @@ function toNode(p: Placed, slug: string, cutAt: string): RuleNode {
   if (meta !== undefined) node.recommendationMeta = meta;
   const cleanLog = log === undefined ? undefined : dropCorrupt(log);
   if (cleanLog !== undefined) node.log = cleanLog;
+
+  moveLinksToIssues(node, item);
 
   const bucket = legacyLoeBucket(item);
   if (bucket !== undefined) node.loeRationale = legacyLoeRationale(bucket, loeRationale);

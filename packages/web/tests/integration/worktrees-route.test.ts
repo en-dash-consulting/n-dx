@@ -180,6 +180,8 @@ describe("GET /api/worktrees", () => {
         finishedAt: "2026-09-16T11:00:00.000Z",
         // No worktree took this run's task over.
         claimLostTo: null,
+        // The record carries no classifier verdict.
+        diagnosisClass: null,
       },
     });
     expect(list.find((w) => w.path === linked)!.runs).toEqual({
@@ -193,8 +195,28 @@ describe("GET /api/worktrees", () => {
         startedAt: "2026-09-16T10:00:00.000Z",
         finishedAt: null,
         claimLostTo: null,
+        diagnosisClass: null,
       },
     });
+    await server.close();
+  });
+
+  it("carries the latest run's diagnosis class from its record", async () => {
+    const runsDir = join(repo, ".hench", "runs");
+    writeFileSync(join(runsDir, "run-z.json"), JSON.stringify({
+      id: "run-z",
+      taskId: "task-1",
+      taskTitle: "t",
+      startedAt: "2026-09-17T10:00:00.000Z",
+      finishedAt: "2026-09-17T11:00:00.000Z",
+      status: "failed",
+      diagnosis: { class: "test-failure", summary: "s", evidence: [], actions: [], attempt: { n: 1, of: 2 } },
+    }));
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const list = await fetchWorktrees(server);
+    // The fixture is shared across tests: leave it as found.
+    rmSync(join(runsDir, "run-z.json"));
+    expect(list.find((w) => w.path === repo)!.runs.latest).toMatchObject({ id: "run-z", diagnosisClass: "test-failure" });
     await server.close();
   });
 

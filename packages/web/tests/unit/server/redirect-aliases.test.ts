@@ -26,6 +26,7 @@ const ASSETS: StaticAssets = {
   resolvedPackageRoot: "/nonexistent",
   getViewerHtml: () => "<html><body>viewer</body></html>",
   getLandingHtml: () => null,
+  getHubSessionHtml: () => null,
   findAssetPath: () => null,
 };
 

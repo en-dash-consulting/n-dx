@@ -8,6 +8,8 @@
  * through `useFeatureToggle` into `useSidecarShell`, then `TopNav` and
  * `SidecarDock` — against a stubbed server and socket.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
@@ -31,11 +33,18 @@ import {
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
+import { openExtensionTab } from "../../../src/viewer/components/sidecar-extension-tabs.js";
+import { installBasePathFetch, setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import type { ViewId } from "../../../src/viewer/types.js";
+
+/** `text` with every regular-expression metacharacter escaped, for building a pattern from a CSS selector. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 const VALID = buildValidViews(null);
 
@@ -67,6 +76,10 @@ interface Server {
   lensesGate?: Promise<void>;
   /** Status of the newest hench run of any task, per GET /api/hench/runs?taskId=; unset means no runs. */
   lastRunStatus?: string;
+  /** Drawer tabs the hub lists for project p1; unset means no hub answers. */
+  hubTabs?: Array<{ name: string; label: string }>;
+  /** The keyed page's answer; unset is a 200. A pending promise is a sidecar still starting. */
+  pageAnswer?: () => Response | Promise<Response>;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -103,7 +116,8 @@ function cliProbe(vendor: string): { cli?: { found: boolean; version: null; path
 
 function stubServer(): void {
   vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
-    const url = String(input);
+    // The tab's page probe is absolute (it must skip the base-path rewrite).
+    const url = String(input).replace(location.origin, "");
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     server.requests.push({ method, url, ...(body !== undefined && { body }) });
@@ -120,6 +134,7 @@ function stubServer(): void {
         local: { models: [], defaultModel: "" },
       });
     }
+    if (url === "/api/sidecar/settings" && method === "PUT") return json({ githubReads: body.githubReads });
     if (url === "/api/sidecar/lenses") {
       if (server.lensesGate) await server.lensesGate;
       return json({ lenses: server.lenses });
@@ -178,6 +193,15 @@ function stubServer(): void {
         return json({ session: session({ id }), running: true, from: 0 }, 202);
       }
       if (action === "interrupt") return json({ interrupted: true });
+    }
+    if (server.hubTabs) {
+      if (url === "/api/hub/projects") return json({ projects: [{ id: "p1", name: "P1", status: { state: "running" } }] });
+      if (url === "/api/hub/extensions?project=p1") {
+        return json({ extensions: server.hubTabs.map((t) => ({ name: t.name, tab: { label: t.label, url: `/x/${t.name}/tab` } })) });
+      }
+      const frame = /^\/api\/hub\/extensions\/([\w-]+)\/frame\?project=p1$/.exec(url);
+      if (frame && method === "POST") return json({ url: `/x/${frame[1]}/~f/key${server.requests.length}/tab?project=p1` });
+      if (url.startsWith("/x/")) return server.pageAnswer ? await server.pageAnswer() : new Response("<p>tab</p>");
     }
     return json({});
   }));
@@ -382,6 +406,34 @@ describe("the top-nav button", () => {
 });
 
 // ── Transcript ─────────────────────────────────────────────────────────────
+
+describe("a page handed off with ?sidecar=<id>", () => {
+  beforeEach(() => {
+    // "recent" is the session the drawer would pick on its own.
+    server.sessions = [
+      { session: session({ id: "handed", lastActivityAt: "2026-10-28T09:00:00.000Z" }), running: false },
+      { session: session({ id: "recent", lastActivityAt: "2026-10-28T11:00:00.000Z" }), running: false },
+    ];
+    server.frames = [user(1, "Handed-off question")];
+    history.replaceState(null, "", "/?sidecar=handed");
+  });
+  afterEach(() => history.replaceState(null, "", "/"));
+
+  it("opens the drawer on that session and reads its frames, though another is more recent", async () => {
+    await mount();
+    expect(drawer()).not.toBeNull();
+    expect(rows()).toEqual(["Handed-off question"]);
+    expect(frameFetches()).toContain("/api/sidecar/sessions/handed/frames?after=0");
+    expect(frameFetches().some((u) => u.includes("/sessions/recent/"))).toBe(false);
+  });
+
+  it("leaves the drawer closed and reads no session with web.sidecar off", async () => {
+    server.enabled = false;
+    await mount();
+    expect(drawer()).toBeNull();
+    expect(server.requests.some((r) => r.url.startsWith("/api/sidecar"))).toBe(false);
+  });
+});
 
 describe("the transcript", () => {
   beforeEach(() => {
@@ -589,8 +641,68 @@ describe("the agent picker", () => {
     await pressCmdJ();
     expect(server.requests.some((r) => r.url === "/api/llm/catalog")).toBe(true);
     const options = (sel: string) => [...root.querySelectorAll(`${sel} option`)].map((o) => o.textContent);
-    expect(options(".sidecar-vendor")).toEqual(["claude", "codex"]);
+    expect(options(".sidecar-vendor")).toEqual(["Claude", "Codex"]);
     expect(options(".sidecar-model")).toEqual(["gpt-5.5", "gpt-5.5-mini"]);
+    const values = (sel: string) => [...root.querySelectorAll<HTMLOptionElement>(`${sel} option`)].map((o) => o.value);
+    expect(values(".sidecar-vendor")).toEqual(["claude", "codex"]);
+    expect(values(".sidecar-model")).toEqual(["gpt-5.5", "gpt-5.5-mini"]);
+  });
+
+  it("labels each picker visibly and shows readable Claude model names over the ids", async () => {
+    await mount();
+    await pressCmdJ();
+    for (const [sel, text] of [[".sidecar-vendor", "Agent"], [".sidecar-model", "Model"]] as const) {
+      const select = root.querySelector<HTMLSelectElement>(sel)!;
+      const label = root.querySelector<HTMLLabelElement>(`label[for="${select.id}"]`)!;
+      expect(label.textContent).toBe(text);
+    }
+    await pick(".sidecar-vendor", "claude");
+    const opts = [...root.querySelectorAll<HTMLOptionElement>(".sidecar-model option")];
+    expect(opts.map((o) => o.textContent)).toEqual(["Sonnet 5.5", "Haiku 4.5"]);
+    expect(opts.map((o) => o.value)).toEqual(["claude-sonnet-5-5", "claude-haiku-4-5"]);
+    expect(opts.map((o) => o.title)).toEqual(["claude-sonnet-5-5", "claude-haiku-4-5"]);
+  });
+
+  it("styles the header controls and pickers from tokens only", () => {
+    const css = readFileSync(join(process.cwd(), "src/viewer/styles/sidecar.css"), "utf8");
+    const rule = (sel: string) => css.match(new RegExp(`${escapeRegExp(sel)}\\s*\\{([^}]*)\\}`))![1]!;
+    expect(rule(".sidecar-tab.active")).toMatch(/background: var\(--bg-active\)[\s\S]*color: var\(--text\)/);
+    expect(rule(".sidecar-tab")).toMatch(/color: var\(--text-dim\)/);
+    expect(rule(".sidecar-sessions-toggle.active")).toMatch(/background: var\(--bg-active\)/);
+    expect(rule(".sidecar-agent select")).toMatch(/var\(--bg-surface\)[\s\S]*var\(--border\)[\s\S]*var\(--radius-md\)/);
+    expect(rule(".sidecar-close")).toMatch(/width: var\(--space-8\)/);
+    for (const sel of [".sidecar-tab", ".sidecar-sessions-toggle", ".sidecar-close", ".sidecar-agent select", ".sidecar-field-label"]) {
+      expect(rule(sel)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  });
+
+  it("renders the lens pill, textarea, hint and Send in one composer card", async () => {
+    await mount();
+    await pressCmdJ();
+    const card = root.querySelector(".sidecar-composer > .sidecar-composer-card")!;
+    expect(card).not.toBeNull();
+    expect(card.querySelector(".sidecar-chip-lens")!.getAttribute("aria-label")).toMatch(/^Lens: /);
+    expect(card.querySelector<HTMLTextAreaElement>("textarea.sidecar-input")!.placeholder)
+      .toBe("Ask about this project, or tell the agent what to do…");
+    expect(card.querySelector(".sidecar-composer-hint")!.textContent).toBe("Enter to send · Shift+Enter for a new line");
+    expect(card.querySelector<HTMLButtonElement>(".sidecar-send")!.disabled).toBe(true);
+  });
+
+  it("styles the composer card, lens pill and Send from tokens only", () => {
+    const css = readFileSync(join(process.cwd(), "src/viewer/styles/sidecar.css"), "utf8");
+    const rule = (sel: string) => css.match(new RegExp(`${escapeRegExp(sel)}\\s*\\{([^}]*)\\}`))![1]!;
+    expect(rule(".sidecar-composer-card")).toMatch(/var\(--bg-surface\)[\s\S]*var\(--border\)[\s\S]*var\(--radius-xl\)/);
+    expect(rule(".sidecar-composer-card:focus-within")).toMatch(/var\(--accent\)/);
+    expect(rule(".sidecar-input")).toMatch(/background: transparent[\s\S]*font-size: 14px/);
+    expect(rule(".sidecar-send")).toMatch(/background: var\(--accent\)[\s\S]*color: var\(--bg\)/);
+    expect(rule(".sidecar-send, .sidecar-stop")).toMatch(/height: 36px/);
+    expect(rule(".sidecar-chip-lens")).toMatch(/color-mix\(in srgb, var\(--accent\)[\s\S]*color: var\(--accent\)/);
+    // The visible "Lens:" prefix and chevron are drawn in CSS, so the chip text stays the lens name.
+    expect(rule(".sidecar-chip-lens::before")).toMatch(/content: "Lens:"/);
+    expect(rule(".sidecar-chip-lens::after")).toMatch(/var\(--select-chevron\)/);
+    for (const sel of [".sidecar-composer-card", ".sidecar-input", ".sidecar-send", ".sidecar-send:disabled", ".sidecar-stop", ".sidecar-chip-lens"]) {
+      expect(rule(sel)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
   });
 
   it("creates the first session with the chosen vendor and model", async () => {
@@ -792,6 +904,80 @@ describe("tool calls", () => {
 
     await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
     expect(tools[0].querySelector(".sidecar-tool-body")).toBeNull();
+  });
+
+  it("names broker and external tools in plain words, with the wire name only in the details", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "mcp__ndx-sidecar__fake__create_ticket", { title: "t" }),
+      call(2, "mcp__ndx-sidecar__run_command", { argv: ["ndx", "status"] }),
+      result(3, "mcp__ndx-sidecar__run_command", "ok"),
+      call(4, "mcp__rex__get_item", { id: "x" }),
+    ];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    const names = () => tools.map((t) => t.querySelector(".sidecar-tool-name")!.textContent);
+    expect(names()).toEqual(["fake · create ticket", "Run command", "get_item"]);
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-status")!.textContent)).toEqual(["Running", "Done", "Running"]);
+    expect(tools[0].querySelector(".sidecar-tool-dot")!.getAttribute("data-status")).toBe("running");
+    expect(tools[0].textContent).not.toContain("mcp__ndx-sidecar__");
+
+    await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
+    expect(tools[0].querySelector(".sidecar-tool-wire")!.textContent).toBe("mcp__ndx-sidecar__fake__create_ticket");
+  });
+
+  it("reads a card-less call whose result is an error as Failed, keeping its details", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "mcp__ndx-sidecar__run_command", { argv: ["rm"] }, "toolu_A"),
+      call(2, "mcp__ndx-sidecar__run_command", { argv: ["ls"] }, "toolu_B"),
+      result(3, "unknown", "[error] command not allowed", "toolu_A"),
+      result(4, "unknown", "ok", "toolu_B"),
+    ];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-status")!.textContent)).toEqual(["Failed", "Done"]);
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-dot")!.getAttribute("data-status"))).toEqual(["failed", "done"]);
+
+    await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
+    expect(tools[0].querySelector(".sidecar-tool-output")!.textContent).toBe("[error] command not allowed");
+  });
+
+  it("uses the connection's label from its external-call card and shows the waiting state", async () => {
+    server.sessions = [{ session: session(), running: true }];
+    server.frames = [call(1, "mcp__ndx-sidecar__fake__create_ticket", { title: "t" })];
+    server.cards = [card("c1", 1, {
+      tool: "external_call", kind: "external-call",
+      input: { connection: "fake", tool: "fake.create_ticket", class: "write", arguments: { title: "t" } },
+      externalCall: { label: "CAOS", inputSchema: {} },
+    })];
+    await mount();
+    await pressCmdJ();
+
+    const tool = root.querySelector<HTMLElement>(".sidecar-tool")!;
+    expect(tool.querySelector(".sidecar-tool-name")!.textContent).toBe("CAOS · create ticket");
+    expect(tool.querySelector(".sidecar-tool-status")!.textContent).toBe("Waiting for you");
+    expect(tool.querySelector(".sidecar-tool-dot")!.getAttribute("data-status")).toBe("waiting");
+  });
+
+  it("leaves a call that raised no card without one, so the next call keeps its own", async () => {
+    server.sessions = [{ session: session(), running: true }];
+    server.frames = [
+      // Allow-listed: ran without a card.
+      call(1, "mcp__ndx-sidecar__run_command", { argv: ["ndx", "status", "."] }),
+      result(2, "mcp__ndx-sidecar__run_command", "ok"),
+      call(3, "mcp__ndx-sidecar__run_command", { argv: ["pnpm", "test"] }),
+    ];
+    server.cards = [card("c1", 1, { input: { argv: ["pnpm", "test"] } })];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-status")!.textContent)).toEqual(["Done", "Waiting for you"]);
   });
 });
 
@@ -1000,16 +1186,157 @@ describe("permission cards", () => {
     expect(root.querySelector(".sidecar-card-always")).toBeNull();
   });
 
+  describe("draft-post card", () => {
+    const draft = (): SidecarCard => card("d1", 1, { kind: "draft-post", tool: "draft_github_post", input: { kind: "comment", target: "931", body: "lint fails on main too" } });
+    const button = (cls: string) => root.querySelector<HTMLButtonElement>(`.${cls}`)!;
+
+    it("shows the draft as it would be posted, and Post approves it", async () => {
+      await openWith([draft()]);
+      expect(root.querySelector(".sidecar-draft-target")?.textContent).toBe("Comment on 931");
+      expect(root.querySelector(".sidecar-draft-text")?.textContent).toBe("lint fails on main too");
+      expect(button("sidecar-card-approve").textContent).toBe("Post under your gh login");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      await act(async () => { button("sidecar-card-approve").click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("Copy puts the draft on the clipboard and denies the card, so nothing is posted", async () => {
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      await openWith([draft()]);
+      await act(async () => { button("sidecar-card-copy").click(); });
+      await settle();
+      expect(writeText).toHaveBeenCalledWith("lint fails on main too");
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny", reason: "Copied, not posted" }]);
+    });
+
+    it("a refused clipboard leaves the card waiting and says so", async () => {
+      Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => { throw new Error("denied"); }) }, configurable: true });
+      await openWith([draft()]);
+      await act(async () => { button("sidecar-card-copy").click(); });
+      await settle();
+      expect(button("sidecar-card-copy").textContent).toBe("Copy failed — select it");
+      expect(decisions()).toEqual([]);
+    });
+
+    it("Discard denies it", async () => {
+      await openWith([draft()]);
+      expect(button("sidecar-card-deny").textContent).toBe("Discard");
+      await act(async () => { button("sidecar-card-deny").click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
+
+    it("a hub draft names its project in the title and on the card", async () => {
+      await openWith([card("d2", 1, { kind: "draft-post", tool: "draft_github_post", input: { project: "app", kind: "review", target: "931", body: "x" } })]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("app · review · 931");
+      expect(root.querySelector(".sidecar-draft-target")?.textContent).toBe("Review comment on 931 in project app");
+    });
+  });
+
+  describe("draft-file card", () => {
+    const file = (): SidecarCard => card("f1", 1, { kind: "draft-file", tool: "save_draft", input: { kind: "restack-plan", path: "/h/hub/drafts/restack.md", content: "1. rebase #12" } });
+    const pathInput = () => root.querySelector<HTMLInputElement>(".sidecar-draft-path-input")!;
+
+    it("shows the path and the content, offers no always-allow, and Save approves at the shown path", async () => {
+      await openWith([file()]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("restack-plan · /h/hub/drafts/restack.md");
+      expect(pathInput().value).toBe("/h/hub/drafts/restack.md");
+      expect(root.querySelector(".sidecar-draft-text")?.textContent).toBe("1. rebase #12");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      expect(root.querySelector(".sidecar-card-approve")?.textContent).toBe("Save file");
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", path: "/h/hub/drafts/restack.md" }]);
+    });
+
+    it("saves at the path the operator edited, and a denial carries no path", async () => {
+      await openWith([file()]);
+      await act(async () => {
+        pathInput().value = "/tmp/plan.md";
+        pathInput().dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", path: "/tmp/plan.md" }]);
+    });
+
+    it("Deny sends no path", async () => {
+      await openWith([file()]);
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-deny")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
+  });
+
+  it("a network-read card names what gh reads, and \"Allow GitHub reads for this project\" approves it and turns the setting on", async () => {
+    await openWith([card("n1", 1, { kind: "network-read", tool: "github_read", input: { kind: "check", ref: "lint", base: "main" } })]);
+    expect(root.querySelector(".sidecar-network-read")?.textContent).toBe('Reads github.com with your gh login: the newest run of check "lint" on main.');
+    const allow = root.querySelector<HTMLButtonElement>(".sidecar-card-always")!;
+    expect(allow.textContent).toBe("Allow GitHub reads for this project");
+    await act(async () => { allow.click(); });
+    await settle();
+    expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    expect(server.requests.filter((r) => r.url === "/api/sidecar/settings")).toEqual([
+      { method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } },
+    ]);
+  });
+
   const INPUTS: Record<SidecarCardKind, { tool: string; input: Record<string, unknown>; title: string }> = {
     command: { tool: "run_command", input: { argv: ["ndx", "status", "."] }, title: "ndx status ." },
     work: { tool: "start_work", input: { taskId: "425819f5", options: { review: true } }, title: "n-dx work --task=425819f5 --auto --review ." },
     "change-set": { tool: "propose_prd_change", input: { items: [{ title: "a" }, { title: "b" }] }, title: "2 items" },
+    // Without its plan (a card from before the plan was read) the title falls back to the tool.
+    "run-plan": { tool: "propose_run_plan", input: { note: "two lanes" }, title: "propose_run_plan" },
     placement: { tool: "place_change_card", input: { change: "CH-212", target: "A3.2", relation: "amends" }, title: "CH-212 → A3.2" },
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
+    // Without its link (a card from before the link was read) the title is the call's own.
+    link: { tool: "propose_link", input: { itemId: "t1", ref: "WM-2054" }, title: "t1 → WM-2054" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
+    "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },
     "migration-decision": { tool: "migration_decision", input: { entries: [{ id: "x" }] }, title: "1 decision" },
+    "external-call": {
+      tool: "external_call",
+      input: { connection: "docs", tool: "docs.update_item", class: "write", arguments: { id: "7", title: "t" } },
+      title: "docs.update_item · write",
+    },
   };
+  it("draws a link card from the link the server read: the item, the tracker's label and the ref", async () => {
+    const host = document.createElement("div");
+    await act(async () => {
+      render(h(SidecarCards, {
+        cards: [card("l", 1, {
+          kind: "link", tool: "propose_link", input: { itemId: "t1", ref: "https://tracker.example/items/9" },
+          link: { itemId: "t1", title: "Write the cache", ref: "https://tracker.example/items/9", label: "CAOS" },
+        })],
+        manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
+        decide: vi.fn(async () => true),
+      }), host);
+    });
+    expect(host.querySelector(".sidecar-card-title")?.textContent).toBe("t1 → CAOS tracker.example");
+    expect(host.querySelector(".sidecar-link-item")?.textContent).toBe("t1 Write the cache");
+    expect(host.querySelector(".sidecar-link-ref a")?.getAttribute("href")).toBe("https://tracker.example/items/9");
+    // A link is never allow-listed, so there is nothing to remember.
+    expect(host.querySelector(".sidecar-card-always")).toBeNull();
+  });
+
+  it("titles a work card from the run options the server attached, not the call's own", async () => {
+    const titleOf = async (input: Record<string, unknown>, runOptions: Record<string, unknown>): Promise<string> => {
+      const host = document.createElement("div");
+      await act(async () => {
+        render(h(SidecarCards, {
+          cards: [card("w", 1, { kind: "work", tool: "start_work", input, runOptions })],
+          manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
+          decide: vi.fn(async () => true),
+        }), host);
+      });
+      return host.querySelector(".sidecar-card-title")?.textContent ?? "";
+    };
+    expect(await titleOf({ taskId: "t1" }, { requireUnblocked: true })).toBe("n-dx work --task=t1 --auto --require-unblocked .");
+    expect(await titleOf({ taskId: "t1", options: { requireUnblocked: false } }, {})).toBe("n-dx work --task=t1 --auto .");
+  });
   const STATES: Array<[string, Partial<SidecarCard>, RegExp | null]> = [
     ["pending", { status: "pending" }, null],
     ["approved", { status: "approved" }, /^Approved$/],
@@ -1026,7 +1353,7 @@ describe("permission cards", () => {
         render(h(SidecarCards, {
           cards: [card("x", 1, { kind, tool, input, ...over })],
           manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
-          decide: vi.fn(async () => {}),
+          decide: vi.fn(async () => true),
         }), host);
       });
       const el = host.querySelector<HTMLElement>(".sidecar-card")!;
@@ -1050,7 +1377,7 @@ describe("permission cards", () => {
             effects: { status: { reads, writes: writes.map((path) => ({ path })), llm: [], duration: "fast" } },
             layoutPaths,
           },
-          decide: vi.fn(async () => {}),
+          decide: vi.fn(async () => true),
         }), host);
       });
       const text = host.querySelector(".sidecar-card-effects")!.textContent!;
@@ -1079,7 +1406,7 @@ describe("permission cards", () => {
       render(h(SidecarCards, {
         cards: [card("x", 1, { status: "withdrawn", reason: "session ended" })],
         manifest: null,
-        decide: vi.fn(async () => {}),
+        decide: vi.fn(async () => true),
       }), host);
     });
     const el = host.querySelector(".sidecar-card")!;
@@ -1213,6 +1540,23 @@ describe("attachment and lens", () => {
     expect(resolveLens("guide", [{ id: "guide", available: false, needs: "x" }]).running).toBe("general");
     expect(resolveLens("future", [])).toMatchObject({ running: "general", needs: expect.any(String) });
     expect(resolveLens("plan", [{ id: "plan", available: true }])).toEqual({ wanted: "plan", running: "plan" });
+    // A lens that needs a task runs General, naming what it needs, until one is attached.
+    const diagnose = [{ id: "diagnose-run", available: true, target: { kind: "task", needs: "a task to diagnose" } }];
+    expect(resolveLens("diagnose-run", diagnose, null)).toEqual({ wanted: "diagnose-run", running: "general", needs: "a task to diagnose" });
+    expect(resolveLens("diagnose-run", diagnose, { kind: "live", label: "Live" }).needs).toBe("a task to diagnose");
+    expect(resolveLens("diagnose-run", diagnose, { kind: "task", ref: "t1", label: "t1" })).toEqual({ wanted: "diagnose-run", running: "diagnose-run" });
+  });
+
+  it("a Workspaces worktree card attaches as a worktree, keyed by workspace, and defaults to Diagnose branch", () => {
+    const item = pageItemFor({ view: "workspaces", zone: null, taskId: null, worktree: "sidecar-l2" });
+    expect(item).toEqual({ kind: "worktree", ref: "sidecar-l2", label: "sidecar-l2" });
+    expect(wantedLensFor(item, false)).toBe("diagnose-branch");
+    // The Workspaces page with no card attached is about nothing.
+    expect(pageItemFor({ view: "workspaces", zone: null, taskId: null })).toBeNull();
+    const branch = [{ id: "diagnose-branch", available: true, target: { kind: "worktree", needs: "a branch or worktree" } }];
+    expect(resolveLens("diagnose-branch", branch, null)).toEqual({ wanted: "diagnose-branch", running: "general", needs: "a branch or worktree" });
+    expect(resolveLens("diagnose-branch", branch, { kind: "task", ref: "t1", label: "t1" }).needs).toBe("a branch or worktree");
+    expect(resolveLens("diagnose-branch", branch, item)).toEqual({ wanted: "diagnose-branch", running: "diagnose-branch" });
   });
 
   it("a task gives Describe, and the session takes the lens and target through PATCH", async () => {
@@ -1308,6 +1652,26 @@ describe("attachment and lens", () => {
     expect(root.querySelector(".sidecar-lens-menu")).toBeNull();
   });
 
+  it("a lens that needs a task is marked and cannot be picked until one is attached", async () => {
+    server.lenses = server.lenses.map((l) => l.id === "diagnose-run"
+      ? { id: "diagnose-run", available: true, target: { kind: "task", needs: "a task to diagnose" } }
+      : l);
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("plan");
+    await click(lensChip());
+    const option = () => root.querySelector<HTMLButtonElement>(`.sidecar-lens-option[data-lens="diagnose-run"]`)!;
+    expect(option().disabled).toBe(true);
+    expect(option().textContent).toContain("needs a task to diagnose");
+    server.requests = [];
+    await click(option());
+    expect(patches()).toEqual([]);
+    await unmount();
+    await open("prd", { taskId: "t1" });
+    await click(lensChip());
+    expect(option().disabled).toBe(false);
+    expect(option().textContent).not.toContain("needs");
+  });
+
   it("/ in an empty composer opens the lens list; in a typed composer it types", async () => {
     await open("plan");
     const input = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
@@ -1327,5 +1691,184 @@ describe("attachment and lens", () => {
     await click(root.querySelector(".sidecar-chip-remove"));
     expect(itemChip()).toBeNull();
     expect(patches().map((r) => r.body)).toEqual([{ target: {} }]);
+  });
+});
+
+// ── Extension tabs (Sidecar design §17.1) ─────────────────────────────────
+
+describe("extension tabs", () => {
+  const tabButtons = () => [...root.querySelectorAll<HTMLButtonElement>(".sidecar-tab")];
+  const tab = (id: string) => root.querySelector<HTMLButtonElement>(`.sidecar-tab[data-tab="${id}"]`)!;
+  const frameKeyPosts = () => server.requests.filter((r) => r.method === "POST" && r.url.includes("/frame"));
+  const iframe = () => root.querySelector<HTMLIFrameElement>("iframe.sidecar-ext-frame");
+  const composer = () => root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+  const press = async (el: Element) => {
+    await act(async () => { (el as HTMLElement).click(); });
+    await settle();
+  };
+  const status = () => root.querySelector(".sidecar-ext-status")?.textContent;
+
+  it("shows no strip without a hub, or with no tabs", async () => {
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector(".sidecar-tabs")).toBeNull();
+    await unmount();
+
+    server.hubTabs = [];
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector(".sidecar-tabs")).toBeNull();
+  });
+
+  it("lists Chat first, then each tab in the hub's order, and asks for no key yet", async () => {
+    server.hubTabs = [{ name: "zeta", label: "Zeta" }, { name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    expect(tabButtons().map((b) => b.textContent)).toEqual(["Chat", "Zeta", "Alpha"]);
+    expect(root.querySelector(".sidecar-title")!.textContent).toBe("Sidecar");
+    expect(frameKeyPosts()).toEqual([]);
+    expect(iframe()).toBeNull();
+  });
+
+  it("exposes the selected tab and the Sessions toggle's pressed state", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    expect(tabButtons().map((b) => b.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    await press(tab("alpha"));
+    expect(tabButtons().map((b) => b.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    const toggle = root.querySelector<HTMLButtonElement>(".sidecar-sessions-toggle")!;
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    await press(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("loads the page on first open in an iframe sandboxed exactly, and keeps it across tab switches", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    server.frames = [user(1, "hello"), said(2, "hi there")];
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    await act(async () => {
+      composer().value = "half a thought";
+      composer().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await press(tab("alpha"));
+    expect(frameKeyPosts().map((r) => r.url)).toEqual(["/api/hub/extensions/alpha/frame?project=p1"]);
+    const frame = iframe()!;
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups allow-downloads");
+    expect(frame.getAttribute("src")).toMatch(/^\/x\/alpha\/~f\/key\d+\/tab\?project=p1$/);
+
+    await press(tab("sidecar"));
+    await press(tab("alpha"));
+    expect(frameKeyPosts()).toHaveLength(1);
+    expect(iframe()).toBe(frame);
+    expect(rows()).toEqual(["hello", "hi there"]);
+    expect(composer().value).toBe("half a thought");
+  });
+
+  it("hides the other tab rather than unmounting it", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(root.querySelector<HTMLElement>(".sidecar-chat-panel")!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>("#sidecar-tab-alpha")!.hidden).toBe(false);
+    await press(tab("sidecar"));
+    expect(root.querySelector<HTMLElement>(".sidecar-chat-panel")!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>("#sidecar-tab-alpha")!.hidden).toBe(true);
+  });
+
+  it("opens the keyed URL in a new window from the pop-out link", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    const link = root.querySelector<HTMLAnchorElement>(".sidecar-ext-popout")!;
+    expect(link.getAttribute("href")).toBe(iframe()!.getAttribute("src"));
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("offers Reload on a ready tab, which asks for a new key and reloads the frame", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    const before = iframe()!.getAttribute("src");
+    expect(frameKeyPosts()).toHaveLength(1);
+
+    await press(root.querySelector(".sidecar-ext-reload-frame")!);
+    expect(frameKeyPosts()).toHaveLength(2);
+    expect(iframe()!.getAttribute("src")).not.toBe(before);
+  });
+
+  it("says \"Starting <label>…\" until the sidecar answers", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    let release!: () => void;
+    server.pageAnswer = () => new Promise<Response>((r) => { release = () => r(new Response("<p>tab</p>")); });
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(status()).toBe("Starting Alpha…");
+    expect(iframe()).toBeNull();
+    await act(async () => { release(); });
+    await settle();
+    expect(status()).toBeUndefined();
+    expect(iframe()).not.toBeNull();
+  });
+
+  it("shows the hub's 503 with the log file it names", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    server.pageAnswer = () => json({ error: "The alpha sidecar did not answer within 20 s", log: "/home/u/.ndx/logs/alpha.log" }, 503);
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(root.querySelector(".sidecar-ext-error")?.textContent).toBe(
+      "The alpha sidecar did not answer within 20 s Log: /home/u/.ndx/logs/alpha.log",
+    );
+    expect(iframe()).toBeNull();
+  });
+
+  it("shows \"Expired · Reload\" on a 401, and Reload asks for a new key", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    server.pageAnswer = () => json({ error: "The frame key is no longer valid" }, 401);
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(status()).toBe("Expired · Reload");
+    expect(frameKeyPosts()).toHaveLength(1);
+
+    server.pageAnswer = undefined;
+    await press(root.querySelector(".sidecar-ext-reload")!);
+    expect(frameKeyPosts()).toHaveLength(2);
+    expect(iframe()).not.toBeNull();
+  });
+
+  it("under /p/<id>/ asks for the key under the prefix but probes the page at the hub's own /x/ mount", async () => {
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      seen.push(String(input));
+      return String(input).includes("/frame") ? json({ url: "/x/alpha/~f/k1/tab" }) : new Response("<p>tab</p>");
+    }));
+    setBasePathForTests("/p/p1");
+    try {
+      installBasePathFetch();
+      const state = await openExtensionTab({ name: "alpha", label: "Alpha" }, "/api/hub/extensions/alpha/frame");
+      expect(state).toEqual({ kind: "ready", url: "/x/alpha/~f/k1/tab" });
+      expect(seen).toEqual(["/p/p1/api/hub/extensions/alpha/frame", `${location.origin}/x/alpha/~f/k1/tab`]);
+    } finally {
+      setBasePathForTests(null);
+    }
+  });
+
+  it("renders no tab and asks for no key while web.sidecar is off", async () => {
+    server.enabled = false;
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector(".sidecar-tabs")).toBeNull();
+    expect(server.requests.some((r) => r.url.includes("/frame") || r.url.startsWith("/x/"))).toBe(false);
   });
 });

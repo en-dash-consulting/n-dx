@@ -2,7 +2,7 @@
  * REQUIRED TEST — the extensions contract across every process boundary.
  *
  * The fixture package in tests/e2e/fixture-extension/ (one command, one
- * sidecar, one project link, a config schema) is copied to a temp directory
+ * sidecar, one project link, one drawer tab, a config schema) is copied to a temp directory
  * and listed in `extensions.paths`, the development source, of an n-dx home
  * of the test's own. It is then driven only through the real CLI and a real
  * hub started by `ndx start`: discovery, approval, dispatch, the environment
@@ -440,6 +440,42 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     expect(page.status).toBe(200);
     expect(page.text).toContain("Fixture app");
     expect(page.text).toContain('href="/x/fixture/"');
+  });
+
+  it("serves its drawer tab through a frame key, and the key is no credential anywhere else", async () => {
+    if (!canBindPorts) return;
+    const tab = (await getJson(`/api/hub/extensions?project=${PROJECT_ID}`)).body.extensions.find((e) => e.name === "fixture").tab;
+    expect(tab).toEqual({ label: "Fixture tab", url: `/x/fixture/tab?project=${PROJECT_ID}` });
+
+    const issued = await hubRequest(port, `/api/hub/extensions/fixture/frame?project=${PROJECT_ID}`, { method: "POST", headers: auth() });
+    expect(issued.status, issued.text).toBe(200);
+    const { url } = JSON.parse(issued.text);
+    const key = /^\/x\/fixture\/~f\/([^/]+)\/tab\?project=fixture-app$/.exec(url)?.[1];
+    expect(key, url).toBeTruthy();
+
+    // No token: the key alone admits the page, which reports the base path it got.
+    const page = await get(url, {});
+    expect(page.status, page.text).toBe(200);
+    expect(page.text).toContain(`/x/fixture/~f/${key}/`);
+    expect(page.headers["content-security-policy"]).toMatch(/\bsandbox\b/);
+
+    // The page's own script reads `api/data` relative to its keyed URL. Its
+    // origin is opaque, so the browser sends Origin: null and shows the body
+    // only if the response names that origin; the fixture sidecar sets no CORS.
+    expect(page.text).toContain('fetch("api/data")');
+    const base = url.split("?")[0].replace(/tab$/, "");
+    const preflight = await hubRequest(port, `${base}api/data`, { method: "OPTIONS", headers: { Origin: "null", "Access-Control-Request-Method": "GET" } });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe("null");
+    const data = await get(`${base}api/data`, { Origin: "null" });
+    expect(data.status, data.text).toBe(200);
+    expect(data.headers["access-control-allow-origin"]).toBe("null");
+    expect(data.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(JSON.parse(data.text).greeting).toBe("hello from the fixture sidecar");
+
+    const status = await get(`/p/${PROJECT_ID}/api/status`, { "X-Ndx-Token": key });
+    expect(status.status).toBe(401);
+    expect((await get(`/p/${PROJECT_ID}/x/fixture/~f/${key}/tab`, {})).status).toBe(401);
   });
 
   it("restarts a crashed sidecar on the next request", async () => {

@@ -13,26 +13,12 @@
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { OWN_WORKTREE_NOTE } from "../utils/own-worktree-note.js";
+import type { PlannedTask as PlanTask, QueuePlan } from "../external.js";
 import type { NavigateTo } from "../types.js";
 
 /** The registry key in routes-features.ts. */
 export const READY_NEXT_FEATURE = "hench.readyNext";
-
-interface PlanTask {
-  id: string;
-  title: string;
-  reason: string;
-}
-
-/** What `ndx work --plan-queue --format=json` prints. Mirrors hench's `QueuePlan`. */
-export interface QueuePlan {
-  /** `ownWorktree`: the lane must run in a worktree of its own (every lane after the first, and lane 1 while a run is live here). */
-  lanes: Array<{ command: string; changeId: string; ownWorktree?: boolean; tasks: PlanTask[] }>;
-  excluded: PlanTask[];
-  activeRuns: number;
-  runLimit: number;
-  summary: string;
-}
 
 /** A planned task: its title opens the task, as an Up next item does. */
 function TaskLine({ task, navigateTo }: { task: PlanTask; navigateTo: NavigateTo }) {
@@ -83,7 +69,7 @@ export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navi
                 h("span", { class: "live-side-title" }, `Lane ${i + 1}`),
                 // Every command targets `.`; two runs in one checkout collide.
                 lane.ownWorktree
-                  ? h("p", { class: "live-ready-worktree" }, "Run in its own worktree: this command targets the current checkout, and two runs in one checkout collide.")
+                  ? h("p", { class: "live-ready-worktree" }, OWN_WORKTREE_NOTE)
                   : null,
                 h("code", { class: "live-ready-command" }, lane.command),
                 h("ul", null, lane.tasks.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))))

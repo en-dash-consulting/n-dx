@@ -426,6 +426,12 @@ export interface RepoExecutionConfig {
    * sorted: the vendor CLI, graview binary or graview face n-dx runs.
    */
   vendorCliPaths: string[];
+  /**
+   * The project config's {@link NETWORK_READ_FIELDS} that are `true`, as
+   * sorted `path = true` lines: reads n-dx runs with the user's GitHub login
+   * without asking first.
+   */
+  networkReads: string[];
   permissionMode: string | null;
   provider: string | null;
   posture: RepoRunPosture;
@@ -547,6 +553,24 @@ export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
   ["llm", "claude", "cli_path"],
   ["llm", "codex", "cli_path"],
 ];
+
+/**
+ * Project-config switches that, set `true`, let n-dx run a network read with
+ * the user's credentials without asking: `web.sidecarGithubReads` lets the
+ * Sidecar's `github_read`, its Diagnose branch packet and
+ * `GET /api/branch-health` run gh with the user's login and no network-read
+ * card. `false` only tightens. The project config's `true` applies only once
+ * the user has trusted it; the user's `.n-dx.local.json` always applies.
+ */
+export const NETWORK_READ_FIELDS: readonly (readonly string[])[] = [
+  ["web", "sidecarGithubReads"],
+];
+
+/** The {@link NETWORK_READ_FIELDS} a config object turns on, as sorted `path = true` lines. */
+export function networkReadsIn(config: Record<string, unknown> | null): string[] {
+  if (!config) return [];
+  return NETWORK_READ_FIELDS.filter((path) => fieldAt(config, path) === true).map((path) => `${path.join(".")} = true`).sort();
+}
 
 /**
  * The {@link CREDENTIAL_ROUTING_FIELDS} a config object sets, and each
@@ -1139,9 +1163,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ...vendorCliPathsIn(effective),
     ...(henchClaudePath && henchClaudePath !== "claude" ? [`hench.claudePath = ${henchClaudePath}`] : []),
   ].sort();
+  const networkReads = networkReadsIn(effective);
   const projectSetsGated = optionalString(sectionOf(projectConfig, "rex")?.test)
     || credentialRoutingIn(projectConfig).length
-    || vendorCliPathsIn(projectConfig).length;
+    || vendorCliPathsIn(projectConfig).length
+    || networkReadsIn(projectConfig).length;
   if (projectSetsGated && !projectHench) {
     sources.push(relOf(root, layout.configFile));
   }
@@ -1183,6 +1209,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     // Present only when set, for the same reason.
     ...(credentialRouting.length ? { credentialRouting } : {}),
     ...(vendorCliPaths.length ? { vendorCliPaths } : {}),
+    ...(networkReads.length ? { networkReads } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     ...(posture.autonomous !== null ? { autonomous: posture.autonomous } : {}),
@@ -1216,6 +1243,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     envDeny: [...envDeny].sort(),
     credentialRouting,
     vendorCliPaths,
+    networkReads,
     localConfigTracked,
     localConfigUnanswered,
     localConfigTrackedPaths,
@@ -1251,6 +1279,7 @@ export type RepoTrustFindingCode =
   | "env-allow-added"
   | "credential-routing"
   | "vendor-cli-path"
+  | "network-reads"
   | "permission-bypass"
   | "test-command"
   | "mcp-servers"
@@ -1487,6 +1516,15 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
       severity: "warning",
       message: `Chooses a program n-dx runs (vendor CLI, graview binary or face): ${config.vendorCliPaths.join(", ")}`,
       values: [...config.vendorCliPaths],
+    });
+  }
+
+  if (config.networkReads.length) {
+    findings.push({
+      code: "network-reads",
+      severity: "warning",
+      message: `Lets n-dx run GitHub reads with your login without asking first: ${config.networkReads.join(", ")}`,
+      values: [...config.networkReads],
     });
   }
 

@@ -133,6 +133,7 @@ export interface ResolvedSettings {
   tokenBudget: Resolved<number>;
   fresh: Resolved<boolean>;
   allowDirty: Resolved<boolean>;
+  requireUnblocked: Resolved<boolean>;
   resetDeferred: Resolved<boolean>;
 }
 
@@ -204,7 +205,6 @@ const PASSTHROUGH_FLAGS: ReadonlyArray<{ flag: string; type: "boolean" | "string
   { flag: "mine", type: "boolean" },
   { flag: "priority", type: "string" },
   { flag: "context-file", type: "string" },
-  { flag: "require-unblocked", type: "boolean" },
 ];
 
 /**
@@ -225,6 +225,7 @@ const RUN_OPTIONS: readonly RunOption[] = [
   { key: "tokenBudget", flag: "token-budget", type: "integer", scope: "task", description: "Token budget for the run; 0 means unlimited." },
   { key: "fresh", flag: "fresh", type: "boolean", scope: "launch", description: "Discard the cached orientation session so the run re-orients." },
   { key: "allowDirty", flag: "allow-dirty", type: "boolean", scope: "launch", description: "Start even though the working tree has uncommitted changes." },
+  { key: "requireUnblocked", flag: "require-unblocked", type: "boolean", scope: "launch", description: "With --task: refuse to start the task while any of its blockers is not completed." },
   { key: "resetDeferred", flag: "reset-deferred", type: "boolean", scope: "launch", description: "Reset deferred and failing tasks to pending before the run." },
 ];
 
@@ -500,6 +501,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     tokenBudget: withFallback(settings.tokenBudget, "tokenBudget"),
     fresh: flagged("fresh"),
     allowDirty: flagged("allow-dirty"),
+    requireUnblocked: flagged("require-unblocked"),
     resetDeferred: flagged("reset-deferred"),
   };
 

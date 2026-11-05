@@ -29,6 +29,7 @@ import {
   RepoTrustStrip,
   ServerUnavailableNotice,
   SidecarDock,
+  PlaceWithSidecarContext,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -53,6 +54,7 @@ import { waitForSession } from "./session.js";
 import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
 import { LiveBar } from "./views/domain-live.js";
+import { captureSignInReturn } from "./views/connections.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
@@ -62,6 +64,8 @@ if (isDeployedMode()) {
   // Served through the hub at /p/<id>/: prefix every root-relative fetch.
   // At the root this is a no-op.
   installBasePathFetch();
+  // Before the router's first history write, which keeps the path alone.
+  captureSignInReturn();
 }
 
 initTheme();
@@ -152,6 +156,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [openCapability, setOpenCapability] = useState<string | null>(null);
   // The PRD page reports the task picked in its tree, which the route does not carry.
   const [openTask, setOpenTask] = useState<string | null>(null);
+  // The Workspaces board reports the worktree card attached to Sidecar (Diagnose branch).
+  const [openWorktree, setOpenWorktree] = useState<string | null>(null);
+  // The change "Place with Sidecar" attached (Place lens); dropped when the operator leaves the page.
+  const [openChange, setOpenChange] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -180,7 +188,22 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange },
+  );
+  const showSidecar = sidecarShell.drawer.show;
+  useEffect(() => { setOpenChange(null); }, [pageView]);
+  // Null while Sidecar is off, so no change offers "Place with Sidecar".
+  const placeWithSidecar = useMemo(
+    () => (sidecarShell.button ? { place: (id: string) => { setOpenChange(id); showSidecar(); }, attached: openChange } : null),
+    [sidecarShell.button !== null, showSidecar, openChange],
+  );
+  // Null while Sidecar is off, so the Workspaces cards offer no attach control.
+  const attachWorktree = useMemo(
+    () => (sidecarShell.button ? (key: string | null) => {
+      setOpenWorktree(key);
+      if (key) showSidecar();
+    } : undefined),
+    [sidecarShell.button !== null, showSidecar],
   );
   const stage = stageForView(pageView, validViews);
 
@@ -253,9 +276,9 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, setOpenTask, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(Fragment, null,
+  return h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -334,7 +357,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  );
+  ));
 }
 
 const root = document.getElementById("app");

@@ -41,7 +41,9 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { STATUS_CODES } from "node:http";
 import type { ServerContext } from "./types.js";
+import { FEATURE_DISABLED_HEADER } from "../shared/index.js";
 import { jsonResponse } from "./response-utils.js";
 import { isFeatureEnabled } from "./routes-features.js";
 
@@ -103,6 +105,21 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
       "The Sidecar command job's status and stop routes too: only an approved Sidecar call starts that job, and the job tray skips a refused status.",
   },
   {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/connections",
+    reason:
+      "The operator's connections and their OAuth sign-in. Only the Sidecar uses them, and listing one connects it, " +
+      "which spawns a stdio server.",
+  },
+  {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/tracker",
+    reason:
+      "Tracker sync's tick, activity log and card decisions. A tick calls the tracker through a connection, so it is off with the connections.",
+  },
+  {
     feature: "rex.placementDraft",
     // Documents the endpoint; it carries a change id, so no exact path matches
     // it here and routes-rex/placement.ts refuses with this module's body.
@@ -114,6 +131,12 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     feature: "hench.readyNext",
     exact: ["/api/hench/plan-queue"],
     reason: "Live's Ready next section. Each call spawns `ndx work --plan-queue`, so it is off when the section is.",
+  },
+  {
+    feature: "git.branchHealth",
+    exact: ["/api/branch-health"],
+    reason:
+      "The Workspaces health strip's one read. Each call runs git (and gh when GitHub reads are on), so it is off when the strip is.",
   },
 ];
 
@@ -166,6 +189,29 @@ export function enforceRouteFeatureGate(
   if (!gate || gate.selfEnforced) return false;
   if (isFeatureEnabled(ctx.projectDir, gate.feature)) return false;
 
+  res.setHeader(FEATURE_DISABLED_HEADER, gate.feature);
   jsonResponse(res, 403, featureDisabledBody(gate.feature, pathname));
   return true;
+}
+
+/**
+ * {@link enforceRouteFeatureGate} for a WebSocket upgrade: the raw 403 to write
+ * on the socket in place of the handshake when `pathname`'s toggle is off, or
+ * null. The flag is read per call, as on the HTTP path.
+ */
+export function featureDisabledUpgradeResponse(pathname: string, ctx: ServerContext): string | null {
+  const gate = findRouteFeatureGate(pathname);
+  if (!gate || gate.selfEnforced) return null;
+  if (isFeatureEnabled(ctx.projectDir, gate.feature)) return null;
+
+  const body = JSON.stringify(featureDisabledBody(gate.feature, pathname));
+  return [
+    `HTTP/1.1 403 ${STATUS_CODES[403]}`,
+    "Content-Type: application/json",
+    `${FEATURE_DISABLED_HEADER}: ${gate.feature}`,
+    "Connection: close",
+    `Content-Length: ${Buffer.byteLength(body)}`,
+    "",
+    body,
+  ].join("\r\n");
 }

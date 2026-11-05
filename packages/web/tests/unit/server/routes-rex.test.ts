@@ -373,6 +373,23 @@ describe("Rex API routes", () => {
     expect(limitData.entries[1].event).toBe("task_started");
   });
 
+  it("GET /api/rex/log passes an entry's decision fields through untouched", async () => {
+    const decided = {
+      timestamp: "2026-01-04T00:00:00Z",
+      event: "change_placed",
+      itemId: "task-3",
+      detail: "touches A1.1 (via Sidecar)",
+      decidedBy: "sidecar:s1",
+      approvedBy: "Ada <ada@example.com>",
+      reasons: ["The change retries a declined card."],
+    };
+    await writeFile(join(rexDir, "execution-log.jsonl"), JSON.stringify({ timestamp: "2026-01-01T00:00:00Z", event: "task_started" }) + "\n" + JSON.stringify(decided) + "\n");
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/log`);
+    expect(res.status).toBe(200);
+    expect((await res.json()).entries).toEqual([expect.objectContaining({ event: "task_started" }), decided]);
+  });
+
   it("returns 404 when no PRD exists", async () => {
     // Remove prd.json
     const { unlink } = await import("node:fs/promises");
