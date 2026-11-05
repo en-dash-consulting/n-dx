@@ -236,6 +236,7 @@ export const VALIDATED_ARTIFACTS = {
  * - `docs-command-refs` reads `docs/index.md` and every page under
  *   `docs/guide/` and `docs/packages/`, nested ones and `skills.md` included.
  * - `cli-ui-gap-drift` reads `docs/cli-ui-gap.md`.
+ * - `docs-skill-table-drift` reads the skill table in `docs/guide/skills.md`.
  * - `cli-smoke-parity` reads the error-code table in
  *   `docs/contributing/cli-smoke-parity.md`.
  * - `assistant-parity-smoke` is a root-drift file that also reads two pages.
