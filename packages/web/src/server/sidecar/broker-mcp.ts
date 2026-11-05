@@ -315,8 +315,9 @@ function registerExternalTools(
           }
           return result;
         } catch (err) {
-          if (!(err instanceof ConnectionUnavailableError)) throw err;
+          // An unreachable server, a stopped turn's abort or any other throw: the card reads failed, never still running.
           if (cardId) broker.recordCarriedOut(sessionId, cardId, { ok: false });
+          if (!(err instanceof ConnectionUnavailableError)) throw err;
           return unavailableText(tool, err.status);
         } finally {
           carrying.release();

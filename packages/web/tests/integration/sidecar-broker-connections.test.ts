@@ -202,6 +202,36 @@ describe("a worktree session's broker and the operator's connections", () => {
     expect(broker.cards(id)[0]).toMatchObject({ status: "approved", carriedOut: { ok: true } });
   });
 
+  it("reads an approved write that a stopped turn aborts as failed, and keeps the connection connected", async () => {
+    // A write the server answers only when released, so the turn can stop mid-call.
+    let release!: () => void;
+    const gate = new Promise<void>((done) => (release = done));
+    await fake.close();
+    fake = await startFakeMcpHttpServer({
+      extraTools: (mcp) =>
+        mcp.registerTool("slow_write", { description: "Writes when released." }, async () => {
+          await gate;
+          return { content: [{ type: "text", text: "written" }] };
+        }),
+    });
+    await startDashboard({ docs: docs() });
+    const { id, client } = await sessionClient();
+
+    const call = client.callTool({ name: "docs__slow_write", arguments: {} }).catch((err: unknown) => err);
+    const card = await pendingCard(id);
+    broker.decide(id, card.id, { approve: true });
+    await expect.poll(() => fake.calls.length).toBe(1);
+
+    broker.withdraw(id, "the turn stopped");
+    await expect.poll(() => broker.cards(id)[0].carriedOut).toEqual({ ok: false });
+    release();
+    await call;
+
+    const status = (await service.listConnections()).find((c) => c.id === "docs")?.status;
+    expect(status).toEqual({ state: "connected" });
+    expect(fake.methods.filter((m) => m === "initialize")).toHaveLength(1);
+  });
+
   it("refuses an ask-policy write on Deny, with the operator's note, and never calls the server", async () => {
     await startDashboard({ docs: docs() });
     const { id, client } = await sessionClient();

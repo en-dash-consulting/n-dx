@@ -119,9 +119,8 @@ async function readOptions(
     ? autoToolNames(property).map((name) => readTools.find((t) => t.tool === name)).find((t) => t !== undefined)
     : readTools.find((t) => t.tool === hint.optionsFrom.tool);
   if (!tool) return [];
-  // The limit stops waiting; it does not abort the read. An aborted call reaches the service as
-  // a request timeout, which it reads as a dead connection and drops the client for — a slow
-  // list must not do that. The read finishes, or meets the service's own call timeout, alone.
+  // The limit stops waiting; it does not abort the read, which finishes, or meets the service's
+  // own call timeout, alone. Only the card's own signal (a stopped turn) aborts it.
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<"expired">((resolve) => { timer = setTimeout(() => resolve("expired"), timeoutMs); });
   const args = "optionsFrom" in hint ? hint.optionsFrom.arguments ?? {} : {};
