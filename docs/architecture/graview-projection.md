@@ -54,7 +54,9 @@ owns, never the checkout, so a `graview` the repository installs in its
 `node_modules` and the repository's `.npmrc` are not used.
 
 `graviewDir` is a field of the layout resolver (`.ndx/graview` or
-`.graview`), gitignored by `ndx init`. Nothing is written under the rex,
+`.graview`), gitignored by `ndx init`; every emit also writes a `.gitignore`
+of `*` inside it, so a project initialized before the projection existed
+never commits it either. Nothing is written under the rex,
 sourcevision or hench directories: even the N-DX-Item trailer cache that
 `computeRealizedBy` keeps goes under the graview dir.
 

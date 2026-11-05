@@ -96,6 +96,63 @@ describe("bin/serve.js by hand, with an ambient PORT", () => {
   });
 });
 
+/** Holds `port` on `localhost`, as another checkout's face would. */
+function hold(port: number): Promise<ReturnType<typeof createServer>> {
+  return new Promise((done, fail) => {
+    const server = createServer();
+    server.once("error", fail);
+    server.listen(port, "localhost", () => done(server));
+  });
+}
+
+/** The port serve.js says it listens on, or the error it exits with. */
+function outcome(child: ChildProcess): Promise<{ port?: number; code?: number | null; output: string }> {
+  let output = "";
+  return new Promise((done) => {
+    const onData = (chunk: Buffer) => {
+      output += String(chunk).replace(/\x1b\[[0-9;]*m/g, "");
+      const match = /localhost:(\d+)/.exec(output);
+      if (match) done({ port: Number(match[1]), output });
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.once("exit", (code) => done({ code, output }));
+  });
+}
+
+describe("bin/serve.js when another checkout's face holds the port", () => {
+  const children: ChildProcess[] = [];
+  const held: Array<ReturnType<typeof createServer>> = [];
+  const env = { ...process.env };
+  delete env["NDX_EXTENSION_NAME"];
+  delete env["PORT"];
+
+  afterAll(async () => {
+    for (const child of children) child.kill();
+    await Promise.all(held.map((server) => new Promise((done) => server.close(done))));
+  });
+
+  it("takes the next free port when the default one is held", async () => {
+    const port = await freePort();
+    held.push(await hold(port));
+    // An ambient PORT is a starting point, like the 5188 default.
+    const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
+    children.push(child);
+    const result = await outcome(child);
+    expect(result.port, result.output).toBeGreaterThan(port);
+  }, 90_000);
+
+  it("refuses a port --port names when it is held, rather than serving somewhere else", async () => {
+    const port = await freePort();
+    held.push(await hold(port));
+    const child = spawn(process.execPath, [BIN, "--port", String(port)], { env, stdio: ["pipe", "pipe", "pipe"] });
+    children.push(child);
+    const result = await outcome(child);
+    expect(result.port, result.output).toBeUndefined();
+    expect(result.code).not.toBe(0);
+  }, 90_000);
+});
+
 const sidecarFetch: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers);
   headers.set("X-Ndx-Sidecar-Secret", "test-launch-secret");
