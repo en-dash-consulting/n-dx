@@ -716,6 +716,19 @@ describe("v2 product reads", () => {
       })]);
     });
 
+    it("marks an Inbox guess tied when the top two candidates share a score", async () => {
+      const untied = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(untied.inbox[0]!.strength).not.toBe("tied");
+      // A twin of "Pay by card" scores the same against the Inbox change.
+      write("product/checkout/pay-by-card-twin.md", [
+        "---", 'id: "a0000000-0000-4000-8000-000000000003"', 'type: "capability"', 'title: "Pay by card"',
+        'slug: "pay-by-card-twin"', 'statement: "A shopper can pay for a basket with a card."',
+        'criteria: [{"id":"c1","text":"A valid card is charged once"},{"id":"c2","text":"A declined card shows why"}]', "---",
+      ]);
+      const area = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(area.inbox).toEqual([expect.objectContaining({ id: INBOX_ID, strength: "tied" })]);
+    });
+
     it("resolves the area by id and display id, and lists an applied change as recently applied", async () => {
       applyChange();
       for (const ref of [AREA_ID, "A1"]) {

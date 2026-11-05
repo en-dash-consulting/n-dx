@@ -496,7 +496,8 @@ export interface AreaInboxGuess {
   title: string;
   target: { id: string; title: string; type: "capability" | "constraint" };
   relation: PlacementRelation;
-  strength: PlacementStrength;
+  /** `tied` when the top two candidates share a score, as the Inbox page shows it. */
+  strength: PlacementStrength | "tied";
 }
 
 /** An applied change that amended or touched the area or a node in it. */

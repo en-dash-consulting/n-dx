@@ -72,6 +72,11 @@ describe("filled cards", () => {
     expect(onPlace).toHaveBeenCalledWith("i1");
   });
 
+  it("shows a tied guess with the tied strength chip, as the Inbox page does", () => {
+    mount({ ...area, inbox: [{ ...area.inbox[0]!, strength: "tied" }] });
+    expect(card("inbox").querySelector(".inbox-strength")?.getAttribute("data-strength")).toBe("tied");
+  });
+
   it("disables Place when nothing can open the placement panel", () => {
     mount(area);
     expect(card("inbox").querySelector<HTMLButtonElement>("button.inbox-place")!.disabled).toBe(true);

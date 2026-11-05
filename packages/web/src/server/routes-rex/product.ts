@@ -230,7 +230,8 @@ export interface AreaInboxGuessWire {
   title: string;
   target: { id: string; title: string; type: "capability" | "constraint" };
   relation: "touches" | "amends";
-  strength: "strong" | "possible" | "weak";
+  /** `tied` when the top two candidates share a score, as the Inbox page shows it. */
+  strength: "strong" | "possible" | "weak" | "tied";
 }
 
 /** An applied change that amended or touched the area or a node in it. */
@@ -741,7 +742,7 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
       const top = suggestion.shortlist[0];
       const target = top ? index.resolve(top.target) : undefined;
       if (target && (target.type === "capability" || target.type === "constraint") && owned.has(target.id)) {
-        inbox.push({ ...brief, target: { id: target.id, title: target.title, type: target.type }, relation: suggestion.relation, strength: top.strength });
+        inbox.push({ ...brief, target: { id: target.id, title: target.title, type: target.type }, relation: suggestion.relation, strength: suggestion.tied ? "tied" : top.strength });
       }
     } else if (relatesHere(change)) {
       const delta = (change.amends ?? []).find((a) => owned.has(index.resolve(a.target)?.id ?? ""))?.delta;
