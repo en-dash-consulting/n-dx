@@ -341,8 +341,9 @@ export class ConnectionService {
   /**
    * Call `tool` on `connection`. Throws {@link ConnectionUnavailableError} when
    * the connection cannot be reached; a failure mid-call marks it unavailable
-   * (needs-sign-in for a refused token) so the next call reconnects. A tool's
-   * own error is its result's `isError`.
+   * (needs-sign-in for a refused token) so the next call reconnects. A call
+   * aborted through `signal` rethrows the abort and leaves the connection and
+   * its client alone. A tool's own error is its result's `isError`.
    */
   async callTool(
     connection: string,
@@ -360,6 +361,9 @@ export class ConnectionService {
         timeout: this.callTimeoutMs,
       })) as CallToolResult;
     } catch (err) {
+      // The caller gave up (a stopped turn); the server did nothing wrong, so the
+      // connection stays as it was and other calls on its client are untouched.
+      if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new DOMException("The call was aborted", "AbortError");
       if (isConnectionFailure(err)) {
         this.fail(slot, live, err);
         throw new ConnectionUnavailableError(connection, slot.status as Exclude<ConnectionState, { state: "connected" }>);

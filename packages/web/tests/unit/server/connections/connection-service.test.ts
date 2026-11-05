@@ -453,6 +453,61 @@ describe("ConnectionService", () => {
       expect(initializes(server)).toBe(before);
     });
 
+    describe("a call aborted by its caller", () => {
+      const statusOf = async (svc: ConnectionService) => (await svc.listConnections()).find((c) => c.id === "docs")?.status;
+
+      it("rethrows the abort and leaves the connection connected on the same client", async () => {
+        const { server, release } = await slowServer();
+        const { svc } = service({ docs: { transport: "http", url: server.url } });
+        await svc.listTools();
+        const before = initializes(server);
+        const abort = new AbortController();
+        const call = svc.callTool("docs", "slow", {}, abort.signal);
+        const settled = expect(call).rejects.toMatchObject({ name: "AbortError" });
+        await expect.poll(() => server.calls.length).toBe(1);
+
+        abort.abort();
+        await settled;
+
+        // listConnections reconnects a failed connection, so a reconnect would show as a new initialize.
+        expect(await statusOf(svc)).toEqual({ state: "connected" });
+        expect(initializes(server)).toBe(before);
+        release();
+        expect(text(await svc.callTool("docs", "read_item", { id: "4" }))).toBe("item 4");
+        expect(initializes(server)).toBe(before);
+      });
+
+      it("does not cut off another call in flight on the same client", async () => {
+        const { server, release } = await slowServer();
+        const { svc } = service({ docs: { transport: "http", url: server.url } });
+        await svc.listTools();
+        const abort = new AbortController();
+        const aborted = svc.callTool("docs", "slow", {}, abort.signal);
+        const settled = expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+        const other = svc.callTool("docs", "slow", {});
+        await expect.poll(() => server.calls.length).toBe(2);
+
+        abort.abort();
+        await settled;
+        release();
+
+        expect(text(await other)).toBe("done");
+        expect(await statusOf(svc)).toEqual({ state: "connected" });
+      });
+
+      it("still marks the connection unavailable when the service's own call timeout fires", async () => {
+        const { server } = await slowServer();
+        const { svc } = service({ docs: { transport: "http", url: server.url } }, { callTimeoutMs: 300 });
+        await svc.listTools();
+
+        // listConnections would reconnect, so read the status the failure left on the error.
+        await expect(svc.callTool("docs", "slow", {}, new AbortController().signal)).rejects.toMatchObject({
+          name: "ConnectionUnavailableError",
+          status: { state: "unavailable", reason: expect.stringMatching(/timed out/i) },
+        });
+      });
+    });
+
     it("reconnects on next use when the url changes", async () => {
       const first = await httpServer();
       const second = await httpServer();
