@@ -131,8 +131,12 @@ absent field, and every edge's relation, target kind and cardinality.
 `emit` warns about a misfit and `check` fails on one, naming the record,
 because `graview check` judges the declaration alone and a misfit would
 otherwise surface only as a `validateGraph` finding when a face loads the
-pair. The adapter's tests hold `fit.ts` to `@graview/core`'s
-`validateGraph`, so the two cannot drift apart unnoticed.
+pair. The adapter's tests run a set of bad snapshots through both `fit.ts`
+and `@graview/core`'s `validateGraph` and fail when Graview flags one that
+`fit.ts` passes; a field type `fit.ts` does not know (a url, an email) is
+left to Graview. Rex, git and sourcevision set no length limits, so the
+snapshot builder cuts any string, text or list to Graview's caps and warns,
+rather than let a long description or commit subject fail `check`.
 
 Ids are n-dx's own, so a Graview answer can be taken straight back to the tool
 that owns the node. Edges whose far end is missing are dropped, never

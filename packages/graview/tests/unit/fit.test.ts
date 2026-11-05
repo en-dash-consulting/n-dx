@@ -7,9 +7,9 @@ import { emitProjection } from "../../src/emit.js";
 import { buildSnapshot } from "../../src/snapshot.js";
 import { resolveLayout } from "../../src/llm-gateway.js";
 import { documentFor, loadDocument } from "../../src/document.js";
-import { fitSnapshot, describeMisfits, LIST_MAX, STRING_MAX } from "../../src/fit.js";
+import { clampToCaps, fitSnapshot, describeMisfits, LIST_MAX, STRING_MAX, TEXT_MAX } from "../../src/fit.js";
 import type { GraphSnapshot } from "../../src/types.js";
-import { makeProject, runRecord } from "../helpers/project.js";
+import { makeProject, runRecord, ZONES } from "../helpers/project.js";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -93,7 +93,7 @@ describe("the snapshot fits the declaration", () => {
     expect(said).toEqual(expect.arrayContaining([
       `c1 title: change.title is ${STRING_MAX + 1} characters, over Graview's ${STRING_MAX}`,
       expect.stringMatching(/^t1 tags: task\.tags holds 7, which is not a string/),
-      "z2 fileCount: zone.fileCount is 2.5, not a whole number",
+      "z2 fileCount: zone.fileCount is 2.5, not a whole number Graview can hold",
       `z3 entryPoints: zone.entryPoints holds ${LIST_MAX + 1} items, over Graview's ${LIST_MAX}`,
       'r1 startedAt: run.startedAt is "not a date", not a date and time',
       'c2 fix: change.fix is "yes", not true or false',
@@ -142,5 +142,44 @@ describe("the snapshot fits the declaration", () => {
     expect(report.snapshot.edges.some((e) => e.kind === "blockedBy" && e.to === EPIC)).toBe(false);
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^1 blockedBy reference names a product node.*33333333-3333-3333-3333-333333333333 -> 11111111/));
     expect(fitSnapshot(doc, report.snapshot), describeMisfits(fitSnapshot(doc, report.snapshot))).toEqual([]);
+  });
+
+  it("cuts what the sources wrote to Graview's caps, so a valid PRD never fails check for its length", () => {
+    const nodes = [
+      { id: "c9", kind: "change", title: "t".repeat(STRING_MAX + 40), status: "pending", tags: ["ok", "x".repeat(STRING_MAX + 1)] },
+      { id: "z9", kind: "zone", name: "Big", description: "d".repeat(TEXT_MAX + 1), entryPoints: Array.from({ length: LIST_MAX + 13 }, (_, i) => `src/${i}.ts`) },
+      { id: "c10", kind: "change", title: "Short", status: "pending" },
+    ];
+    const cut = clampToCaps(doc, nodes);
+    expect([...cut.keys()].sort()).toEqual(["change.tags", "change.title", "zone.description", "zone.entryPoints"]);
+    expect((nodes[0]!.title as string).length).toBe(STRING_MAX);
+    expect((nodes[0]!.title as string).endsWith("…")).toBe(true);
+    expect((nodes[0]!.tags as string[])[1]!.length).toBe(STRING_MAX);
+    expect((nodes[1]!.description as string).length).toBe(TEXT_MAX);
+    expect((nodes[1]!.entryPoints as string[]).length).toBe(LIST_MAX);
+    expect(nodes[2]!.title).toBe("Short");
+    expect(fitSnapshot(doc, { nodes, edges: [] })).toEqual([]);
+  });
+
+  it("builds a snapshot that fits from a zone with more entry points and a longer description than Graview takes, and says so", async () => {
+    const root = makeProject();
+    roots.push(root);
+    const layout = resolveLayout(root);
+    const zones = structuredClone(ZONES);
+    zones.zones[1]!.description = "d".repeat(TEXT_MAX + 5);
+    zones.zones[1]!.entryPoints = Array.from({ length: LIST_MAX + 1 }, (_, i) => `src/catalog/${String(i).padStart(3, "0")}.ts`);
+    writeFileSync(join(layout.sourcevisionDir, "zones.json"), JSON.stringify(zones));
+    const warn = vi.fn();
+    const report = await buildSnapshot(layout, { warn, cacheDir: join(root, "cache") });
+    const catalog = report.snapshot.nodes.find((n) => n.id === "catalog")!;
+    expect((catalog.entryPoints as string[]).length).toBe(LIST_MAX);
+    expect((catalog.description as string).length).toBe(TEXT_MAX);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^cut to Graview's length caps .*zone\.description \(1\).*zone\.entryPoints \(1\)/));
+    expect(fitSnapshot(doc, report.snapshot)).toEqual([]);
+  });
+
+  it("holds an integer to what Graview can hold: a whole number past 2^53 is not one", () => {
+    const said = fitSnapshot(doc, { nodes: [{ ...zone, fileCount: 2 ** 53 + 2 }], edges: [] }).map((m) => m.message);
+    expect(said).toEqual([expect.stringMatching(/^zone\.fileCount is \d+, not a whole number Graview can hold$/)]);
   });
 });

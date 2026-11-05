@@ -75,7 +75,8 @@ function wrongType(spec: FieldSpec, value: unknown): string | undefined {
     case "integer":
     case "number": {
       if (typeof value !== "number" || !Number.isFinite(value)) return `is ${show(value)}, not a number`;
-      if (spec.type === "integer" && !Number.isInteger(value)) return `is ${value}, not a whole number`;
+      // Graview's z.int() is a safe integer: a whole number past 2^53 is refused too.
+      if (spec.type === "integer" && !Number.isSafeInteger(value)) return `is ${value}, not a whole number Graview can hold`;
       if (spec.min !== undefined && value < spec.min) return `is ${value}, below the declared minimum ${spec.min}`;
       if (spec.max !== undefined && value > spec.max) return `is ${value}, above the declared maximum ${spec.max}`;
       if (spec.step !== undefined && spec.step > 0 && Math.abs(value / spec.step - Math.round(value / spec.step)) > 1e-9) {
@@ -162,6 +163,42 @@ export function fitSnapshot(doc: GraviewDocumentData, snapshot: GraphSnapshot): 
     }
   }
   return misfits;
+}
+
+/**
+ * Cut what rex, git or sourcevision wrote to Graview's caps, so a valid PRD
+ * never fails `check` for its length: a string to 500 characters, a text to
+ * 20,000, a list to 200 items of at most 500 characters each. A cut string
+ * ends in an ellipsis. Returns how many fields were cut, by kind and field,
+ * for one warning; the nodes are changed in place.
+ */
+export function clampToCaps(doc: GraviewDocumentData, nodes: Iterable<Record<string, unknown> & { kind: string }>): Map<string, number> {
+  const kinds = doc.kinds as unknown as Record<string, KindSpec>;
+  const cut = new Map<string, number>();
+  const count = (kind: string, field: string) => cut.set(`${kind}.${field}`, (cut.get(`${kind}.${field}`) ?? 0) + 1);
+  const shorten = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+  for (const node of nodes) {
+    const fields = kinds[node.kind]?.fields;
+    if (!fields) continue;
+    for (const [field, spec] of Object.entries(fields)) {
+      const value = node[field];
+      if ((spec.type === "string" || spec.type === "text") && typeof value === "string") {
+        const max = spec.type === "string" ? STRING_MAX : TEXT_MAX;
+        if (value.length > max) {
+          node[field] = shorten(value, max);
+          count(node.kind, field);
+        }
+      } else if (spec.type === "list" && Array.isArray(value)) {
+        const strings = spec.of !== "number" && spec.of !== "date" && spec.of !== "image" && spec.of !== "file";
+        const items = value.slice(0, LIST_MAX).map((item) => (strings && typeof item === "string" ? shorten(item, STRING_MAX) : item));
+        if (items.length < value.length || items.some((item, i) => item !== value[i])) {
+          node[field] = items;
+          count(node.kind, field);
+        }
+      }
+    }
+  }
+  return cut;
 }
 
 /** The misfits as lines a person reads, the first `limit` of them and a count of the rest. */
