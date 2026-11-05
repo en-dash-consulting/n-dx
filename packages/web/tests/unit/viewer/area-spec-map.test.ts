@@ -95,6 +95,14 @@ describe("SpecMap", () => {
     expect(el.querySelector('[role="status"]')?.textContent).toBe("This area has no capabilities yet.");
   });
 
+  it("says the capabilities are retired when every one is, not that none exist", () => {
+    const el = mount({ capabilities: [row({ id: "a", status: "retired" }), row({ id: "b", status: "retired" })] });
+    const text = el.querySelector('[role="status"]')?.textContent;
+    expect(text).toBe("All of this area's capabilities are retired.");
+    expect(text).not.toContain("no capabilities yet");
+    expect(el.querySelector(".pam-block")).toBeNull();
+  });
+
   it("selects a block with a click on its native button and marks it pressed", () => {
     const onSelect = vi.fn();
     const el = mount({ onSelect, selectedId: "cap-placement" });

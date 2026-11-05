@@ -80,7 +80,10 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
   return h("section", { class: "asm", "aria-label": "Spec map" },
     h(ConstraintBands, { constraints }),
     capabilities.length === 0
-      ? h("div", { class: "empty-state", role: "status" }, "This area has no capabilities yet.")
+      ? h("div", { class: "empty-state", role: "status" },
+          allCapabilities.length === 0
+            ? "This area has no capabilities yet."
+            : "All of this area's capabilities are retired.")
       : h("div", { class: "pam" },
           h("div", { class: "pam-blocks" },
             orderCapabilities(capabilities).map((row) =>
