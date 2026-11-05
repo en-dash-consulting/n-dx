@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import {
   DEFAULT_TIMEOUT_MS,
   NO_DEFAULT_TIMEOUT_COMMANDS,
+  SERVER_SUBCOMMANDS,
+  subcommandOf,
   resolveCommandTimeout,
   withCommandTimeout,
 } from "../../packages/core/cli-timeout.js";
@@ -71,9 +73,36 @@ describe("resolveCommandTimeout", () => {
     expect(resolveCommandTimeout("sv", {}, "analyze")).toBe(DEFAULT_TIMEOUT_MS);
   });
 
-  it("cli.js passes the first positional argument as the subcommand, so a leading flag does not hide a server", () => {
+  const SUBCOMMAND_CASES = [
+    ["rex", ["mcp", "."], "mcp"],
+    ["rex", ["-q", "mcp", "."], "mcp"],
+    ["rex", ["--format", "json", "mcp", "."], "mcp"],
+    ["rex", ["--format=json", "mcp", "."], "mcp"],
+    ["rex", ["add", "--title", "mcp"], "add"],
+    ["rex", ["status", "."], "status"],
+    ["sv", ["--quiet", "serve", "."], "serve"],
+    ["graview", ["serve", ".", "--port", "4000"], "serve"],
+    ["graview", ["--place", "home", "describe", "."], "home"],
+    ["rex", [], undefined],
+  ];
+
+  it.each(SUBCOMMAND_CASES)("reads the subcommand of %s %j as %s: a flag, or a flag's value before a server, does not hide it", (command, rest, expected) => {
+    expect(subcommandOf(command, rest)).toBe(expected);
+  });
+
+  it("cli.js times a command by subcommandOf, so `ndx rex --format json mcp .` is the rex MCP server", () => {
     const cli = readFileSync(new URL("../../packages/core/cli.js", import.meta.url), "utf-8");
-    expect(cli).toMatch(/resolveCommandTimeout\(command \?\? "", projectConfig, rest\.find\(\(arg\) => !arg\.startsWith\("-"\)\)\)/);
+    expect(cli).toContain('resolveCommandTimeout(command ?? "", projectConfig, subcommandOf(command ?? "", rest))');
+    expect(resolveCommandTimeout("rex", { cli: { timeoutMs: 3000 } }, subcommandOf("rex", ["--format", "json", "mcp", "."]))).toBe(0);
+  });
+
+  it("the dashboard's copy of the server subcommands matches core's", () => {
+    const web = readFileSync(new URL("../../packages/web/src/server/routes-cli-timeout.ts", import.meta.url), "utf-8");
+    const literal = /const SERVER_SUBCOMMANDS: Record<string, readonly string\[\]> = (\{[^\n]*\});/.exec(web)?.[1];
+    expect(literal, "routes-cli-timeout.ts no longer declares SERVER_SUBCOMMANDS on one line").toBeDefined();
+    const theirs = JSON.parse(literal.replace(/([a-z]+):/g, '"$1":'));
+    const ours = Object.fromEntries([...SERVER_SUBCOMMANDS].map(([k, v]) => [k, [...v].sort()]));
+    expect(Object.fromEntries(Object.entries(theirs).map(([k, v]) => [k, [...v].sort()]))).toEqual(ours);
   });
 
   it("the dashboard's copy of the server list matches core's", () => {

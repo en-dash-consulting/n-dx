@@ -53,6 +53,28 @@ interface CliTimeoutsPutBody {
 const DEFAULT_TIMEOUT_MS = 1_800_000; // 30 minutes
 // tests/unit/cli-timeout.test.js holds this list to core's NO_DEFAULT_TIMEOUT_COMMANDS.
 const NO_DEFAULT_TIMEOUT_COMMANDS = ["start", "web", "dev", "mcp"];
+// Subcommands that serve under a command that otherwise runs once (core's SERVER_SUBCOMMANDS, pinned by the same test).
+const SERVER_SUBCOMMANDS: Record<string, readonly string[]> = { graview: ["serve", "mcp"], rex: ["mcp"], sourcevision: ["mcp", "serve"], sv: ["mcp", "serve"] };
+
+/**
+ * The subcommand a command line names, as core's `subcommandOf` reads it: the
+ * first word that is not a flag, unless that word may be a flag's value and
+ * the next one names a server (`rex --format json mcp .`).
+ */
+export function subcommandOf(command: string, rest: readonly string[]): string | undefined {
+  const servers = SERVER_SUBCOMMANDS[command];
+  const words: { arg: string; afterFlag: boolean }[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i]!;
+    if (arg.startsWith("-")) continue;
+    const prev = i > 0 ? rest[i - 1]! : "";
+    words.push({ arg, afterFlag: prev.startsWith("-") && !prev.includes("=") });
+  }
+  const [first, second] = words;
+  if (!first) return undefined;
+  if (servers && first.afterFlag && !servers.includes(first.arg) && second && servers.includes(second.arg)) return second.arg;
+  return first.arg;
+}
 /** Per-command code defaults overriding DEFAULT_TIMEOUT_MS (mirrors core's COMMAND_TIMEOUT_DEFAULTS). */
 const COMMAND_TIMEOUT_DEFAULTS: Record<string, number> = {
   work: 14_400_000, // 4 hours — bounded by vendor session limits
@@ -121,14 +143,16 @@ function extractCliTimeouts(projectDir: string): CliTimeoutsResponse {
  *
  * Returns 0 for "no timeout".
  */
-export function resolveEffectiveCliTimeoutMs(projectDir: string, command: string): number {
+export function resolveEffectiveCliTimeoutMs(projectDir: string, command: string, rest: readonly string[] = []): number {
   const { timeoutMs, timeouts, defaultTimeoutMs, noDefaultTimeoutCommands } = extractCliTimeouts(projectDir);
 
   if (command in timeouts) {
     return timeouts[command];
   }
-  // A server is bounded only by its own key, never by the global limit: core's order.
-  if (noDefaultTimeoutCommands.includes(command)) {
+  // A server is bounded only by its own key, never by the global limit: core's order. That includes
+  // a server subcommand (`graview serve`, `sv serve`, `rex mcp`) under a command that otherwise runs once.
+  const subcommand = subcommandOf(command, rest);
+  if (noDefaultTimeoutCommands.includes(command) || (subcommand !== undefined && (SERVER_SUBCOMMANDS[command] ?? []).includes(subcommand))) {
     return 0;
   }
   if (timeoutMs !== null) {

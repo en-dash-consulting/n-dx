@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleCliTimeoutRoute, resolveEffectiveCliTimeoutMs } from "../../../src/server/routes-cli-timeout.js";
+import { handleCliTimeoutRoute, resolveEffectiveCliTimeoutMs, subcommandOf } from "../../../src/server/routes-cli-timeout.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs CLI timeout routes. */
@@ -316,5 +316,31 @@ describe("resolveEffectiveCliTimeoutMs, in core's order", () => {
     expect(resolveEffectiveCliTimeoutMs(dir, "mcp")).toBe(0);
     expect(resolveEffectiveCliTimeoutMs(dir, "web")).toBe(60000);
     expect(resolveEffectiveCliTimeoutMs(dir, "analyze")).toBe(5000);
+  });
+
+  it("does not bound a server subcommand either, the way a Sidecar run_command spawns it", async () => {
+    await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 5000 } }));
+    expect(resolveEffectiveCliTimeoutMs(dir, "graview", ["serve", "."])).toBe(0);
+    expect(resolveEffectiveCliTimeoutMs(dir, "sv", ["serve", "."])).toBe(0);
+    expect(resolveEffectiveCliTimeoutMs(dir, "rex", ["--format", "json", "mcp", "."])).toBe(0);
+    expect(resolveEffectiveCliTimeoutMs(dir, "graview", ["check", "."])).toBe(5000);
+    expect(resolveEffectiveCliTimeoutMs(dir, "rex", ["add", "--title", "mcp"])).toBe(5000);
+  });
+
+  const SUBCOMMAND_CASES: [string, string[], string | undefined][] = [
+    ["rex", ["mcp", "."], "mcp"],
+    ["rex", ["-q", "mcp", "."], "mcp"],
+    ["rex", ["--format", "json", "mcp", "."], "mcp"],
+    ["rex", ["--format=json", "mcp", "."], "mcp"],
+    ["rex", ["add", "--title", "mcp"], "add"],
+    ["rex", ["status", "."], "status"],
+    ["sv", ["--quiet", "serve", "."], "serve"],
+    ["graview", ["serve", ".", "--port", "4000"], "serve"],
+    ["graview", ["--place", "home", "describe", "."], "home"],
+    ["rex", [], undefined],
+  ];
+
+  it.each(SUBCOMMAND_CASES)("reads the subcommand of %s %j as %s, as core does", (command, rest, expected) => {
+    expect(subcommandOf(command, rest)).toBe(expected);
   });
 });

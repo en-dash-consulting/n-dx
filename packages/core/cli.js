@@ -49,7 +49,7 @@ import {
   resolveAutoConfirm,
   runConfirmationPrompt,
 } from "./self-heal-confirm.js";
-import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
+import { resolveCommandTimeout, subcommandOf, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
   runWeb,
@@ -3877,8 +3877,9 @@ async function main() {
     ? process.cwd()
     : resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
   const projectConfig = extension ? {} : await loadProjectConfig(dir).catch(() => ({}));
-  // The subcommand is the first positional: `ndx rex -q mcp .` is still the rex MCP server.
-  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig, rest.find((arg) => !arg.startsWith("-")));
+  // The subcommand is the first word that is not a flag or a flag's value: `ndx rex -q mcp .` and
+  // `ndx rex --format json mcp .` are both the rex MCP server.
+  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig, subcommandOf(command ?? "", rest));
 
   // Resolve BETA experimental flags from the same config read, so childEnv() can
   // forward them to sub-CLIs without a second filesystem hit.

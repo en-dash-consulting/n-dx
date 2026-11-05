@@ -1438,7 +1438,7 @@ export async function startSidecarCommand(
     const ndx = resolveNdxBin(ctx);
     bin = ndx.bin;
     args = [...ndx.args, ...rest];
-    timeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, rest[0] ?? "");
+    timeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, rest[0] ?? "", rest.slice(1));
   } else if (program === "git") {
     bin = "git";
     args = rest;

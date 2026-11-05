@@ -46,12 +46,39 @@ export const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev", "mcp"
  * them open for its whole session, and a timeout kills its connection.
  */
 const SV_SERVERS = new Set(["mcp", "serve"]);
-const SERVER_SUBCOMMANDS = new Map([
+// Exported, like NO_DEFAULT_TIMEOUT_COMMANDS, so tests/unit/cli-timeout.test.js pins the dashboard's copy to it.
+export const SERVER_SUBCOMMANDS = new Map([
   ["graview", new Set(["serve", "mcp"])],
   ["rex", new Set(["mcp"])],
   ["sourcevision", SV_SERVERS],
   ["sv", SV_SERVERS],
 ]);
+
+/**
+ * The subcommand a command line names, for the server rules: its first word
+ * that is not a flag. A word straight after a flag may be that flag's value
+ * (`ndx rex --format json mcp .`), so when the word after it names one of the
+ * command's servers, that is the subcommand; `ndx rex -q mcp .` and
+ * `ndx rex mcp .` read `mcp` either way.
+ *
+ * @param {string} command - The top-level command (`rex`, `sv`, `graview`, …)
+ * @param {string[]} rest - The arguments after it
+ * @returns {string | undefined}
+ */
+export function subcommandOf(command, rest) {
+  const servers = SERVER_SUBCOMMANDS.get(command);
+  const words = [];
+  for (let i = 0; i < rest.length; i++) {
+    const arg = String(rest[i]);
+    if (arg.startsWith("-")) continue;
+    const prev = i > 0 ? String(rest[i - 1]) : "";
+    words.push({ arg, afterFlag: prev.startsWith("-") && !prev.includes("=") });
+  }
+  const [first, second] = words;
+  if (!first) return undefined;
+  if (servers && first.afterFlag && !servers.has(first.arg) && second && servers.has(second.arg)) return second.arg;
+  return first.arg;
+}
 
 function isServer(command, subcommand) {
   return NO_DEFAULT_TIMEOUT_COMMANDS.has(command) || (SERVER_SUBCOMMANDS.get(command)?.has(subcommand) ?? false);
