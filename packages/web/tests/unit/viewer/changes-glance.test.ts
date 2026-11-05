@@ -54,7 +54,8 @@ describe("ChangesGlance", () => {
     expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "c1" });
   });
 
-  it("ends a long list in N more and lists no Inbox rows", async () => {
+  // Inbox exclusion is the summary route's job: routes-rex-product.test.ts asserts `open` omits held changes.
+  it("ends a long list in N more", async () => {
     await mount(Array.from({ length: 14 }, (_, i) => change(`c${i}`)));
     expect(root.querySelectorAll(".cg-row")).toHaveLength(MAX_GLANCE_ROWS);
     expect(root.querySelector(".cg-more")!.textContent).toBe("2 more");
