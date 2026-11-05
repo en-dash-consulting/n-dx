@@ -177,7 +177,7 @@ export {
 } from "@n-dx/rex";
 
 // ---- Rex health -------------------------------------------------------------
-export { computeHealthScore } from "@n-dx/rex";
+export { computeHealthScore, checkStaleReleasePlans } from "@n-dx/rex";
 
 // ---- Rex reorganize ---------------------------------------------------------
 export { detectReorganizations, applyProposals } from "@n-dx/rex";

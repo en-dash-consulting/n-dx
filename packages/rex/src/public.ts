@@ -490,6 +490,7 @@ export type { ReshapeReasonOptions, ReshapeReasonResult } from "./analyze/reshap
 export {
   computeHealthScore,
   formatHealthScore,
+  checkStaleReleasePlans,
 } from "./core/health.js";
 export type {
   StructureHealthScore, HealthDimensions, HealthOptions,

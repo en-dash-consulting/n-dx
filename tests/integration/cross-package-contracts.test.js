@@ -1004,7 +1004,7 @@ describe("gateway export auto-detection", () => {
         "loadTrailerCommits", "loadCommitFiles",
         "handleProductEdit", "ProductEditError", "withPrdModelTransaction", "applyChange",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
-        "computeRequirementsSummary", "computeHealthScore",
+        "computeRequirementsSummary", "computeHealthScore", "checkStaleReleasePlans",
         "detectReorganizations", "applyProposals", "applyReshape",
         "reasonForReshape", "isPriority",
         "isRequirementCategory", "isValidationType",

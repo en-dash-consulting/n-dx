@@ -14,6 +14,9 @@ import {
   walkTree,
   findItem,
   collectAllIds,
+  prdLayout,
+  loadPrdModel,
+  checkStaleReleasePlans,
 } from "./rex-gateway.js";
 import { type ItemType, TYPE_PARENTS, isItemType, itemTypeOf } from "../shared/index.js";
 import { loadPRDSync } from "./prd-io.js";
@@ -199,7 +202,7 @@ function validateDAG(items: PRDItem[]): { valid: boolean; errors: Array<{ messag
   return { valid: errors.length === 0, errors };
 }
 
-function runValidation(items: PRDItem[]): {
+function runValidation(items: PRDItem[], extraChecks: CheckResult[] = []): {
   ok: boolean;
   checks: CheckResult[];
   summary: { total: number; passed: number; failed: number; warnings: number };
@@ -274,6 +277,8 @@ function runValidation(items: PRDItem[]): {
       errors: blockedNoDeps,
     });
   }
+
+  checks.push(...extraChecks);
 
   const errorChecks = checks.filter((c) => !c.pass && c.severity !== "warn");
   const ok = errorChecks.length === 0;
@@ -465,21 +470,40 @@ export function handleValidationRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): boolean | Promise<boolean> {
   const url = req.url || "/";
   const method = req.method || "GET";
 
   // GET /api/rex/validate
   if (url.startsWith(VALIDATION_PREFIX) && method === "GET") {
-    const doc = loadPRD(ctx);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    return (async () => {
+      const doc = loadPRD(ctx);
+      if (!doc) {
+        errorResponse(res, 404, "No PRD data found");
+        return true;
+      }
 
-    const result = runValidation(doc.items);
-    jsonResponse(res, 200, result);
-    return true;
+      // The same rule `rex validate` runs, so both name the same stale plans.
+      // Only a v2 tree has releases and a change layer to plan against.
+      const extra: CheckResult[] = [];
+      if ((await prdLayout(ctx.rexDir)) === "v2") {
+        try {
+          const stale = checkStaleReleasePlans((await loadPrdModel(ctx.rexDir)).tree);
+          extra.push({
+            name: "release plans",
+            pass: stale.length === 0,
+            severity: "warn",
+            errors: stale.map((f) => ({ message: f.message, itemId: f.nodeId })),
+          });
+        } catch (err) {
+          // An unreadable tree must not read as "no stale plans".
+          errorResponse(res, 500, (err as Error).message);
+          return true;
+        }
+      }
+      jsonResponse(res, 200, { ...runValidation(doc.items, extra), ranAt: new Date().toISOString() });
+      return true;
+    })();
   }
 
   // GET /api/rex/dependency-graph
