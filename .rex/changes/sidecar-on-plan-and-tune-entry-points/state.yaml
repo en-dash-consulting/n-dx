@@ -67,10 +67,13 @@ items:
     lastModified: "2026-11-05T19:21:20.916Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d3112cec-53b7-4ce9-b011-209af418fa1b":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T21:38:13.762Z"
-    activeIntervals: [{"start":"2026-11-05T21:38:13.762Z"}]
-    lastModified: "2026-11-05T21:38:18.272Z"
+    completedAt: "2026-11-05T22:31:55.166Z"
+    endedAt: "2026-11-05T22:31:55.166Z"
+    activeIntervals: [{"end":"2026-11-05T22:29:57.540Z","start":"2026-11-05T21:38:13.762Z"},{"end":"2026-11-05T22:31:55.166Z","start":"2026-11-05T22:31:55.166Z"}]
+    failureReason: "Test gate failed [command: npm run test]: `npm run test` did not finish within 30m 0s and was killed; the whole process tree was gone 0.2s after the kill began (ran for 31m 45s in all). This process only reached its deadline at 31m 45s — i…\nFailing tests (12):\n- makes no local-scope registration at all by default\n- registers against the initialised project, not the caller's cwd\n- bin \"./bin/hench.js\" responds to --help without ENOENT\n- web really does compose no prompt text\n- uses the llm-client estimator rather than a second one\n- resolves tool paths from package.json bin fields\n- tests/e2e/cli-orchestration.test.js > resolves tool paths from package.json bin fields\n- tests/e2e/mcp-registration-scope.test.js > makes no local-scope registration at all by default\n… and 4 more"
+    lastModified: "2026-11-05T22:31:55.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "df78a8d3-c5a4-434e-86b9-840a59b77c2f":
     lastModified: "2026-11-05T01:08:20.159Z"
