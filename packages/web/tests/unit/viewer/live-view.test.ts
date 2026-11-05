@@ -197,7 +197,13 @@ describe("the rendered page", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url: String(url), init });
       if (String(url).includes("/api/live")) return { ok: true, status: 200, json: async () => body };
-      if (String(url).includes("/api/hench/throttle")) return { ok: true, status: 200, json: async () => ({ paused: false }) };
+      if (String(url).includes("/api/hench/throttle")) {
+        if (init?.method === "PUT") {
+          const { maxConcurrent } = JSON.parse(String(init.body));
+          return { ok: true, status: 200, json: async () => ({ ok: true, concurrencyOverride: maxConcurrent, effectiveMaxConcurrent: maxConcurrent ?? 3 }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ paused: false, effectiveMaxConcurrent: 3, concurrencyOverride: null, configMaxConcurrent: 3 }) };
+      }
       if (String(url).includes("/api/hench/memory")) return { ok: true, status: 200, json: async () => MEMORY };
       if (String(url).includes("/api/hench/concurrency")) return { ok: true, status: 200, json: async () => CONCURRENCY };
       return { ok: true, status: 200, json: async () => ({}) };
@@ -247,6 +253,30 @@ describe("the rendered page", () => {
     expect(labels).toContain("Memory");
     expect(labels.some((l) => l?.startsWith("Hench slots"))).toBe(true);
     expect(root.querySelector(".live-side")?.textContent).not.toMatch(/Memory|slots/i);
+  });
+
+  it("sets and clears the concurrency override from the Hench slots tile", async () => {
+    await mount();
+    await act(async () => { await flush(); });
+    const stepper = root.querySelector(".live-machine .live-slots-stepper")!;
+    expect(stepper.textContent).toContain("limit 3");
+    expect(stepper.textContent).not.toContain("Reset");
+
+    await act(async () => {
+      (stepper.querySelector('[aria-label="Fewer slots"]') as HTMLButtonElement).click();
+      await flush();
+    });
+    const put = calls.find((c) => c.init?.method === "PUT")!;
+    expect(put.url).toBe("/api/hench/throttle");
+    expect(JSON.parse(String(put.init!.body))).toEqual({ maxConcurrent: 2 });
+    expect(root.querySelector(".live-slots-stepper")!.textContent).toContain("limit 2");
+
+    await act(async () => {
+      ([...root.querySelectorAll(".live-slots-stepper button")].find((b) => b.textContent === "Reset") as HTMLButtonElement).click();
+      await flush();
+    });
+    const last = calls.filter((c) => c.init?.method === "PUT").pop()!;
+    expect(JSON.parse(String(last.init!.body))).toEqual({ maxConcurrent: null });
   });
 
   it("shows idle with Start working and both analysis options when nothing runs", async () => {

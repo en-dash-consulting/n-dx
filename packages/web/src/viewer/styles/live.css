@@ -91,6 +91,15 @@
   white-space: nowrap;
 }
 .live-tile-detail { font-size: var(--font-sm); color: var(--text-dim); }
+.live-slots-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5, 6px);
+  margin-top: var(--space-1, 4px);
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
 
 /* ── Body ───────────────────────────────────────────────────────────── */
 

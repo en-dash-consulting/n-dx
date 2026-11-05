@@ -761,6 +761,10 @@ export function handleConfigEndpoint(
   return true;
 }
 
+/**
+ * GET /api/ws/health — WebSocket connection counters for scripts and external
+ * monitors. A server probe only: no dashboard view reads it.
+ */
 function handleWsHealthEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
