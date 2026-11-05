@@ -808,3 +808,23 @@
 
 .area-steward-none { color: var(--text-muted); font-style: italic; }
 .area-actions { display: flex; gap: var(--space-2); margin-left: auto; }
+
+/* ── Area spec map (views/area-spec-map.ts) ────────────────────── */
+
+.asm { display: flex; flex-direction: column; gap: var(--space-2); }
+.asm .pam { padding: 0; }
+.pam-block[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.asm-bands { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.asm-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-muted);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.asm-band-defective { border-left-color: var(--red); }
+.asm-band-title { font-weight: 600; overflow-wrap: anywhere; }

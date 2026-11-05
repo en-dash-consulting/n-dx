@@ -61,8 +61,8 @@ export interface AreaBlockModel {
   label: string;
   /** What the block's size stands for. */
   size: number;
-  /** What `size` counts, for the accessible name ("capabilities"). */
-  unit: string;
+  /** What `size` counts, for the accessible name. */
+  unit: "capabilities" | "criteria";
   status: BlockStatus;
   openChanges: number;
   /** The area's slug; null on the block that folds smaller areas. */
@@ -114,7 +114,9 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /** The block's accessible name: what it is, how big, its status, and its open changes. */
 export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" | "status" | "openChanges">): string {
-  const unit = block.unit === "capabilities" ? plural(block.size, "capability", "capabilities") : `${block.size} ${block.unit}`;
+  const unit = block.unit === "capabilities"
+    ? plural(block.size, "capability", "capabilities")
+    : plural(block.size, "criterion", "criteria");
   const open = block.openChanges === 0 ? "no open changes" : plural(block.openChanges, "open change", "open changes");
   return `${block.label}: ${unit}, ${BLOCK_STATUS_LABELS[block.status].toLowerCase()}, ${open}`;
 }
@@ -123,10 +125,12 @@ export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" 
  * One block of the map. Reusable: the area view passes a capability's title,
  * size and status. A native button, so Enter and Space open it.
  */
-export function AreaBlock({ block, onOpen }: { block: AreaBlockModel; onOpen: () => void }) {
+export function AreaBlock({ block, onOpen, selected }: { block: AreaBlockModel; onOpen: () => void; selected?: boolean }) {
   return h("button", {
     type: "button",
     class: `pam-block pam-${block.status}`,
+    // Only blocks that can be selected carry a pressed state.
+    "aria-pressed": selected === undefined ? undefined : String(selected),
     "data-status": block.status,
     "data-block": block.key,
     // Bigger areas grow wider; the basis keeps a one-capability block legible.

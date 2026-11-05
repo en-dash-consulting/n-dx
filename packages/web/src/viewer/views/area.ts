@@ -14,10 +14,11 @@
  */
 
 import { h } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
 import { replaceAppHistory } from "../base-path.js";
 import type { AreaDetail } from "./product-model.js";
+import { SpecMap } from "./area-spec-map.js";
 
 /** The area's address. */
 export function areaPath(slug: string): string {
@@ -89,8 +90,9 @@ export interface AreaViewProps {
   onBack?: () => void;
 }
 
-/** The area: its header, then (in later slices) the spec map and the side column. */
+/** The area: its header, its spec map, then (in a later slice) the side column. */
 export function AreaView({ slug, onOpenPage, onBack }: AreaViewProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
   const back = onBack
     ? h("button", { type: "button", class: "cap-back", onClick: onBack }, "Product")
@@ -117,6 +119,7 @@ export function AreaView({ slug, onOpenPage, onBack }: AreaViewProps) {
       ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not refresh: ${load.refreshError}. Showing the last loaded data.`)
       : null,
     h(AreaHeader, { area, onOpenPage }),
+    h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
   );
 }
 
