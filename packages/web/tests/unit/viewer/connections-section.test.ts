@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ProjectView } from "../../../src/viewer/views/project.js";
-import { ConnectionsSection, type ConnectionRow } from "../../../src/viewer/views/connections.js";
+import { captureSignInReturn, ConnectionsSection, type ConnectionRow } from "../../../src/viewer/views/connections.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 
@@ -150,6 +150,26 @@ describe("Connections section", () => {
     expect(location.search).toBe("?tab=x");
     expect(location.pathname).toBe("/project");
     expect(root.querySelector(".connections-notice--ok")?.textContent).toContain("Signed in to Wiki");
+  });
+
+  it("finishes a sign-in captured at boot after the router has rewritten the address to the bare view path", async () => {
+    history.replaceState(null, "", "/project?connection=wiki&code=boot-code&state=boot-state");
+    captureSignInReturn();
+    expect(location.search).toBe("");
+    // As use-route-state seeds its first entry: the view's path, no query.
+    history.replaceState({ view: "project" }, "", "/project");
+    const requests = stubApi();
+    act(() => { render(h(ConnectionsSection, null), root); });
+    await settle();
+    const finish = requests.find((r) => r.url === "/api/connections/wiki/oauth/finish");
+    expect(finish?.body).toEqual({ code: "boot-code", state: "boot-state" });
+
+    // Used once: a later mount finishes nothing.
+    act(() => { render(null, root); });
+    const again = stubApi();
+    act(() => { render(h(ConnectionsSection, null), root); });
+    await settle();
+    expect(again.some((r) => r.method === "POST")).toBe(false);
   });
 
   it("reports an authorization server's refusal without posting anything", async () => {

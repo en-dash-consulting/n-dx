@@ -54,6 +54,7 @@ import { waitForSession } from "./session.js";
 import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
 import { LiveBar } from "./views/domain-live.js";
+import { captureSignInReturn } from "./views/connections.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
@@ -63,6 +64,8 @@ if (isDeployedMode()) {
   // Served through the hub at /p/<id>/: prefix every root-relative fetch.
   // At the root this is a no-op.
   installBasePathFetch();
+  // Before the router's first history write, which keeps the path alone.
+  captureSignInReturn();
 }
 
 initTheme();

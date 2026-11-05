@@ -59,12 +59,22 @@ async function post(path: string, body: Record<string, unknown> = {}): Promise<R
   return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
 
+interface SignInReturn {
+  connection: string;
+  code?: string;
+  state?: string;
+  error?: string;
+}
+
+/** The return {@link captureSignInReturn} took at boot, until the section consumes it. */
+let captured: SignInReturn | null = null;
+
 /**
  * A sign-in's return, taken out of the address bar: the connection and code
  * and state, or the authorization server's refusal. Null when this load is
  * not one.
  */
-function takeSignInReturn(): { connection: string; code?: string; state?: string; error?: string } | null {
+function takeSignInReturn(): SignInReturn | null {
   const params = new URLSearchParams(location.search);
   const connection = params.get(CONNECTION_PARAM);
   if (!connection) return null;
@@ -80,6 +90,23 @@ function takeSignInReturn(): { connection: string; code?: string; state?: string
   const rest = params.toString();
   replaceAppHistory(history.state, `${path}${rest ? `?${rest}` : ""}${location.hash}`);
   return found;
+}
+
+/**
+ * Take a sign-in's return out of the address bar at boot, before the router
+ * seeds its history entry: that entry is the view's path alone, so the code
+ * and state would be gone by the time the section mounts (it waits on
+ * `web.sidecar`). The section finishes the sign-in when it mounts.
+ */
+export function captureSignInReturn(): void {
+  captured = takeSignInReturn() ?? captured;
+}
+
+/** The captured return, else one still in the address bar; each is used once. */
+function consumeSignInReturn(): SignInReturn | null {
+  const returned = captured ?? takeSignInReturn();
+  captured = null;
+  return returned;
 }
 
 export interface ConnectionsSectionProps {
@@ -118,7 +145,7 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
   }, []);
 
   useEffect(() => {
-    const returned = takeSignInReturn();
+    const returned = consumeSignInReturn();
     void (async () => {
       if (returned) {
         sectionRef.current?.scrollIntoView?.({ block: "start" });
