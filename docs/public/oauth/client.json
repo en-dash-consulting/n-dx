@@ -1,0 +1,14 @@
+{
+  "client_id": "https://docs.n-dx.dev/oauth/client.json",
+  "client_name": "n-dx",
+  "client_uri": "https://docs.n-dx.dev/",
+  "logo_uri": "https://docs.n-dx.dev/n-dx-logo.png",
+  "redirect_uris": [
+    "http://127.0.0.1/oauth/callback",
+    "http://localhost/oauth/callback"
+  ],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none",
+  "application_type": "native"
+}
