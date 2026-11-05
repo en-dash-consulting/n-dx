@@ -10,6 +10,9 @@ items:
     resolutionDetail: "rex core/apply-change.ts applyChange (preview or apply under withPrdModelTransaction, refusal as data) shared by MCP apply_change and new web routes POST /api/rex/changes/:id/apply[/preview]; detail panel Apply… section for awaiting-apply changes."
     lastModified: "2026-11-05T07:19:51.544Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "26bd2722-39dc-474b-94e9-6329564f0449":
+    lastModified: "2026-11-05T07:21:16.054Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "470bef87-90da-4345-932c-74e386314499":
     lastModified: "2026-11-05T01:16:50.798Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -29,5 +32,5 @@ items:
     lastModified: "2026-10-28T18:50:02.560Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "99692891-d095-469e-aa09-1725b77e87de":
-    lastModified: "2026-11-05T01:16:34.844Z"
+    lastModified: "2026-11-05T07:21:16.054Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
