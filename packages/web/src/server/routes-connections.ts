@@ -459,6 +459,10 @@ async function testSpecRoute(
   delete form.token;
   const config = connectionFromForm({ id: "probe", ...form });
   if (typeof config === "string") return refuse(res, 400, config);
+  // The probe would read connection:<form id>, so an existing id with another
+  // URL would carry a stored credential to a server nobody saved. Credentialed
+  // servers are tested once added (POST /api/connections/:id/test).
+  if (config.auth !== "none") return refuse(res, 400, "Only a server with auth \"none\" can be tested before it is added; add it, then test it");
   const probe = new ConnectionService({ projectDir: ctx.projectDir, connections: [config], credentials, warn: () => undefined });
   try {
     const tools = await probe.listTools();

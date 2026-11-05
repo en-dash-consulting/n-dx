@@ -188,6 +188,22 @@ describe("a token typed into the form", () => {
     expect(readLocal().connections.vault).toEqual({ transport: "http", auth: "token", url: expect.any(String) });
   });
 
+  it("is never sent by Test to the URL an unsaved form names", async () => {
+    await send("POST", "/api/connections", tokenForm());
+    const other = await startFakeMcpHttpServer();
+    try {
+      // The stored connection's id, another server: Test must not carry connection:vault there.
+      for (const auth of ["token", "oauth"]) {
+        const res = await send("POST", "/api/connections/test", { id: "vault", transport: "http", url: other.url, auth });
+        expect(res.status, auth).toBe(400);
+      }
+      expect(other.authorizations.filter((header) => header?.includes(SECRET))).toEqual([]);
+      expect(other.authorizations).toEqual([]);
+    } finally {
+      await other.close();
+    }
+  });
+
   it("is accepted only for a token connection", async () => {
     await send("POST", "/api/connections", httpForm());
     const res = await send("PUT", "/api/connections/docs/token", { token: SECRET });
