@@ -132,7 +132,13 @@ export function trackerItemIdOfRef(mapping: Pick<TrackerMapping, "itemUrlTemplat
   if (typeof placeholder !== "string") return ref;
   const [prefix, suffix] = template.split(placeholder);
   if (!ref.startsWith(prefix) || !ref.endsWith(suffix) || ref.length <= prefix.length + suffix.length) return ref;
-  const id = decodeURIComponent(ref.slice(prefix.length, ref.length - suffix.length));
+  let id: string;
+  try {
+    id = decodeURIComponent(ref.slice(prefix.length, ref.length - suffix.length));
+  } catch {
+    // A malformed escape (a hand-linked URL): the template never built it.
+    return ref;
+  }
   if (placeholder === "{id}") return id;
   const uuid = COMPACT_UUID.exec(id);
   return uuid ? uuid.slice(1).join("-") : id;

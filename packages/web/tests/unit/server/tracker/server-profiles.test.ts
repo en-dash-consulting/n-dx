@@ -184,6 +184,8 @@ describe("item URL template", () => {
     expect(trackerItemIdOfRef(mapping, "https://desk.example/t/a%20b/view")).toBe("a b");
     expect(trackerItemIdOfRef(mapping, "WM-7")).toBe("WM-7");
     expect(trackerItemIdOfRef(mapping, "https://other.example/t/x/view")).toBe("https://other.example/t/x/view");
+    // A hand-linked URL with a malformed escape is read as itself, never thrown on.
+    expect(trackerItemIdOfRef(mapping, "https://desk.example/t/a%zz/view")).toBe("https://desk.example/t/a%zz/view");
   });
 
   it("builds nothing and reads every ref as itself without a template", () => {

@@ -123,6 +123,13 @@ describe("rule modes", () => {
     expect(toolCalls()).toHaveLength(2);
   });
 
+  it("moves a hand-linked URL with a malformed escape as it reads, and the events behind it still run", async () => {
+    settings({ "run-started": "dry-run", "pr-merged": "dry-run" });
+    const bad = "https://www.notion.so/abc%zz";
+    const { entries } = await tick({ event: "run-started", rexId: "rex-1", ref: bad }, { event: "pr-merged", rexId: "rex-1", ref: "WM-1" });
+    expect(entries.map((e) => [e.event, e.call.args.workItemId])).toEqual([["run-started", bad], ["pr-merged", "WM-1"]]);
+  });
+
   it("names the project after its directory when trackerSync.project is unset", async () => {
     writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ trackerSync: { connection: "caos", rules: { "run-started": "dry-run" } } }));
     const { entries } = await tick(runStarted);
