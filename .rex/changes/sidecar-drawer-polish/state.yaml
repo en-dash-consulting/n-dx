@@ -10,6 +10,9 @@ items:
     resolutionDetail: "Chat/extension segmented tabs, pill Sessions toggle, 32px close, labelled styled Agent/Model selects with readable names (sidecar-agent-names.ts)"
     lastModified: "2026-11-05T01:46:23.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "77cd6136-39b4-4992-9153-126cc513704b":
+    lastModified: "2026-11-05T02:22:12.183Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "80e80636-1733-4ade-a6b4-a1d4a3cce8cb":
     status: "completed"
     startedAt: "2026-11-05T02:07:31.381Z"
@@ -34,8 +37,15 @@ items:
     lastModified: "2026-11-05T01:52:10.798Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e98b1054-a956-47af-9db6-3fb4894cf6a8":
-    lastModified: "2026-11-05T01:38:15.783Z"
+    status: "completed"
+    startedAt: "2026-11-05T02:19:33.415Z"
+    completedAt: "2026-11-05T02:24:04.768Z"
+    endedAt: "2026-11-05T02:24:04.768Z"
+    activeIntervals: [{"end":"2026-11-05T02:24:04.768Z","start":"2026-11-05T02:19:33.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "External-call card fields use the agent-bar field style; Approve primary, Deny secondary; connection badge reads \"sign in\" vs \"sign in again\"."
+    lastModified: "2026-11-05T02:24:04.768Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eed75eaf-9a45-483e-978a-34410fb2894c":
-    lastModified: "2026-11-05T02:17:50.405Z"
+    lastModified: "2026-11-05T02:22:12.183Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
