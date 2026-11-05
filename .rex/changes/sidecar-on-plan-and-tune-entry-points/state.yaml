@@ -19,7 +19,10 @@ items:
     lastModified: "2026-11-05T01:08:43.256Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "66415182-c172-4ba9-a2c9-d7dad6ce7adf":
-    lastModified: "2026-11-05T01:08:21.625Z"
+    startedAt: "2026-11-05T17:07:35.939Z"
+    activeIntervals: [{"end":"2026-11-05T17:31:40.538Z","start":"2026-11-05T17:07:35.939Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T17:31:43.219Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a7bb7079-fcc5-4b3d-83c1-784fa7ab1f5f":
     lastModified: "2026-11-05T01:08:18.734Z"
@@ -28,7 +31,7 @@ items:
     lastModified: "2026-11-05T01:08:25.778Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c226b635-1423-4093-8c70-50d677a34ba4":
-    lastModified: "2026-11-05T01:08:29.821Z"
+    lastModified: "2026-11-05T17:15:43.320Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "df78a8d3-c5a4-434e-86b9-840a59b77c2f":
     lastModified: "2026-11-05T01:08:20.159Z"
@@ -36,4 +39,7 @@ items:
   "f453e786-c4bb-4f28-b049-3912ce0e02b0":
     status: "deferred"
     lastModified: "2026-11-05T01:08:50.890Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f76d0e7d-ca55-4080-af71-c3c7ff4bae9c":
+    lastModified: "2026-11-05T17:15:43.320Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
