@@ -82,6 +82,9 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
       onClick: () => setOpen(!open),
       "aria-expanded": String(open),
       "aria-haspopup": "true",
+      // Below 1440 px the label is hidden and the button is its glyph (UX2'),
+      // so the name cannot come from the text.
+      "aria-label": statusText ? `Run project: ${statusText}` : "Run project",
       title: chosen ? `${chosen.label} — from ${chosen.source}` : undefined,
     },
       running

@@ -8,8 +8,9 @@
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  min-width: 140px;
-  flex-shrink: 0;
+  /* Gives way before the stage tabs, which do not shrink (UX2', sidecar.css). */
+  min-width: 100px;
+  flex: 0 1 auto;
   max-width: 260px;
   padding: 0 var(--space-4);
   border-right: 1px solid var(--border);
@@ -33,6 +34,12 @@
   margin-left: 0;
   align-self: flex-start;
 }
+
+/* While the context shrinks, the name and branch chip ellipsize inside it. */
+.project-context .breadcrumb-workspace { max-width: 100%; }
+.project-context .breadcrumb-project,
+.project-context .breadcrumb-branch { min-width: 0; max-width: 100%; }
+.breadcrumb-project-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Extension project links (components/extension-links.ts) */
 .project-context-links {

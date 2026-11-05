@@ -556,20 +556,31 @@
   text-align: center;
 }
 
-/* ── Width tiers (UX2'): ≥1440 full · 1200–1439 · 1100–1199 · 961–1099 · ≤960 ───── */
+/* ── Width tiers (UX2') ──────────────────────────────────────────────────
+ * Four stage tabs, Live and the Sidecar button share the bar, so it sheds
+ * optional text as it narrows; the tabs themselves never scroll:
+ *   ≥1600      everything shows
+ *   <1600      stage hints drop (with the Sidecar on; off, shell.css drops
+ *              them at a 1400 px bar)
+ *   <1440      search label drops to its ⌘K; run control to its ▶ glyph
+ *   <1200      tab padding tightens
+ *   ≤960       tab glyphs drop; the Sidecar button is its glyph and badge
+ * At every width the project context gives way before the tabs, down to
+ * 100 px with its name ellipsized (breadcrumb.css). */
 
-@media (max-width: 1439px) {
-  .topnav-tab-hint { display: none; }
+@media (max-width: 1599px) {
+  .topnav:has(.topnav-sidecar) .topnav-tab-hint { display: none; }
 }
-@media (max-width: 1199px) {
+@media (max-width: 1439px) {
   .topnav-search-label { display: none; }
   .topnav-search { min-width: 0; }
+  .topnav-run .runcmd-label { display: none; }
 }
-@media (max-width: 1099px) {
-  /* Four stage tabs plus Live: tighter tabs keep the Sidecar button last and in view. */
+@media (max-width: 1199px) {
   .topnav-tab { padding: 0 var(--space-2); gap: 6px; }
 }
 @media (max-width: 960px) {
+  .topnav-tab-glyph { display: none; }
   .topnav-sidecar { padding: 5px var(--space-2); }
   .topnav-sidecar-label { display: none; }
   /* The badge rides the glyph's corner. */
