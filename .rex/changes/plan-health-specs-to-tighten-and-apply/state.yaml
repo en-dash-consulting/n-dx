@@ -11,10 +11,13 @@ items:
     lastModified: "2026-11-05T07:19:51.544Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "26bd2722-39dc-474b-94e9-6329564f0449":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T07:22:06.007Z"
-    activeIntervals: [{"start":"2026-11-05T07:22:06.007Z"}]
-    lastModified: "2026-11-05T07:22:06.724Z"
+    completedAt: "2026-11-05T07:43:57.707Z"
+    endedAt: "2026-11-05T07:43:57.707Z"
+    activeIntervals: [{"end":"2026-11-05T07:38:20.325Z","start":"2026-11-05T07:22:06.007Z"},{"end":"2026-11-05T07:43:57.707Z","start":"2026-11-05T07:43:57.707Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- sends PUT request when concurrency slider changes\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  TypeError: The \"path\" argument must be of type string or an instance of Buffer or URL. Received undefined\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T07:43:57.707Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "470bef87-90da-4345-932c-74e386314499":
     lastModified: "2026-11-05T01:16:50.798Z"
