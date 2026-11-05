@@ -171,11 +171,34 @@ function prepare(options: TrackerSyncOptions): Ready | Exclude<TrackerTickResult
   return { config, mapping: profile.tracker, profile };
 }
 
+/** Each project's tick in progress; the next waits for it. */
+const ticking = new Map<string, Promise<TrackerTickResult>>();
+
 /**
  * Run every queued event through the rules: log what each plans, and make
  * the calls whose rule is on. Returns the entries this tick logged.
+ *
+ * One tick per project at a time: a second waits for the first, so it reads
+ * the log the first wrote and never re-plans an event the first settled
+ * (a refusal included) while that call was in flight.
  */
-export async function runTrackerSyncTick(options: TrackerSyncOptions): Promise<TrackerTickResult> {
+export function runTrackerSyncTick(options: TrackerSyncOptions): Promise<TrackerTickResult> {
+  const { projectDir } = options;
+  const prior = ticking.get(projectDir);
+  // The prior tick's own caller handles its failure; this one only waits for it to settle.
+  const run = prior ? prior.then(() => tickOnce(options), () => tickOnce(options)) : tickOnce(options);
+  ticking.set(projectDir, run);
+  const forget = () => {
+    if (ticking.get(projectDir) === run) ticking.delete(projectDir);
+  };
+  run.then(forget, forget);
+  return run;
+}
+
+/** Whether `result` means the connection could not be used, so the event stays queued. */
+const isUnreachable = (result: TrackerResult): boolean => result === "unavailable" || result === "needs-sign-in";
+
+async function tickOnce(options: TrackerSyncOptions): Promise<TrackerTickResult> {
   const { projectDir, service } = options;
   const ready = prepare(options);
   if ("state" in ready) {
@@ -184,7 +207,11 @@ export async function runTrackerSyncTick(options: TrackerSyncOptions): Promise<T
   }
   const { config, mapping, profile } = ready;
   const now = options.now ?? (() => new Date());
-  const settled = new Set(readTrackerActivity(projectDir).filter((e) => SETTLED_RESULTS.has(e.result)).map((e) => e.requestId));
+  const logged = readTrackerActivity(projectDir);
+  const settled = new Set(logged.filter((e) => SETTLED_RESULTS.has(e.result)).map((e) => e.requestId));
+  // The last result per request id: an event that stays unreachable tick after
+  // tick is logged once, not once per tick.
+  const last = new Map(logged.map((e) => [e.requestId, e.result]));
   const pending = takeQueue(projectDir);
   const kept: TrackerEventRecord[] = [];
   const entries: TrackerActivityEntry[] = [];
@@ -220,10 +247,13 @@ export async function runTrackerSyncTick(options: TrackerSyncOptions): Promise<T
           result: outcome.result,
           ...(outcome.problems && { problems: outcome.problems }),
         };
-        appendTrackerActivity(projectDir, entry);
-        entries.push(entry);
+        if (!(isUnreachable(outcome.result) && last.get(plan.requestId) === outcome.result)) {
+          appendTrackerActivity(projectDir, entry);
+          entries.push(entry);
+          last.set(plan.requestId, outcome.result);
+        }
         if (SETTLED_RESULTS.has(outcome.result)) settled.add(plan.requestId);
-        if (outcome.result === "unavailable" || outcome.result === "needs-sign-in") kept.push(record);
+        if (isUnreachable(outcome.result)) kept.push(record);
       }
       pending.shift();
     }

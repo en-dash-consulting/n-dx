@@ -37,10 +37,14 @@ items:
     lastModified: "2026-11-05T01:49:00.922Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "97291b04-5d49-45d3-b7f7-7950e76f9ea4":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T06:11:59.697Z"
-    activeIntervals: [{"start":"2026-11-05T06:11:59.697Z"}]
-    lastModified: "2026-11-05T06:12:00.333Z"
+    completedAt: "2026-11-05T06:29:05.038Z"
+    endedAt: "2026-11-05T06:29:05.038Z"
+    activeIntervals: [{"end":"2026-11-05T06:29:05.038Z","start":"2026-11-05T06:11:59.697Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tracker/rules.ts (pure plan: create/blocked → card, move → call when on, dry-run → would), sync-config.ts (trackerSync from untracked local config, rules default off), sync-engine.ts (queue, tick, requestId ndx:<project>:<rexId>:<event>, create/duplicate confirmed by read, refusal settles), activity-log.ts (JSONL in <henchDir>/sidecar), routes-tracker.ts (POST tick per-user token only, GET activity), web.sidecar gate; unit + integration tests with fake CAOS server."
+    lastModified: "2026-11-05T06:29:05.038Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a294dc86-f527-475e-acd0-afbc4391493d":
     lastModified: "2026-11-05T01:48:55.447Z"

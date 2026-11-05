@@ -11,10 +11,11 @@
  * - `duplicate`: the tracker had it already, confirmed by a read.
  * - `refused`: the tracker refused it; `problems` lists why. Never retried.
  * - `unavailable` / `needs-sign-in`: the connection could not be used; the
- *   event stays queued for the next tick, with the same arguments.
+ *   event stays queued for the next tick, with the same arguments, and is
+ *   logged again only when its result changes.
  */
 
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
 import type { SidecarCallProblem } from "../../shared/index.js";
 import { ensureSidecarDir } from "../sidecar/sidecar-dir.js";
@@ -55,9 +56,23 @@ export function trackerActivityPath(projectDir: string): string {
 export function appendTrackerActivity(projectDir: string, entry: TrackerActivityEntry): void {
   const path = trackerActivityPath(projectDir);
   ensureSidecarDir(worktreeSidecarDir(projectDir));
-  const text = existsSync(path) ? readFileSync(path, "utf-8") : "";
-  const lead = text.length > 0 && !text.endsWith("\n") ? "\n" : "";
+  const lead = endsMidLine(path) ? "\n" : "";
   appendFileSync(path, lead + JSON.stringify(entry) + "\n", "utf-8");
+}
+
+/** Whether the file at `path` ends without a newline; reads its last byte only. */
+function endsMidLine(path: string): boolean {
+  if (!existsSync(path)) return false;
+  const fd = openSync(path, "r");
+  try {
+    const { size } = fstatSync(fd);
+    if (size === 0) return false;
+    const last = Buffer.alloc(1);
+    readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /**

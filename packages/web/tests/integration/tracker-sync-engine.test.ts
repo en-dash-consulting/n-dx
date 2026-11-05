@@ -8,13 +8,13 @@
  * the event queued.
  */
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ConnectionConfig } from "../../src/server/connections/connection-config.js";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
-import { readTrackerActivity } from "../../src/server/tracker/activity-log.js";
+import { readTrackerActivity, trackerActivityPath } from "../../src/server/tracker/activity-log.js";
 import { enqueueTrackerEvent, queuedTrackerEvents, runTrackerSyncTick } from "../../src/server/tracker/sync-engine.js";
 import type { TrackerEventRecord } from "../../src/server/tracker/rules.js";
 import { addCaosTools, type CaosReply } from "../fixtures/connections/fake-mcp-tools.mjs";
@@ -184,6 +184,22 @@ describe("tracker replies", () => {
     expect(toolCalls()).toHaveLength(1);
     expect(readTrackerActivity(root)).toHaveLength(1);
   });
+
+  it("does not let an overlapping tick retry a refusal still in flight", async () => {
+    settings({ "pr-opened": "on" });
+    replies.move_work_item = () => ({
+      isError: true,
+      content: [{ type: "text", text: JSON.stringify({ error: "validation_failed", problems: ["reviewer is required"] }) }],
+    });
+    enqueueTrackerEvent(root, { event: "pr-opened", rexId: "rex-1", ref: "WM-1" });
+    const first = runTrackerSyncTick({ projectDir: root, service: connect(), profiles: { ndxHome } });
+    // The same event again, queued while the first tick's call is in flight, and a second tick.
+    enqueueTrackerEvent(root, { event: "pr-opened", rexId: "rex-1", ref: "WM-1", values: { "review.reviewerNotionUserId": "u-1" } });
+    const second = runTrackerSyncTick({ projectDir: root, service: connect(), profiles: { ndxHome } });
+    await Promise.all([first, second]);
+    expect(toolCalls()).toHaveLength(1);
+    expect(readTrackerActivity(root).map((e) => e.result)).toEqual(["refused"]);
+  });
 });
 
 describe("an unreachable connection", () => {
@@ -197,6 +213,22 @@ describe("an unreachable connection", () => {
     expect(result.entries).toEqual([expect.objectContaining({ result: "unavailable", problems: [{ message: expect.stringContaining("connection unavailable") }] })]);
     expect(queuedTrackerEvents(root)).toEqual([runStarted]);
     expect(result.queued).toBe(1);
+
+    // Every later tick still fails, and logs nothing new until the result changes.
+    const again = await tick();
+    expect(again.entries).toEqual([]);
+    expect(again.queued).toBe(1);
+    expect(readTrackerActivity(root)).toHaveLength(1);
+  });
+});
+
+describe("the activity log", () => {
+  it("starts an entry on its own line after a fragment a crash left mid-append", async () => {
+    settings({ "run-started": "dry-run" });
+    mkdirSync(join(root, ".hench", "sidecar"), { recursive: true });
+    writeFileSync(trackerActivityPath(root), '{"at":"2026-11-05T11:00:00.000Z","eve');
+    await tick(runStarted);
+    expect(readTrackerActivity(root)).toEqual([expect.objectContaining({ result: "would", requestId: "ndx:ndx:rex-1:run-started" })]);
   });
 });
 

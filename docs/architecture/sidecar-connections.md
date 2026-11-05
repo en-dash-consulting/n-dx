@@ -118,8 +118,9 @@ untracked `.n-dx.local.json` only, as connections do:
   profile's `readTool` before it is logged.
 - A refusal logs its problems list and settles the event: it is never planned
   again, with the same arguments or other ones. So do `ok`, `duplicate` and
-  `card`. An unreachable connection, or one that needs sign-in, logs that and
-  keeps the event queued, unchanged.
+  `card`. An unreachable connection, or one that needs sign-in, logs that once
+  (again only when the result changes) and keeps the event queued, unchanged.
+  One tick runs per project at a time; a second waits for the first.
 - The log is append-only JSONL, `<henchDir>/sidecar/tracker-activity.jsonl`:
   `{ at, event, rexId, rule, mode, requestId, call, result, problems? }`, with
   `result` one of `would`, `ok`, `duplicate`, `refused`, `card`, `unavailable`,
