@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { main } from "../../src/cli/index.js";
+import { absolutePathFlags, main } from "../../src/cli/index.js";
 import { makeProject } from "../helpers/project.js";
 
 let root: string;
@@ -31,8 +31,15 @@ afterEach(() => {
 });
 
 describe("a graview flag's value", () => {
-  it.each(["--allow-origin", "--remote-url", "--previous", "--views", "--face"])("%s keeps its value, and the directory after it is the project", async (flag) => {
+  it.each(["--allow-origin", "--remote-url", "--previous", "--views", "--face", "--width", "--id", "--seed"])("%s keeps its value, and the directory after it is the project", async (flag) => {
     expect(await main(["info", flag, "http://127.0.0.1:9999", root, "--json"])).toBe(0);
     expect((JSON.parse(out.join("\n")) as { projectRoot: string }).projectRoot).toBe(root);
+  });
+});
+
+describe("a graview flag that names a file", () => {
+  it("is made absolute against the project, since npx runs graview elsewhere", () => {
+    const out = absolutePathFlags(["--previous", "old.json", "--views=views.js", "--face", "face", "--place", "home"], root);
+    expect(out).toEqual(["--previous", join(root, "old.json"), `--views=${join(root, "views.js")}`, "--face", join(root, "face"), "--place", "home"]);
   });
 });

@@ -83,7 +83,7 @@ function parse(argv: string[]): ParsedArgs {
       passthrough.push(arg);
       // A flag's value: the next token when it is not a flag and the flag takes one.
       // The value flags of the graview subcommands this CLI passes on: check, describe, serve and mcp (graview 0.1.67).
-      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite", "--allow-origin", "--remote-url", "--views", "--face", "--previous"].includes(arg);
+      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite", "--allow-origin", "--remote-url", "--views", "--face", "--previous", "--width", "--id", "--seed"].includes(arg);
       if (takesValue && i + 1 < rest.length) passthrough.push(rest[++i]!);
     } else if (dir === undefined) dir = arg;
     else passthrough.push(arg);
@@ -132,7 +132,8 @@ function run(cmd: string, args: string[], options: { cwd: string; env: NodeJS.Pr
 }
 
 /** graview's flags whose value is a path. */
-const PATH_FLAGS = ["--data", "--sqlite"];
+// Flags whose value is a path: resolved against the project, since npx runs graview elsewhere.
+const PATH_FLAGS = ["--data", "--sqlite", "--seed", "--previous", "--views", "--face"];
 
 /**
  * A relative path given to a path flag, made absolute against the project

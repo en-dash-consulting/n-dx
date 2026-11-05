@@ -26,8 +26,8 @@
  * the mapping declares.
  */
 import { SyncEngine, systemAuthor, type RemoteLink, type SettledConflict, type SyncReport } from "@graview/core/sync";
-import type { AnySchema, Store } from "@graview/core";
-import { applyInbound, isSyncedKind, mapping, SYNC_FIELDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
+import { PermissionDeniedError, type AnySchema, type Store } from "@graview/core";
+import { applyInbound, isSyncedKind, linkBecause, mapping, SYNC_FIELDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 import { ndxRemote, type EmitOutcome, type NdxRemote, type NdxRemoteOptions } from "./ndx-system.js";
 
 export interface SyncStatus {
@@ -64,6 +64,70 @@ export interface Sync {
   readonly remote: NdxRemote;
   /** One pass of the engine: inbound, conflicts settled to rex, then what changed here. */
   run(): Promise<{ report: SyncReport; resolved: readonly SettledConflict[]; emit?: EmitOutcome }>;
+  /** Hold the store to what rex takes: the engine's guard, and no link made or taken away on a synced record. Returns the way back. */
+  guard(): () => void;
+}
+
+/** A derived relation act on a synced kind: `connect-change-touches`, `disconnect-task-blocked-by`. */
+const SYNCED_LINK_ACT = /^(connect|disconnect)-(change|task)-/;
+
+type Planned = { readonly ops: readonly { readonly author: { kind: string; id: string }; readonly mutation?: { name: string }; readonly primitives: readonly Record<string, unknown>[] }[] };
+
+/**
+ * NO LINK ON A SYNCED RECORD IS MADE HERE. The engine pushes a change's and a
+ * task's fields; a link added or taken away on one would stay in the face,
+ * never reach rex and never be put back. Graview's own guard holds links only
+ * on read-only kinds, so this one refuses the rest the same way, before the
+ * act is offered and when it is tried. Rex's own inbound changes pass, and so
+ * does a record's removal, which takes its links with it.
+ */
+export function holdSyncedLinks(store: Store<AnySchema>): () => void {
+  const held = store as unknown as Record<string, unknown>;
+  const names = ["applyAll", "undo", "permits", "permittedMutations"] as const;
+  const was = names.map((name) => [name, held[name], Object.prototype.hasOwnProperty.call(store, name)] as const);
+  const applyAll = store.applyAll;
+  const undo = store.undo;
+  const permits = store.permits;
+  const permittedMutations = store.permittedMutations;
+  const refuse = (planned: Planned): void => {
+    for (const op of planned.ops) {
+      if (op.author.kind === "system" && op.author.id === SYSTEM) continue;
+      const removed = new Set(op.primitives.filter((p) => p["op"] === "remove-node").map((p) => (p["node"] as { id: string }).id));
+      for (const primitive of op.primitives) {
+        if (primitive["op"] !== "add-edge" && primitive["op"] !== "remove-edge") continue;
+        const edge = primitive["edge"] as { kind: string; from: string; to: string };
+        if (primitive["op"] === "remove-edge" && (removed.has(edge.from) || removed.has(edge.to))) continue;
+        const kind = String((store.graph.getNode(edge.from) as unknown as Record<string, unknown> | undefined)?.["kind"] ?? "");
+        if (!isSyncedKind(kind)) continue;
+        throw new PermissionDeniedError({ mutation: op.mutation?.name ?? "", message: linkBecause(kind, edge.kind), wouldNeed: [] } as never);
+      }
+    }
+  };
+  type ApplyOptions = { admit?: (planned: never) => void } & Record<string, unknown>;
+  const admitted = (options: ApplyOptions = {}): ApplyOptions => ({
+    ...options,
+    admit: (planned: never) => {
+      refuse(planned as Planned);
+      options.admit?.(planned);
+    },
+  });
+  held["applyAll"] = (calls: unknown, options?: ApplyOptions) => (applyAll as (c: unknown, o: ApplyOptions) => unknown).call(store, calls, admitted(options));
+  held["undo"] = (batchIds: unknown, options?: ApplyOptions) => (undo as (b: unknown, o: ApplyOptions) => unknown).call(store, batchIds, admitted(options));
+  held["permits"] = (call: { name: string }, principal: { kind?: string; id?: string } | undefined) => {
+    const verdict = (permits as (c: unknown, p: unknown) => { ok: boolean }).call(store, call, principal);
+    const rex = principal?.kind === "system" && principal.id === SYSTEM;
+    const link = SYNCED_LINK_ACT.exec(call.name);
+    if (!verdict.ok || rex || !link) return verdict;
+    return { ok: false, refusal: { mutation: call.name, message: linkBecause(link[2]!, call.name.slice(link[0].length)), wouldNeed: [] } };
+  };
+  held["permittedMutations"] = (principal: unknown) =>
+    (permittedMutations as (p: unknown) => readonly { name: string }[]).call(store, principal).filter((mutation) => !SYNCED_LINK_ACT.test(mutation.name));
+  return () => {
+    for (const [name, value, own] of was) {
+      if (own) held[name] = value;
+      else delete held[name];
+    }
+  };
 }
 
 /** A link at no version for every synced record that carries none: projected by rex, agreed at nothing, never ours to create. */
@@ -107,12 +171,20 @@ export function createSync(options: SyncOptions): Sync {
       const emit = remote.lastEmit();
       return { report, resolved: report.resolved, ...(emit ? { emit } : {}) };
     },
+    guard() {
+      const engineGuard = engine.guard();
+      const linkGuard = holdSyncedLinks(options.store);
+      return () => {
+        linkGuard();
+        engineGuard();
+      };
+    },
   };
 }
 
 export function startSync(options: StartSyncOptions): SyncHandle {
   const sync = createSync(options);
-  const release = sync.engine.guard();
+  const release = sync.guard();
   const listeners = new Set<(status: SyncStatus) => void>();
   let status: SyncStatus = { running: false, resolved: [] };
   let inFlight: Promise<SyncStatus> | undefined;
