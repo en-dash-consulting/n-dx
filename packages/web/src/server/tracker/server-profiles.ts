@@ -231,7 +231,7 @@ export function loadServerProfile(name: string, options: ProfileOptions = {}): S
   const userOnly = name.startsWith(USER_PREFIX);
   const base = userOnly ? name.slice(USER_PREFIX.length) : name;
   if (!PROFILE_NAME.test(base)) return { problems: [`a profile name must match ${PROFILE_NAME} (or user:<name>)`] };
-  if (!userOnly && base in BUILT_IN) return parseServerProfile(name, BUILT_IN[base]);
+  if (!userOnly && Object.hasOwn(BUILT_IN, base)) return parseServerProfile(name, BUILT_IN[base]);
   const file = join(options.ndxHome ?? resolveNdxHome(), USER_PROFILES_DIR, `${base}.json`);
   const raw = readUserProfile(file, name);
   return isProblems(raw) ? raw : parseServerProfile(name, raw);

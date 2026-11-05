@@ -82,6 +82,11 @@ describe("user profiles", () => {
     expect((loadServerProfile("user:caos", { ndxHome }) as ServerProfile).label).toBe("My CAOS");
   });
 
+  it("load by a bare name that is also an Object.prototype member, not the prototype's value", () => {
+    userProfile("constructor", { ...deskProfile, label: "Mine" });
+    expect((loadServerProfile("constructor", { ndxHome }) as ServerProfile).label).toBe("Mine");
+  });
+
   it("refuse a name that could leave the directory, and name a missing or unreadable file", () => {
     expect(loadServerProfile("user:../secrets", { ndxHome })).toEqual({ problems: [expect.stringContaining("a profile name must match")] });
     expect(loadServerProfile("nope", { ndxHome })).toEqual({ problems: [expect.stringContaining("no profile named nope")] });

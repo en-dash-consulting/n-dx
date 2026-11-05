@@ -2,7 +2,10 @@ schema: "rex/v2"
 items:
   "0943b9b0-e71e-4bb2-ab30-7047910ffdf1":
     issues: ["https://www.notion.so/3f7a80b7192481948d5cc046d3a68c0a","https://www.notion.so/3f7a80b71924818487c7f0e1c2d5db03","https://www.notion.so/3f7a80b719248147aad1d64b44332ec6","https://www.notion.so/3f7a80b7192481b18321d6a2f010c472","https://www.notion.so/3f7a80b71924810aa352f54b4bbead6e"]
-    lastModified: "2026-11-05T01:49:18.467Z"
+    lastModified: "2026-11-05T02:04:56.427Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "38fce780-09ae-4f8f-842b-64321c23a839":
+    lastModified: "2026-11-05T02:04:56.427Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3b86452e-1829-499a-af72-1620953e00e7":
     lastModified: "2026-11-05T01:48:50.073Z"
@@ -11,10 +14,14 @@ items:
     lastModified: "2026-11-05T01:48:28.168Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6aa7f142-e208-405d-98a8-e4cebb8f8c79":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T01:52:20.740Z"
-    activeIntervals: [{"start":"2026-11-05T01:52:20.740Z"}]
-    lastModified: "2026-11-05T01:52:21.603Z"
+    completedAt: "2026-11-05T02:07:18.224Z"
+    endedAt: "2026-11-05T02:07:18.224Z"
+    activeIntervals: [{"end":"2026-11-05T02:07:18.224Z","start":"2026-11-05T01:52:20.740Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tracker/server-profiles.ts + built-in profiles/caos.json; connections carry a profile name; external-call merges profile hints under the connection's; GET /api/connections reports profile ok/invalid/unchecked; unit + integration tests with fake CAOS server."
+    lastModified: "2026-11-05T02:07:18.224Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "920b0ec3-0de3-4197-941a-89a90608ef74":
     lastModified: "2026-11-05T01:49:00.922Z"
