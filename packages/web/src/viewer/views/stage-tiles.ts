@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { ViewId } from "../types.js";
 import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
+import { LiveBadge } from "./stage-badge.js";
 
 /** What a panel can ask of the grid: open (or switch the modal to) another tile, by key. */
 export interface TileGridApi {
@@ -198,6 +199,7 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
     },
       h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
       h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
+      tile.badge ? h(LiveBadge, { badge: tile.badge }) : null,
       tile.panel ? null : h("span", { class: "stage-tile-blurb" }, viewBlurb(tile.view)),
       h("span", { class: "stage-tile-open", "aria-hidden": "true" }, h(ActionIcon, { name: "expand" })),
     ),

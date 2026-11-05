@@ -24,13 +24,13 @@ import {
   viewGlyph,
   type StageId,
   type StageSection,
-  type StageSectionBadge,
   type StageTab,
   type StageTile,
 } from "./stages.js";
 import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { BADGES, CountPill } from "./stage-badge.js";
 import { TileGrid, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
@@ -62,20 +62,6 @@ interface SectionProps {
   navigateTo: NavigateTo;
   renderView: RenderView;
 }
-
-interface BadgeDef {
-  /** The count, or null while status is unknown or the tree has none (v1). */
-  count(status: ProjectStatus | null): number | null;
-  /** Accessible name for the pill. */
-  label(count: number): string;
-}
-
-const BADGES: Record<StageSectionBadge, BadgeDef> = {
-  inbox: {
-    count: (status) => status?.rex.inbox?.open ?? null,
-    label: (n) => `${n} change${n === 1 ? "" : "s"} in the Inbox`,
-  },
-};
 
 /**
  * A section with a header count. Its own component so only badged sections
@@ -117,7 +103,6 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
     setChosen(next);
     writeOpenState(key, next);
   };
-  const badge = section.badge ? BADGES[section.badge] : null;
   const toggleFull = () => {
     const next = !full;
     setFull(next);
@@ -141,12 +126,7 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
       },
         h("span", { class: "stage-section-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
         h("span", { class: "stage-section-title" }, title),
-        badge && count !== null
-          ? h("span", { class: "stage-section-badge", "data-count": String(count) },
-              h("span", { "aria-hidden": "true" }, count.toLocaleString()),
-              h("span", { class: "sr-only" }, badge.label(count)),
-            )
-          : null,
+        section.badge ? h(CountPill, { badge: section.badge, count }) : null,
         h("span", { class: "stage-section-blurb" }, blurb),
       ),
       section.scroll && open

@@ -123,6 +123,8 @@ export interface StageTile {
    * and full page.
    */
   tabs?: readonly StageTab[];
+  /** A live count in the tile header, read from project status like a section's. */
+  badge?: StageSectionBadge;
   featureGate?: string;
   requiresServer?: boolean;
   hiddenWhenDeployed?: boolean;
