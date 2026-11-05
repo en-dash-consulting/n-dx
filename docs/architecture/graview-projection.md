@@ -133,7 +133,7 @@ or a relation rex does not have and the table's first column does not name
 it. Fields are not covered by the test; the ones whose names differ are
 `inbox` (rex's `needsPlacement`), `appliesToAll` (`appliesTo: "all"`),
 `changeKind` (`deriveChangeKind`), `intentStatus` (`computeProductStatus`),
-`reviewed` (a capability with a `reviewedHash`) and `level` on a change (the
+`reviewed` (a capability with a `reviewedHash`) and `level` on a change (`change`, or the
 v1 level it was read from).
 
 | Projection | Rex | Why |
@@ -146,7 +146,7 @@ v1 level it was read from).
 | `run`, `commit` | none (hench run records, git) | The work that made it |
 | `inZone`, `crosses` | none (sourcevision) | A component's or file's zone; imports between zones |
 | `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` | A run's task and its commits |
-| `landedFor` | the `N-DX-Item` trailer | A commit's work |
+| `landedFor` | the `N-DX-Item` trailer, and a run record's `commits` (the run's task) | A commit's work |
 | `realizes`, `realizedIn`, `livesIn` | `computeRealizedBy`'s `commits`, `zones` and `files` (wider here: touches and run commits count) | Where a capability lives in code |
 | `changed` | none (git's file lists) | A commit's files |
 | `ranFor`, `landedFor` reaching a capability, constraint or area | a v1 feature or epic id | A run record or trailer named an item the migration turned into a product node, whether the plan only proposes it or has applied it; rex keeps no such edge. A `blockedBy` naming one is left out, as rex requires a change or task |
