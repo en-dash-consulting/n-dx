@@ -2041,6 +2041,9 @@ function zoomHint(){
 }
 if (EMBED) {
   window.addEventListener("message", function(ev){
+    // Only the page that frames the map steers it: a page that frames that page in turn
+    // could reach this window too, and its messages come from elsewhere.
+    if (ev.source && ev.source !== window.parent) return;
     var d = ev.data;
     if (!d || d.type !== "ndx-iso") return;
     if (typeof d.wheelZoom === "boolean") wheelZoom = d.wheelZoom;

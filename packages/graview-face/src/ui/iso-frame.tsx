@@ -60,14 +60,16 @@ export function IsoFrame({ focus, height, wheelZoom = false, title }: { focus?: 
   useEffect(() => {
     const target = frame.current?.contentWindow;
     if (!loaded || !target) return;
-    const say = () => target.postMessage({ type: "ndx-iso", theme: scheme(), wheelZoom, ...(focus ? { focus } : {}) }, window.location.origin);
+    // The frame is sandboxed, so its origin is opaque and only "*" reaches it; the message says nothing private.
+    const say = () => target.postMessage({ type: "ndx-iso", theme: scheme(), wheelZoom, ...(focus ? { focus } : {}) }, "*");
     say();
-    const watch = new MutationObserver(() => target.postMessage({ type: "ndx-iso", theme: scheme() }, window.location.origin));
+    const watch = new MutationObserver(() => target.postMessage({ type: "ndx-iso", theme: scheme() }, "*"));
     watch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-graview-scheme"] });
     return () => watch.disconnect();
   }, [loaded, focus, wheelZoom]);
 
   if (available === "no") return <Empty command="ndx analyze .">No code map yet: sourcevision has not analyzed this project, or the projection was emitted before it did.</Empty>;
   if (available === "checking") return <div className="ndx-iso" style={{ height }} aria-busy="true" />;
-  return <iframe ref={frame} className="ndx-iso" src={ISO_MAP_URL} title={title} style={{ height }} onLoad={() => setLoaded(true)} />;
+  // Scripts only: the map runs its own, but in an opaque origin it cannot read this page's door key or call the door.
+  return <iframe ref={frame} className="ndx-iso" sandbox="allow-scripts" src={ISO_MAP_URL} title={title} style={{ height }} onLoad={() => setLoaded(true)} />;
 }

@@ -481,6 +481,15 @@ describe("iso map focus over areas and sub-zones", () => {
     expect(selected()).toBe("WEB-A-X");
   });
 
+  it("takes no message from a window other than the page that frames it", () => {
+    focus("db");
+    const stranger = new JSDOM("").window;
+    win.dispatchEvent(new win.MessageEvent("message", { data: { type: "ndx-iso", focus: "web" }, source: stranger as unknown as MessageEventSource }));
+    expect(crumbs()).toContain("Core area");
+    expect(selected()).toBe("DB");
+    stranger.close();
+  });
+
   it("stays where it is for an id the map does not have, a prototype key included", () => {
     focus("db");
     for (const id of ["nowhere", "constructor", "__proto__", "toString"]) {
