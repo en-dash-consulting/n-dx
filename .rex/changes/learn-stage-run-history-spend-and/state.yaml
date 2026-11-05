@@ -25,7 +25,10 @@ items:
     lastModified: "2026-11-05T01:53:01.278Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2ddbf697-23ef-4f2a-964f-d54877532282":
-    lastModified: "2026-10-28T18:44:25.019Z"
+    startedAt: "2026-11-05T05:09:01.025Z"
+    activeIntervals: [{"end":"2026-11-05T05:28:20.578Z","start":"2026-11-05T05:09:01.025Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T05:28:21.151Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3044e7b8-703d-48ae-a651-acf4fdad8305":
     lastModified: "2026-11-05T02:10:47.442Z"
@@ -43,6 +46,9 @@ items:
     resolutionDetail: "merge-history links merges by N-DX-Item trailers (git's parser) and shapes v2 items from the change layer; merge-graph view uses tree-depth indent and \"Changes only\" labels on v2, v1 unchanged."
     lastModified: "2026-11-05T05:04:58.631Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6a77921e-d047-41a8-be72-ed1729555dd7":
+    lastModified: "2026-11-05T05:19:33.667Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "95300e23-699c-4649-8aa2-af95a1d4b6a0":
     lastModified: "2026-11-05T01:52:56.332Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -50,5 +56,5 @@ items:
     lastModified: "2026-11-05T01:01:56.305Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5c7b061-22b2-4b84-93cd-55793d328d68":
-    lastModified: "2026-11-05T02:10:47.442Z"
+    lastModified: "2026-11-05T05:19:33.667Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
