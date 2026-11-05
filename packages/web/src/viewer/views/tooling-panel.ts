@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { appUrl } from "../base-path.js";
 import { viewPathname } from "../route-state.js";
 import type { NavigateTo } from "../types.js";
+import { ROBOT_WRANGLER_SECTIONS, type RobotWranglerSection } from "./robot-wrangler-sections.js";
 import {
   summarizeTooling,
   type ToolingAuth,
@@ -55,19 +56,20 @@ async function readAuth(config: ToolingConfig): Promise<ToolingAuth> {
     : { ok: false, detail: body.error ?? "Credential check failed" };
 }
 
-/** A link to a Settings page, named for the field it leads to. */
-function SettingsLink({ view, navigateTo, children }: {
-  view: "robot-wrangler";
+/** A link to the Robot Wrangler section that edits the line it labels. */
+function SettingsLink({ section, navigateTo, children }: {
+  section: RobotWranglerSection;
   navigateTo: NavigateTo;
   children?: ComponentChildren;
 }): ComponentChild {
   return h("a", {
     class: "tooling-link",
-    href: appUrl(viewPathname(view, null)),
+    "data-section": section,
+    href: appUrl(`${viewPathname("robot-wrangler", null)}?${new URLSearchParams({ section })}`),
     onClick: (e: MouseEvent) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
-      navigateTo(view);
+      navigateTo("robot-wrangler", { section });
     },
   }, children);
 }
@@ -106,7 +108,7 @@ export function ToolingPanel({ navigateTo, extra }: {
     h("ul", { class: "tooling-vendors", "aria-label": "Vendors" },
       summary.vendors.map((vendor) => h("li", { key: vendor.id, class: "tooling-vendor", "data-vendor": vendor.id },
         h("div", { class: "tooling-vendor-head" },
-          h(SettingsLink, { view: "robot-wrangler", navigateTo }, vendor.label),
+          h(SettingsLink, { section: "models", navigateTo }, vendor.label),
           h("span", {
             class: `tooling-state tooling-state--${vendor.state}`,
             title: vendor.detail,
@@ -117,15 +119,13 @@ export function ToolingPanel({ navigateTo, extra }: {
             h("dt", null, TIER_LABEL[row.tier] ?? row.tier),
             h("dd", null, h("code", null, row.model)))))))),
     h("p", { class: "tooling-line tooling-routes" },
+      // No Settings field edits llm.routes; `ndx config` does.
       summary.routes.length === 0
-        ? h(SettingsLink, { view: "robot-wrangler", navigateTo }, "No per-command route overrides")
-        : [
-            h(SettingsLink, { key: "l", view: "robot-wrangler", navigateTo }, "Route overrides"),
-            ": ",
-            summary.routes.map((r) => `${r.label} → ${TIER_LABEL[r.tier] ?? r.tier}`).join(", "),
-          ]),
+        ? "No per-command route overrides"
+        : `Route overrides: ${summary.routes.map((r) => `${r.label} → ${TIER_LABEL[r.tier] ?? r.tier}`).join(", ")}`,
+      " (change with ", h("code", null, "ndx config"), ")"),
     h("p", { class: "tooling-line tooling-review" },
-      h(SettingsLink, { view: "robot-wrangler", navigateTo }, summary.review)),
+      h(SettingsLink, { section: "review", navigateTo }, summary.review)),
     // Reserved for S8: the Sidecar's settings and C1's connections.
     h("div", { class: "tooling-extra", "data-slot": "sidecar-connections" }, extra ?? null));
 }

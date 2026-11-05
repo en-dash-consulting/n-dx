@@ -44,11 +44,14 @@ export interface HistoryEntry {
   taskId: string | null;
   tab: string | null;
   askSeed: AskSeed | null;
+  /** Page section to scroll to, carried as `?section=` (never a hash: the legacy hash router owns it). */
+  section?: string | null;
 }
 
 export function entryUrl(entry: HistoryEntry): string {
   const subId = entry.runId ?? entry.taskId ?? entry.tab;
-  return viewPathname(entry.view, subId);
+  const path = viewPathname(entry.view, subId);
+  return entry.section ? `${path}?${new URLSearchParams({ section: entry.section })}` : path;
 }
 
 /**
@@ -131,6 +134,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       taskId: opts?.taskId ?? null,
       tab: routeTab(resolved, opts?.tab ?? alias?.sub ?? null),
       askSeed: opts?.askSeed ?? null,
+      section: opts?.section ?? null,
     };
     guardedLeave(() => applyEntry(entry, true));
   }, [validViews, applyEntry]);
@@ -170,6 +174,8 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       // Seed the initial history entry — preserve deep-link path if present
       const entry: HistoryEntry = {
         view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, tab: selectedTab, askSeed: null,
+        // A deep link keeps its section across the seed, or the URL rewrite drops it.
+        section: new URLSearchParams(location.search).get("section"),
       };
       currentRef.current = entry;
       history.replaceState(entry, "", appUrl(entryUrl(entry)));
@@ -186,6 +192,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
             taskId?: string | null;
             tab?: string | null;
             askSeed?: AskSeed | null;
+            section?: string | null;
           };
           if (s.view && validViews.has(s.view as ViewId)) {
             return {
@@ -196,6 +203,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
               taskId: s.taskId ?? null,
               tab: s.tab ?? null,
               askSeed: s.askSeed ?? null,
+              section: s.section ?? null,
             };
           }
         }

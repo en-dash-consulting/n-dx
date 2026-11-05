@@ -15,6 +15,7 @@ import { h } from "preact";
 import { ActionIcon } from "../components/index.js";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { ROBOT_WRANGLER_SECTIONS, robotWranglerSectionId } from "./robot-wrangler-sections.js";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 
@@ -632,7 +633,7 @@ function TierTable({
 }) {
   const cliName = useCliName();
   const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
-  return h("section", { class: "llm-rw-section llm-tier-section" },
+  return h("section", { class: "llm-rw-section llm-tier-section", id: ROBOT_WRANGLER_SECTIONS.models },
     h(SectionHeader, {
       number: 3,
       title: "Models",
@@ -999,7 +1000,7 @@ function ReviewSection({
           : null,
       ];
 
-  return h("section", { class: `llm-rw-section${modeDirty ? " llm-field-dirty" : ""}` },
+  return h("section", { class: `llm-rw-section${modeDirty ? " llm-field-dirty" : ""}`, id: ROBOT_WRANGLER_SECTIONS.review },
     h(SectionHeader, { number: 5, title: "Review", subtitle: "A second model checks each task before it commits" }),
     body,
   );
@@ -1928,6 +1929,15 @@ export function RobotWranglerView() {
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
+
+  // A deep link (`?section=models`) scrolls once the sections exist.
+  const sectionScrolled = useRef(false);
+  useEffect(() => {
+    if (loading || sectionScrolled.current) return;
+    sectionScrolled.current = true;
+    const id = robotWranglerSectionId(new URLSearchParams(location.search).get("section"));
+    if (id) document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth" });
+  }, [loading]);
 
   // The catalog holds every vendor, so switching vendor reads another entry
   // rather than refetching — nothing from the previous vendor can linger.

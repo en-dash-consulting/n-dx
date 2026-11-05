@@ -39,7 +39,8 @@ export interface AskSeed {
   labels?: Record<string, string>;
 }
 
-export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; tab?: string; askSeed?: AskSeed }) => void;
+/** `section` rides in the URL as `?section=<key>`; the target view scrolls to it. */
+export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; tab?: string; askSeed?: AskSeed; section?: string }) => void;
 
 export interface FileDetail {
   type: "file";

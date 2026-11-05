@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { ToolingPanel } from "../../../src/viewer/views/tooling-panel.js";
 import type { NavigateTo } from "../../../src/viewer/types.js";
+import { robotWranglerSectionId } from "../../../src/viewer/views/robot-wrangler-sections.js";
 import { summarizeTooling } from "../../../src/viewer/views/tooling-summary.js";
 
 async function waitFor(fn: () => void, timeout = 2000) {
@@ -90,18 +91,32 @@ describe("ToolingPanel", () => {
     expect(text(".tooling-review")).toContain("codex (gpt-review) · 2 fix rounds");
   });
 
-  it("has no editable control, and every line links to Robot Wrangler", async () => {
+  it("has no editable control; tier and review lines link to their Robot Wrangler section", async () => {
     stub(CONFIG, CATALOG);
     mount();
     await waitFor(() => expect(root.querySelectorAll(".tooling-vendor")).toHaveLength(3));
 
     expect(root.querySelectorAll("input, select, textarea, button")).toHaveLength(0);
     const links = Array.from(root.querySelectorAll<HTMLAnchorElement>("a.tooling-link"));
-    // Three vendors, the routes line, the review line.
-    expect(links).toHaveLength(5);
-    for (const a of links) expect(a.getAttribute("href")).toMatch(/\/robot-wrangler$/);
+    // Three vendors and the review line; route overrides name `ndx config` instead.
+    expect(links.map((a) => a.dataset.section)).toEqual(["models", "models", "models", "review"]);
+    for (const a of links) {
+      expect(a.getAttribute("href")).toMatch(new RegExp(`/robot-wrangler\\?section=${a.dataset.section}$`));
+      // Every target section exists in Robot Wrangler under a known id.
+      expect(robotWranglerSectionId(a.dataset.section ?? null)).not.toBeNull();
+    }
     links[0].click();
-    expect(navigateTo).toHaveBeenCalledWith("robot-wrangler");
+    expect(navigateTo).toHaveBeenLastCalledWith("robot-wrangler", { section: "models" });
+    links[3].click();
+    expect(navigateTo).toHaveBeenLastCalledWith("robot-wrangler", { section: "review" });
+  });
+
+  it("names ndx config as where route overrides change", async () => {
+    stub(CONFIG, CATALOG);
+    mount();
+    await waitFor(() => expect(text(".tooling-routes")).toContain("ndx plan → Heavy"));
+    expect(text(".tooling-routes")).toContain("ndx config");
+    expect(root.querySelector(".tooling-routes a")).toBeNull();
   });
 
   it("shows a signed-out active vendor without breaking the tile", async () => {
