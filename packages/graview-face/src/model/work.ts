@@ -81,13 +81,14 @@ export interface AreaStanding {
   /** Capabilities anywhere under the area. */
   readonly capabilities: number;
   readonly met: number;
-  /** Open changes that amend or touch those capabilities, or the area itself. */
+  /** Open changes that amend or touch the area or anything under it: sub-areas, capabilities, constraints. */
   readonly open: number;
 }
 
 /** An area at a glance: what it holds and how much of that stands. */
 export function areaStanding(store: Reader, area: Of<"area">): AreaStanding {
   const capabilities: Of<"capability">[] = [];
+  // Everything under the area, at any depth: its sub-areas, capabilities and constraints.
   const seen = new Set<string>([area.id]);
   const walk = (id: string) => {
     for (const child of inward(store, id, "under")) {
@@ -99,7 +100,7 @@ export function areaStanding(store: Reader, area: Of<"area">): AreaStanding {
   };
   walk(area.id);
   const open = new Set<string>();
-  for (const target of [area.id, ...capabilities.map((c) => c.id)]) {
+  for (const target of seen) {
     for (const edge of ["amends", "touches"] as const) for (const change of inward(store, target, edge)) if (change.kind === "change" && isOpen(change)) open.add(change.id);
   }
   return { capabilities: capabilities.length, met: capabilities.filter((c) => c.intentStatus === "met").length, open: open.size };

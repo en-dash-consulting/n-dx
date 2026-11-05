@@ -1544,18 +1544,32 @@
         "empty": "Nothing waits in the Inbox."
       },
       {
-        "title": "Open changes",
+        "title": "Under way",
         "key": "open-changes"
       },
       {
-        "list": "all('change') where status != 'completed' and status != 'cancelled' and status != 'deleted'",
+        "list": "all('change') where status == 'in_progress' or status == 'blocked' or status == 'failing'",
         "sort": {
           "by": "status",
           "direction": "choices"
         },
         "limit": 8,
         "as": "row",
-        "empty": "No change is open. ndx capture . or ndx plan . adds one."
+        "empty": "Nothing is under way."
+      },
+      {
+        "title": "Waiting to start",
+        "key": "waiting-changes"
+      },
+      {
+        "list": "all('change') where status == 'pending' or status == 'deferred'",
+        "sort": {
+          "by": "status",
+          "direction": "choices"
+        },
+        "limit": 8,
+        "as": "row",
+        "empty": "No change waits to start. ndx capture . or ndx plan . adds one."
       },
       {
         "title": "Recent runs",

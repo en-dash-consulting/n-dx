@@ -22,6 +22,10 @@ const nodes = [
   { id: "a1", kind: "area", title: "Checkout", status: "pending" },
   { id: "cap-met", kind: "capability", title: "Pay by card", status: "pending", intentStatus: "met" },
   { id: "cap-open", kind: "capability", title: "Pay by wallet", status: "pending", intentStatus: "changing" },
+  { id: "a1-sub", kind: "area", title: "Refunds", status: "pending" },
+  { id: "k1", kind: "constraint", title: "PCI scope", status: "pending" },
+  change("c-sub", "pending"),
+  change("c-constraint", "failing"),
   change("c-inbox-open", "pending", { inbox: true, priority: "high" }),
   change("c-inbox-done", "completed", { inbox: true }),
   change("c-inbox-cancelled", "cancelled", { inbox: true }),
@@ -32,6 +36,10 @@ const nodes = [
 const edges = [
   { kind: "under", from: "cap-met", to: "a1" },
   { kind: "under", from: "cap-open", to: "a1" },
+  { kind: "under", from: "a1-sub", to: "a1" },
+  { kind: "under", from: "k1", to: "a1-sub" },
+  { kind: "touches", from: "c-sub", to: "a1-sub" },
+  { kind: "amends", from: "c-constraint", to: "k1" },
   { kind: "amends", from: "c-amends", to: "cap-open" },
   { kind: "touches", from: "c-touches", to: "a1" },
   { kind: "amends", from: "c-done", to: "cap-met" },
@@ -56,14 +64,15 @@ describe("attention", () => {
     const needs = attention(store);
     expect(needs.inbox.map((c) => c.id)).toEqual(["c-inbox-open"]);
     expect(needs.placedNever.map((c) => c.id).sort()).toEqual(["c-inbox-cancelled", "c-inbox-done"]);
-    // The Inbox's one change and the blocked one; a finished unplaced change needs no one.
-    expect(needs.total).toBe(2);
+    // The Inbox's one change, the blocked one and the failing one; a finished unplaced change needs no one.
+    expect(needs.total).toBe(3);
   });
 });
 
 describe("an area's card", () => {
-  it("counts its capabilities, those met, and the open changes placed on it or on them", () => {
+  it("counts its capabilities, those met, and the open changes placed on it or anything under it", () => {
     const area = nodesOf(store, "area").find((a) => a.id === "a1")!;
-    expect(areaStanding(store, area)).toEqual({ capabilities: 2, met: 1, open: 2 });
+    // c-amends and c-touches on the area and its capability; c-sub on a sub-area; c-constraint on a constraint two levels down.
+    expect(areaStanding(store, area)).toEqual({ capabilities: 2, met: 1, open: 4 });
   });
 });
