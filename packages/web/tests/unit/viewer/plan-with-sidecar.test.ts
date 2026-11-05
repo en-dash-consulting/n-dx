@@ -1,0 +1,86 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { h, render } from "preact";
+import { act } from "preact/test-utils";
+import { PlanWithSidecarButton, PlanWithSidecarContext } from "../../../src/viewer/components/plan-with-sidecar.js";
+import { SmartAddInput } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
+import { pageItemFor, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+
+let root: HTMLDivElement;
+beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); });
+const show = (vnode: Parameters<typeof render>[0]) => { act(() => { render(vnode, root); }); };
+afterEach(() => { act(() => { render(null, root); }); root.remove(); });
+
+describe("Plan with Sidecar button", () => {
+  it("draws nothing while the Sidecar is off", () => {
+    show(h(PlanWithSidecarButton, { text: "Add SSO" }));
+    expect(root.innerHTML).toBe("");
+  });
+
+  it("sends the typed text, trimmed, with no area from the plain capture bar", () => {
+    const plan = vi.fn();
+    show(h(PlanWithSidecarContext.Provider, { value: { plan } }, h(PlanWithSidecarButton, { text: "  Add SSO  " })));
+    act(() => { root.querySelector<HTMLButtonElement>("button")?.click(); });
+    expect(plan).toHaveBeenCalledWith("Add SSO", undefined);
+  });
+
+  it("sends the area from an area-scoped capture", () => {
+    const plan = vi.fn();
+    show(h(PlanWithSidecarContext.Provider, { value: { plan } }, h(PlanWithSidecarButton, { text: "Add SSO", areaId: "area-1" })));
+    act(() => { root.querySelector<HTMLButtonElement>("button")?.click(); });
+    expect(plan).toHaveBeenCalledWith("Add SSO", "area-1");
+  });
+
+  it("is disabled until something is typed", () => {
+    show(h(PlanWithSidecarContext.Provider, { value: { plan: vi.fn() } }, h(PlanWithSidecarButton, { text: "   " })));
+    expect(root.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+  });
+});
+
+describe("capture bar", () => {
+  const ctx = { plan: vi.fn() };
+  const realFetch = globalThis.fetch;
+  // The bar reads the PRD for its scope list; an answer that never comes keeps its state updates out of the test.
+  beforeEach(() => { globalThis.fetch = vi.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch; });
+  afterEach(() => { globalThis.fetch = realFetch; });
+  const bar = (layout: "v1" | "v2", sidecar: boolean) =>
+    h(PlanWithSidecarContext.Provider, { value: sidecar ? ctx : null },
+      h(SmartAddInput, { onPrdChanged: () => {}, bar: true, layout }));
+
+  it("offers the button beside Preview on a v2 tree when the Sidecar is on", () => {
+    show(bar("v2", true));
+    expect(root.querySelector(".smart-add-btn-generate")).not.toBeNull();
+    expect(root.querySelector(".smart-add-btn-sidecar")?.textContent).toBe("Plan with Sidecar");
+  });
+
+  it("omits it while web.sidecar is off", () => {
+    show(bar("v2", false));
+    expect(root.querySelector(".smart-add-btn-sidecar")).toBeNull();
+  });
+
+  it("omits it on a v1 tree", () => {
+    show(bar("v1", true));
+    expect(root.querySelector(".smart-add-btn-sidecar")).toBeNull();
+  });
+});
+
+describe("Plan with Sidecar attachment", () => {
+  const registry = [{ id: "plan", available: true }];
+
+  it("asks with the Plan lens on the capture bar's page, whatever page it is", () => {
+    const item = pageItemFor({ view: "analysis", zone: null, taskId: null, plan: { area: null } });
+    expect(item).toMatchObject({ kind: "plan", lens: "plan" });
+    expect(item?.ref).toBeUndefined();
+    expect(resolveLens(wantedLensFor(item, false), registry, item).running).toBe("plan");
+  });
+
+  it("targets the area from an area-scoped capture and still asks with Plan, not Explain", () => {
+    const item = pageItemFor({ view: "product", zone: null, taskId: null, plan: { area: "area-1" } });
+    expect(item).toMatchObject({ kind: "area", ref: "area-1" });
+    expect(wantedLensFor(item, false)).toBe("plan");
+  });
+
+  it("an area attached without a lens asks with Explain", () => {
+    expect(wantedLensFor({ kind: "area", ref: "a", label: "a" }, false)).toBe("explain");
+  });
+});

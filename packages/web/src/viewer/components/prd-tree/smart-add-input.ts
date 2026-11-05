@@ -25,6 +25,7 @@ import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from "./change-placement.js";
+import { PlanWithSidecarButton } from "../plan-with-sidecar.js";
 import { useProductRead } from "../../hooks/index.js";
 import type { AreaDetail, PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
 
@@ -685,6 +686,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
         onClick: handleSubmit,
         "aria-label": copy.actionLabel,
       }, state === "loading" ? copy.busy : copy.action),
+      // v2 only: the Plan lens proposes a change set, which a v1 tree has no place for.
+      layout === "v2" ? h(PlanWithSidecarButton, { text: input, areaId: area?.id, disabled: state === "loading" }) : null,
       bar ? barAction : null,
     ),
 

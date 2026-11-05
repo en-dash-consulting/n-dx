@@ -23,7 +23,7 @@ export interface SidecarLensInfo {
   target?: { kind: string; needs: string };
 }
 
-export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change";
+export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change" | "area";
 
 /** The thing the current page is about. `ref` is what the lens packet is pointed at; Plan and Live have none. */
 export interface SidecarPageItem {
@@ -49,6 +49,8 @@ export interface SidecarPageSelection {
   changeId?: string | null;
   /** The task whose failed run "Diagnose in Sidecar" attached, by id; asks with Diagnose run on any page. */
   diagnoseTaskId?: string | null;
+  /** "Plan with Sidecar" on a capture bar: asks with the Plan lens, aimed at `area` when the capture was area-scoped. */
+  plan?: { area: string | null } | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
@@ -56,6 +58,11 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
   if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
   if (page.diagnoseTaskId) return { kind: "task", ref: page.diagnoseTaskId, label: page.diagnoseTaskId, lens: "diagnose-run" };
+  if (page.plan) {
+    return page.plan.area
+      ? { kind: "area", ref: page.plan.area, label: page.plan.area, lens: "plan" }
+      : { kind: "plan", label: "Plan", lens: "plan" };
+  }
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };
   }
@@ -75,6 +82,7 @@ export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boole
   switch (item?.kind) {
     case "task": return lastRunFailed ? "diagnose-run" : "describe";
     case "capability":
+    case "area":
     case "zone": return "explain";
     case "plan": return "plan";
     case "live": return "guide";

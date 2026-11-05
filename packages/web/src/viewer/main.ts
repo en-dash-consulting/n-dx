@@ -30,6 +30,7 @@ import {
   ServerUnavailableNotice,
   SidecarDock,
   PlaceWithSidecarContext,
+  PlanWithSidecarContext,
   DiagnoseInSidecarContext,
 } from "./components/index.js";
 import {
@@ -164,6 +165,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [openChange, setOpenChange] = useState<string | null>(null);
   // The task whose failed run "Diagnose in Sidecar" attached (Diagnose run lens); dropped with the page.
   const [diagnoseTask, setDiagnoseTask] = useState<string | null>(null);
+  // "Plan with Sidecar" on a capture bar: the Plan lens, aimed at an area when the capture was scoped to one; dropped with the page.
+  const [planWith, setPlanWith] = useState<{ area: string | null } | null>(null);
+  // The text that bar typed, waiting to go as the session's first turn once the session holds that lens and target.
+  const [planText, setPlanText] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -192,10 +197,26 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, plan: planWith },
   );
   const showSidecar = sidecarShell.drawer.show;
-  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); }, [pageView]);
+  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setPlanWith(null); setPlanText(null); }, [pageView]);
+  // Send the typed text once the open session has followed the attachment (a PATCH answers
+  // the change), so the turn opens with the Plan lens and its target rather than racing them.
+  const { sidecar, drawer } = sidecarShell;
+  useEffect(() => {
+    if (planText === null || !planWith || !drawer.open || !sidecar.attachment.ready) return;
+    if (sidecar.attachment.lens.running !== "plan" || sidecar.running || sidecar.sending) return;
+    const held = sidecar.session;
+    if (held && (held.endedAt || held.lens !== "plan" || (held.target?.ref ?? "") !== (planWith.area ?? ""))) return;
+    setPlanText(null);
+    void sidecar.send(planText);
+  }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending]);
+  // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar".
+  const planWithSidecar = useMemo(
+    () => (sidecarShell.button ? { plan: (text: string, area?: string) => { setPlanWith({ area: area ?? null }); setPlanText(text); showSidecar(); } } : null),
+    [sidecarShell.button !== null, showSidecar],
+  );
   // Null while Sidecar is off, so no failed run offers "Diagnose in Sidecar".
   const diagnoseInSidecar = useMemo(
     () => (sidecarShell.button ? { diagnose: (taskId: string) => { setDiagnoseTask(taskId); showSidecar(); }, attached: diagnoseTask } : null),
@@ -287,7 +308,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
+  return h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -366,7 +387,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  )));
+  ))));
 }
 
 const root = document.getElementById("app");
