@@ -427,6 +427,25 @@ describe("the Requirements tab", () => {
     expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
   });
 
+  it("/product/area/<slug> opens the Product page at that area", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    const original = Element.prototype.scrollIntoView;
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    try {
+      const area = PRODUCT_MAP_FIXTURE.areas[1]!;
+      await mount(h("div", null, renderActiveView("product", { selectedTab: `area/${area.slug}` } as never)));
+      await vi.waitFor(() => expect(root.querySelector(".pm-area")).not.toBeNull());
+      const focused = root.querySelectorAll('.pm-area[aria-current="location"]');
+      expect([...focused].map((s) => s.id)).toEqual([`product-area-${area.slug}`]);
+      // The scroll is an effect, which Preact runs after paint.
+      await vi.waitFor(() => expect(scrolled).toHaveBeenCalledOnce());
+      expect(scrolled.mock.contexts[0]).toBe(focused[0]);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("the /requirements route opens on that tab on a v2 project", async () => {
     stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
     await mount(h(ProductPage, { initialTab: "requirements" }));
