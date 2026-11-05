@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "019399a6-ea02-4193-be85-9a411a30dc55":
+    lastModified: "2026-11-05T14:26:43.849Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "056a30fd-25f2-428d-a193-308a7c6fcc8b":
     status: "completed"
     startedAt: "2026-11-05T13:28:28.027Z"
@@ -36,10 +39,13 @@ items:
     lastModified: "2026-11-05T13:28:07.789Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "79842c6f-d3e5-4b7f-961a-5521d5bdd0cc":
-    lastModified: "2026-11-05T01:05:53.642Z"
+    startedAt: "2026-11-05T14:21:16.878Z"
+    activeIntervals: [{"end":"2026-11-05T14:38:52.300Z","start":"2026-11-05T14:21:16.878Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (22):\n- /product/area/<slug> shows that area's view as the page, with the way back to the map\n- shows field-level error styling after blur on empty title\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n… and 14 more"
+    lastModified: "2026-11-05T14:38:54.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b5e6519-b13e-4ca2-a70a-40988f4dcea8":
-    lastModified: "2026-11-05T14:07:38.107Z"
+    lastModified: "2026-11-05T14:26:43.849Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c72e349-bf76-42ba-8274-2d40b7c3127e":
     lastModified: "2026-11-05T01:06:03.990Z"
