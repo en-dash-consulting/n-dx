@@ -108,6 +108,16 @@ describe("Connections section", () => {
     expect(buttons("local")).toEqual([]);
   });
 
+  it("reads 'sign in' for a connection that never signed in and 'sign in again' for one whose token was refused", async () => {
+    const never: ConnectionRow = { ...WIKI, id: "fresh", reason: "not signed in yet; sign in from the dashboard" };
+    const refused: ConnectionRow = { ...WIKI, id: "lost", reason: "the server refused the signed-in token; the sign-in expired or was revoked; sign in again" };
+    stubApi({ connections: [never, refused] });
+    act(() => { render(h(ConnectionsSection, null), root); });
+    await settle();
+    expect(state("fresh")).toBe("sign in");
+    expect(state("lost")).toBe("sign in again");
+  });
+
   it("Sign in asks for an authorization URL that returns to this dashboard's Project page", async () => {
     setBasePathForTests("/p/alpha");
     const requests = stubApi();
@@ -129,7 +139,7 @@ describe("Connections section", () => {
     await act(async () => { (row("docs")!.querySelector("button") as HTMLButtonElement).click(); });
     await settle();
     expect(requests.some((r) => r.method === "POST" && r.url === "/api/connections/docs/sign-out")).toBe(true);
-    expect(state("docs")).toBe("sign in again");
+    expect(state("docs")).toBe("sign in");
     expect(buttons("docs")).toEqual(["Sign in"]);
   });
 

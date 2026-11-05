@@ -42,7 +42,9 @@ const RETURN_PARAMS = [CONNECTION_PARAM, "code", "state", "error", "error_descri
 export function connectionStateLabel(row: Pick<ConnectionRow, "state" | "reason">): string {
   if (row.state === "connected") return "connected";
   if (row.state === "unavailable") return `connection unavailable: ${row.reason ?? "unknown reason"}`;
-  return "sign in again";
+  // The server words a lost or refused token "…; sign in again" and a connection that never had one
+  // "not signed in yet; …" (or "signed out" after a deliberate sign-out), so the reason tells them apart.
+  return row.reason?.includes("sign in again") ? "sign in again" : "sign in";
 }
 
 async function readError(res: Response): Promise<string> {

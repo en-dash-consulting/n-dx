@@ -179,8 +179,7 @@ function Picker({ path, name, required, value, options, onChange }: Pick<FieldPr
   return h("select", {
     class: "sidecar-external-input sidecar-external-picker",
     "aria-label": name,
-    "aria-required": required ? "true" : undefined,
-    "data-field": path,
+    "aria-required": required ? "true" : undefined,    "data-field": path,
     value: isScalar(value) ? String(value) : "",
     onChange: (e: Event) => {
       const picked = choices.find((o) => String(o.value) === (e.target as HTMLSelectElement).value);

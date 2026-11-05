@@ -392,11 +392,38 @@
 .sidecar-external-form { display: flex; flex-direction: column; gap: var(--space-2); }
 .sidecar-external-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
 .sidecar-external-check { flex-direction: row; align-items: center; gap: var(--space-1); }
-.sidecar-external-label { color: var(--text-muted); font-size: 11px; }
+.sidecar-external-label { color: var(--text-dim); font-size: 11px; }
 .sidecar-external-required { color: var(--red); }
-.sidecar-external-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; }
+/* The agent bar's field style; a select keeps the chevron forms.css draws. */
+.sidecar-external-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2-5);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.sidecar-external-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sidecar-external-check input { width: auto; }
+.sidecar-card-approve, .sidecar-card-deny {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sidecar-card-approve { border: 1px solid var(--accent); background: var(--accent); color: var(--bg); }
+.sidecar-card-approve:disabled { border-color: var(--border); background: var(--bg-active); color: var(--text-muted); cursor: default; }
+.sidecar-card-deny { border: 1px solid var(--border-strong, var(--border)); background: transparent; color: var(--text); }
+.sidecar-card-deny:hover:not(:disabled) { background: var(--bg-hover); }
+.sidecar-card-approve:focus-visible, .sidecar-card-deny:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sidecar-external-json { font-family: var(--font-mono, monospace); }
-.sidecar-external-input[aria-invalid="true"] { outline: 1px solid var(--red); }
+.sidecar-external-input[aria-invalid="true"] { border-color: var(--red); outline: 1px solid var(--red); }
 .sidecar-external-group { margin: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; gap: var(--space-2); }
 .sidecar-external-group legend { padding: 0 var(--space-1); }
 .sidecar-external-problems { border-left: 3px solid var(--red); padding: var(--space-1) var(--space-2); background: var(--bg-surface); }

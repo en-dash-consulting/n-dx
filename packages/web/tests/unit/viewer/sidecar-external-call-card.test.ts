@@ -130,6 +130,25 @@ describe("external-call card form", () => {
     expect(decide.mock.calls[0][1].arguments).toEqual({ ...args, priority: "high" });
   });
 
+  it("gives every field, pickers included, an accessible name equal to its property's label", async () => {
+    const { el } = await draw(externalCard({
+      externalCall: {
+        label: "CAOS", host: "caos.endash.us", inputSchema: SCHEMA,
+        options: { ownerId: [{ value: "u1", label: "Rae" }] },
+      },
+    }));
+    const names = ["title", "estimate", "ratio", "urgent", "priority", "labels", "owner.name", "owner.seats", "links", "extra", "ownerId"];
+    for (const path of names) {
+      const control = field(el, path);
+      const property = path.split(".").pop()!;
+      expect(control.getAttribute("aria-label"), path).toBe(property);
+      // The visible label wraps the control and says the same thing.
+      expect(control.closest("label")!.querySelector(".sidecar-external-label")!.textContent!.replace(/\s*\*$/, ""), path).toBe(property);
+    }
+    expect(field(el, "ownerId").tagName).toBe("SELECT");
+    expect(field(el, "priority").tagName).toBe("SELECT");
+  });
+
   it("marks required fields", async () => {
     const { el } = await draw(externalCard());
     expect(field(el, "title").getAttribute("aria-required")).toBe("true");
