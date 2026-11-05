@@ -25,7 +25,7 @@ import { VIEW_META } from "./view-meta.js";
 
 export * from "./view-meta.js";
 
-export type StageId = "analyze" | "plan" | "work";
+export type StageId = "analyze" | "plan" | "work" | "tune";
 
 export type StageProduct = "sourcevision" | "rex" | "hench";
 
@@ -154,7 +154,7 @@ export function tilePlacesView(tile: StageTile): boolean {
 }
 
 /** Loop order. The side stage links step through it and wrap. */
-export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work"];
+export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work", "tune"];
 
 export const STAGES: Readonly<Record<StageId, StageDef>> = {
   analyze: {
@@ -189,8 +189,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "product", requiresServer: true },
       { view: "changes", requiresServer: true },
       { view: "command-reference" },
-      { view: "hench-runs", scroll: true },
-      { view: "merge-graph" },
       { view: "validation" },
       { view: "requirements" },
     ],
@@ -199,12 +197,20 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     id: "work",
     sections: [
       { view: "rex-dashboard", plain: true },
-      { view: "activity", scroll: true },
-      { view: "token-usage" },
       { view: "hench-audit" },
-      { view: "hench-optimization" },
-      { view: "hench-adaptive" },
       { view: "workspaces", requiresServer: true },
+    ],
+  },
+  tune: {
+    id: "tune",
+    // The lead is the stage's own question (rendered by the registry); tiles
+    // reuse existing views, as Analysis does.
+    sections: [{ view: "tune", plain: true }],
+    tiles: [
+      { view: "hench-runs", tabs: [{ view: "activity" }] },
+      { view: "token-usage" },
+      { view: "hench-optimization", tabs: [{ view: "hench-adaptive" }] },
+      { view: "merge-graph" },
     ],
   },
 };
@@ -260,7 +266,7 @@ export function isLiveView(view: ViewId): boolean {
 // ── Lookups ────────────────────────────────────────────────────
 
 export function isStageId(view: ViewId): view is StageId {
-  return view === "analyze" || view === "plan" || view === "work";
+  return STAGE_ORDER.includes(view as StageId);
 }
 
 /**

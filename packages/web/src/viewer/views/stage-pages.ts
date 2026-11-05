@@ -207,6 +207,7 @@ const NO_SUMMARY: RenderSummary = () => null;
 export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
+  const cliName = useCliName();
   const gates: Record<string, boolean> = {
     "sourcevision.prMarkdown": useFeatureToggle("sourcevision.prMarkdown", false),
     "sourcevision.ask": useFeatureToggle("sourcevision.ask", false),
@@ -233,7 +234,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       h("div", { class: "stage-page-heading" },
         h("div", { class: "stage-page-titles" },
           h("h1", { class: "stage-page-title" }, viewLabel(stage)),
-          h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
+          h("p", { class: "stage-page-blurb" }, resolveCliLabel(viewBlurb(stage), cliName)),
         ),
         headStatus,
       ),
@@ -374,12 +375,13 @@ export interface HomeViewProps {
 
 export function HomeView({ validViews, navigateTo }: HomeViewProps) {
   const status = useProjectStatus();
+  const cliName = useCliName();
   const stages = visibleStages(validViews);
 
   return h("div", { class: "home" },
     h("div", { class: "home-head" },
       h("h1", null, "n-dx"),
-      h("p", null, "Three stages in a loop — understand the code, decide what to build, let the agent build it."),
+      h("p", null, "Four stages in a loop — understand the code, decide what to build, let the agent build it, then tune the workflow."),
     ),
     h(NextStepPanel, { status }),
     // Reserved for A8's preflight card — intentionally empty until then.
@@ -401,7 +403,7 @@ export function HomeView({ validViews, navigateTo }: HomeViewProps) {
           h("span", { class: "stage-card-glyph", "aria-hidden": "true" }, viewGlyph(id)),
           h("span", { class: "stage-card-name" }, label),
           h("span", { class: "stage-card-hint" }, product),
-          h("span", { class: "stage-card-blurb" }, viewBlurb(id)),
+          h("span", { class: "stage-card-blurb" }, resolveCliLabel(viewBlurb(id), cliName)),
           facts.length
             ? h("span", { class: "stage-card-facts" },
                 facts.map(([v, k]) => h("span", { key: k, class: "stage-card-fact" },

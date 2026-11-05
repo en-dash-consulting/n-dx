@@ -41,6 +41,7 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
 
 export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
   "work",
+  "tune",
   "hench-runs",
   "hench-audit",
   "hench-optimization",

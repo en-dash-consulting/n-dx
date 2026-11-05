@@ -156,7 +156,10 @@ function stage(id: StageId): ViewRenderer {
     // On a tiled stage the lead Overview drops what its tiles show.
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
-      : renderActiveView(view, { ...ctx, inSection: true })),
+      // A stage's own lead is its question, not a view the registry could render.
+      : view === id
+        ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
+        : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
     detailOpen: ctx.detailOpen ?? false,
@@ -184,6 +187,7 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "analyze": stage("analyze"),
   "plan": stage("plan"),
+  "tune": stage("tune"),
   // `/work/prep/<taskId>` is the Work page with the Prepare task modal open
   // over it; closing returns to `/work`, a start hands off to Live.
   "work": (ctx) => h(Fragment, null,

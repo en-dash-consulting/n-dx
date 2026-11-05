@@ -27,6 +27,7 @@ import {
   viewGlyph,
   viewLabel,
   visibleStages,
+  type StageId,
 } from "../../../src/viewer/views/stages.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -95,8 +96,8 @@ const ALL = buildValidViews(null);
 // ── The layout as data ─────────────────────────────────────────
 
 describe("stages.ts", () => {
-  it("orders the loop Analysis → Plan → Work", () => {
-    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
+  it("orders the loop Analysis → Plan → Work → Tune", () => {
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
   });
 
   it("lists only real views, each with a registry renderer", () => {
@@ -120,30 +121,30 @@ describe("stages.ts", () => {
     ]);
   });
 
-  it("puts PRD items and the execution log at the top of Work", () => {
+  it("puts PRD items and the audit at the top of Work", () => {
     const work = STAGES.work.sections.map((s) => s.view);
-    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "activity"]);
+    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "hench-audit"]);
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
-  it("puts CLI help above History on Plan", () => {
+  it("puts CLI help above Validation on Plan", () => {
     const plan = STAGES.plan.sections.map((s) => s.view);
-    expect(plan.indexOf("command-reference")).toBeLessThan(plan.indexOf("hench-runs"));
+    expect(plan.indexOf("command-reference")).toBeLessThan(plan.indexOf("validation"));
   });
 
   it("finds a view's stage, honouring the viewer's scope", () => {
     expect(stageForView("zones")).toBe("analyze");
     expect(stageForView("iso-map")).toBe("analyze"); // the dashboard's hero tile
     expect(stageForView("graph")).toBe("analyze"); // off the page, still the stage's
-    expect(stageForView("hench-runs")).toBe("plan");
+    expect(stageForView("hench-runs")).toBe("tune");
     expect(stageForView("rex-dashboard")).toBe("work");
     expect(stageForView("work")).toBe("work");
     expect(stageForView("home")).toBeNull();
     expect(stageForView("robot-wrangler")).toBeNull();
-    // Token Usage is on Work only; a Rex-only viewer has no Work stage.
-    expect(stageForView("token-usage")).toBe("work");
+    // Token Usage is on Tune only; a Rex-only viewer has no Tune stage.
+    expect(stageForView("token-usage")).toBe("tune");
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
-    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("work");
+    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("tune");
   });
 
   it("lists each view in at most one stage", () => {
@@ -159,10 +160,10 @@ describe("stages.ts", () => {
   });
 
   it("gives a scoped viewer only its own stage", () => {
-    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work"]);
+    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work", "tune"]);
     expect(visibleStages(buildValidViews("sourcevision"))).toEqual(["analyze"]);
     expect(visibleStages(buildValidViews("rex"))).toEqual(["plan"]);
-    expect(visibleStages(buildValidViews("hench"))).toEqual(["work"]);
+    expect(visibleStages(buildValidViews("hench"))).toEqual(["work", "tune"]);
   });
 });
 
@@ -176,10 +177,10 @@ describe("TopNav", () => {
   const tabLabels = () => Array.from(root.querySelectorAll(".topnav-tab[data-stage] .topnav-tab-label")).map((el) => el.textContent);
   const activeTab = () => root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent ?? null;
 
-  it("shows exactly the three stages, under the View navigation landmark", async () => {
+  it("shows exactly the four stages, under the View navigation landmark", async () => {
     await mount(nav("home"));
     expect(root.querySelector('nav[aria-label="View navigation"]')).not.toBeNull();
-    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work"]);
+    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work", "Tune"]);
     expect(activeTab()).toBeNull();
     expect(root.querySelector(".topnav-brand")?.getAttribute("aria-current")).toBe("page");
   });
@@ -262,9 +263,11 @@ describe("StageLinks", () => {
 
   it("points each stage at its neighbours, wrapping around the loop", async () => {
     await mount(h(StageLinks, { stage: "analyze", validViews: ALL, onNavigate: vi.fn() }));
-    expect(links()).toEqual(["work", "plan"]);
+    expect(links()).toEqual(["tune", "plan"]);
     await act(async () => { render(h(StageLinks, { stage: "work", validViews: ALL, onNavigate: vi.fn() }), root); });
-    expect(links()).toEqual(["plan", "analyze"]);
+    expect(links()).toEqual(["plan", "tune"]);
+    await act(async () => { render(h(StageLinks, { stage: "tune", validViews: ALL, onNavigate: vi.fn() }), root); });
+    expect(links()).toEqual(["work", "analyze"]);
   });
 
   it("navigates on click and labels both directions", async () => {
@@ -289,7 +292,7 @@ describe("StageLinks", () => {
 describe("StagePage", () => {
   const rendered: ViewId[] = [];
   const renderView = (view: ViewId) => { rendered.push(view); return h("div", { class: "fake-view", "data-rendered": view }); };
-  const page = (stage: "analyze" | "plan" | "work", validViews = ALL, navigateTo = vi.fn()) =>
+  const page = (stage: StageId, validViews = ALL, navigateTo = vi.fn()) =>
     h(StagePage, { stage, validViews, navigateTo, renderView });
   const sectionViews = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view);
 
@@ -320,41 +323,45 @@ describe("StagePage", () => {
 
   it("opens and closes a section, remembering the choice", async () => {
     await mount(page("work"));
-    const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="activity"] .stage-section-toggle')!;
+    const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="hench-audit"] .stage-section-toggle')!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     act(() => { toggle.click(); });
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     const body = document.getElementById(toggle.getAttribute("aria-controls")!);
-    expect(body?.querySelector('[data-rendered="activity"]')).not.toBeNull();
-    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:activity": true });
+    expect(body?.querySelector('[data-rendered="hench-audit"]')).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:hench-audit": true });
 
     render(null, root);
     root.remove();
     await mount(page("work"));
-    expect(root.querySelector('.stage-section[data-view="activity"] .stage-section-toggle')?.getAttribute("aria-expanded")).toBe("true");
+    expect(root.querySelector('.stage-section[data-view="hench-audit"] .stage-section-toggle')?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("keeps History a bounded scroll region until Expand, remembering the choice", async () => {
-    expect(STAGES.work.sections.find((s) => s.view === "activity")?.scroll).toBe(true);
-    expect(STAGES.plan.sections.find((s) => s.view === "hench-runs")?.scroll).toBe(true);
+  // No stage section sets `scroll` now that the run history and log are Tune
+  // tabs, so the option is exercised on a section given it for this test.
+  it("keeps a scroll section a bounded region until Expand, remembering the choice", async () => {
+    const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
+    Object.assign(audit, { scroll: true });
+    try {
+      localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-audit": true }));
+      await mount(page("work"));
+      const history = () => root.querySelector('.stage-section[data-view="hench-audit"]')!;
+      const body = () => history().querySelector<HTMLElement>(".stage-section-body")!;
+      const expand = () => history().querySelector<HTMLButtonElement>(".stage-section-expand")!;
 
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:activity": true }));
-    await mount(page("work"));
-    const history = () => root.querySelector('.stage-section[data-view="activity"]')!;
-    const body = () => history().querySelector<HTMLElement>(".stage-section-body")!;
-    const expand = () => history().querySelector<HTMLButtonElement>(".stage-section-expand")!;
+      expect(body().classList.contains("stage-section-body--scroll")).toBe(true);
+      expect(body().getAttribute("tabindex")).toBe("0");
+      expect(expand().getAttribute("aria-expanded")).toBe("false");
 
-    expect(body().classList.contains("stage-section-body--scroll")).toBe(true);
-    expect(body().getAttribute("tabindex")).toBe("0");
-    expect(expand().getAttribute("aria-expanded")).toBe("false");
-
-    act(() => { expand().click(); });
-    expect(body().classList.contains("stage-section-body--scroll")).toBe(false);
-    expect(expand().getAttribute("aria-expanded")).toBe("true");
-    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:activity:full": true });
+      act(() => { expand().click(); });
+      expect(body().classList.contains("stage-section-body--scroll")).toBe(false);
+      expect(expand().getAttribute("aria-expanded")).toBe("true");
+      expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:hench-audit:full": true });
+    } finally {
+      Object.assign(audit, { scroll: undefined });
+    }
 
     // Sections without the option get no Expand control.
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-audit": true }));
     render(null, root);
     root.remove();
     await mount(page("work"));
@@ -423,17 +430,16 @@ describe("StagePage", () => {
     expect(body?.querySelector('[data-rendered="prd"]')).not.toBeNull();
   });
 
-  it("keeps Work lit when its Usage section is opened", async () => {
-    const navigateTo = vi.fn();
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:token-usage": true }));
-    await mount(page("work", ALL, navigateTo));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="token-usage"] .stage-section-open')!.click(); });
-    expect(navigateTo).toHaveBeenCalledWith("token-usage");
+  it("renders Tune as a tile grid after its lead, with Spend and Shipped beside Runs", async () => {
+    await mount(page("tune"));
+    expect(sectionViews()).toEqual(["tune"]);
+    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph"]);
+  });
 
-    render(null, root);
-    root.remove();
+  it("keeps Tune lit on the pages of its tiles", async () => {
     await mount(h(TopNav, { view: "token-usage", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
-    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
   });
 
   it("drops sections outside the viewer's scope", async () => {
@@ -447,11 +453,11 @@ describe("StagePage", () => {
 // ── Landing ────────────────────────────────────────────────────
 
 describe("HomeView", () => {
-  it("shows the three stages as columns in loop order, each going to its stage", async () => {
+  it("shows the four stages as columns in loop order, each going to its stage", async () => {
     const navigateTo = vi.fn();
     await mount(h(HomeView, { validViews: ALL, navigateTo }));
     const cards = Array.from(root.querySelectorAll<HTMLButtonElement>(".stage-card"));
-    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work"]);
+    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work", "Tune"]);
     expect(cards.every((c) => c.querySelector(".stage-card-mark img"))).toBe(true);
     act(() => { cards[1].click(); });
     expect(navigateTo).toHaveBeenCalledWith("plan");
@@ -484,14 +490,14 @@ describe("HomeView next-step panel", () => {
     rex: { ...STATUS.rex, exists: true, stats: { ...STATUS.rex.stats, total: 0 }, nextTaskTitle: null },
   };
 
-  it("names `init` on a never-touched project, above the three stage cards", async () => {
+  it("names `init` on a never-touched project, above the four stage cards", async () => {
     stubApi([], NOT_INITIALIZED);
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     const panel = root.querySelector(".next-step-panel");
     expect(panel?.getAttribute("data-state")).toBe("not-initialized");
     expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
-    // The panel replaces no stage content — all three cards are still there.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+    // The panel replaces no stage content — all four cards are still there.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
     const panelIndex = Array.from(root.querySelector(".home")!.children).indexOf(panel!);
     const stagesIndex = Array.from(root.querySelector(".home")!.children).findIndex((el) => el.classList.contains("home-stages"));
     expect(panelIndex).toBeLessThan(stagesIndex);
@@ -564,7 +570,7 @@ describe("HomeView next-step panel", () => {
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     expect(root.querySelector(".next-step-panel")).toBeNull();
     // Home itself still renders — the cards just carry no numbers.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
   });
 });
 

@@ -145,13 +145,13 @@ describe("the rendered tab", () => {
 
   const tab = () => root.querySelector<HTMLButtonElement>(".topnav-tab-live")!;
 
-  it("renders after the three stage tabs and a divider", async () => {
+  it("renders after the four stage tabs and a divider", async () => {
     await mount();
     const nav = root.querySelector("nav")!;
     const kids = [...nav.children].map((c) => c.className);
-    expect(kids.slice(0, 3).every((c) => c.includes("topnav-tab "))).toBe(true);
-    expect(kids[3]).toContain("topnav-divider");
-    expect(kids[4]).toContain("topnav-live");
+    expect(kids.slice(0, 4).every((c) => c.includes("topnav-tab "))).toBe(true);
+    expect(kids[4]).toContain("topnav-divider");
+    expect(kids[5]).toContain("topnav-live");
   });
 
   it("is idle: hollow dot, no count, announced as nothing running", async () => {

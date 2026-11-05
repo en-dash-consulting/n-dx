@@ -270,16 +270,23 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
   });
 
   it("a bounded scroll region is reachable by keyboard", async () => {
-    await mount(h(StagePage, {
-      stage: "plan", validViews: VALID, navigateTo: () => {}, renderView: () => null,
-    }));
-    // `hench-runs` is the Plan stage's scroll section; open it.
-    const section = root.querySelector("[data-view='hench-runs']")!;
-    act(() => { (section.querySelector(".stage-section-toggle") as HTMLButtonElement).click(); });
-    await act(async () => {});
+    // No stage section sets `scroll` now that the run history and log are Tune
+    // tabs, so give one the option for this test.
+    const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
+    Object.assign(audit, { scroll: true });
+    try {
+      await mount(h(StagePage, {
+        stage: "work", validViews: VALID, navigateTo: () => {}, renderView: () => null,
+      }));
+      const section = root.querySelector("[data-view='hench-audit']")!;
+      act(() => { (section.querySelector(".stage-section-toggle") as HTMLButtonElement).click(); });
+      await act(async () => {});
 
-    const body = section.querySelector(".stage-section-body--scroll");
-    expect(body, "the scroll section did not open").not.toBeNull();
-    expect(body!.getAttribute("tabindex")).toBe("0");
+      const body = section.querySelector(".stage-section-body--scroll");
+      expect(body, "the scroll section did not open").not.toBeNull();
+      expect(body!.getAttribute("tabindex")).toBe("0");
+    } finally {
+      Object.assign(audit, { scroll: undefined });
+    }
   });
 });

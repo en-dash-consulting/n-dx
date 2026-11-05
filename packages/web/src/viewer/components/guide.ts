@@ -29,7 +29,7 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
   analyze: {
     description: "SourceVision's views as sections on one page: repository information, the import map in 2D or 3D, zones, files, findings and token usage.",
     lookFor: "Low-cohesion, high-coupling zones, circular dependencies, and findings from the enrichment passes.",
-    actions: "Open a section to see it here, or \"Open\" to give it the whole page. The side buttons step on to Plan, or back to Work.",
+    actions: "Open a section to see it here, or \"Open\" to give it the whole page. The side buttons step on to Plan, or back to Tune.",
   },
   plan: {
     description: "Rex's planning views on one page: add or import items, the task tree, command help, run history and the PRD's structural checks.",
@@ -37,9 +37,14 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
     actions: "Add items from a description or a file, then open Tasks to arrange them. The side buttons step on to Work, or back to Analysis.",
   },
   work: {
-    description: "Hench's views on one page: the next task with its run button, PRD progress, the execution log, templates and usage.",
-    lookFor: "The next task, epics close to done, and what the runs are costing.",
-    actions: "Start the next task or pick a template. The side buttons step on to Analysis, or back to Plan.",
+    description: "Hench's views on one page: the next task with its run button, PRD progress and the audit.",
+    lookFor: "The next task and epics close to done.",
+    actions: "Start the next task or pick a template. The side buttons step on to Tune, or back to Plan.",
+  },
+  tune: {
+    description: "How the project's workflow should change: run history and the execution log, spend, suggestions for the settings, and what shipped.",
+    lookFor: "Runs that fail or cost more than they should, and suggestions worth applying.",
+    actions: "Open a tile to see it full-screen, with its tabs. The side buttons step on to Analysis, or back to Work.",
   },
 
   // ── SourceVision views ──

@@ -8,11 +8,12 @@
 
 export type ViewId =
   // Shell pages: the landing page and the three stage pages that compose
-  // the product views below into the analyze → plan → work loop.
+  // the product views below into the analyze → plan → work → tune loop.
   | "home"
   | "analyze"
   | "plan"
   | "work"
+  | "tune"
   // Live sits outside the loop: one overview, one page per running task, and
   // the sourcevision analysis page. Cross-cutting, like `home`.
   | "live"

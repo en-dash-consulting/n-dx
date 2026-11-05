@@ -94,7 +94,9 @@ function placementsOf(view: ViewId): string[] {
   if ((STAGE_ORDER as readonly string[]).includes(view)) places.push(`stage:${view}`);
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
-      if (section.view === view) places.push(`section:${stage}`);
+      // A stage's lead may be its own question (Tune): that is the stage page
+      // itself, already counted above, not a second placement.
+      if (section.view === view && view !== stage) places.push(`section:${stage}`);
     }
     for (const tile of STAGES[stage].tiles ?? []) {
       if (tile.view === view && tilePlacesView(tile)) places.push(`tile:${stage}`);
@@ -113,6 +115,17 @@ describe("navigation model: placement", () => {
       .filter(([, places]) => places.length !== 1)
       .map(([v, places]) => `${v}: ${places.length ? places.join(", ") : "nowhere"}`);
     expect(wrong).toEqual([]);
+  });
+
+  it("loops through four stages: Analysis, Plan, Work, Tune", () => {
+    expect([...STAGE_ORDER]).toEqual(["analyze", "plan", "work", "tune"]);
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+    expect(resolveCliLabel(viewBlurb("tune"), "ndx")).toBe("Fit the ndx workflow to this project and the tools you have.");
+  });
+
+  it("renders Tune as a lead plus a tile grid, with no stacked sections", () => {
+    expect(STAGES.tune.sections.map((s) => s.view)).toEqual(["tune"]);
+    expect((STAGES.tune.tiles ?? []).length).toBeGreaterThan(0);
   });
 
   it("gives each stage exactly one lead section, first", () => {
@@ -271,7 +284,7 @@ describe("rendered surfaces take their labels from the model", () => {
     cards.forEach((card, i) => {
       const stage = STAGE_ORDER[i];
       expect(card.querySelector(".stage-card-name")?.textContent).toBe(viewLabel(stage));
-      expect(card.querySelector(".stage-card-blurb")?.textContent).toBe(viewBlurb(stage));
+      expect(card.querySelector(".stage-card-blurb")?.textContent).toBe(resolveCliLabel(viewBlurb(stage), "n-dx"));
       expect(card.querySelector(".stage-card-glyph")?.textContent).toBe(viewGlyph(stage));
       expect(card.querySelector(".stage-card-hint")?.textContent).toBe(viewProduct(stage));
     });
@@ -286,7 +299,7 @@ describe("rendered surfaces take their labels from the model", () => {
       });
       await settle();
       expect(root.querySelector(".stage-page-title")?.textContent, stage).toBe(viewLabel(stage));
-      expect(root.querySelector(".stage-page-blurb")?.textContent, stage).toBe(viewBlurb(stage));
+      expect(root.querySelector(".stage-page-blurb")?.textContent, stage).toBe(resolveCliLabel(viewBlurb(stage), "n-dx"));
     }
   });
 

@@ -626,6 +626,8 @@
 .home-preflight-slot:empty { display: none; }
 .home-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 .home-stages-2 { grid-template-columns: repeat(2, 1fr); }
+.home-stages-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1199px) { .home-stages-4 { grid-template-columns: repeat(2, 1fr); } }
 .home-stages-1 { grid-template-columns: minmax(0, 420px); }
 .stage-card {
   display: flex;
@@ -675,7 +677,7 @@
   .topnav-brand-text { display: none; }
   .topnav-tab { padding: 0 var(--space-2); }
   .main--staged { padding-left: calc(16px + var(--stage-link-w)); padding-right: calc(16px + var(--stage-link-w)); }
-  .home-stages, .home-stages-2 { grid-template-columns: 1fr; }
+  .home-stages, .home-stages-2, .home-stages-4 { grid-template-columns: 1fr; }
   .stage-card { min-height: 0; }
   .stage-card-mark { max-width: 110px; }
   .bottombar-status { display: none; }

@@ -556,7 +556,7 @@
   text-align: center;
 }
 
-/* ── Width tiers (UX2'): ≥1440 full · 1200–1439 · 961–1199 · ≤960 ───── */
+/* ── Width tiers (UX2'): ≥1440 full · 1200–1439 · 1100–1199 · 961–1099 · ≤960 ───── */
 
 @media (max-width: 1439px) {
   .topnav-tab-hint { display: none; }
@@ -564,6 +564,10 @@
 @media (max-width: 1199px) {
   .topnav-search-label { display: none; }
   .topnav-search { min-width: 0; }
+}
+@media (max-width: 1099px) {
+  /* Four stage tabs plus Live: tighter tabs keep the Sidecar button last and in view. */
+  .topnav-tab { padding: 0 var(--space-2); gap: 6px; }
 }
 @media (max-width: 960px) {
   .topnav-sidecar { padding: 5px var(--space-2); }

@@ -106,6 +106,12 @@ export const VIEW_META = {
     product: "hench",
     blurb: "Get it done: hand the next task to the agent, pick a run mode, watch what it costs.",
   },
+  tune: {
+    label: "Tune",
+    glyph: "◑",
+    product: "hench",
+    blurb: "Fit the {cli} workflow to this project and the tools you have.",
+  },
 
   // ── SourceVision ─────────────────────────────────────────────
   overview: {
