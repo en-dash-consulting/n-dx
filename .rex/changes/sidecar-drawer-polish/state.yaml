@@ -14,10 +14,14 @@ items:
     lastModified: "2026-11-05T01:38:06.420Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c6cba43b-b23d-4602-9986-cbf53e54fa6e":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T01:46:57.166Z"
-    activeIntervals: [{"start":"2026-11-05T01:46:57.166Z"}]
-    lastModified: "2026-11-05T01:46:57.813Z"
+    completedAt: "2026-11-05T01:52:10.798Z"
+    endedAt: "2026-11-05T01:52:10.798Z"
+    activeIntervals: [{"end":"2026-11-05T01:52:10.798Z","start":"2026-11-05T01:46:57.166Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Composer is one card (lens pill, textarea, hint, Send/Stop); token-only CSS; viewer tests added."
+    lastModified: "2026-11-05T01:52:10.798Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e98b1054-a956-47af-9db6-3fb4894cf6a8":
     lastModified: "2026-11-05T01:38:15.783Z"

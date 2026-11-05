@@ -692,6 +692,9 @@ describe("the agent picker", () => {
     expect(rule(".sidecar-send")).toMatch(/background: var\(--accent\)[\s\S]*color: var\(--bg\)/);
     expect(rule(".sidecar-send, .sidecar-stop")).toMatch(/height: 36px/);
     expect(rule(".sidecar-chip-lens")).toMatch(/color-mix\(in srgb, var\(--accent\)[\s\S]*color: var\(--accent\)/);
+    // The visible "Lens:" prefix and chevron are drawn in CSS, so the chip text stays the lens name.
+    expect(rule(".sidecar-chip-lens::before")).toMatch(/content: "Lens:"/);
+    expect(rule(".sidecar-chip-lens::after")).toMatch(/var\(--select-chevron\)/);
     for (const sel of [".sidecar-composer-card", ".sidecar-input", ".sidecar-send", ".sidecar-send:disabled", ".sidecar-stop", ".sidecar-chip-lens"]) {
       expect(rule(sel)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     }
