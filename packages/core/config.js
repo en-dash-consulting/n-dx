@@ -2697,9 +2697,12 @@ CLI settings (.n-dx.json):
                                      to raise the limit. Set to 0 to disable the global
                                      timeout entirely.
                                      Exceptions: "work" and "self-heal" default to 14400000
-                                     (4 hours); "start", "web", "dev", "graview serve" and
-                                     "graview mcp" are servers: neither a default nor this
-                                     limit applies, only cli.timeouts.<command>.
+                                     (4 hours); "start", "web", "dev", "mcp", "rex mcp",
+                                     "sv mcp|serve", "graview serve" and "graview mcp" are
+                                     servers: neither a default nor this limit applies, only
+                                     cli.timeouts.<command> (keyed on the top-level command,
+                                     e.g. cli.timeouts.graview, which bounds every graview
+                                     subcommand).
                                      Validation: must be a non-negative integer.
                                      Example: n-dx config cli.timeoutMs 3600000
   cli.timeouts.<command>   number    Per-command timeout override in milliseconds.

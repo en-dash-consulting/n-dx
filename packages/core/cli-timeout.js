@@ -35,14 +35,22 @@ const COMMAND_TIMEOUT_DEFAULTS = new Map([
  * bound them either — they can only be bounded if the user explicitly sets
  * cli.timeouts.<command> in .n-dx.json.
  */
-const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev"]);
+const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev", "mcp"]);
 
 /**
  * Subcommands that serve indefinitely under a command that otherwise runs
  * once: `ndx graview serve` and `ndx graview mcp` are servers, while
- * `ndx graview emit|check|describe` finish.
+ * `ndx graview emit|check|describe` finish. `ndx rex mcp .` and
+ * `ndx sv mcp .` are the stdio servers `.mcp.json` registers: an editor holds
+ * them open for its whole session, and a timeout kills its connection.
  */
-const SERVER_SUBCOMMANDS = new Map([["graview", new Set(["serve", "mcp"])]]);
+const SV_SERVERS = new Set(["mcp", "serve"]);
+const SERVER_SUBCOMMANDS = new Map([
+  ["graview", new Set(["serve", "mcp"])],
+  ["rex", new Set(["mcp"])],
+  ["sourcevision", SV_SERVERS],
+  ["sv", SV_SERVERS],
+]);
 
 function isServer(command, subcommand) {
   return NO_DEFAULT_TIMEOUT_COMMANDS.has(command) || (SERVER_SUBCOMMANDS.get(command)?.has(subcommand) ?? false);

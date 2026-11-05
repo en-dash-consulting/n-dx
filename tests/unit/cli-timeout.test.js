@@ -59,6 +59,16 @@ describe("resolveCommandTimeout", () => {
     expect(resolveCommandTimeout("graview", {}, "check")).toBe(DEFAULT_TIMEOUT_MS);
   });
 
+  it("returns 0 for the stdio MCP servers .mcp.json registers and the hub bridge, but times their one-shot siblings", () => {
+    const cfg = { cli: { timeoutMs: 3000 } };
+    for (const [command, sub] of [["rex", "mcp"], ["sv", "mcp"], ["sourcevision", "mcp"], ["sv", "serve"], ["sourcevision", "serve"], ["mcp", "rex"]]) {
+      expect(resolveCommandTimeout(command, {}, sub), `${command} ${sub}`).toBe(0);
+      expect(resolveCommandTimeout(command, cfg, sub), `${command} ${sub} under cli.timeoutMs`).toBe(0);
+    }
+    expect(resolveCommandTimeout("rex", cfg, "status")).toBe(3000);
+    expect(resolveCommandTimeout("sv", {}, "analyze")).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
   it("the global cli.timeoutMs does not bound a server", () => {
     const cfg = { cli: { timeoutMs: 5000 } };
     expect(resolveCommandTimeout("start", cfg)).toBe(0);
