@@ -134,10 +134,12 @@ describe("GET /api/tracker/activity", () => {
     expect((await tick()).status).toBe(200);
     expect(await sources()).toEqual([{ event: "pr-merged", problem: expect.stringContaining("web.sidecarGithubReads"), at: expect.any(String) }]);
 
-    // The rule is turned off: nothing is read, so nothing is wrong.
+    // The rule is turned off: the hub stops ticking, and the record no longer answers.
     local.trackerSync.rules = {};
     writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify(local));
-    expect((await tick()).status).toBe(200);
+    expect(await sources()).toEqual([]);
+    // Sync settings removed entirely: likewise.
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ connections: local.connections }));
     expect(await sources()).toEqual([]);
   });
 });

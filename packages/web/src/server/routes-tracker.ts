@@ -22,7 +22,7 @@ import { errorResponse, jsonResponse } from "./response-utils.js";
 import { readSidecarSettings } from "./sidecar/settings.js";
 import { readTrackerActivity } from "./tracker/activity-log.js";
 import { collectTrackerEvents, type TrackerEventExec } from "./tracker/event-sources.js";
-import { readSourceProblems } from "./tracker/source-problems.js";
+import { readSourceProblems, type SourceProblem } from "./tracker/source-problems.js";
 import { TRACKER_EVENTS } from "./tracker/server-profiles.js";
 import { loadTrackerSync } from "./tracker/sync-config.js";
 import { enqueueTrackerEvent, runTrackerSyncTick, type TrackerSyncService } from "./tracker/sync-engine.js";
@@ -65,7 +65,7 @@ export async function handleTrackerRoute(
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
     jsonResponse(res, 200, {
       entries: readTrackerActivity(ctx.projectDir).slice(-MAX_ACTIVITY_ENTRIES),
-      sources: readSourceProblems(ctx.projectDir),
+      sources: currentSourceProblems(ctx.projectDir),
     });
     return true;
   }
@@ -91,6 +91,17 @@ async function collectSince(ctx: ServerContext, opts: TrackerRouteOptions): Prom
   });
   for (const record of records) enqueueTrackerEvent(ctx.projectDir, record);
   return { queued: records.length, problems };
+}
+
+/**
+ * The recorded source problems whose rule is still on. With every rule off
+ * the hub stops ticking, so nothing rewrites the record; a problem for a rule
+ * that no longer reads is not a problem.
+ */
+function currentSourceProblems(projectDir: string): SourceProblem[] {
+  const config = loadTrackerSync(projectDir);
+  if (!config || "problems" in config) return [];
+  return readSourceProblems(projectDir).filter((p) => (config.rules[p.event] ?? "off") !== "off");
 }
 
 function refuse(res: ServerResponse, status: number, message: string): true {
