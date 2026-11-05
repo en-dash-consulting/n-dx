@@ -24,6 +24,9 @@ items:
   "3a1f90aa-bf46-4a71-99be-47785695bd6d":
     lastModified: "2026-11-05T01:08:43.256Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3dcb81db-6444-4129-9c97-8a62ad747581":
+    lastModified: "2026-11-05T19:21:20.916Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "66415182-c172-4ba9-a2c9-d7dad6ce7adf":
     status: "completed"
     startedAt: "2026-11-05T17:07:35.939Z"
@@ -55,13 +58,19 @@ items:
     lastModified: "2026-11-05T19:06:21.933Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c226b635-1423-4093-8c70-50d677a34ba4":
-    lastModified: "2026-11-05T17:40:33.389Z"
+    lastModified: "2026-11-05T19:21:20.916Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d3112cec-53b7-4ce9-b011-209af418fa1b":
+    lastModified: "2026-11-05T19:21:06.767Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "df78a8d3-c5a4-434e-86b9-840a59b77c2f":
     lastModified: "2026-11-05T01:08:20.159Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f453e786-c4bb-4f28-b049-3912ce0e02b0":
-    lastModified: "2026-11-05T19:07:16.504Z"
+    startedAt: "2026-11-05T19:07:45.630Z"
+    activeIntervals: [{"end":"2026-11-05T19:49:21.962Z","start":"2026-11-05T19:07:45.630Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (39):\n- writes README.md referencing the target project when no README exists\n- leaves an existing README.md byte-for-byte and writes README.proposed.md\n- uses the proposed-file path when README exists\n- uses the proposed-file path when README.rst exists\n- overwrites README.proposed.md on rerun but never touches the original README\n- primary README.md contains Overview, Quick Start, Testing, and License sections in order\n- proposed README.proposed.md mirrors all four sections in order\n- emits a non-empty ## License stub when package.json lacks a license field\n… and 31 more"
+    lastModified: "2026-11-05T19:49:23.598Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f76d0e7d-ca55-4080-af71-c3c7ff4bae9c":
     status: "completed"
