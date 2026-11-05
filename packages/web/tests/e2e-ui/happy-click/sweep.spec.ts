@@ -24,7 +24,8 @@ import { trackConsoleErrors } from "../helpers/console-errors.js";
 import { VIEW_META } from "../../../src/viewer/views/view-meta.js";
 import { clickSweep } from "./helpers/sweep.js";
 
-const SETTINGS_VIEWS = new Set(["robot-wrangler", "project", "workflow", "commands"]);
+// command-reference redirects to the Reference tab of Settings › Commands.
+const SETTINGS_VIEWS = new Set(["robot-wrangler", "project", "workflow", "commands", "command-reference"]);
 const VIEWS = Object.keys(VIEW_META).filter((v) => !SETTINGS_VIEWS.has(v));
 
 let fixture: FixtureProject;

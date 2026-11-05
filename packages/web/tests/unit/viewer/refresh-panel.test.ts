@@ -164,4 +164,58 @@ describe("CommandsView", () => {
     root.remove();
     vi.unstubAllGlobals();
   });
+
+  describe("Reference tab", () => {
+    const MANIFEST = {
+      cliName: "myapp",
+      groups: [{ id: "setup", label: "Setup", commands: [
+        { name: "init", invocation: "myapp init", description: "Initialize project", status: "available" },
+      ] }],
+    };
+    let root: HTMLDivElement;
+    let fetchMock: ReturnType<typeof vi.fn>;
+    const startPath = location.pathname;
+
+    beforeEach(() => {
+      root = document.createElement("div");
+      document.body.appendChild(root);
+      fetchMock = vi.fn(async (url: string) =>
+        url === "/api/commands/manifest" ? jsonResponse(200, MANIFEST) : jsonResponse(404, {}));
+      vi.stubGlobal("fetch", fetchMock);
+    });
+
+    afterEach(() => {
+      act(() => { render(null, root); });
+      root.remove();
+      vi.unstubAllGlobals();
+      history.replaceState(null, "", startPath);
+    });
+
+    async function flush() {
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    }
+
+    it("opens on Run, and the Reference tab renders the command reference", async () => {
+      history.replaceState(null, "", "/commands");
+      act(() => { render(h(CommandsView, { jobs: emptyJobTray() }), root); });
+      const reference = root.querySelector<HTMLButtonElement>("#commands-tab-reference")!;
+      expect(reference.getAttribute("aria-selected")).toBe("false");
+      expect(root.textContent).toContain("Refresh Data");
+
+      act(() => { reference.click(); });
+      await flush();
+      expect(reference.getAttribute("aria-selected")).toBe("true");
+      expect(root.textContent).toContain("myapp init");
+      expect(root.textContent).not.toContain("Refresh Data");
+      expect(fetchMock).toHaveBeenCalledWith("/api/commands/manifest");
+    });
+
+    it("opens on Reference at /commands/reference, where /command-reference lands", async () => {
+      history.replaceState(null, "", "/commands/reference");
+      act(() => { render(h(CommandsView, { jobs: emptyJobTray() }), root); });
+      await flush();
+      expect(root.querySelector("#commands-tab-reference")!.getAttribute("aria-selected")).toBe("true");
+      expect(root.textContent).toContain("myapp init");
+    });
+  });
 });
