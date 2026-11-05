@@ -236,12 +236,17 @@ describe("the rendered page", () => {
     return navigateTo;
   }
 
-  it("mounts the Memory and Concurrency panels in the side column", async () => {
+  it("shows memory pressure and slots once, in the machine strip, with no side-column duplicate", async () => {
     await mount();
-    // The panels fetch only once the snapshot has mounted them.
     await act(async () => { await flush(); });
-    expect(root.querySelector(".live-side .memory-panel")).not.toBeNull();
-    expect(root.querySelector(".live-side .concurrency-panel")).not.toBeNull();
+    expect(root.textContent).not.toContain("Memory and concurrency");
+    expect(root.querySelector(".live-side .memory-panel")).toBeNull();
+    expect(root.querySelector(".live-side .concurrency-panel")).toBeNull();
+    // The strip is the one place memory pressure and slots are shown.
+    const labels = [...root.querySelectorAll(".live-machine .live-tile-label")].map((el) => el.textContent);
+    expect(labels).toContain("Memory");
+    expect(labels.some((l) => l?.startsWith("Hench slots"))).toBe(true);
+    expect(root.querySelector(".live-side")?.textContent).not.toMatch(/Memory|slots/i);
   });
 
   it("shows idle with Start working and both analysis options when nothing runs", async () => {
