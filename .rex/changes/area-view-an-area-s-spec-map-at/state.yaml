@@ -68,7 +68,10 @@ items:
     lastModified: "2026-11-05T01:06:03.990Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aafbcb58-7768-4992-9361-1d7804243c96":
-    lastModified: "2026-11-05T15:24:37.103Z"
+    startedAt: "2026-11-05T17:13:09.431Z"
+    activeIntervals: [{"end":"2026-11-05T17:32:22.187Z","start":"2026-11-05T17:13:09.431Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (22):\n- every test file that asserts straight after a real sleep is in the inventory\n- opened at the capability's address, selects it, and Esc goes back to the area's address\n- tests/e2e/wall-clock-inventory-policy.test.js > wall-clock assertion inventory completeness > every test file that asserts straight after a real sleep is in the inventory\n  AssertionError: Test file(s) assert immediately after a real-timer sleep but have no entry in tests/wall-clock-assertion-inventory.md:\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n… and 14 more"
+    lastModified: "2026-11-05T17:32:23.103Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d4ea348e-a405-4ea3-8aa7-fbff41d82cc5":
     status: "completed"
