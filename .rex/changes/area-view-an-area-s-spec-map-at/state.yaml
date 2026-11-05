@@ -41,6 +41,9 @@ items:
     resolutionDetail: "views/area-spec-map.ts: SpecMap (one AreaBlock per capability sized by criteriaCount, tinted by status, open-change count marker, ConstraintBands above, order changing/defective then size). AreaBlock gains optional selected/aria-pressed. Tests: area-spec-map (7)."
     lastModified: "2026-11-05T14:19:40.585Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1eec7ffe-4ce7-46fc-abcd-4d1ec573bb15":
+    lastModified: "2026-11-05T18:31:53.371Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "50c98ea3-d30c-4eea-8df7-fece3958d327":
     status: "completed"
     startedAt: "2026-11-05T13:10:16.427Z"
@@ -62,7 +65,7 @@ items:
     lastModified: "2026-11-05T14:53:15.277Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b5e6519-b13e-4ca2-a70a-40988f4dcea8":
-    lastModified: "2026-11-05T16:56:53.480Z"
+    lastModified: "2026-11-05T18:31:53.371Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c72e349-bf76-42ba-8274-2d40b7c3127e":
     status: "completed"
