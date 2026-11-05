@@ -22,7 +22,7 @@ interface GuideProps {
 const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: string; actions: string }>> = {
   // ── Shell pages ──
   home: {
-    description: "The three stages of the loop, side by side: Analysis (what the code looks like), Plan (what to build next) and Work (the agent building it), each with its headline numbers.",
+    description: "The four stages of the loop, side by side: Analysis (what the code is), Plan (what is changing), Work (what goes to the agent next) and Tune (how the project's workflow should change), each with its headline numbers.",
     lookFor: "A stale analysis, a PRD with nothing pending, or runs that are live or stale.",
     actions: "Click a column to open that stage. The logo in the top bar always brings you back here.",
   },
@@ -32,19 +32,19 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
     actions: "Open a section to see it here, or \"Open\" to give it the whole page. The side buttons step on to Plan, or back to Tune.",
   },
   plan: {
-    description: "Rex's planning views on one page: add or import items, the task tree, command help, run history and the PRD's structural checks.",
+    description: "Rex's planning views on one page: add or import items, the Inbox, the task tree, the product and the PRD's structural checks. Requirements are a tab of Product; All Commands is the Reference tab under Settings › Commands; run history and the PRD Graph (Shipped) moved to Tune.",
     lookFor: "Proposals worth accepting, tasks without acceptance criteria, and validation warnings.",
     actions: "Add items from a description or a file, then open Tasks to arrange them. The side buttons step on to Work, or back to Analysis.",
   },
   work: {
-    description: "Hench's views on one page: the next task with its run button, PRD progress and the audit.",
+    description: "Hench's views on one page: the next task with its run button, PRD progress, the audit and workspaces. The Execution Log, Token Usage, Optimization and Adaptive moved to Tune.",
     lookFor: "The next task and epics close to done.",
     actions: "Start the next task or pick a template. The side buttons step on to Tune, or back to Plan.",
   },
   tune: {
-    description: "How the project's workflow should change: run history and the execution log, spend, suggestions for the settings, and what shipped.",
+    description: "How the project's workflow should change, fitted to the project and its tooling. Tiles: Runs (with the Execution Log tab), Spend (Token Usage), Suggestions (Optimization and Adaptive tabs) and Shipped (the PRD Graph: PRD items beside the merges that shipped them). Robot Wrangler and Workflow settings stay in the Settings overlay.",
     lookFor: "Runs that fail or cost more than they should, and suggestions worth applying.",
-    actions: "Open a tile to see it full-screen, with its tabs. The side buttons step on to Analysis, or back to Work.",
+    actions: "Open a tile to see it full-screen, with its tabs, or \"Open\" for its own page. The side buttons step on to Analysis, or back to Work.",
   },
 
   // ── SourceVision views ──

@@ -23,7 +23,7 @@ Rules that follow:
 
 ## Stages
 
-The dashboard is a loop of three stages, `STAGE_ORDER = ["analyze", "plan", "work"]`. Each stage is itself a `ViewId` and a page that composes existing views as sections. A section is a window onto a view that keeps its own route; its "Open" link goes to that page.
+The dashboard is a loop of four stages, `STAGE_ORDER = ["analyze", "plan", "work", "tune"]`. Each stage is itself a `ViewId` and a page that composes existing views as sections. A section is a window onto a view that keeps its own route; its "Open" link goes to that page.
 
 `STAGES[stage].sections` is a list of `StageSection`. A section names only a `view`; its heading and blurb are that view's `VIEW_META` entry. Optional fields:
 
@@ -50,8 +50,11 @@ The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows`
 Current composition:
 
 - **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line and controls); tiles `map` (8 × 3, chromeless, `iso-map`, dropped in static exports), `health` (the stats), `next-steps` (4 × 2), then `problems`, `suggestions`, `zones`, `architecture` (tab `routes`), `files`, `languages`, `pr-markdown` (6 wide, gate `sourcevision.prMarkdown`), `ask` (6 wide, gate `sourcevision.ask`, requires server). Owns `graph` off-page.
-- **Plan:** `analysis` (plain); `prd`; `command-reference`; `hench-runs`; `merge-graph`; `validation`; `requirements`.
-- **Work:** `rex-dashboard` (plain); `activity`; `token-usage`; `hench-audit`; `hench-optimization`; `hench-adaptive`; `workspaces` (requires server).
+- **Plan:** `analysis` (plain); `inbox` (requires server); `prd`; `product` (requires server); `changes` (requires server); `validation`. Owns `requirements` off-page: it is a tab of Product, and its route still opens that tab.
+- **Work:** `rex-dashboard` (plain); `hench-audit`; `workspaces` (requires server).
+- **Tune (tiles):** lead `tune` (the stage's question, "how should this project's workflow change?": fit the workflow to the project and the tools it has); tiles `hench-runs` (Runs, 8 × 2, tab `activity` = Execution Log), `token-usage` (titled Spend), `hench-optimization` (titled Suggestions, tab `hench-adaptive`; never "Tuning", so the page does not read Tune › Tuning) and `merge-graph` (titled Shipped). Tile titles override view labels because labels are unique.
+
+Moved views keep their ids and routes. `command-reference` (All Commands) is the Reference tab of Settings › Commands; the alias `/command-reference` lands on `/commands/reference` (`VIEW_ALIASES`, `VIEW_ALIAS_SUBPATH` in `view-routing.ts`). Robot Wrangler and Workflow stay in the Settings overlay.
 
 Each view is listed by at most one stage. Lookups in `stages.ts`:
 
