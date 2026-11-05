@@ -102,14 +102,14 @@ describe("collectTrackerEvents", () => {
       { event: "release-published", rexId: CHANGE, ref: "WM-1", sources: { release: "1.2.0" } },
     ]);
 
-    // The task's runs fail twice in a row: one event, with the diagnosis class; a third failure is no new event.
+    // The task's runs fail twice in a row: one event, with the diagnosis summary; a third failure is no new event.
     const diagnosis = { class: "test-failure", summary: "tests fail", evidence: [], actions: [], attempt: { n: 2, of: 3 } };
     writeRun("r-1", { startedAt: "2026-11-05T10:00:00.000Z", finishedAt: "2026-11-05T10:30:00.000Z", status: "failed" });
     expect((await collect()).records).toEqual([]);
     writeRun("r-2", { startedAt: "2026-11-05T13:00:00.000Z", finishedAt: "2026-11-05T13:30:00.000Z", status: "failed", diagnosis });
     expect((await collect()).records).toEqual([
       { event: "run-started", rexId: TASK, ref: "WM-2" },
-      { event: "run-failed-twice", rexId: TASK, ref: "WM-2", sources: { "run-diagnosis": "test-failure" } },
+      { event: "run-failed-twice", rexId: TASK, ref: "WM-2", diagnosis: { summary: "tests fail" } },
     ]);
     writeRun("r-3", { startedAt: "2026-11-05T14:00:00.000Z", finishedAt: "2026-11-05T14:30:00.000Z", status: "timeout" });
     expect((await collect()).records).toEqual([{ event: "run-started", rexId: TASK, ref: "WM-2" }]);
@@ -139,6 +139,17 @@ describe("collectTrackerEvents", () => {
     const result = await collect({ events: ["pr-opened"], githubReads: false });
     expect(result.problems).toEqual([expect.stringContaining("web.sidecarGithubReads")]);
     expect(calls).toEqual([]);
+  });
+
+  it("carries the CODEOWNERS owner of a PR's files beside its URL", async () => {
+    mkdirSync(join(root, ".github"), { recursive: true });
+    writeFileSync(join(root, ".github", "CODEOWNERS"), "*  @core\n/packages/web/ @hal\n");
+    await collect({ events: ["pr-opened"] });
+    const url = "https://github.com/x/y/pull/4";
+    prs = [{ number: 4, url, createdAt: "2026-11-05T11:00:00Z", body: `N-DX-Item: ${TASK}`, files: [{ path: "packages/web/src/a.ts" }] }];
+    expect((await collect({ events: ["pr-opened"] })).records).toEqual([
+      { event: "pr-opened", rexId: TASK, ref: "WM-2", sources: { "pr-url": url, codeowners: "@hal" } },
+    ]);
   });
 
   it("keeps a source's cursor when gh fails, so the next read still sees the PR", async () => {

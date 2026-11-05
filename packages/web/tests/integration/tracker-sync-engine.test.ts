@@ -68,6 +68,13 @@ async function tick(...records: TrackerEventRecord[]) {
 /** Every tools/call the fake received. */
 const toolCalls = () => fake.calls;
 const runStarted: TrackerEventRecord = { event: "run-started", rexId: "rex-1", ref: "WM-1" };
+const prOpened: TrackerEventRecord = {
+  event: "pr-opened",
+  rexId: "rex-1",
+  ref: "WM-1",
+  values: { "review.reviewerNotionUserId": "u-1" },
+  sources: { "pr-url": "https://github.com/x/y/pull/1" },
+};
 const json = (value: unknown): CaosReply => () => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
 
 describe("rule modes", () => {
@@ -171,7 +178,7 @@ describe("tracker replies", () => {
       isError: true,
       content: [{ type: "text", text: JSON.stringify({ error: "validation_failed", problems: [{ field: "review.reviewerNotionUserId", message: "is required" }] }) }],
     });
-    const { entries } = await tick({ event: "pr-opened", rexId: "rex-1", ref: "WM-1" });
+    const { entries } = await tick(prOpened);
     expect(entries).toEqual([expect.objectContaining({
       result: "refused",
       problems: [{ field: "review.reviewerNotionUserId", message: "is required" }],
@@ -179,7 +186,7 @@ describe("tracker replies", () => {
     expect(toolCalls()).toHaveLength(1);
 
     // The same event again, now with a value: not called, not logged again.
-    const again = await tick({ event: "pr-opened", rexId: "rex-1", ref: "WM-1", values: { "review.reviewerNotionUserId": "u-1" } });
+    const again = await tick({ ...prOpened, values: { "review.reviewerNotionUserId": "u-2" } });
     expect(again.entries).toEqual([]);
     expect(toolCalls()).toHaveLength(1);
     expect(readTrackerActivity(root)).toHaveLength(1);
@@ -191,10 +198,10 @@ describe("tracker replies", () => {
       isError: true,
       content: [{ type: "text", text: JSON.stringify({ error: "validation_failed", problems: ["reviewer is required"] }) }],
     });
-    enqueueTrackerEvent(root, { event: "pr-opened", rexId: "rex-1", ref: "WM-1" });
+    enqueueTrackerEvent(root, prOpened);
     const first = runTrackerSyncTick({ projectDir: root, service: connect(), profiles: { ndxHome } });
     // The same event again, queued while the first tick's call is in flight, and a second tick.
-    enqueueTrackerEvent(root, { event: "pr-opened", rexId: "rex-1", ref: "WM-1", values: { "review.reviewerNotionUserId": "u-1" } });
+    enqueueTrackerEvent(root, { ...prOpened, values: { "review.reviewerNotionUserId": "u-2" } });
     const second = runTrackerSyncTick({ projectDir: root, service: connect(), profiles: { ndxHome } });
     await Promise.all([first, second]);
     expect(toolCalls()).toHaveLength(1);

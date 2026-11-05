@@ -44,6 +44,7 @@
         { "fact": "whoCanUnblock", "property": "stalled.whoCanUnblock", "from": ["run-diagnosis"] }
       ]
     },
-    "defaults": {}
+    "defaults": {},
+    "limits": ["create-feature"]
   }
 }

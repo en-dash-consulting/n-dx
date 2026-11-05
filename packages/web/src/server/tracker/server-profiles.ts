@@ -64,6 +64,10 @@ export interface TrackerFact {
   value?: string;
 }
 
+/** What a tracker cannot do for ndx, so a person must: each surfaces as a card naming the work. */
+export const TRACKER_LIMITS = ["create-feature"] as const;
+export type TrackerLimit = (typeof TRACKER_LIMITS)[number];
+
 export interface TrackerMapping {
   createTool: string;
   moveTool: string;
@@ -79,6 +83,8 @@ export interface TrackerMapping {
   statusMap: Record<TrackerEvent, string>;
   facts: Partial<Record<TrackerEvent, TrackerFact[]>>;
   defaults: { reviewer?: string; estimateScale?: string[] };
+  /** Declared limits of the tracker; none when it can do everything ndx asks. */
+  limits: TrackerLimit[];
 }
 
 export interface ServerProfile {
@@ -178,6 +184,10 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
       problems.push("tracker.defaults.estimateScale must be a list of strings");
     }
   }
+  const limits = raw.limits === undefined ? [] : raw.limits;
+  if (!Array.isArray(limits) || limits.some((limit) => !(TRACKER_LIMITS as readonly unknown[]).includes(limit))) {
+    problems.push(`tracker.limits must be a list drawn from ${TRACKER_LIMITS.join(", ")}`);
+  }
   if (problems.length > 0) return undefined;
   return {
     createTool: raw.createTool as string,
@@ -191,6 +201,7 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
     statusMap: statusMap as Record<TrackerEvent, string>,
     facts,
     defaults: defaults as TrackerMapping["defaults"],
+    limits: limits as TrackerLimit[],
   };
 }
 

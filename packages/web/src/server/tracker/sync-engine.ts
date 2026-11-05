@@ -220,11 +220,11 @@ async function tickOnce(options: TrackerSyncOptions): Promise<TrackerTickResult>
   try {
     while (pending.length > 0) {
       const record = pending[0];
-      const plan = planTrackerEvent(record, config, mapping);
+      const plan = planTrackerEvent(record, config, mapping, profile.label);
       if (plan.action !== "skip" && !settled.has(plan.requestId)) {
         let outcome: Outcome;
         if (plan.action !== "call") {
-          outcome = { result: plan.action };
+          outcome = { result: plan.action, ...(plan.missing && { problems: plan.missing.map((message) => ({ message })) }) };
         } else {
           // Checked once per tick, before the first call: a profile that no
           // longer fits its server makes no call.

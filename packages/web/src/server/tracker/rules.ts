@@ -19,7 +19,7 @@
  * here and are never overridden by a value.
  */
 
-import type { FactSource, TrackerEvent, TrackerMapping } from "./server-profiles.js";
+import type { FactSource, TrackerEvent, TrackerFact, TrackerMapping } from "./server-profiles.js";
 import type { TrackerRuleMode, TrackerSyncConfig } from "./sync-config.js";
 
 export type TrackerRuleKind = "create" | "move" | "blocked";
@@ -43,10 +43,15 @@ export interface TrackerEventRecord {
   /** Input values the collector already knows, by property (dotted for nested). */
   values?: Record<string, unknown>;
   /**
-   * What the event itself says, by fact source (`pr-url`, `release`,
-   * `run-diagnosis`), for the profile's facts to draw on; not sent as is.
+   * What the event itself says, by fact source (`pr-url`, `release` as the
+   * version, `codeowners` as the owner of the PR's files), for the profile's
+   * facts to draw on; not sent as is.
    */
   sources?: Partial<Record<FactSource, string>>;
+  /** The failed run's diagnosis: what blocks it, and the best-ranked way to unblock it. */
+  diagnosis?: { summary: string; unblock?: string };
+  /** The tracker feature the item's work belongs under, for the `feature-map` source. */
+  feature?: { name: string; epic?: string };
 }
 
 export interface PlannedCall {
@@ -63,6 +68,12 @@ export type TrackerPlan =
       mode: Exclude<TrackerRuleMode, "off">;
       requestId: string;
       call: PlannedCall;
+      /**
+       * A required fact no source answered, or work the tracker cannot do. Set,
+       * the plan is a card whatever its mode and `call` is incomplete: it is
+       * never made, and nothing stands in for the fact.
+       */
+      missing?: string[];
     };
 
 /** The idempotency key of one event on one item. */
@@ -82,8 +93,67 @@ function setDotted(target: Record<string, unknown>, property: string, value: unk
   current[keys[keys.length - 1]] = value;
 }
 
-/** What `record` plans under `config` and `mapping`. */
-export function planTrackerEvent(record: TrackerEventRecord, config: TrackerSyncConfig, mapping: TrackerMapping): TrackerPlan {
+/** The value at dotted `property` of `values`, when one is set. */
+function valueAt(values: Record<string, unknown> | undefined, property: string): string | undefined {
+  const value = values?.[property];
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+/** What `fact` is from the first of its sources that answers, or why none does. */
+function resolveFact(
+  fact: TrackerFact,
+  record: TrackerEventRecord,
+  config: TrackerSyncConfig,
+  mapping: TrackerMapping,
+  label: string,
+): { value: string } | { missing: string } {
+  // A value the collector already knows for the property stands for its item and loe sources.
+  const known = valueAt(record.values, fact.property);
+  if (known) return { value: known };
+  let missing = `missing ${fact.fact}: no ${fact.from.join(" or ")} value`;
+  for (const source of fact.from) {
+    let value: string | undefined;
+    switch (source) {
+      case "constant":
+        value = fact.value;
+        break;
+      case "profile-default":
+        value = (mapping.defaults as Record<string, unknown>)[fact.fact] as string | undefined;
+        break;
+      case "codeowners":
+      case "pr-url":
+        value = record.sources?.[source];
+        break;
+      case "release":
+        value = record.sources?.release && `shipped in ndx ${record.sources.release}`;
+        break;
+      case "run-diagnosis":
+        value = fact.fact === "whoCanUnblock" ? record.diagnosis?.unblock : record.diagnosis?.summary;
+        break;
+      case "feature-map": {
+        const feature = record.feature;
+        value = feature && config.featureMap[feature.name];
+        if (feature && !value && mapping.limits.includes("create-feature")) {
+          const under = feature.epic ? ` under epic ${feature.epic}` : "";
+          missing = `Create feature '${feature.name}'${under} in ${label}, then map it in trackerSync.featureMap`;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    if (typeof value === "string" && value !== "") return { value };
+  }
+  return { missing };
+}
+
+/** What `record` plans under `config` and `mapping`; `label` names the tracker in a card. */
+export function planTrackerEvent(
+  record: TrackerEventRecord,
+  config: TrackerSyncConfig,
+  mapping: TrackerMapping,
+  label = "the tracker",
+): TrackerPlan {
   const mode = config.rules[record.event] ?? "off";
   if (mode === "off") return { action: "skip", reason: `the ${record.event} rule is off` };
   const rule = TRACKER_RULE_KINDS[record.event];
@@ -94,6 +164,12 @@ export function planTrackerEvent(record: TrackerEventRecord, config: TrackerSync
   const status = mapping.statusMap[record.event];
   const args: Record<string, unknown> = {};
   for (const [property, value] of Object.entries(record.values ?? {})) setDotted(args, property, value);
+  const missing: string[] = [];
+  for (const fact of mapping.facts[record.event] ?? []) {
+    const resolved = resolveFact(fact, record, config, mapping, label);
+    if ("missing" in resolved) missing.push(resolved.missing);
+    else setDotted(args, fact.property, resolved.value);
+  }
   args[mapping.requestIdProperty] = requestId;
   let tool: string;
   if (rule === "create") {
@@ -105,6 +181,8 @@ export function planTrackerEvent(record: TrackerEventRecord, config: TrackerSync
     args[mapping.moveStatusProperty] = status;
   }
 
+  const call = { tool, args };
+  if (missing.length > 0) return { action: "card", rule, mode, requestId, call, missing };
   const action = mode === "dry-run" ? "would" : rule === "move" ? "call" : "card";
-  return { action, rule, mode, requestId, call: { tool, args } };
+  return { action, rule, mode, requestId, call };
 }

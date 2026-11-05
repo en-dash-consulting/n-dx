@@ -139,6 +139,24 @@ is not off:
 | `pr-opened`, `pr-merged` | `gh pr list`, PRs whose description or commits carry `N-DX-Item`; only while `web.sidecarGithubReads` is on | `createdAt`, `mergedAt` |
 | `release-published` | a change stamped `shippedIn` a version that has a git tag (`v1.2.3`, `<pkg>@1.2.3`) | each change and version once |
 
+- Each event's required facts are the profile's `tracker.facts[<event>]`; each
+  takes the first of its `from` sources that answers (a value the collector
+  already knows for the property counts first):
+
+  | Fact | Source |
+  |------|--------|
+  | reviewer | profile `defaults.reviewer`, else the CODEOWNERS owner of the PR's files (`.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS`; last matching rule wins) |
+  | review link | the PR URL |
+  | delivery note | `shipped in ndx <version>` from the release |
+  | blocked reason, who can unblock | the failed run's diagnosis summary and best-ranked action |
+  | epic | `trackerSync.featureMap[<feature name>]` |
+
+  A fact no source answers turns the planned call into a `card` (in dry-run
+  too) whose `problems` name it (`missing reviewer: …`); nothing stands in for
+  it, no call is made, and the event is settled like any card. A profile's
+  `limits` name what the tracker cannot do: with `create-feature` (CAOS), an
+  unmapped feature's card reads `Create feature 'X' under epic Y in CAOS, then
+  map it in trackerSync.featureMap`.
 - An event is about the nearest item that links to a work item (the item,
   else its parent, and so on) and carries that item's first ref; an event no
   item links for is dropped.

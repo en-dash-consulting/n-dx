@@ -8,10 +8,11 @@
  * - `run-started`: a hench run record (`<henchDir>/runs/`), by `startedAt`.
  * - `run-failed-twice`: a run that ends a task's second hard failure in a
  *   row (hench's own rule, `stuck-tasks.ts`), by `finishedAt`, carrying the
- *   run's diagnosis class.
+ *   run's diagnosis summary and best-ranked action.
  * - `pr-opened` / `pr-merged`: a PR whose description or commits carry an
  *   `N-DX-Item` trailer, by `createdAt` / `mergedAt`. Read with gh, only
- *   while the project's GitHub reads (`web.sidecarGithubReads`) are on.
+ *   while the project's GitHub reads (`web.sidecarGithubReads`) are on. A PR
+ *   carries its URL and the CODEOWNERS owner of its files, when one matches.
  * - `release-published`: a change stamped `shippedIn` a version that has a
  *   git tag (`v1.2.3`, `@scope/pkg@1.2.3`), once per change and version.
  *
@@ -33,6 +34,7 @@ import { resolveStore, type PRDItem } from "../rex-gateway.js";
 import { readDiagnosis } from "../run-diagnosis.js";
 import { isHardFailure, isReviewGateRefusal, readRunRecords, type RunLike } from "../stuck-tasks.js";
 import { readEventCursors, sinceSeen, sinceWatermark, writeEventCursors, type EventCursors, type Observation } from "./event-cursors.js";
+import { ownerOfFiles, readCodeowners, type CodeownersRule } from "./codeowners.js";
 import { itemLinkRefs, type LinkFields } from "./link-refs.js";
 import type { TrackerEventRecord } from "./rules.js";
 import type { FactSource, TrackerEvent } from "./server-profiles.js";
@@ -71,6 +73,7 @@ interface Candidate {
   event: TrackerEvent;
   itemId: string;
   sources?: Partial<Record<FactSource, string>>;
+  diagnosis?: TrackerEventRecord["diagnosis"];
 }
 
 type SourceRead = { candidates: Candidate[]; cursors: EventCursors } | { problem: string };
@@ -131,7 +134,7 @@ function readRunsFailedTwice(runs: readonly RunLike[], cursors: EventCursors): S
     .filter((r) => failureStreak(r, finished) === 2)
     .map((r): Candidate => {
       const diagnosis = readDiagnosis(r.run.diagnosis);
-      return { event: "run-failed-twice", itemId: r.taskId, ...(diagnosis && { sources: { "run-diagnosis": diagnosis.class } }) };
+      return { event: "run-failed-twice", itemId: r.taskId, ...(diagnosis && { diagnosis: { summary: diagnosis.summary, ...(diagnosis.actions[0] && { unblock: diagnosis.actions[0].label }) } }) };
     });
   return { candidates, cursors: { "run-failed-twice": next } };
 }
@@ -156,6 +159,8 @@ export function itemTrailerIds(text: string): string[] {
 interface PrSeen extends Observation {
   url: string;
   itemIds: string[];
+  /** The first owner CODEOWNERS names for the PR's files. */
+  owner?: string;
 }
 
 /** The first line a command said on a failure, or how it ended. */
@@ -167,7 +172,7 @@ function said(result: ExecResult, cmd: string): string {
 async function readPrs(exec: TrackerEventExec, projectDir: string): Promise<{ prs: Record<string, unknown>[] } | { problem: string }> {
   const result = await exec(
     "gh",
-    ["pr", "list", "--state", "all", "--search", "sort:updated-desc", "--limit", String(PR_PAGE_SIZE), "--json", "number,url,createdAt,mergedAt,body,commits"],
+    ["pr", "list", "--state", "all", "--search", "sort:updated-desc", "--limit", String(PR_PAGE_SIZE), "--json", "number,url,createdAt,mergedAt,body,commits,files"],
     { cwd: projectDir, timeout: EXEC_TIMEOUT_MS, env: { ...process.env, ...NO_PROMPT_ENV } },
   );
   if (!result.launched || result.error || result.exitCode !== 0) return { problem: `gh pr list answered: ${said(result, "gh")}` };
@@ -188,19 +193,29 @@ function prItemIds(pr: Record<string, unknown>): string[] {
   return [...new Set(texts.flatMap(itemTrailerIds))];
 }
 
-function prsAt(prs: readonly Record<string, unknown>[], field: "createdAt" | "mergedAt"): PrSeen[] {
+/** The first owner of the PR's changed files, from the project's CODEOWNERS. */
+function prOwner(pr: Record<string, unknown>, rules: readonly CodeownersRule[]): string | undefined {
+  const files = Array.isArray(pr.files) ? pr.files.filter(isRecord).map((f) => f.path).filter(isString) : [];
+  return ownerOfFiles(rules, files);
+}
+
+function prsAt(prs: readonly Record<string, unknown>[], field: "createdAt" | "mergedAt", rules: readonly CodeownersRule[]): PrSeen[] {
   return prs.flatMap((pr) => {
     const at = timeOf(pr[field]);
     const itemIds = prItemIds(pr);
     if (typeof pr.number !== "number" || at === null || itemIds.length === 0) return [];
-    return [{ key: String(pr.number), at, url: isString(pr.url) ? pr.url : "", itemIds }];
+    const owner = prOwner(pr, rules);
+    return [{ key: String(pr.number), at, url: isString(pr.url) ? pr.url : "", itemIds, ...(owner && { owner }) }];
   });
 }
 
 function prCandidates(event: "pr-opened" | "pr-merged", fresh: PrSeen[]): Candidate[] {
   return fresh
     .sort((a, b) => a.at - b.at)
-    .flatMap((pr) => pr.itemIds.map((itemId): Candidate => ({ event, itemId, ...(pr.url && { sources: { "pr-url": pr.url } }) })));
+    .flatMap((pr) => {
+      const sources: Candidate["sources"] = { ...(pr.url && { "pr-url": pr.url }), ...(pr.owner && { codeowners: pr.owner }) };
+      return pr.itemIds.map((itemId): Candidate => ({ event, itemId, ...(Object.keys(sources).length > 0 && { sources }) }));
+    });
 }
 
 async function readPrEvents(
@@ -214,9 +229,10 @@ async function readPrEvents(
   if ("problem" in read) return read;
   const candidates: Candidate[] = [];
   const next: EventCursors = {};
+  const rules = readCodeowners(options.projectDir);
   for (const [event, field] of [["pr-opened", "createdAt"], ["pr-merged", "mergedAt"]] as const) {
     if (!events.has(event)) continue;
-    const { fresh, next: cursor } = sinceWatermark(prsAt(read.prs, field), cursors[event]);
+    const { fresh, next: cursor } = sinceWatermark(prsAt(read.prs, field, rules), cursors[event]);
     candidates.push(...prCandidates(event, fresh));
     next[event] = cursor;
   }
@@ -338,7 +354,9 @@ async function collectOnce(options: CollectOptions): Promise<CollectedEvents> {
       const linked = linkedItem(items, candidate.itemId);
       if (!linked || queued.has(`${candidate.event}:${linked.rexId}`)) continue;
       queued.add(`${candidate.event}:${linked.rexId}`);
-      records.push({ event: candidate.event, rexId: linked.rexId, ref: linked.ref, ...(candidate.sources && { sources: candidate.sources }) });
+      records.push({ event: candidate.event, rexId: linked.rexId, ref: linked.ref, ...(candidate.sources && { sources: candidate.sources }),
+        ...(candidate.diagnosis && { diagnosis: candidate.diagnosis }),
+      });
     }
   }
   if (JSON.stringify(next) !== JSON.stringify(cursors)) writeEventCursors(options.projectDir, next);

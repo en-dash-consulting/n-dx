@@ -6,7 +6,9 @@
  *
  * `result` says what became of the call:
  * - `would`: a dry-run rule; nothing was called.
- * - `card`: a create or blocked rule; a person decides, nothing was called.
+ * - `card`: a create or blocked rule, or any rule missing a required fact or
+ *   facing a tracker limit (`problems` names it); a person decides, nothing
+ *   was called.
  * - `ok`: called and accepted (a create confirmed by a read).
  * - `duplicate`: the tracker had it already, confirmed by a read.
  * - `refused`: the tracker refused it; `problems` lists why. Never retried.
