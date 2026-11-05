@@ -35,10 +35,11 @@ import {
 import { errorMessage } from "../response-utils.js";
 import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import { loadConnections, type ConnectionConfig, type HttpConnectionConfig } from "./connection-config.js";
-import { connectionToken, withoutConnectionToken } from "./connection-credentials.js";
+import { connectionToken, withoutConnectionToken, withoutSecrets } from "./connection-credentials.js";
 import {
   ConnectionOAuth,
   ConnectionRefreshError,
+  type FetchLike,
   ConnectionSignInRequiredError,
   SIGN_IN_AGAIN,
 } from "./oauth-provider.js";
@@ -138,7 +139,16 @@ interface Slot {
   failures: number;
   /** Until this time (ms) a listing serves the slot as it is instead of reconnecting. */
   retryAt?: number;
+  /**
+   * The credentials the transport sent, newest last, in memory only. A reason
+   * is scrubbed with these because the store may hold a different value by
+   * the time a call fails (a re-stored or refreshed token).
+   */
+  sent: string[];
 }
+
+/** How many sent credentials a slot remembers; an OAuth refresh adds one each time. */
+const MAX_SENT_SECRETS = 8;
 
 function definedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   return Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
@@ -173,7 +183,7 @@ export class ConnectionService {
     this.oauth = new ConnectionOAuth({ credentials: options.credentials, now: this.now });
     const configs = options.connections ?? loadConnections(options.projectDir, { warn: this.warn });
     for (const config of configs) {
-      this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" }, failures: 0 });
+      this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" }, failures: 0, sent: [] });
     }
   }
 
@@ -333,7 +343,8 @@ export class ConnectionService {
   }
 
   /** Why a connection failed: a 401 means sign in (again), anything else unavailable. */
-  private failureStatus(config: ConnectionConfig, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
+  private failureStatus(slot: Slot, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
+    const { config } = slot;
     if (err instanceof ConnectionSignInRequiredError) return { state: "needs-sign-in", reason: err.reason };
     if (err instanceof InvalidGrantError && config.auth === "oauth") {
       // Refused on the retry too. When the stored token is the refused one,
@@ -348,27 +359,44 @@ export class ConnectionService {
         : config.auth === "oauth" ? `the server refused the signed-in token; ${SIGN_IN_AGAIN}` : "the server refused the stored token";
       return { state: "needs-sign-in", reason };
     }
-    if (err instanceof ConnectionRefreshError) return { state: "unavailable", reason: this.scrubReason(config, err.message) };
+    if (err instanceof ConnectionRefreshError) return { state: "unavailable", reason: this.scrubReason(slot, err.message) };
     // The SDK's message may not carry the status, so name it first.
     const status = err instanceof StreamableHTTPError && err.code !== undefined ? `HTTP ${err.code}: ` : "";
-    return { state: "unavailable", reason: this.scrubReason(config, status + errorMessage(err)) };
+    return { state: "unavailable", reason: this.scrubReason(slot, status + errorMessage(err)) };
   }
 
   /**
    * A reason reaches listings and logs, and a server's error body can echo the
-   * request headers. The connection's token becomes its fingerprint, anything
-   * else secret-shaped is redacted and the length is capped; the leading
+   * request headers. Every credential the transport sent becomes its
+   * fingerprint, and for OAuth so does what the store holds (refresh token,
+   * client secret, which are never sent as a bearer); anything else
+   * secret-shaped is redacted and the length is capped. The leading
    * "HTTP <status>" survives, so the operator can still diagnose the failure.
    */
-  private scrubReason(config: ConnectionConfig, reason: string): string {
-    const withoutToken = config.transport === "http" && config.auth !== "none"
-      ? withoutConnectionToken(config.id, reason, this.options.credentials)
-      : reason;
+  private scrubReason(slot: Slot, reason: string): string {
+    const { config } = slot;
+    let withoutToken = withoutSecrets(slot.sent, reason);
+    if (config.transport === "http" && config.auth === "oauth") {
+      withoutToken = withoutConnectionToken(config.id, withoutToken, this.options.credentials);
+    }
     const scrubbed = redactSecrets(withoutToken);
     return scrubbed.length > MAX_REASON_LENGTH ? `${scrubbed.slice(0, MAX_REASON_LENGTH)}…` : scrubbed;
   }
 
-  private async transportFor(config: ConnectionConfig): Promise<Transport | ConnectionState> {
+  /** `base` (or the global fetch) that notes the credential each request carries on `slot`. */
+  private recordingFetch(slot: Slot, base: FetchLike = fetch): FetchLike {
+    return (url, init) => {
+      const credential = new Headers(init?.headers).get("authorization")?.replace(/^\S+\s+/, "");
+      if (credential && credential.length >= 8 && !slot.sent.includes(credential)) {
+        slot.sent.push(credential);
+        if (slot.sent.length > MAX_SENT_SECRETS) slot.sent.shift();
+      }
+      return base(url, init);
+    };
+  }
+
+  private async transportFor(slot: Slot): Promise<Transport | ConnectionState> {
+    const { config } = slot;
     if (config.transport === "stdio") {
       return new StdioClientTransport({
         command: config.command,
@@ -387,11 +415,12 @@ export class ConnectionService {
       // transport also refreshes through the provider on a 401.
       const prepared = await this.oauth.prepare(config);
       if ("needsSignIn" in prepared) return { state: "needs-sign-in", reason: prepared.needsSignIn };
-      return new StreamableHTTPClientTransport(url, { authProvider: prepared.provider, fetch: prepared.fetch });
+      return new StreamableHTTPClientTransport(url, { authProvider: prepared.provider, fetch: this.recordingFetch(slot, prepared.fetch) });
     }
     if (config.auth === "token") {
       const token = connectionToken(config.id, this.options.credentials);
       if (!token) return { state: "needs-sign-in", reason: `no token stored as connection:${config.id}` };
+      if (!slot.sent.includes(token)) slot.sent.push(token);
       return new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
     }
     return new StreamableHTTPClientTransport(url);
@@ -401,7 +430,7 @@ export class ConnectionService {
     const { config } = slot;
     const client = new Client({ name: "n-dx-connections", version: "1.0.0" }, { capabilities: {} });
     try {
-      const transport = await this.transportFor(config);
+      const transport = await this.transportFor(slot);
       if (!("start" in transport)) {
         slot.status = transport;
         return undefined;
@@ -431,7 +460,7 @@ export class ConnectionService {
       return live;
     } catch (err) {
       await client.close().catch(() => undefined);
-      slot.status = this.failureStatus(config, err);
+      slot.status = this.failureStatus(slot, err);
       // A refused token answers at once and is fixed by storing a new one, so
       // only an unavailable server is backed off.
       if (slot.status.state === "unavailable") {
@@ -446,7 +475,7 @@ export class ConnectionService {
   private fail(slot: Slot, live: Live, failure: unknown): void {
     if (slot.live !== live) return;
     slot.live = undefined;
-    slot.status = typeof failure === "string" ? { state: "unavailable", reason: failure } : this.failureStatus(slot.config, failure);
+    slot.status = typeof failure === "string" ? { state: "unavailable", reason: failure } : this.failureStatus(slot, failure);
     live.client.onclose = undefined;
     void live.client.close().catch(() => undefined);
   }

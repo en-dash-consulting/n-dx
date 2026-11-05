@@ -193,6 +193,27 @@ describe("ConnectionService", () => {
     expect(JSON.stringify(docs.status)).not.toContain("tok-echoed-secret-1234");
   });
 
+  it("scrubs the token the live client sent, not only the one now stored", async () => {
+    const http = await httpServer();
+    const { svc, ndxHome } = service({ docs: { transport: "http", url: http.url, auth: "token" } });
+    setCredential("connection:docs", "tok-sent-A-secret-1234", { ndxHome });
+    expect((await svc.listConnections())[0].status).toEqual({ state: "connected" });
+
+    // Rotated while A's client is live, then a call fails with a body echoing A.
+    setCredential("connection:docs", "tok-stored-B-secret-5678", { ndxHome });
+    http.echoErrors = "calls";
+    const failure = await svc.callTool("docs", "read_item", { id: "1" }).catch((err: unknown) => err);
+
+    expect(failure).toBeInstanceOf(ConnectionUnavailableError);
+    const reason = JSON.stringify((failure as ConnectionUnavailableError).status);
+    expect(http.authorizations).toContain("Bearer tok-sent-A-secret-1234");
+    for (const secret of ["tok-sent-A-secret-1234", "tok-stored-B-secret-5678"]) {
+      expect(reason).not.toContain(secret);
+      expect((failure as Error).message).not.toContain(secret);
+    }
+    expect(reason).toContain(`[token ${credentialFingerprint("tok-sent-A-secret-1234")}]`);
+  });
+
   it("caps a long reason, keeping the HTTP status", async () => {
     const http = await httpServer();
     http.echoErrors = "all";

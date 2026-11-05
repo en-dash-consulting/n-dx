@@ -78,10 +78,14 @@ function connectionSecrets(id: string, options: CredentialStoreOptions): string[
  * is stored or shown.
  */
 export function withoutConnectionToken(id: string, text: string, options: CredentialStoreOptions = {}): string {
-  return connectionSecrets(id, options).reduce(
-    (out, secret) => out.split(secret).join(`[token ${credentialFingerprint(secret)}]`),
-    text,
-  );
+  return withoutSecrets(connectionSecrets(id, options), text);
+}
+
+/** `text` with each of `secrets` replaced by its fingerprint. */
+export function withoutSecrets(secrets: Iterable<string>, text: string): string {
+  let out = text;
+  for (const secret of secrets) out = out.split(secret).join(`[token ${credentialFingerprint(secret)}]`);
+  return out;
 }
 
 /** An 8-character fingerprint of connection `id`'s token, or null when none is stored. */

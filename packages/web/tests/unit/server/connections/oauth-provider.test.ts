@@ -152,6 +152,26 @@ describe("OAuth connections", () => {
     expect(fake.hits["/authorize"]).toBeUndefined();
   });
 
+  it("scrubs every access token it sent from a failed call's reason, across a refresh", async () => {
+    const fake = await oauthServer();
+    const { svc, ndxHome } = service(fake.url);
+    await signIn(svc, fake);
+    const sent = stored(ndxHome)!.tokens.access_token as string;
+
+    // The call meets a 401, refreshes, and the retry carrying the new token
+    // fails with a body that echoes it.
+    fake.expireAccessTokens();
+    fake.mcp.echoErrors = "calls";
+    const failure = await svc.callTool("docs", "read_item", { id: "1" }).catch((err: unknown) => err);
+
+    expect(failure).toBeInstanceOf(ConnectionUnavailableError);
+    expect(fake.mcp.authorizations).toContain(`Bearer ${sent}`);
+    const reason = `${(failure as Error).message} ${JSON.stringify((await svc.listConnections())[0].status)}`;
+    expect(reason).toContain("HTTP 500");
+    expect(reason).not.toContain(sent);
+    expect(reason).not.toContain(stored(ndxHome)!.tokens.access_token);
+  });
+
   it("concurrent calls that all meet a rejected token refresh without signing the connection out", async () => {
     const fake = await oauthServer();
     const { svc, ndxHome } = service(fake.url);
