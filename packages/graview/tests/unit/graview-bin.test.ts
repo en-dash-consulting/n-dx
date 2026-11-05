@@ -34,8 +34,10 @@ describe("resolveGraviewCommand", () => {
   it("downloads nothing unasked: with no binary found it says how to install graview, and runs nothing", () => {
     const command = resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "linux" });
     expect(command).toMatchObject({ cmd: "", prefix: [], source: "none" });
-    expect(command.detail).toContain(`npm i -D graview@${GRAVIEW_VERSION}`);
-    expect(command.detail).toContain("graview.allowNpx: true");
+    expect(command.detail).toContain(`npm i -g graview@${GRAVIEW_VERSION}`);
+    expect(command.detail).toContain("ndx config graview.bin <path> .");
+    expect(command.detail).not.toContain("graview-face");
+    expect(command.detail).toContain("ndx config graview.allowNpx true .");
     expect(command.detail).toContain(GRAVIEW_NPX_ENV);
   });
 

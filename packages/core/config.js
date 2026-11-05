@@ -143,6 +143,9 @@ const LOCAL_ONLY_SETTINGS = {
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv", ".auth"] },
   hench: new Set(["apiKeyEnv", "claudePath"]),
   web: new Set(["auth"]),
+  // A binary to run and a download to allow are this machine's choices; in the
+  // shared config `bin` is a trust finding and `allowNpx` would opt every clone in.
+  graview: new Set(["bin", "allowNpx"]),
 };
 
 /**
@@ -193,6 +196,9 @@ const PROJECT_SECTIONS = new Set([
   "features",
   "sourcevision",
   "selfHeal",
+  // The Graview projection's settings (`graview.bin`, `graview.allowNpx`, …),
+  // read by packages/graview/src/graview-bin.ts.
+  "graview",
   // Per-extension sections, `extensions.<name>`. Unlike the others it is also
   // read from the user config and set through its own handler (see
   // "Extension config sections" below).

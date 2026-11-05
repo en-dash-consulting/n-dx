@@ -189,9 +189,13 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
     cmd: "",
     prefix: [],
     source: "none",
+    // Every way out named here is one this resolver then finds: a global install lands on
+    // PATH (a project's node_modules/.bin is not searched), and `ndx config` writes both keys
+    // to the machine-local config, whichever file the layout uses.
     detail:
-      `no graview binary found. Install it (npm i -D graview@${GRAVIEW_VERSION}, or @n-dx/graview-face, which carries its own), ` +
-      `point graview.bin in .n-dx.json or ${GRAVIEW_BIN_ENV} at one, or let npx download it with graview.allowNpx: true or ${GRAVIEW_NPX_ENV}=1.`,
+      `no graview binary found. Install it with \`npm i -g graview@${GRAVIEW_VERSION}\`, ` +
+      `point at one with \`ndx config graview.bin <path> .\` or ${GRAVIEW_BIN_ENV}, ` +
+      `or let npx download it with \`ndx config graview.allowNpx true .\` or ${GRAVIEW_NPX_ENV}=1.`,
   };
 }
 
