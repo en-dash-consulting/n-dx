@@ -113,6 +113,13 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
       "which spawns a stdio server.",
   },
   {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/tracker",
+    reason:
+      "Tracker sync's tick and activity log. A tick calls the tracker through a connection, so it is off with the connections.",
+  },
+  {
     feature: "rex.placementDraft",
     // Documents the endpoint; it carries a change id, so no exact path matches
     // it here and routes-rex/placement.ts refuses with this module's body.

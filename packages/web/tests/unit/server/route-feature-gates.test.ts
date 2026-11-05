@@ -72,6 +72,8 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/sidecar/sessions/abc/frames", "web.sidecar"],
   ["/api/commands/sidecar-command/status", "web.sidecar"],
   ["/api/commands/sidecar-command/stop", "web.sidecar"],
+  ["/api/tracker/sync/tick", "web.sidecar"],
+  ["/api/tracker/activity", "web.sidecar"],
   ["/api/hench/plan-queue", "hench.readyNext"],
   ["/api/branch-health", "git.branchHealth"],
 ];

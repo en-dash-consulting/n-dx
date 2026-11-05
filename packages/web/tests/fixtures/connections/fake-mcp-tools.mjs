@@ -70,13 +70,15 @@ const requestId = z.string().min(8).max(128);
 /**
  * CAOS's work-item tools by name and input schema (its MCP contract), with
  * canned answers: the server the built-in CAOS profile is checked against.
- * Never the real server.
+ * `replies[tool]` answers in place of a work-item tool's canned answer when it
+ * returns one (a duplicate, a validation failure). Never the real server.
  */
-export function addCaosTools(server) {
+export function addCaosTools(server, replies = {}) {
+  const answer = (tool, canned) => async (args) => replies[tool]?.(args) ?? canned(args);
   server.registerTool(
     "get_work_item",
     { description: "Get work item.", inputSchema: { workItemId: z.string() }, annotations: CAOS_READ },
-    async ({ workItemId }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status: "backlog" }) }] }),
+    answer("get_work_item", ({ workItemId }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status: "backlog" }) }] })),
   );
   server.registerTool(
     "list_epics",
@@ -119,7 +121,7 @@ export function addCaosTools(server) {
       },
       annotations: CAOS_WRITE,
     },
-    async ({ title }) => ({ content: [{ type: "text", text: JSON.stringify({ id: "wi-1", title, created: true }) }] }),
+    answer("create_work_item", ({ title }) => ({ content: [{ type: "text", text: JSON.stringify({ id: "wi-1", title, created: true }) }] })),
   );
   server.registerTool(
     "edit_work_item",
@@ -128,7 +130,7 @@ export function addCaosTools(server) {
       inputSchema: { requestId, workItemId: z.string(), patch: z.object({ title: z.string().optional() }) },
       annotations: CAOS_WRITE,
     },
-    async ({ workItemId }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId }) }] }),
+    answer("edit_work_item", ({ workItemId }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId }) }] })),
   );
   server.registerTool(
     "move_work_item",
@@ -148,7 +150,7 @@ export function addCaosTools(server) {
       },
       annotations: CAOS_WRITE,
     },
-    async ({ workItemId, toStatus }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status: toStatus }) }] }),
+    answer("move_work_item", ({ workItemId, toStatus }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status: toStatus }) }] })),
   );
 }
 

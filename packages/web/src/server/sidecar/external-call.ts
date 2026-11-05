@@ -42,7 +42,7 @@ type Json = Record<string, unknown>;
 const isRecord = (value: unknown): value is Json => !!value && typeof value === "object" && !Array.isArray(value);
 
 /** A result's data: its structured content, else its first text block parsed as JSON. */
-function resultData(result: CallToolResult): unknown {
+export function resultData(result: CallToolResult): unknown {
   if (result.structuredContent !== undefined) return result.structuredContent;
   for (const block of result.content ?? []) {
     if (block.type !== "text") continue;

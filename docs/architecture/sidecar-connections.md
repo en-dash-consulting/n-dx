@@ -89,6 +89,49 @@ a work ref into `issues` and keeps any other (an opaque page id) in `links`.
   link. A call naming no item, a bad ref, or a ref the item already has raises
   no card.
 
+## Tracker sync
+
+Deterministic rules, no model, turn ndx events into tracker calls
+(`src/server/tracker/rules.ts`, `sync-engine.ts`). Settings live in the
+untracked `.n-dx.local.json` only, as connections do:
+
+```json
+"trackerSync": {
+  "connection": "caos",
+  "profile": "caos",
+  "project": "n-dx",
+  "featureMap": { "0.10.0": "<epic id>" },
+  "rules": { "run-started": "dry-run", "pr-merged": "on" }
+}
+```
+
+- `profile` defaults to the connection's own; `project` (the `<project>` in
+  every request id) defaults to the directory name.
+- Each event is one rule. `change-captured` (no link yet) is **create**,
+  `run-failed-twice` is **blocked**, the rest are **move** on a linked item.
+- Every rule is `off` unless set. `dry-run` logs the would-be call and makes
+  none. `on` makes a move through the connection service; create and blocked
+  are logged as a card instead, so a person decides.
+- Every call carries the profile's `requestIdProperty` set to
+  `ndx:<project>:<rexId>:<event>`. A create reply, and any duplicate reply
+  (`duplicate: true` or an `error` starting `duplicate`), is confirmed with the
+  profile's `readTool` before it is logged.
+- A refusal logs its problems list and settles the event: it is never planned
+  again, with the same arguments or other ones. So do `ok`, `duplicate` and
+  `card`. An unreachable connection, or one that needs sign-in, logs that and
+  keeps the event queued, unchanged.
+- The log is append-only JSONL, `<henchDir>/sidecar/tracker-activity.jsonl`:
+  `{ at, event, rexId, rule, mode, requestId, call, result, problems? }`, with
+  `result` one of `would`, `ok`, `duplicate`, `refused`, `card`, `unavailable`,
+  `needs-sign-in`.
+
+Routes, governed by `web.sidecar`:
+
+- `POST /api/tracker/sync/tick` runs the queued events. It answers the
+  per-user token itself only: a browser session is refused with 403, and a
+  Sidecar broker credential never passes the request gate on it.
+- `GET /api/tracker/activity` answers `{ entries }`, the newest 200.
+
 ## Tool class and policy
 
 `tool-policy.ts` (pure) gives each listed tool a class and a policy, and the
