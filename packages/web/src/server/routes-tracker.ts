@@ -3,7 +3,8 @@
  *
  *   POST /api/tracker/sync/tick   collect the ndx events since the last tick (tracker/event-sources.ts),
  *                                 run the queue through the rules -> the tick's result and { collected }
- *   GET  /api/tracker/activity    -> { entries } the activity log, newest last
+ *   GET  /api/tracker/activity    -> { entries, sources } the activity log, newest last, and each
+ *                                 event source the last tick could not read ({ event, problem, at })
  *
  * The tick is the hub's clock: it is answered only on the per-user token
  * itself. A browser session is refused here, and a Sidecar broker credential
@@ -21,6 +22,7 @@ import { errorResponse, jsonResponse } from "./response-utils.js";
 import { readSidecarSettings } from "./sidecar/settings.js";
 import { readTrackerActivity } from "./tracker/activity-log.js";
 import { collectTrackerEvents, type TrackerEventExec } from "./tracker/event-sources.js";
+import { readSourceProblems } from "./tracker/source-problems.js";
 import { TRACKER_EVENTS } from "./tracker/server-profiles.js";
 import { loadTrackerSync } from "./tracker/sync-config.js";
 import { enqueueTrackerEvent, runTrackerSyncTick, type TrackerSyncService } from "./tracker/sync-engine.js";
@@ -61,7 +63,10 @@ export async function handleTrackerRoute(
 
   if (pathname === ACTIVITY_PATH) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
-    jsonResponse(res, 200, { entries: readTrackerActivity(ctx.projectDir).slice(-MAX_ACTIVITY_ENTRIES) });
+    jsonResponse(res, 200, {
+      entries: readTrackerActivity(ctx.projectDir).slice(-MAX_ACTIVITY_ENTRIES),
+      sources: readSourceProblems(ctx.projectDir),
+    });
     return true;
   }
 

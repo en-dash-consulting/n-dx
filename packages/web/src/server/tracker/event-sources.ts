@@ -37,6 +37,7 @@ import { readEventCursors, sinceSeen, sinceWatermark, writeEventCursors, type Ev
 import { ownerOfFiles, readCodeowners, type CodeownersRule } from "./codeowners.js";
 import { itemLinkRefs, type LinkFields } from "./link-refs.js";
 import type { TrackerEventRecord } from "./rules.js";
+import { readSourceProblems, writeSourceProblems, type SourceProblem } from "./source-problems.js";
 import type { FactSource, TrackerEvent } from "./server-profiles.js";
 
 /** Runs one command: the llm-client `exec` in production, a stub in tests. */
@@ -320,33 +321,43 @@ export function collectTrackerEvents(options: CollectOptions): Promise<Collected
 
 async function collectOnce(options: CollectOptions): Promise<CollectedEvents> {
   const events = new Set(options.events.filter((e) => (COLLECTED_EVENTS as readonly string[]).includes(e)));
-  if (events.size === 0) return { records: [], problems: [] };
+  if (events.size === 0) {
+    recordSourceProblems(options.projectDir, new Map());
+    return { records: [], problems: [] };
+  }
   const exec = options.exec ?? llmExec;
 
   let items: Map<string, IndexedItem>;
   try {
     items = indexItems((await (await resolveStore(options.rexDir)).loadDocument()).items);
   } catch (err) {
-    return { records: [], problems: [`the PRD could not be read: ${errorMessage(err)}`] };
+    const problem = `the PRD could not be read: ${errorMessage(err)}`;
+    recordSourceProblems(options.projectDir, new Map([...events].map((event) => [event, problem])));
+    return { records: [], problems: [problem] };
   }
 
   const cursors = readEventCursors(options.projectDir);
-  const reads: SourceRead[] = [];
+  const reads: { events: TrackerEvent[]; read: SourceRead }[] = [];
   if (events.has("run-started") || events.has("run-failed-twice")) {
     const runs = await readRunRecords(join(resolveLayout(options.projectDir).henchDir, "runs"));
-    if (events.has("run-started")) reads.push(readRunsStarted(runs, cursors));
-    if (events.has("run-failed-twice")) reads.push(readRunsFailedTwice(runs, cursors));
+    if (events.has("run-started")) reads.push({ events: ["run-started"], read: readRunsStarted(runs, cursors) });
+    if (events.has("run-failed-twice")) reads.push({ events: ["run-failed-twice"], read: readRunsFailedTwice(runs, cursors) });
   }
-  if (events.has("pr-opened") || events.has("pr-merged")) reads.push(await readPrEvents(events, options, exec, cursors));
-  if (events.has("release-published")) reads.push(await readReleases(exec, options.projectDir, items, cursors));
+  if (events.has("pr-opened") || events.has("pr-merged")) {
+    const prEvents = (["pr-opened", "pr-merged"] as const).filter((e) => events.has(e));
+    reads.push({ events: prEvents, read: await readPrEvents(events, options, exec, cursors) });
+  }
+  if (events.has("release-published")) reads.push({ events: ["release-published"], read: await readReleases(exec, options.projectDir, items, cursors) });
 
   const problems: string[] = [];
+  const failed = new Map<TrackerEvent, string>();
   const records: TrackerEventRecord[] = [];
   const queued = new Set<string>();
   let next = cursors;
-  for (const read of reads) {
+  for (const { events: sourceEvents, read } of reads) {
     if ("problem" in read) {
       problems.push(read.problem);
+      for (const event of sourceEvents) failed.set(event, read.problem);
       continue;
     }
     next = { ...next, ...read.cursors };
@@ -360,5 +371,17 @@ async function collectOnce(options: CollectOptions): Promise<CollectedEvents> {
     }
   }
   if (JSON.stringify(next) !== JSON.stringify(cursors)) writeEventCursors(options.projectDir, next);
+  recordSourceProblems(options.projectDir, failed);
   return { records, problems };
+}
+
+/** Make the recorded problems say what `failed` does: a source not in it, rule on or off, has none. */
+function recordSourceProblems(projectDir: string, failed: ReadonlyMap<TrackerEvent, string>): void {
+  const prior = new Map(readSourceProblems(projectDir).map((p) => [p.event, p]));
+  const now = new Date().toISOString();
+  const problems = [...failed].map(([event, problem]): SourceProblem => {
+    const before = prior.get(event);
+    return { event, problem, at: before?.problem === problem ? before.at : now };
+  });
+  writeSourceProblems(projectDir, problems);
 }

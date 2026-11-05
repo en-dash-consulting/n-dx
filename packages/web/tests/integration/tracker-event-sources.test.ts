@@ -6,7 +6,7 @@
  * fake gh/git; nothing reaches GitHub or a tracker.
  */
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { resolveStore } from "@n-dx/rex";
@@ -16,6 +16,7 @@ import { updateInTree, type PRDItem } from "../../src/server/rex-gateway.js";
 import { trackerCursorsPath } from "../../src/server/tracker/event-cursors.js";
 import { collectTrackerEvents, COLLECTED_EVENTS, itemTrailerIds, tagVersions, type TrackerEventExec } from "../../src/server/tracker/event-sources.js";
 import { changeItemLink } from "../../src/server/tracker/item-links.js";
+import { readSourceProblems } from "../../src/server/tracker/source-problems.js";
 import { removeTestDir } from "../helpers/server-route-test-support.js";
 
 const V2_FIXTURE = resolve(__dirname, "../../../rex/tests/fixtures/v2-tree");
@@ -160,6 +161,45 @@ describe("collectTrackerEvents", () => {
     expect((await collect({ events: ["pr-opened"] })).records).toEqual([
       { event: "pr-opened", rexId: TASK, ref: "WM-2", sources: { "pr-url": "https://github.com/x/y/pull/3" } },
     ]);
+  });
+});
+
+describe("recorded source problems", () => {
+  const failing: TrackerEventExec = async () => ({ launched: true, exitCode: 1, stdout: "", stderr: "HTTP 502\nmore", error: null }) as ExecResult;
+
+  it("records that GitHub reads are off, naming the setting, for each PR event whose rule is on", async () => {
+    await collect({ events: ["pr-opened", "pr-merged", "run-started"], githubReads: false });
+    expect(readSourceProblems(root)).toEqual([
+      { event: "pr-opened", problem: expect.stringContaining("web.sidecarGithubReads"), at: expect.any(String) },
+      { event: "pr-merged", problem: expect.stringContaining("web.sidecarGithubReads"), at: expect.any(String) },
+    ]);
+  });
+
+  it("records a failing gh command's first line for its source, and the cursor does not move", async () => {
+    await collect({ events: ["pr-opened"] });
+    const cursors = readFileSync(trackerCursorsPath(root), "utf-8");
+    prs = [{ number: 3, url: "https://github.com/x/y/pull/3", createdAt: "2026-11-05T11:00:00Z", body: `N-DX-Item: ${TASK}` }];
+    await collect({ events: ["pr-opened"], exec: failing });
+    expect(readSourceProblems(root)).toEqual([{ event: "pr-opened", problem: "gh pr list answered: HTTP 502", at: expect.any(String) }]);
+    expect(readFileSync(trackerCursorsPath(root), "utf-8")).toBe(cursors);
+  });
+
+  it("keeps the time of an unchanged problem", async () => {
+    await collect({ events: ["pr-opened"], exec: failing });
+    const [first] = readSourceProblems(root);
+    await collect({ events: ["pr-opened"], exec: failing });
+    expect(readSourceProblems(root)).toEqual([first]);
+  });
+
+  it("clears a source's problem once it reads, and when its rule is turned off", async () => {
+    await collect({ events: ["pr-opened", "release-published"], exec: failing });
+    expect(readSourceProblems(root).map((p) => p.event)).toEqual(["pr-opened", "release-published"]);
+    // gh reads again; git still fails.
+    const gitFails: TrackerEventExec = (cmd, args, opts) => (cmd === "git" ? failing(cmd, args, opts) : fakeExec(cmd, args, opts));
+    await collect({ events: ["pr-opened", "release-published"], exec: gitFails });
+    expect(readSourceProblems(root).map((p) => p.event)).toEqual(["release-published"]);
+    await collect({ events: ["run-started"] });
+    expect(readSourceProblems(root)).toEqual([]);
   });
 });
 

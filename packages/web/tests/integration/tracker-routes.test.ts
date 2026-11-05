@@ -6,7 +6,7 @@
  * back as written.
  */
 
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -121,6 +121,23 @@ describe("GET /api/tracker/activity", () => {
     appendTrackerActivity(root, entry);
     expect((await fetch(`${server.baseUrl}/api/tracker/activity`)).status).toBe(401);
     const res = await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth });
-    expect(await res.json()).toEqual({ entries: [entry] });
+    expect(await res.json()).toEqual({ entries: [entry], sources: [] });
+  });
+
+  it("answers why a rule that is on reads nothing, until GitHub reads are turned on", async () => {
+    cpSync(resolve(__dirname, "../../../rex/tests/fixtures/v2-tree"), join(root, ".rex"), { recursive: true });
+    const local = JSON.parse(readFileSync(join(root, ".n-dx.local.json"), "utf-8"));
+    local.trackerSync.rules = { "pr-merged": "on" };
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify(local));
+    const sources = async () => (await (await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth })).json()).sources;
+
+    expect((await tick()).status).toBe(200);
+    expect(await sources()).toEqual([{ event: "pr-merged", problem: expect.stringContaining("web.sidecarGithubReads"), at: expect.any(String) }]);
+
+    // The rule is turned off: nothing is read, so nothing is wrong.
+    local.trackerSync.rules = {};
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify(local));
+    expect((await tick()).status).toBe(200);
+    expect(await sources()).toEqual([]);
   });
 });
