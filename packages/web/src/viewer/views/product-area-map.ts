@@ -126,7 +126,7 @@ export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" 
  * One block of the map. Reusable: the area view passes a capability's title,
  * size and status. A native button, so Enter and Space open it.
  */
-export function AreaBlock({ block, onOpen, selected, basisRem, lit, near }: {
+export function AreaBlock({ block, onOpen, selected, basisRem, lit, near, pending }: {
   block: AreaBlockModel;
   onOpen: () => void;
   selected?: boolean;
@@ -146,8 +146,11 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit, near }: {
    * on the shortlist ("near · refund"); a lit block is never also near.
    */
   near?: string;
+  /** Placement mode: the size an amendment would leave the block with ("12 → 13"), shown in place of its size. */
+  pending?: string;
 }) {
   const note = lit ?? near;
+  const label = note ? `${blockName(block)}; ${note}` : blockName(block);
   return h("button", {
     type: "button",
     class: `pam-block pam-${block.status}${lit ? " pam-lit" : near ? " pam-near" : ""}`,
@@ -161,12 +164,12 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit, near }: {
       flexGrow: String(Math.max(1, block.size)),
       ...(basisRem === undefined ? {} : { flexBasis: `${basisRem}rem` }),
     },
-    "aria-label": note ? `${blockName(block)}; ${note}` : blockName(block),
+    "aria-label": pending ? `${label}; ${block.unit} ${pending} with this amendment` : label,
     onClick: onOpen,
   },
     h("span", { class: "pam-label", "aria-hidden": "true" }, block.label),
     note ? h("span", { class: lit ? "pam-lit-note" : "pam-near-note", "aria-hidden": "true" }, note) : null,
-    h("span", { class: "pam-size", "aria-hidden": "true" }, String(block.size)),
+    h("span", { class: `pam-size${pending ? " pam-pending" : ""}`, "aria-hidden": "true" }, pending ?? String(block.size)),
     block.openChanges > 0
       ? h("span", { class: "pam-open", "aria-hidden": "true", title: plural(block.openChanges, "open change", "open changes") },
           String(block.openChanges))

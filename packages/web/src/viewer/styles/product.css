@@ -747,6 +747,7 @@
 
 .pam-label { font-weight: 600; overflow-wrap: anywhere; }
 .pam-size { color: var(--text-muted); font-size: var(--font-sm); }
+.pam-size.pam-pending { color: var(--accent, var(--text)); font-weight: 600; }
 
 .pam-met { border-color: var(--green); }
 .pam-changing { border-color: var(--accent); }

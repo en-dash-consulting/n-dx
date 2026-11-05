@@ -215,7 +215,8 @@ export async function checkPlacementRequest(change: string, body: PlacementEditB
   }
 }
 
-const CHECK_DEBOUNCE_MS = 250;
+/** How long an edit settles before it is re-checked; placement mode's Amends card waits the same. */
+export const CHECK_DEBOUNCE_MS = 250;
 
 // ── Body ─────────────────────────────────────────────────────────────
 

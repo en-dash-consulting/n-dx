@@ -83,6 +83,8 @@ export interface SpecMapProps {
   lit?: ReadonlyMap<string, string>;
   /** Placement mode: capabilities off the shortlist that share words with the change, each with its note. */
   near?: ReadonlyMap<string, string>;
+  /** Placement mode: the capability an amendment edits, with the size it would leave ("12 → 13"). */
+  pending?: { id: string; note: string } | null;
 }
 
 /**
@@ -93,7 +95,7 @@ export function liveCapabilities(rows: readonly CapabilityRow[]): CapabilityRow[
   return rows.filter((row) => row.status !== "retired");
 }
 
-export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit, near }: SpecMapProps) {
+export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit, near, pending }: SpecMapProps) {
   const capabilities = liveCapabilities(allCapabilities);
   return h("section", { class: "asm", "aria-label": "Spec map" },
     h(ConstraintBands, { constraints }),
@@ -113,6 +115,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
                 onOpen: () => onSelect(row.id),
                 lit: lit?.get(row.id),
                 near: near?.get(row.id),
+                pending: pending?.id === row.id ? pending.note : undefined,
               }))),
           h(BlockLegend, null)));
 }

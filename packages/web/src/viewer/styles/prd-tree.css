@@ -1911,6 +1911,16 @@ a.tracker-link {
   color: var(--text);
 }
 
+/* The wide card's dry run of an amendment (WF5) */
+.cp-dry-run {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.cp-dry-run[data-check="ok"] { color: var(--green, var(--text)); }
+.cp-dry-run.is-refused { color: var(--red); }
+
 /* Apply… for a change awaiting apply (change-apply.ts) */
 .ca-effects {
   margin: var(--space-1) 0;

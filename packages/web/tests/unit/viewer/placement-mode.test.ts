@@ -22,7 +22,7 @@ import {
   sharedWords,
   targetOfRow,
 } from "../../../src/viewer/views/placement-mode.js";
-import { amendsEffect, relationQuestion, touchesEffect } from "../../../src/viewer/components/prd-tree/change-placement.js";
+import { REFUSAL_HINTS, amendsEffect, relationQuestion, touchesEffect } from "../../../src/viewer/components/prd-tree/change-placement.js";
 import { ProductPage } from "../../../src/viewer/views/product-pages.js";
 import { parsePathnameRoute, placeChangeOfTab, placementTab, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -35,6 +35,8 @@ import type {
   PlacementCandidate,
   ProductMap,
 } from "../../../src/viewer/views/product-model.js";
+import type { SidecarPlacementCheck } from "../../../src/viewer/hooks/sidecar.js";
+import { CHECK_DEBOUNCE_MS } from "../../../src/viewer/components/sidecar-placement.js";
 
 vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -177,7 +179,10 @@ describe("near blocks, map picks and other-area candidates", () => {
 
 let root: HTMLDivElement;
 
-function serve(changes: ChangeRow[], shortlists: ChangePlacement[]): void {
+/** Answers `POST …/placement/check`: rex's dry run of the body the card sent. */
+type CheckRoute = (body: Record<string, unknown>) => Promise<SidecarPlacementCheck> | SidecarPlacementCheck;
+
+function serve(changes: ChangeRow[], shortlists: ChangePlacement[], check?: CheckRoute): void {
   const routes: Record<string, unknown> = {
     "/api/project": { cliName: "ndx" },
     "/api/rex/changes": { layout: "v2", changes },
@@ -186,7 +191,11 @@ function serve(changes: ChangeRow[], shortlists: ChangePlacement[]): void {
     ...Object.fromEntries(MAP.areas.map((a) => [`/api/rex/product/area/${a.slug}`, { layout: "v2", area: areaDetail(a.slug) }])),
     ...Object.fromEntries(changes.map((c) => [`/api/rex/changes/${c.id}/place`, { relation: "touches" }])),
   };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (check && url.endsWith("/placement/check")) {
+      const answer = await check(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify({ layout: "v2", change: "a", check: answer }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     const body = routes[url];
     return new Response(JSON.stringify(body ?? { error: "not found" }), {
       status: body === undefined ? 404 : 200,
@@ -420,6 +429,107 @@ describe("PlacementMode", () => {
     expect(gift.classList.contains("pam-near")).toBe(true);
     expect(gift.querySelector(".pam-near-note")?.textContent).toBe("near · gift");
     expect(gift.getAttribute("aria-label")).toContain("; near · gift");
+  });
+
+  describe("an amendment edited in the card (WF5)", () => {
+    const REFUNDS = candidate("cap-refund", {
+      title: "Refunds", score: 9,
+      criteria: [{ id: "c1", text: "Refund to card" }, { id: "c2", text: "Refund to wallet" }, { id: "c3", text: "Partial refunds" }],
+    });
+    const accepted = (body: Record<string, unknown>): SidecarPlacementCheck =>
+      ({ ok: true, action: "place", target: String(body.target), title: "Refunds", relation: "amends", base: "abcdef12", warnings: [] });
+
+    const place = () => $<HTMLButtonElement>(".cp-place")!;
+    const dryRun = () => $('.cp-card.is-checked .cp-dry-run');
+    /** Let the edit settle past the check's debounce, then let its answer land. */
+    async function recheck(): Promise<void> {
+      await act(async () => { await new Promise<void>((r) => setTimeout(r, CHECK_DEBOUNCE_MS + 20)); });
+      await settle();
+    }
+    async function amend(): Promise<void> {
+      await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="amends"]')!.click(); });
+      await settle();
+    }
+
+    it("re-checks every edit through /placement/check, shows the dry-run line, and holds Place while a check is in flight", async () => {
+      const sent: Array<Record<string, unknown>> = [];
+      const answers: Array<() => void> = [];
+      serve([change("a")], [placement("a", [REFUNDS])], (body) => {
+        sent.push(body);
+        return new Promise((resolve) => answers.push(() => resolve(accepted(body))));
+      });
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await amend();
+
+      // The editor sits in the checked card.
+      expect($(".cp-card.is-checked .cp-amends")).not.toBeNull();
+      expect(dryRun()?.dataset.check).toBe("checking");
+      expect(dryRun()?.textContent).toBe("Checking the amendment…");
+      expect(place().disabled).toBe(true);
+
+      await recheck();
+      expect(sent).toEqual([{ target: "cap-refund", relation: "amends" }]);
+      expect(place().disabled).toBe(true);
+      await act(async () => { answers.shift()!(); });
+      await settle();
+      expect(dryRun()?.dataset.check).toBe("ok");
+      expect(dryRun()?.textContent).toBe("Applies cleanly: amends Refunds (cap-refund @ spec abcd).");
+      expect(place().disabled).toBe(false);
+
+      // Editing the statement checks again, and Place waits for it.
+      const statement = $<HTMLTextAreaElement>(".cp-card.is-checked .cp-amends textarea")!;
+      await act(async () => { statement.value = "Refunds reach the original card"; statement.dispatchEvent(new Event("input")); });
+      expect(place().disabled).toBe(true);
+      expect(dryRun()?.dataset.check).toBe("checking");
+      await recheck();
+      expect(sent[1]).toEqual({ target: "cap-refund", relation: "amends", proposed: "Refunds reach the original card" });
+      await act(async () => { answers.shift()!(); });
+      await settle();
+      expect(place().disabled).toBe(false);
+    });
+
+    it("shows rex's own message and kind for a refusal, and keeps Place disabled", async () => {
+      serve([change("a")], [placement("a", [REFUNDS])], () =>
+        ({ ok: false, kind: "nothing-to-modify", error: "amends needs a criteria edit or a proposed statement" }));
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await amend();
+      await recheck();
+      expect(dryRun()?.dataset.check).toBe("refused");
+      expect(dryRun()?.dataset.kind).toBe("nothing-to-modify");
+      expect(dryRun()?.querySelector(".cp-dry-run-line")?.textContent)
+        .toBe("Rex refuses this placement (nothing-to-modify): amends needs a criteria edit or a proposed statement");
+      expect(dryRun()?.querySelector(".cp-refusal-hint")?.textContent).toBe(REFUSAL_HINTS["nothing-to-modify"]);
+      expect(place().disabled).toBe(true);
+    });
+
+    it("shows the pending criteria count on the selected block", async () => {
+      serve([change("a")], [placement("a", [REFUNDS])], accepted);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      const size = () => $('.pam-block[data-block="cap-refund"] .pam-size')?.textContent;
+      expect(size()).toBe("3");
+      await amend();
+      expect(size()).toBe("3 → 3");
+
+      await act(async () => { $<HTMLButtonElement>(".cp-card.is-checked .task-criterion-add-btn")!.click(); });
+      const input = $<HTMLInputElement>(".cp-card.is-checked .task-criterion-add-input")!;
+      await act(async () => { input.value = "Refunds show on the statement"; input.dispatchEvent(new Event("input")); });
+      await act(async () => { $<HTMLButtonElement>(".cp-card.is-checked .task-criterion-add-confirm")!.click(); });
+      await settle();
+      expect(size()).toBe("3 → 4");
+      expect($('.pam-block[data-block="cap-refund"]')?.getAttribute("aria-label")).toContain("; criteria 3 → 4 with this amendment");
+
+      await act(async () => { $$<HTMLButtonElement>(".cp-card.is-checked .task-criterion-remove")[0]!.click(); });
+      await act(async () => { $$<HTMLButtonElement>(".cp-card.is-checked .task-criterion-remove")[0]!.click(); });
+      await settle();
+      expect(size()).toBe("3 → 2");
+
+      // Touches amends nothing: the block shows its own size again.
+      await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="touches"]')!.click(); });
+      await settle();
+      expect(size()).toBe("3");
+    });
   });
 
   it("is what the Product page shows at /product/place/<id>", async () => {

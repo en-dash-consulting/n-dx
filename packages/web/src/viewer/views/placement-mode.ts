@@ -20,7 +20,9 @@
  * Candidates in other areas show as chips above the zoomed map, and picking
  * one, as chip or card, moves the map there. The panel stays mounted, so its
  * edits survive the move. Blocks off the shortlist dim, except those sharing
- * words with the change, which are marked near.
+ * words with the change, which are marked near. While the panel's card
+ * amends a capability, its block shows the criteria count the amendment
+ * would leave ("12 → 13").
  *
  * @module viewer/views/placement-mode
  */
@@ -33,7 +35,9 @@ import { placementTab } from "../route-state.js";
 import {
   ChangePlacementSection,
   inboxPosition,
+  pendingCriteriaNote,
   strongUntiedPick,
+  type PendingCriteria,
   type PlacementTarget,
 } from "../components/prd-tree/change-placement.js";
 import { StrengthChip } from "../components/index.js";
@@ -189,13 +193,15 @@ function AreaLevel({ map, groups, onZoom }: { map: ProductMap; groups: readonly 
  * The zoomed area's spec map: its candidates lit with their rank, blocks
  * sharing words with the change marked near, and the panel's pick selected.
  */
-function ZoomedArea({ slug, group, tied, changeText, selectedId, onSelect }: {
+function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, onSelect }: {
   slug: string;
   group: AreaCandidates | undefined;
   tied: boolean;
   /** What the change says, for the near marks. */
   changeText: string;
   selectedId: string | null;
+  /** The panel's amendment, shown on its block as the criteria count it would leave. */
+  pending: PendingCriteria | null;
   onSelect: (row: CapabilityRow, areaTitle: string) => void;
 }) {
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
@@ -203,10 +209,12 @@ function ZoomedArea({ slug, group, tied, changeText, selectedId, onSelect }: {
   if (load.state !== "ready") return h(Pending, { load });
   const { capabilities, constraints, title } = load.data;
   const lit = new Map((group?.candidates ?? []).map(({ candidate, rank }) => [candidate.target, candidateNote(rank, candidate, tied)]));
+  const amended = pending ? capabilities.find((c) => c.id === pending.target) : undefined;
   return h(SpecMap, {
     capabilities,
     constraints,
     selectedId,
+    pending: amended && pending ? { id: amended.id, note: pendingCriteriaNote(amended.criteriaCount, pending.delta) } : null,
     onSelect: (id: string) => {
       const row = capabilities.find((c) => c.id === id);
       if (row) onSelect(row, title);
@@ -271,6 +279,8 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const [zoom, setZoom] = useState<string | null | undefined>(undefined);
   // The target the panel and the map share.
   const [selection, setSelection] = useState<PlacementTarget | null>(null);
+  // The panel's amendment, for the selected block's pending criteria count.
+  const [pending, setPending] = useState<PendingCriteria | null>(null);
   /** A pick from the panel, a chip or a block: select it and move the map to its area. */
   const choose = (target: PlacementTarget) => {
     setSelection(target);
@@ -335,6 +345,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
               tied: !!placement?.tied,
               changeText: shown.change.title,
               selectedId,
+              pending,
               onSelect: (row: CapabilityRow, areaTitle: string) => choose(targetOfRow(row, areaTitle, shortlist)),
             })
           : null,
@@ -348,6 +359,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           layout: "wide",
           selection,
           onChoose: choose,
+          onPendingCriteria: setPending,
         })),
     ),
   );
