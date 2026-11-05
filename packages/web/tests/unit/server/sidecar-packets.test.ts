@@ -22,6 +22,7 @@ import {
   DIAGNOSE_RUN_CAP,
   EXPLAIN_CAP,
   GUIDE_CAP,
+  MISSING_DONE_WHEN_NOTE,
   PLAN_CAP,
 } from "../../../src/server/sidecar/packet-builders.js";
 import type { PacketSources, RunGateRead, TaskRunRead } from "../../../src/server/sidecar/packet-sources.js";
@@ -457,6 +458,13 @@ describe("Describe", () => {
     expect(packet.text).not.toContain("## Task\n");
     expect(packet.text).toMatch(/## Tasks\n_source: [^\n]*\n\n- task Wire the button: pending\n {2}Done when:\n {2}- \[ \] The button appears on Safari only\n/);
     expect(packet.text).toContain("- task Add the receipt line: pending\n  Done when:\n  (none stated)");
+    expect(packet.text).toContain(MISSING_DONE_WHEN_NOTE);
+  });
+
+  it("on a change whose tasks all have done-when: lists them without the missing-checks note", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE }, NOW)).text;
+    expect(text).toContain("## Tasks");
+    expect(text).not.toContain(MISSING_DONE_WHEN_NOTE);
   });
 
   it("on a task: carries no Tasks section", async () => {

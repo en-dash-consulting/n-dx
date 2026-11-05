@@ -438,6 +438,8 @@ function previewDigest(brief: string): string {
 }
 
 const DESCRIBE_CHILDREN_MAX = 15;
+export const MISSING_DONE_WHEN_NOTE =
+  "A task whose done-when reads (none stated) has no checks: propose done-when for it as text in your reply, as for a vague check.";
 
 /** `node`'s done-when as unchecked boxes, each line prefixed by `indent`. */
 function doneWhenChecks(node: RuleNode, indent: string): string {
@@ -458,8 +460,12 @@ function childrenSections(node: RuleNode, now: string): PacketSection[] {
   );
   const rest = children.length - shown.length;
   const more = rest > 0 ? [`… ${rest} more not shown`] : [];
+  // The lens instructions cover vague checks; a task with none needs its own ask.
+  const unchecked = children.some((c) => strings(c.acceptanceCriteria).length === 0)
+    ? [MISSING_DONE_WHEN_NOTE]
+    : [];
   const [id, title] = node.type === "change" ? ["tasks", "Tasks"] : ["subtasks", "Subtasks"];
-  return [prdSection(id, title, [...shown, ...more].join("\n"), now)];
+  return [prdSection(id, title, [...shown, ...more, ...unchecked].join("\n"), now)];
 }
 
 /** Describe: the task as it will run: text, done-when, settings, what blocks it and how it has gone. */
