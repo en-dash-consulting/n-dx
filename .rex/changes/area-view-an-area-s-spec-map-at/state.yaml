@@ -1,10 +1,13 @@
 schema: "rex/v2"
 items:
   "019399a6-ea02-4193-be85-9a411a30dc55":
+    status: "completed"
     startedAt: "2026-11-05T19:13:55.578Z"
-    activeIntervals: [{"end":"2026-11-05T19:47:51.783Z","start":"2026-11-05T19:13:55.578Z"}]
+    completedAt: "2026-11-05T20:00:19.559Z"
+    endedAt: "2026-11-05T20:00:19.559Z"
+    activeIntervals: [{"end":"2026-11-05T19:47:51.783Z","start":"2026-11-05T19:13:55.578Z"},{"end":"2026-11-05T20:00:19.559Z","start":"2026-11-05T20:00:19.559Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (39):\n- overwrites README.proposed.md on rerun but never touches the original README\n- primary README.md contains Overview, Quick Start, Testing, and License sections in order\n- proposed README.proposed.md mirrors all four sections in order\n- emits a non-empty ## License stub when package.json lacks a license field\n- emits a non-empty ## Testing stub when no test command is detected\n- mentions both CLAUDE.md and AGENTS.md artifacts\n- shows status summary\n- shows completion percentage\n… and 31 more"
-    lastModified: "2026-11-05T19:47:55.058Z"
+    lastModified: "2026-11-05T20:00:19.559Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "056a30fd-25f2-428d-a193-308a7c6fcc8b":
     status: "completed"
@@ -73,7 +76,14 @@ items:
     lastModified: "2026-11-05T14:53:15.277Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b5e6519-b13e-4ca2-a70a-40988f4dcea8":
-    lastModified: "2026-11-05T18:31:53.371Z"
+    status: "completed"
+    startedAt: "2026-11-05T20:00:19.559Z"
+    completedAt: "2026-11-05T20:00:19.559Z"
+    endedAt: "2026-11-05T20:00:19.559Z"
+    activeIntervals: [{"end":"2026-11-05T20:00:19.559Z","start":"2026-11-05T20:00:19.559Z"}]
+    appliedAt: "2026-11-05T20:00:19.559Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-05T20:00:19.559Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c72e349-bf76-42ba-8274-2d40b7c3127e":
     status: "completed"
