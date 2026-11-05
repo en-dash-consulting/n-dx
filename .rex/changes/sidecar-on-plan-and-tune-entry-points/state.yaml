@@ -67,10 +67,13 @@ items:
     lastModified: "2026-11-05T01:08:20.159Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f453e786-c4bb-4f28-b049-3912ce0e02b0":
+    status: "completed"
     startedAt: "2026-11-05T19:07:45.630Z"
-    activeIntervals: [{"end":"2026-11-05T19:49:21.962Z","start":"2026-11-05T19:07:45.630Z"}]
+    completedAt: "2026-11-05T19:56:10.710Z"
+    endedAt: "2026-11-05T19:56:10.710Z"
+    activeIntervals: [{"end":"2026-11-05T19:49:21.962Z","start":"2026-11-05T19:07:45.630Z"},{"end":"2026-11-05T19:56:10.710Z","start":"2026-11-05T19:56:10.710Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (39):\n- writes README.md referencing the target project when no README exists\n- leaves an existing README.md byte-for-byte and writes README.proposed.md\n- uses the proposed-file path when README exists\n- uses the proposed-file path when README.rst exists\n- overwrites README.proposed.md on rerun but never touches the original README\n- primary README.md contains Overview, Quick Start, Testing, and License sections in order\n- proposed README.proposed.md mirrors all four sections in order\n- emits a non-empty ## License stub when package.json lacks a license field\n… and 31 more"
-    lastModified: "2026-11-05T19:49:23.598Z"
+    lastModified: "2026-11-05T19:56:10.710Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f76d0e7d-ca55-4080-af71-c3c7ff4bae9c":
     status: "completed"
