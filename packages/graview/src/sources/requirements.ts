@@ -135,7 +135,12 @@ export async function readRequirements(rexDir: string, warn: Warn, options: Requ
         fields.priority = node.priority;
         fields.level = node.type === "subtask" ? "subtask" : "task";
       }
-      for (const blocker of node.blockedBy ?? []) edges.push({ kind: "blockedBy", from: node.id, to: blocker });
+      for (const blocker of node.blockedBy ?? []) {
+        // Rex's ref-resolves rule: blockedBy names a change-layer node. A v1 blocker the
+        // proposed layer turned into a capability, area or constraint is not one, so it is dropped.
+        if (productIds.has(blocker)) blockersOnProduct.push(`${node.id} -> ${blocker}`);
+        else edges.push({ kind: "blockedBy", from: node.id, to: blocker });
+      }
       nodes.push({ id: node.id, kind, ...fields });
       ids.add(node.id);
       if (parent) edges.push({ kind: "under", from: node.id, to: parent.id });
@@ -144,7 +149,15 @@ export async function readRequirements(rexDir: string, warn: Warn, options: Requ
   };
 
   walkProduct(tree.product);
+  const productIds = new Set(ids);
+  const blockersOnProduct: string[] = [];
   walkChanges(tree.changes);
+  if (blockersOnProduct.length > 0) {
+    warn(
+      `${blockersOnProduct.length} blockedBy ${blockersOnProduct.length === 1 ? "reference names" : "references name"} a product node, not a change or task, and ` +
+        `${blockersOnProduct.length === 1 ? "is" : "are"} left out: ${blockersOnProduct.slice(0, 5).join(", ")}${blockersOnProduct.length > 5 ? ", …" : ""}`,
+    );
+  }
 
   const productLayer = tree.product.length === 0 ? "none" : proposed ? "proposed" : "stored";
   return { model, tree, productEdges, ids, nodes, edges, productLayer };

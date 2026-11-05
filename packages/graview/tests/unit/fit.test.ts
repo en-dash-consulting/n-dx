@@ -1,10 +1,15 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { rmSync } from "node:fs";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { compileDocument } from "@graview/core/check";
+import { validateGraph } from "@graview/core";
 import { emitProjection } from "../../src/emit.js";
-import { loadDocument } from "../../src/document.js";
-import { fitSnapshot, describeMisfits } from "../../src/fit.js";
+import { buildSnapshot } from "../../src/snapshot.js";
+import { resolveLayout } from "../../src/llm-gateway.js";
+import { documentFor, loadDocument } from "../../src/document.js";
+import { fitSnapshot, describeMisfits, LIST_MAX, STRING_MAX } from "../../src/fit.js";
 import type { GraphSnapshot } from "../../src/types.js";
-import { makeProject } from "../helpers/project.js";
+import { makeProject, runRecord } from "../helpers/project.js";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -51,7 +56,7 @@ describe("the snapshot fits the declaration", () => {
       "c1 crosses: change declares no relation \"crosses\"",
       "t1 inZone: inZone reaches nowhere, which is not in the snapshot",
     ]));
-    expect(describeMisfits(fitSnapshot(doc, snapshot), 2)).toMatch(/^\d+ records do not fit the declaration:\n {2}c1: .*\n {2}.*\n {2}and \d+ more$/);
+    expect(describeMisfits(fitSnapshot(doc, snapshot), 2)).toMatch(/^\d+ misfits in 6 records against the declaration:\n {2}c1: .*\n {2}.*\n {2}and \d+ more$/);
   });
 
   it("holds a relation declared to reach one record to one", () => {
@@ -67,5 +72,75 @@ describe("the snapshot fits the declaration", () => {
       const emitted = await emitProjection(root, { warn: () => {} });
       expect(emitted.misfits, `${prd}: ${describeMisfits(emitted.misfits)}`).toEqual([]);
     }
+  });
+
+  it("holds each field to Graview's types, caps and its rule against null", () => {
+    const run = { id: "r1", kind: "run", status: "completed" };
+    const snapshot: GraphSnapshot = {
+      nodes: [
+        { ...change, title: "x".repeat(STRING_MAX + 1) },
+        { ...task, tags: ["ok", 7] },
+        { id: "z2", kind: "zone", name: "Cart", fileCount: 2.5 },
+        { id: "z3", kind: "zone", name: "Lists", entryPoints: Array.from({ length: LIST_MAX + 1 }, (_, i) => `src/${i}.ts`) },
+        { ...run, startedAt: "not a date" },
+        { id: "c2", kind: "change", title: "Two", status: "pending", fix: "yes" },
+        { id: "t3", kind: "task", title: "Three", status: "pending", assignee: null },
+        { id: "", kind: "task", title: "No id", status: "pending" },
+      ],
+      edges: [],
+    };
+    const said = fitSnapshot(doc, snapshot).map((m) => `${m.record} ${m.at}: ${m.message}`);
+    expect(said).toEqual(expect.arrayContaining([
+      `c1 title: change.title is ${STRING_MAX + 1} characters, over Graview's ${STRING_MAX}`,
+      expect.stringMatching(/^t1 tags: task\.tags holds 7, which is not a string/),
+      "z2 fileCount: zone.fileCount is 2.5, not a whole number",
+      `z3 entryPoints: zone.entryPoints holds ${LIST_MAX + 1} items, over Graview's ${LIST_MAX}`,
+      'r1 startedAt: run.startedAt is "not a date", not a date and time',
+      'c2 fix: change.fix is "yes", not true or false',
+      "t3 assignee: task.assignee is null; leave it out instead",
+      " id: a task record has no id",
+    ]));
+  });
+
+  it("flags every record Graview's validateGraph flags", () => {
+    // fit.ts is plain data over the declaration; this holds it to the validator a face runs.
+    const compiled = compileDocument(documentFor("n-dx"));
+    if (!compiled.ok || !compiled.app) throw new Error(JSON.stringify(compiled.findings));
+    const run = { id: "r1", kind: "run", status: "completed" };
+    const bad: GraphSnapshot[] = [
+      { nodes: [{ ...change, title: "x".repeat(STRING_MAX + 1) }], edges: [] },
+      { nodes: [{ ...task, tags: Array.from({ length: LIST_MAX + 1 }, (_, i) => `t${i}`) }], edges: [] },
+      { nodes: [{ ...task, assignee: null }], edges: [] },
+      { nodes: [{ ...change, status: "shipped" }], edges: [] },
+      { nodes: [{ ...zone, cohesion: 1.5 }], edges: [] },
+      { nodes: [{ ...zone, fileCount: 2.5 }], edges: [] },
+      { nodes: [{ ...run, startedAt: "soon" }], edges: [] },
+      { nodes: [task, zone], edges: [{ kind: "blockedBy", from: "t1", to: "z1" }] },
+    ];
+    for (const snapshot of bad) {
+      const graview = validateGraph(compiled.app, structuredClone(snapshot));
+      expect(graview.length, `validateGraph finds nothing in ${JSON.stringify(snapshot).slice(0, 120)}`).toBeGreaterThan(0);
+      expect(fitSnapshot(doc, snapshot).length, `fit misses what validateGraph finds: ${JSON.stringify(graview.map((f) => f.message))}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("admits a run or a commit for the area a v1 epic becomes, and leaves out a blocker that names one", async () => {
+    const root = makeProject({ prd: "v1" });
+    roots.push(root);
+    const layout = resolveLayout(root);
+    const EPIC = "11111111-1111-1111-1111-111111111111";
+    writeFileSync(join(layout.henchDir, "runs", "run-epic.json"), JSON.stringify(runRecord("run-epic", EPIC, { commits: [] })));
+    const blocked = join(layout.rexDir, "prd_tree", "auth-platform-11111111", "login-flow-22222222", "password-login-33333333", "index.md");
+    writeFileSync(blocked, readFileSync(blocked, "utf-8").replace('"dep-password-policy"', `"${EPIC}"`));
+
+    const warn = vi.fn();
+    const report = await buildSnapshot(layout, { warn, cacheDir: join(root, "cache") });
+    expect(report.productLayer).toBe("proposed");
+    expect(report.snapshot.nodes.find((n) => n.id === EPIC)?.kind).toBe("area");
+    // The edge stays, and the declaration admits it: narrowing ranFor again fails here.
+    expect(report.snapshot.edges).toContainEqual({ kind: "ranFor", from: "run-epic", to: EPIC });
+    expect(report.snapshot.edges.some((e) => e.kind === "blockedBy" && e.to === EPIC)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^1 blockedBy reference names a product node.*33333333-3333-3333-3333-333333333333 -> 11111111/));
+    expect(fitSnapshot(doc, report.snapshot), describeMisfits(fitSnapshot(doc, report.snapshot))).toEqual([]);
   });
 });

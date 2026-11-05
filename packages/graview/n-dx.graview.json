@@ -617,9 +617,7 @@
         "blockedBy": {
           "to": [
             "change",
-            "task",
-            "capability",
-            "area"
+            "task"
           ],
           "description": "what has to finish first",
           "inverse": "what is waiting on this"
@@ -815,9 +813,7 @@
         "blockedBy": {
           "to": [
             "change",
-            "task",
-            "capability",
-            "area"
+            "task"
           ],
           "description": "what has to finish first",
           "inverse": "what is waiting on this"
@@ -1184,6 +1180,7 @@
             "change",
             "task",
             "capability",
+            "constraint",
             "area"
           ],
           "cardinality": "one",
@@ -1281,6 +1278,7 @@
             "change",
             "task",
             "capability",
+            "constraint",
             "area"
           ],
           "description": "the work this commit landed for",

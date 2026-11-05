@@ -2,11 +2,17 @@
  * Whether the snapshot fits the declaration. `graview check` judges the
  * declaration alone, so a record with an enum value the declaration does not
  * offer, or an edge whose far end is a kind the relation does not reach,
- * passes it and fails later, at `serve`, in front of whoever opened the face.
- * This reads the pair the way Graview will: every record's kind and fields
- * against its kind's declaration, every edge against the relation declared on
- * the kind it leaves. Plain data over the checked-in JSON, so the adapter
- * still imports nothing from Graview.
+ * passes it, and Graview's `validateGraph` reports the record when a face
+ * loads the pair. This holds the pair to at least what Graview holds it to:
+ * every record's kind and fields against its kind's declaration (types, enum
+ * options, ranges and steps, Graview's length caps on strings, texts and
+ * lists, and no `null` where Graview takes only an absent field), every edge
+ * against the relation declared on the kind it leaves. It is stricter in two
+ * places Graview lets through: an undeclared field (Graview strips it) and a
+ * relation declared to reach one record that reaches more (Graview holds that
+ * only in acts). A type it does not know is Graview's to judge. Plain data
+ * over the checked-in JSON, so the adapter still imports nothing from
+ * Graview; `tests/unit/fit.test.ts` holds it to `validateGraph`.
  */
 import type { GraviewDocumentData } from "./document.js";
 import type { GraphSnapshot } from "./types.js";
@@ -27,6 +33,7 @@ interface FieldSpec {
   of?: string;
   min?: number;
   max?: number;
+  step?: number;
 }
 
 interface EdgeSpec {
@@ -39,6 +46,12 @@ interface KindSpec {
   edges?: Record<string, EdgeSpec>;
 }
 
+/** Graview's caps (`@graview/core` `fieldSchema`): a string, a text, a list, and each string in a list. */
+export const STRING_MAX = 500;
+export const TEXT_MAX = 20_000;
+export const LIST_MAX = 200;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 const show = (value: unknown): string => {
   const text = JSON.stringify(value) ?? String(value);
   return text.length > 60 ? `${text.slice(0, 57)}...` : text;
@@ -48,8 +61,13 @@ const show = (value: unknown): string => {
 function wrongType(spec: FieldSpec, value: unknown): string | undefined {
   switch (spec.type) {
     case "string":
-    case "text":
-      return typeof value === "string" ? undefined : `is ${show(value)}, not a string`;
+    case "text": {
+      if (typeof value !== "string") return `is ${show(value)}, not a string`;
+      const max = spec.type === "string" ? STRING_MAX : TEXT_MAX;
+      return value.length > max ? `is ${value.length} characters, over Graview's ${max}` : undefined;
+    }
+    case "date":
+      return typeof value === "string" && ISO_DAY.test(value) ? undefined : `is ${show(value)}, not a date like 2026-10-02`;
     case "datetime":
       return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? undefined : `is ${show(value)}, not a date and time`;
     case "boolean":
@@ -60,15 +78,22 @@ function wrongType(spec: FieldSpec, value: unknown): string | undefined {
       if (spec.type === "integer" && !Number.isInteger(value)) return `is ${value}, not a whole number`;
       if (spec.min !== undefined && value < spec.min) return `is ${value}, below the declared minimum ${spec.min}`;
       if (spec.max !== undefined && value > spec.max) return `is ${value}, above the declared maximum ${spec.max}`;
+      if (spec.step !== undefined && spec.step > 0 && Math.abs(value / spec.step - Math.round(value / spec.step)) > 1e-9) {
+        return `is ${value}, not a multiple of the declared step ${spec.step}`;
+      }
       return undefined;
     }
     case "enum":
       return typeof value === "string" && (spec.options ?? []).includes(value) ? undefined : `is ${show(value)}, which is not one of ${(spec.options ?? []).join(", ")}`;
     case "list": {
       if (!Array.isArray(value)) return `is ${show(value)}, not a list`;
-      if (!spec.of) return undefined;
-      const bad = value.find((item) => wrongType({ type: spec.of! }, item) !== undefined);
-      return bad === undefined ? undefined : `holds ${show(bad)}, not a ${spec.of}`;
+      if (value.length > LIST_MAX) return `holds ${value.length} items, over Graview's ${LIST_MAX}`;
+      // Graview reads a list's items as strings of at most 500 characters unless `of` names numbers, days or files.
+      if (spec.of === "image" || spec.of === "file") return undefined;
+      const of = spec.of === "number" || spec.of === "date" ? spec.of : "string";
+      const bad = value.find((item) => wrongType({ type: of }, item) !== undefined);
+      if (bad === undefined) return undefined;
+      return `holds ${show(bad)}, which is not ${of === "string" ? `a string of at most ${STRING_MAX} characters` : `a ${of}`}`;
     }
     default:
       // A type this check does not know yet is Graview's to judge, not a misfit.
@@ -83,16 +108,24 @@ export function fitSnapshot(doc: GraviewDocumentData, snapshot: GraphSnapshot): 
 
   for (const node of snapshot.nodes) {
     kindOf.set(node.id, node.kind);
+    if (typeof node.id !== "string" || node.id.length === 0) {
+      misfits.push({ record: String(node.id), kind: node.kind, at: "id", message: `a ${node.kind} record has no id` });
+    }
     const spec = kinds[node.kind];
     if (!spec) {
       misfits.push({ record: node.id, kind: node.kind, at: "kind", message: `kind "${node.kind}" is not declared` });
       continue;
     }
     for (const [field, value] of Object.entries(node)) {
-      if (field === "id" || field === "kind" || value === undefined || value === null) continue;
+      if (field === "id" || field === "kind" || value === undefined) continue;
       const fieldSpec = spec.fields[field];
       if (!fieldSpec) {
         misfits.push({ record: node.id, kind: node.kind, at: field, message: `${node.kind}.${field} is not declared` });
+        continue;
+      }
+      if (value === null) {
+        // Graview takes an absent field, never a null one; a required one is reported as missing below.
+        if (!fieldSpec.required) misfits.push({ record: node.id, kind: node.kind, at: field, message: `${node.kind}.${field} is null; leave it out instead` });
         continue;
       }
       const why = wrongType(fieldSpec, value);
@@ -135,5 +168,7 @@ export function fitSnapshot(doc: GraviewDocumentData, snapshot: GraphSnapshot): 
 export function describeMisfits(misfits: readonly Misfit[], limit = 20): string {
   const lines = misfits.slice(0, limit).map((m) => `  ${m.record}: ${m.message}`);
   if (misfits.length > limit) lines.push(`  and ${misfits.length - limit} more`);
-  return `${misfits.length} ${misfits.length === 1 ? "record does" : "records do"} not fit the declaration:\n${lines.join("\n")}`;
+  const records = new Set(misfits.map((m) => m.record)).size;
+  const count = `${misfits.length} ${misfits.length === 1 ? "misfit" : "misfits"} in ${records} ${records === 1 ? "record" : "records"}`;
+  return `${count} against the declaration:\n${lines.join("\n")}`;
 }

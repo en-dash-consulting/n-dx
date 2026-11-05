@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_FILES, type Components, type Inventory, type Zone, type Zones } from "../sourcevision-gateway.js";
 import type { SnapshotEdge, SnapshotNode, SourceSlice, Warn } from "../types.js";
+import { LIST_MAX } from "../fit.js";
 
 export interface CodeSlice extends SourceSlice {
   /** A repository-relative file's deepest zone, for `computeRealizedBy`. */
@@ -57,7 +58,8 @@ export function readCode(sourcevisionDir: string, options: ReadCodeOptions, warn
         coupling: zone.coupling,
         fileCount: zone.files.length,
         depth: zone.depth ?? depth,
-        entryPoints: zone.entryPoints.length > 0 ? [...zone.entryPoints].sort() : undefined,
+        // Graview holds a list to 200 items; a zone with more entry points shows the first 200 in path order.
+        entryPoints: zone.entryPoints.length > 0 ? [...zone.entryPoints].sort().slice(0, LIST_MAX) : undefined,
       });
       if (parent) edges.push({ kind: "under", from: zone.id, to: parent.id });
       // Parents first, children after: the deepest zone a file is listed in wins.

@@ -98,15 +98,15 @@ and the same code path then reads the stored v2 tree.
 | `dependsOn` | `capability.dependsOn` |
 | `appliesTo` | `constraint.appliesTo` (an `"all"` binding is the `appliesToAll` field) |
 | `amends`, `touches` | `change.amends[].target`, `change.touches` (rex derives `changedBy` and `coChanges` from these) |
-| `blockedBy` | `blockedBy` on changes and tasks; on a v1 tree's proposed layer it may reach the capability or area a blocking feature or epic became |
+| `blockedBy` | `blockedBy` on changes and tasks. Rex requires it to name a change-layer node, so a blocker that names a product node (on a v1 tree's proposed layer, the capability, constraint or area a blocking feature or epic became) is left out with a warning |
 | `discoveredFrom` | `change.discoveredFrom.item` / `.run` |
 | `plannedFor`, `shippedWith` | `change.plannedRelease`, `ItemState.shippedIn`; a finished change with no stamped `shippedIn` ships with the first release tag containing its landing (`computeLandings`, `releasesContaining`: rex's `resolveShippedIn` answer, for every change in one walk) |
-| `landedFor` (commit → change or task; a capability or area when the trailer names a v1 feature or epic the proposed layer turned into one) | the commit's `N-DX-Item` trailers, and the run record that names the commit (its task) |
+| `landedFor` (commit → change or task; a capability, constraint or area when the trailer names a v1 feature or epic the migration turned into one, whether the plan only proposes it or has applied it) | the commit's `N-DX-Item` trailers, and the run record that names the commit (its task) |
 | `realizedIn` (capability → zone), `realizes` (commit → capability) | every commit that landed for a change placed on the capability (`amends` or `touches`, via `changedBy`) or for the work under it, through `loadCommitFiles` and the zone map |
 | `changed` (commit → file), `livesIn` (capability → file) | the same `loadCommitFiles` read, kept as edges when files are projected: every commit on the graph to the files it changed, and a capability to the files its realizing commits changed. A path the inventory no longer has is dropped |
 | `inZone` | a component's or file's deepest zone |
 | `crosses` | `zones.json` crossings and sub-crossings |
-| `ranFor`, `produced` | `RunRecord.taskId` (a capability or area when the run worked a v1 feature or epic the proposed layer turned into one), `RunRecord.commits` |
+| `ranFor`, `produced` | `RunRecord.taskId` (a capability, constraint or area when the run worked a v1 feature or epic the migration turned into one, proposed or applied: run records keep the old id), `RunRecord.commits` |
 
 A v1 tree gets all of this too: its changes carry `completedAt`, its tasks
 the trailers, and the tags are git's; with the proposed product layer the
@@ -125,10 +125,14 @@ mirror a computed state the snapshot already carries.
 
 `ndx graview emit` holds the snapshot to the declaration (`src/fit.ts`):
 every record's kind and fields, every enum value, list, number range and
-required field, and every edge's relation, target kind and cardinality.
+step, required field, Graview's length caps (a string 500 characters, a
+text 20,000, a list 200 items) and a `null` where Graview takes only an
+absent field, and every edge's relation, target kind and cardinality.
 `emit` warns about a misfit and `check` fails on one, naming the record,
 because `graview check` judges the declaration alone and a misfit would
-otherwise surface only when a face loads the pair.
+otherwise surface only as a `validateGraph` finding when a face loads the
+pair. The adapter's tests hold `fit.ts` to `@graview/core`'s
+`validateGraph`, so the two cannot drift apart unnoticed.
 
 Ids are n-dx's own, so a Graview answer can be taken straight back to the tool
 that owns the node. Edges whose far end is missing are dropped, never
