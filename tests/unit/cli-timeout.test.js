@@ -71,6 +71,11 @@ describe("resolveCommandTimeout", () => {
     expect(resolveCommandTimeout("sv", {}, "analyze")).toBe(DEFAULT_TIMEOUT_MS);
   });
 
+  it("cli.js passes the first positional argument as the subcommand, so a leading flag does not hide a server", () => {
+    const cli = readFileSync(new URL("../../packages/core/cli.js", import.meta.url), "utf-8");
+    expect(cli).toMatch(/resolveCommandTimeout\(command \?\? "", projectConfig, rest\.find\(\(arg\) => !arg\.startsWith\("-"\)\)\)/);
+  });
+
   it("the dashboard's copy of the server list matches core's", () => {
     const web = readFileSync(new URL("../../packages/web/src/server/routes-cli-timeout.ts", import.meta.url), "utf-8");
     const list = /const NO_DEFAULT_TIMEOUT_COMMANDS = (\[[^\]]*\]);/.exec(web)?.[1];

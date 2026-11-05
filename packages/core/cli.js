@@ -3877,7 +3877,8 @@ async function main() {
     ? process.cwd()
     : resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
   const projectConfig = extension ? {} : await loadProjectConfig(dir).catch(() => ({}));
-  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig, rest[0]);
+  // The subcommand is the first positional: `ndx rex -q mcp .` is still the rex MCP server.
+  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig, rest.find((arg) => !arg.startsWith("-")));
 
   // Resolve BETA experimental flags from the same config read, so childEnv() can
   // forward them to sub-CLIs without a second filesystem hit.
