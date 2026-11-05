@@ -63,10 +63,13 @@ items:
     lastModified: "2026-11-05T05:50:51.614Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "52b2ecff-be44-4870-a115-d6a36489aed7":
+    status: "completed"
     startedAt: "2026-11-05T09:09:27.445Z"
-    activeIntervals: [{"end":"2026-11-05T09:21:48.148Z","start":"2026-11-05T09:09:27.445Z"}]
+    completedAt: "2026-11-05T09:23:25.031Z"
+    endedAt: "2026-11-05T09:23:25.031Z"
+    activeIntervals: [{"end":"2026-11-05T09:21:48.148Z","start":"2026-11-05T09:09:27.445Z"},{"end":"2026-11-05T09:23:25.031Z","start":"2026-11-05T09:23:25.031Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- concurrent auth requests share one spawn\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n… and 11 more"
-    lastModified: "2026-11-05T09:21:48.760Z"
+    lastModified: "2026-11-05T09:23:25.031Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "637d5b5b-b14e-441d-aa14-3c8944fec4fa":
     status: "completed"
