@@ -183,7 +183,21 @@ Routes, governed by `web.sidecar`:
   `collected: { queued, problems }`. It answers the
   per-user token itself only: a browser session is refused with 403, and a
   Sidecar broker credential never passes the request gate on it.
-- `GET /api/tracker/activity` answers `{ entries }`, the newest 200.
+- `GET /api/tracker/activity` answers `{ entries, cards, sources, connection }`:
+  the newest 200 entries, the request ids of the cards still waiting, the
+  event sources the last tick could not read, and the sync connection's state
+  (`null` with no `trackerSync` connection). Live's Tracker activity section
+  reads it while `web.sidecar` is on.
+- `GET /api/tracker/cards/form?requestId=` answers `{ externalCall }`, the
+  waiting card's call drawn as the C1 form (schema and picker choices).
+- `POST /api/tracker/cards/decide { requestId, action, args? }` decides a
+  waiting card. `dismiss` logs `dismissed` and calls nothing. `approve` makes
+  the call with `args` (the operator's edits; the planned `requestId` is kept
+  whatever is sent), confirms a create or duplicate with a read, and logs the
+  result. Either entry closes the card; an approval that finds the connection
+  unreachable is logged and leaves the card waiting. Decisions run one at a
+  time per project, so two approvals make one call. These need the per-user
+  token or a browser session; a Sidecar broker credential is refused.
 
 ## Tool class and policy
 

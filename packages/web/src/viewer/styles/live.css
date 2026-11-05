@@ -576,3 +576,29 @@
 
 .live-analyze-narration { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
 .live-analyze-stage-links { margin: 0; font-size: var(--font-sm); color: var(--text-muted); }
+
+/* ── Tracker activity ───────────────────────────────────────────────── */
+
+.live-tracker-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.live-tracker-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.live-tracker-row[data-result="card"] { border-color: var(--orange); }
+.live-tracker-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); font-size: var(--font-base); }
+.live-tracker-item, .live-tracker-call { overflow-wrap: anywhere; }
+.live-tracker-event { color: var(--text-dim); }
+.live-tracker-result { margin-left: auto; font-weight: var(--weight-semibold); }
+.live-tracker-result--refused, .live-tracker-result--card,
+.live-tracker-result--unavailable, .live-tracker-result--needs-sign-in,
+.live-tracker-state--unavailable, .live-tracker-state--needs-sign-in { color: var(--orange); }
+.live-tracker-result--would, .live-tracker-result--dismissed { color: var(--text-dim); }
+.live-tracker-problems { margin: 0; padding-left: var(--space-4); font-size: var(--font-sm); color: var(--text-dim); }
+.live-tracker-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.live-tracker-form { display: flex; flex-direction: column; gap: var(--space-2); }
+.live-tracker-signin { color: var(--accent); }

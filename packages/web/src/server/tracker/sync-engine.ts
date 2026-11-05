@@ -22,8 +22,8 @@ import { McpError, type CallToolResult } from "@modelcontextprotocol/sdk/types.j
 import type { SidecarCallProblem } from "../../shared/index.js";
 import { ConnectionUnavailableError, type ConnectionService } from "../connections/connection-service.js";
 import { errorMessage } from "../response-utils.js";
-import { callProblems, resultData } from "../sidecar/external-call.js";
-import { appendTrackerActivity, readTrackerActivity, SETTLED_RESULTS, type TrackerActivityEntry, type TrackerResult } from "./activity-log.js";
+import { callProblems, IDEMPOTENCY_KEY_PROPERTIES, resultData } from "../sidecar/external-call.js";
+import { appendTrackerActivity, pendingCards, readTrackerActivity, SETTLED_RESULTS, type TrackerActivityEntry, type TrackerResult } from "./activity-log.js";
 import { planTrackerEvent, type PlannedCall, type TrackerEventRecord } from "./rules.js";
 import { checkServerProfile, loadServerProfile, type ProfileOptions, type ServerProfile, type TrackerMapping } from "./server-profiles.js";
 import { loadTrackerSync, type TrackerSyncConfig } from "./sync-config.js";
@@ -262,4 +262,59 @@ async function tickOnce(options: TrackerSyncOptions): Promise<TrackerTickResult>
     requeue(projectDir, [...kept, ...pending]);
   }
   return { state: "ran", entries, queued: queuedTrackerEvents(projectDir).length };
+}
+
+export type CardDecision =
+  | { action: "dismiss" }
+  /** `args`: the operator's edited arguments; the call's idempotency key stays as planned. */
+  | { action: "approve"; args: Record<string, unknown> };
+
+export type CardDecisionResult =
+  | { ok: true; entry: TrackerActivityEntry }
+  | { ok: false; status: 409 | 422; error: string };
+
+/** Each project's card decision in progress; the next waits for it. */
+const deciding = new Map<string, Promise<unknown>>();
+
+/**
+ * Decide the waiting card `requestId`: dismiss it, or make its call with the
+ * operator's arguments and record what became of it. The entry written closes
+ * the card, so a second approval finds none. A call that finds the connection
+ * unreachable is logged and leaves the card waiting. Decisions for a project
+ * run one at a time, so a double click makes one call.
+ */
+export function decideTrackerCard(options: TrackerSyncOptions, requestId: string, decision: CardDecision): Promise<CardDecisionResult> {
+  const { projectDir } = options;
+  const prior = deciding.get(projectDir) ?? Promise.resolve();
+  const run = prior.then(() => decideOnce(options, requestId, decision), () => decideOnce(options, requestId, decision));
+  deciding.set(projectDir, run);
+  const forget = () => {
+    if (deciding.get(projectDir) === run) deciding.delete(projectDir);
+  };
+  run.then(forget, forget);
+  return run;
+}
+
+async function decideOnce(options: TrackerSyncOptions, requestId: string, decision: CardDecision): Promise<CardDecisionResult> {
+  const { projectDir, service } = options;
+  const card = pendingCards(readTrackerActivity(projectDir)).find((e) => e.requestId === requestId);
+  if (!card) return { ok: false, status: 409, error: `${requestId} is not a card waiting for a decision` };
+  const now = options.now ?? (() => new Date());
+  const base = { at: now().toISOString(), event: card.event, rexId: card.rexId, rule: card.rule, mode: card.mode, requestId };
+  let entry: TrackerActivityEntry;
+  if (decision.action === "dismiss") {
+    entry = { ...base, call: card.call, result: "dismissed" };
+  } else {
+    const ready = prepare(options);
+    if ("state" in ready) {
+      return { ok: false, status: 422, error: ready.state === "invalid" ? ready.problems.join("; ") : "tracker sync is not configured" };
+    }
+    // The key that makes the call idempotent is the planned one, whatever the form sent.
+    const call: PlannedCall = { tool: card.call.tool, args: { ...decision.args } };
+    for (const key of IDEMPOTENCY_KEY_PROPERTIES) if (key in card.call.args) call.args[key] = card.call.args[key];
+    const outcome = await executeTrackerCall(service, ready.config.connection, ready.mapping, call);
+    entry = { ...base, call, result: outcome.result, ...(outcome.problems && { problems: outcome.problems }) };
+  }
+  appendTrackerActivity(projectDir, entry);
+  return { ok: true, entry };
 }

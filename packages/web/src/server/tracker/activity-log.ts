@@ -12,6 +12,7 @@
  * - `ok`: called and accepted (a create confirmed by a read).
  * - `duplicate`: the tracker had it already, confirmed by a read.
  * - `refused`: the tracker refused it; `problems` lists why. Never retried.
+ * - `dismissed`: the operator dismissed a `card`; nothing was called.
  * - `unavailable` / `needs-sign-in`: the connection could not be used; the
  *   event stays queued for the next tick, with the same arguments, and is
  *   logged again only when its result changes.
@@ -26,11 +27,11 @@ import type { TrackerEvent } from "./server-profiles.js";
 import type { PlannedCall, TrackerRuleKind } from "./rules.js";
 import type { TrackerRuleMode } from "./sync-config.js";
 
-export const TRACKER_RESULTS = ["would", "ok", "duplicate", "refused", "card", "unavailable", "needs-sign-in"] as const;
+export const TRACKER_RESULTS = ["would", "ok", "duplicate", "refused", "card", "dismissed", "unavailable", "needs-sign-in"] as const;
 export type TrackerResult = (typeof TRACKER_RESULTS)[number];
 
 /** Results that settle an event: it is never planned again. */
-export const SETTLED_RESULTS: ReadonlySet<TrackerResult> = new Set(["ok", "duplicate", "refused", "card"]);
+export const SETTLED_RESULTS: ReadonlySet<TrackerResult> = new Set(["ok", "duplicate", "refused", "card", "dismissed"]);
 
 export interface TrackerActivityEntry {
   at: string;
@@ -92,4 +93,19 @@ export function readTrackerActivity(projectDir: string): TrackerActivityEntry[] 
       return [];
     }
   });
+}
+
+/**
+ * The cards still waiting for a person: the request ids whose latest entry
+ * that is not an unreachable connection is a `card`. An approval that found
+ * the connection unreachable leaves its card waiting; any other decision
+ * (a call's result, or `dismissed`) closes it.
+ */
+export function pendingCards(entries: readonly TrackerActivityEntry[]): TrackerActivityEntry[] {
+  const latest = new Map<string, TrackerActivityEntry>();
+  for (const entry of entries) {
+    if (entry.result === "unavailable" || entry.result === "needs-sign-in") continue;
+    latest.set(entry.requestId, entry);
+  }
+  return [...latest.values()].filter((e) => e.result === "card");
 }

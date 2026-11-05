@@ -110,6 +110,56 @@ describe("POST /api/tracker/sync/tick", () => {
   });
 });
 
+describe("tracker cards", () => {
+  const requestId = "ndx:ndx:rex-2:change-captured";
+  const card: TrackerActivityEntry = {
+    at: "2026-11-05T12:00:00.000Z", event: "change-captured", rexId: "rex-2", rule: "create", mode: "on", requestId,
+    call: { tool: "create_work_item", args: { title: "T", requestId } },
+    result: "card",
+  };
+  const decide = (body: object, headers: Record<string, string> = auth) =>
+    fetch(`${server.baseUrl}/api/tracker/cards/decide`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const activity = async () => (await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth })).json();
+
+  it("lists a waiting card, and dismisses it on a browser session", async () => {
+    appendTrackerActivity(root, card);
+    expect((await activity()).cards).toEqual([requestId]);
+
+    const { credential } = credentials.mintSession();
+    const res = await decide({ requestId, action: "dismiss" }, { Authorization: `Bearer ${credential}` });
+    expect(res.status).toBe(200);
+    expect((await res.json()).entry).toMatchObject({ requestId, result: "dismissed" });
+    const after = await activity();
+    expect(after.cards).toEqual([]);
+    expect(after.entries.map((e: TrackerActivityEntry) => e.result)).toEqual(["card", "dismissed"]);
+  });
+
+  it("refuses a decision for no waiting card, a bad body and a missing credential", async () => {
+    expect((await decide({ requestId, action: "dismiss" })).status).toBe(409);
+    appendTrackerActivity(root, card);
+    expect((await decide({ requestId, action: "approve" })).status).toBe(400);
+    expect((await decide({ requestId: "", action: "dismiss" })).status).toBe(400);
+    expect((await decide({ requestId, action: "dismiss" }, {})).status).toBe(401);
+    // A Sidecar session's agent cannot approve its way into the tracker.
+    expect((await decide({ requestId, action: "approve", args: {} }, { [SIDECAR_BROKER_KEY_HEADER]: sidecarBrokerCredential("tracker-test") })).status).toBe(401);
+    expect((await fetch(`${server.baseUrl}/api/tracker/cards/decide`, { headers: auth })).status).toBe(405);
+    expect((await activity()).cards).toEqual([requestId]);
+  });
+
+  it("answers the form only for a waiting card", async () => {
+    const form = (id: string) => fetch(`${server.baseUrl}/api/tracker/cards/form?requestId=${encodeURIComponent(id)}`, { headers: auth });
+    expect((await form(requestId)).status).toBe(409);
+  });
+
+  it("logs an approval that cannot reach the connection and leaves the card waiting", async () => {
+    appendTrackerActivity(root, card);
+    const res = await decide({ requestId, action: "approve", args: { title: "T" } });
+    expect(res.status).toBe(200);
+    expect((await res.json()).entry.result).toMatch(/^(unavailable|needs-sign-in)$/);
+    expect((await activity()).cards).toEqual([requestId]);
+  });
+});
+
 describe("GET /api/tracker/activity", () => {
   it("answers the log as written, and needs a credential", async () => {
     const entry: TrackerActivityEntry = {
@@ -121,7 +171,17 @@ describe("GET /api/tracker/activity", () => {
     appendTrackerActivity(root, entry);
     expect((await fetch(`${server.baseUrl}/api/tracker/activity`)).status).toBe(401);
     const res = await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth });
-    expect(await res.json()).toEqual({ entries: [entry], sources: [] });
+    expect(await res.json()).toEqual({
+      entries: [entry],
+      cards: [],
+      sources: [],
+      connection: { id: "caos", label: "caos", state: "unavailable", reason: expect.any(String) },
+    });
+  });
+
+  it("answers no connection while no trackerSync settings name one", async () => {
+    writeFileSync(join(root, ".n-dx.local.json"), "{}");
+    expect(await (await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth })).json()).toMatchObject({ connection: null });
   });
 
   it("answers why a rule that is on reads nothing, until GitHub reads are turned on", async () => {

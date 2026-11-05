@@ -14,8 +14,8 @@ import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ConnectionConfig } from "../../src/server/connections/connection-config.js";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
-import { readTrackerActivity, trackerActivityPath } from "../../src/server/tracker/activity-log.js";
-import { enqueueTrackerEvent, queuedTrackerEvents, runTrackerSyncTick } from "../../src/server/tracker/sync-engine.js";
+import { pendingCards, readTrackerActivity, trackerActivityPath } from "../../src/server/tracker/activity-log.js";
+import { decideTrackerCard, enqueueTrackerEvent, queuedTrackerEvents, runTrackerSyncTick } from "../../src/server/tracker/sync-engine.js";
 import type { TrackerEventRecord } from "../../src/server/tracker/rules.js";
 import { addCaosTools, type CaosReply } from "../fixtures/connections/fake-mcp-tools.mjs";
 import { startFakeMcpHttpServer, type FakeMcpHttpServer } from "../helpers/fake-mcp-http-server.js";
@@ -162,6 +162,77 @@ describe("cards", () => {
     const { entries } = await tick({ event: "change-captured", rexId: "rex-2", ref: "WM-9" }, { event: "run-started", rexId: "rex-3" });
     expect(entries).toEqual([]);
     expect(toolCalls()).toEqual([]);
+  });
+});
+
+describe("deciding a card", () => {
+  const created: TrackerEventRecord = { event: "change-captured", rexId: "rex-2", values: { title: "Sidecar tracker sync" } };
+  const requestId = "ndx:ndx:rex-2:change-captured";
+  const decide = (decision: Parameters<typeof decideTrackerCard>[2], id = requestId) =>
+    decideTrackerCard({ projectDir: root, service: connect(), now: () => AT, profiles: { ndxHome } }, id, decision);
+
+  it("approves a card once: makes the call with the operator's edits, keeps the request id, and records the result", async () => {
+    settings({ "change-captured": "on" });
+    replies.create_work_item = json({ id: "WM-7" });
+    await tick(created);
+    const decided = await decide({ action: "approve", args: { title: "Edited title", epicId: "e-1", requestId: "forged", initialStatus: "backlog" } });
+    expect(decided).toMatchObject({ ok: true, entry: { result: "ok", requestId, call: { tool: "create_work_item", args: { title: "Edited title", requestId } } } });
+    expect(toolCalls().map((c) => [c.name, c.arguments])).toEqual([
+      ["create_work_item", { title: "Edited title", epicId: "e-1", requestId, initialStatus: "backlog" }],
+      ["get_work_item", { workItemId: "WM-7" }],
+    ]);
+    expect(readTrackerActivity(root).map((e) => e.result)).toEqual(["card", "ok"]);
+
+    // The card is closed: a second approval, or a dismissal, makes no call.
+    expect(await decide({ action: "approve", args: {} })).toMatchObject({ ok: false, status: 409 });
+    expect(await decide({ action: "dismiss" })).toMatchObject({ ok: false, status: 409 });
+    expect(toolCalls()).toHaveLength(2);
+  });
+
+  it("makes one call for two approvals sent together", async () => {
+    settings({ "change-captured": "on" });
+    replies.create_work_item = json({ id: "WM-7" });
+    await tick(created);
+    const args = { title: "T", epicId: "e-1" };
+    const results = await Promise.all([decide({ action: "approve", args }), decide({ action: "approve", args })]);
+    expect(results.map((r) => r.ok).sort()).toEqual([false, true]);
+    expect(toolCalls().filter((c) => c.name === "create_work_item")).toHaveLength(1);
+  });
+
+  it("records a refusal with its problems, and the card is closed", async () => {
+    settings({ "change-captured": "on" });
+    replies.create_work_item = () => ({ isError: true, content: [{ type: "text", text: JSON.stringify({ error: "validation_failed", problems: [{ field: "title", message: "too long" }] }) }] });
+    await tick(created);
+    expect(await decide({ action: "approve", args: { title: "T", epicId: "e-1" } })).toMatchObject({
+      ok: true,
+      entry: { result: "refused", problems: [{ field: "title", message: "too long" }] },
+    });
+    expect(await decide({ action: "dismiss" })).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("dismisses a card without a call and records it dismissed", async () => {
+    settings({ "change-captured": "on" });
+    await tick(created);
+    expect(await decide({ action: "dismiss" })).toMatchObject({ ok: true, entry: { result: "dismissed", requestId } });
+    expect(toolCalls()).toEqual([]);
+    expect(readTrackerActivity(root).map((e) => e.result)).toEqual(["card", "dismissed"]);
+    // A tick that sees the event again plans nothing for it.
+    expect((await tick(created)).entries).toEqual([]);
+  });
+
+  it("refuses a request id that is no card", async () => {
+    settings({ "run-started": "dry-run" });
+    await tick(runStarted);
+    expect(await decide({ action: "dismiss" }, "ndx:ndx:rex-1:run-started")).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("leaves the card waiting when the connection cannot be reached", async () => {
+    settings({ "change-captured": "on" });
+    await tick(created);
+    await fake.close();
+    const decided = await decide({ action: "approve", args: { title: "T", epicId: "e-1" } });
+    expect(decided).toMatchObject({ ok: true, entry: { result: expect.stringMatching(/^(unavailable|needs-sign-in)$/) } });
+    expect(pendingCards(readTrackerActivity(root)).map((e) => e.requestId)).toEqual([requestId]);
   });
 });
 
