@@ -20,9 +20,9 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "16f0fc5c-2ffb-4b10-8ac6-c3ef21a72464":
     startedAt: "2026-11-05T05:51:58.974Z"
-    activeIntervals: [{"end":"2026-11-05T06:10:11.740Z","start":"2026-11-05T05:51:58.974Z"}]
+    activeIntervals: [{"end":"2026-11-05T06:10:11.740Z","start":"2026-11-05T05:51:58.974Z"},{"end":"2026-11-05T06:35:56.954Z","start":"2026-11-05T06:34:51.295Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (54):\n- renders Token Usage from direct canonical /token-usage navigation\n- redirects legacy Rex token links to canonical global /token-usage\n- renders health panel after fetch resolves\n- displays health level badge\n- shows degraded health level\n- shows unhealthy health level\n- displays active connection count\n- renders connection bar when peak > 0\n… and 46 more"
-    lastModified: "2026-11-05T06:10:14.187Z"
+    lastModified: "2026-11-05T06:35:57.559Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2cce9d4d-2f92-4c74-86bc-d319cb9409da":
     lastModified: "2026-11-05T01:53:01.278Z"
