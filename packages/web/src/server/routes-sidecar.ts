@@ -89,7 +89,8 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
-import { readPlacementCall, readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
+import { readLinkCall, writeLinkCard } from "./tracker/link-card.js";
+import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
 import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
@@ -477,6 +478,14 @@ export function sidecarActions(
     },
     writePlacement(placement, sessionId) {
       return writePlacementCard(ctx, placement, sessionId, broadcast);
+    },
+    checkLink(input) {
+      return readLinkCall(ctx, input);
+    },
+    async writeLink(link) {
+      const written = await writeLinkCard(ctx, link);
+      if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      return written;
     },
     async startWork(taskId, options) {
       const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);

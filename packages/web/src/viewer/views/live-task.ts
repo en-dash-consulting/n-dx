@@ -34,7 +34,7 @@ import {
   type LiveTaskSnapshot,
   type RunEventLine,
 } from "../hooks/index.js";
-import { WorkspaceWriteStrip } from "../components/index.js";
+import { TrackerLinkList, WorkspaceWriteStrip, useTrackerLabel } from "../components/index.js";
 import { CRITERIA_LABEL } from "../external.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
@@ -302,10 +302,14 @@ function Section({ id, title, children }: { id: string; title: string; children?
 
 function TaskSection({ snapshot }: { snapshot: LiveTaskSnapshot }) {
   const task = snapshot.task;
+  const trackerLabel = useTrackerLabel();
   if (!task) return h(Section, { id: "lt-task-h", title: "Task" }, h("p", { class: "live-muted" }, "This worktree's PRD does not have this task."));
   const criteria = criteriaRows(task);
   return h(Section, { id: "lt-task-h", title: "Task" },
     task.description ? h("p", { class: "live-task-desc" }, task.description) : null,
+    task.links.length > 0
+      ? h("p", { class: "live-task-tracker" }, h("span", { class: "live-muted" }, "Tracker "), h(TrackerLinkList, { refs: task.links, label: trackerLabel }))
+      : null,
     criteria.length > 0
       ? h("ul", { class: "live-criteria", "aria-label": CRITERIA_LABEL.work }, criteria.map((c, i) =>
         h("li", { key: i, class: `live-criterion live-criterion-${c.met ? "met" : "open"}` },

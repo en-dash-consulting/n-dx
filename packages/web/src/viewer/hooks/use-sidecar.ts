@@ -103,6 +103,7 @@ export type SidecarCardKind =
   | "run-plan"
   | "placement"
   | "edit"
+  | "link"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -146,6 +147,9 @@ export interface SidecarPlacement {
   check: SidecarPlacementCheck;
 }
 
+/** A link card's item, tracker ref and the tracker's label; mirrors `SidecarLink` in shared/sidecar-card.ts. */
+export interface SidecarLink { itemId: string; title: string; ref: string; label: string | null }
+
 /** One choice of an external-call card's picker; mirrors `SidecarFieldOption` in shared/sidecar-card.ts. */
 export interface SidecarFieldOption { value: string | number | boolean; label: string }
 
@@ -179,6 +183,8 @@ export interface SidecarCard {
   runPlan?: QueuePlan;
   /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
   placement?: SidecarPlacement;
+  /** A link card's item and tracker ref as approval writes them. */
+  link?: SidecarLink;
   /** An external-call card's connection, workspace host, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */

@@ -15,6 +15,7 @@ import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
+import { TrackerLinksEditor } from "../tracker-links.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
@@ -69,6 +70,9 @@ const PRIORITY_OPTIONS: Array<{ value: Priority; label: string }> = [
   { value: "medium", label: "Medium" },
   { value: "low", label: "Low" },
 ];
+
+/** The items that link to a tracker work item: work, never the product layer. */
+const LINKABLE_TYPES: ReadonlySet<string> = new Set(["change", "epic", "feature", "task", "subtask"]);
 
 // Type labels come from itemTypeLabel() in shared/item-type.ts, via external.ts.
 
@@ -1402,6 +1406,16 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       h("div", { class: "task-section-label" }, "Tags"),
       h(TagEditor, { tags: item.tags ?? [], onUpdate: handleTagsUpdate }),
     ),
+
+    // Tracker links: the item's work refs, with Link and Unlink on a task or change
+    LINKABLE_TYPES.has(itemType)
+      ? h(
+          "div",
+          { class: "task-section", "data-section": "tracker-links" },
+          h("div", { class: "task-section-label" }, "Tracker"),
+          h(TrackerLinksEditor, { itemId: item.id, refreshKey: item, onChanged: onPrdChanged }),
+        )
+      : null,
 
     // Requirements
     h(

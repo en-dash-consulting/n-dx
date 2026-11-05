@@ -24,7 +24,7 @@
  */
 
 import { laneSteps, stepRunOptions } from "../../shared/index.js";
-import type { QueuePlan, SidecarChangeSet, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet, SidecarLink, SidecarPlacement } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
 
@@ -51,6 +51,10 @@ export interface SidecarActions {
   checkPlacement(input: Record<string, unknown>): Promise<SidecarPlacement | string>;
   /** An approved placement card's write through rex's rule, under the PRD lock. Never throws; a refusal names rex's kind. */
   writePlacement(placement: SidecarPlacement, sessionId: string): Promise<CarryOutResult>;
+  /** A link call read against the PRD for its card, or why no card can be raised. Writes nothing. */
+  checkLink(input: Record<string, unknown>): Promise<SidecarLink | string>;
+  /** An approved link card's write: the ref onto the item's issues (v2) or links (v1). Never throws. */
+  writeLink(link: SidecarLink): Promise<CarryOutResult>;
   /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
   /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
@@ -172,6 +176,11 @@ async function carryOut(
       // The card's placement, read and dry-run when it was raised; never the raw input.
       if (!card?.placement) return { ok: false, text: "A placement is written only from its approved card; nothing was written." };
       return actions.writePlacement(card.placement, card.sessionId);
+    }
+    case "propose_link": {
+      // The card's link, read when it was raised; never the raw input.
+      if (!card?.link) return { ok: false, text: "A link is written only from its approved card; nothing was written." };
+      return actions.writeLink(card.link);
     }
     case "github_read": {
       const read = githubReadOf(input);

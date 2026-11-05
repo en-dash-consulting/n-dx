@@ -1291,6 +1291,8 @@ describe("permission cards", () => {
     "run-plan": { tool: "propose_run_plan", input: { note: "two lanes" }, title: "propose_run_plan" },
     placement: { tool: "place_change_card", input: { change: "CH-212", target: "A3.2", relation: "amends" }, title: "CH-212 → A3.2" },
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
+    // Without its link (a card from before the link was read) the title is the call's own.
+    link: { tool: "propose_link", input: { itemId: "t1", ref: "WM-2054" }, title: "t1 → WM-2054" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },
@@ -1301,6 +1303,25 @@ describe("permission cards", () => {
       title: "docs.update_item · write",
     },
   };
+  it("draws a link card from the link the server read: the item, the tracker's label and the ref", async () => {
+    const host = document.createElement("div");
+    await act(async () => {
+      render(h(SidecarCards, {
+        cards: [card("l", 1, {
+          kind: "link", tool: "propose_link", input: { itemId: "t1", ref: "https://tracker.example/items/9" },
+          link: { itemId: "t1", title: "Write the cache", ref: "https://tracker.example/items/9", label: "CAOS" },
+        })],
+        manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
+        decide: vi.fn(async () => true),
+      }), host);
+    });
+    expect(host.querySelector(".sidecar-card-title")?.textContent).toBe("t1 → CAOS tracker.example");
+    expect(host.querySelector(".sidecar-link-item")?.textContent).toBe("t1 Write the cache");
+    expect(host.querySelector(".sidecar-link-ref a")?.getAttribute("href")).toBe("https://tracker.example/items/9");
+    // A link is never allow-listed, so there is nothing to remember.
+    expect(host.querySelector(".sidecar-card-always")).toBeNull();
+  });
+
   it("titles a work card from the run options the server attached, not the call's own", async () => {
     const titleOf = async (input: Record<string, unknown>, runOptions: Record<string, unknown>): Promise<string> => {
       const host = document.createElement("div");

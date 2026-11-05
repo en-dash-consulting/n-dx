@@ -43,6 +43,7 @@ function snapshot(over: Partial<LiveTaskSnapshot> = {}): LiveTaskSnapshot {
     task: {
       id: "t1", title: "Fix the thing", description: "Do it well", status: "completed", priority: "high",
       acceptanceCriteria: ["first"],
+      links: [],
       epicChain: [{ id: "e", title: "Epic", itemType: "epic" }, { id: "f", title: "Feature", itemType: "feature" }],
     },
     runs: [run()],

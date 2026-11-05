@@ -119,6 +119,8 @@ export { TopNav } from "./top-nav.js";
 export type { TopNavProps } from "./top-nav.js";
 export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
+export { TrackerLinkList, TrackerLinksEditor, resetTrackerLabel, useTrackerLabel } from "./tracker-links.js";
+export type { TrackerLinksEditorProps } from "./tracker-links.js";
 export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
 export { StrengthChip } from "./strength-chip.js";

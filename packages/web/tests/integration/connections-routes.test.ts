@@ -78,6 +78,20 @@ describe("connections routes", () => {
     expect((await fetch(`${server.baseUrl}/api/connections`, { headers: { "X-Ndx-Token": "nope" } })).status).toBe(401);
   });
 
+  it("answer the tracker's label from the profile of the connection that maps a tracker, or null", async () => {
+    const label = async () => (await (await fetch(`${server.baseUrl}/api/connections/tracker`, { headers: auth })).json()).label;
+    expect(await label()).toBeNull();
+
+    await service.close();
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({
+      connections: { plain: { transport: "http", url: fake.mcp.url, auth: "none", profile: "caos" } },
+    }));
+    service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {} });
+    expect(await label()).toBe("CAOS");
+    expect((await fetch(`${server.baseUrl}/api/connections/tracker`, { method: "POST", headers: auth })).status).toBe(405);
+    expect((await fetch(`${server.baseUrl}/api/connections/tracker`)).status).toBe(401);
+  });
+
   it("are off with web.sidecar", async () => {
     writeConfig(false);
     const res = await fetch(`${server.baseUrl}/api/connections`, { headers: auth });

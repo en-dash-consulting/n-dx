@@ -7,7 +7,9 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, readJsonObject, errorMessage } from "../response-utils.js";
+import { changeItemLink, type LinkAction } from "../tracker/item-links.js";
+import { itemLinkRefs, type LinkFields } from "../tracker/link-refs.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, updateInTree,
@@ -75,6 +77,23 @@ export function routeItems(
     // GET /api/rex/items/:id/index-md — index.md content (new schema sections)
     if (path === `items/${itemId}/index-md` && method === "GET") {
       return getIndexMarkdown(res, ctx, itemId);
+    }
+
+    // GET /api/rex/items/:id/links — the tracker refs the item links to (v2 issues, v1 links)
+    if (path === `items/${itemId}/links` && method === "GET") {
+      const doc = loadPRDSync(ctx.rexDir);
+      const item = doc ? findItemById(doc.items, itemId) : null;
+      if (!item) {
+        errorResponse(res, 404, `Item "${itemId}" not found`);
+        return true;
+      }
+      jsonResponse(res, 200, { refs: itemLinkRefs(item as LinkFields) });
+      return true;
+    }
+
+    // POST / DELETE /api/rex/items/:id/links { ref } — link the item to a tracker work item, or unlink it
+    if (path === `items/${itemId}/links` && (method === "POST" || method === "DELETE")) {
+      return handleItemLink(req, res, ctx, itemId, method === "POST" ? "link" : "unlink", broadcast);
     }
 
     // Requirements sub-routes: /api/rex/items/:id/requirements[/:reqId]
@@ -284,6 +303,38 @@ async function handleItemPatch(
       errorResponse(res, 400, message);
     }
   }
+  return true;
+}
+
+/** Handle POST / DELETE /api/rex/items/:id/links — the item's link to a tracker work item. */
+async function handleItemLink(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  itemId: string,
+  action: LinkAction,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const body = await readJsonObject(req, res);
+  if (typeof body === "string") {
+    errorResponse(res, 400, body);
+    return true;
+  }
+  const result = await changeItemLink(ctx.rexDir, itemId, body.ref, action);
+  if (!result.ok) {
+    errorResponse(res, result.status, result.error);
+    return true;
+  }
+  if (result.changed) {
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "item_edited",
+      itemId,
+      detail: `${action === "link" ? "Linked" : "Unlinked"} "${result.title}" ${action === "link" ? "to" : "from"} ${String(body.ref).trim()} (via web)`,
+    });
+    broadcast?.({ type: "rex:item-updated", itemId, updates: { links: result.refs }, timestamp: new Date().toISOString() });
+  }
+  jsonResponse(res, 200, { ok: true, changed: result.changed, refs: result.refs });
   return true;
 }
 

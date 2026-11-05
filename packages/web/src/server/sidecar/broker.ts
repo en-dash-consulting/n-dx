@@ -30,7 +30,7 @@ import {
   type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarLink, SidecarPlacement } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
 import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
 import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
@@ -57,6 +57,8 @@ export interface SidecarCard {
   runPlan?: QueuePlan;
   /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
   placement?: SidecarPlacement;
+  /** A link card's item, work ref and tracker label as approval writes them, read when the card was raised. */
+  link?: SidecarLink;
   /** An external-call card's connection, workspace, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator chose to start on a run-plan card. */
@@ -85,6 +87,7 @@ export interface CardAnnex {
   changeSet?: SidecarChangeSet;
   runPlan?: QueuePlan;
   placement?: SidecarPlacement;
+  link?: SidecarLink;
   externalCall?: SidecarExternalCall;
 }
 
@@ -220,6 +223,7 @@ export class SidecarBroker {
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
       ...(annex.placement !== undefined && { placement: annex.placement }),
+      ...(annex.link !== undefined && { link: annex.link }),
       ...(annex.externalCall !== undefined && { externalCall: annex.externalCall }),
       status: "pending",
       raisedAt: this.iso(),

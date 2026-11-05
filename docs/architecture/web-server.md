@@ -258,7 +258,7 @@ with the token. That page holds only static paths; everything else there is 401.
 The hub session's broker is scoped (`BROKER_SCOPE_TOOLS` in
 `sidecar/broker-policy.ts`): it is offered `run_command`, `draft_github_post`,
 `save_draft` and `ledger_append`, and never `start_work`, `propose_edit`,
-`propose_prd_change`, `place_change_card` or `migration_decision`. Calls name a
+`propose_prd_change`, `place_change_card`, `propose_link` or `migration_decision`. Calls name a
 `project`, resolved to its repository root through the hub's overview
 (`sidecar/hub-actions.ts`), never from a path the agent gives.
 

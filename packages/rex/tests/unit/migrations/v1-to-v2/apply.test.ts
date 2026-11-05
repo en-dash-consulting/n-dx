@@ -187,6 +187,34 @@ describe("buildV2Tree", () => {
     }
   });
 
+  it("carries a v1 item's links[] into v2 issues, keeping what is not a work ref in links", async () => {
+    const linked = TREE.map((top) => top.id !== "e1" ? top : {
+      ...top,
+      children: top.children!.map((f) => f.id !== "f4" ? f : {
+        ...f,
+        children: [
+          item("t4", "task", "Evict entries", [], {
+            status: "pending",
+            links: [
+              { system: "jira", workItemId: "WM-2054" },
+              { system: "notion", workItemId: "a1b2c3", url: "https://notion.so/a1b2c3" },
+              { system: "jira", workItemId: "WM-2054", url: "https://jira.example/browse/WM-2054" },
+              { system: "asana", workItemId: "opaque id" },
+            ],
+          }),
+          item("t5", "task", "Evict on timer", [], { status: "pending", links: [{ system: "jira", workItemId: "WM-77" }] }),
+        ],
+      }),
+    });
+    const { tree } = buildV2Tree(linked, await planOf(linked));
+    // A link becomes its URL when it has one, else its key; a repeat is dropped.
+    expect(byId(tree, "t4")!.issues).toEqual(["WM-2054", "https://notion.so/a1b2c3", "https://jira.example/browse/WM-2054"]);
+    // An id no tracker key or URL can hold stays where v1 put it.
+    expect(byId(tree, "t4")!.links).toEqual([{ system: "asana", workItemId: "opaque id" }]);
+    expect(byId(tree, "t5")!.issues).toEqual(["WM-77"]);
+    expect(byId(tree, "t5")!.links).toBeUndefined();
+  });
+
   it("stamps a release umbrella's plannedRelease and keeps a review-sourced epic as an area", async () => {
     const { tree } = buildV2Tree(TREE, await planOf(TREE));
     expect(byId(tree, "f5")!.plannedRelease).toBe("0.9.0");

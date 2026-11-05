@@ -131,6 +131,17 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     description: "Propose a source edit as a unified diff. Always waits for the operator's edit card.",
     input: { path: z.string().min(1), diff: z.string().min(1) },
   },
+  propose_link: {
+    description: [
+      "Propose linking a PRD item to a tracker work item. Always waits for the operator's link card, which shows the item and the ref; the ref is written only on Approve, and never allow-listed.",
+      "`ref` is a tracker key (WM-2054) or the work item's http(s) URL. On a v2 PRD it is added to the item's issues, on a v1 PRD to its links.",
+      "Refused with no card when the item does not exist, the ref is neither a key nor a URL, or the item already links to it.",
+    ].join(" "),
+    input: {
+      itemId: z.string().min(1).describe("The change, task or subtask to link"),
+      ref: z.string().min(1).describe("A tracker key or the tracker item's URL"),
+    },
+  },
   github_read: {
     description: [
       "Read from GitHub with gh. `pr`: the PR of the worktree the workspace key `ref` names, its checks, each failing check's class and log tail; it reads nothing while the git.branchHealth feature is off.",
@@ -362,6 +373,13 @@ export function createBrokerMcpServer(
         const placement = await actions.checkPlacement(input);
         if (typeof placement === "string") return text(`No card was raised: ${placement}. Nothing was written.`, true);
         annex.placement = placement;
+      }
+      // A link card shows the item and ref read against the PRD; a call that cannot be written raises none.
+      if (name === "propose_link") {
+        if (!actions) return text("No card was raised: this server cannot read the PRD. Nothing was written.", true);
+        const link = await actions.checkLink(input);
+        if (typeof link === "string") return text(`No card was raised: ${link}. Nothing was written.`, true);
+        annex.link = link;
       }
       // A run-plan card lists the planner's own lanes; with no plan, or no lane, no card is raised.
       if (name === "propose_run_plan") {

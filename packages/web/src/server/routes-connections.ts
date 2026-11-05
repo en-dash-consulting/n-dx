@@ -2,7 +2,8 @@
  * The operator's connections (connections/), for Settings > Project:
  *
  *   GET  /api/connections                    each connection and its state, and the config file's name
- *   POST /api/connections/:id/oauth/start    { redirectUrl } -> { authorizationUrl }
+ *   GET  /api/connections/tracker            -> { label } the tracker's name from its profile, or null
+ *   POST /api/connections/:id/oauth/start   { redirectUrl } -> { authorizationUrl }
  *   POST /api/connections/:id/oauth/finish   { code, state } -> { connection }
  *   POST /api/connections/:id/sign-out       -> { connection }
  *
@@ -26,11 +27,15 @@ import { workspaceConnectionService, type ConnectionInfo, type ConnectionService
 import { ConnectionSignInError } from "./connections/oauth-provider.js";
 import { errorMessage, errorResponse, jsonResponse, readJsonObject } from "./response-utils.js";
 import { resolveServerProfile } from "./tracker/server-profiles.js";
+import { trackerLabel } from "./tracker/tracker-label.js";
 import type { ServerContext } from "./types.js";
 
 export const CONNECTIONS_PREFIX = "/api/connections";
 
-const ACTION_PATH = /^\/api\/connections\/([^/]+)\/(oauth\/start|oauth\/finish|sign-out)$/;
+/** `GET` -> `{ label }`: the tracker's name from its profile, for the links an item shows. */
+const TRACKER_PATH = `${CONNECTIONS_PREFIX}/tracker`;
+
+const ACTION_PATH =/^\/api\/connections\/([^/]+)\/(oauth\/start|oauth\/finish|sign-out)$/;
 
 /** Hostnames a sign-in may return to: the dashboard is served on loopback only. */
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -121,6 +126,13 @@ export async function handleConnectionsRoute(
       // The file connections are declared in, for the page to name.
       configFile: basename(resolveLayout(ctx.projectDir).localConfigFile),
     });
+    return true;
+  }
+
+  if (pathname === TRACKER_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const connections = await service.listConnections();
+    jsonResponse(res, 200, { label: trackerLabel(connections.map((info) => service.callContext(info.id)?.profile)) });
     return true;
   }
 

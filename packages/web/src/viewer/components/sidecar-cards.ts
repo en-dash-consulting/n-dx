@@ -40,6 +40,7 @@ import { useCliName } from "../hooks/sidecar.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/sidecar.js";
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
 import { CopyTextButton } from "./copy-text-button.js";
+import { linkHref, linkText } from "./tracker-links.js";
 import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
 import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "./sidecar-external-call.js";
 
@@ -53,6 +54,7 @@ export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>>
   "run-plan": "Run plan",
   placement: "Placement",
   edit: "Edit",
+  link: "Link",
   "network-read": "Network read",
   "draft-post": "Draft post",
   "draft-file": "Draft file",
@@ -103,6 +105,9 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       case "placement":
         return card.placement ? placementTitle(card.placement) : str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
       case "edit": return str(input.path);
+      // The card's own link, as approval will write it; the call's input only when the card carries none.
+      case "link":
+        return card.link ? `${card.link.itemId} → ${linkText(card.link.ref, card.link.label)}` : [str(input.itemId), str(input.ref)].filter(Boolean).join(" → ");
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
       case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
       case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
@@ -400,6 +405,22 @@ function DraftFileBody({ card, editable, path, onPath }: { card: SidecarCard; ed
   );
 }
 
+/** A link card's body: the item, the tracker ref as the tracker's label reads it, and where approval writes it. */
+function LinkBody({ link, written }: { link: NonNullable<SidecarCard["link"]>; written: SidecarCard["carriedOut"] }) {
+  const href = linkHref(link.ref);
+  return h("div", { class: "sidecar-link" },
+    h("p", { class: "sidecar-link-item" }, h("strong", null, link.itemId), " ", link.title),
+    h("p", { class: "sidecar-link-ref" }, "Link to ",
+      href
+        ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, linkText(link.ref, link.label))
+        : h("span", null, linkText(link.ref, link.label)),
+    ),
+    h("p", { class: "sidecar-link-note" }, written
+      ? (written.ok ? "Written to the item." : "Nothing was written.")
+      : "Approve writes the ref to the item; Deny writes nothing."),
+  );
+}
+
 /** A network-read card's body: the host and what would be read. */
 function NetworkReadBody({ card }: { card: SidecarCard }) {
   const { kind, ref, base } = card.input;
@@ -516,6 +537,11 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
     : card.placement
       ? [
           h(PlacementBody, { card, editable, onEdit: onPlacementEdit, edit: placementEdit }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
+    : card.link
+      ? [
+          h(LinkBody, { link: card.link, written: card.carriedOut }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
     : card.runPlan

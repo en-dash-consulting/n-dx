@@ -348,6 +348,8 @@
   border-radius: 4px;
   font-size: 11px;
 }
+.sidecar-link p { margin: 0 0 4px; font-size: 12px; overflow-wrap: anywhere; }
+.sidecar-link-note { color: var(--text-muted); }
 .sidecar-card-details summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
 
 /* Change-set card (story 11) */

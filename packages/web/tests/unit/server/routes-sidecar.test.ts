@@ -128,6 +128,8 @@ const noEffects: SidecarActions = {
   writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
   checkPlacement: async () => "this test places nothing",
   writePlacement: async () => ({ ok: true, text: "Placed it.", ids: ["x"] }),
+  checkLink: async () => "this test links nothing",
+  writeLink: async () => ({ ok: true, text: "Linked it.", ids: ["x"] }),
   readRunPlan: async () => "this test plans nothing",
   githubReadsAllowed: () => false,
   branchHealthEnabled: () => true,
@@ -565,7 +567,7 @@ describe("broker", () => {
     return (result.content as Array<{ text: string }>)[0].text;
   }
 
-  it("serves the ten broker tools while a turn runs, and refuses with no turn running", async () => {
+  it("serves the eleven broker tools while a turn runs, and refuses with no turn running", async () => {
     const idle = await createSession();
     const refused = await fetch(`${server.baseUrl}/api/sidecar/sessions/${idle}/mcp`, {
       method: "POST",
@@ -579,7 +581,7 @@ describe("broker", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
-      "propose_edit", "propose_prd_change", "propose_run_plan", "run_command", "start_work",
+      "propose_edit", "propose_link", "propose_prd_change", "propose_run_plan", "run_command", "start_work",
     ]);
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });

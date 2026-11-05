@@ -23,6 +23,7 @@ export const BROKER_TOOL_NAMES = [
   "propose_run_plan",
   "place_change_card",
   "propose_edit",
+  "propose_link",
   "github_read",
   "draft_github_post",
   "migration_decision",
@@ -50,6 +51,7 @@ export type SidecarCardKind =
   | "run-plan"
   | "placement"
   | "edit"
+  | "link"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -82,6 +84,8 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerCardTool, BrokerToolPolic
   propose_run_plan: { card: "run-plan", allowList: "never" },
   place_change_card: { card: "placement", allowList: "never" },
   propose_edit: { card: "edit", allowList: "never" },
+  // A link changes what the tracker and the PRD say about each other: decided card by card, like a PRD write.
+  propose_link: { card: "link", allowList: "never" },
   github_read: { card: "network-read", allowList: "per-project" },
   draft_github_post: { card: "draft-post", allowList: "never" },
   migration_decision: { card: "migration-decision", allowList: "never" },

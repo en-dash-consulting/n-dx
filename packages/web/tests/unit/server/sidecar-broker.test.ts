@@ -49,6 +49,7 @@ const SAMPLE: Record<Exclude<BrokerToolName, "ledger_append">, Record<string, un
   propose_run_plan: {},
   place_change_card: { change: "c", target: "cap", relation: "realizes" },
   propose_edit: { path: "a.ts", diff: "-a\n+b" },
+  propose_link: { itemId: "t1", ref: "WM-2054" },
   github_read: { kind: "pr", ref: "1" },
   draft_github_post: { kind: "comment", target: "1", body: "hi" },
   migration_decision: { entries: [{ id: "x" }] },
@@ -64,9 +65,9 @@ async function isPending(p: Promise<unknown>): Promise<boolean> {
 }
 
 describe("allow-listability", () => {
-  const NEVER = ["start_work", "propose_prd_change", "propose_run_plan", "place_change_card", "propose_edit", "draft_github_post", "migration_decision", "save_draft"] as const;
+  const NEVER = ["start_work", "propose_prd_change", "propose_run_plan", "place_change_card", "propose_edit", "propose_link", "draft_github_post", "migration_decision", "save_draft"] as const;
 
-  it("never allow-lists work, edits, PRD writes, placements, migration decisions or posts", () => {
+  it("never allow-lists work, edits, PRD writes, placements, links, migration decisions or posts", () => {
     for (const tool of NEVER) {
       expect(BROKER_TOOL_POLICY[tool].allowList).toBe("never");
       expect(allowListKey(tool, SAMPLE[tool])).toBeNull();

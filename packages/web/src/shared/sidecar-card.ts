@@ -86,6 +86,15 @@ export interface SidecarPlacement {
   check: SidecarPlacementCheck;
 }
 
+/** A link card: an item, the tracker work ref approval writes to it, and the tracker's label from its profile. */
+export interface SidecarLink {
+  itemId: string;
+  title: string;
+  ref: string;
+  /** The tracker's label ("CAOS"); null while no connection names a tracker profile. */
+  label: string | null;
+}
+
 /** The operator's edit of one item, sent with the approval. */
 export interface SidecarChangeSetEdit {
   index: number;

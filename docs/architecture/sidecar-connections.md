@@ -67,6 +67,28 @@ covers every event with a status the server accepts. Otherwise
 each gap, its hints are not used, and the connection works attended as one
 without a profile: reads run and writes raise the plain form card.
 
+## Tracker links
+
+An item links to a tracker work item by one work ref, a tracker key
+(`WM-2054`) or an http(s) URL, the shapes rex's `isWorkRef` accepts. A v2 item
+holds it in `issues`, a v1 item in `links[]` (`{ system: "tracker",
+workItemId, url? }`); the v1 to v2 migration moves each `links[]` entry that is
+a work ref into `issues` and keeps any other (an opaque page id) in `links`.
+`server/tracker/link-refs.ts` is the one reader of either shape and
+`item-links.ts` the one write, under the PRD lock, so rex gains no export.
+
+- **Dashboard.** `GET`, `POST` and `DELETE /api/rex/items/:id/links` (`POST` and
+  `DELETE` take `{ ref }`) serve Link and Unlink on a task or change's detail
+  panel. The Live task page shows the same refs. A ref reads with the tracker's
+  label, the `label` of the profile of the first connection whose profile maps
+  a tracker (`GET /api/connections/tracker`), and as its key or host while none
+  does.
+- **Sidecar.** `propose_link { itemId, ref }` raises a link card, never
+  allow-listed, from a worktree session only. The card shows the item and the
+  ref as read when it was raised and writes only on Approve, from its own
+  link. A call naming no item, a bad ref, or a ref the item already has raises
+  no card.
+
 ## Tool class and policy
 
 `tool-policy.ts` (pure) gives each listed tool a class and a policy, and the
