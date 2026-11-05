@@ -13,7 +13,7 @@ const VIEWER_DIR = join(import.meta.dirname!, "..", "..", "..", "src", "viewer")
 const VIEWS_DIR = join(VIEWER_DIR, "views");
 const BARREL = join(VIEWER_DIR, "components", "index.ts");
 
-const PANELS = ["ConcurrencyPanel", "MemoryPanel", "WsHealthPanel", "ThrottleControlsPanel"];
+const PANELS = ["WsHealthPanel", "ThrottleControlsPanel"];
 
 function collectTsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
