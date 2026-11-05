@@ -127,14 +127,19 @@ checkout is what gives its graph the history.
 ### Where the projection's names differ from rex's
 
 An agent reads the same graph over `graview mcp` and over rex's MCP tools, so
-every name the projection uses that rex does not is listed here.
-`tests/unit/document.test.ts` fails when the declaration gains a kind or a
-relation rex does not have and this table does not name it.
+every kind and relation the projection names differently from rex is listed
+here. `tests/unit/document.test.ts` fails when the declaration gains a kind
+or a relation rex does not have and the table's first column does not name
+it. Fields are not covered by the test; the ones whose names differ are
+`inbox` (rex's `needsPlacement`), `appliesToAll` (`appliesTo: "all"`),
+`changeKind` (`deriveChangeKind`), `intentStatus` (`computeProductStatus`),
+`reviewed` (a capability with a `reviewedHash`) and `level` on a change (the
+v1 level it was read from).
 
 | Projection | Rex | Why |
 |---|---|---|
 | `task` with `level: "subtask"` | `subtask` node type | One kind of work reads better in Graview's places; a subtask is a smaller task |
-| `under` | the folder tree's parent (rex v2 says *part of*) | One relation for every containment, in both layers and between zones |
+| `under` | a node's parent: the folder nesting, `get_item`'s `parentChain`, and an added amendment's `under` | One relation for every containment, in both layers and between zones |
 | `release` | `plannedRelease` and `shippedIn` fields on a change | A release is a place work gathers; Graview draws it as a record |
 | `plannedFor`, `shippedWith` | the same two fields | The fields as relations to the `release` records |
 | `zone`, `component`, `file` | none (sourcevision's output) | Where the work lives in code |
@@ -142,9 +147,9 @@ relation rex does not have and this table does not name it.
 | `inZone`, `crosses` | none (sourcevision) | A component's or file's zone; imports between zones |
 | `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` | A run's task and its commits |
 | `landedFor` | the `N-DX-Item` trailer | A commit's work |
-| `realizes`, `realizedIn` | `computeRealizedBy` (wider here: touches and run commits count) | Where a capability lives in code |
-| `changed`, `livesIn` | none (git's file lists) | A commit's files, and a capability's |
-| `blockedBy`, `ranFor`, `landedFor` reaching a capability or area | a v1 feature or epic id | On a v1 tree's proposed layer, the work named an item the plan turned into a product node |
+| `realizes`, `realizedIn`, `livesIn` | `computeRealizedBy`'s `commits`, `zones` and `files` (wider here: touches and run commits count) | Where a capability lives in code |
+| `changed` | none (git's file lists) | A commit's files |
+| `ranFor`, `landedFor` reaching a capability, constraint or area | a v1 feature or epic id | A run record or trailer named an item the migration turned into a product node, whether the plan only proposes it or has applied it; rex keeps no such edge. A `blockedBy` naming one is left out, as rex requires a change or task |
 
 `packages/graview/src/document.ts` holds the two mapping tables
 (`NODE_KINDS`, `PRODUCT_EDGE_SOURCES`) and `tests/unit/document.test.ts` fails

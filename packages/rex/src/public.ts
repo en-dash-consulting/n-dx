@@ -73,10 +73,11 @@ export type { PRDStore, SaveFileReport } from "./store/contracts.js";
 export { takeSaveFileReport } from "./store/contracts.js";
 
 // ---- Store: the PRD model (product + change layers) --------------------------
-// EXPERIMENTAL, from here to the migrations section's end: the v2 model, its
-// index, the derived product computations and the migration plan's rules stage
-// are public while the v2 migration (M1–M9, PR 23's apply) is still open, so
-// their shapes may change in a patch release. docs/packages/rex.md says so.
+// EXPERIMENTAL, from here to the migrations section's end: these helpers are
+// outside the declared freeze (docs/architecture/public-surface.md, "Rex
+// TypeScript helpers"), so their shapes may change in a patch release. The node
+// types follow the rex/v2 schema, which is soft-frozen. docs/packages/rex.md
+// lists what this covers.
 // One reader for both layouts. A v1 tree reads as changes only (V1_LEVEL_TYPES:
 // epics and features become changes), so a consumer such as the dashboard's
 // Product and Changes views or the Graview projection holds one code path over
