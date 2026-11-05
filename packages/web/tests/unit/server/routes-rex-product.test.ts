@@ -254,6 +254,28 @@ describe("v2 product reads", () => {
     expect(map.areas[0].capabilities[0].openChanges[0].stage).toBe("awaiting-apply");
   });
 
+  describe("stage of an open change whose own state is empty", () => {
+    it("reads in-progress while one of its tasks is in_progress", async () => {
+      writeTaskStartedState();
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("in-progress");
+    });
+
+    it("reads proposed when no task has started and the change is not ready", async () => {
+      writeEmptyChangeState();
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("proposed");
+    });
+  });
+
+  /** The change's own state row cleared, as before `ndx work` starts anything. */
+  function writeEmptyChangeState(extra = ""): void {
+    writeFileSync(join(rexDir, "changes", "add-apple-pay", "state.yaml"), `schema: "rex/v2"\nitems:\n${extra}`);
+  }
+
+  /** The change's own state empty and its task started, as `ndx work` leaves them. */
+  function writeTaskStartedState(): void {
+    writeEmptyChangeState(`  "${TASK_ID}":\n    status: "in_progress"\n    startedAt: "2026-11-05T12:00:00.000Z"\n`);
+  }
+
   it("GET /changes reads a shipped change as shipped", async () => {
     applyChange();
     const { body } = await get("changes");
@@ -314,6 +336,19 @@ describe("v2 product reads", () => {
       expect(summary.inbox).toBe(1);
       expect(summary.stages).toEqual({ proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 });
       expect(summary.open.map((c) => c.id)).toEqual([CHANGE_ID]);
+    });
+
+    it("counts a change whose task is in_progress under in-progress, not proposed", async () => {
+      writeTaskStartedState();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.stages).toEqual({ proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 });
+      expect(summary.open[0].stage).toBe("in-progress");
+    });
+
+    it("counts an unstarted, unready change as proposed", async () => {
+      writeEmptyChangeState();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.stages).toEqual({ proposed: 1, ready: 0, "in-progress": 0, "awaiting-apply": 0 });
     });
 
     it("reads the tree on every request, so a write shows on the next read", async () => {

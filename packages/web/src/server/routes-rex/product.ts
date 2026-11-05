@@ -203,6 +203,9 @@ const HISTORY_LIMIT = 100;
  * A change's stage, the views' provisional vocabulary (see `ChangeStage` in
  * product-model.ts): shipped and applied from rex's state, then started, then
  * marked ready. Rex has no stage of its own to defer to.
+ *
+ * Started means the change or any live task or subtask under it. `ndx work`
+ * records the start on the task it runs and leaves the change's own state empty.
  */
 function stageOf(change: RuleNode): ChangeStageWire {
   if (change.shippedIn) return "shipped";
@@ -210,10 +213,19 @@ function stageOf(change: RuleNode): ChangeStageWire {
   // Completed but not applied: rex.applyOn is review or release, so only a steward's
   // apply (MCP, CLI) or a release stamp moves it on. The dashboard has no apply action.
   if (change.status === "completed") return "awaiting-apply";
-  if (change.startedAt || change.status === "in_progress" || change.status === "failing") {
-    return "in-progress";
-  }
+  if (isStarted(change) || liveWorkUnder(change).some(isStarted)) return "in-progress";
   return change.ready ? "ready" : "proposed";
+}
+
+const isStarted = (node: RuleNode): boolean =>
+  !!node.startedAt || node.status === "in_progress" || node.status === "failing";
+
+/** Tasks and subtasks under a change, skipping deleted and cancelled ones and their children. */
+function liveWorkUnder(node: RuleNode): RuleNode[] {
+  const children = (node as { children?: RuleNode[] }).children ?? [];
+  return children
+    .filter((c) => (c.type === "task" || c.type === "subtask") && c.status !== "deleted" && c.status !== "cancelled")
+    .flatMap((c) => [c, ...liveWorkUnder(c)]);
 }
 
 /** Live changes in tree order (the change layer's roots and anything nested under a non-change). */
