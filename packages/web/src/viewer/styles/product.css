@@ -825,7 +825,7 @@
 .cap-amendment-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .cap-diff-statement { display: grid; gap: var(--space-2); }
 .cap-diff-label { color: var(--text-muted); font-size: var(--font-sm); }
-.cap-diff-statement .cap-diff-before, .cap-diff-row del { background: color-mix(in srgb, var(--danger, #c0392b) 14%, transparent); }
+.cap-diff-statement .cap-diff-before, .cap-diff-row del { background: color-mix(in srgb, var(--red) 14%, transparent); }
 .cap-diff-statement .cap-diff-after, .cap-diff-row ins { background: color-mix(in srgb, var(--success, #2e8540) 14%, transparent); text-decoration: none; }
 .cap-diff-criteria { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
 .cap-diff-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
