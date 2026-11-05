@@ -18,6 +18,7 @@ export const BROKER_TOOL_LABELS: Readonly<Record<string, string>> = {
   propose_run_plan: "Propose run plan",
   place_change_card: "Place change",
   propose_edit: "Propose edit",
+  propose_link: "Propose tracker link",
   github_read: "Read GitHub",
   draft_github_post: "Draft GitHub post",
   migration_decision: "Migration decision",
