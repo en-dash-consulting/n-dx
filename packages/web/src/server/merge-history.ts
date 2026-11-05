@@ -1,12 +1,18 @@
 /**
  * Merge history data pipeline — walks git merges and correlates them to PRD items.
  *
- * This module is the data foundation for the PRD/merge context-graph view. It:
+ * This module is the data foundation for the PRD/merge context-graph view. It
+ * reads either PRD layout: on v1 the nodes are epics, features, tasks and
+ * subtasks from `prd_tree/`; on v2 they are changes and their tasks and
+ * subtasks from `changes/`. It:
  *
  *   1. Enumerates merge commits via `git log --merges`.
  *   2. Extracts file-change summaries per merge (vs. first parent).
- *   3. Correlates each merge to PRD item IDs using three strategies:
- *        - commit message references (full UUIDs embedded in subject/body)
+ *   3. Correlates each merge to PRD item IDs using four strategies:
+ *        - `N-DX-Item` trailers, as git parses them. The trailer is the
+ *          commit's identity for an item: it survives rebase and squash,
+ *          where a stored SHA does not.
+ *        - other commit message references (full UUIDs in subject/body)
  *        - merged source branch names (e.g. `task/<short-id>`, `feature/<id>`)
  *        - hench run metadata (runs that finished in a window before the merge
  *          contribute their `taskId` as the run's attributed PRD item)
@@ -61,7 +67,7 @@ export interface FileChange {
 }
 
 /** How an edge between a merge and a PRD item was derived. */
-export type EdgeAttribution = "commit-message" | "branch-name" | "hench-run";
+export type EdgeAttribution = "trailer" | "commit-message" | "branch-name" | "hench-run";
 
 /** An edge connecting a merge node to a PRD-item node. */
 export interface MergeGraphEdge {
@@ -307,18 +313,24 @@ export function extractPrdIdFromBranch(
   return undefined;
 }
 
-/**
- * Parse the output of `git log --merges` formatted with field separator U+001F
- * and record separator U+001E. One record per merge commit.
- */
-export function parseMergeLogOutput(stdout: string): Array<{
+/** One merge commit as {@link listMergeCommits} reads it. */
+export interface MergeCommitRecord {
   sha: string;
   parents: string[];
   mergedAt: string;
   author: string;
   subject: string;
   body: string;
-}> {
+  /** Values of the commit's `N-DX-Item` trailers, as git parses them. */
+  itemTrailers: string[];
+}
+
+/**
+ * Parse the output of `git log --merges` formatted with field separator U+001F
+ * and record separator U+001E. One record per merge commit. The optional
+ * seventh field holds the `N-DX-Item` trailer values, comma-separated.
+ */
+export function parseMergeLogOutput(stdout: string): MergeCommitRecord[] {
   if (!stdout) return [];
   const records = stdout.split("");
   const merges = [];
@@ -327,7 +339,7 @@ export function parseMergeLogOutput(stdout: string): Array<{
     if (!rec) continue;
     const fields = rec.split("");
     if (fields.length < 6) continue;
-    const [sha, parentsRaw, mergedAt, author, subject, body] = fields;
+    const [sha, parentsRaw, mergedAt, author, subject, body, trailersRaw = ""] = fields;
     if (!sha) continue;
     merges.push({
       sha: sha.trim(),
@@ -337,6 +349,7 @@ export function parseMergeLogOutput(stdout: string): Array<{
       subject: subject.trim(),
       // Body is everything after the subject field — keep trailing newlines trimmed.
       body: body.replace(/\s+$/, ""),
+      itemTrailers: trailersRaw.split(",").map((v) => v.trim()).filter(Boolean),
     });
   }
   return merges;
@@ -401,6 +414,23 @@ export function classifyNodeShape(
 }
 
 /**
+ * Classify a v2 change-layer item's shape from the document alone.
+ *
+ * A v2 change is a folder with `index.md`; a task or subtask is a `<slug>.md`
+ * leaf until it has children, when it becomes a folder too. The document's
+ * child structure therefore mirrors the disk, so the v1 folder rules apply
+ * without reading `changes/`:
+ *   - triangle: no children
+ *   - trapezoid: every child has children of its own (child folders only)
+ *   - diamond: at least one leaf child (`.md` leaves, alone or mixed)
+ */
+export function classifyItemShape(item: PRDItem): NodeShape {
+  const children = item.children ?? [];
+  if (children.length === 0) return "triangle";
+  return children.every((c) => (c.children?.length ?? 0) > 0) ? "trapezoid" : "diamond";
+}
+
+/**
  * Parse the output of a batched `git show --name-status` call that uses
  * `__NDXSHA__ <sha>` marker lines to delimit per-merge file blocks.
  */
@@ -460,7 +490,13 @@ function itemToSlug(item: PRDItem): string {
   return slug;
 }
 
-/** Build a flat tree of PRDNode objects along with a parent-lookup map. */
+/**
+ * Build a flat tree of PRDNode objects along with a parent-lookup map.
+ *
+ * A v2 document (its roots are changes) takes shapes from its own structure
+ * via {@link classifyItemShape}; a v1 document reads them from `prd_tree/`
+ * when a `rexDir` anchors it.
+ */
 export function flattenPrdItems(doc: PRDDocument, rexDir?: string): {
   nodes: PrdNode[];
   knownIds: Set<string>;
@@ -469,27 +505,31 @@ export function flattenPrdItems(doc: PRDDocument, rexDir?: string): {
   const nodes: PrdNode[] = [];
   const knownIds = new Set<string>();
   const shortIdIndex = new Map<string, string>();
+  const isV2 = doc.items.some((item) => itemTypeOf(item) === "change");
 
   const walk = (items: PRDItem[], parentId?: string, parentPath?: string): void => {
     for (const item of items) {
       knownIds.add(item.id.toLowerCase());
       shortIdIndex.set(item.id.slice(0, 8).toLowerCase(), item.id);
 
-      // The item's folder on disk, which only exists to be read by
+      // v1 only: the item's folder on disk, which only exists to be read by
       // `classifyNodeShape` — so without a `rexDir` to anchor it there is
       // nothing to compute. It used to fall back to a literal `.rex`, which
       // named a directory this function was explicitly told it did not have,
       // and on a `.ndx/` project named one that does not exist at all. The
       // value was then stored in a map nothing read.
-      const slug = itemToSlug(item);
-      const itemPath = parentPath
-        ? join(parentPath, slug)
-        : rexDir
-          ? join(rexDir, "prd_tree", slug)
-          : undefined;
+      const itemPath = isV2
+        ? undefined
+        : parentPath
+          ? join(parentPath, itemToSlug(item))
+          : rexDir
+            ? join(rexDir, "prd_tree", itemToSlug(item))
+            : undefined;
 
       let shape: string | undefined;
-      if (rexDir && itemPath) {
+      if (isV2) {
+        shape = classifyItemShape(item);
+      } else if (rexDir && itemPath) {
         try {
           shape = classifyNodeShape(item.id, itemPath);
         } catch {
@@ -703,21 +743,17 @@ const FS = "";
 const RS = "";
 
 /**
- * List merge commits with metadata (subject, body, parents, timestamp, author).
+ * List merge commits with metadata (subject, body, parents, timestamp, author)
+ * and their `N-DX-Item` trailer values. Git parses the trailers itself, so a
+ * trailer counts exactly when `git interpret-trailers` would read it.
  * Uses ASCII separators to avoid any ambiguity with newlines inside commit bodies.
  */
 export function listMergeCommits(
   runner: GitRunner,
   maxMerges: number,
-): Array<{
-  sha: string;
-  parents: string[];
-  mergedAt: string;
-  author: string;
-  subject: string;
-  body: string;
-}> {
-  const format = `%H${FS}%P${FS}%cI${FS}%an${FS}%s${FS}%b${RS}`;
+): MergeCommitRecord[] {
+  const trailers = "%(trailers:key=N-DX-Item,valueonly,separator=%x2c)";
+  const format = `%H${FS}%P${FS}%cI${FS}%an${FS}%s${FS}%b${FS}${trailers}${RS}`;
   const stdout = runner([
     "log",
     "--merges",
@@ -972,9 +1008,23 @@ export function buildMergeGraph(opts: BuildMergeGraphOptions): MergeGraph {
     };
     mergeNodes.push(node);
 
-    // Commit-message correlation
+    // Trailer correlation: the merge's own `N-DX-Item` trailers name the
+    // items it shipped.
+    const trailerIds = new Set(
+      c.itemTrailers.map((v) => v.toLowerCase()).filter((id) => knownIds.has(id)),
+    );
+    for (const id of trailerIds) {
+      addEdge(c.sha, id, "trailer");
+      mergesWithLinkage.add(c.sha);
+      linkedPrdItems.add(id);
+    }
+
+    // Commit-message correlation: any other known id the message mentions.
+    // The body includes the trailer block, so ids a trailer already linked
+    // are skipped rather than drawn twice.
     const msgText = `${c.subject}\n${c.body}`;
     for (const id of extractPrdIdsFromMessage(msgText, knownIds)) {
+      if (trailerIds.has(id)) continue;
       addEdge(c.sha, id, "commit-message");
       mergesWithLinkage.add(c.sha);
       linkedPrdItems.add(id);

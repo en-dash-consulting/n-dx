@@ -2,16 +2,24 @@
  * MergeGraphView — PRD/merge context graph.
  *
  * Renders PRD items and git merge commits as a connected graph so users can
- * see which code changes were shipped against which planned work. PRD items
- * use a compact, indented folder-tree layout — each visible node sits on its
- * own row, horizontally indented by depth — visually echoing the on-disk
- * `.rex/prd_tree/` hierarchy. Merge commits cluster in a column to the right
- * of the deepest visible PRD indent.
+ * see which code changes were shipped against which planned work. It reads
+ * either PRD layout:
+ *
+ * - v2: changes and their tasks and subtasks, from `changes/` under the rex
+ *   directory. The root rows are changes.
+ * - v1: epics, features, tasks and subtasks, from `prd_tree/`. The root rows
+ *   are epics.
+ *
+ * PRD items use a compact, indented folder-tree layout — each visible node
+ * sits on its own row, horizontally indented by depth — visually echoing the
+ * on-disk hierarchy. Merge commits cluster in a column to the right of the
+ * deepest visible PRD indent. A merge links to the items its `N-DX-Item`
+ * trailers name (the trailer is the commit's identity, never its SHA), then
+ * to ids its message mentions, its branch name and the hench runs before it.
  *
  * View mode: defaults to "Full tree" (every PRD item from every depth is
- * rendered) so the graph is representative of the whole `.rex/prd_tree/`
- * folder. An "Epics only" mode in the header trims the tree to just the
- * top-level rows for a high-level overview.
+ * rendered). A "Changes only" mode (v2) or "Epics only" mode (v1) in the
+ * header trims the tree to the root rows for a high-level overview.
  *
  * Interactions:
  * - Pan: mouse drag or two-finger drag on the canvas
@@ -51,7 +59,7 @@ interface FileChange {
   oldPath?: string;
 }
 
-type EdgeAttribution = "commit-message" | "branch-name" | "hench-run";
+type EdgeAttribution = "trailer" | "commit-message" | "branch-name" | "hench-run";
 
 interface MergeGraphEdge {
   from: string;
@@ -253,17 +261,19 @@ function computeLayout(
   // ── DFS pre-order traversal: each visible node claims one row ────────────
   // Compact folder-tree layout — y advances monotonically as we walk the tree
   // depth-first, so parents always sit above their children and siblings
-  // stack vertically. x is the indent depth for the node's level (epic=0,
-  // feature=1, …). This mirrors the on-disk `.rex/prd_tree/` rendering used
-  // elsewhere in the dashboard.
+  // stack vertically. On v1, x is the indent depth for the node's level
+  // (epic=0, feature=1, …). A v2 tree has no feature level, so x is the
+  // node's depth in the tree: a change's tasks sit one indent in, not two.
+  // This mirrors the on-disk PRD tree rendering used elsewhere in the dashboard.
   const positions = new Map<string, { x: number; y: number; depth: number }>();
   let yCounter = 0;
   let maxDepth = 0;
+  const isV2 = graph.nodes.some((n) => n.kind === "prd" && n.itemType === "change");
 
-  function traverse(nodeId: string): void {
+  function traverse(nodeId: string, treeDepth: number): void {
     const node = prdNodes.find((p) => p.id === nodeId);
     if (!node) return;
-    const depth = TYPE_DEPTH[node.itemType] ?? 3;
+    const depth = isV2 ? treeDepth : TYPE_DEPTH[node.itemType] ?? 3;
     if (depth > maxDepth) maxDepth = depth;
     positions.set(nodeId, {
       x: depth * INDENT_W,
@@ -271,11 +281,11 @@ function computeLayout(
       depth,
     });
     yCounter++;
-    for (const kid of childrenMap.get(nodeId) ?? []) traverse(kid.id);
+    for (const kid of childrenMap.get(nodeId) ?? []) traverse(kid.id, treeDepth + 1);
   }
 
   for (const root of childrenMap.get(null) ?? []) {
-    traverse(root.id);
+    traverse(root.id, 0);
   }
 
   // ── Build PRD layout nodes ───────────────────────────────────────────────
@@ -508,6 +518,7 @@ function renderNodeShape(shape: string | undefined, r: number, fill: string, isS
 // ── Attribution stroke ────────────────────────────────────────────────────────
 
 function attributionStroke(attr?: EdgeAttribution): string {
+  if (attr === "trailer") return "var(--brand-teal)";
   if (attr === "commit-message") return "var(--accent)";
   if (attr === "branch-name") return "var(--brand-purple)";
   if (attr === "hench-run") return "var(--brand-orange)";
@@ -1090,9 +1101,9 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
-  // "full-tree" renders every PRD item from .rex/prd_tree/ at every depth —
-  // the default so the graph mirrors the on-disk layout. "epics-only" trims
-  // to the top-level epic rows for a higher-level overview.
+  // "full-tree" renders every PRD item at every depth — the default so the
+  // graph mirrors the on-disk layout. "epics-only" trims to the root rows
+  // (changes on v2, epics on v1) for a higher-level overview.
   const [viewMode, setViewMode] = useState<"full-tree" | "epics-only">("full-tree");
   /** Graph vs table toggle for the accessible alternative view. */
   const [tableViewMode, setTableViewMode] = useState<"graph" | "table">("graph");
@@ -1159,6 +1170,11 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     if (!graph) return [] as PrdNode[];
     return graph.nodes.filter((n): n is PrdNode => n.kind === "prd" && isRootType(n.itemType));
   }, [graph]);
+  // Root rows are changes on a v2 tree and epics on v1; `epics` and the
+  // `epicIds` filter hold whichever the layout has. Only the words differ.
+  const rootLabels = epics.some((n) => n.itemType === "change")
+    ? { plural: "Changes", only: "Changes only", chain: "change → task → subtask" }
+    : { plural: "Epics", only: "Epics only", chain: "epic → feature → task → subtask" };
 
   // Filter pass: which PRD/merge ids survive epic+status+date filters and the
   // view-mode toggle. Full-tree mode renders every depth; epics-only restricts
@@ -1466,15 +1482,15 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
           h("button", {
             class: `mg-chip${viewMode === "full-tree" ? " active" : ""}`,
             "aria-pressed": viewMode === "full-tree" ? "true" : "false",
-            title: "Show every PRD item (epic → feature → task → subtask)",
+            title: `Show every PRD item (${rootLabels.chain})`,
             onClick: () => setViewMode("full-tree"),
           }, "Full tree"),
           h("button", {
             class: `mg-chip${viewMode === "epics-only" ? " active" : ""}`,
             "aria-pressed": viewMode === "epics-only" ? "true" : "false",
-            title: "Show only top-level epics",
+            title: `Show only top-level ${rootLabels.plural.toLowerCase()}`,
             onClick: () => setViewMode("epics-only"),
-          }, "Epics only"),
+          }, rootLabels.only),
         ),
         h("button", {
           class: `mg-filter-btn${showFilters ? " active" : ""}`,
@@ -1487,10 +1503,10 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     // ── Filter bar ───────────────────────────────────────────────────────────
     showFilters
       ? h("div", { class: "mg-filter-bar" },
-          // Epic selector
+          // Root-row selector (changes on v2, epics on v1)
           epics.length > 0
             ? h("div", { class: "mg-filter-group" },
-                h("span", { class: "mg-filter-label" }, "Epics"),
+                h("span", { class: "mg-filter-label" }, rootLabels.plural),
                 h("div", { class: "mg-filter-chips" },
                   epics.map((epic) =>
                     h("button", {

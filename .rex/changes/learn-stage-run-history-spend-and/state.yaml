@@ -34,7 +34,14 @@ items:
     lastModified: "2026-10-28T18:44:38.442Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "637d5b5b-b14e-441d-aa14-3c8944fec4fa":
-    lastModified: "2026-10-28T18:49:37.600Z"
+    status: "completed"
+    startedAt: "2026-11-05T04:46:56.021Z"
+    completedAt: "2026-11-05T05:04:58.631Z"
+    endedAt: "2026-11-05T05:04:58.631Z"
+    activeIntervals: [{"end":"2026-11-05T05:04:58.631Z","start":"2026-11-05T04:46:56.021Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "merge-history links merges by N-DX-Item trailers (git's parser) and shapes v2 items from the change layer; merge-graph view uses tree-depth indent and \"Changes only\" labels on v2, v1 unchanged."
+    lastModified: "2026-11-05T05:04:58.631Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "95300e23-699c-4649-8aa2-af95a1d4b6a0":
     lastModified: "2026-11-05T01:52:56.332Z"
