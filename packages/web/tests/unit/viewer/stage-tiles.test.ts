@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
@@ -76,6 +76,32 @@ describe("TileGrid", () => {
     act(() => tile("map").querySelector<HTMLButtonElement>(".expand-map")!.click());
     expect(dialog()!.querySelector(".panel-map-opened")).not.toBeNull();
     expect(dialog()!.querySelector("h2")?.textContent).toBe("Codebase map");
+  });
+
+  it("opens a tile at a focus from its panel: the trail names it, the tile step drops it, Esc returns", () => {
+    mount({
+      renderPanel: (p, opened, grid) => opened
+        ? h("div", { class: `panel-${p}-opened`, "data-focus": grid.focus?.id ?? "" })
+        : h("button", { class: `open-${p}`, onClick: () => grid.openTile(p, { id: "checkout", label: "Checkout" }) }, "Checkout"),
+    });
+    const opener = tile("map").querySelector<HTMLButtonElement>(".open-map")!;
+    opener.focus();
+    act(() => opener.click());
+    expect(dialog()!.querySelector("[role=dialog]")?.getAttribute("aria-label")).toBe("Checkout");
+    const trail = dialog()!.querySelector(".stage-tile-trail")!;
+    expect([...trail.querySelectorAll("button, h2")].map((el) => el.textContent)).toEqual(["← Analysis", "Codebase map", "Checkout"]);
+    expect(dialog()!.querySelector<HTMLElement>(".panel-map-opened")?.dataset.focus).toBe("checkout");
+
+    // The tile step keeps the modal open, on the tile as a whole.
+    act(() => trail.querySelector<HTMLButtonElement>(".stage-tile-trail-tile")!.click());
+    expect(dialog()!.querySelector<HTMLElement>(".panel-map-opened")?.dataset.focus).toBe("");
+    expect(dialog()!.querySelector("h2")?.textContent).toBe("Codebase map");
+
+    // Closing hands focus back to the block without scrolling the page.
+    const focus = vi.spyOn(opener, "focus");
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+    expect(dialog()).toBeNull();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 
   it("renders a chromeless tile as its panel alone, with no header to open it", () => {

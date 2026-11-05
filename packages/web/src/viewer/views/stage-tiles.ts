@@ -13,7 +13,10 @@
  * backdrop, holding the whole view with the tile's tabs, headed by a back
  * trail "← Stage / Tile". The backdrop, the trail's stage, Esc and the close
  * button all close it and return focus to the tile. It stops short of the
- * detail panel when one is open, so the two sit side by side. A chromeless tile (the codebase map) is its panel alone: the panel
+ * detail panel when one is open, so the two sit side by side. A panel may open
+ * its tile at a focus (`TileFocus`: an area of Plan's product map); the trail
+ * then reads "← Stage / Tile / Focus", and the tile step drops the focus.
+ * A chromeless tile (the codebase map) is its panel alone: the panel
  * brings its own header, controls and full-screen.
  *
  * Views render through `renderView` and panels through `renderPanel`, both
@@ -30,9 +33,21 @@ import { ActionIcon } from "../components/index.js";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 import { LiveBadge } from "./stage-badge.js";
 
-/** What a panel can ask of the grid: open (or switch the modal to) another tile, by key. */
+/**
+ * A thing inside a tile the modal opens at (an area of Plan's product map),
+ * named as the trail's last step.
+ */
+export interface TileFocus {
+  id: string;
+  label: string;
+}
+
+/** What a panel can ask of the grid. */
 export interface TileGridApi {
-  openTile: (key: string) => void;
+  /** Open (or switch the modal to) a tile by key, optionally at a focus inside it. */
+  openTile: (key: string, focus?: TileFocus) => void;
+  /** The focus the open tile was opened at; null for the tile as a whole. */
+  focus: TileFocus | null;
 }
 
 /** A stage panel; `opened` is true in the opened tile, false in the tile itself. */
@@ -120,6 +135,7 @@ interface FullScreenProps extends TileContentProps {
 }
 
 function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...content }: FullScreenProps) {
+  const focus = content.grid.focus;
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -140,7 +156,7 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
     // A click on the backdrop itself, not one that bubbled up from the modal.
     onClick: (e: MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
-    h("div", { class: "stage-tile-modal", role: "dialog", "aria-modal": "true", "aria-label": title },
+    h("div", { class: "stage-tile-modal", role: "dialog", "aria-modal": "true", "aria-label": focus?.label ?? title },
       h("div", { class: "stage-tile-fullscreen-head" },
         h("nav", { class: "stage-tile-trail", "aria-label": "Back" },
           h("button", {
@@ -151,7 +167,19 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
           }, h("span", { "aria-hidden": "true" }, "← "), stageName),
           h("span", { class: "stage-tile-trail-sep", "aria-hidden": "true" }, "/"),
           h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
-          h("h2", { class: "stage-tile-fullscreen-title", "aria-current": "page" }, title),
+          focus
+            // Opened at a focus: the tile is a step back, the focus is the page.
+            ? h(Fragment, null,
+                h("button", {
+                  type: "button",
+                  class: "stage-tile-trail-back stage-tile-trail-tile",
+                  onClick: () => content.grid.openTile(tileKey(tile)),
+                  title: `Back to ${title}`,
+                }, title),
+                h("span", { class: "stage-tile-trail-sep", "aria-hidden": "true" }, "/"),
+                h("h2", { class: "stage-tile-fullscreen-title", "aria-current": "page" }, focus.label),
+              )
+            : h("h2", { class: "stage-tile-fullscreen-title", "aria-current": "page" }, title),
         ),
         navigateTo
           ? h("button", {
@@ -250,19 +278,27 @@ export interface TileGridProps {
 }
 
 export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false, navigateTo }: TileGridProps) {
-  const [fullScreen, setFullScreen] = useState<string | null>(null);
+  const [fullScreen, setFullScreen] = useState<{ key: string; focus: TileFocus | null } | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
   const closeFullScreen = useCallback(() => {
     setFullScreen(null);
-    // Return focus to the tile that opened it.
-    openerRef.current?.focus();
+    // Return focus to what opened it, leaving the page where it was scrolled.
+    openerRef.current?.focus({ preventScroll: true });
   }, []);
 
-  const full = fullScreen ? tiles.find((t) => tileKey(t) === fullScreen) : undefined;
-  // Switching tiles from inside the modal keeps the original opener, so
-  // closing still returns focus to the tile the reader started from.
-  const grid: TileGridApi = { openTile: (key) => { if (tiles.some((t) => tileKey(t) === key)) setFullScreen(key); } };
+  const full = fullScreen ? tiles.find((t) => tileKey(t) === fullScreen.key) : undefined;
+  const grid: TileGridApi = {
+    openTile: (key, focus) => {
+      if (!tiles.some((t) => tileKey(t) === key)) return;
+      // Switching tiles from inside the modal keeps the original opener, so
+      // closing still returns focus to where the reader started. Opened from a
+      // panel (an area block), the opener is the control that was pressed.
+      if (!fullScreen) openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setFullScreen({ key, focus: focus ?? null });
+    },
+    focus: fullScreen?.focus ?? null,
+  };
 
   // Bands sit above the grid: its rows are one fixed height, a strip is not.
   const tileOf = (tile: StageTile) => {
@@ -272,7 +308,7 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
       grid,
       stage,
       tile,
-      onOpen: (opener: HTMLElement) => { openerRef.current = opener; setFullScreen(key); },
+      onOpen: (opener: HTMLElement) => { openerRef.current = opener; setFullScreen({ key, focus: null }); },
       renderView,
       renderPanel,
       renderSummary,
@@ -286,8 +322,8 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
     tiles.filter((t) => !t.band).map(tileOf),
     full
       ? h(FullScreenTile, {
-          // Keyed by tile, so switching tiles remounts the content (tabs reset).
-          key: tileKey(full),
+          // Keyed by tile and focus, so switching either remounts the content (tabs reset).
+          key: `${tileKey(full)}:${fullScreen?.focus?.id ?? ""}`,
           grid,
           stage,
           tile: full,

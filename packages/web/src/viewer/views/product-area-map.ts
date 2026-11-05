@@ -2,7 +2,8 @@
  * Plan's product area map: one block per area, sized by how many capabilities
  * it holds, tinted by its computed status, with a count of the open changes
  * that touch, amend or add under it (the server's `openChangeIds`). A block
- * opens the area at `/product/area/<slug>`.
+ * opens the area view (views/area.ts) in the tile's full-screen, at
+ * `/product/area/<slug>`.
  *
  * Reads the product map the Product page already fetches. `AreaBlock` is the
  * reusable part — the area view draws an area's capabilities with it.
@@ -12,7 +13,6 @@
 
 import { h } from "preact";
 import { useProductRead } from "../hooks/index.js";
-import type { NavigateTo } from "../types.js";
 import type { AreaSection, ProductMap } from "./product-model.js";
 
 /** What tints a block. Defective outranks the status of the capabilities. */
@@ -154,27 +154,28 @@ export function BlockLegend() {
   );
 }
 
-export function openArea(navigateTo: NavigateTo, slug: string | null): void {
-  if (slug) navigateTo("product", { tab: `area/${slug}` });
-  else navigateTo("product");
-}
+/**
+ * Opens an area from its block: its slug and title, or a null slug for the
+ * block that folds the smaller areas (which opens the whole map).
+ */
+export type OpenArea = (slug: string | null, title: string) => void;
 
-export function AreaBlocks({ map, navigateTo }: { map: ProductMap; navigateTo: NavigateTo }) {
+export function AreaBlocks({ map, onOpenArea }: { map: ProductMap; onOpenArea: OpenArea }) {
   if (map.areas.length === 0) {
     return h("div", { class: "empty-state", role: "status" }, "No areas yet. They appear once the product layer is populated.");
   }
   return h("div", { class: "pam" },
     h("div", { class: "pam-blocks" },
       areaBlocks(map.areas).map((block) =>
-        h(AreaBlock, { key: block.key, block, onOpen: () => openArea(navigateTo, block.slug) }))),
+        h(AreaBlock, { key: block.key, block, onOpen: () => onOpenArea(block.slug, block.label) }))),
     h(BlockLegend, null),
   );
 }
 
 /** The Product tile's panel on Plan. */
-export function ProductAreaMap({ navigateTo }: { navigateTo: NavigateTo }) {
+export function ProductAreaMap({ onOpenArea }: { onOpenArea: OpenArea }) {
   const load = useProductRead("/api/rex/product", (body) => body.map as ProductMap);
-  if (load.state === "ready") return h(AreaBlocks, { map: load.data, navigateTo });
+  if (load.state === "ready") return h(AreaBlocks, { map: load.data, onOpenArea });
   if (load.state === "loading") return h("div", { class: "pam-pending", role: "status" }, "Loading...");
   if (load.state === "v1") return null;
   return h("div", { role: "alert" }, `Could not load the product map: ${load.message}`);

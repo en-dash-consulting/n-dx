@@ -112,8 +112,8 @@ describe("AreaBlock", () => {
 
 describe("ProductAreaMap", () => {
   let root: HTMLElement;
-  const navigateTo = vi.fn();
-  beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); navigateTo.mockReset(); });
+  const onOpenArea = vi.fn();
+  beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); onOpenArea.mockReset(); });
   afterEach(() => { render(null, root); root.remove(); vi.unstubAllGlobals(); });
 
   const map: ProductMap = {
@@ -123,7 +123,7 @@ describe("ProductAreaMap", () => {
 
   async function mount(body: unknown) {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => body })));
-    await act(async () => { render(h(ProductAreaMap, { navigateTo }), root); });
+    await act(async () => { render(h(ProductAreaMap, { onOpenArea }), root); });
     await act(async () => {});
   }
 
@@ -133,7 +133,14 @@ describe("ProductAreaMap", () => {
     expect(blocks.map((b) => b.dataset.status)).toEqual(["changing", "defective"]);
     expect(root.querySelector(".pam-legend")?.textContent).toContain("Defective");
     blocks[1]!.click();
-    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "area/b" });
+    expect(onOpenArea).toHaveBeenCalledWith("b", "B");
+  });
+
+  it("opens the folded block with no slug", async () => {
+    const areas = Array.from({ length: MAX_BLOCKS + 1 }, (_, i) => area(`a${i}`, [cap()]));
+    await mount({ layout: "v2", map: { areas, constraints: [] } });
+    root.querySelector<HTMLButtonElement>('.pam-block[data-block="folded"]')!.click();
+    expect(onOpenArea).toHaveBeenCalledWith(null, "+2 smaller areas");
   });
 
   it("says so when the project has no areas", async () => {

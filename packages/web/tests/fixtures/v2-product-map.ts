@@ -15,6 +15,7 @@
  */
 
 import type {
+  AreaDetail,
   CapabilityDetail,
   ChangeRow,
   ProductMap,
@@ -385,6 +386,25 @@ export const CAPABILITY_DETAIL_FIXTURE: CapabilityDetail = {
     { path: "packages/hench/src/agent/loop.ts", role: "agent loop" },
     { path: "packages/hench/tests/integration/run-loop.test.ts", role: "tests" },
   ],
+};
+
+const DEFINE_AREA = PRODUCT_MAP_FIXTURE.areas[0]!;
+
+/** The area read for "Define the product", built from the map's own rows. */
+export const AREA_DETAIL_FIXTURE: AreaDetail = {
+  id: DEFINE_AREA.id,
+  slug: DEFINE_AREA.slug,
+  displayId: DEFINE_AREA.displayId,
+  title: DEFINE_AREA.title,
+  summary: DEFINE_AREA.summary,
+  stewards: DEFINE_AREA.stewards ?? [],
+  counts: { capabilities: 3, constraints: 1, met: 1, changing: 1, defective: 0, openChanges: 2 },
+  capabilities: DEFINE_AREA.capabilities,
+  constraints: PRODUCT_MAP_FIXTURE.constraints.slice(0, 1),
+  openChanges: DEFINE_AREA.capabilities.flatMap((c) => c.openChanges),
+  inbox: [],
+  recentlyApplied: [],
+  code: [],
 };
 
 /** A map with nothing in it, for the Product page's empty state. */

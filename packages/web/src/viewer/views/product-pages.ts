@@ -8,7 +8,8 @@
  * `{ layout: "v1" }` and both pages say to run `ndx migrate`.
  *
  * The capability page opens inside the Product page, from a row; Back
- * returns to the map.
+ * returns to the map. `/product/area/<slug>` shows that area's view
+ * (area.ts) as the page.
  *
  * @module viewer/views/product-pages
  */
@@ -23,6 +24,7 @@ import type { NavigateTo } from "../types.js";
 import { ProductView } from "./product.js";
 import { CapabilityPage } from "./capability.js";
 import { ChangesView } from "./changes.js";
+import { AreaView } from "./area.js";
 import { RequirementsView } from "./requirements.js";
 import type { CapabilityDetail, ChangeRow, ProductEdit, ProductMap } from "./product-model.js";
 
@@ -142,12 +144,23 @@ function ProductTabs({ tab, onTab, children }: {
  * project, which has no product layer, the same tabs show: Map says to
  * migrate, Requirements reads v1 data and renders the requirements view.
  */
-export function ProductPage({ onCapabilityChange, initialTab = "map", areaSlug = null }: {
+export function ProductPage({ areaSlug = null, onLeaveArea, ...rest }: ProductMapPageProps & {
+  /** The area `/product/area/<slug>` names: the page is that area's view. */
+  areaSlug?: string | null;
+  /** Leaves the area for the map (`/product`). */
+  onLeaveArea?: () => void;
+}) {
+  return areaSlug
+    ? h(AreaView, { slug: areaSlug, onBack: onLeaveArea })
+    : h(ProductMapPage, rest);
+}
+
+interface ProductMapPageProps {
   onCapabilityChange?: (id: string | null) => void;
   initialTab?: ProductTab;
-  /** Opens the page at this area (`/product/area/<slug>`), until the area has a view of its own. */
-  areaSlug?: string | null;
-}) {
+}
+
+function ProductMapPage({ onCapabilityChange, initialTab = "map" }: ProductMapPageProps) {
   const [tab, setTab] = useState<ProductTab>(initialTab);
   const [capabilityId, setCapabilityId] = useState<string | null>(null);
   // The open capability is what the page is about; the shell attaches it to Sidecar.
@@ -173,7 +186,7 @@ export function ProductPage({ onCapabilityChange, initialTab = "map", areaSlug =
       ? h(RequirementsView, null)
       : h("div", null,
           h(StaleNotice, { message: load.refreshError }),
-          h(ProductView, { map: load.data, onSelectCapability: setCapabilityId, focusArea: areaSlug }),
+          h(ProductView, { map: load.data, onSelectCapability: setCapabilityId }),
         ),
   );
 }

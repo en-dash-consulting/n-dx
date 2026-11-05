@@ -229,7 +229,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     tiles: [
       // On both layouts: a v1 tree reads Pending, In progress and Next.
       { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
-      // The area map; "Open" and full-screen show the whole Product page.
+      // The area map. Full-screen shows the whole Product page; a block opens
+      // its area's view there instead (views/area.ts, `/product/area/<slug>`).
       { view: "product", panel: "product-map", title: "Product", embedsView: true, cols: 12, rows: 2, v2Only: true, requiresServer: true },
       { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
       { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },

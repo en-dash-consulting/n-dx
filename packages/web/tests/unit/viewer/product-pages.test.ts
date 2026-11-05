@@ -15,6 +15,7 @@ import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
 import {
+  AREA_DETAIL_FIXTURE,
   CAPABILITY_DETAIL_FIXTURE,
   CHANGES_FIXTURE,
   PRODUCT_MAP_FIXTURE,
@@ -428,23 +429,18 @@ describe("the Requirements tab", () => {
     expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
   });
 
-  it("/product/area/<slug> opens the Product page at that area", async () => {
-    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
-    const original = Element.prototype.scrollIntoView;
-    const scrolled = vi.fn();
-    Element.prototype.scrollIntoView = scrolled;
-    try {
-      const area = PRODUCT_MAP_FIXTURE.areas[1]!;
-      await mount(h("div", null, renderActiveView("product", { selectedTab: `area/${area.slug}` } as never)));
-      await vi.waitFor(() => expect(root.querySelector(".pm-area")).not.toBeNull());
-      const focused = root.querySelectorAll('.pm-area[aria-current="location"]');
-      expect([...focused].map((s) => s.id)).toEqual([`product-area-${area.slug}`]);
-      // The scroll is an effect, which Preact runs after paint.
-      await vi.waitFor(() => expect(scrolled).toHaveBeenCalledOnce());
-      expect(scrolled.mock.contexts[0]).toBe(focused[0]);
-    } finally {
-      Element.prototype.scrollIntoView = original;
-    }
+  it("/product/area/<slug> shows that area's view as the page, with the way back to the map", async () => {
+    const area = AREA_DETAIL_FIXTURE;
+    stubRoutes({ [`/api/rex/product/area/${area.slug}`]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    const navigateTo = vi.fn();
+    await mount(h("div", null, renderActiveView("product", { selectedTab: `area/${area.slug}`, navigateTo } as never)));
+    await vi.waitFor(() => expect(root.querySelector(".area-head")).not.toBeNull());
+    expect(fetched).toEqual([`/api/rex/product/area/${area.slug}`]);
+    expect(root.querySelector("h2")?.textContent).toContain(AREA_DETAIL_FIXTURE.title);
+    // On its own page the area offers no "Open on Product page": it is that page.
+    expect([...root.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Product"]);
+    act(() => root.querySelector<HTMLButtonElement>(".cap-back")!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product");
   });
 
   it("the /requirements route opens on that tab on a v2 project", async () => {

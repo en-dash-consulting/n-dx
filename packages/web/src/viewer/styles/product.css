@@ -788,4 +788,23 @@
 .pam-swatch.pam-defective { background: var(--red); }
 .pam-legend-open { position: static; }
 
-.pm-area-focused { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-md); }
+/* ── Area view (views/area.ts) ─────────────────────────────────── */
+
+.area-container { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.area-head { display: flex; flex-direction: column; gap: var(--space-2); }
+.area-summary { margin: 0; }
+.area-head-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+
+.area-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+
+.area-steward-none { color: var(--text-muted); font-style: italic; }
+.area-actions { display: flex; gap: var(--space-2); margin-left: auto; }
