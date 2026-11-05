@@ -24,6 +24,10 @@ import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/s
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
 import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
+import {
+  TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus,
+} from "./sidecar-tool-names.js";
+import type { ToolLineCard } from "./sidecar-tool-names.js";
 import { useHubProjects } from "./project-switcher.js";
 import {
   ExtensionTabPanel, ExtensionTabStrip, SIDECAR_TAB, extensionFramePath, useExtensionTabs,
@@ -129,14 +133,35 @@ export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, To
   return paired;
 }
 
-/** A tool call: collapsed to its name and a one-line summary, expanded to the raw input and result. */
-function SidecarToolRow({ seq, call, result }: {
+/**
+ * The card each tool call raised, by the call's `seq`: the earliest card of
+ * the same tool not yet claimed by an earlier call.
+ */
+export function pairToolCards<C extends ToolLineCard>(frames: readonly SidecarFrame[], cards: readonly C[]): Map<number, C> {
+  const free = [...cards];
+  const paired = new Map<number, C>();
+  for (const frame of frames) {
+    if (frame.type !== "event" || frame.checkpoint) continue;
+    const { event } = frame;
+    if (event.type !== "tool_use" || !event.toolCall) continue;
+    const parsed = parseToolName(event.toolCall.tool);
+    const index = free.findIndex((card) => cardIsForCall(card, parsed));
+    if (index >= 0) paired.set(frame.seq, free.splice(index, 1)[0]!);
+  }
+  return paired;
+}
+
+/** A tool call: a status dot, a readable name and status, and a one-line summary; expanded, the raw wire name, input and result. */
+function SidecarToolRow({ seq, call, result, card, connectionLabels }: {
   seq: number;
   call: NonNullable<SidecarRuntimeEvent["toolCall"]>;
   result: ToolResult | undefined;
+  card?: ToolLineCard;
+  connectionLabels?: Readonly<Record<string, string>>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const bodyId = `sidecar-tool-${seq}`;
+  const status = toolLineStatus(card, result !== undefined);
   return h("li", { class: "sidecar-tool", "data-seq": seq },
     h("button", {
       type: "button",
@@ -145,11 +170,15 @@ function SidecarToolRow({ seq, call, result }: {
       "aria-controls": bodyId,
       onClick: () => setExpanded((v) => !v),
     },
-      h("span", { class: "sidecar-tool-name" }, call.tool),
+      h("span", { class: "sidecar-tool-dot", "data-status": status, "aria-hidden": "true" }),
+      h("span", { class: "sidecar-tool-name" }, parseToolName(call.tool, connectionLabels).label),
+      h("span", { class: "sidecar-tool-status" }, TOOL_STATUS_TEXT[status]),
       h("span", { class: "sidecar-tool-summary" }, summarizeToolInput(call.input)),
     ),
     expanded
       ? h("div", { class: "sidecar-tool-body", id: bodyId },
+          h("div", { class: "sidecar-tool-label" }, "Tool"),
+          h("code", { class: "sidecar-tool-wire" }, call.tool),
           h("div", { class: "sidecar-tool-label" }, "Input"),
           h("pre", { class: "sidecar-tool-input" }, JSON.stringify(call.input, null, 2)),
           h("div", { class: "sidecar-tool-label" }, "Result"),
@@ -162,7 +191,12 @@ function SidecarToolRow({ seq, call, result }: {
 }
 
 /** One frame as a transcript row; null for frames the conversation does not show. */
-export function SidecarFrameRow({ frame, result }: { frame: SidecarFrame; result?: ToolResult }) {
+export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
+  frame: SidecarFrame;
+  result?: ToolResult;
+  card?: ToolLineCard;
+  connectionLabels?: Readonly<Record<string, string>>;
+}) {
   switch (frame.type) {
     case "user":
       return h("li", { class: "sidecar-msg sidecar-msg-user", "data-seq": frame.seq }, frame.text);
@@ -178,7 +212,7 @@ export function SidecarFrameRow({ frame, result }: { frame: SidecarFrame; result
         return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, event.text);
       }
       if (event.type === "tool_use" && event.toolCall) {
-        return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result });
+        return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result, card, connectionLabels });
       }
       if (event.type === "failure") {
         return h("li", { class: "sidecar-msg sidecar-msg-failure", role: "alert", "data-seq": frame.seq },
@@ -334,8 +368,10 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   };
 
   const results = pairToolResults(sidecar.frames);
+  const toolCards = pairToolCards(sidecar.frames, sidecar.cards);
+  const connectionLabels = connectionLabelsFromCards(sidecar.cards);
   const rows: ComponentChildren[] = sidecar.frames.map((frame) =>
-    h(SidecarFrameRow, { key: frame.seq, frame, result: results.get(frame.seq) }));
+    h(SidecarFrameRow, { key: frame.seq, frame, result: results.get(frame.seq), card: toolCards.get(frame.seq), connectionLabels }));
   const { agent, catalog } = sidecar;
   const models = agent ? catalog?.[agent.vendor]?.models ?? [] : [];
   // A session's own model may not be in the live list; keep it selectable.

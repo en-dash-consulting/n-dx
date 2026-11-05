@@ -130,7 +130,21 @@
 }
 .sidecar-tool-toggle::before { content: "▸"; }
 .sidecar-tool-toggle[aria-expanded="true"]::before { content: "▾"; }
-.sidecar-tool-name { font-weight: 600; flex: none; }
+.sidecar-tool-toggle { align-items: center; }
+.sidecar-tool-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.sidecar-tool-dot[data-status="running"] { background: var(--accent); }
+.sidecar-tool-dot[data-status="done"] { background: var(--green); }
+.sidecar-tool-dot[data-status="failed"] { background: var(--red); }
+.sidecar-tool-dot[data-status="waiting"] { background: var(--orange); }
+.sidecar-tool-name { font-weight: 600; flex: none; color: var(--text); }
+.sidecar-tool-status { flex: none; color: var(--text-dim); }
+.sidecar-tool-wire { display: block; color: var(--text); word-break: break-all; }
 .sidecar-tool-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidecar-tool-body { margin-top: var(--space-1); }
 .sidecar-tool-label { margin-top: var(--space-1); text-transform: uppercase; font-size: 10px; }

@@ -900,6 +900,45 @@ describe("tool calls", () => {
     await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
     expect(tools[0].querySelector(".sidecar-tool-body")).toBeNull();
   });
+
+  it("names broker and external tools in plain words, with the wire name only in the details", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "mcp__ndx-sidecar__fake__create_ticket", { title: "t" }),
+      call(2, "mcp__ndx-sidecar__run_command", { argv: ["ndx", "status"] }),
+      result(3, "mcp__ndx-sidecar__run_command", "ok"),
+      call(4, "mcp__rex__get_item", { id: "x" }),
+    ];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    const names = () => tools.map((t) => t.querySelector(".sidecar-tool-name")!.textContent);
+    expect(names()).toEqual(["fake · create ticket", "Run command", "get_item"]);
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-status")!.textContent)).toEqual(["Running", "Done", "Running"]);
+    expect(tools[0].querySelector(".sidecar-tool-dot")!.getAttribute("data-status")).toBe("running");
+    expect(tools[0].textContent).not.toContain("mcp__ndx-sidecar__");
+
+    await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
+    expect(tools[0].querySelector(".sidecar-tool-wire")!.textContent).toBe("mcp__ndx-sidecar__fake__create_ticket");
+  });
+
+  it("uses the connection's label from its external-call card and shows the waiting state", async () => {
+    server.sessions = [{ session: session(), running: true }];
+    server.frames = [call(1, "mcp__ndx-sidecar__fake__create_ticket", { title: "t" })];
+    server.cards = [card("c1", 1, {
+      tool: "external_call", kind: "external-call",
+      input: { connection: "fake", tool: "create_ticket", arguments: { title: "t" } },
+      externalCall: { label: "CAOS", inputSchema: {} },
+    })];
+    await mount();
+    await pressCmdJ();
+
+    const tool = root.querySelector<HTMLElement>(".sidecar-tool")!;
+    expect(tool.querySelector(".sidecar-tool-name")!.textContent).toBe("CAOS · create ticket");
+    expect(tool.querySelector(".sidecar-tool-status")!.textContent).toBe("Waiting for you");
+    expect(tool.querySelector(".sidecar-tool-dot")!.getAttribute("data-status")).toBe("waiting");
+  });
 });
 
 // ── Badge ──────────────────────────────────────────────────────────────────
