@@ -473,6 +473,7 @@ describe("n-dx ci", () => {
         expect(step.ok).toBe(false);
         expect(step.violations).toHaveLength(1);
         expect(step.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+        expect(step.detail).toBe("1 file could not be read");
       },
     );
 
@@ -484,6 +485,7 @@ describe("n-dx ci", () => {
         expect(step.ok).toBe(false);
         expect(step.violations).toHaveLength(1);
         expect(step.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+        expect(step.detail).toBe("1 file could not be read");
       },
     );
 

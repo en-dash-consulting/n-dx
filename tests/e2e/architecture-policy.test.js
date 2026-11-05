@@ -28,7 +28,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -1215,6 +1215,25 @@ describe("architecture policy: process execution", () => {
         rmSync(dir, { recursive: true, force: true });
       }
     });
+
+    // POSIX only: chmod 000 does not stop the owner on Windows, and root reads anything.
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "names a file it cannot read by the read error, not as a violation",
+      () => {
+        const dir = mkdtempSync(join(tmpdir(), "ndx-arch-unreadable-"));
+        try {
+          mkdirSync(join(dir, "scripts"));
+          writeFileSync(join(dir, "scripts", "release.js"), 'console.log("release");\n');
+          chmodSync(join(dir, "scripts", "release.js"), 0o000);
+          const result = checkArchitecturePolicy(dir);
+          expect(result.ok).toBe(false);
+          expect(result.violations).toHaveLength(1);
+          expect(result.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    );
 
     // The step `ndx ci` runs: on the monorepo it is the allowlist rule plus any
     // ci.restrictedImports rule, and the allowlist rule names its own file.

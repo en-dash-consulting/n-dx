@@ -307,7 +307,7 @@ async function runBoundaryPhase(dir, info, isJSON) {
       ? `skipped (no ${RESTRICTED_IMPORTS_KEY} configured)`
       : archResult.ok
       ? `${archResult.checked} files checked against ${plural(archResult.rules, "restricted-import rule")}, no unauthorized imports`
-      : `${archResult.violations.length} restricted-import violation(s) found`,
+      : describeArchFailure(archResult),
     ...(archResult.violations.length > 0 ? { violations: archResult.violations } : {}),
   });
   if (!archResult.applies) {
@@ -1259,6 +1259,18 @@ function scanRestrictedImports(dir, rules) {
   return { checked, violations, unreadable };
 }
 
+/**
+ * The failed architecture-policy step's summary. A file it could not read is
+ * counted apart from the violations, so an EACCES never reads as an import.
+ */
+function describeArchFailure({ violations, unreadable }) {
+  const found = violations.length - unreadable;
+  return [
+    ...(found > 0 ? [`${found} restricted-import violation(s) found`] : []),
+    ...(unreadable > 0 ? [`${plural(unreadable, "file")} could not be read`] : []),
+  ].join(", ");
+}
+
 /** What an unreadable file tells the operator: the file and the read error. */
 function describeUnreadable({ file, message }) {
   return `cannot read ${file}: ${message}`;
@@ -1275,14 +1287,16 @@ function describeViolation({ file, rule }) {
  * architecture-policy.test.js, so a skipped or broken test file still leaves
  * the rule enforced.
  *
- * Returns the violating paths. Exported for the parity test.
+ * Returns the violating paths, plus a `cannot read <file>: <error>` entry for
+ * each file it could not read, so a read failure never passes for a violation.
+ * Exported for the parity test.
  */
 export function checkArchitecturePolicy(dir) {
   const { checked, violations, unreadable } = scanRestrictedImports(dir, [NDX_CHILD_PROCESS_RULE]);
   return {
     ok: violations.length === 0 && unreadable.length === 0,
     checked,
-    violations: [...violations.map((v) => v.file), ...unreadable.map((u) => u.file)],
+    violations: [...violations.map((v) => v.file), ...unreadable.map(describeUnreadable)],
   };
 }
 
@@ -1292,24 +1306,27 @@ export function checkArchitecturePolicy(dir) {
  * project's `ci.restrictedImports` rules. `applies` is false when there is no
  * rule, and the step is then reported as skipped.
  *
+ * `violations` lists rule violations, then files it could not read;
+ * `unreadable` counts the second kind, so the step's summary can tell them apart.
+ *
  * Exported for tests.
  *
- * @returns {Promise<{ applies: boolean, ok: boolean, rules: number, checked: number, violations: string[] }>}
+ * @returns {Promise<{ applies: boolean, ok: boolean, rules: number, checked: number, violations: string[], unreadable: number }>}
  */
 export async function checkRestrictedImports(dir) {
   // Strict: an unparseable config would otherwise read as "no rules" and skip.
   const { config, errors: configErrors } = await loadProjectConfigStrict(dir);
   if (configErrors.length > 0) {
-    return { applies: true, ok: false, rules: 0, checked: 0, violations: configErrors };
+    return { applies: true, ok: false, rules: 0, checked: 0, violations: configErrors, unreadable: 0 };
   }
   const configLabel = projectConfigLabel(dir, PROJECT_CONFIG_FILE);
   const { rules: configured, errors } = parseRestrictedImports(config?.ci?.restrictedImports, configLabel);
   if (errors.length > 0) {
-    return { applies: true, ok: false, rules: 0, checked: 0, violations: errors };
+    return { applies: true, ok: false, rules: 0, checked: 0, violations: errors, unreadable: 0 };
   }
   const rules = [...(isNdxMonorepo(dir) ? [NDX_CHILD_PROCESS_RULE] : []), ...configured];
   if (rules.length === 0) {
-    return { applies: false, ok: true, rules: 0, checked: 0, violations: [] };
+    return { applies: false, ok: true, rules: 0, checked: 0, violations: [], unreadable: 0 };
   }
   const { checked, violations, unreadable } = scanRestrictedImports(dir, rules);
   return {
@@ -1318,6 +1335,7 @@ export async function checkRestrictedImports(dir) {
     rules: rules.length,
     checked,
     violations: [...violations.map(describeViolation), ...unreadable.map(describeUnreadable)],
+    unreadable: unreadable.length,
   };
 }
 
