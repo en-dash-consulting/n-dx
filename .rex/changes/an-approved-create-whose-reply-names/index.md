@@ -1,13 +1,14 @@
 ---
 id: "42a34384-e328-4c95-8db3-0a96e385b874"
 type: "change"
-title: "An approved create whose reply names an opaque id cannot link the change"
+title: "An approved CAOS create links the change through a URL the profile builds from the item id"
 slug: "an-approved-create-whose-reply-names"
-intent: "Verdict should-fix (high). decideTrackerCard (packages/web/src/server/tracker/sync-engine.ts, decideOnce) links an approved create with changeItemLink(rexDir, rexId, workItemId). changeItemLink only accepts a work ref (link-refs.ts normalizeWorkRef: /^[A-Z][A-Z0-9_]*-\\d+$/ or an http(s) URL). executeTrackerCall takes the id from data[itemIdProperty] ?? data.id. The CAOS-shaped fake's default create reply is {id: \"wi-1\"} (tests/fixtures/connections/fake-mcp-tools.mjs:135): an opaque id. If real CAOS answers likewise (a page id, not WM-2054), every approved create logs ok with a problem \"could not link …: \\\"ref\\\" must be a tracker key\", and later move rules still skip the change. Reachable: Live Tracker activity / Plan's Create in tracker approve. Loud, not silent: the entry names the failure. Unverified: the real CAOS reply shape. Options: (A, recommended) add an optional profile property (e.g. tracker.itemRefProperty) naming the reply field that holds the key or URL, read from the create reply or the confirming get_work_item reply, falling back to the id when it is a work ref; cost small, risk a profile schema change. (B) link the opaque id via v1-style links[] on v2 — contradicts the v2 issues contract. Decision for the operator: confirm the real CAOS create/get reply fields first."
+intent: "Ryan's decision (2026-11-05): real CAOS work items carry only an opaque UUID id (checked read-only through the caos connector: list_work_items/get_work_item return id like 3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0, no WM-style key, no URL field). So changeItemLink, which accepts a tracker key or an http(s) URL (link-refs.ts normalizeWorkRef), refuses every real CAOS create and the change stays unlinked (found in the review of 57bf05e3, run 06531dfc). Fix: the tracker profile builds a URL from the item id. Add an optional profile property (e.g. tracker.itemUrlTemplate in profiles/caos.json, with placeholders for the id as given and the id without dashes); CAOS items are Notion pages, so the CAOS template is the Notion page URL. When a create reply's id is not already a key or URL and the profile has a template, link the change to the built URL, which the existing link rule accepts. Do not widen normalizeWorkRef or the v2 issues contract. Without a template, keep today's behaviour: the entry records the created item and names the link problem. The chip then links to the item through that URL."
 acceptanceCriteria:
-  - "Approving a create card whose reply names an opaque id plus a tracker key (or URL) links the change to the key, and the entry names no link problem"
-  - "A sync-engine test against the fake CAOS server uses a create reply with an opaque id and a key and asserts the change's issues hold the key"
-  - "A later run-started event for that change plans a move with the linked key as the work item id"
+  - "Approving a CAOS create whose reply carries only an opaque id links the change to the URL the profile builds from that id, and the entry names no link problem"
+  - "A profile without an item URL template keeps today's behaviour: the entry records the created item and names the link problem"
+  - "normalizeWorkRef and the v2 issues contract are unchanged"
+  - "A sync-engine test against the fake CAOS server with an opaque-id create reply asserts the change's issues hold the built URL, and a later run-started event plans a move for that work item"
 touches:
   - "7df16224-db25-4a39-81d2-5c5c3904f4b9"
 priority: "high"
