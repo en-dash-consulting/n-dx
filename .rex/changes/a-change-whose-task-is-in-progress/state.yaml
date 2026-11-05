@@ -1,8 +1,13 @@
 schema: "rex/v2"
 items:
   "5f109594-0096-4a42-8b2a-a4b378aa43ce":
+    status: "completed"
     startedAt: "2026-11-05T12:43:20.053Z"
-    activeIntervals: [{"end":"2026-11-05T12:53:00.610Z","start":"2026-11-05T12:43:20.053Z"}]
+    completedAt: "2026-11-05T12:57:43.779Z"
+    endedAt: "2026-11-05T12:57:43.779Z"
+    activeIntervals: [{"end":"2026-11-05T12:53:00.610Z","start":"2026-11-05T12:43:20.053Z"},{"end":"2026-11-05T12:57:43.779Z","start":"2026-11-05T12:57:43.779Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (22):\n- does not expose unexpected commands\n- shows field-level error styling after blur on empty title\n- tests/e2e/cli-arg-contracts.test.js > CLI argument contracts > rex CLI > does not expose unexpected commands\n  AssertionError: unexpected rex command: ready — update the contract if intentional: expected [ 'init', 'status', 'tree', …(35) ] to include 'ready'\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n… and 14 more"
-    lastModified: "2026-11-05T12:53:01.106Z"
+    appliedAt: "2026-11-05T12:57:43.779Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-05T12:57:43.779Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
