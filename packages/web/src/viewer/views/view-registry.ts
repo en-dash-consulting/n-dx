@@ -48,7 +48,6 @@ import {
   RexDashboard,
   TokenUsageView,
   ValidationView,
-  RequirementsView,
   ActivityView,
   TaskAuditView,
   WorkflowOptimizationView,
@@ -282,8 +281,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "validation": ({ navigateTo }) =>
     h(ValidationView, { navigateTo }),
 
-  "requirements": () =>
-    h(RequirementsView, null),
+  // Requirements is a tab of the Product page; the route opens that tab.
+  "requirements": ({ setOpenCapability }) =>
+    h(ProductPage, { onCapabilityChange: setOpenCapability, initialTab: "requirements" }),
 
   "activity": () =>
     h(ActivityView, null),

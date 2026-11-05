@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render, type FunctionComponent } from "preact";
 import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
-import { STAGES } from "../../../src/viewer/views/index.js";
+import { STAGES, stageViews } from "../../../src/viewer/views/index.js";
 import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -86,6 +86,13 @@ describe("routing", () => {
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);
     expect(buildValidViews("rex").has("changes")).toBe(true);
+  });
+
+  it("Plan no longer lists Requirements, yet still owns its route and keeps it valid", () => {
+    expect(STAGES.plan.sections.map((s) => s.view)).not.toContain("requirements");
+    expect(stageViews("plan")).toContain("requirements");
+    expect(buildValidViews(null).has("requirements")).toBe(true);
+    expect(buildValidViews("rex").has("requirements")).toBe(true);
   });
 });
 
@@ -365,5 +372,41 @@ describe("on a v1 project", () => {
     const empty = root.querySelector(".pm-no-product-layer");
     expect(empty?.textContent).toContain("ndx migrate");
     expect(root.querySelector(".pm-area, [data-change-id]")).toBeNull();
+  });
+
+  it("the /requirements route still shows the requirements view, with no Product tabs", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v1" } });
+    await mount(h(ProductPage, { initialTab: "requirements" }));
+    // The requirements view mounts once the product read lands, and reads on mount.
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
+    expect(root.querySelector('[role="tablist"]')).toBeNull();
+    expect(root.querySelector(".pm-no-product-layer")).toBeNull();
+  });
+});
+
+describe("the Requirements tab", () => {
+  const tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Product views"] [role="tab"]')];
+
+  it("sits beside Map and renders the coverage and traceability reads", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    await mount(h(ProductPage, null));
+    expect(tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(tabs()[0].getAttribute("aria-selected")).toBe("true");
+
+    act(() => { tabs()[1].click(); });
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/traceability"));
+    await settle();
+    expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
+    expect(fetched).toContain("/api/rex/requirements/coverage");
+    expect(root.querySelector(".pm-area")).toBeNull();
+  });
+
+  it("the /requirements route opens on that tab on a v2 project", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    await mount(h(ProductPage, { initialTab: "requirements" }));
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
+    expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
   });
 });

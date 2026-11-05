@@ -189,8 +189,9 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "product", requiresServer: true },
       { view: "changes", requiresServer: true },
       { view: "validation" },
-      { view: "requirements" },
     ],
+    // A tab of the Product page; its route still opens that tab.
+    alsoOwns: ["requirements"],
   },
   work: {
     id: "work",
