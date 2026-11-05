@@ -232,6 +232,49 @@ describe("a token typed into the form", () => {
     expect(existsSync(localFile()) ? readLocal().connections : undefined).toBeUndefined();
     expect(service.connectionIds()).toEqual([]);
   });
+
+  describe("kept after a remove", () => {
+    const readdForm = (url: string) => ({ id: "vault", transport: "http", url, auth: "token" });
+    let other: FakeMcpHttpServer;
+
+    beforeEach(async () => {
+      other = await startFakeMcpHttpServer();
+      await send("POST", "/api/connections", { id: "vault", transport: "http", url: fake.url, auth: "token", token: SECRET });
+      await send("DELETE", "/api/connections/vault");
+      fake.authorizations.length = 0;
+    });
+    afterEach(() => other.close());
+
+    it("is not sent to a different server under the same id, and the row says so", async () => {
+      const res = await send("POST", "/api/connections", readdForm(other.url));
+      expect(res.status).toBe(201);
+      const { connection } = await res.json();
+      expect(connection).toMatchObject({ id: "vault", state: "needs-sign-in", signIn: "first", tokenStored: true });
+      expect(connection.reason).toContain(new URL(fake.url).origin);
+      expect(connection.reason).toContain("not used");
+      expect(other.authorizations.filter(Boolean)).toEqual([]);
+      expect(JSON.stringify(connection)).not.toContain(SECRET);
+    });
+
+    it("still works when the same id returns at the same URL", async () => {
+      const res = await send("POST", "/api/connections", readdForm(fake.url));
+      expect((await res.json()).connection).toMatchObject({ state: "connected", tokenStored: true });
+      expect(fake.authorizations).toContain(`Bearer ${SECRET}`);
+    });
+
+    it("is replaced by a token typed for the new server, which then connects", async () => {
+      await send("POST", "/api/connections", readdForm(other.url));
+      const res = await send("PUT", "/api/connections/vault/token", { token: `${SECRET}-new` });
+      expect((await res.json()).connection).toMatchObject({ state: "connected" });
+      expect(other.authorizations).toContain(`Bearer ${SECRET}-new`);
+    });
+
+    it("is dropped with its binding when the operator deletes it", async () => {
+      await send("POST", "/api/connections", readdForm(fake.url));
+      await send("DELETE", "/api/connections/vault?credential=delete");
+      expect(storedCredential("connection-origin:vault", { ndxHome })).toBeUndefined();
+    });
+  });
 });
 
 describe("removing a connection", () => {

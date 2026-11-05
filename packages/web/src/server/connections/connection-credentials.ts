@@ -57,9 +57,44 @@ export function setConnectionToken(id: string, token: string, options: Credentia
   setCredential(connectionCredentialName(id), token, options);
 }
 
-/** Remove connection `id`'s entry; whether there was one. */
+/** Remove connection `id`'s entry (and the origin it was bound to); whether there was one. */
 export function unsetConnectionCredential(id: string, options: CredentialStoreOptions = {}): boolean {
+  unsetCredential(connectionOriginName(id), options);
   return unsetCredential(connectionCredentialName(id), options);
+}
+
+/** The store entry holding the origin connection `id`'s credential was stored for. */
+function connectionOriginName(id: string): string {
+  return `connection-origin:${id}`;
+}
+
+/** The origin (scheme, host, port) of `url`, or undefined when it is not a URL. */
+function originOf(url: string): string | undefined {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Bind connection `id`'s stored credential to the server at `url`, so it is
+ * never sent anywhere else: removing a connection keeps its credential, and
+ * the same id may later be declared at another server.
+ */
+export function bindConnectionCredential(id: string, url: string, options: CredentialStoreOptions = {}): void {
+  const origin = originOf(url);
+  if (origin) setCredential(connectionOriginName(id), origin, options);
+}
+
+/**
+ * The origin the credential kept for `id` was stored for when it is not
+ * `url`'s, else undefined. An entry stored before binding existed carries no
+ * origin and is used as before.
+ */
+export function connectionCredentialBoundElsewhere(id: string, url: string, options: CredentialStoreOptions = {}): string | undefined {
+  const bound = storedCredential(connectionOriginName(id), options)?.value;
+  return bound && bound !== originOf(url) ? bound : undefined;
 }
 
 /** Every secret an entry holds: the token itself, or an OAuth record's tokens and client secret. */

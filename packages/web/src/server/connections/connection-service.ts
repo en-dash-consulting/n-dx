@@ -35,7 +35,7 @@ import {
 import { errorMessage } from "../response-utils.js";
 import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import { loadConnections, type ConnectionConfig, type FieldHints, type HttpConnectionConfig } from "./connection-config.js";
-import { connectionToken, withoutConnectionToken, withoutSecrets } from "./connection-credentials.js";
+import { connectionCredentialBoundElsewhere, connectionToken, withoutConnectionToken, withoutSecrets } from "./connection-credentials.js";
 import {
   ConnectionOAuth,
   ConnectionRefreshError,
@@ -243,6 +243,12 @@ export class ConnectionService {
   /** Every declared connection's id, in config order. Reads config only; connects nothing. */
   connectionIds(): string[] {
     return [...this.slots.keys()];
+  }
+
+  /** An HTTP connection's URL, or undefined for a stdio or unknown one. */
+  connectionUrl(id: string): string | undefined {
+    const config = this.slots.get(id)?.config;
+    return config?.transport === "http" ? config.url : undefined;
   }
 
   /** Whether any connection is declared. */
@@ -486,6 +492,17 @@ export class ConnectionService {
       });
     }
     const url = new URL(config.url);
+    if (config.auth !== "none") {
+      // A credential kept from a removed connection never follows its id to another server.
+      const bound = connectionCredentialBoundElsewhere(config.id, config.url, this.options.credentials);
+      if (bound) {
+        return {
+          state: "needs-sign-in",
+          reason: `a stored credential for ${config.id} was for ${bound}, not this server, and was not used; store a new one`,
+          signIn: "first",
+        };
+      }
+    }
     if (config.auth === "oauth") {
       // Headless: refreshes an expired token, never asks for a sign-in. The
       // transport also refreshes through the provider on a 401.

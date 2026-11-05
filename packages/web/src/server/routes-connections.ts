@@ -46,7 +46,7 @@ import {
   setConnectionProfile,
   setToolOverride,
 } from "./connections/connection-writes.js";
-import { connectionToken, setConnectionToken, unsetConnectionCredential, withoutSecrets } from "./connections/connection-credentials.js";
+import { bindConnectionCredential, connectionToken, setConnectionToken, unsetConnectionCredential, withoutSecrets } from "./connections/connection-credentials.js";
 import {
   ConnectionService,
   workspaceConnectionService,
@@ -363,6 +363,7 @@ export async function handleConnectionsRoute(
     if (typeof token !== "string") return refuse(res, 400, token?.problem ?? `"token" is required`);
     try {
       setConnectionToken(id, token, credentials);
+      bindConnectionCredential(id, service.connectionUrl(id)!, credentials);
     } catch (err) {
       return refuseWrite(res, err, [token]);
     }
@@ -401,6 +402,10 @@ export async function handleConnectionsRoute(
       if (err instanceof ConnectionSignInError) return refuse(res, 400, err.message);
       return refuse(res, 502, `Could not finish the sign-in: ${redactSecrets(errorMessage(err).split(code).join("[code]"))}`);
     }
+    // The record the sign-in stored is for this server.
+    bindConnectionCredential(id, service.connectionUrl(id)!, credentials);
+    service.reconnect(id);
+    await service.listTools([id]);
     jsonResponse(res, 200, { connection: await viewOf(id) });
     return true;
   }
@@ -434,6 +439,7 @@ async function addConnectionRoute(
   if (token !== undefined) {
     try {
       setConnectionToken(config.id, token, credentials);
+      if (config.transport === "http") bindConnectionCredential(config.id, config.url, credentials);
     } catch (err) {
       // No half-added connection.
       removeConnection(ctx.projectDir, config.id);
