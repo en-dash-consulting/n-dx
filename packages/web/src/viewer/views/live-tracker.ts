@@ -17,9 +17,8 @@
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { appUrl } from "../base-path.js";
-import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "../components/sidecar-external-call.js";
-import type { SidecarExternalCall } from "../hooks/sidecar.js";
-import { useFeatureToggle } from "../hooks/index.js";
+import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "../components/index.js";
+import { useFeatureToggle, type SidecarExternalCall } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { formatSince } from "../utils/format.js";
 import {
