@@ -88,6 +88,8 @@ describe("connections routes", () => {
     }));
     service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {} });
     expect(await label()).toBe("CAOS");
+    // Read from config: naming a link connects nothing, so a page view never spawns or waits on a server.
+    expect(service.connection("plain")?.status).toEqual({ state: "unavailable", reason: "not connected yet" });
     expect((await fetch(`${server.baseUrl}/api/connections/tracker`, { method: "POST", headers: auth })).status).toBe(405);
     expect((await fetch(`${server.baseUrl}/api/connections/tracker`)).status).toBe(401);
   });

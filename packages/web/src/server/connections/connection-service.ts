@@ -208,6 +208,11 @@ export class ConnectionService {
     return slot ? this.info(slot) : undefined;
   }
 
+  /** Every declared connection's id, in config order. Reads config only; connects nothing. */
+  connectionIds(): string[] {
+    return [...this.slots.keys()];
+  }
+
   /** Whether any connection is declared. */
   hasConnections(): boolean {
     return this.slots.size > 0;

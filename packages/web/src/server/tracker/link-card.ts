@@ -17,14 +17,8 @@ import type { SidecarLink } from "../../shared/index.js";
 import type { ServerContext } from "../types.js";
 import { changeItemLink, linkRefProblem } from "./item-links.js";
 import { itemLinkRefs } from "./link-refs.js";
-import { trackerLabel } from "./tracker-label.js";
+import { connectionsTrackerLabel } from "./tracker-label.js";
 
-/** The tracker's label for this project, or null while no connection names a tracker profile. */
-export async function projectTrackerLabel(projectDir: string): Promise<string | null> {
-  const service = workspaceConnectionService(projectDir);
-  const connections = await service.listConnections();
-  return trackerLabel(connections.map((info) => service.callContext(info.id)?.profile));
-}
 
 /** A `propose_link` call read against the PRD for its card, or why no card can be raised. Writes nothing. */
 export async function readLinkCall(ctx: Pick<ServerContext, "rexDir" | "projectDir">, input: Record<string, unknown>): Promise<SidecarLink | string> {
@@ -35,7 +29,7 @@ export async function readLinkCall(ctx: Pick<ServerContext, "rexDir" | "projectD
   const item = await (await resolveStore(ctx.rexDir)).getItem(itemId);
   if (!item) return `no item ${itemId}`;
   if (itemLinkRefs(item as { issues?: unknown; links?: unknown }).includes(checked.ref)) return `${itemId} already links to ${checked.ref}`;
-  return { itemId: item.id, title: item.title, ref: checked.ref, label: await projectTrackerLabel(ctx.projectDir) };
+  return { itemId: item.id, title: item.title, ref: checked.ref, label: connectionsTrackerLabel(workspaceConnectionService(ctx.projectDir)) };
 }
 
 /** An approved link card's write. Never throws. */

@@ -27,7 +27,7 @@ import { workspaceConnectionService, type ConnectionInfo, type ConnectionService
 import { ConnectionSignInError } from "./connections/oauth-provider.js";
 import { errorMessage, errorResponse, jsonResponse, readJsonObject } from "./response-utils.js";
 import { resolveServerProfile } from "./tracker/server-profiles.js";
-import { trackerLabel } from "./tracker/tracker-label.js";
+import { connectionsTrackerLabel } from "./tracker/tracker-label.js";
 import type { ServerContext } from "./types.js";
 
 export const CONNECTIONS_PREFIX = "/api/connections";
@@ -131,8 +131,7 @@ export async function handleConnectionsRoute(
 
   if (pathname === TRACKER_PATH) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
-    const connections = await service.listConnections();
-    jsonResponse(res, 200, { label: trackerLabel(connections.map((info) => service.callContext(info.id)?.profile)) });
+    jsonResponse(res, 200, { label: connectionsTrackerLabel(service) });
     return true;
   }
 
