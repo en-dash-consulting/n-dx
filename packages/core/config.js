@@ -143,6 +143,9 @@ const LOCAL_ONLY_SETTINGS = {
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv", ".auth"] },
   hench: new Set(["apiKeyEnv", "claudePath"]),
   web: new Set(["auth"]),
+  // A binary to run and a download to allow are this machine's choices; in the
+  // shared config `bin` is a trust finding and `allowNpx` would opt every clone in.
+  graview: new Set(["bin", "allowNpx"]),
 };
 
 /**
@@ -193,6 +196,9 @@ const PROJECT_SECTIONS = new Set([
   "features",
   "sourcevision",
   "selfHeal",
+  // The Graview projection's settings (`graview.bin`, `graview.allowNpx`, …),
+  // read by packages/graview/src/graview-bin.ts.
+  "graview",
   // Per-extension sections, `extensions.<name>`. Unlike the others it is also
   // read from the user config and set through its own handler (see
   // "Extension config sections" below).
@@ -1229,7 +1235,13 @@ function getValidator(pkg, settingPath) {
   }
   if (pkg === "selfHeal") return SELF_HEAL_VALIDATORS[settingPath] ?? null;
   if (pkg === "hench") return HENCH_VALIDATORS[settingPath] ?? null;
+  if (pkg === "graview" && settingPath === "allowNpx") return validateBooleanSetting;
   return null;
+}
+
+/** A setting the reader takes only as true or false: `yes` or `1` would be stored and then ignored. */
+function validateBooleanSetting(value) {
+  if (typeof value !== "boolean") throw new Error(`expected true or false, got ${JSON.stringify(value)}`);
 }
 
 const REVIEW_MODES = ["off", "self", "pair"];
@@ -2685,8 +2697,12 @@ CLI settings (.n-dx.json):
                                      to raise the limit. Set to 0 to disable the global
                                      timeout entirely.
                                      Exceptions: "work" and "self-heal" default to 14400000
-                                     (4 hours); "start", "web", and "dev" have no default
-                                     timeout (they run until stopped).
+                                     (4 hours); "start", "web", "dev", "mcp", "rex mcp",
+                                     "sv mcp|serve", "graview serve" and "graview mcp" are
+                                     servers: neither a default nor this limit applies, only
+                                     cli.timeouts.<command> (keyed on the top-level command,
+                                     e.g. cli.timeouts.graview, which bounds every graview
+                                     subcommand).
                                      Validation: must be a non-negative integer.
                                      Example: n-dx config cli.timeoutMs 3600000
   cli.timeouts.<command>   number    Per-command timeout override in milliseconds.

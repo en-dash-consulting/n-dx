@@ -4,10 +4,11 @@
  * listed from `placesOf` so a lens added in n-dx.graview.json shows up here
  * with no edit to this file. Every kind is reachable — the hidden ones
  * (commits, components, files) under "Everything else". Graview's own bar
- * stays above without its places (`without: ["places"]`): the face switch,
- * Find, the standing and the person are its; the places are this rail's.
+ * stays above without its places (`without: ["undo", "places"]`): Find, the
+ * standing and the person are its (the face switch sits in the app name's
+ * menu since Graview 0.1.66); the places are this rail's.
  */
-import { placesOf } from "@graview/core";
+import { placesOf } from "@graview/core/seat";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -91,7 +92,10 @@ export function shell(app: App) {
             {kindItem("task")}
             {kindItem("release")}
           </Group>
-          <Group title="Code">{CODE.map(kindItem)}</Group>
+          <Group title="Code">
+            <Item to="/code-map" icon="scene" label="Code map" here={here} />
+            {CODE.map(kindItem)}
+          </Group>
           <Group title="Runs">{RUNS.map(kindItem)}</Group>
           {pictures.length > 0 ? (
             <Group title="Pictures">

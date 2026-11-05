@@ -17,8 +17,9 @@ Rules that keep that honest:
   (`scripts/sync-data.mjs` copies them from the project's graview dir;
   `dev/ndx-door.ts` serves them live, by byte range when asked, since the
   snapshot is in Graview's line format and `fetchSnapshot` reads a kind at a
-  time). That is why there are no gateways here and the domain-isolation
-  tests have nothing to check.
+  time; and `/data/iso-map.html`, sourcevision's isometric map, which the
+  Code map page and zone pages frame). That is why there are no gateways
+  here and the domain-isolation tests have nothing to check.
 - **The types come from the document.** `src/model/types.ts` is written by
   `graview types` from n-dx.graview.json (`pnpm types`), and `src/model/graph.ts`
   reads the store through `typedReader`, so a kind, field or relation renamed
@@ -37,7 +38,10 @@ Rules that keep that honest:
   `mcpClient` in `dev/ndx-door.ts`, which holds the token; the browser never
   sees it). Every kind but change and task is a read-only resource whose
   `because` names the tool that owns it, and the engine guards the store, so
-  such an act is refused and never offered. A write rex refuses (a
+  such an act is refused and never offered. No link is made in the face on any
+  kind (`holdSyncedLinks`): only a change's or task's fields reach rex, so a
+  derived `connect-`/`disconnect-` act is hidden and refused with the owner's
+  sentence. A write rex refuses (a
   transition its table forbids, a completion it holds for a run's test gate)
   is put back to rex's value after the run, and `status: deleted` is never
   sent. The door admits only requests carrying the key it writes into the

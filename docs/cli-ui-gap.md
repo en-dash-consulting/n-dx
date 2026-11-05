@@ -89,7 +89,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx next` | nothing (read-only) | none | none | seconds |
 | `ndx tree` | nothing (read-only) | none | none | seconds |
 | `ndx tree-diff` | nothing (read-only) | none | none | seconds |
-| `ndx graview` | `{graview}/document.json and {graview}/snapshot.json`<br>`{graview}/cache/` (only when the PRD has a product layer and the project is a git repository)<br>`{graview}/data/` (only for serve and mcp) | none | remote (only when no graview binary is configured or on PATH) | seconds to emit; serve and mcp run until stopped |
+| `ndx graview` | `{graview}/document.json and {graview}/snapshot.json`<br>`{graview}/cache/` (only when the PRD has a product layer and the project is a git repository)<br>`{graview}/data/` (only for serve and mcp) | none | remote (only when no graview binary is found and graview.allowNpx or NDX_GRAVIEW_NPX=1 allows the download) | seconds to emit; serve and mcp run until stopped |
 | `ndx readiness` | nothing (read-only) | none | none | seconds |
 | `ndx reset` | `{sourcevision}/` | none | none | seconds |
 | `ndx show` | nothing (read-only) | none | none | seconds |

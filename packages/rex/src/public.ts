@@ -73,6 +73,14 @@ export type { PRDStore, SaveFileReport } from "./store/contracts.js";
 export { takeSaveFileReport } from "./store/contracts.js";
 
 // ---- Store: the PRD model (product + change layers) --------------------------
+// EXPERIMENTAL, from here to the migrations section's end: these helpers are
+// outside the declared freeze (docs/architecture/public-surface.md, "Rex
+// TypeScript helpers"), so their TypeScript signatures may change in a patch
+// release. Not what they return through MCP: productReport, capabilityReport,
+// prdStatusReport and suggestPlacement are get_product, get_capability,
+// get_prd_status and place_change's results, which are soft-frozen, and the
+// node types are the soft-frozen rex/v2 schema. docs/packages/rex.md lists
+// what this covers.
 // One reader for both layouts. A v1 tree reads as changes only (V1_LEVEL_TYPES:
 // epics and features become changes), so a consumer such as the dashboard's
 // Product and Changes views or the Graview projection holds one code path over

@@ -12,7 +12,8 @@ import { NODE_TYPES } from "../../src/rex-gateway.js";
 const KIND_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const FIELD_NAME = /^[a-z][A-Za-z0-9]*$/;
 const EDGE_NAME = /^(?:[a-z][a-z0-9]*(?:-[a-z0-9]+)*|[a-z][A-Za-z0-9]*)$/;
-const REQUIRED_LENSES = ["columns", "timeline", "coverage", "calendar", "blocks"];
+// No timeline: Graview lays one out in numbers (minutes of a day), and runs span dates, which are a calendar's.
+const REQUIRED_LENSES = ["columns", "coverage", "calendar", "blocks"];
 
 describe("n-dx.graview.json", () => {
   const doc = loadDocument();
@@ -49,6 +50,26 @@ describe("n-dx.graview.json", () => {
     ]) {
       expect(edges.has(edge), `edge "${edge}" is emitted but not declared`).toBe(true);
     }
+  });
+
+  it("lists every kind and relation rex does not have in the doc's table of where the names differ", () => {
+    // Rex's own names: its v2 node types (rex's list, not the projection's mapping, so a
+    // kind renamed in both NODE_KINDS and the declaration still needs a row), and the
+    // stored relations the projection carries under rex's field names.
+    const REX_KINDS = new Set<string>(NODE_TYPES);
+    const REX_EDGES = new Set(["dependsOn", "appliesTo", "amends", "touches", "blockedBy", "discoveredFrom"]);
+    const doc_ = readFileSync(new URL("../../../../docs/architecture/graview-projection.md", import.meta.url), "utf-8");
+    const start = doc_.indexOf("### Where the projection's names differ from rex's");
+    expect(start, "docs/architecture/graview-projection.md has no table of where the names differ").toBeGreaterThan(-1);
+    const end = doc_.indexOf("\n#", start + 1);
+    // Only the Projection column counts: a name in the Rex column or the prose around the table is not a row for it.
+    const firstCells = doc_.slice(start, end === -1 ? undefined : end).split(/\r?\n/)
+      .filter((line) => line.startsWith("| ") && !/^\|\s*-/.test(line))
+      .map((line) => line.split("|")[1] ?? "");
+    const named = new Set(firstCells.flatMap((cell) => [...cell.matchAll(/`([A-Za-z][A-Za-z0-9-]*)`/g)].map((m) => m[1]!)));
+    expect(named.size, "the table has no rows").toBeGreaterThan(0);
+    for (const kind of Object.keys(doc.kinds)) if (!REX_KINDS.has(kind)) expect(named.has(kind), `kind "${kind}" is not rex's and the table does not name it`).toBe(true);
+    for (const edge of declaredEdges(doc).keys()) if (!REX_EDGES.has(edge)) expect(named.has(edge), `relation "${edge}" is not rex's and the table does not name it`).toBe(true);
   });
 
   it("names kinds, fields and edges the way the format requires, and every edge target is a kind", () => {

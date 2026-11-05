@@ -173,8 +173,10 @@ describe("AddItemForm", () => {
 
     const titleInput = root.querySelector("#add-form-title") as HTMLInputElement;
 
-    // Blur with empty value triggers field-level validation
-    titleInput.dispatchEvent(new Event("blur", { bubbles: true }));
+    // Blur with empty value triggers field-level validation. Inside act, the
+    // re-render is flushed here, whatever render scheduling another file in
+    // the shared pool left behind; two microtasks were not always enough.
+    act(() => { titleInput.dispatchEvent(new Event("blur", { bubbles: true })); });
     await flush();
 
     // Input should have error class

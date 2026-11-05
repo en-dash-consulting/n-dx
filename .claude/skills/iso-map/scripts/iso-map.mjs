@@ -1903,7 +1903,7 @@ function refresh(scrollPanel){
 }
 
 function selectNode(id){
-  if (!BY[id]) return;
+  if (!Object.prototype.hasOwnProperty.call(BY, id)) return;
   curNode = id; curEdge = null;
   refresh(true);
 }
@@ -1911,6 +1911,65 @@ function selectEdge(index){
   if (!EDGES[index]) return;
   curEdge = index; curNode = null;
   refresh(true);
+}
+/** The node in a scene that is the zone itself (exact) or carries it as a tile on its top face. */
+function holderIn(scene, id, exact){
+  var list = (scene && scene.nodes) || [];
+  for (var i = 0; i < list.length; i++) {
+    var n = list[i];
+    if (n.id === id) return n.id;
+    if (exact) continue;
+    var tiles = n.tiles || [];
+    for (var t = 0; t < tiles.length; t++) if (tiles[t].id === id) return n.id;
+  }
+  return null;
+}
+function ownKey(o, k){ return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+/**
+ * Select a zone from outside (the host's focus message). An area and a zone
+ * may share an id (the area named for its largest zone), and a zone page
+ * means the zone. The zone's own ancestry comes first: ROOT.parents runs
+ * sub-zone, zone, ... up to "area:<id>" when areas are drawn, so the map opens
+ * that area's scene and expands each ancestor in place, outermost first, until
+ * the zone itself is drawn, at any depth. A zone the hierarchy does not reach
+ * falls back to the scene that draws it or carries it as a tile, then to the
+ * top level. An id the map does not draw leaves the scene where it is.
+ * Returns whether it found the zone.
+ */
+function focusZone(id){
+  if (!id) return false;
+  if (MODEL !== ROOT && ownKey(BY, id)) { selectNode(id); return true; }
+  var parents = ROOT.parents || {};
+  var scenes = ROOT.scenes || {};
+  var chain = [], cur = id, guard = 0;
+  while (ownKey(parents, cur) && guard++ < 24) { cur = parents[cur]; chain.push(cur); }
+  if (chain.length > 0) {
+    var top = chain[chain.length - 1];
+    var area = top.indexOf("area:") === 0 && ownKey(scenes, top.slice(5)) ? top.slice(5) : "";
+    switchScene(area);
+    for (var c = chain.length - 1; c >= 0 && !ownKey(BY, id); c--) {
+      var z = chain[c];
+      if (z.indexOf("area:") !== 0 && ownKey(BY, z) && !EXPANDED[z] && expandable(BY[z])) toggleExpand(z);
+    }
+    if (ownKey(BY, id)) { selectNode(id); return true; }
+  }
+  for (var pass = 0; pass < 2; pass++) {
+    for (var sid in scenes) {
+      if (!ownKey(scenes, sid)) continue;
+      var holder = holderIn(scenes[sid], id, pass === 0);
+      if (!holder) continue;
+      switchScene(sid);
+      // A tile is a sub-zone drawn on its parent's top: open the parent so the zone itself can be selected.
+      if (!ownKey(BY, id) && ownKey(BY, holder) && expandable(BY[holder])) toggleExpand(holder);
+      selectNode(ownKey(BY, id) ? id : holder);
+      return true;
+    }
+  }
+  var atRoot = holderIn(ROOT, id, false);
+  if (!atRoot) return false;
+  switchScene("");
+  selectNode(ownKey(BY, "area:" + atRoot) ? "area:" + atRoot : atRoot);
+  return true;
 }
 function clearSelection(){
   if (curNode === null && curEdge === null) return;
@@ -1984,10 +2043,22 @@ function zoomHint(){
 }
 if (EMBED) {
   window.addEventListener("message", function(ev){
+    // Only the page that frames the map steers it: a page that frames that page in turn
+    // could reach this window too, and its messages come from elsewhere.
+    if (ev.source && ev.source !== window.parent) return;
     var d = ev.data;
     if (!d || d.type !== "ndx-iso") return;
     if (typeof d.wheelZoom === "boolean") wheelZoom = d.wheelZoom;
     if (d.theme === "light" || d.theme === "dark") document.documentElement.setAttribute("data-theme", d.theme);
+    if (typeof d.focus === "string") {
+      // A zone the map does not draw clears the last selection, so the map never shows another zone under this one's name,
+      // and the host is told, so it can say why nothing is selected. The reply names an id and a yes or no: nothing private.
+      var found = focusZone(d.focus);
+      if (!found) clearSelection();
+      if (window.parent !== window) {
+        try { window.parent.postMessage({ type: "ndx-iso-focus", focus: d.focus, found: found }, "*"); } catch (e) { /* a detached host */ }
+      }
+    }
   });
 }
 

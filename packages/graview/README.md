@@ -10,22 +10,26 @@ the rex tree, sourcevision's output and hench's run records.
 ndx graview emit .            # writes document.json and snapshot.json under the layout's graview dir
 ndx graview check .           # graview check on the emitted declaration
 ndx graview describe .        # a text readout of the graph, or one place with --place <slug>
-ndx graview serve .           # graview serve: the store over HTTP and its live WebSocket wire, for a Graview face to connect to
+ndx graview serve .           # the product face on the fresh projection; with --no-face, graview serve: the store over HTTP and its
+                              # live WebSocket wire, for a Graview face holding the key it prints (--allow-origin for another origin)
 ndx graview mcp .             # graview mcp --read-only: search_graph, get_node, describe_place, …
 ndx graview info .            # where the projection lands, which binary, and the hub's rex endpoint a face writes back through
 ```
 
 Nothing here depends on `@graview/*`. The `graview` binary is resolved from
-`graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, the installed
-`@n-dx/graview-face`'s own `graview` (it pins the same release), then
-`npx -y graview@0.1.20`. Install it once with `npm i -g graview` to skip the
-npx round-trip.
+`graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, a checkout of
+`@n-dx/graview-face`'s own `graview` (it pins the same release; the published
+face installs none). Nothing is downloaded unasked: with none of those,
+`check`, `describe`, `mcp` and `serve` with no face to run stop and say how to
+install graview, unless `graview.allowNpx: true` (or `NDX_GRAVIEW_NPX=1`)
+lets `npx -y graview@<pinned>` fetch it.
 
 Config keys (`.ndx/config.json` or `.n-dx.json`):
 
 | Key | Meaning |
 |-----|---------|
 | `graview.bin` | Path to the graview binary or its `cli.js`; a `.js` path runs under the current Node |
+| `graview.allowNpx` | When no graview binary is found, let `npx -y graview@<pinned>` download one (default `false`). Read only from your own, untracked local config (`ndx config graview.allowNpx true .`): in the shared config it would opt every clone in. `NDX_GRAVIEW_NPX=1` (`true`, `yes`, `on`) does the same, and `NDX_GRAVIEW_NPX=0` (`false`, `no`, `off`) refuses the download whatever the config says |
 | `graview.includeFiles` | Project file nodes (default `true`); `false` leaves them out, the same as `--no-files` |
 | `graview.proposeProductLayer` | On a v1 tree, draw the areas, capabilities and constraints rex's migration plan proposes, each marked `proposed` (default `true`); `false` projects the tree as changes only |
 | `graview.mainRef` | The branch commits, landings and releases are read from (`main`, `upstream/main`). Unset, rex's default: the first of `origin/HEAD`, `origin/main`, `main` that resolves |

@@ -1,4 +1,4 @@
-import { placesOf } from "@graview/core";
+import { placesOf } from "@graview/core/seat";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { Link } from "react-router-dom";
 import type { App } from "../../app.js";
@@ -77,7 +77,7 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
               <Link key={place.slug} to={place.address} className="ndx-place ndx-rise" style={at(i)}>
                 <b>{place.title}</b>
                 <span>
-                  {place.lens} over {place.kind ? pluralSlug(store.schema, place.kind).replace(/-/g, " ") : "everything"}
+                  {place.lens} over {place.kind ? (place.over ?? [place.kind]).map((kind) => pluralSlug(store.schema, kind).replace(/-/g, " ")).join(" and ") : "everything"}
                 </span>
               </Link>
             ))}

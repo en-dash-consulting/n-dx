@@ -1,6 +1,13 @@
 schema: "rex/v2"
 items:
   "ef5a6cb4-7fcf-4c4e-9bfb-a9a251e4a0e1":
+    status: "completed"
+    startedAt: "2026-11-05T15:57:05.902Z"
+    completedAt: "2026-11-05T15:57:05.902Z"
+    endedAt: "2026-11-05T15:57:05.902Z"
+    activeIntervals: [{"end":"2026-11-05T15:57:05.902Z","start":"2026-11-05T15:57:05.902Z"}]
+    appliedAt: "2026-11-05T15:57:05.902Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Sterling H <sterling.h@endash.us>"
-    lastModified: "2026-10-13T19:53:08.042Z"
+    lastModified: "2026-11-05T15:57:05.902Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

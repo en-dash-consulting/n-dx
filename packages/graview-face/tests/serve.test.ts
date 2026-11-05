@@ -96,6 +96,63 @@ describe("bin/serve.js by hand, with an ambient PORT", () => {
   });
 });
 
+/** Holds `port` on `localhost`, as another checkout's face would. */
+function hold(port: number): Promise<ReturnType<typeof createServer>> {
+  return new Promise((done, fail) => {
+    const server = createServer();
+    server.once("error", fail);
+    server.listen(port, "localhost", () => done(server));
+  });
+}
+
+/** The port serve.js says it listens on, or the error it exits with. */
+function outcome(child: ChildProcess): Promise<{ port?: number; code?: number | null; output: string }> {
+  let output = "";
+  return new Promise((done) => {
+    const onData = (chunk: Buffer) => {
+      output += String(chunk).replace(/\x1b\[[0-9;]*m/g, "");
+      const match = /localhost:(\d+)/.exec(output);
+      if (match) done({ port: Number(match[1]), output });
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.once("exit", (code) => done({ code, output }));
+  });
+}
+
+describe("bin/serve.js when another checkout's face holds the port", () => {
+  const children: ChildProcess[] = [];
+  const held: Array<ReturnType<typeof createServer>> = [];
+  const env = { ...process.env };
+  delete env["NDX_EXTENSION_NAME"];
+  delete env["PORT"];
+
+  afterAll(async () => {
+    for (const child of children) child.kill();
+    await Promise.all(held.map((server) => new Promise((done) => server.close(done))));
+  });
+
+  it("takes the next free port when the default one is held", async () => {
+    const port = await freePort();
+    held.push(await hold(port));
+    // An ambient PORT is a starting point, like the 5188 default.
+    const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
+    children.push(child);
+    const result = await outcome(child);
+    expect(result.port, result.output).toBeGreaterThan(port);
+  }, 90_000);
+
+  it("refuses a port --port names when it is held, rather than serving somewhere else", async () => {
+    const port = await freePort();
+    held.push(await hold(port));
+    const child = spawn(process.execPath, [BIN, "--port", String(port)], { env, stdio: ["pipe", "pipe", "pipe"] });
+    children.push(child);
+    const result = await outcome(child);
+    expect(result.port, result.output).toBeUndefined();
+    expect(result.code).not.toBe(0);
+  }, 90_000);
+});
+
 const sidecarFetch: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers);
   headers.set("X-Ndx-Sidecar-Secret", "test-launch-secret");
@@ -161,6 +218,26 @@ describe("bin/serve.js with an explicitly injected project projection", () => {
     expect(await document.json()).toEqual({ name: "hub-mounted" });
     const info = (await (await sidecarFetch(`${origin}/ndx/sync-info`)).json()) as { live: boolean };
     expect(info.live).toBe(true);
+  });
+
+  it("answers 404 for a code map the projection does not have, never the face's own page, and marks one it does", async () => {
+    for (const path of ["/data/iso-map.html", `${MOUNT}data/iso-map.html`]) {
+      const missing = await sidecarFetch(`${origin}${path}`);
+      expect(missing.status).toBe(404);
+      expect(await missing.text()).not.toContain("ndx-door");
+    }
+    writeFileSync(join(scratch, "iso-map.html"), '<!doctype html>\n<html lang="en" class="embed"><body>map</body></html>');
+    try {
+      const map = await sidecarFetch(`${origin}${MOUNT}data/iso-map.html`);
+      expect(map.status).toBe(200);
+      expect(map.headers.get("x-ndx-iso-map")).toBe("1");
+      // Framed by this origin only: the hub's DENY would otherwise stand, and no other site may frame it.
+      expect(map.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+      expect(map.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+      expect(await map.text()).toContain('class="embed"');
+    } finally {
+      rmSync(join(scratch, "iso-map.html"), { force: true });
+    }
   });
 
   it("hands POST /ndx/mcp to the MCP door, stripped or under the mount", async () => {

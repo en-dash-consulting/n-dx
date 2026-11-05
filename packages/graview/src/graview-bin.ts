@@ -2,9 +2,14 @@
  * Where the `graview` binary is. In order: `graview.bin` in the project
  * config (machine-local over shared; the repository's only once the checkout
  * is trusted), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
- * the product face's own `graview` (it pins the same release this package
- * checks against), then `npx -y graview@<pinned>`. npx resolves a local
- * install and the project `.npmrc` from its working directory, so the
+ * a product face checkout's own `graview` (it pins the same release this
+ * package checks against; the published face lists graview as a dev
+ * dependency, so an npm install of it brings none), then — only when the user opts in with
+ * `graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1` — `npx -y
+ * graview@<pinned>`. Without the opt-in nothing is downloaded: npx fetches
+ * and runs a package at command time and hangs offline, so the answer is
+ * `source: "none"` with a sentence on how to install graview. npx resolves a
+ * local install and the project `.npmrc` from its working directory, so the
  * fallback runs in a directory n-dx owns under the ndx home, never the
  * checkout: a graview the repository installs is not run. A path ending in
  * `.js`/`.mjs`/`.cjs` is a CLI entry run under the current Node, so a sibling
@@ -16,15 +21,16 @@
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
-import { resolveNdxHome, trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
+import { isLocalConfigTracked, resolveNdxHome, trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
 import { GRAVIEW_VERSION } from "./document.js";
 
-export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx";
+export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx" | "none";
 
 export interface GraviewCommand {
   cmd: string;
   /** Arguments that come before the graview subcommand (`-y graview@x` for npx, the script for a .js entry). */
   prefix: string[];
+  /** `none`: nothing found and npx not allowed; `cmd` is empty and `detail` says how to install graview. */
   source: GraviewBinSource;
   /** What was configured or found, for the operator. */
   detail: string;
@@ -59,9 +65,13 @@ export interface GraviewConfig {
    * a checkout goes under `extensions.paths`. Read only so the CLI can say so.
    */
   app?: string;
+  /** When no graview binary is found, let `npx -y graview@<pinned>` download one. Default false. */
+  allowNpx?: boolean;
 }
 
 export const GRAVIEW_BIN_ENV = "NDX_GRAVIEW_BIN";
+/** Set to 1 (or true) to let npx download the pinned graview when none is installed; 0 (or false) refuses it whatever the config says. */
+export const GRAVIEW_NPX_ENV = "NDX_GRAVIEW_NPX";
 
 function readConfigFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -86,10 +96,14 @@ export function readGraviewConfig(layout: Layout): GraviewConfig {
     trustedProjectConfig(layout.root, readConfigFile(layout.configFile)),
     trustedLocalConfig(layout.root, readConfigFile(layout.localConfigFile)),
   ];
-  for (const config of configs) {
+  // A download is the user's to allow: `allowNpx` counts only from their own, untracked local config.
+  // In the shared config, or a local one the repository commits, it would opt every clone in unasked.
+  const ownLocal = !isLocalConfigTracked(layout.root);
+  for (const [i, config] of configs.entries()) {
     const section = config?.graview;
     if (section === null || typeof section !== "object") continue;
-    const { bin, includeFiles, app, mainRef, proposeProductLayer } = section as Record<string, unknown>;
+    const { bin, includeFiles, app, mainRef, proposeProductLayer, allowNpx } = section as Record<string, unknown>;
+    if (i === 1 && ownLocal && typeof allowNpx === "boolean") out.allowNpx = allowNpx;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();
     if (typeof includeFiles === "boolean") out.includeFiles = includeFiles;
     if (typeof mainRef === "string" && mainRef.trim().length > 0) out.mainRef = mainRef.trim();
@@ -164,13 +178,30 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
   const fromFace = faceBin(options.face, platform);
   if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
-  const npx = platform === "win32" ? "npx.cmd" : "npx";
+  // The environment wins either way: NDX_GRAVIEW_NPX=0 (false, no, off) refuses a download the local config allows.
+  const npxEnv = env[GRAVIEW_NPX_ENV]?.trim().toLowerCase();
+  const envAllows = npxEnv === undefined || npxEnv === "" ? undefined : ["1", "true", "yes", "on"].includes(npxEnv) ? true : ["0", "false", "no", "off"].includes(npxEnv) ? false : undefined;
+  if (envAllows ?? readGraviewConfig(layout).allowNpx === true) {
+    const npx = platform === "win32" ? "npx.cmd" : "npx";
+    return {
+      cmd: npx,
+      prefix: ["-y", `graview@${GRAVIEW_VERSION}`],
+      source: "npx",
+      detail: `npx -y graview@${GRAVIEW_VERSION}`,
+      cwd: join(resolveNdxHome({ env }), "graview", "npx"),
+    };
+  }
   return {
-    cmd: npx,
-    prefix: ["-y", `graview@${GRAVIEW_VERSION}`],
-    source: "npx",
-    detail: `npx -y graview@${GRAVIEW_VERSION}`,
-    cwd: join(resolveNdxHome({ env }), "graview", "npx"),
+    cmd: "",
+    prefix: [],
+    source: "none",
+    // Every way out named here is one this resolver then finds: a global install lands on
+    // PATH (a project's node_modules/.bin is not searched), and `ndx config` writes both keys
+    // to the machine-local config, whichever file the layout uses.
+    detail:
+      `no graview binary found. Install it with \`npm i -g graview@${GRAVIEW_VERSION}\`, ` +
+      `point at one with \`ndx config graview.bin <path> .\` or ${GRAVIEW_BIN_ENV}, ` +
+      `or let npx download it with \`ndx config graview.allowNpx true .\` or ${GRAVIEW_NPX_ENV}=1.`,
   };
 }
 

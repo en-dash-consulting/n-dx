@@ -24,5 +24,6 @@ export {
   execStdout,
   trustedProjectConfig,
   trustedLocalConfig,
+  isLocalConfigTracked,
 } from "@n-dx/llm-client";
 export type { Layout, SpawnToolResult } from "@n-dx/llm-client";

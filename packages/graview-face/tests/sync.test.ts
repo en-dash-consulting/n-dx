@@ -248,4 +248,70 @@ describe("two-way sync with rex as the system of record", () => {
     expect(door.rex.get(change.id)?.status).toBe(was);
     expect((store.graph.getNode(change.id) as unknown as Item).status).toBe(was);
   });
+
+  it("offers no act on a synced kind that rex could not take: no archive, merge, tidying or relation act, which would change the face and never reach rex", async () => {
+    const { store, change, sync } = await setUp();
+    const task = (store.graph.nodesOfKind("task" as never) as unknown as Item[])[0]!;
+    const otherChange = (store.graph.nodesOfKind("change" as never) as unknown as Item[]).find((c) => c.id !== change.id)!;
+    const otherTask = (store.graph.nodesOfKind("task" as never) as unknown as Item[]).find((t) => t.id !== task.id)!;
+    // Only status, priority, title and tags reach rex (mapping.ts): every other act on change or task is off.
+    const release = sync.guard();
+    try {
+      const offered = (store.permittedMutations(SEAT) as readonly { name: string }[]).map((m) => m.name).filter((n) => /-(change|task)(-|$)/.test(n));
+      expect(offered.filter((n) => /^(archive|unarchive|merge|leave-alone|allow-tidying|connect|disconnect)-/.test(n))).toEqual([]);
+      for (const [name, args] of [
+        ["archive-change", { id: change.id }],
+        ["merge-change", { id: change.id, into: otherChange.id }],
+        ["leave-alone-change", { id: change.id }],
+        ["archive-task", { id: task.id }],
+        ["merge-task", { id: task.id, into: otherTask.id }],
+        ["leave-alone-task", { id: task.id }],
+      ] as const) {
+        // Gone from the declaration (archives: false, tidying: "never"): no such act.
+        expect(() => store.apply({ name, args } as never, { author: SEAT }), name).toThrow();
+      }
+      // The link acts exist and would apply without the guard: each is refused with rex's sentence.
+      const capability = (store.graph.nodesOfKind("capability" as never) as unknown as Item[])[0]!;
+      for (const [name, args, says] of [
+        ["connect-change-touches", { id: change.id, to: capability.id }, "ndx rex change place"],
+        ["connect-task-blocked-by", { id: task.id, to: otherTask.id }, "edit_item (blockedBy)"],
+      ] as const) {
+        let refused: unknown;
+        try {
+          store.apply({ name, args } as never, { author: SEAT });
+        } catch (error) {
+          refused = error;
+        }
+        expect(refused, name).toBeInstanceOf(PermissionDeniedError);
+        expect(String((refused as Error).message), name).toContain(says);
+      }
+      expect(store.graph.getNode(change.id)).toBeTruthy();
+      expect(store.graph.getNode(task.id)).toBeTruthy();
+      // Said in rex's words before it is tried, and rex's own system still links what it projects.
+      const said = store.permits({ name: "connect-change-touches", args: { id: change.id, to: otherChange.id } } as never, SEAT);
+      expect(said.ok).toBe(false);
+      expect(JSON.stringify(said)).toContain("ndx rex change place");
+    } finally {
+      release();
+    }
+  });
+
+  it("refuses a link on a kind another tool owns too: Graview's guard holds its fields, this one its links", async () => {
+    const { store, sync } = await setUp();
+    const zones = store.graph.nodesOfKind("zone" as never) as unknown as Item[];
+    expect(zones.length).toBeGreaterThan(1);
+    const release = sync.guard();
+    try {
+      let refused: unknown;
+      try {
+        store.apply({ name: "connect-zone-crosses", args: { id: zones[0]!.id, to: zones[1]!.id } } as never, { author: SEAT });
+      } catch (error) {
+        refused = error;
+      }
+      expect(refused).toBeInstanceOf(PermissionDeniedError);
+      expect(String((refused as Error).message)).toContain("sourcevision");
+    } finally {
+      release();
+    }
+  });
 });

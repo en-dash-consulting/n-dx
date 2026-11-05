@@ -785,6 +785,26 @@ describe("n-dx config", () => {
       expect(shared.web.port).toBe(4000);
     });
 
+    it("sets graview.allowNpx and graview.bin in .n-dx.local.json, as the graview install hint says", async () => {
+      // `ndx graview` names these two commands when no graview binary is found;
+      // in the shared file `bin` is a trust finding and `allowNpx` would opt every clone in.
+      await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify({ graview: { includeFiles: false } }, null, 2) + "\n");
+      expect(run(["graview.allowNpx", "true", tmpDir])).toContain("graview.allowNpx = true");
+      run(["graview.bin", join(tmpDir, "graview.cjs"), tmpDir]);
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.graview).toEqual({ allowNpx: true, bin: join(tmpDir, "graview.cjs") });
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.graview).toEqual({ includeFiles: false });
+    });
+
+    it("refuses a graview.allowNpx that is not true or false, which the reader would ignore", async () => {
+      for (const value of ["yes", "1"]) {
+        const result = spawnSync(process.execPath, [CLI_PATH, "config", "graview.allowNpx", value, tmpDir], { encoding: "utf-8", env: isolatedEnv(), timeout: DEFAULT_TIMEOUT });
+        expect(result.status, value).not.toBe(0);
+        expect(result.stderr, value).toContain("expected true or false");
+      }
+    });
+
     it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
       // The trust review reads a non-default apiKeyEnv in .hench/config.json
       // or .n-dx.json as the repository's credential routing: written there,

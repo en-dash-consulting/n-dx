@@ -1394,8 +1394,9 @@ const ORCHESTRATOR_HELP_DEFS = {
       "Every command re-emits first, so the graph is never older than the tree.\n" +
       "The projection is read-only: nothing is written under the rex,\n" +
       "sourcevision or hench directories. No @graview/* dependency: the binary\n" +
-      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, the\n" +
-      "installed @n-dx/graview-face's own graview, or npx -y graview@<pinned>.",
+      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, a\n" +
+      "@n-dx/graview-face checkout's own graview; npx -y graview@<pinned> only\n" +
+      "with graview.allowNpx: true or NDX_GRAVIEW_NPX=1.",
     options: [
       { flag: "--no-files", description: "Leave source files out (default: every file, with its zone, the commits that changed it and the capabilities living there)" },
       { flag: "--place=<slug>", description: "describe: one place (a titled lens) instead of the whole graph" },
@@ -1406,7 +1407,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     examples: [
       { command: "ndx graview emit .", description: "Write document.json and snapshot.json" },
-      { command: "ndx graview check .", description: "Validate the declaration with graview check" },
+      { command: "ndx graview check .", description: "Validate the declaration with graview check, and hold the emitted snapshot to it" },
       { command: "ndx graview serve .", description: "Run the product face on the fresh projection (http://localhost:5188)" },
       { command: "ndx graview serve --no-face .", description: "Serve the bare store for a Graview face to connect to" },
       { command: "ndx graview mcp . --list", description: "List the read tools an agent would get" },

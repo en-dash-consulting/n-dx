@@ -46,6 +46,8 @@ beforeEach(() => {
   vi.stubEnv("NDX_HOME", home);
   // `ndx work` and `ndx start` export the user's runner here; with none, serve draws the bare store.
   vi.stubEnv("NDX_CLI_PATH", "");
+  // The bare store needs a graview; npx (spawn is recorded, not run) stands in for one.
+  vi.stubEnv("NDX_GRAVIEW_NPX", "1");
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });

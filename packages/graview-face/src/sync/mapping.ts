@@ -44,6 +44,26 @@ export function because(kind: string): string {
   return `${kind} is not written from here: it belongs to ${OWNERS[kind] ?? "another tool"}.`;
 }
 
+/**
+ * A synced record's links are rex's too, but no write reaches rex for one:
+ * the engine pushes fields only. Graview derives `connect-` and `disconnect-`
+ * acts for every relation (0.1.37), so the face's guard refuses them on a
+ * change or a task with this sentence, naming where rex changes the link.
+ */
+const LINK_OWNER: Readonly<Record<string, string>> = {
+  under: "move an item with ndx rex move",
+  amends: "place a change with ndx rex change place",
+  touches: "place a change with ndx rex change place",
+  blockedBy: "set what blocks it with rex's edit_item (blockedBy)",
+  discoveredFrom: "rex records it when the change is captured",
+  plannedFor: "a release is a field rex keeps on the change (plannedRelease)",
+  shippedWith: "a release is a field rex keeps on the change (shippedIn, stamped from CI)",
+};
+
+export function linkBecause(kind: string, relation: string): string {
+  return `a ${kind}'s ${relation} is not changed from here: rex keeps it; ${LINK_OWNER[relation] ?? "change it in rex"}.`;
+}
+
 /** The mapping over every kind the schema declares: two synced, the rest read-only. */
 export function mapping(kinds: readonly string[]): SyncMapping {
   const synced: ResourceMapping[] = SYNCED_KINDS.map((kind) => ({

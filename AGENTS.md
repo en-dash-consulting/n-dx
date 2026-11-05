@@ -222,7 +222,7 @@ Follow `.rex/workflow.md` for task execution discipline. Key steps:
 
 ## Available Skills
 
-The following skills are installed in `.agents/skills/`. Each skill directory contains a `SKILL.md` with detailed instructions.
+The following skills are installed in `.agents/skills/`.
 
 - **no-plan-mode** — Prevent plan-mode stalls in autonomous hench agent runs
 - **ndx-plan** — Analyze the codebase and propose PRD updates
@@ -233,6 +233,7 @@ The following skills are installed in `.agents/skills/`. Each skill directory co
 - **ndx-config** `[key] [value]` — View or change n-dx configuration with guided assistance
 - **ndx-reshape** — Restructure the PRD — regroup, reparent, merge overlaps and place changes
 - **ndx-feedback** `[description]` — Submit feedback, bug reports, or feature requests for n-dx
+- **ndx-graview** — Run the product map and report what is wrong
 - **ndx-adversarial-review** `[task-id | name | topic]` — Attack a change or a completion claim, triage what breaks, and capture only what the user approves
 
 ## MCP Servers

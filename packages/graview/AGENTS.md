@@ -8,8 +8,10 @@ rex PRD model, sourcevision's JSON output and hench's run records. `ndx graview 
 
 - **No `@graview/*` or `graview` dependency, ever.** The binary is a peer tool
   resolved from `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH,
-  then `npx -y graview@<pinned>` (`src/graview-bin.ts`), run from a directory
-  under the ndx home so npx never resolves the checkout's own install. A repository's
+  then `npx -y graview@<pinned>` only on the `graview.allowNpx` /
+  `NDX_GRAVIEW_NPX` opt-in, and otherwise a refusal naming how to install it
+  (`src/graview-bin.ts`). npx runs from a directory under the ndx home so it
+  never resolves the checkout's own install. A repository's
   `graview.bin` (`.n-dx.json`, or a git-tracked `.n-dx.local.json`) is a
   trust finding and applies only once the checkout is trusted. `@graview/core` is a
   devDependency only, so the tests can compile the declaration;
@@ -19,7 +21,8 @@ rex PRD model, sourcevision's JSON output and hench's run records. `ndx graview 
 - **Read-only.** Nothing is written under the rex, sourcevision or hench
   directories. Output and the trailer and commit-file caches go under
   the layout's graview dir (`.ndx/graview` or `.graview`), which `ndx init`
-  gitignores.
+  gitignores and every emit also ignores from inside (a `.gitignore` of `*`),
+  for projects initialized before the projection existed.
 - **One gateway per upstream package.** `src/rex-gateway.ts`,
   `src/sourcevision-gateway.ts`, `src/hench-gateway.ts` and
   `src/llm-gateway.ts` are the only files that import another `@n-dx/*`
@@ -51,7 +54,9 @@ carries, never a judgement rex has not made.
 
 ```
 <graviewDir>/
+  .gitignore      `*`: the dir ignores itself, whatever the project's own .gitignore says
   document.json   the declaration, `name` set to the project
+  iso-map.html    sourcevision's isometric map in embed mode, when the project is analyzed: the face's Code map and zone pages frame it
   snapshot.json   Graview's line format: a header saying when it was made and what it holds, then one record per line, keys sorted — the body is byte-identical on an unchanged checkout
   data/           graview's own store, created by `serve` and `mcp`; refreshed with `sync-seed`
   cache/          rex's N-DX-Item trailer cache and commit-file cache, kept here

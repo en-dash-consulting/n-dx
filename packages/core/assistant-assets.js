@@ -472,8 +472,9 @@ export function renderAgentsMd(projectDir = process.cwd()) {
   sections.push(
     "## Available Skills",
     "",
-    "The following skills are installed in `.agents/skills/`. " +
-      "Each skill directory contains a `SKILL.md` with detailed instructions.",
+    // Kept short: Codex reads root + nested AGENTS.md as one chain under a
+    // fixed byte budget (tests/e2e/agents-md-size-budget.test.js).
+    "The following skills are installed in `.agents/skills/`.",
     "",
   );
 

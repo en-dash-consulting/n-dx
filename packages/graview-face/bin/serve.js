@@ -10,6 +10,11 @@
  *
  * The port is `--port`, else `PORT`, else 5188. Only the hub's `PORT`, which
  * arrives with `NDX_EXTENSION_NAME`, mounts the page at `/x/<name>/`.
+ *
+ * A port `--port` names, or the hub assigned, is insisted on. Otherwise the
+ * port is a starting point: when another checkout's face already holds 5188,
+ * this one takes the next free port, so several projects can each run
+ * `ndx graview serve` at once.
  */
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +23,8 @@ const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
   console.log(`ndx-graview-face [--port <n>]
 
-  Serves n-dx's face on Graview at the root, on --port, else PORT, else 5188.
+  Serves n-dx's face on Graview at the root, on --port, else PORT, else 5188;
+  without --port a held port moves on to the next free one.
   Under \`ndx graview serve .\` the projection and the rex endpoint arrive in
   the environment; by hand it serves public/data (see \`pnpm sync\`), read-only.
   Started by the hub, /x/<name>/ explains how to open a project with ndx graview serve.`);
@@ -71,7 +77,9 @@ if (hubbed && !process.env.NDX_GRAVIEW_DIR) {
 } else {
   // --help and a projectless hub mount need no Vite dependency at runtime.
   const { createServer } = await import("vite");
-  const server = await createServer({ root, base, configFile: resolve(root, "vite.config.ts"), server: { port, strictPort: true, host: hubbed ? "127.0.0.1" : "localhost" } });
+  // The hub probes the port it assigned, and a named --port is a promise to the caller; both are strict.
+  const strictPort = hubbed || portFlag !== -1;
+  const server = await createServer({ root, base, configFile: resolve(root, "vite.config.ts"), server: { port, strictPort, host: hubbed ? "127.0.0.1" : "localhost" } });
   await server.listen();
   server.printUrls();
 }
