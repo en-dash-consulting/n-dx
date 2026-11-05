@@ -50,7 +50,7 @@ export function InboxScreen({ context }: { context: Ctx }) {
       {placedNever.length > 0 ? (
         <Section title={`Finished, never placed (${placedNever.length})`} i={1}>
           <p className="ndx-small ndx-muted" style={{ margin: 0 }}>
-            Done work the rules could not put on a capability. Nothing waits on it; the migration places it as history, so it is not counted as needing attention.
+            Finished or dropped work (completed, cancelled or deleted) the rules could not put on a capability. Nothing waits on it; the migration places it as history, so it is not counted as needing attention.
           </p>
           <Rows>{placedNever.slice(0, 40).map((n, i) => <RecordRow key={n.id} context={context} node={n} i={i} />)}</Rows>
           {placedNever.length > 40 ? <p className="ndx-small ndx-muted">and {placedNever.length - 40} more</p> : null}

@@ -1545,7 +1545,7 @@
       },
       {
         "title": "Under way",
-        "key": "open-changes"
+        "key": "under-way"
       },
       {
         "list": "all('change') where status == 'in_progress' or status == 'blocked' or status == 'failing'",

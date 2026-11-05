@@ -199,10 +199,9 @@ export function RecordCard({ context, node, i = 0, children }: { context: Ctx; n
 /** An area's card says what it holds, not its slug: a proposed area carries no standing of its own. */
 function AreaBadges({ context, area }: { context: Ctx; area: Of<"area"> }) {
   const s = areaStanding(context.store, area);
-  if (s.capabilities === 0) return <div className="ndx-badges"><Badge plain>no capabilities yet</Badge></div>;
   return (
     <div className="ndx-badges">
-      <Badge tone={s.met === s.capabilities ? "good" : "accent"}>{s.met} of {s.capabilities} met</Badge>
+      {s.capabilities === 0 ? <Badge plain>no capabilities yet</Badge> : <Badge tone={s.met === s.capabilities ? "good" : "accent"}>{s.met} of {s.capabilities} met</Badge>}
       {s.open > 0 ? <Badge tone="accent">{s.open} {s.open === 1 ? "change" : "changes"} open</Badge> : null}
     </div>
   );
