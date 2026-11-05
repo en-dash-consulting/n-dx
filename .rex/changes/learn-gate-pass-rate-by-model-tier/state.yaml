@@ -13,7 +13,13 @@ items:
     lastModified: "2026-11-05T05:26:02.048Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73eb106d-acbe-4325-9009-7ef625aa193e":
-    lastModified: "2026-11-05T05:35:25.445Z"
+    status: "completed"
+    startedAt: "2026-11-05T05:49:24.752Z"
+    completedAt: "2026-11-05T06:11:55.954Z"
+    endedAt: "2026-11-05T06:11:55.954Z"
+    activeIntervals: [{"end":"2026-11-05T06:05:23.804Z","start":"2026-11-05T05:49:24.752Z"},{"end":"2026-11-05T06:11:55.954Z","start":"2026-11-05T06:11:55.954Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (30):\n- concurrent auth requests share one spawn\n- viewer source contains no bare 'ndx <command>' strings\n- sends PUT request when concurrency slider changes\n- shows field-level error styling after blur on empty title\n- tests/e2e/mcp-transport.test.js > MCP HTTP transport (e2e)\n  Error: Server did not start within 8000ms:\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n… and 22 more"
+    lastModified: "2026-11-05T06:11:55.954Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9e8c64c5-d9c6-411c-9412-690db4082b2d":
     lastModified: "2026-11-05T01:04:51.088Z"
