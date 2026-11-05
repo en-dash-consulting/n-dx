@@ -7,6 +7,8 @@
  * neither draws. The server side is tracker-routes.test.ts.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ChangeTrackerChip, asTrackerChipRead } from "../../../src/viewer/components/tracker-chip.js";
@@ -114,5 +116,18 @@ describe("ChangeTrackerChip", () => {
     await mount();
     expect(root.querySelector(".tracker-chip, .create-in-tracker-button")).toBeNull();
     expect(calls.some((c) => c.url === "/api/tracker/changes")).toBe(false);
+  });
+});
+
+describe("tracker chip styles (stage-tiles.css)", () => {
+  const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf8");
+
+  it("styles the chip and opens the form full width beneath its row", () => {
+    expect(css).toMatch(/\.tracker-chip\s*\{[^}]*border-radius/);
+    expect(css).toMatch(/\.create-in-tracker-open\s*\{[^}]*flex:\s*1 0 100%/);
+  });
+
+  it("leaves an unlinked label in plain text: only a.tracker-link takes the link colour", () => {
+    expect(css).not.toMatch(/\.tracker-chip\s+\.tracker-link/);
   });
 });
