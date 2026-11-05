@@ -62,10 +62,13 @@ items:
     lastModified: "2026-11-05T05:19:33.667Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "95300e23-699c-4649-8aa2-af95a1d4b6a0":
+    status: "completed"
     startedAt: "2026-11-05T06:53:31.131Z"
-    activeIntervals: [{"end":"2026-11-05T07:09:22.667Z","start":"2026-11-05T06:53:31.131Z"}]
+    completedAt: "2026-11-05T07:10:10.193Z"
+    endedAt: "2026-11-05T07:10:10.193Z"
+    activeIntervals: [{"end":"2026-11-05T07:09:22.667Z","start":"2026-11-05T06:53:31.131Z"},{"end":"2026-11-05T07:10:10.193Z","start":"2026-11-05T07:10:10.193Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
-    lastModified: "2026-11-05T07:09:24.099Z"
+    lastModified: "2026-11-05T07:10:10.193Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a520e32b-17c3-41a8-a192-2f5784b2765d":
     lastModified: "2026-11-05T01:01:56.305Z"
