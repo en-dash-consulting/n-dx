@@ -45,7 +45,7 @@ import {
   openClaimsStore,
   resolveClaimHolder,
   computeEdges,
-  suggestPlacement,
+  suggestPlacements,
 } from "../rex-gateway.js";
 import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
 
@@ -719,6 +719,11 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
   const constraints = map.constraints.filter((c) => bound.has(c.id));
 
   const changes = changesOf(index);
+  // One batch: rex builds its placement inputs once, not once per Inbox change.
+  const guesses = suggestPlacements(
+    tree,
+    changes.filter((c) => !isAppliedChange(c) && isOpenChange(c) && awaitsPlacement(index, c)).map((c) => c.id),
+  );
   const openChanges: OpenChangeOverlayWire[] = [];
   const inbox: AreaInboxGuessWire[] = [];
   const applied: ChangeRuleNode[] = [];
@@ -729,8 +734,10 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
       continue;
     }
     if (!isOpenChange(change)) continue;
-    if (awaitsPlacement(index, change)) {
-      const suggestion = suggestPlacement(tree, change.id);
+    const guess = guesses.get(change.id);
+    if (guess) {
+      if ("error" in guess) continue;
+      const { suggestion } = guess;
       const top = suggestion.shortlist[0];
       const target = top ? index.resolve(top.target) : undefined;
       if (target && (target.type === "capability" || target.type === "constraint") && owned.has(target.id)) {

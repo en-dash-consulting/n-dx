@@ -560,7 +560,7 @@ describe("web → rex gateway contract", () => {
     "parseApplyOn",
     "parsePlacementSettings",
     // v2 placement — the Inbox section and the detail panel place and propose
-    "suggestPlacement",
+    "suggestPlacements",
     "recordPlacement",
     "recordProposal",
     "ChangePlacementError",
@@ -1022,7 +1022,7 @@ describe("gateway export auto-detection", () => {
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
         "parseApplyOn", "parsePlacementSettings",
-        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength", "draftChangePlacement",
+        "suggestPlacements", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength", "draftChangePlacement",
         // The Sidecar change-set card flags proposed items with smart add's own matcher.
         "findDuplicateItem"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",

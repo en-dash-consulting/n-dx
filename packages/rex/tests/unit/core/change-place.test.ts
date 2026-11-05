@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
-import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../../src/core/change-place.js";
+import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement, suggestPlacements } from "../../../src/core/change-place.js";
 import { placementStrength } from "../../../src/core/placement.js";
 import { checkV2Rules, indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
@@ -161,6 +161,52 @@ describe("suggestPlacement", () => {
       );
       expect(() => suggestPlacement(twoAreas(), "ch", undefined, { area: "nowhere" })).toThrow(ChangePlacementError);
     });
+  });
+});
+
+describe("suggestPlacements", () => {
+  // Several Inbox changes amending each other's candidates, plus one applied, one cancelled and one unknown ref.
+  const inbox = (): V2Tree => {
+    const t = tree();
+    t.changes.push(
+      node({ id: "ch2", type: "change", displayId: "CH-2", title: "Refund an order twice", needsPlacement: true, amends: [{ target: "card", delta: "modified", summary: "s", proposed: "p" }] }),
+      node({ id: "ch3", type: "change", title: "Split the store module", tags: ["code-health"], needsPlacement: true, amends: [{ target: "refund", delta: "modified", summary: "s", proposed: "p" }] }),
+      node({ id: "ch4", type: "change", displayId: "CH-4", title: "Card copy", needsPlacement: true, amends: [{ target: "card", delta: "modified", summary: "s", proposed: "p" }, { target: "A1.1", delta: "removed", summary: "s" }] }),
+      node({ id: "ch5", type: "change", title: "Old card refund work", ...APPLIED, needsPlacement: true }),
+      node({ id: "gone", type: "change", title: "Card refund", status: "cancelled", needsPlacement: true }),
+    );
+    return t;
+  };
+  const refs = ["CH-1", "ch2", "ch3", "CH-4", "ch5", "gone", "nowhere"];
+
+  const single = (t: V2Tree, ref: string, ...rest: [number?, { area?: string }?]) => {
+    try {
+      return { suggestion: suggestPlacement(t, ref, ...rest) };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  it("equals suggestPlacement for every ref, refusals included", () => {
+    const t = inbox();
+    const batch = suggestPlacements(t, refs);
+    expect([...batch.keys()]).toEqual(refs);
+    for (const ref of refs) expect(batch.get(ref)).toEqual(single(t, ref));
+    expect(batch.get("CH-4")).toMatchObject({ suggestion: { shortlist: expect.arrayContaining([expect.objectContaining({ target: "card", amendedBy: ["CH-2"] })]) } });
+    expect(batch.get("gone")).toMatchObject({ error: { kind: "change-not-open" } });
+    expect(batch.get("nowhere")).toMatchObject({ error: { kind: "no-such-change" } });
+  });
+
+  it("equals suggestPlacement with a shortlist size and an area", () => {
+    const t = inbox();
+    const batch = suggestPlacements(t, refs, 1, { area: "pay" });
+    for (const ref of refs) expect(batch.get(ref)).toEqual(single(t, ref, 1, { area: "pay" }));
+  });
+
+  it("refuses the whole call for an area that is not live", () => {
+    expect(() => suggestPlacements(inbox(), refs, undefined, { area: "nowhere" })).toThrow(
+      expect.objectContaining({ kind: "not-an-area" }) as unknown as Error,
+    );
   });
 });
 

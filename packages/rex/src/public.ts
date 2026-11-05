@@ -114,9 +114,9 @@ export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOption
 // or a proposal and writes nothing; a drafted proposal has no target, so
 // accepting it through `recordProposal` mints the new node's id.
 
-export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
+export { suggestPlacement, suggestPlacements, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
 export type {
-  ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, SuggestedPlacementRow, RecordPlacementInput, RecordPlacementResult,
+  ChangePlacementErrorKind, PlacementSuggestion, PlacementSuggestionResult, SuggestedPlacementCandidate, SuggestedPlacementRow, RecordPlacementInput, RecordPlacementResult,
   RecordProposalInput, RecordProposalOptions, RecordProposalResult, PlacementDraft, DraftedProposal,
 } from "./core/change-place.js";
 export { draftChangePlacement } from "./analyze/place-draft.js";

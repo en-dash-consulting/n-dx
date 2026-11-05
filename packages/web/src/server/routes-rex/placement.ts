@@ -16,7 +16,7 @@
  *                                         rex's dry run of `{ target, relation?, … }` or `{ propose: { type, under, title, … } }`
  *                                         on the loaded tree: what it would record, or the refusal kind. Writes nothing.
  *
- * Rex decides everything (`suggestPlacement`, `recordPlacement`,
+ * Rex decides everything (`suggestPlacements`, `recordPlacement`,
  * `recordProposal`); this module enriches the shortlist with what the viewer
  * shows and writes through rex's v2 transaction, as `place_change` does.
  * {@link writePlacement} is the one write: the two POST routes and an
@@ -44,14 +44,20 @@ import {
   isAppliedChange,
   awaitsPlacement,
   resolveStore,
-  suggestPlacement,
+  suggestPlacements,
   recordPlacement,
   recordProposal,
   ChangePlacementError,
   placementStrength,
   withPrdModelTransaction,
 } from "../rex-gateway.js";
-import type { RuleNode, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
+import type { RuleNode, TreeIndex, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
+
+/** One change's rex suggestion, read off `suggestPlacements` so the gateway carries no extra type for it. */
+type PlacementSuggestion = Extract<
+  ReturnType<typeof suggestPlacements> extends Map<string, infer R> ? R : never,
+  { suggestion: unknown }
+>["suggestion"];
 import type { SidecarPlacementCheck, SidecarPlacementRequest } from "../../shared/index.js";
 
 // ── Wire types (mirror viewer/views/product-model.ts) ────────────────
@@ -158,9 +164,9 @@ function areaTitles(index: ReturnType<typeof indexTree>): (id: string) => string
 /** Rex's shortlist rows, each with the target's title, area, statement and criteria. */
 function enrichShortlist(
   index: ReturnType<typeof indexTree>,
+  areaOf: (id: string) => string,
   candidates: ReadonlyArray<{ target: string; score: number; strength: PlacementStrengthWire; reasons: string[]; amendedBy?: string[] }>,
 ): PlacementCandidateWire[] {
-  const areaOf = areaTitles(index);
   return candidates.flatMap((candidate): PlacementCandidateWire[] => {
     const node = index.resolve(candidate.target);
     if (!node || (node.type !== "capability" && node.type !== "constraint")) return [];
@@ -182,11 +188,17 @@ function enrichShortlist(
 
 /** The shortlist for `changeRef`, with each candidate's title, area, statement and criteria. */
 export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePlacementWire {
-  const suggestion = suggestPlacement(tree, changeRef);
+  const result = suggestPlacements(tree, [changeRef]).get(changeRef)!;
+  if ("error" in result) throw result.error;
   const index = indexTree(tree);
+  return placementWire(index, areaTitles(index), result.suggestion);
+}
+
+/** The wire shape of rex's `suggestion`, with each candidate's title, area, statement and criteria. */
+function placementWire(index: TreeIndex, areaOf: (id: string) => string, suggestion: PlacementSuggestion): ChangePlacementWire {
   const change = index.resolve(suggestion.change)!;
   const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
-  const shortlist = enrichShortlist(index, suggestion.shortlist);
+  const shortlist = enrichShortlist(index, areaOf, suggestion.shortlist);
 
   return {
     layout: "v2",
@@ -276,16 +288,14 @@ export interface ChangePlacementsWire {
 /** The shortlist of every open change awaiting placement and every applied change never placed, keyed by change id. */
 export function buildAwaitingPlacements(tree: V2Tree): ChangePlacementsWire["placements"] {
   const index = indexTree(tree);
+  const waiting = index.entries.flatMap(({ node }) =>
+    node.type === "change" && (isOpenChange(node) ? awaitsPlacement(index, node) : isAppliedChange(node) && !!node.needsPlacement) ? [node.id] : [],
+  );
+  // One batch: rex builds its placement inputs once, not once per change.
+  const areaOf = areaTitles(index);
   const out: ChangePlacementsWire["placements"] = {};
-  for (const { node } of index.entries) {
-    if (node.type !== "change") continue;
-    const waiting = isOpenChange(node) ? awaitsPlacement(index, node) : isAppliedChange(node) && !!node.needsPlacement;
-    if (!waiting) continue;
-    try {
-      out[node.id] = buildChangePlacement(tree, node.id);
-    } catch (err) {
-      out[node.id] = { error: errorMessage(err) };
-    }
+  for (const [id, result] of suggestPlacements(tree, waiting)) {
+    out[id] = "error" in result ? { error: errorMessage(result.error) } : placementWire(index, areaOf, result.suggestion);
   }
   return out;
 }
@@ -647,12 +657,13 @@ async function handlePlacementDraft(changeRef: string, res: ServerResponse, ctx:
   try {
     const { tree } = await loadPrdModel(ctx.rexDir);
     const draft = await draftChangePlacement(tree, changeRef, { rexDir: ctx.rexDir, projectDir: ctx.projectDir });
+    const index = indexTree(tree);
     const body: PlacementDraftWire = {
       layout: "v2",
       change: draft.change,
       relation: draft.relation,
       tied: draft.tied,
-      shortlist: enrichShortlist(indexTree(tree), draft.shortlist),
+      shortlist: enrichShortlist(index, areaTitles(index), draft.shortlist),
       ...(draft.pick !== undefined ? { pick: draft.pick } : {}),
       ...(draft.proposal ? { proposal: draft.proposal } : {}),
       ...(draft.model ? { model: draft.model } : {}),

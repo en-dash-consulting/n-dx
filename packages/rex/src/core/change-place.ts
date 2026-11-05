@@ -6,6 +6,8 @@
  *   over the tree's live capabilities and constraints. Rules only: the text
  *   model and Jev are seams a caller with a model supplies to
  *   `decidePlacement`; the caller of this module (an assistant) is the model.
+ *   {@link suggestPlacements} ranks many changes against one tree, building
+ *   the index, the nodes and the open amenders once.
  * - {@link recordPlacement} writes the choice: a `touches` target joins the
  *   change's `touches`; an `amends` target becomes a `modified` amendment with
  *   `base` set to the target's current spec hash, so apply refuses it if the
@@ -41,7 +43,7 @@
 import { randomUUID } from "node:crypto";
 import type { AddedNodeType, Amendment, ChangeNode, CriteriaDelta, Criterion } from "../schema/v2.js";
 import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
-import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
 import { computeEdges } from "./product-edges.js";
 import {
   asProposal,
@@ -151,15 +153,59 @@ export function suggestPlacement(
   shortlistSize = PLACEMENT_SHORTLIST_SIZE,
   options: SuggestPlacementOptions = {},
 ): PlacementSuggestion {
-  const change = placeableChange(tree, changeRef);
+  return suggestFrom(placementContext(tree, options), changeRef, shortlistSize);
+}
+
+/** One ref's {@link suggestPlacement} result, or the refusal it threw. */
+export type PlacementSuggestionResult = { suggestion: PlacementSuggestion } | { error: ChangePlacementError };
+
+/**
+ * {@link suggestPlacement} for each of `changeRefs`, keyed by ref, with the
+ * tree index, the ranked nodes and the open amenders built once rather than
+ * once per change. A ref that cannot be placed carries its refusal; an area
+ * that is not live refuses the whole call, as it would every single one.
+ */
+export function suggestPlacements(
+  tree: V2Tree,
+  changeRefs: Iterable<string>,
+  shortlistSize = PLACEMENT_SHORTLIST_SIZE,
+  options: SuggestPlacementOptions = {},
+): Map<string, PlacementSuggestionResult> {
+  const context = placementContext(tree, options);
+  const out = new Map<string, PlacementSuggestionResult>();
+  for (const ref of changeRefs) {
+    try {
+      out.set(ref, { suggestion: suggestFrom(context, ref, shortlistSize) });
+    } catch (err) {
+      if (!(err instanceof ChangePlacementError)) throw err;
+      out.set(ref, { error: err });
+    }
+  }
+  return out;
+}
+
+/** What ranking any change against one tree needs, independent of the change. */
+interface PlacementContext {
+  index: TreeIndex;
+  nodes: PlacementNode[];
+  /** Per product node id, every open change amending it (modified or removed), in tree order. */
+  amenders: Map<string, Array<{ id: string; label: string }>>;
+}
+
+function placementContext(tree: V2Tree, options: SuggestPlacementOptions): PlacementContext {
+  const index = indexTree(tree);
+  const inArea = options.area === undefined ? undefined : areaTargets(tree, index, options.area);
+  const all = placementNodes(index);
+  return { index, nodes: inArea ? all.filter((n) => inArea.has(n.id)) : all, amenders: openAmenders(index) };
+}
+
+function suggestFrom(context: PlacementContext, changeRef: string, shortlistSize: number): PlacementSuggestion {
+  const change = placeableChange(context.index, changeRef);
   const input = placementInput(change);
   const { relation, rule } = defaultRelationRule(change);
-  const inArea = options.area === undefined ? undefined : areaTargets(tree, options.area);
-  const nodes = inArea ? placementNodes(tree).filter((n) => inArea.has(n.id)) : placementNodes(tree);
   // Rank at least two, so a tie shows even when the caller asks for one.
-  const ranked = rankPlacementCandidates(input, nodes, Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
+  const ranked = rankPlacementCandidates(input, context.nodes, Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
   const [top, next] = ranked;
-  const amendedBy = openAmenders(tree, change);
   return {
     change: change.id,
     relation,
@@ -168,14 +214,20 @@ export function suggestPlacement(
     shortlist: ranked.slice(0, shortlistSize).map((c) => ({
       ...c,
       strength: placementStrength(c.score),
-      amendedBy: amendedBy.get(c.target) ?? [],
+      amendedBy: amendedByOthers(context.amenders.get(c.target), change.id),
     })),
   };
 }
 
+/** The labels of `amenders` other than `changeId`, each once, first claim first. */
+function amendedByOthers(amenders: ReadonlyArray<{ id: string; label: string }> | undefined, changeId: string): string[] {
+  const labels: string[] = [];
+  for (const { id, label } of amenders ?? []) if (id !== changeId && !labels.includes(label)) labels.push(label);
+  return labels;
+}
+
 /** The ids of the capabilities and constraints that are `areaRef`'s placement targets. */
-function areaTargets(tree: V2Tree, areaRef: string): Set<string> {
-  const index = indexTree(tree);
+function areaTargets(tree: V2Tree, index: TreeIndex, areaRef: string): Set<string> {
   const resolved = index.resolve(areaRef);
   const area = resolved?.type === "area"
     ? resolved
@@ -197,19 +249,18 @@ function areaTargets(tree: V2Tree, areaRef: string): Set<string> {
   return new Set([...capabilities, ...constraints]);
 }
 
-/** Per product node id, the open changes other than `change` that amend it (modified or removed), by display id or id. */
-function openAmenders(tree: V2Tree, change: RuleNode): Map<string, string[]> {
-  const index = indexTree(tree);
-  const out = new Map<string, string[]>();
+/** Per product node id, the open changes that amend it (modified or removed), with their display id or id. */
+function openAmenders(index: TreeIndex): Map<string, Array<{ id: string; label: string }>> {
+  const out = new Map<string, Array<{ id: string; label: string }>>();
   for (const { node } of index.entries) {
-    if (node.type !== "change" || node.id === change.id || !isOpenChange(node)) continue;
+    if (node.type !== "change" || !isOpenChange(node)) continue;
     for (const amendment of node.amends ?? []) {
       if (amendment.delta === "added") continue;
       const target = index.resolve(amendment.target);
       if (!target) continue;
-      const label = node.displayId ?? node.id;
       const list = out.get(target.id) ?? [];
-      if (!list.includes(label)) out.set(target.id, [...list, label]);
+      list.push({ id: node.id, label: node.displayId ?? node.id });
+      out.set(target.id, list);
     }
   }
   return out;
@@ -245,7 +296,7 @@ export interface RecordPlacementResult {
 export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPlacementInput, now: Date): RecordPlacementResult {
   const next = structuredClone(tree);
   const index = indexTree(next);
-  const change = placeableChange(next, changeRef) as ChangeNode & RuleNode;
+  const change = placeableChange(index, changeRef) as ChangeNode & RuleNode;
   if (isAppliedChange(change) && (input.relation === "amends" || input.proposed !== undefined || input.criteria !== undefined)) {
     throw appliedChangeAmends(change);
   }
@@ -351,7 +402,7 @@ export function recordProposal(
 ): RecordProposalResult {
   const next = structuredClone(tree);
   const index = indexTree(next);
-  const change = placeableChange(next, changeRef) as ChangeNode & RuleNode;
+  const change = placeableChange(index, changeRef) as ChangeNode & RuleNode;
   // An added amendment on an applied change would never be applied.
   if (isAppliedChange(change)) throw appliedChangeAmends(change);
   const label = change.displayId ?? change.id;
@@ -428,11 +479,12 @@ export interface PlacementDraft {
  * draft is the rules shortlist alone.
  */
 export async function draftPlacement(tree: V2Tree, changeRef: string, model?: PlacementModel): Promise<PlacementDraft> {
-  const change = placeableChange(tree, changeRef);
+  const index = indexTree(tree);
+  const change = placeableChange(index, changeRef);
   // A pick could only touch, and a proposal is refused outright: drafting is for open changes.
   if (isAppliedChange(change)) throw appliedChangeAmends(change);
   const input = placementInput(change);
-  const result = await placeChange(input, placementNodes(tree), { model, areas: placementAreas(tree) });
+  const result = await placeChange(input, placementNodes(index), { model, areas: placementAreas(tree) });
   const warnings = [...result.warnings];
   const { shortlist } = result;
   const [top, next] = shortlist;
@@ -508,8 +560,8 @@ function novelApplyProblems(before: V2Tree, after: V2Tree, changeId: string, now
 }
 
 /** The open or applied change `ref` names, or a refusal naming why it cannot be placed. */
-function placeableChange(tree: V2Tree, ref: string): RuleNode {
-  const node = indexTree(tree).resolve(ref);
+function placeableChange(index: TreeIndex, ref: string): RuleNode {
+  const node = index.resolve(ref);
   if (!node || node.type !== "change") throw new ChangePlacementError(`No live change "${ref}"`, "no-such-change");
   // A change cancelled after it was applied stays refused: abandoned, whatever appliedAt says.
   const abandoned = node.status === "cancelled" || node.status === "deleted";
@@ -549,8 +601,8 @@ function placementInput(node: RuleNode): PlacementChange {
 }
 
 /** Every live capability and constraint, as the ranker sees it. */
-function placementNodes(tree: V2Tree): PlacementNode[] {
-  return indexTree(tree).entries.flatMap(({ node, root }): PlacementNode[] => {
+function placementNodes(index: TreeIndex): PlacementNode[] {
+  return index.entries.flatMap(({ node, root }): PlacementNode[] => {
     if (root !== "product" || (node.type !== "capability" && node.type !== "constraint")) return [];
     return [{
       id: node.id,

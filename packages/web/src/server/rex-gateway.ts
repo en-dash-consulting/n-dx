@@ -70,7 +70,9 @@ export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
 // The Inbox routes read a change's placement shortlist and place or propose it
 // through rex's own rule (the one `rex change place` and MCP `place_change`
 // run), so the shortlist, the strength bands and the refusals stay rex's.
-export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError, placementStrength } from "@n-dx/rex";
+// `suggestPlacements` ranks one change or many against one tree, building rex's
+// placement inputs once: the area read and the Inbox list rank every Inbox change.
+export { suggestPlacements, recordPlacement, recordProposal, ChangePlacementError, placementStrength } from "@n-dx/rex";
 export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
 export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
 export type { RecordProposalInput, RecordProposalOptions, RecordProposalResult } from "@n-dx/rex";
