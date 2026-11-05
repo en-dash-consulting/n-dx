@@ -24,7 +24,14 @@ items:
     lastModified: "2026-11-05T02:17:12.466Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "99e2bdb7-df41-4278-8cf7-c20b1776935c":
-    lastModified: "2026-11-05T02:17:54.804Z"
+    status: "completed"
+    startedAt: "2026-11-05T05:08:43.782Z"
+    completedAt: "2026-11-05T05:17:56.619Z"
+    endedAt: "2026-11-05T05:17:56.619Z"
+    activeIntervals: [{"end":"2026-11-05T05:17:56.619Z","start":"2026-11-05T05:08:43.782Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "toolLineStatus takes resultFailed; drawer passes toolResultIsError(output) (\"[error] \" wire prefix). Viewer test added."
+    lastModified: "2026-11-05T05:17:56.619Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c6cba43b-b23d-4602-9986-cbf53e54fa6e":
     status: "completed"

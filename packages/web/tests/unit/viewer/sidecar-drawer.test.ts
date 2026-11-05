@@ -923,6 +923,25 @@ describe("tool calls", () => {
     expect(tools[0].querySelector(".sidecar-tool-wire")!.textContent).toBe("mcp__ndx-sidecar__fake__create_ticket");
   });
 
+  it("reads a card-less call whose result is an error as Failed, keeping its details", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "mcp__ndx-sidecar__run_command", { argv: ["rm"] }, "toolu_A"),
+      call(2, "mcp__ndx-sidecar__run_command", { argv: ["ls"] }, "toolu_B"),
+      result(3, "unknown", "[error] command not allowed", "toolu_A"),
+      result(4, "unknown", "ok", "toolu_B"),
+    ];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-status")!.textContent)).toEqual(["Failed", "Done"]);
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-dot")!.getAttribute("data-status"))).toEqual(["failed", "done"]);
+
+    await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
+    expect(tools[0].querySelector(".sidecar-tool-output")!.textContent).toBe("[error] command not allowed");
+  });
+
   it("uses the connection's label from its external-call card and shows the waiting state", async () => {
     server.sessions = [{ session: session(), running: true }];
     server.frames = [call(1, "mcp__ndx-sidecar__fake__create_ticket", { title: "t" })];

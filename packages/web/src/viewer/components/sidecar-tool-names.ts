@@ -140,11 +140,22 @@ export function connectionLabelsFromCards(cards: readonly ToolLineCard[]): Recor
 /**
  * A call's status: waiting while its card is pending, failed when the operator
  * denied or the card was withdrawn or its effect failed, done once a result
- * is in, else running. The wire result carries no error flag, so a failure
- * shows only where a card records one.
+ * is in, else running. A result that is itself an error (`resultFailed`)
+ * reads failed even with no card: a call that raised none, such as a refusal.
  */
-export function toolLineStatus(card: ToolLineCard | undefined, hasResult: boolean): ToolLineStatus {
+export function toolLineStatus(card: ToolLineCard | undefined, hasResult: boolean, resultFailed = false): ToolLineStatus {
   if (card?.status === "pending") return "waiting";
   if (card && (card.status === "denied" || card.status === "withdrawn" || card.carriedOut?.ok === false)) return "failed";
+  if (hasResult && resultFailed) return "failed";
   return hasResult ? "done" : "running";
+}
+
+/**
+ * Whether a tool result's output is an error. The wire has no flag: the vendor
+ * parser (llm-client's Claude stream-json reader) prefixes `[error] ` to the
+ * output of a result the CLI marked `is_error`, which includes a broker
+ * refusal (an MCP `isError` result).
+ */
+export function toolResultIsError(output: string): boolean {
+  return output.startsWith("[error] ");
 }
