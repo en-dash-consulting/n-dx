@@ -25,6 +25,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
 import { handleRequestSecurity } from "../../src/server/request-security.js";
+import { handleConnectionsRoute } from "../../src/server/routes-connections.js";
 import { createAnnouncingBroker, handleSidecarRoute, sidecarBrokerEndpoint } from "../../src/server/routes-sidecar.js";
 import { isSidecarBrokerRequest } from "../../src/server/sidecar/broker-credential.js";
 import { BROKER_SCOPE_TOOLS } from "../../src/server/sidecar/broker-policy.js";
@@ -80,11 +81,12 @@ async function startDashboard(connections?: Record<string, unknown>, options: { 
   broker = createAnnouncingBroker(dir, () => {});
   server = await startRouteTestServer((req, res) => {
     if (handleRequestSecurity(req, res, { token: TOKEN, scopedCredential: isSidecarBrokerRequest })) return true;
-    return handleSidecarRoute(req, res, ctx, () => {}, {
-      registryFor: () => registry,
-      brokerFor: () => broker,
-      connectionsFor: () => service,
-    });
+    return handleConnectionsRoute(req, res, ctx, { connectionsFor: () => service, credentials: { ndxHome } }).then((handled) =>
+      handled || handleSidecarRoute(req, res, ctx, () => {}, {
+        registryFor: () => registry,
+        brokerFor: () => broker,
+        connectionsFor: () => service,
+      }));
   });
   ctx.port = server.port;
 }
@@ -451,5 +453,45 @@ describe("an external-call card's form, hints and problems", () => {
     // No retry with altered arguments, and no second card.
     expect(fake.calls).toEqual([{ name: "reject_ticket", arguments: { title: "t" } }]);
     expect(broker.cards(id)).toHaveLength(1);
+  });
+});
+
+describe("a tool's class and policy edited on the Settings route", () => {
+  const put = (path: string, body: unknown) =>
+    fetch(`${server.baseUrl}${path}`, { method: "PUT", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const localConnections = () => JSON.parse(readFileSync(join(root, ".n-dx.local.json"), "utf-8")).connections;
+
+  it("reach the next tools/list of a session that is already running, and the local config file", async () => {
+    await startDashboard({ docs: { transport: "http", url: fake.url } });
+    const { client } = await sessionClient();
+    const names = async () => (await client.listTools()).tools.map((t) => t.name).filter((n) => n.startsWith("docs__")).sort();
+    expect(await names()).toEqual(["docs__delete_item", "docs__read_item", "docs__update_item"]);
+
+    // never: gone from the session's list.
+    const never = await put("/api/connections/docs/tools/delete_item", { policy: "never" });
+    expect(never.status).toBe(200);
+    expect((await never.json()).tool).toMatchObject({ tool: "delete_item", policy: "never", policySource: "override" });
+    expect(await names()).toEqual(["docs__read_item", "docs__update_item"]);
+    expect(localConnections().docs.tools).toEqual({ delete_item: { policy: "never" } });
+
+    // A class change moves the default policy with it: a write told to be a read runs.
+    const read = await put("/api/connections/docs/tools/update_item", { class: "read" });
+    expect((await read.json()).tool).toMatchObject({ class: "read", classSource: "override", policy: "run", policySource: "default" });
+
+    // null clears the override and the tool comes back.
+    const cleared = await put("/api/connections/docs/tools/delete_item", { policy: null });
+    expect((await cleared.json()).tool).toMatchObject({ policy: "ask", policySource: "default" });
+    expect(await names()).toEqual(["docs__delete_item", "docs__read_item", "docs__update_item"]);
+    expect(localConnections().docs.tools).toEqual({ update_item: { class: "read" } });
+  });
+
+  it("refuse an unknown tool, class or policy and write nothing", async () => {
+    await startDashboard({ docs: { transport: "http", url: fake.url } });
+    const before = readFileSync(join(root, ".n-dx.local.json"), "utf-8");
+    expect((await put("/api/connections/docs/tools/nope", { policy: "never" })).status).toBe(404);
+    expect((await put("/api/connections/docs/tools/read_item", { policy: "sometimes" })).status).toBe(400);
+    expect((await put("/api/connections/docs/tools/read_item", { class: "admin" })).status).toBe(400);
+    expect((await put("/api/connections/missing/tools/read_item", { policy: "run" })).status).toBe(404);
+    expect(readFileSync(join(root, ".n-dx.local.json"), "utf-8")).toBe(before);
   });
 });

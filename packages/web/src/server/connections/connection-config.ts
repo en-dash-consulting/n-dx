@@ -139,7 +139,7 @@ export function parseFieldHints(raw: unknown, skipped: string[]): FieldHints | u
 }
 
 /** One entry as a connection, or the reason it is not one. */
-function parseConnection(id: string, raw: unknown, warnHint: (message: string) => void): ConnectionConfig | string {
+export function parseConnection(id: string, raw: unknown, warnHint: (message: string) => void): ConnectionConfig | string {
   if (!CONNECTION_ID_PATTERN.test(id)) return `its id must match ${CONNECTION_ID_PATTERN}`;
   const entry = asRecord(raw);
   if (!entry) return "it is not an object";

@@ -202,6 +202,38 @@ export class ConnectionService {
     return [...this.slots.values()].map((slot) => this.info(slot));
   }
 
+  /**
+   * Re-read the declared connections (or use `configs`): a connection whose
+   * declaration is unchanged keeps its client; a removed or changed one is
+   * closed, and a changed or new one connects afresh on its next use. The
+   * Settings page calls this after it writes config, so the broker, which
+   * shares this service, sees the change without a restart.
+   */
+  reload(configs: ConnectionConfig[] = loadConnections(this.options.projectDir, { warn: this.warn })): void {
+    const wanted = new Map(configs.map((config) => [config.id, config]));
+    for (const [id, slot] of [...this.slots]) {
+      const next = wanted.get(id);
+      if (next && JSON.stringify(next) === JSON.stringify(slot.config)) continue;
+      this.reset(slot, { state: "unavailable", reason: "not connected yet" });
+      this.slots.delete(id);
+    }
+    for (const config of configs) {
+      if (!this.slots.has(config.id)) {
+        this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" }, failures: 0, sent: [] });
+      }
+    }
+    // Keep the declared order, which the listings show.
+    const ordered = configs.map((config) => [config.id, this.slots.get(config.id)!] as const);
+    this.slots.clear();
+    for (const [id, slot] of ordered) this.slots.set(id, slot);
+  }
+
+  /** Drop `connection`'s client so its next use connects afresh, e.g. after its stored token changed. */
+  reconnect(connection: string): void {
+    const slot = this.slots.get(connection);
+    if (slot) this.reset(slot, { state: "unavailable", reason: "not connected yet" });
+  }
+
   /** One connection with its state, without connecting it; undefined for an unknown id. */
   connection(id: string): ConnectionInfo | undefined {
     const slot = this.slots.get(id);
@@ -492,7 +524,8 @@ export class ConnectionService {
           this.fail(slot, live, err);
         }
       });
-      if (this.closed) {
+      if (this.closed || this.slots.get(config.id) !== slot) {
+        // Closed, or removed or replaced by a reload while it connected.
         await client.close().catch(() => undefined);
         return undefined;
       }
@@ -573,7 +606,7 @@ const workspaceServices = new Map<string, ConnectionService>();
  * The workspace's connections, read from its `.n-dx.local.json` on first use
  * and kept for the server's life: one service per workspace, shared by the
  * Sidecar broker and the connections routes, so a sign-in reaches the broker.
- * A connection added later needs a restart until the Settings page manages them.
+ * The Settings page reloads it after writing config; a hand edit of the file needs a restart.
  */
 export function workspaceConnectionService(projectDir: string): ConnectionService {
   let service = workspaceServices.get(projectDir);

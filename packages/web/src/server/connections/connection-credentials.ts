@@ -49,6 +49,14 @@ export function setConnectionCredentialRecord(id: string, record: Record<string,
   setCredential(connectionCredentialName(id), JSON.stringify(record), options);
 }
 
+/**
+ * Store `token` as connection `id`'s entry, replacing what was there. Throws
+ * (without the value in the message) for an empty or multi-line token.
+ */
+export function setConnectionToken(id: string, token: string, options: CredentialStoreOptions = {}): void {
+  setCredential(connectionCredentialName(id), token, options);
+}
+
 /** Remove connection `id`'s entry; whether there was one. */
 export function unsetConnectionCredential(id: string, options: CredentialStoreOptions = {}): boolean {
   return unsetCredential(connectionCredentialName(id), options);

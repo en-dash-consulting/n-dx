@@ -1,8 +1,11 @@
 /**
- * Connections — the read-only section of Settings > Project that lists the
- * MCP servers the operator connected (`connections` in the local config
- * file, whose name the server sends) with their state, and signs OAuth connections in and out. Shown only while
- * `web.sidecar` is on; the Project page decides.
+ * Connections — the section of Settings > Project that manages the MCP servers
+ * the operator connected (`connections` in the local config file, whose name
+ * the server sends): their state, an add form (connections-add-form.ts), Test,
+ * Remove, each server's tools, profile and token (connections-details.ts), and
+ * the tracker sync rules (connections-sync.ts). Every change is saved at once
+ * by its own route to the untracked local config file, so it never makes the
+ * page dirty. Shown only while `web.sidecar` is on; the Project page decides.
  *
  * Sign-in goes through this page and nothing else. Sign in asks the server
  * for an authorization URL that returns to `<base>/project?connection=<id>`,
@@ -16,23 +19,22 @@
 import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { appUrl, getBasePath, replaceAppHistory } from "../base-path.js";
+import { AddConnectionForm } from "./connections-add-form.js";
+import {
+  connectionPath,
+  connectionStateLabel,
+  errorText,
+  readError,
+  send,
+  type ConnectionRow,
+  type Notice,
+  type ToolRow,
+} from "./connections-api.js";
+import { ConnectionDetails } from "./connections-details.js";
+import { SyncRulesSection } from "./connections-sync.js";
 
-export interface ConnectionRow {
-  id: string;
-  label: string;
-  transport: "http" | "stdio";
-  auth: "none" | "token" | "oauth";
-  state: "connected" | "unavailable" | "needs-sign-in";
-  reason?: string;
-  /** On a needs-sign-in row: the first sign-in, or one the connection had and lost. */
-  signIn?: "first" | "again";
-  tools: number;
-}
-
-interface Notice {
-  kind: "ok" | "error";
-  text: string;
-}
+export { connectionStateLabel };
+export type { ConnectionRow };
 
 /** The page a sign-in returns to, and the query parameter naming its connection. */
 const RETURN_PATH = "/project";
@@ -40,27 +42,7 @@ const CONNECTION_PARAM = "connection";
 /** What an authorization server adds to the return address. */
 const RETURN_PARAMS = [CONNECTION_PARAM, "code", "state", "error", "error_description", "error_uri", "iss"];
 
-/** The state as Settings words it. */
-export function connectionStateLabel(row: Pick<ConnectionRow, "state" | "reason" | "signIn">): string {
-  if (row.state === "connected") return "connected";
-  if (row.state === "unavailable") return `connection unavailable: ${row.reason ?? "unknown reason"}`;
-  // The server says whether the connection lost a sign-in it had; the reason text is only shown.
-  return row.signIn === "again" ? "sign in again" : "sign in";
-}
-
-async function readError(res: Response): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error) return body.error;
-  } catch {
-    // Not JSON: the status says enough.
-  }
-  return `HTTP ${res.status}`;
-}
-
-async function post(path: string, body: Record<string, unknown> = {}): Promise<Response> {
-  return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-}
+const post = (path: string, body: Record<string, unknown> = {}): Promise<Response> => send("POST", path, body);
 
 interface SignInReturn {
   connection: string;
@@ -125,6 +107,11 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /** The connection whose tools, profile and token are open. */
+  const [expanded, setExpanded] = useState<string | null>(null);
+  /** The connection asking to be removed, and whether its stored credential goes too. */
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [deleteCredential, setDeleteCredential] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -209,14 +196,58 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
     }
   };
 
+  const testRow = async (row: ConnectionRow) => {
+    setBusy(row.id);
+    setNotice(null);
+    try {
+      const res = await post(`${connectionPath(row.id)}/test`);
+      if (!res.ok) {
+        setNotice({ kind: "error", text: `Could not test ${row.label}: ${await readError(res)}` });
+        return;
+      }
+      const { connection, tools } = (await res.json()) as { connection: ConnectionRow; tools: ToolRow[] };
+      replaceRow(connection);
+      setNotice(connection.state === "connected"
+        ? { kind: "ok", text: `${connection.label} is connected: ${tools.length} tool${tools.length === 1 ? "" : "s"}.` }
+        : { kind: "error", text: `${connection.label}: ${connectionStateLabel(connection)}` });
+    } catch (err) {
+      setNotice({ kind: "error", text: `Could not test ${row.label}: ${errorText(err)}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removeRow = async (row: ConnectionRow) => {
+    setBusy(row.id);
+    setNotice(null);
+    try {
+      const res = await send("DELETE", `${connectionPath(row.id)}${deleteCredential ? "?credential=delete" : ""}`);
+      if (!res.ok) {
+        setNotice({ kind: "error", text: `Could not remove ${row.label}: ${await readError(res)}` });
+        return;
+      }
+      setRows((current) => current?.filter((r) => r.id !== row.id) ?? current);
+      setExpanded((current) => (current === row.id ? null : current));
+      setRemoving(null);
+      setNotice({ kind: "ok", text: `Removed ${row.label}${deleteCredential ? " and its stored token" : ""}.` });
+    } catch (err) {
+      setNotice({ kind: "error", text: `Could not remove ${row.label}: ${errorText(err)}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const added = (row: ConnectionRow) => {
+    setRows((current) => [...(current ?? []).filter((r) => r.id !== row.id), row]);
+    setExpanded(row.id);
+  };
+
   return h("div", { ref: sectionRef, class: "connections", id: "connections" },
     h("p", { class: "project-section-note" },
-      "Servers the Sidecar can use. Add one under ",
-      h("code", null, "connections"),
-      " in ",
+      "Servers the Sidecar can use. Changes here are saved at once to ",
       // The server names the file: the viewer cannot resolve the layout.
       configFile ? h("code", null, configFile) : "your local config file",
-      " and restart the dashboard; they cannot be added here yet.",
+      ", never the tracked config, and a token goes to your credential store.",
     ),
     notice
       ? h("p", { class: `connections-notice connections-notice--${notice.kind}`, role: notice.kind === "error" ? "alert" : "status" }, notice.text)
@@ -241,16 +272,53 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
             row.state === "needs-sign-in" && row.reason
               ? h("p", { class: "connections-reason" }, row.reason)
               : null,
-            row.auth === "oauth"
-              ? h("div", { class: "connections-actions" },
-                row.state === "connected"
+            h("div", { class: "connections-actions" },
+              row.auth === "oauth"
+                ? row.state === "connected"
                   ? h("button", { type: "button", class: "connections-button", disabled: busy !== null, onClick: () => signOut(row) }, "Sign out")
-                  : h("button", { type: "button", class: "connections-button", disabled: busy !== null, onClick: () => signIn(row) }, "Sign in"),
+                  : h("button", { type: "button", class: "connections-button", disabled: busy !== null, onClick: () => signIn(row) }, "Sign in")
+                : null,
+              h("button", { type: "button", class: "connections-button", disabled: busy !== null, onClick: () => testRow(row) }, "Test"),
+              h("button", {
+                type: "button",
+                class: "connections-button",
+                "aria-expanded": expanded === row.id,
+                onClick: () => setExpanded(expanded === row.id ? null : row.id),
+              }, expanded === row.id ? "Hide details" : "Details"),
+              h("button", {
+                type: "button",
+                class: "connections-button connections-button--quiet",
+                disabled: busy !== null,
+                onClick: () => { setRemoving(row.id); setDeleteCredential(false); },
+              }, "Remove"),
+            ),
+            removing === row.id
+              ? h("div", { class: "connections-remove", role: "group", "aria-label": `Remove ${row.label}` },
+                h("p", { class: "connections-reason" }, `Remove ${row.label} from your local config? Its tools leave the Sidecar at once.`),
+                row.auth !== "none"
+                  ? h("label", { class: "connections-radio" },
+                    h("input", {
+                      type: "checkbox",
+                      checked: deleteCredential,
+                      onChange: (event: Event) => setDeleteCredential((event.target as HTMLInputElement).checked),
+                    }),
+                    ` Also delete the stored credential (connection:${row.id})`,
+                  )
+                  : null,
+                h("div", { class: "connections-actions" },
+                  h("button", { type: "button", class: "connections-button connections-button--danger", disabled: busy !== null, onClick: () => removeRow(row) }, "Remove connection"),
+                  h("button", { type: "button", class: "connections-button connections-button--quiet", onClick: () => setRemoving(null) }, "Cancel"),
+                ),
               )
+              : null,
+            expanded === row.id
+              ? h(ConnectionDetails, { row, onNotice: setNotice, onChanged: replaceRow })
               : null,
           ),
         ),
       )
       : null,
+    h(AddConnectionForm, { onAdded: added, onNotice: setNotice }),
+    h(SyncRulesSection, { connectionIds: (rows ?? []).map((row) => row.id), onNotice: setNotice }),
   );
 }

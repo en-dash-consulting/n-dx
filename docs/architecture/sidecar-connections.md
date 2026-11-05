@@ -270,8 +270,11 @@ wire name, after the broker's own tools. A hub session gets none.
   broker's own tools or another connection's calls. Without connections the
   request path is as before.
 - **One per project.** The server keeps one `ConnectionService` per project for
-  its life (`workspaceConnectionService`); a connection added to `.n-dx.local.json` takes effect on
-  restart until the Settings page manages connections.
+  its life (`workspaceConnectionService`). The Settings routes call `reload()`
+  after each write, which keeps a connection whose declaration is unchanged,
+  closes a removed or changed one and connects it afresh on its next use, so a
+  change reaches a running session's next `tools/list`. A hand edit of
+  `.n-dx.local.json` takes effect on restart.
 - **Vendors.** The broker is the only MCP server a Sidecar spawn names, so an
   external server never reaches a vendor's own MCP config. The external tools
   are part of the broker's MCP surface, which a client reaches over Streamable
@@ -287,10 +290,35 @@ section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
 
 | Route | Answer |
 |-------|--------|
-| `GET /api/connections` | `{ connections }`: id, label, transport, auth, state, reason, tool count |
+| `GET /api/connections` | `{ connections }`: id, label, transport, auth, state, reason, tool count, `tokenStored`, profile check |
+| `POST /api/connections` `{ id, label?, transport, auth?, url \| command, args?, env?, profile?, token? }` | `201 { connection }`; writes the declaration, and stores `token` as `connection:<id>` |
+| `POST /api/connections/test` (same body, unsaved) | `{ state, reason?, tools }`: a throwaway service connects, lists tools and closes |
+| `DELETE /api/connections/:id[?credential=delete]` | `{ removed, credentialDeleted }`; the token is kept unless asked |
+| `POST /api/connections/:id/test` | `{ connection, tools }` after a fresh connect |
+| `GET /api/connections/:id/tools` | `{ connection, tools }`: each tool with class, policy and where each came from |
+| `PUT /api/connections/:id/tools/:tool` `{ class?, policy? }` | `{ tool }`; `null` clears an override |
+| `PUT /api/connections/:id/profile` `{ profile \| null }` | `{ connection }` with the profile's check against the server's tools |
+| `PUT /api/connections/:id/token` `{ token }` | `{ connection }`; the token is not in the answer |
+| `GET`, `PUT /api/connections/sync` `{ rules, connection? }` | tracker sync's per-event `off \| dry-run \| on`, writing `trackerSync.rules` |
 | `POST /api/connections/:id/oauth/start` `{ redirectUrl }` | `{ authorizationUrl }` |
 | `POST /api/connections/:id/oauth/finish` `{ code, state }` | `{ connection }` |
 | `POST /api/connections/:id/sign-out` | `{ connection }` |
+
+- **Writes land in `.n-dx.local.json` only.** `local-config-write.ts` edits one
+  top-level key (`connections`, `trackerSync`) in place and refuses, with 409,
+  a local file the repository commits or one that does not parse. The tracked
+  `.n-dx.json` is never touched. The ids `test`, `sync`, `tracker` and
+  `profiles` are reserved because they are fixed paths. An env value typed into
+  the add form is written to that file as typed, as hand-editing would; a token
+  never is.
+- **A token is accepted, never returned.** The add and token routes store it
+  through `connection-credentials.ts`; no response, log line or error carries
+  it (a body that fails to parse is reported without the text it choked on),
+  and the form empties its field as soon as it sends. Test of an unsaved
+  token or OAuth server is not offered: its credential is stored when it is
+  added.
+- **A write to `ndx work`'s config is reverted mid-run.** Saving here while
+  `ndx work` runs is the same hazard as `ndx config`; save it again after.
 
 - **Never public.** Every route needs the per-user token or a browser session,
   directly and through the hub; `web.sidecar` gates the family
@@ -314,8 +342,8 @@ section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
 - **Only the user's own config declares a connection.** A connection names a
   command to spawn or the URL a token is sent to, so a cloned repository must
   not choose one. A `connections` block in the tracked `.n-dx.json`, or in a
-  `.n-dx.local.json` the repository commits, is ignored with one warning. Until
-  the Settings page writes connections, `.n-dx.local.json` is edited by hand.
+  `.n-dx.local.json` the repository commits, is ignored with one warning. The
+  Settings page writes that file and no other; it can also be edited by hand.
 - **One module reads the credential store.** Web reads `connection:<id>`
   directly through `connection-credentials.ts`, with no gateway and no new
   llm-client export; a policy test fails any other `src/` file that imports a
