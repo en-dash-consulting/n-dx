@@ -437,11 +437,12 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },
     },
+      h("div", { class: "sidecar-composer-card" },
       h(SidecarAttachmentBar, { attachment: sidecar.attachment, menuOpen: lensMenu, setMenuOpen: setLensMenu }),
       h("textarea", {
         class: "sidecar-input",
         "aria-label": "Message Sidecar",
-        placeholder: blocked ? `Install the ${blocked.cli} CLI first` : busy ? "A turn is running…" : "Message Sidecar",
+        placeholder: blocked ? `Install the ${blocked.cli} CLI first` : busy ? "A turn is running…" : "Ask about this project, or tell the agent what to do…",
         value: draft,
         disabled: busy,
         rows: 3,
@@ -461,10 +462,12 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
         },
       }),
       h("div", { class: "sidecar-composer-actions" },
+        h("span", { class: "sidecar-composer-hint" }, "Enter to send · Shift+Enter for a new line"),
         sidecar.running
           ? h("button", { type: "button", class: "sidecar-stop", onClick: () => { void sidecar.stop(); } }, "Stop")
           : null,
         h("button", { type: "submit", class: "sidecar-send", disabled: busy || !draft.trim() }, "Send"),
+      ),
       ),
     ),
     ]),

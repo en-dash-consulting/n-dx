@@ -671,6 +671,32 @@ describe("the agent picker", () => {
     }
   });
 
+  it("renders the lens pill, textarea, hint and Send in one composer card", async () => {
+    await mount();
+    await pressCmdJ();
+    const card = root.querySelector(".sidecar-composer > .sidecar-composer-card")!;
+    expect(card).not.toBeNull();
+    expect(card.querySelector(".sidecar-chip-lens")!.getAttribute("aria-label")).toMatch(/^Lens: /);
+    expect(card.querySelector<HTMLTextAreaElement>("textarea.sidecar-input")!.placeholder)
+      .toBe("Ask about this project, or tell the agent what to do…");
+    expect(card.querySelector(".sidecar-composer-hint")!.textContent).toBe("Enter to send · Shift+Enter for a new line");
+    expect(card.querySelector<HTMLButtonElement>(".sidecar-send")!.disabled).toBe(true);
+  });
+
+  it("styles the composer card, lens pill and Send from tokens only", () => {
+    const css = readFileSync(join(process.cwd(), "src/viewer/styles/sidecar.css"), "utf8");
+    const rule = (sel: string) => css.match(new RegExp(`${sel.replace(/[.:]/g, "\\$&")}\\s*\\{([^}]*)\\}`))![1]!;
+    expect(rule(".sidecar-composer-card")).toMatch(/var\(--bg-surface\)[\s\S]*var\(--border\)[\s\S]*var\(--radius-xl\)/);
+    expect(rule(".sidecar-composer-card:focus-within")).toMatch(/var\(--accent\)/);
+    expect(rule(".sidecar-input")).toMatch(/background: transparent[\s\S]*font-size: 14px/);
+    expect(rule(".sidecar-send")).toMatch(/background: var\(--accent\)[\s\S]*color: var\(--bg\)/);
+    expect(rule(".sidecar-send, .sidecar-stop")).toMatch(/height: 36px/);
+    expect(rule(".sidecar-chip-lens")).toMatch(/color-mix\(in srgb, var\(--accent\)[\s\S]*color: var\(--accent\)/);
+    for (const sel of [".sidecar-composer-card", ".sidecar-input", ".sidecar-send", ".sidecar-send:disabled", ".sidecar-stop", ".sidecar-chip-lens"]) {
+      expect(rule(sel)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  });
+
   it("creates the first session with the chosen vendor and model", async () => {
     await mount();
     await pressCmdJ();
