@@ -133,6 +133,21 @@ describe("a profile that does not fit its server", () => {
   });
 });
 
+describe("the built-in CAOS profile on a server with many epics", () => {
+  it("asks list_epics for its largest page, so the picker holds more than the default 25", async () => {
+    const big = await startFakeMcpHttpServer({ extraTools: (server) => addCaosTools(server, {}, { epicCount: 150 }) });
+    try {
+      const svc = connect(http("caos", big.url, { profile: "caos" }));
+      const tools = await svc.listTools();
+      const call = await buildExternalCall(tools.find((t) => t.tool === "create_work_item")!, tools, svc, undefined, { ndxHome });
+      expect(big.calls.find((c) => c.name === "list_epics")?.arguments).toEqual({ pageSize: 100 });
+      expect(call.options?.epicId).toHaveLength(100);
+    } finally {
+      await big.close();
+    }
+  });
+});
+
 describe("a connection with no profile", () => {
   it("lists its tools, runs reads and raises plain write cards", async () => {
     const svc = connect(http("desk", plainFake.url));

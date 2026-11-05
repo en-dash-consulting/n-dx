@@ -10,4 +10,4 @@ export function addCallCardTools(server: McpServer): void;
 export type CaosReply = (args: Record<string, unknown>) => CallToolResult | undefined;
 
 /** CAOS's work-item tools by name and input schema, answering canned data (or `replies`); never the real server. */
-export function addCaosTools(server: McpServer, replies?: Record<string, CaosReply>): void;
+export function addCaosTools(server: McpServer, replies?: Record<string, CaosReply>, options?: { epicCount?: number }): void;

@@ -5,7 +5,14 @@ items:
     lastModified: "2026-11-05T07:17:42.839Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "38fce780-09ae-4f8f-842b-64321c23a839":
-    lastModified: "2026-11-05T02:07:56.687Z"
+    status: "completed"
+    startedAt: "2026-11-05T07:21:20.611Z"
+    completedAt: "2026-11-05T07:27:57.488Z"
+    endedAt: "2026-11-05T07:27:57.488Z"
+    activeIntervals: [{"end":"2026-11-05T07:27:57.488Z","start":"2026-11-05T07:21:20.611Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "FieldHint optionsFrom gains optional literal `arguments` passed to the read call (external-call.ts); caos.json sets list_epics pageSize 100; checkServerProfile refuses an argument the read tool's input does not declare. Tests: server-profiles unit, tracker-server-profiles (150 epics -> 100 options), sidecar-external-call-hints (records arguments). Option A; no cursor following."
+    lastModified: "2026-11-05T07:27:57.488Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3b86452e-1829-499a-af72-1620953e00e7":
     status: "completed"

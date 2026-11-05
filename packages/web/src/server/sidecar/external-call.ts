@@ -102,7 +102,7 @@ function autoList(data: unknown): unknown {
 
 /**
  * The choices for one property, or none. Only a read-class tool of the same
- * connection whose policy is `run` is called, and with no arguments.
+ * connection whose policy is `run` is called, with the hint's literal arguments (none by default).
  */
 async function readOptions(
   property: string,
@@ -124,7 +124,8 @@ async function readOptions(
   // list must not do that. The read finishes, or meets the service's own call timeout, alone.
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<"expired">((resolve) => { timer = setTimeout(() => resolve("expired"), timeoutMs); });
-  const read = connections.callTool(connection, tool.tool, {}, signal);
+  const args = "optionsFrom" in hint ? hint.optionsFrom.arguments ?? {} : {};
+  const read = connections.callTool(connection, tool.tool, args, signal);
   // Nobody awaits a read that outlives the limit; its failure is not the card's.
   read.catch(() => undefined);
   try {

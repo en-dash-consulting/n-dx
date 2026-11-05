@@ -33,6 +33,21 @@ afterEach(async () => {
 });
 
 describe("a field hint's read", () => {
+  it("is called with the hint's literal arguments", async () => {
+    service = new ConnectionService({
+      projectDir: root,
+      credentials: { ndxHome },
+      warn: () => {},
+      connections: [{
+        id: "desk", label: "Desk", auth: "none", transport: "http", url: fake.url,
+        fieldHints: { teamId: { optionsFrom: { tool: "find_teams", path: "data.teams", arguments: { pageSize: 100 } } } },
+      }],
+    });
+    const tools = await service.listTools();
+    await buildExternalCall(tools.find((t) => t.tool === "create_ticket")!, tools, service, undefined, {});
+    expect(fake.calls.find((c) => c.name === "find_teams")?.arguments).toEqual({ pageSize: 100 });
+  });
+
   it("that runs past its limit leaves a plain field and the connection connected", async () => {
     service = new ConnectionService({
       projectDir: root,

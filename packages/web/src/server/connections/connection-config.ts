@@ -23,10 +23,11 @@ export type ConnectionAuth = "none" | "token" | "oauth";
  * How an external-call card fills a picker for one property: from the
  * `path` (dotted keys; empty for the result itself) of a read tool's result,
  * or, with `auto`, from the connection's read tool the property's name points
- * at (`ownerId` → `list_owners`, `list_owner` or `owners`). With no hint a
+ * at (`ownerId` → `list_owners`, `list_owner` or `owners`). `arguments` are
+ * literal arguments for that read (a page size, say); with none it gets `{}`. With no hint a
  * property is a plain field.
  */
-export type FieldHint = { optionsFrom: { tool: string; path: string } } | { auto: true };
+export type FieldHint = { optionsFrom: { tool: string; path: string; arguments?: Record<string, unknown> } } | { auto: true };
 
 /** Hints by the property name of a write tool's input. */
 export type FieldHints = Record<string, FieldHint>;
@@ -123,10 +124,15 @@ export function parseFieldHints(raw: unknown, skipped: string[]): FieldHints | u
     const hint = asRecord(value);
     const from = asRecord(hint?.optionsFrom);
     if (hint?.auto === true) out[property] = { auto: true };
-    else if (from && typeof from.tool === "string" && from.tool && (from.path === undefined || typeof from.path === "string")) {
-      out[property] = { optionsFrom: { tool: from.tool, path: from.path ?? "" } };
+    else if (
+      from && typeof from.tool === "string" && from.tool &&
+      (from.path === undefined || typeof from.path === "string") &&
+      (from.arguments === undefined || asRecord(from.arguments))
+    ) {
+      const args = asRecord(from.arguments);
+      out[property] = { optionsFrom: { tool: from.tool, path: from.path ?? "", ...(args ? { arguments: args } : {}) } };
     } else {
-      skipped.push(`the field hint for ${JSON.stringify(property)} must be { "auto": true } or { "optionsFrom": { "tool", "path" } }`);
+      skipped.push(`the field hint for ${JSON.stringify(property)} must be { "auto": true } or { "optionsFrom": { "tool", "path", "arguments"? } }`);
     }
   }
   return Object.keys(out).length > 0 ? out : undefined;

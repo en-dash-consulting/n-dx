@@ -2,7 +2,7 @@
   "label": "CAOS",
   "fieldHints": {
     "create_work_item": {
-      "epicId": { "optionsFrom": { "tool": "list_epics", "path": "items" } },
+      "epicId": { "optionsFrom": { "tool": "list_epics", "path": "items", "arguments": { "pageSize": 100 } } },
       "type": { "optionsFrom": { "tool": "get_creation_options", "path": "types" } },
       "priority": { "optionsFrom": { "tool": "get_creation_options", "path": "priorities" } },
       "estimate": { "optionsFrom": { "tool": "get_creation_options", "path": "estimates" } }

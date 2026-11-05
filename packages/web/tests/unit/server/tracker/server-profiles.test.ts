@@ -65,7 +65,7 @@ describe("built-in profiles", () => {
     const caos = loadServerProfile("caos", { ndxHome }) as ServerProfile;
     expect(caos.label).toBe("CAOS");
     expect(Object.keys(caos.tracker!.statusMap).sort()).toEqual([...TRACKER_EVENTS].sort());
-    expect(caos.fieldHints.create_work_item.epicId).toEqual({ optionsFrom: { tool: "list_epics", path: "items" } });
+    expect(caos.fieldHints.create_work_item.epicId).toEqual({ optionsFrom: { tool: "list_epics", path: "items", arguments: { pageSize: 100 } } });
   });
 });
 
@@ -129,6 +129,19 @@ describe("a profile that does not fit", () => {
       "tracker.statusMap.pr-merged is shipped, which is not a status the server accepts",
       "tracker.facts.pr-opened (reviewer) names review.who, which set_status's input does not declare",
     ]);
+  });
+
+  it("is refused when a hint's argument is not declared by its read tool, naming it", () => {
+    const profile = {
+      name: "desk",
+      label: "Desk",
+      fieldHints: { new_ticket: { title: { optionsFrom: { tool: "list_boards", path: "boards", arguments: { pageSize: 100 } } } } },
+    } as unknown as ServerProfile;
+    expect(checkServerProfile(profile, desk)).toEqual([
+      "fieldHints.new_ticket.title.arguments names pageSize, which list_boards's input does not declare",
+    ]);
+    const declared = [...desk.slice(0, 3), { tool: "list_boards", inputSchema: object({ pageSize: {} }) }];
+    expect(checkServerProfile(profile, declared)).toEqual([]);
   });
 
   it("is refused for a malformed shape, naming each problem", () => {

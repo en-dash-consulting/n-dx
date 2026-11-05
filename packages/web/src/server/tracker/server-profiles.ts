@@ -283,7 +283,11 @@ export function checkServerProfile(profile: ServerProfile, tools: readonly Profi
     const tool = listed(toolName, `fieldHints.${toolName}`);
     for (const [property, hint] of Object.entries(hints)) {
       declares(tool, property, `fieldHints.${toolName}`);
-      if ("optionsFrom" in hint) listed(hint.optionsFrom.tool, `fieldHints.${toolName}.${property}`);
+      if ("optionsFrom" in hint) {
+        const where = `fieldHints.${toolName}.${property}`;
+        const read = listed(hint.optionsFrom.tool, where);
+        for (const name of Object.keys(hint.optionsFrom.arguments ?? {})) declares(read, name, `${where}.arguments`);
+      }
     }
   }
 

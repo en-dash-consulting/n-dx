@@ -71,9 +71,11 @@ const requestId = z.string().min(8).max(128);
  * CAOS's work-item tools by name and input schema (its MCP contract), with
  * canned answers: the server the built-in CAOS profile is checked against.
  * `replies[tool]` answers in place of a work-item tool's canned answer when it
- * returns one (a duplicate, a validation failure). Never the real server.
+ * returns one (a duplicate, a validation failure). `epicCount` is how many
+ * epics list_epics holds; like the real one it pages by `pageSize` (default 25,
+ * at most 100). Never the real server.
  */
-export function addCaosTools(server, replies = {}) {
+export function addCaosTools(server, replies = {}, { epicCount = 2 } = {}) {
   const answer = (tool, canned) => async (args) => replies[tool]?.(args) ?? canned(args);
   server.registerTool(
     "get_work_item",
@@ -82,11 +84,20 @@ export function addCaosTools(server, replies = {}) {
   );
   server.registerTool(
     "list_epics",
-    { description: "List epics.", inputSchema: { query: z.string().optional(), cursor: z.string().optional() }, annotations: CAOS_READ },
-    async () => ({
-      content: [{ type: "text", text: "epics" }],
-      structuredContent: { items: [{ id: "ep-1", name: "ndx 0.10.0 - Sidecar" }, { id: "ep-2", name: "ndx 1.0.0 - Freeze" }], nextCursor: null, total: 2 },
-    }),
+    {
+      description: "List epics.",
+      inputSchema: { query: z.string().optional(), cursor: z.string().optional(), pageSize: z.number().int().min(1).max(100).optional() },
+      annotations: CAOS_READ,
+    },
+    async ({ pageSize = 25 }) => {
+      const names = ["ndx 0.10.0 - Sidecar", "ndx 1.0.0 - Freeze"];
+      const all = Array.from({ length: epicCount }, (_, i) => ({ id: `ep-${i + 1}`, name: names[i] ?? `Epic ${i + 1}` }));
+      const items = all.slice(0, pageSize);
+      return {
+        content: [{ type: "text", text: "epics" }],
+        structuredContent: { items, nextCursor: items.length < all.length ? "more" : null, total: all.length },
+      };
+    },
   );
   server.registerTool(
     "get_creation_options",
