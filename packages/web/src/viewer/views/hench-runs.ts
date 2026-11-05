@@ -20,10 +20,6 @@ import {
   RexTaskLink,
   CopyLinkButton,
   ActiveTasksPanel,
-  ConcurrencyPanel,
-  MemoryPanel,
-  WsHealthPanel,
-  ThrottleControlsPanel,
   TaskStartControl,
 } from "../components/index.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
@@ -1556,22 +1552,6 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       filteredRuns.length === 0
         ? h("div", { class: "hench-no-results" }, "No runs match the selected filter.")
         : null,
-    ),
-
-    // System status — operational diagnostics tucked into a collapsed drawer so
-    // the run history stays the focus. Expand to inspect live infrastructure.
-    h("details", { class: "hench-system-status" },
-      h("summary", { class: "hench-system-status-summary" },
-        h("span", { class: "hench-system-status-chevron", "aria-hidden": "true" }, "▸"),
-        h("span", { class: "hench-system-status-label" }, "System status"),
-        h("span", { class: "hench-system-status-hint" }, "concurrency · memory · sockets · throttle"),
-      ),
-      h("div", { class: "hench-system-status-body" },
-        h(ConcurrencyPanel, null),
-        h(MemoryPanel, null),
-        h(WsHealthPanel, null),
-        h(ThrottleControlsPanel, null),
-      ),
     ),
   );
 }

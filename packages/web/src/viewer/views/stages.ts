@@ -207,10 +207,12 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     // reuse existing views, as Analysis does.
     sections: [{ view: "tune", plain: true }],
     tiles: [
-      { view: "hench-runs", tabs: [{ view: "activity" }] },
-      { view: "token-usage" },
-      { view: "hench-optimization", tabs: [{ view: "hench-adaptive" }] },
-      { view: "merge-graph" },
+      // Tile titles, not view labels: "Suggestions" is the Analysis view's
+      // label and labels are unique, and "Tuning" would read Tune › Tuning.
+      { view: "hench-runs", cols: 8, rows: 2, tabs: [{ view: "activity" }] },
+      { view: "token-usage", title: "Spend" },
+      { view: "hench-optimization", title: "Suggestions", tabs: [{ view: "hench-adaptive" }] },
+      { view: "merge-graph", title: "Shipped" },
     ],
   },
 };
