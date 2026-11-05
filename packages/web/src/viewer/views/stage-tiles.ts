@@ -196,10 +196,12 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
       onClick: (e: Event) => onOpen(e.currentTarget as HTMLElement),
       "aria-haspopup": "dialog",
       "aria-label": `Open ${title}`,
+      // aria-label replaces the button's content, so the count is named here.
+      "aria-describedby": tile.badge ? `${idBase}-badge` : undefined,
     },
       h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
       h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
-      tile.badge ? h(LiveBadge, { badge: tile.badge }) : null,
+      tile.badge ? h(LiveBadge, { badge: tile.badge, id: `${idBase}-badge` }) : null,
       tile.panel ? null : h("span", { class: "stage-tile-blurb" }, viewBlurb(tile.view)),
       h("span", { class: "stage-tile-open", "aria-hidden": "true" }, h(ActionIcon, { name: "expand" })),
     ),

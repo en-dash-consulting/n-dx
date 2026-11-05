@@ -170,6 +170,10 @@ describe("stage tile badge", () => {
     expect(tileBadge()?.dataset.count).toBe("19");
     expect(tileBadge()?.querySelector(".sr-only")?.textContent).toBe("19 changes in the Inbox");
     expect(tileBadge()?.previousElementSibling?.className).toBe("stage-tile-title");
+    // The head's aria-label hides its content, so the count must be its description.
+    const head = root.querySelector<HTMLButtonElement>(".stage-tile-head")!;
+    const described = document.getElementById(head.getAttribute("aria-describedby") ?? "");
+    expect(described?.textContent).toContain("19 changes in the Inbox");
   });
 
   it("follows rex:prd-changed without a reload", async () => {

@@ -27,16 +27,16 @@ export const BADGES: Record<StageSectionBadge, BadgeDef> = {
 };
 
 /** The pill; renders nothing while the count is unknown. */
-export function CountPill({ badge, count }: { badge: StageSectionBadge; count: number | null }) {
+export function CountPill({ badge, count, id }: { badge: StageSectionBadge; count: number | null; id?: string }) {
   if (count === null) return null;
-  return h("span", { class: "stage-section-badge", "data-count": String(count) },
+  return h("span", { class: "stage-section-badge", "data-count": String(count), id },
     h("span", { "aria-hidden": "true" }, count.toLocaleString()),
     h("span", { class: "sr-only" }, BADGES[badge].label(count)),
   );
 }
 
 /** A pill that subscribes to project status itself, so only badged tiles do. */
-export function LiveBadge({ badge }: { badge: StageSectionBadge }) {
+export function LiveBadge({ badge, id }: { badge: StageSectionBadge; id?: string }) {
   const status = useProjectStatus();
-  return h(CountPill, { badge, count: BADGES[badge].count(status) });
+  return h(CountPill, { badge, count: BADGES[badge].count(status), id });
 }
