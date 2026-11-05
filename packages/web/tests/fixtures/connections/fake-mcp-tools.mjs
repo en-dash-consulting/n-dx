@@ -11,8 +11,8 @@ import { z } from "zod";
  * Tools for the call-card tests, added only when asked for so the default tool
  * list stays what the other connection tests expect: a write with a rich input
  * schema and an idempotency key, two read tools that list choices (one a
- * structured object, one JSON text), and a write that answers a validation
- * error carrying a problems list.
+ * structured object, one JSON text), a read tool that never answers, and a
+ * write that answers a validation error carrying a problems list.
  */
 export function addCallCardTools(server) {
   server.registerTool(
@@ -43,6 +43,11 @@ export function addCallCardTools(server) {
     "find_teams",
     { description: "Find teams.", inputSchema: {}, annotations: { readOnlyHint: true } },
     async () => ({ content: [{ type: "text", text: JSON.stringify({ data: { teams: [{ key: "t-a", title: "Alpha" }, "t-b"] } }) }] }),
+  );
+  server.registerTool(
+    "stall_owners",
+    { description: "Never answers.", inputSchema: {}, annotations: { readOnlyHint: true } },
+    () => new Promise(() => {}),
   );
   server.registerTool(
     "reject_ticket",

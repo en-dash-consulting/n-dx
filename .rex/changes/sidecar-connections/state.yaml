@@ -63,14 +63,25 @@ items:
     lastModified: "2026-11-04T19:54:53.567Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23959f9-b72d-4d98-ba2e-7e8e49853788":
+    status: "completed"
+    startedAt: "2026-11-05T01:20:38.713Z"
+    completedAt: "2026-11-05T01:20:38.713Z"
+    endedAt: "2026-11-05T01:20:38.713Z"
+    activeIntervals: [{"end":"2026-11-05T01:20:38.713Z","start":"2026-11-05T01:20:38.713Z"}]
+    appliedAt: "2026-11-05T01:20:38.713Z"
+    appliedAmendsHash: "c16184a4395e4405998ffcce43b1cbb61f90dfc0644175da68c13ae1b61855e1"
     issues: ["https://www.notion.so/3f7a80b71924811aafc7edb86c8706cc","https://www.notion.so/3f7a80b7192481a398e1cb38f63618a8","https://www.notion.so/3f7a80b7192481f7ad52e6a9e7739ce4","https://www.notion.so/3f7a80b719248169970dd9029aff5e07"]
-    lastModified: "2026-11-05T00:52:34.565Z"
+    lastModified: "2026-11-05T01:20:38.713Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b59456bd-36ac-4409-9707-6f30c2844f89":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T01:03:56.472Z"
-    activeIntervals: [{"start":"2026-11-05T01:03:56.472Z"}]
-    lastModified: "2026-11-05T01:03:57.145Z"
+    completedAt: "2026-11-05T01:20:38.713Z"
+    endedAt: "2026-11-05T01:20:38.713Z"
+    activeIntervals: [{"end":"2026-11-05T01:20:38.713Z","start":"2026-11-05T01:03:56.472Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "External-call card is a schema-driven form with edited arguments, header, read-only key, hint pickers and problems list; tests in viewer, broker and integration."
+    lastModified: "2026-11-05T01:20:38.713Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9ab5436-8b42-44ce-bfa8-4f15fc911275":
     status: "completed"

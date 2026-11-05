@@ -60,6 +60,26 @@ export function fieldKind(schema: unknown, nested = false): FieldKind {
   return { kind: "json" };
 }
 
+/**
+ * Whether a field of `kind` can show `value` as it is. One that cannot (an
+ * enum value off the list, a number in a string field, a string in a list
+ * field) is drawn as JSON instead, so the card never shows one value and
+ * sends another. An absent value fits every kind.
+ */
+export function valueFits(kind: FieldKind, value: unknown): boolean {
+  if (value === undefined) return true;
+  switch (kind.kind) {
+    case "scalar":
+      if (kind.type === "string") return typeof value === "string";
+      if (kind.type === "boolean") return typeof value === "boolean";
+      return typeof value === "number" && (kind.type === "number" || Number.isInteger(value));
+    case "enum": return kind.values.includes(value as string | number | boolean);
+    case "list": return Array.isArray(value) && value.every((item) => valueFits({ kind: "scalar", type: kind.item }, item));
+    case "object": return isRecord(value);
+    case "json": return true;
+  }
+}
+
 /** The top-level properties of a schema: its own, in order, then any argument it does not name. */
 export function formFields(schema: Json, args: Json): Array<{ name: string; schema: unknown; required: boolean }> {
   const properties = isRecord(schema.properties) ? schema.properties : {};
@@ -174,7 +194,10 @@ function Picker({ path, name, required, value, options, onChange }: Pick<FieldPr
 
 function Field(props: FieldProps) {
   const { path, name, schema, required, value, options, onChange, onValidity, nested } = props;
-  const kind = fieldKind(schema, nested);
+  const drawn = fieldKind(schema, nested);
+  // Decided once, from the agent's value: a field does not change kind as the operator types.
+  const [fits] = useState(() => valueFits(drawn, value));
+  const kind: FieldKind = fits ? drawn : { kind: "json" };
   const [raw, setRaw] = useState(() => {
     if (kind.kind === "scalar" && (kind.type === "number" || kind.type === "integer")) return value === undefined ? "" : String(value);
     if (kind.kind === "list") return Array.isArray(value) ? value.map(String).join("\n") : "";

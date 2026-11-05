@@ -102,6 +102,34 @@ describe("external-call card form", () => {
     expect(JSON.parse(field(el, "extra").value)).toEqual({ kept: true });
   });
 
+  it("draws an argument that does not fit its property's type as JSON, so the card shows what Approve sends", async () => {
+    const schema = {
+      type: "object",
+      required: ["priority"],
+      properties: {
+        priority: { enum: ["low", "high"] },
+        title: { type: "string" },
+        estimate: { type: "integer" },
+        urgent: { type: "boolean" },
+        labels: { type: "array", items: { type: "string" } },
+        owner: { type: "object", properties: { name: { type: "string" } } },
+      },
+    };
+    const args = { priority: "urgent", title: 5, estimate: "three", urgent: "yes", labels: "a", owner: ["x"] };
+    const { el, decide } = await draw(externalCard({
+      input: { connection: "caos", tool: "caos.t", class: "write", arguments: args },
+      externalCall: { label: "CAOS", inputSchema: schema },
+    }));
+    for (const [name, value] of Object.entries(args)) {
+      expect(field(el, name).closest("label")!.dataset.kind).toBe("json");
+      expect(JSON.parse(field(el, name).value)).toEqual(value);
+    }
+    // Fixing one by hand sends the fixed value.
+    await type(field(el, "priority"), '"high"');
+    await click(approve(el));
+    expect(decide.mock.calls[0][1].arguments).toEqual({ ...args, priority: "high" });
+  });
+
   it("marks required fields", async () => {
     const { el } = await draw(externalCard());
     expect(field(el, "title").getAttribute("aria-required")).toBe("true");

@@ -108,6 +108,7 @@ async function readOptions(
   connection: string,
   connections: Pick<ConnectionService, "callTool">,
   signal: AbortSignal | undefined,
+  timeoutMs: number,
 ): Promise<SidecarFieldOption[]> {
   // Only a read that runs without asking: a hint never makes a call the operator would be asked about.
   const readTools = tools.filter((t) => t.connection === connection && t.policy.class === "read" && t.policy.policy === "run");
@@ -115,15 +116,24 @@ async function readOptions(
     ? autoToolNames(property).map((name) => readTools.find((t) => t.tool === name)).find((t) => t !== undefined)
     : readTools.find((t) => t.tool === hint.optionsFrom.tool);
   if (!tool) return [];
-  const timeout = AbortSignal.timeout(HINT_READ_TIMEOUT_MS);
+  // The limit stops waiting; it does not abort the read. An aborted call reaches the service as
+  // a request timeout, which it reads as a dead connection and drops the client for — a slow
+  // list must not do that. The read finishes, or meets the service's own call timeout, alone.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<"expired">((resolve) => { timer = setTimeout(() => resolve("expired"), timeoutMs); });
+  const read = connections.callTool(connection, tool.tool, {}, signal);
+  // Nobody awaits a read that outlives the limit; its failure is not the card's.
+  read.catch(() => undefined);
   try {
-    const result = await connections.callTool(connection, tool.tool, {}, signal ? AbortSignal.any([signal, timeout]) : timeout);
-    if (result.isError) return [];
+    const result = await Promise.race([read, expired]);
+    if (result === "expired" || result.isError) return [];
     const data = resultData(result);
     return optionsOf("auto" in hint ? autoList(data) : at(data, hint.optionsFrom.path));
   } catch {
     // A hint is an aid: an unreachable server or a malformed result leaves a plain field.
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -133,14 +143,16 @@ export async function buildExternalCall(
   tools: readonly ConnectionTool[],
   connections: Pick<ConnectionService, "callContext" | "callTool">,
   signal?: AbortSignal,
+  limits: { hintTimeoutMs?: number } = {},
 ): Promise<SidecarExternalCall> {
+  const timeoutMs = limits.hintTimeoutMs ?? HINT_READ_TIMEOUT_MS;
   const context = connections.callContext(tool.connection);
   const inputSchema = tool.inputSchema as Json;
   const properties = isRecord(inputSchema.properties) ? inputSchema.properties : {};
   const hints: FieldHints = context?.fieldHints ?? {};
   const named = Object.entries(hints).filter(([property]) => property in properties);
   const read = await Promise.all(
-    named.map(async ([property, hint]) => [property, await readOptions(property, hint, tools, tool.connection, connections, signal)] as const),
+    named.map(async ([property, hint]) => [property, await readOptions(property, hint, tools, tool.connection, connections, signal, timeoutMs)] as const),
   );
   const options = Object.fromEntries(read.filter(([, list]) => list.length > 0));
   return {
