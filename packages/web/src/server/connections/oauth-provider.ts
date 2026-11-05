@@ -104,7 +104,10 @@ export interface ConnectionOAuthOptions {
   now?: () => number;
 }
 
-export type PreparedOAuth = { provider: OAuthClientProvider } | { needsSignIn: string };
+export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
+
+/** A provider and the fetch its transport must use, so a refused refresh token is noted. */
+export type PreparedOAuth = { provider: OAuthClientProvider; fetch: FetchLike } | { needsSignIn: string };
 
 function isRecord(value: Record<string, unknown> | undefined): value is Record<string, unknown> & OAuthRecord {
   const client = value?.client as { client_id?: unknown } | undefined;
@@ -129,6 +132,13 @@ export class ConnectionOAuth {
   private readonly now: () => number;
   private readonly flows = new Map<string, SignInFlow>();
   private readonly refreshing = new Map<string, Promise<PreparedOAuth>>();
+  /**
+   * Refresh tokens the authorization server refused, per connection, in
+   * memory. Concurrent requests share one provider, so a refused refresh can
+   * mean a sibling rotated the token first; the tokens are cleared only when
+   * the one stored now is itself refused.
+   */
+  private readonly refused = new Map<string, Set<string>>();
 
   constructor(options: ConnectionOAuthOptions = {}) {
     this.credentials = options.credentials ?? {};
@@ -144,7 +154,7 @@ export class ConnectionOAuth {
     const record = this.storedRecord(config.id);
     const blocked = this.signInReason(config, record);
     if (blocked) return { needsSignIn: blocked };
-    if (!this.expired(record!)) return { provider: new HeadlessProvider(this, config, record!.redirectUrl) };
+    if (!this.expired(record!)) return this.headless(config, record!);
     let refresh = this.refreshing.get(config.id);
     if (!refresh) {
       refresh = this.refresh(config).finally(() => this.refreshing.delete(config.id));
@@ -199,13 +209,50 @@ export class ConnectionOAuth {
   /** Forget the connection's client registration and tokens, and any sign-in in progress. */
   signOut(config: HttpConnectionConfig): void {
     for (const [state, flow] of this.flows) if (flow.connection === config.id) this.flows.delete(state);
+    this.refused.delete(config.id);
     unsetConnectionCredential(config.id, this.credentials);
   }
 
   /** Drop the connection's tokens, keeping its client registration: the next use reads "sign in again". */
   forgetTokens(id: string): void {
+    this.refused.delete(id);
     const record = this.storedRecord(id);
     if (record?.tokens) this.write(id, { ...record, tokens: undefined, expiresAt: undefined });
+  }
+
+  /**
+   * Drop the tokens only when the stored refresh token is one the server
+   * refused, not one a concurrent refresh has since rotated in; whether it did.
+   */
+  forgetRefusedTokens(id: string): boolean {
+    const stored = this.storedRecord(id)?.tokens?.refresh_token;
+    if (!stored || !this.refused.get(id)?.has(stored)) return false;
+    this.forgetTokens(id);
+    return true;
+  }
+
+  /**
+   * A fetch for `id`'s transport and refreshes that notes each refresh token
+   * the token endpoint refuses (400 or 401), and passes everything through.
+   */
+  fetchFor(id: string): FetchLike {
+    return async (url, init) => {
+      const response = await fetch(url, init);
+      if ((response.status === 400 || response.status === 401) && (typeof init?.body === "string" || init?.body instanceof URLSearchParams)) {
+        const form = new URLSearchParams(init.body.toString());
+        const refreshToken = form.get("grant_type") === "refresh_token" ? form.get("refresh_token") : null;
+        if (refreshToken) {
+          let refused = this.refused.get(id);
+          if (!refused) this.refused.set(id, (refused = new Set()));
+          refused.add(refreshToken);
+        }
+      }
+      return response;
+    };
+  }
+
+  private headless(config: HttpConnectionConfig, record: OAuthRecord): Extract<PreparedOAuth, { provider: unknown }> {
+    return { provider: new HeadlessProvider(this, config, record.redirectUrl), fetch: this.fetchFor(config.id) };
   }
 
   /** The stored record for `id`, read fresh, or undefined when there is none (or it is not OAuth). */
@@ -255,21 +302,18 @@ export class ConnectionOAuth {
       const record = this.storedRecord(config.id);
       const blocked = this.signInReason(config, record);
       if (blocked) return { needsSignIn: blocked };
-      const provider = new HeadlessProvider(this, config, record!.redirectUrl);
+      const prepared = this.headless(config, record!);
       // Rotated by another process while the first attempt failed.
-      if (attempt > 0 && !this.expired(record!)) return { provider };
+      if (attempt > 0 && !this.expired(record!)) return prepared;
       try {
-        await auth(provider, { serverUrl: config.url });
-        return { provider };
+        await auth(prepared.provider, { serverUrl: config.url, fetchFn: prepared.fetch });
+        return prepared;
       } catch (err) {
         if (err instanceof ConnectionSignInRequiredError) return { needsSignIn: err.reason };
         failure = err;
       }
     }
-    if (failure instanceof InvalidGrantError) {
-      this.forgetTokens(config.id);
-      return { needsSignIn: SIGN_IN_AGAIN };
-    }
+    if (failure instanceof InvalidGrantError && this.forgetRefusedTokens(config.id)) return { needsSignIn: SIGN_IN_AGAIN };
     throw new ConnectionRefreshError(`could not refresh the sign-in: ${errorMessage(failure)}`);
   }
 
@@ -285,9 +329,6 @@ export class ConnectionOAuth {
  * SDK would send a user to sign in.
  */
 class HeadlessProvider implements OAuthClientProvider {
-  /** The refresh token last handed to the SDK, to tell a refused one from one rotated meanwhile. */
-  private handedOut?: string;
-
   constructor(
     private readonly owner: ConnectionOAuth,
     private readonly config: HttpConnectionConfig,
@@ -308,9 +349,7 @@ class HeadlessProvider implements OAuthClientProvider {
   }
 
   tokens(): OAuthTokens | undefined {
-    const tokens = this.owner.boundRecord(this.config)?.tokens;
-    this.handedOut = tokens?.refresh_token;
-    return tokens;
+    return this.owner.boundRecord(this.config)?.tokens;
   }
 
   saveTokens(tokens: OAuthTokens): void {
@@ -343,10 +382,11 @@ class HeadlessProvider implements OAuthClientProvider {
     if (scope === "verifier" || scope === "discovery") return;
     const record = this.owner.boundRecord(this.config);
     if (!record) return;
-    // Rotated by another process since this refresh read it: the SDK retries
-    // with the new one instead of signing out.
+    // A refused refresh: the SDK retries once with whatever is stored then.
+    // A token a concurrent request or another process rotated in is kept and
+    // tried; only a stored token the server itself refused is dropped.
     if (scope === "tokens") {
-      if (record.tokens?.refresh_token === this.handedOut) this.owner.forgetTokens(this.config.id);
+      this.owner.forgetRefusedTokens(this.config.id);
       return;
     }
     // The server rejected the client: its tokens go with it, and a sign-in registers anew.

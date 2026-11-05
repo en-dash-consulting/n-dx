@@ -336,9 +336,11 @@ export class ConnectionService {
   private failureStatus(config: ConnectionConfig, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
     if (err instanceof ConnectionSignInRequiredError) return { state: "needs-sign-in", reason: err.reason };
     if (err instanceof InvalidGrantError && config.auth === "oauth") {
-      // The refresh token was refused twice over; only a sign-in recovers.
-      this.oauth.forgetTokens(config.id);
-      return { state: "needs-sign-in", reason: SIGN_IN_AGAIN };
+      // Refused on the retry too. When the stored token is the refused one,
+      // only a sign-in recovers; when a concurrent refresh rotated in a new
+      // one meanwhile, this call lost the race and the next one uses it.
+      if (this.oauth.forgetRefusedTokens(config.id)) return { state: "needs-sign-in", reason: SIGN_IN_AGAIN };
+      return { state: "unavailable", reason: "a concurrent refresh replaced the token; retry" };
     }
     if (err instanceof StreamableHTTPError && err.code === 401) {
       const reason = config.auth === "none"
@@ -385,7 +387,7 @@ export class ConnectionService {
       // transport also refreshes through the provider on a 401.
       const prepared = await this.oauth.prepare(config);
       if ("needsSignIn" in prepared) return { state: "needs-sign-in", reason: prepared.needsSignIn };
-      return new StreamableHTTPClientTransport(url, { authProvider: prepared.provider });
+      return new StreamableHTTPClientTransport(url, { authProvider: prepared.provider, fetch: prepared.fetch });
     }
     if (config.auth === "token") {
       const token = connectionToken(config.id, this.options.credentials);

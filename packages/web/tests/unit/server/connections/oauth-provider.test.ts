@@ -152,6 +152,23 @@ describe("OAuth connections", () => {
     expect(fake.hits["/authorize"]).toBeUndefined();
   });
 
+  it("concurrent calls that all meet a rejected token refresh without signing the connection out", async () => {
+    const fake = await oauthServer();
+    const { svc, ndxHome } = service(fake.url);
+    await signIn(svc, fake);
+
+    for (let round = 0; round < 5; round++) {
+      fake.expireAccessTokens();
+      const results = await Promise.allSettled(
+        Array.from({ length: 4 }, (_, i) => svc.callTool("docs", "read_item", { id: String(i) })),
+      );
+      // A call may lose the race and read unavailable; none may sign the connection out.
+      expect(stored(ndxHome)?.tokens?.refresh_token).toMatch(/^rt-/);
+      expect(results.some((r) => r.status === "fulfilled")).toBe(true);
+    }
+    expect(text(await svc.callTool("docs", "read_item", { id: "9" }))).toBe("item 9");
+  });
+
   it("headless: refreshes an expired token before connecting and succeeds; with none valid, reads needs-sign-in without blocking", async () => {
     const fake = await oauthServer();
     const browser = service(fake.url);

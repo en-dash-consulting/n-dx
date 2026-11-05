@@ -12,10 +12,17 @@ items:
     lastModified: "2026-11-04T20:23:44.851Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "56b4e856-c20b-4811-9a4e-ca08a85c2dff":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T23:49:58.950Z"
-    activeIntervals: [{"start":"2026-11-04T23:49:58.950Z"}]
-    lastModified: "2026-11-04T23:50:04.332Z"
+    completedAt: "2026-11-05T00:20:58.290Z"
+    endedAt: "2026-11-05T00:20:58.290Z"
+    activeIntervals: [{"end":"2026-11-05T00:20:58.290Z","start":"2026-11-04T23:49:58.950Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "oauth-provider.ts on the SDK's auth(): S256 PKCE sign-in, one URL-bound JSON record in connection:<id>, headless refresh with store re-read and one retry, revoke clears tokens and keeps the client; ConnectionService gains beginSignIn/finishSignIn/signOut. 7 tests against a fake authorization server."
+    lastModified: "2026-11-05T00:20:58.290Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "63203636-b90b-455d-9d06-f3c9272bddf5":
+    lastModified: "2026-11-05T00:10:29.757Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "98f4d418-79b5-4c39-bcbd-aa5b91aa5e36":
     lastModified: "2026-11-04T17:39:20.554Z"
@@ -30,7 +37,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23959f9-b72d-4d98-ba2e-7e8e49853788":
     issues: ["https://www.notion.so/3f7a80b71924811aafc7edb86c8706cc","https://www.notion.so/3f7a80b7192481a398e1cb38f63618a8","https://www.notion.so/3f7a80b7192481f7ad52e6a9e7739ce4","https://www.notion.so/3f7a80b719248169970dd9029aff5e07"]
-    lastModified: "2026-11-04T23:31:14.841Z"
+    lastModified: "2026-11-05T00:10:29.757Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b59456bd-36ac-4409-9707-6f30c2844f89":
     lastModified: "2026-11-04T17:39:25.942Z"
