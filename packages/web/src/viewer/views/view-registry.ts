@@ -86,6 +86,7 @@ import {
   CommandReferenceView,
   RobotWranglerView,
   ProjectView,
+  ToolingPanel,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -195,6 +196,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       : h(ProductAreaMap, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "outcomes": return h(OutcomesPanel, null);
+    case "tooling": return h(ToolingPanel, { navigateTo: ctx.navigateTo });
   }
 }
 

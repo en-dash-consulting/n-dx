@@ -501,7 +501,7 @@ describe("StagePage", () => {
     await mount(page("tune"));
     expect(sectionViews()).toEqual(["tune"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes"]);
+    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes", "tooling"]);
   });
 
   it("a Rex viewer's Tune draws the Execution Log (promoted from Runs' tab) and the PRD Graph, and no Spend", async () => {

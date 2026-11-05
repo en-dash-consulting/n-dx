@@ -69,8 +69,8 @@ import {
   localReadiness,
 } from "./llm-catalog.js";
 import type { CliInfo, LiveVendorProbe, VendorReadiness } from "./llm-catalog.js";
-import { buildTierTable } from "./llm-tiers.js";
-import type { TierRow } from "./llm-tiers.js";
+import { buildRouteOverrides, buildTierTable, buildVendorTiers } from "./llm-tiers.js";
+import type { RouteOverride, TierRow, VendorTierSummary } from "./llm-tiers.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
@@ -168,6 +168,14 @@ export interface LlmConfigResponse {
    * `llm-tiers.ts`.
    */
   tiers: TierRow[];
+  /**
+   * Light, standard and heavy for each of claude, codex and local, active or
+   * not. Read-only context for the Tune "Your tooling" tile; `tiers` above is
+   * the editable table for the active vendor.
+   */
+  vendorTiers: Record<"claude" | "codex" | "local", VendorTierSummary[]>;
+  /** Commands whose saved `llm.routes` entry differs from the default route. */
+  routeOverrides: RouteOverride[];
   /**
    * Failover chain information.
    */
@@ -767,6 +775,8 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
     },
     agentModels: readAgentModels(config),
     ...resolveLlmConfig(snapshot),
+    vendorTiers: buildVendorTiers(parseLLMConfig(config)),
+    routeOverrides: buildRouteOverrides(parseLLMConfig(config)),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {

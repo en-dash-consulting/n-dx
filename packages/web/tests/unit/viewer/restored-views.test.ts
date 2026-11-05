@@ -117,13 +117,16 @@ describe("views moved into Tune", () => {
     for (const view of MOVED) expect(listed).not.toContain(view);
   });
 
-  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped and Outcomes by tier", () => {
+  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped, Outcomes by tier and Your tooling", () => {
     const tiles = STAGES.tune.tiles!;
-    expect(tiles.map(tileTitle)).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier"]);
-    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], []]);
+    expect(tiles.map(tileTitle)).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
+    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], [], []]);
     expect(tiles[0]).toMatchObject({ cols: 8, rows: 2 });
     // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.
     expect(tiles[4]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
     expect(tiles[4].cols ?? 4).toBe(4);
+    // Your tooling is a 4×2 read-only panel; its lines link to Settings, which cannot be a stage view.
+    expect(tiles[5]).toMatchObject({ view: "hench-optimization", panel: "tooling", rows: 2 });
+    expect(tiles[5].cols ?? 4).toBe(4);
   });
 });
