@@ -141,10 +141,19 @@ describe("stages.ts", () => {
     expect(stageForView("work")).toBe("work");
     expect(stageForView("home")).toBeNull();
     expect(stageForView("robot-wrangler")).toBeNull();
-    // Token Usage is on Tune only; a Rex-only viewer has no Tune stage.
+    // Token Usage is on Tune only; a Rex viewer's borrowed Tune does not show
+    // global views, so there it lights no stage.
     expect(stageForView("token-usage")).toBe("tune");
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
     expect(stageForView("token-usage", buildValidViews("hench"))).toBe("tune");
+  });
+
+  it("places the PRD Graph and Execution Log on Tune in a Rex viewer", () => {
+    const rex = buildValidViews("rex");
+    expect(stageForView("merge-graph", rex)).toBe("tune");
+    expect(stageForView("activity", rex)).toBe("tune");
+    // Hench's own Tune views are not in a Rex viewer at all.
+    expect(stageForView("hench-runs", rex)).toBeNull();
   });
 
   it("lists each view in at most one stage", () => {
@@ -162,7 +171,8 @@ describe("stages.ts", () => {
   it("gives a scoped viewer only its own stage", () => {
     expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work", "tune"]);
     expect(visibleStages(buildValidViews("sourcevision"))).toEqual(["analyze"]);
-    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan"]);
+    // Rex borrows Tune for the PRD Graph and Execution Log.
+    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan", "tune"]);
     expect(visibleStages(buildValidViews("hench"))).toEqual(["work", "tune"]);
   });
 });
@@ -474,6 +484,20 @@ describe("StagePage", () => {
     expect(sectionViews()).toEqual(["tune"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
     expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph"]);
+  });
+
+  it("a Rex viewer's Tune draws the Execution Log (promoted from Runs' tab) and the PRD Graph, and no Spend", async () => {
+    await mount(page("tune", buildValidViews("rex")));
+    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+    expect(tiles).toEqual(["activity", "merge-graph"]);
+  });
+
+  it("gives a Rex viewer a Tune tab that lights on the PRD Graph and Execution Log", async () => {
+    const rex = buildValidViews("rex");
+    for (const view of ["merge-graph", "activity"] as const) {
+      await mount(h(TopNav, { view, validViews: rex, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
+      expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
+    }
   });
 
   it("keeps Tune lit on the pages of its tiles", async () => {

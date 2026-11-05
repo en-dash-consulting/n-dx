@@ -19,10 +19,14 @@ items:
     lastModified: "2026-11-05T02:21:28.136Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "16f0fc5c-2ffb-4b10-8ac6-c3ef21a72464":
+    status: "completed"
     startedAt: "2026-11-05T05:51:58.974Z"
-    activeIntervals: [{"end":"2026-11-05T06:10:11.740Z","start":"2026-11-05T05:51:58.974Z"},{"end":"2026-11-05T06:35:56.954Z","start":"2026-11-05T06:34:51.295Z"}]
-    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (54):\n- renders Token Usage from direct canonical /token-usage navigation\n- redirects legacy Rex token links to canonical global /token-usage\n- renders health panel after fetch resolves\n- displays health level badge\n- shows degraded health level\n- shows unhealthy health level\n- displays active connection count\n- renders connection bar when peak > 0\n… and 46 more"
-    lastModified: "2026-11-05T10:08:04.885Z"
+    completedAt: "2026-11-05T10:23:51.232Z"
+    endedAt: "2026-11-05T10:23:51.232Z"
+    activeIntervals: [{"end":"2026-11-05T06:10:11.740Z","start":"2026-11-05T05:51:58.974Z"},{"end":"2026-11-05T06:35:56.954Z","start":"2026-11-05T06:34:51.295Z"},{"end":"2026-11-05T10:23:51.232Z","start":"2026-11-05T10:08:18.482Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rex scope borrows Tune; a borrowed stage shows only product views (stageShowsView), and tiles promote their first shown tab (tileForScope). Rex Tune draws Execution Log + PRD Graph, no Spend; /token-usage lights no stage."
+    lastModified: "2026-11-05T10:23:53.416Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "28ab2232-830a-42b8-a80e-f2f4cf3902e7":
     status: "completed"
@@ -143,5 +147,12 @@ items:
     lastModified: "2026-11-05T07:45:51.116Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5c7b061-22b2-4b84-93cd-55793d328d68":
-    lastModified: "2026-11-05T08:45:40.438Z"
+    status: "completed"
+    startedAt: "2026-11-05T10:23:51.232Z"
+    completedAt: "2026-11-05T10:23:51.232Z"
+    endedAt: "2026-11-05T10:23:51.232Z"
+    activeIntervals: [{"end":"2026-11-05T10:23:51.232Z","start":"2026-11-05T10:23:51.232Z"}]
+    appliedAt: "2026-11-05T10:23:51.232Z"
+    appliedAmendsHash: "69dfc2a24996d74ab48551b74ab507ef5553bbc1192cdc06420ed05b8490aebb"
+    lastModified: "2026-11-05T10:23:51.232Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

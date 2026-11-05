@@ -278,17 +278,49 @@ export function isStageId(view: ViewId): view is StageId {
  * stage listing it as a section, a tile, or in `alsoOwns`. Each view is listed by at most one stage, so
  * the answer never depends on where the user came from — a view listed twice
  * would light the first stage in loop order even when opened from the second.
- * Given `validViews`, only stages this viewer has count: Token Usage is on
- * Work, so a Rex-only viewer has it in no stage. Null for home, settings, and
+ * Given `validViews`, only what a stage shows in this viewer counts
+ * (`stageShowsView`): Token Usage is on Tune, and a Rex viewer's borrowed Tune
+ * does not show it, so there it is in no stage. Null for home, settings, and
  * anything no (available) stage lists.
  */
 export function stageForView(view: ViewId, validViews?: ReadonlySet<ViewId>): StageId | null {
   if (isStageId(view)) return view;
   for (const id of STAGE_ORDER) {
-    if (validViews && !validViews.has(id)) continue;
-    if (stageViews(id).includes(view)) return id;
+    if (!stageViews(id).includes(view)) continue;
+    if (!validViews || stageShowsView(id, view, validViews)) return id;
   }
   return null;
+}
+
+/**
+ * Whether this viewer's copy of the stage shows the view. The stage and the
+ * view must both be valid. A stage another scope borrows (Tune, hench's, in a
+ * Rex viewer) shows only product views: a global view it lists (Spend) belongs
+ * to the viewers that have the stage's own product, so a borrowed stage draws
+ * no tile for it and opening it lights no stage. A viewer has a product when
+ * some non-stage view of that product is valid.
+ */
+export function stageShowsView(id: StageId, view: ViewId, validViews: ReadonlySet<ViewId>): boolean {
+  if (!validViews.has(id) || !validViews.has(view)) return false;
+  if (VIEW_META[view].product !== "global") return true;
+  const product = stageProduct(id);
+  return [...validViews].some((v) => !isStageId(v) && VIEW_META[v].product === product);
+}
+
+/**
+ * The tile as this viewer's copy of the stage shows it. A tile whose own view
+ * is not shown but one of its tabs is (Runs in a Rex viewer, with the
+ * Execution Log as its tab) is promoted: the first shown tab becomes the
+ * tile's view and the rest follow it. Null when the stage shows nothing the
+ * tile lists.
+ */
+export function tileForScope(stage: StageId, tile: StageTile, validViews: ReadonlySet<ViewId>): StageTile | null {
+  const shows = (view: ViewId) => stageShowsView(stage, view, validViews);
+  const tabs = (tile.tabs ?? []).filter((t) => shows(t.view));
+  if (shows(tile.view)) return tabs.length === (tile.tabs ?? []).length ? tile : { ...tile, tabs };
+  const [first, ...rest] = tabs;
+  if (!first) return null;
+  return { ...tile, view: first.view, tabs: rest, hiddenWhenDeployed: first.hiddenWhenDeployed ?? tile.hiddenWhenDeployed };
 }
 
 /**

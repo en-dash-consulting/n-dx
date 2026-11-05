@@ -27,6 +27,9 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
 
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "plan",
+  // Borrowed from hench for the PRD Graph and Execution Log, which have no
+  // other stage here. It shows only Rex's own views (see `stageShowsView`).
+  "tune",
   "rex-dashboard",
   "prd",
   "product",
