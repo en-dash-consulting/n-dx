@@ -163,8 +163,9 @@ describe("v2 product reads", () => {
         touches: [],
         taskCount: 1,
         completedTaskCount: 0,
-        // The change itself carries no acceptance criteria; only its task does.
-        criteriaGap: true,
+        // The change carries no criteria of its own, as after rex's split, but its
+        // one open task does: no gap.
+        criteriaGap: false,
         openBlockers: 0,
       }],
     });
@@ -205,10 +206,31 @@ describe("v2 product reads", () => {
       expect(await row()).toMatchObject({ taskCount: 0, criteriaGap: false });
     });
 
+    it("reports a gap for a task-less change without criteria", async () => {
+      rmSync(taskPath());
+      expect(await row()).toMatchObject({ taskCount: 0, criteriaGap: true });
+    });
+
+    const dropTaskCriteria = (): void => {
+      writeFileSync(taskPath(), readFileSync(taskPath(), "utf-8").replace(/acceptanceCriteria:\n {2}- .*\n/, ""));
+    };
+    /** The fixture's task has no state row; add one. */
+    const setTaskStatus = (status: string): void => {
+      const statePath = join(changeDir(), "state.yaml");
+      writeFileSync(statePath, `${readFileSync(statePath, "utf-8")}  "${TASK_ID}":\n    status: "${status}"\n`);
+    };
+
     it("reports a gap when an open task has no criteria", async () => {
       withChangeCriteria();
-      writeFileSync(taskPath(), readFileSync(taskPath(), "utf-8").replace(/acceptanceCriteria:\n {2}- .*\n/, ""));
+      dropTaskCriteria();
       expect((await row()).criteriaGap).toBe(true);
+    });
+
+    it("ignores a cancelled task without criteria, and its blockers", async () => {
+      dropTaskCriteria();
+      addBlocker("pending");
+      setTaskStatus("cancelled");
+      expect(await row()).toMatchObject({ criteriaGap: false, openBlockers: 0 });
     });
 
     it("counts an open blocker on a task", async () => {

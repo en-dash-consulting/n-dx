@@ -367,14 +367,16 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
 }
 
 /**
- * The gap chips' inputs. `criteriaGap`: the change has no acceptance criteria, or
- * an open task under it has none. A task-less change with its own criteria has no
- * gap; it runs as its own unit. `openBlockers`: distinct `blockedBy` ids on the
- * change or its open tasks whose node is not completed. A ref that resolves to
- * nothing cannot be shown complete, so it counts.
+ * The gap chips' inputs. `criteriaGap`: a task-less change has no acceptance
+ * criteria of its own (it runs as its own unit), or an open task under a change
+ * has none. A change with tasks is judged by its tasks alone: rex moves a change's
+ * criteria to its first task when it gains one (`core/change-completion.ts`), so
+ * such a change normally carries none. `openBlockers`: distinct `blockedBy` ids on
+ * the change or its open tasks whose node is not completed; as in rex's selection,
+ * a ref that resolves to nothing counts. Open means neither completed nor cancelled.
  */
 function gapOf(index: TreeIndex, change: ChangeRuleNode, tasks: RuleNode[]): { criteriaGap: boolean; openBlockers: number } {
-  const openTasks = tasks.filter((t) => t.status !== "completed");
+  const openTasks = tasks.filter((t) => t.status !== "completed" && t.status !== "cancelled");
   const hasCriteria = (node: RuleNode): boolean =>
     (node.type === "change" || node.type === "task" || node.type === "subtask") && (node.acceptanceCriteria?.length ?? 0) > 0;
   const blockers = new Set<string>();
@@ -385,7 +387,7 @@ function gapOf(index: TreeIndex, change: ChangeRuleNode, tasks: RuleNode[]): { c
     }
   }
   return {
-    criteriaGap: !hasCriteria(change) || openTasks.some((t) => !hasCriteria(t)),
+    criteriaGap: tasks.length === 0 ? !hasCriteria(change) : openTasks.some((t) => !hasCriteria(t)),
     openBlockers: blockers.size,
   };
 }
