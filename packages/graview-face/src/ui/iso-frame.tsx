@@ -7,19 +7,40 @@
  * sourcevision has not analyzed has no map, and the frame says how to make one.
  */
 import { useEffect, useRef, useState } from "react";
+import { BASE } from "../base.js";
 import { Empty } from "./kit.js";
 
-export const ISO_MAP_URL = "/data/iso-map.html";
+export const ISO_MAP_URL = `${BASE}/data/iso-map.html`;
+/** The door marks the map it serves, so a host's page-not-found fallback is never framed as one. */
+export const ISO_MAP_HEADER = "x-ndx-iso-map";
+/** The map's own root element in embed mode (sourcevision's renderIsoMap). */
+const ISO_MAP_ROOT = '<html lang="en" class="embed">';
 
 type Availability = "checking" | "yes" | "no";
 
-/** Whether the door has a map to serve, asked once per page. */
+/**
+ * Whether the URL answers with the map. A single-page host (Vite's dev server,
+ * `vite preview`, most static hosts) answers a missing file with the face's own
+ * index.html, 200 and text/html, so the content type alone would frame the face
+ * inside itself. The door says so in a header; any other host is read for the
+ * map's root element.
+ */
+async function servesMap(): Promise<boolean> {
+  const head = await fetch(ISO_MAP_URL, { method: "HEAD", cache: "no-store" });
+  if (!head.ok) return false;
+  if (head.headers.get(ISO_MAP_HEADER) === "1") return true;
+  if (!(head.headers.get("content-type") ?? "").includes("text/html")) return false;
+  const page = await fetch(ISO_MAP_URL, { cache: "no-store" });
+  return page.ok && (await page.text()).includes(ISO_MAP_ROOT);
+}
+
+/** Whether there is a map to frame, asked once per page. */
 function useIsoMap(): Availability {
   const [state, setState] = useState<Availability>("checking");
   useEffect(() => {
     let live = true;
-    fetch(ISO_MAP_URL, { method: "HEAD", cache: "no-store" })
-      .then((r) => live && setState(r.ok && (r.headers.get("content-type") ?? "").includes("text/html") ? "yes" : "no"))
+    servesMap()
+      .then((yes) => live && setState(yes ? "yes" : "no"))
       .catch(() => live && setState("no"));
     return () => {
       live = false;

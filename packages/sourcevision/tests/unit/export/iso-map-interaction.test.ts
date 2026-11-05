@@ -427,6 +427,71 @@ describe("iso map embedded in a host page", () => {
   });
 });
 
+describe("iso map focus over areas and sub-zones", () => {
+  // Two areas. "web" is both an area and its largest zone; "web-a" has its own
+  // sub-zones (a depth-2 zone "web-a-x"); "web-b" is a sub-zone of "web".
+  const zone = (id: string, files: string[], extra: Partial<IsoModelInput["zones"][number]> = {}) => ({
+    id, name: id.toUpperCase(), description: "", files, entryPoints: [files[0]!], cohesion: 0.8, coupling: 0.2, ...extra,
+  });
+  const webA = zone("web-a", ["w/a1.ts", "w/a2.ts"], { subZones: [zone("web-a-x", ["w/a1.ts"]), zone("web-a-y", ["w/a2.ts"])] });
+  const web = zone("web", ["w/a1.ts", "w/a2.ts", "w/b1.ts", "w/b2.ts", "w/c.ts"], { subZones: [webA, zone("web-b", ["w/b1.ts", "w/b2.ts"])] });
+  const files = ["w/a1.ts", "w/a2.ts", "w/b1.ts", "w/b2.ts", "w/c.ts", "c/1.ts", "c/2.ts", "d/1.ts"];
+  const input = makeInput({
+    zones: [web, zone("other", ["w/c.ts"]), zone("core", ["c/1.ts", "c/2.ts"]), zone("db", ["d/1.ts"])],
+    crossings: [{ fromZone: "web", toZone: "core" }],
+    files: new Map<string, IsoFileInput>(files.map((f) => [f, { lineCount: 100, kind: "logic" }])),
+    areas: [{ id: "web", name: "Web area", zones: ["web", "other"] }, { id: "core", name: "Core area", zones: ["core", "db"] }],
+  });
+
+  let win: JSDOM["window"];
+  let doc: Document;
+  const errors: string[] = [];
+  const focus = (id: string) => win.dispatchEvent(new win.MessageEvent("message", { data: { type: "ndx-iso", focus: id } }));
+  const crumbs = () => doc.getElementById("crumbs")?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  const selected = () => doc.querySelector("#dossier h3")?.textContent ?? null;
+
+  beforeAll(() => {
+    const model = buildIsoModel(input);
+    expect(model.level).toBe("areas");
+    const dom = new JSDOM(renderIsoMap(model, { embed: true }), { runScripts: "dangerously" });
+    win = dom.window;
+    doc = win.document;
+    win.addEventListener("error", (e) => errors.push(e.message));
+  });
+
+  it("opens the area scene for a zone that shares its area's id, and selects the zone, not the area", () => {
+    focus("web");
+    expect(crumbs()).toContain("Web area");
+    expect(selected()).toBe("WEB");
+  });
+
+  it("switches scenes for a zone in another area", () => {
+    focus("db");
+    expect(crumbs()).toContain("Core area");
+    expect(selected()).toBe("DB");
+  });
+
+  it("expands the parent for a sub-zone, and every ancestor for a zone two levels down", () => {
+    focus("web-b");
+    expect(crumbs()).toContain("Web area");
+    expect(selected()).toBe("WEB-B");
+    focus("db");
+    focus("web-a-x");
+    expect(crumbs()).toContain("Web area");
+    expect(selected()).toBe("WEB-A-X");
+  });
+
+  it("stays where it is for an id the map does not have, a prototype key included", () => {
+    focus("db");
+    for (const id of ["nowhere", "constructor", "__proto__", "toString"]) {
+      focus(id);
+      expect(crumbs(), id).toContain("Core area");
+      expect(selected(), id).toBe("DB");
+    }
+    expect(errors).toEqual([]);
+  });
+});
+
 describe("iso map zoom rate", () => {
   /** Zoom level after one wheel event from the fitted view. */
   function zoomAfter(init: WheelEventInit): number {

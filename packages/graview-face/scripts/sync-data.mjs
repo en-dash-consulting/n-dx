@@ -7,7 +7,7 @@
  * dev server and the build serve them at /data/. `NDX_GRAVIEW_DIR` names the
  * dir; the default is this monorepo's own `.graview`.
  */
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +26,8 @@ if (missing.length > 0) {
 mkdirSync(to, { recursive: true });
 for (const f of files) copyFileSync(join(from, f), join(to, f));
 // The code map is there only when sourcevision has analyzed the project; a static build without it says so on the page.
+// A copy left from an earlier sync goes, as emit removes the map whose analysis is gone.
 const optional = ["iso-map.html"].filter((f) => existsSync(join(from, f)));
+for (const f of ["iso-map.html"]) if (!optional.includes(f)) rmSync(join(to, f), { force: true });
 for (const f of optional) copyFileSync(join(from, f), join(to, f));
 console.log(`sync-data: ${[...files, ...optional].join(", ")} ← ${from}`);

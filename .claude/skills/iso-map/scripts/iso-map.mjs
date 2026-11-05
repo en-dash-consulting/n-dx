@@ -1903,7 +1903,7 @@ function refresh(scrollPanel){
 }
 
 function selectNode(id){
-  if (!BY[id]) return;
+  if (!Object.prototype.hasOwnProperty.call(BY, id)) return;
   curNode = id; curEdge = null;
   refresh(true);
 }
@@ -1924,32 +1924,50 @@ function holderIn(scene, id, exact){
   }
   return null;
 }
+function ownKey(o, k){ return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 /**
  * Select a zone from outside (the host's focus message). An area and a zone
  * may share an id (the area named for its largest zone), and a zone page
- * means the zone: so the area scene that holds the zone itself comes first,
- * then one that holds it as a tile, and only then the area's own block.
+ * means the zone. The zone's own ancestry comes first: ROOT.parents runs
+ * sub-zone, zone, ... up to "area:<id>" when areas are drawn, so the map opens
+ * that area's scene and expands each ancestor in place, outermost first, until
+ * the zone itself is drawn, at any depth. A zone the hierarchy does not reach
+ * falls back to the scene that draws it or carries it as a tile, then to the
+ * top level. An id the map does not have leaves the view where it is.
  */
 function focusZone(id){
   if (!id) return;
-  if (MODEL !== ROOT && BY[id]) { selectNode(id); return; }
+  if (MODEL !== ROOT && ownKey(BY, id)) { selectNode(id); return; }
+  var parents = ROOT.parents || {};
   var scenes = ROOT.scenes || {};
+  var chain = [], cur = id, guard = 0;
+  while (ownKey(parents, cur) && guard++ < 24) { cur = parents[cur]; chain.push(cur); }
+  if (chain.length > 0) {
+    var top = chain[chain.length - 1];
+    var area = top.indexOf("area:") === 0 && ownKey(scenes, top.slice(5)) ? top.slice(5) : "";
+    switchScene(area);
+    for (var c = chain.length - 1; c >= 0 && !ownKey(BY, id); c--) {
+      var z = chain[c];
+      if (z.indexOf("area:") !== 0 && ownKey(BY, z) && !EXPANDED[z] && expandable(BY[z])) toggleExpand(z);
+    }
+    if (ownKey(BY, id)) { selectNode(id); return; }
+  }
   for (var pass = 0; pass < 2; pass++) {
     for (var sid in scenes) {
+      if (!ownKey(scenes, sid)) continue;
       var holder = holderIn(scenes[sid], id, pass === 0);
       if (!holder) continue;
       switchScene(sid);
       // A tile is a sub-zone drawn on its parent's top: open the parent so the zone itself can be selected.
-      if (!BY[id] && BY[holder] && expandable(BY[holder])) toggleExpand(holder);
-      selectNode(BY[id] ? id : holder);
+      if (!ownKey(BY, id) && ownKey(BY, holder) && expandable(BY[holder])) toggleExpand(holder);
+      selectNode(ownKey(BY, id) ? id : holder);
       return;
     }
   }
+  var atRoot = holderIn(ROOT, id, false);
+  if (!atRoot) return;
   switchScene("");
-  if (BY["area:" + id]) { selectNode("area:" + id); return; }
-  if (BY[id]) { selectNode(id); return; }
-  var top = holderIn(ROOT, id, false);
-  if (top) selectNode(BY[top] ? top : "area:" + top);
+  selectNode(ownKey(BY, "area:" + atRoot) ? "area:" + atRoot : atRoot);
 }
 function clearSelection(){
   if (curNode === null && curEdge === null) return;

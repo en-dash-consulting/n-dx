@@ -163,6 +163,23 @@ describe("bin/serve.js with an explicitly injected project projection", () => {
     expect(info.live).toBe(true);
   });
 
+  it("answers 404 for a code map the projection does not have, never the face's own page, and marks one it does", async () => {
+    for (const path of ["/data/iso-map.html", `${MOUNT}data/iso-map.html`]) {
+      const missing = await sidecarFetch(`${origin}${path}`);
+      expect(missing.status).toBe(404);
+      expect(await missing.text()).not.toContain("ndx-door");
+    }
+    writeFileSync(join(scratch, "iso-map.html"), '<!doctype html>\n<html lang="en" class="embed"><body>map</body></html>');
+    try {
+      const map = await sidecarFetch(`${origin}${MOUNT}data/iso-map.html`);
+      expect(map.status).toBe(200);
+      expect(map.headers.get("x-ndx-iso-map")).toBe("1");
+      expect(await map.text()).toContain('class="embed"');
+    } finally {
+      rmSync(join(scratch, "iso-map.html"), { force: true });
+    }
+  });
+
   it("hands POST /ndx/mcp to the MCP door, stripped or under the mount", async () => {
     const html = await (await sidecarFetch(`${origin}/`)).text();
     const key = /<meta name="ndx-door" content="([0-9a-f]+)"/.exec(html)?.[1];

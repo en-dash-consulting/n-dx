@@ -212,9 +212,16 @@ export function ndxDoor(): Plugin {
         try {
           if (graviewDir && url === "/data/iso-map.html") {
             const file = join(graviewDir, "iso-map.html");
-            if (!existsSync(file)) return next();
+            // Answered here, not passed on: Vite would serve a stale copy from public/data, or
+            // its single-page fallback, the face's own index.html, as if it were the map.
+            if (!existsSync(file)) {
+              res.statusCode = 404;
+              res.setHeader("cache-control", "no-store");
+              return void res.end();
+            }
             res.setHeader("content-type", "text/html; charset=utf-8");
             res.setHeader("cache-control", "no-store");
+            res.setHeader("x-ndx-iso-map", "1");
             return void createReadStream(file).pipe(res);
           }
           if (graviewDir && (url === "/data/document.json" || url === "/data/snapshot.json")) {
