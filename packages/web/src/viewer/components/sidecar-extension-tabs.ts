@@ -156,10 +156,10 @@ export interface ExtensionTabStripProps {
   onSelect: (id: string) => void;
 }
 
-/** Sidecar first, then the extension tabs; nothing when there are none. */
+/** Chat first, then the extension tabs, as one segmented control; nothing when there are no extension tabs. */
 export function ExtensionTabStrip({ tabs, active, onSelect }: ExtensionTabStripProps) {
   if (tabs.length === 0) return null;
-  const entries = [{ id: SIDECAR_TAB, label: "Sidecar" }, ...tabs.map((t) => ({ id: t.name, label: t.label }))];
+  const entries = [{ id: SIDECAR_TAB, label: "Chat" }, ...tabs.map((t) => ({ id: t.name, label: t.label }))];
   return h("div", { class: "sidecar-tabs", role: "tablist", "aria-label": "Sidecar tabs" },
     entries.map((entry) => h("button", {
       key: entry.id,

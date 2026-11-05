@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "56af7f24-28ef-44fb-a3ad-d095b231a39e":
-    lastModified: "2026-11-05T01:37:50.339Z"
+    status: "completed"
+    startedAt: "2026-11-05T01:38:41.950Z"
+    completedAt: "2026-11-05T01:46:23.041Z"
+    endedAt: "2026-11-05T01:46:23.041Z"
+    activeIntervals: [{"end":"2026-11-05T01:46:23.041Z","start":"2026-11-05T01:38:41.950Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Chat/extension segmented tabs, pill Sessions toggle, 32px close, labelled styled Agent/Model selects with readable names (sidecar-agent-names.ts)"
+    lastModified: "2026-11-05T01:46:23.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "80e80636-1733-4ade-a6b4-a1d4a3cce8cb":
     lastModified: "2026-11-05T01:38:06.420Z"

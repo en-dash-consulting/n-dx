@@ -23,6 +23,7 @@ import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
+import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
 import { useHubProjects } from "./project-switcher.js";
 import {
   ExtensionTabPanel, ExtensionTabStrip, SIDECAR_TAB, extensionFramePath, useExtensionTabs,
@@ -386,20 +387,25 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     ...(listing ? [] : [
     agent
       ? h("div", { class: "sidecar-agent" },
-          h("select", {
-            class: "sidecar-vendor",
-            "aria-label": "Vendor",
-            value: agent.vendor,
-            onChange: (e: Event) => { void sidecar.chooseAgent((e.target as HTMLSelectElement).value); },
-          }, SIDECAR_VENDORS.filter((v) => catalog?.[v] || v === agent.vendor).map((v) =>
-            h("option", { key: v, value: v, selected: v === agent.vendor }, v))),
-          h("select", {
-            class: "sidecar-model",
-            "aria-label": "Model",
-            value: agent.model,
-            disabled: modelOptions.length === 0,
-            onChange: (e: Event) => { void sidecar.chooseAgent(agent.vendor, (e.target as HTMLSelectElement).value); },
-          }, modelOptions.map((m) => h("option", { key: m, value: m, selected: m === agent.model }, m))),
+          h("div", { class: "sidecar-field" },
+            h("label", { class: "sidecar-field-label", for: "sidecar-vendor" }, "Agent"),
+            h("select", {
+              id: "sidecar-vendor",
+              class: "sidecar-vendor",
+              value: agent.vendor,
+              onChange: (e: Event) => { void sidecar.chooseAgent((e.target as HTMLSelectElement).value); },
+            }, SIDECAR_VENDORS.filter((v) => catalog?.[v] || v === agent.vendor).map((v) =>
+              h("option", { key: v, value: v, selected: v === agent.vendor }, vendorLabel(v))))),
+          h("div", { class: "sidecar-field sidecar-field-model" },
+            h("label", { class: "sidecar-field-label", for: "sidecar-model" }, "Model"),
+            h("select", {
+              id: "sidecar-model",
+              class: "sidecar-model",
+              value: agent.model,
+              disabled: modelOptions.length === 0,
+              onChange: (e: Event) => { void sidecar.chooseAgent(agent.vendor, (e.target as HTMLSelectElement).value); },
+            }, modelOptions.map((m) =>
+              h("option", { key: m, value: m, title: m, selected: m === agent.model }, modelLabel(m))))),
         )
       : null,
     h("ol", { class: "sidecar-transcript", ref: transcriptRef, "aria-live": "polite", "aria-label": "Transcript" },

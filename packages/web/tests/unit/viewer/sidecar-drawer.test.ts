@@ -8,6 +8,8 @@
  * through `useFeatureToggle` into `useSidecarShell`, then `TopNav` and
  * `SidecarDock` — against a stubbed server and socket.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
@@ -634,8 +636,39 @@ describe("the agent picker", () => {
     await pressCmdJ();
     expect(server.requests.some((r) => r.url === "/api/llm/catalog")).toBe(true);
     const options = (sel: string) => [...root.querySelectorAll(`${sel} option`)].map((o) => o.textContent);
-    expect(options(".sidecar-vendor")).toEqual(["claude", "codex"]);
+    expect(options(".sidecar-vendor")).toEqual(["Claude", "Codex"]);
     expect(options(".sidecar-model")).toEqual(["gpt-5.5", "gpt-5.5-mini"]);
+    const values = (sel: string) => [...root.querySelectorAll<HTMLOptionElement>(`${sel} option`)].map((o) => o.value);
+    expect(values(".sidecar-vendor")).toEqual(["claude", "codex"]);
+    expect(values(".sidecar-model")).toEqual(["gpt-5.5", "gpt-5.5-mini"]);
+  });
+
+  it("labels each picker visibly and shows readable Claude model names over the ids", async () => {
+    await mount();
+    await pressCmdJ();
+    for (const [sel, text] of [[".sidecar-vendor", "Agent"], [".sidecar-model", "Model"]] as const) {
+      const select = root.querySelector<HTMLSelectElement>(sel)!;
+      const label = root.querySelector<HTMLLabelElement>(`label[for="${select.id}"]`)!;
+      expect(label.textContent).toBe(text);
+    }
+    await pick(".sidecar-vendor", "claude");
+    const opts = [...root.querySelectorAll<HTMLOptionElement>(".sidecar-model option")];
+    expect(opts.map((o) => o.textContent)).toEqual(["Sonnet 5.5", "Haiku 4.5"]);
+    expect(opts.map((o) => o.value)).toEqual(["claude-sonnet-5-5", "claude-haiku-4-5"]);
+    expect(opts.map((o) => o.title)).toEqual(["claude-sonnet-5-5", "claude-haiku-4-5"]);
+  });
+
+  it("styles the header controls and pickers from tokens only", () => {
+    const css = readFileSync(join(process.cwd(), "src/viewer/styles/sidecar.css"), "utf8");
+    const rule = (sel: string) => css.match(new RegExp(`${sel.replace(/[.]/g, "\\.")}\\s*\\{([^}]*)\\}`))![1]!;
+    expect(rule(".sidecar-tab.active")).toMatch(/background: var\(--bg-active\)[\s\S]*color: var\(--text\)/);
+    expect(rule(".sidecar-tab")).toMatch(/color: var\(--text-dim\)/);
+    expect(rule(".sidecar-sessions-toggle.active")).toMatch(/background: var\(--bg-active\)/);
+    expect(rule(".sidecar-agent select")).toMatch(/var\(--bg-surface\)[\s\S]*var\(--border\)[\s\S]*var\(--radius-md\)/);
+    expect(rule(".sidecar-close")).toMatch(/width: var\(--space-8\)/);
+    for (const sel of [".sidecar-tab", ".sidecar-sessions-toggle", ".sidecar-close", ".sidecar-agent select", ".sidecar-field-label"]) {
+      expect(rule(sel)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
   });
 
   it("creates the first session with the chosen vendor and model", async () => {
@@ -1558,13 +1591,27 @@ describe("extension tabs", () => {
     expect(root.querySelector(".sidecar-tabs")).toBeNull();
   });
 
-  it("lists Sidecar first, then each tab in the hub's order, and asks for no key yet", async () => {
+  it("lists Chat first, then each tab in the hub's order, and asks for no key yet", async () => {
     server.hubTabs = [{ name: "zeta", label: "Zeta" }, { name: "alpha", label: "Alpha" }];
     await mount();
     await pressCmdJ();
-    expect(tabButtons().map((b) => b.textContent)).toEqual(["Sidecar", "Zeta", "Alpha"]);
+    expect(tabButtons().map((b) => b.textContent)).toEqual(["Chat", "Zeta", "Alpha"]);
+    expect(root.querySelector(".sidecar-title")!.textContent).toBe("Sidecar");
     expect(frameKeyPosts()).toEqual([]);
     expect(iframe()).toBeNull();
+  });
+
+  it("exposes the selected tab and the Sessions toggle's pressed state", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    expect(tabButtons().map((b) => b.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    await press(tab("alpha"));
+    expect(tabButtons().map((b) => b.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    const toggle = root.querySelector<HTMLButtonElement>(".sidecar-sessions-toggle")!;
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    await press(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("loads the page on first open in an iframe sandboxed exactly, and keeps it across tab switches", async () => {
