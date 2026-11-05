@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "propose_link with a change's display id raises a link card naming the change's UUID (broker test)"
   - "POST /api/rex/items/<display id>/links writes the ref to the named change (route test)"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
