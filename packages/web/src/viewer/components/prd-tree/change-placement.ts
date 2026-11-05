@@ -496,7 +496,9 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const shortlist = placement?.shortlist ?? [];
   // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
   const [requested] = useState(() => (another ? null : takePlacementRequest(changeId)));
-  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? selection ?? null);
+  // An extra place starts empty: the map's selection is the place just made.
+  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? (another ? null : selection) ?? null);
+  const seenSelection = useRef(selection?.target);
   const [relation, setRelation] = useState<PlacementRelation | null>(requested?.relation ?? initialRelation(placement, wide));
   const [summary, setSummary] = useState("");
   const [proposed, setProposed] = useState("");
@@ -529,7 +531,10 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
     if (row && chosen?.target === row.target) setChosen(row);
   }, [shortlist.length]);
   // The map chose: follow it, preferring the shortlist row, which carries strength and criteria.
+  // Only a new choice counts; the selection the form mounted with is not one.
   useEffect(() => {
+    if (selection?.target === seenSelection.current) return;
+    seenSelection.current = selection?.target;
     if (selection && selection.target !== chosen?.target) {
       setChosen(shortlist.find((c) => c.target === selection.target) ?? selection);
     }

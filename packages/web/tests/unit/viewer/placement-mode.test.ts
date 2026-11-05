@@ -184,6 +184,7 @@ function serve(changes: ChangeRow[], shortlists: ChangePlacement[]): void {
     "/api/rex/product": { layout: "v2", map: MAP },
     "/api/rex/changes/placements": { layout: "v2", placements: Object.fromEntries(shortlists.map((p) => [p.change.id, p])) },
     ...Object.fromEntries(MAP.areas.map((a) => [`/api/rex/product/area/${a.slug}`, { layout: "v2", area: areaDetail(a.slug) }])),
+    ...Object.fromEntries(changes.map((c) => [`/api/rex/changes/${c.id}/place`, { relation: "touches" }])),
   };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     const body = routes[url];
@@ -365,6 +366,22 @@ describe("PlacementMode", () => {
     await settle();
     expect(crumb()).toEqual(["Plan", "Product map", "Shipping"]);
     expect($<HTMLInputElement>(".cp-amends input.cp-input")?.value).toBe("Labels carry the return address");
+  });
+
+  it("Place & add another opens with no target chosen, and a block on the map still chooses one", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-refund", { score: 9 }), candidate("cap-gift", { strength: "possible", score: 2 })])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
+    await settle();
+    await act(async () => { $<HTMLButtonElement>(".cp-place-another")!.click(); });
+    await settle();
+    expect($(".cp-section")?.dataset.changePlacement).toBe("another");
+    expect($$(".cp-card.is-checked")).toEqual([]);
+    expect($<HTMLButtonElement>(".cp-place")!.disabled).toBe(true);
+
+    await act(async () => { $<HTMLButtonElement>('.pam-block[data-block="cap-gift"]')!.click(); });
+    await settle();
+    expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
   });
 
   it("pre-selects rex's relation for a strong, untied pick", async () => {
