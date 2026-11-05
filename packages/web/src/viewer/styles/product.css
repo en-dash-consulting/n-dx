@@ -918,3 +918,18 @@
 .placing-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .placing-chip-rank, .placing-chip-area { color: var(--text-dim); }
 .placing-chip-title { font-weight: 600; overflow-wrap: anywhere; }
+
+/* Items a waiting Sidecar card proposes for the block (SP5): dashed, apart from the real open-change count. */
+.pam-ghost {
+  position: absolute;
+  bottom: var(--space-1);
+  right: var(--space-1);
+  min-width: 1.4em;
+  padding: 0 0.4em;
+  border: 1px dashed var(--text-muted);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-align: center;
+}

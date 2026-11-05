@@ -12,7 +12,9 @@
  */
 
 import { h } from "preact";
+import { useContext, useMemo } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
+import { GhostCardsContext, ghostCountsByTarget } from "../components/index.js";
 import type { AreaSection, ProductMap } from "./product-model.js";
 
 /** What tints a block. Defective outranks the status of the capabilities. */
@@ -65,13 +67,27 @@ export interface AreaBlockModel {
   unit: "capabilities" | "criteria";
   status: BlockStatus;
   openChanges: number;
+  /** Items a waiting Sidecar card proposes for this block: drawn dashed, never in `openChanges`. */
+  ghosts?: number;
   /** The area's slug; null on the block that folds smaller areas. */
   slug: string | null;
 }
 
+/** Waiting items by the node they target; see `ghostCountsByTarget`. */
+export type GhostCounts = ReadonlyMap<string, number>;
+
+/** Waiting items aimed at an area or at any of its capabilities. */
+function areaGhosts(areas: readonly AreaSection[], ghostCounts: GhostCounts): number {
+  return areas.reduce(
+    (n, area) => n + (ghostCounts.get(area.id) ?? 0) + area.capabilities.reduce((m, c) => m + (ghostCounts.get(c.id) ?? 0), 0),
+    0,
+  );
+}
+
 /** One area's block. */
-export function areaBlock(area: AreaSection): AreaBlockModel {
+export function areaBlock(area: AreaSection, ghostCounts: GhostCounts = new Map()): AreaBlockModel {
   return {
+    ghosts: areaGhosts([area], ghostCounts),
     key: area.id,
     label: area.title,
     size: area.capabilities.length,
@@ -86,8 +102,8 @@ export function areaBlock(area: AreaSection): AreaBlockModel {
  * One block per area in the map's order. Past `MAX_BLOCKS`, the smallest areas
  * (ties keep the earlier area) fold into a "+N smaller areas" block.
  */
-export function areaBlocks(areas: readonly AreaSection[]): AreaBlockModel[] {
-  if (areas.length <= MAX_BLOCKS) return areas.map(areaBlock);
+export function areaBlocks(areas: readonly AreaSection[], ghostCounts: GhostCounts = new Map()): AreaBlockModel[] {
+  if (areas.length <= MAX_BLOCKS) return areas.map((a) => areaBlock(a, ghostCounts));
   const keep = new Set(
     areas
       .map((area, index) => ({ area, index }))
@@ -98,8 +114,9 @@ export function areaBlocks(areas: readonly AreaSection[]): AreaBlockModel[] {
   const folded = areas.filter((a) => !keep.has(a.id));
   const rows = folded.flatMap((a) => a.capabilities);
   return [
-    ...areas.filter((a) => keep.has(a.id)).map(areaBlock),
+    ...areas.filter((a) => keep.has(a.id)).map((a) => areaBlock(a, ghostCounts)),
     {
+      ghosts: areaGhosts(folded, ghostCounts),
       key: "folded",
       label: `+${folded.length} smaller areas`,
       size: rows.length,
@@ -114,12 +131,13 @@ export function areaBlocks(areas: readonly AreaSection[]): AreaBlockModel[] {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** The block's accessible name: what it is, how big, its status, and its open changes. */
-export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" | "status" | "openChanges">): string {
+export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" | "status" | "openChanges" | "ghosts">): string {
   const unit = block.unit === "capabilities"
     ? plural(block.size, "capability", "capabilities")
     : plural(block.size, "criterion", "criteria");
   const open = block.openChanges === 0 ? "no open changes" : plural(block.openChanges, "open change", "open changes");
-  return `${block.label}: ${unit}, ${BLOCK_STATUS_LABELS[block.status].toLowerCase()}, ${open}`;
+  const waiting = block.ghosts ? `, ${block.ghosts} waiting on a card` : "";
+  return `${block.label}: ${unit}, ${BLOCK_STATUS_LABELS[block.status].toLowerCase()}, ${open}${waiting}`;
 }
 
 /**
@@ -178,6 +196,10 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit, near, pendin
       ? h("span", { class: "pam-open", "aria-hidden": "true", title: plural(block.openChanges, "open change", "open changes") },
           String(block.openChanges))
       : null,
+    block.ghosts
+      ? h("span", { class: "pam-ghost", "aria-hidden": "true", "data-ghost": block.key, title: `${plural(block.ghosts, "item", "items")} waiting on a card` },
+          `+${block.ghosts}`)
+      : null,
   );
 }
 
@@ -199,12 +221,14 @@ export function BlockLegend() {
 export type OpenArea = (slug: string | null, title: string) => void;
 
 export function AreaBlocks({ map, onOpenArea }: { map: ProductMap; onOpenArea: OpenArea }) {
+  const cards = useContext(GhostCardsContext);
+  const ghostCounts = useMemo(() => ghostCountsByTarget(cards), [cards]);
   if (map.areas.length === 0) {
     return h("div", { class: "empty-state", role: "status" }, "No areas yet. They appear once the product layer is populated.");
   }
   return h("div", { class: "pam" },
     h("div", { class: "pam-blocks" },
-      areaBlocks(map.areas).map((block) =>
+      areaBlocks(map.areas, ghostCounts).map((block) =>
         h(AreaBlock, { key: block.key, block, onOpen: () => onOpenArea(block.slug, block.label) }))),
     h(BlockLegend, null),
   );

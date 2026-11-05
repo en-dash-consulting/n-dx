@@ -34,6 +34,7 @@ import {
   planFirstTurnReady,
   DescribeInSidecarContext,
   DiagnoseInSidecarContext,
+  GhostCardsContext,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -48,6 +49,7 @@ import {
   useAutoCommitGenerated,
   useFeatureToggle,
   useSidecarShell,
+  useSidecarProposals,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -204,6 +206,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, plan: planWith },
   );
   const showSidecar = sidecarShell.drawer.show;
+  // The waiting change-set cards, read once for every Plan surface that draws their ghosts (UX5, SP5).
+  const proposals = useSidecarProposals(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
   useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setDescribeChange(null); setPlanWith(null); setPlanText(null); }, [pageView]);
   // Send the typed text once the open session has followed the attachment (a PATCH answers
   // the change), so the turn opens with the Plan lens and its target rather than racing them.
@@ -343,7 +347,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
+  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -422,7 +426,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  )))));
+  ))))));
 }
 
 const root = document.getElementById("app");

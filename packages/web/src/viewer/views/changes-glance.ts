@@ -12,7 +12,8 @@
  */
 
 import { h } from "preact";
-import { DescribeInSidecarButton } from "../components/index.js";
+import { useContext, useMemo } from "preact/hooks";
+import { DescribeInSidecarButton, GhostCardsContext, ghostChanges } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useChangesSummary } from "./changes-summary-context.js";
 import {
@@ -64,13 +65,23 @@ function Row({ change, navigateTo }: { change: GlanceChange; navigateTo: Navigat
 
 export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
   const load = useChangesSummary();
+  const cards = useContext(GhostCardsContext);
+  const ghosts = useMemo(() => ghostChanges(cards), [cards]);
   if (load.state === "loading") return h("div", { class: "changes-glance", role: "status" }, "Loading...");
   if (load.state === "v1") return null;
   if (load.state === "error") return h("div", { class: "changes-glance", role: "alert" }, `Could not load open changes: ${load.message}`);
 
   const { groups, more } = limitGroups(groupGlanceByRelease(load.data.open));
-  if (groups.length === 0) return h("div", { class: "changes-glance cg-empty" }, "No open changes.");
+  if (groups.length === 0 && ghosts.length === 0) return h("div", { class: "changes-glance cg-empty" }, "No open changes.");
   return h("div", { class: "changes-glance" },
+    // Proposed on a waiting card: dashed, never counted, gone on Deny.
+    ghosts.length > 0
+      ? h("ul", { class: "cg-rows cg-ghosts", "aria-label": "Waiting on a card" },
+        ghosts.map((g) =>
+          h("li", { key: g.key, class: "cg-row cg-ghost", "data-ghost": g.key },
+            h("span", { class: "cg-title" }, g.title),
+            h("span", { class: "cg-chip cg-ghost-chip" }, "proposed · on a card"))))
+      : null,
     groups.map((group) =>
       h("section", { key: group.label, class: "cg-group", "aria-label": group.label },
         h("h4", { class: "cg-release" }, group.label),

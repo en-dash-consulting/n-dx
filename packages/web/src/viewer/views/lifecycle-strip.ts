@@ -15,7 +15,9 @@
 
 import { h } from "preact";
 import type { ComponentChild } from "preact";
+import { useContext, useMemo } from "preact/hooks";
 import { useProjectStatus } from "../hooks/index.js";
+import { GhostCardsContext, ghostStripCounts } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { stageFilter, storeFilter } from "./changes.js";
 import { useChangesSummary } from "./changes-summary-context.js";
@@ -34,6 +36,8 @@ export interface StripCell {
   target: StripTarget;
   /** Said under the count when it is zero. */
   hintWhenZero?: boolean;
+  /** Changes a waiting Sidecar card proposes for this stage; noted apart, never in `count`. */
+  waiting?: number;
 }
 
 /** The strip's short stage names; Open changes spells "awaiting-apply" out in full. */
@@ -45,15 +49,16 @@ const STAGE_CELLS: ReadonlyArray<{ stage: OpenChangeStage; label: string }> = [
 ];
 
 /** The five v2 counts, in lifecycle order. */
-export function v2Cells(summary: ChangeSummary): StripCell[] {
+export function v2Cells(summary: ChangeSummary, waiting: { inbox: number; proposed: number } = { inbox: 0, proposed: 0 }): StripCell[] {
   return [
-    { key: "inbox", label: "Inbox", count: summary.inbox, target: { view: "inbox" } },
+    { key: "inbox", label: "Inbox", count: summary.inbox, target: { view: "inbox" }, waiting: waiting.inbox },
     ...STAGE_CELLS.map(({ stage, label }): StripCell => ({
       key: stage,
       label,
       count: summary.stages[stage],
       target: { view: "changes", stage },
       hintWhenZero: stage === "ready",
+      waiting: stage === "proposed" ? waiting.proposed : 0,
     })),
   ];
 }
@@ -83,6 +88,9 @@ function Count({ cell, navigateTo }: { cell: StripCell; navigateTo: NavigateTo }
     ),
     cell.hintWhenZero && cell.count === 0
       ? h("span", { class: "ls-hint" }, "needs an automated requirement · ", h("code", null, "rex ready"))
+      : null,
+    cell.waiting
+      ? h("span", { class: "ls-waiting" }, `+${cell.waiting} waiting on a card`)
       : null,
   );
 }
@@ -116,9 +124,11 @@ function Strip({ cells, next, navigateTo }: { cells: StripCell[]; next: Componen
 export function LifecycleStrip({ navigateTo }: { navigateTo: NavigateTo }) {
   const load = useChangesSummary();
   const status = useProjectStatus();
+  const cards = useContext(GhostCardsContext);
+  const waiting = useMemo(() => ghostStripCounts(cards), [cards]);
 
   if (load.state === "ready") {
-    return h(Strip, { cells: v2Cells(load.data), next: h(Next, { pick: load.data.next, navigateTo }), navigateTo });
+    return h(Strip, { cells: v2Cells(load.data, waiting), next: h(Next, { pick: load.data.next, navigateTo }), navigateTo });
   }
   if (load.state === "v1") {
     const stats = status?.rex.stats;
