@@ -8,17 +8,21 @@
  * page dirty. Shown only while `web.sidecar` is on; the Project page decides.
  *
  * Sign-in goes through this page and nothing else. Sign in asks the server
- * for an authorization URL that returns to `<base>/project?connection=<id>`,
- * and the tab goes there. The authorization server sends the tab back with
- * `code` and `state`; the page takes them out of the address bar at once and
- * posts them to `/api/connections/:id/oauth/finish` with the tab's session
- * credential in the header (the session script's fetch), so the server never
- * acts on a credential in a URL. The result shows above the list.
+ * for an authorization URL that returns to the fixed loopback callback,
+ * `<origin>/oauth/callback`, with a state naming this page's project,
+ * worktree and the connection, and the tab goes there. The authorization
+ * server sends the tab back with `code`, `state` and `iss` (through the hub,
+ * the hub forwards it to `/p/<project>/oauth/callback`); the page takes them
+ * out of the address bar at once, goes to Settings > Project and posts them
+ * to `/api/connections/:id/oauth/finish` with the tab's session credential in
+ * the header (the session script's fetch), so the server never acts on a
+ * credential in a URL. The result shows above the list.
  */
 
 import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { appUrl, getBasePath, replaceAppHistory } from "../base-path.js";
+import { getBasePath, getWorkspaceKey, replaceAppHistory } from "../base-path.js";
+import { OAUTH_CALLBACK_PATH, detectBasePath, parseSignInState } from "../external.js";
 import { AddConnectionForm } from "./connections-add-form.js";
 import {
   connectionPath,
@@ -36,60 +40,72 @@ import { SyncRulesSection } from "./connections-sync.js";
 export { connectionStateLabel };
 export type { ConnectionRow };
 
-/** The page a sign-in returns to, and the query parameter naming its connection. */
+/** The page a sign-in finishes on: Settings > Project. */
 const RETURN_PATH = "/project";
-const CONNECTION_PARAM = "connection";
-/** What an authorization server adds to the return address. */
-const RETURN_PARAMS = [CONNECTION_PARAM, "code", "state", "error", "error_description", "error_uri", "iss"];
 
 const post = (path: string, body: Record<string, unknown> = {}): Promise<Response> => send("POST", path, body);
 
 interface SignInReturn {
-  connection: string;
+  /** Unset when the state names none: a return this dashboard did not start. */
+  connection?: string;
   code?: string;
   state?: string;
+  iss?: string;
   error?: string;
 }
 
 /** The return {@link captureSignInReturn} took at boot, until the section consumes it. */
 let captured: SignInReturn | null = null;
 
-/**
- * A sign-in's return, taken out of the address bar: the connection and code
- * and state, or the authorization server's refusal. Null when this load is
- * not one.
- */
-function takeSignInReturn(): SignInReturn | null {
-  const params = new URLSearchParams(location.search);
-  const connection = params.get(CONNECTION_PARAM);
-  if (!connection) return null;
-  const found = {
-    connection,
-    code: params.get("code") ?? undefined,
-    state: params.get("state") ?? undefined,
-    error: params.get("error_description") ?? params.get("error") ?? undefined,
-  };
-  for (const name of RETURN_PARAMS) params.delete(name);
+/** This load's path below the base path. */
+function appPath(): string {
   const base = getBasePath();
-  const path = base && location.pathname.startsWith(base) ? location.pathname.slice(base.length) || "/" : location.pathname;
-  const rest = params.toString();
-  replaceAppHistory(history.state, `${path}${rest ? `?${rest}` : ""}${location.hash}`);
-  return found;
+  return base && location.pathname.startsWith(base) ? location.pathname.slice(base.length) || "/" : location.pathname;
 }
 
 /**
- * Take a sign-in's return out of the address bar at boot, before the router
- * seeds its history entry: that entry is the view's path alone, so the code
- * and state would be gone by the time the section mounts (it waits on
- * `web.sidecar`). The section finishes the sign-in when it mounts.
+ * A sign-in's return, taken out of the address bar of the callback page: the
+ * connection its state names and the code, state and iss, or the
+ * authorization server's refusal. The address becomes Settings > Project.
+ * Null when this load is not one, or when it belongs to another worktree's
+ * dashboard, which `replace` sends the tab to with the query intact.
  */
-export function captureSignInReturn(): void {
-  captured = takeSignInReturn() ?? captured;
+function takeSignInReturn(replace: (url: string) => void): SignInReturn | null {
+  if (appPath() !== OAUTH_CALLBACK_PATH) return null;
+  const params = new URLSearchParams(location.search);
+  const state = params.get("state") ?? undefined;
+  const routed = parseSignInState(state);
+  // The hub forwards to the project; the worktree is this page's to reach.
+  const workspace = routed?.workspace ?? null;
+  if (routed && workspace !== getWorkspaceKey()) {
+    const slot = workspace ? `/w/${encodeURIComponent(workspace)}` : "";
+    replace(`${detectBasePath(getBasePath())}${slot}${OAUTH_CALLBACK_PATH}${location.search}`);
+    return null;
+  }
+  replaceAppHistory(history.state, RETURN_PATH);
+  return {
+    connection: routed?.connection,
+    code: params.get("code") ?? undefined,
+    state,
+    iss: params.get("iss") ?? undefined,
+    error: params.get("error_description") ?? params.get("error") ?? undefined,
+  };
+}
+
+/**
+ * Take a sign-in's return out of the callback page's address at boot, before
+ * the router seeds its history entry, and leave the tab on Settings >
+ * Project: the code and state would otherwise be gone by the time the section
+ * mounts (it waits on `web.sidecar`). The section finishes the sign-in when
+ * it mounts. `replace` defaults to `location.replace` (tests replace it).
+ */
+export function captureSignInReturn(replace: (url: string) => void = (url) => location.replace(url)): void {
+  captured = takeSignInReturn(replace) ?? captured;
 }
 
 /** The captured return, else one still in the address bar; each is used once. */
 function consumeSignInReturn(): SignInReturn | null {
-  const returned = captured ?? takeSignInReturn();
+  const returned = captured ?? takeSignInReturn((url) => location.replace(url));
   captured = null;
   return returned;
 }
@@ -139,15 +155,18 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
     void (async () => {
       if (returned) {
         sectionRef.current?.scrollIntoView?.({ block: "start" });
-        if (returned.error || !returned.code || !returned.state) {
-          setNotice({ kind: "error", text: `Sign-in to ${returned.connection} was not completed: ${returned.error ?? "no code was returned"}` });
+        const name = returned.connection ?? "the connection";
+        if (returned.error || !returned.code || !returned.state || !returned.connection) {
+          const why = returned.error ?? (returned.connection ? "no code was returned" : "the return does not name a sign-in started here");
+          setNotice({ kind: "error", text: `Sign-in to ${name} was not completed: ${why}` });
         } else {
           const res = await post(`/api/connections/${encodeURIComponent(returned.connection)}/oauth/finish`, {
             code: returned.code,
             state: returned.state,
+            ...(returned.iss !== undefined && { iss: returned.iss }),
           }).catch((err: unknown) => err as Error);
-          if (res instanceof Error) setNotice({ kind: "error", text: `Sign-in to ${returned.connection} failed: ${res.message}` });
-          else if (!res.ok) setNotice({ kind: "error", text: `Sign-in to ${returned.connection} failed: ${await readError(res)}` });
+          if (res instanceof Error) setNotice({ kind: "error", text: `Sign-in to ${name} failed: ${res.message}` });
+          else if (!res.ok) setNotice({ kind: "error", text: `Sign-in to ${name} failed: ${await readError(res)}` });
           else {
             const { connection } = (await res.json()) as { connection: ConnectionRow };
             setNotice({ kind: "ok", text: `Signed in to ${connection.label}: ${connectionStateLabel(connection)}.` });
@@ -162,8 +181,9 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
     setBusy(row.id);
     setNotice(null);
     try {
-      const redirectUrl = `${location.origin}${appUrl(RETURN_PATH)}?${CONNECTION_PARAM}=${encodeURIComponent(row.id)}`;
-      const res = await post(`/api/connections/${encodeURIComponent(row.id)}/oauth/start`, { redirectUrl });
+      // The fixed callback at this origin's root: through the hub, the hub relays it to the project.
+      const redirectUrl = `${location.origin}${OAUTH_CALLBACK_PATH}`;
+      const res = await post(`/api/connections/${encodeURIComponent(row.id)}/oauth/start`, { redirectUrl, basePath: getBasePath() });
       if (!res.ok) {
         setNotice({ kind: "error", text: `Could not start the sign-in to ${row.label}: ${await readError(res)}` });
         return;

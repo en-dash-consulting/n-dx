@@ -137,4 +137,51 @@ describe("loadConnections", () => {
   it("reads no connections when none are declared", () => {
     expect(loadConnections(project({ local: { web: {} } }), { warn: () => undefined })).toEqual([]);
   });
+
+  it("reads an OAuth connection's client override: another metadata document or a pre-registered client", () => {
+    const url = "https://caos.example/mcp";
+    const dir = project({
+      local: {
+        connections: {
+          doc: { transport: "http", url, auth: "oauth", oauth: { clientMetadataUrl: "https://example.test/n-dx/client.json" } },
+          pre: { transport: "http", url, auth: "oauth", oauth: { clientId: "n-dx-desktop" } },
+        },
+      },
+    });
+    expect(loadConnections(dir, { warn: () => undefined }).map((c) => (c.transport === "http" ? c.oauth : undefined))).toEqual([
+      { clientMetadataUrl: "https://example.test/n-dx/client.json" },
+      { clientId: "n-dx-desktop" },
+    ]);
+  });
+
+  it("skips a connection whose OAuth client override is not valid, naming why", () => {
+    const url = "https://caos.example/mcp";
+    const oauth = (block: unknown, auth = "oauth") => ({ transport: "http", url, auth, oauth: block });
+    const dir = project({
+      local: {
+        connections: {
+          "plain-http": oauth({ clientMetadataUrl: "http://example.test/client.json" }),
+          "root-path": oauth({ clientMetadataUrl: "https://example.test/" }),
+          "fragment": oauth({ clientMetadataUrl: "https://example.test/client.json#x" }),
+          "both": oauth({ clientMetadataUrl: "https://example.test/client.json", clientId: "x" }),
+          "spaced": oauth({ clientId: "has space" }),
+          "unknown-key": oauth({ clientSecret: "s" }),
+          "token-auth": oauth({ clientId: "x" }, "token"),
+          "stdio": { transport: "stdio", command: "node", oauth: { clientId: "x" } },
+          "ok": oauth({ clientId: "fine" }),
+        },
+      },
+    });
+    const warnings: string[] = [];
+    expect(loadConnections(dir, { warn: (m) => warnings.push(m) }).map((c) => c.id)).toEqual(["ok"]);
+    const text = warnings.join("\n");
+    expect(text).toContain(`"plain-http": oauth.clientMetadataUrl must be an HTTPS URL with a path`);
+    expect(text).toContain(`"root-path": oauth.clientMetadataUrl must be an HTTPS URL with a path`);
+    expect(text).toContain(`"fragment": oauth.clientMetadataUrl`);
+    expect(text).toContain(`"both": oauth takes clientMetadataUrl or clientId, not both`);
+    expect(text).toContain(`"spaced": oauth.clientId must be a client id`);
+    expect(text).toContain(`"unknown-key": oauth takes clientMetadataUrl or clientId, not clientSecret`);
+    expect(text).toContain(`"token-auth": oauth is for an auth "oauth" connection only`);
+    expect(text).toContain(`"stdio": oauth is for an auth "oauth" connection only`);
+  });
 });

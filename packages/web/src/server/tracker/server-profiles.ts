@@ -6,7 +6,8 @@
  * connection's own, which win for the same property) and, for a tracker, an
  * optional `tracker` mapping: which tools create, move, read and edit an item,
  * the ndx event → tracker status map, the facts each event needs and where
- * they come from, and defaults (reviewer, estimate scale).
+ * they come from, and defaults (reviewer, estimate scale). An optional `oauth`
+ * block names the scopes an OAuth sign-in asks for (oauth-scopes.ts).
  *
  * Built-in profiles ship as JSON beside this file (CAOS first). A user adds
  * their own as `<ndx home>/tracker-profiles/<name>.json`. A connection names
@@ -87,6 +88,16 @@ export interface TrackerMapping {
   limits: TrackerLimit[];
 }
 
+/**
+ * The OAuth scopes a sign-in asks for (oauth-scopes.ts): `readScopes` always,
+ * `writeScopes` too while any of `writeTools` may run.
+ */
+export interface ProfileOAuth {
+  readScopes: string[];
+  writeScopes: string[];
+  writeTools: string[];
+}
+
 export interface ServerProfile {
   /** As a connection names it: `caos`, or `user:<name>` for a user's own. */
   name: string;
@@ -94,6 +105,7 @@ export interface ServerProfile {
   /** Hints by write tool, then property. */
   fieldHints: Record<string, FieldHints>;
   tracker?: TrackerMapping;
+  oauth?: ProfileOAuth;
 }
 
 /** A profile ready to use, or why it is not. */
@@ -205,6 +217,28 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
   };
 }
 
+/** An OAuth scope: a non-empty token with no spaces (RFC 6749 §3.3). */
+const SCOPE = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
+
+/** `raw` as the profile's OAuth scopes, or the problems with it. */
+function parseOAuth(raw: unknown, problems: string[]): ProfileOAuth | undefined {
+  if (!isRecord(raw)) {
+    problems.push("oauth must be an object");
+    return undefined;
+  }
+  const list = (key: "readScopes" | "writeScopes" | "writeTools", pattern: RegExp): string[] => {
+    const value = raw[key] ?? [];
+    if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string" && pattern.test(entry))) {
+      problems.push(`oauth.${key} must be a list of ${key === "writeTools" ? "tool names" : "scopes"}`);
+      return [];
+    }
+    return value as string[];
+  };
+  const oauth = { readScopes: list("readScopes", SCOPE), writeScopes: list("writeScopes", SCOPE), writeTools: list("writeTools", /^\S+$/) };
+  if (oauth.writeScopes.length > 0 && oauth.writeTools.length === 0) problems.push("oauth.writeScopes needs the writeTools that use them");
+  return oauth;
+}
+
 /** `raw` as a profile named `name`, or every problem with its shape. */
 export function parseServerProfile(name: string, raw: unknown): ServerProfile | { problems: string[] } {
   if (!isRecord(raw)) return { problems: ["a profile must be a JSON object"] };
@@ -218,8 +252,9 @@ export function parseServerProfile(name: string, raw: unknown): ServerProfile | 
     if (hints) fieldHints[tool] = hints;
   }
   const tracker = raw.tracker === undefined ? undefined : parseMapping(raw.tracker, problems);
+  const oauth = raw.oauth === undefined ? undefined : parseOAuth(raw.oauth, problems);
   if (problems.length > 0) return { problems };
-  return { name, label: isString(raw.label) ? raw.label : name, fieldHints, ...(tracker && { tracker }) };
+  return { name, label: isString(raw.label) ? raw.label : name, fieldHints, ...(tracker && { tracker }), ...(oauth && { oauth }) };
 }
 
 function readUserProfile(file: string, name: string): unknown | { problems: string[] } {
@@ -290,6 +325,8 @@ export function checkServerProfile(profile: ServerProfile, tools: readonly Profi
       }
     }
   }
+
+  for (const tool of profile.oauth?.writeTools ?? []) listed(tool, "oauth.writeTools");
 
   const mapping = profile.tracker;
   if (!mapping) return problems;

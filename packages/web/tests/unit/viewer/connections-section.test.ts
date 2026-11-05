@@ -2,9 +2,9 @@
 /**
  * Settings > Project > Connections: shown only while web.sidecar is on; each
  * connection's state ('connected', 'connection unavailable: …', 'sign in
- * again'), Sign in / Sign out for OAuth connections; and the sign-in's return,
- * whose code and state leave the address bar before they are posted to the
- * finish route.
+ * again'), Sign in / Sign out for OAuth connections; and the sign-in's return
+ * to the fixed callback page, whose code, state and iss leave the address bar
+ * before they are posted to the finish route.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
@@ -14,6 +14,9 @@ import { captureSignInReturn, ConnectionsSection, type ConnectionRow } from "../
 import type { ToolRow } from "../../../src/viewer/views/connections-api.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { formatSignInState } from "../../../src/shared/index.js";
+
+const NONCE = "n".repeat(43);
 
 type Json = Record<string, unknown>;
 interface Request { method: string; url: string; body: Json | null }
@@ -179,8 +182,8 @@ describe("Connections section", () => {
     expect(state("tok")).toBe("sign in again");
   });
 
-  it("Sign in asks for an authorization URL that returns to this dashboard's Project page", async () => {
-    setBasePathForTests("/p/alpha");
+  it("Sign in asks for an authorization URL that returns to the fixed callback, naming where this dashboard is mounted", async () => {
+    setBasePathForTests("/p/alpha/w/feature");
     const requests = stubApi();
     const went: string[] = [];
     act(() => { render(h(ConnectionsSection, { navigate: (url) => went.push(url) }), root); });
@@ -189,7 +192,7 @@ describe("Connections section", () => {
     await settle();
     const start = requests.find((r) => r.url === "/api/connections/wiki/oauth/start")!;
     expect(start.method).toBe("POST");
-    expect(start.body).toEqual({ redirectUrl: `${location.origin}/p/alpha/project?connection=wiki` });
+    expect(start.body).toEqual({ redirectUrl: `${location.origin}/oauth/callback`, basePath: "/p/alpha/w/feature" });
     expect(went).toEqual(["https://auth.example/authorize?for=wiki"]);
   });
 
@@ -204,8 +207,16 @@ describe("Connections section", () => {
     expect(buttons("docs")).toEqual(["Sign in", "Test", "Details", "Remove"]);
   });
 
-  it("finishes a returned sign-in, clearing code and state from the address bar before posting them", async () => {
-    history.replaceState(null, "", "/project?connection=wiki&code=the-code&state=the-state&tab=x");
+  it("finishes a sign-in returned to the callback page: code, state and iss posted, the address on Settings > Project first", async () => {
+    setBasePathForTests(null);
+    const state = formatSignInState({ project: "alpha", connection: "wiki", nonce: NONCE });
+    history.replaceState(null, "", `/p/alpha/oauth/callback?${new URLSearchParams({ code: "the-code", state, iss: "https://as.example" })}`);
+    const replaced: string[] = [];
+    captureSignInReturn((url) => replaced.push(url));
+    expect(replaced).toEqual([]);
+    expect(location.pathname).toBe("/p/alpha/project");
+    expect(location.search).toBe("");
+
     const requests = stubApi();
     let urlAtFinish = "";
     const inner = globalThis.fetch as (url: string, init?: RequestInit) => Promise<Response>;
@@ -216,24 +227,9 @@ describe("Connections section", () => {
     act(() => { render(h(ConnectionsSection, null), root); });
     await settle();
     const finish = requests.find((r) => r.url === "/api/connections/wiki/oauth/finish")!;
-    expect(finish.body).toEqual({ code: "the-code", state: "the-state" });
+    expect(finish.body).toEqual({ code: "the-code", state, iss: "https://as.example" });
     expect(urlAtFinish).not.toContain("the-code");
-    expect(location.search).toBe("?tab=x");
-    expect(location.pathname).toBe("/project");
     expect(root.querySelector(".connections-notice--ok")?.textContent).toContain("Signed in to Wiki");
-  });
-
-  it("finishes a sign-in captured at boot after the router has rewritten the address to the bare view path", async () => {
-    history.replaceState(null, "", "/project?connection=wiki&code=boot-code&state=boot-state");
-    captureSignInReturn();
-    expect(location.search).toBe("");
-    // As use-route-state seeds its first entry: the view's path, no query.
-    history.replaceState({ view: "project" }, "", "/project");
-    const requests = stubApi();
-    act(() => { render(h(ConnectionsSection, null), root); });
-    await settle();
-    const finish = requests.find((r) => r.url === "/api/connections/wiki/oauth/finish");
-    expect(finish?.body).toEqual({ code: "boot-code", state: "boot-state" });
 
     // Used once: a later mount finishes nothing.
     act(() => { render(null, root); });
@@ -243,14 +239,45 @@ describe("Connections section", () => {
     expect(again.some((r) => r.method === "POST")).toBe(false);
   });
 
-  it("reports an authorization server's refusal without posting anything", async () => {
-    history.replaceState(null, "", "/project?connection=wiki&error=access_denied&state=s");
+  it("sends a return for another worktree to that worktree's callback page, query intact", async () => {
+    setBasePathForTests(null);
+    const state = formatSignInState({ project: "alpha", workspace: "feature", connection: "wiki", nonce: NONCE });
+    const search = `?${new URLSearchParams({ code: "c", state })}`;
+    history.replaceState(null, "", `/p/alpha/oauth/callback${search}`);
+    const replaced: string[] = [];
+    captureSignInReturn((url) => replaced.push(url));
+    expect(replaced).toEqual([`/p/alpha/w/feature/oauth/callback${search}`]);
+  });
+
+  it("leaves an ordinary page load alone", async () => {
+    history.replaceState(null, "", "/project?code=x&state=y");
+    const replaced: string[] = [];
+    captureSignInReturn((url) => replaced.push(url));
+    expect(replaced).toEqual([]);
+    expect(location.search).toBe("?code=x&state=y");
+  });
+
+  it("reports an authorization server's refusal, or a return this dashboard did not start, without posting anything", async () => {
+    setBasePathForTests(null);
+    const state = formatSignInState({ connection: "wiki", nonce: NONCE });
+    history.replaceState(null, "", `/oauth/callback?error=access_denied&state=${encodeURIComponent(state)}`);
+    captureSignInReturn(() => undefined);
     const requests = stubApi();
     act(() => { render(h(ConnectionsSection, null), root); });
     await settle();
     expect(requests.some((r) => r.method === "POST")).toBe(false);
-    expect(location.search).toBe("");
+    expect(location.pathname).toBe("/project");
     expect(root.querySelector(".connections-notice--error")?.textContent).toContain("access_denied");
+
+    act(() => { render(null, root); });
+    setBasePathForTests(null);
+    history.replaceState(null, "", "/oauth/callback?code=c&state=garbled");
+    captureSignInReturn(() => undefined);
+    const garbled = stubApi();
+    act(() => { render(h(ConnectionsSection, null), root); });
+    await settle();
+    expect(garbled.some((r) => r.method === "POST")).toBe(false);
+    expect(root.querySelector(".connections-notice--error")?.textContent).toContain("does not name a sign-in started here");
   });
 });
 

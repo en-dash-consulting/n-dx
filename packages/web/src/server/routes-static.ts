@@ -8,7 +8,7 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
 import { isKnownViewPath, resolveViewAlias, buildValidViews } from "../shared/view-routing.js";
-import { injectSessionScript } from "../shared/index.js";
+import { OAUTH_CALLBACK_PATH, injectSessionScript } from "../shared/index.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
 (function(){
@@ -233,6 +233,14 @@ export function handleStaticRoute(
       res.writeHead(404);
       res.end("Not found");
     }
+    return true;
+  }
+
+  // A connection sign-in's fixed callback: the viewer reads the code, state
+  // and iss and posts them with its session (views/connections.ts).
+  if (pathOnly === OAUTH_CALLBACK_PATH) {
+    res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-store" });
+    res.end(assets.getViewerHtml());
     return true;
   }
 

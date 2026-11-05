@@ -52,10 +52,19 @@ interface ConnectionBase {
   tools?: unknown;
 }
 
+/**
+ * Which client n-dx signs in as on an `auth: "oauth"` connection, when not
+ * n-dx's own client ID metadata document: another document's HTTPS URL, or a
+ * client the operator registered with the authorization server beforehand.
+ */
+export type OAuthClientOverride = { clientMetadataUrl: string } | { clientId: string };
+
 /** A streamable HTTP server. */
 export interface HttpConnectionConfig extends ConnectionBase {
   transport: "http";
   url: string;
+  /** Set only on an `auth: "oauth"` connection that overrides n-dx's client identity. */
+  oauth?: OAuthClientOverride;
 }
 
 /** A local server spawned over stdio. Always `auth: "none"`. */
@@ -138,6 +147,42 @@ export function parseFieldHints(raw: unknown, skipped: string[]): FieldHints | u
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** The longest pre-registered client id accepted. */
+const MAX_CLIENT_ID_LENGTH = 255;
+
+/**
+ * `raw` (a connection's `oauth` block) as a client override, or the reason it
+ * is not one. `clientMetadataUrl` must be an HTTPS URL with a path, as a
+ * client ID metadata document's URL is; `clientId` a pre-registered public
+ * client. One or the other, not both.
+ */
+export function parseOAuthOverride(raw: unknown): OAuthClientOverride | undefined | string {
+  if (raw === undefined) return undefined;
+  const block = asRecord(raw);
+  if (!block) return "oauth must be an object";
+  const unknown = Object.keys(block).filter((key) => key !== "clientMetadataUrl" && key !== "clientId");
+  if (unknown.length > 0) return `oauth takes clientMetadataUrl or clientId, not ${unknown.join(", ")}`;
+  const { clientMetadataUrl, clientId } = block;
+  if (clientMetadataUrl !== undefined && clientId !== undefined) return "oauth takes clientMetadataUrl or clientId, not both";
+  if (clientId !== undefined) {
+    if (typeof clientId !== "string" || !clientId || clientId.length > MAX_CLIENT_ID_LENGTH || /\s/.test(clientId)) {
+      return `oauth.clientId must be a client id: no spaces, at most ${MAX_CLIENT_ID_LENGTH} characters`;
+    }
+    return { clientId };
+  }
+  if (clientMetadataUrl === undefined) return undefined;
+  const problem = "oauth.clientMetadataUrl must be an HTTPS URL with a path, and no credentials or fragment";
+  if (typeof clientMetadataUrl !== "string") return problem;
+  let url: URL;
+  try {
+    url = new URL(clientMetadataUrl);
+  } catch {
+    return problem;
+  }
+  if (url.protocol !== "https:" || url.pathname === "/" || url.username || url.password || url.hash) return problem;
+  return { clientMetadataUrl: url.href };
+}
+
 /** One entry as a connection, or the reason it is not one. */
 export function parseConnection(id: string, raw: unknown, warnHint: (message: string) => void): ConnectionConfig | string {
   if (!CONNECTION_ID_PATTERN.test(id)) return `its id must match ${CONNECTION_ID_PATTERN}`;
@@ -163,12 +208,16 @@ export function parseConnection(id: string, raw: unknown, warnHint: (message: st
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return "its url must be http or https";
     if (url.username || url.password) return "its url must not carry credentials; use auth \"token\"";
-    return { id, label, auth, tools: entry.tools, ...extras, transport: "http", url: url.href };
+    if (entry.oauth !== undefined && auth !== "oauth") return `oauth is for an auth "oauth" connection only`;
+    const oauth = parseOAuthOverride(entry.oauth);
+    if (typeof oauth === "string") return oauth;
+    return { id, label, auth, tools: entry.tools, ...extras, transport: "http", url: url.href, ...(oauth && { oauth }) };
   }
 
   if (entry.transport === "stdio") {
     // MCP authorization is HTTP-only; a stdio server never receives a token.
     if (auth !== "none") return "a stdio connection takes auth \"none\" only";
+    if (entry.oauth !== undefined) return `oauth is for an auth "oauth" connection only`;
     if (typeof entry.command !== "string" || !entry.command.trim()) return "a stdio connection needs a command";
     const args = entry.args ?? [];
     if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string")) return "args must be a list of strings";

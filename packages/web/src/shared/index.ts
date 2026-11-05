@@ -32,6 +32,8 @@ export {
   webSocketUrl,
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { OAUTH_CALLBACK_PATH, formatSignInState, parseSignInState } from "./oauth-callback.js";
+export type { SignInState } from "./oauth-callback.js";
 export { PAGE_CSP, SAME_ORIGIN_FRAME_PAGE_CSP, STRICT_CSP, applySameOriginFramePolicy, applySecurityHeaders, applyStrictContentPolicy } from "./response-headers.js";
 export type { HeaderSink } from "./response-headers.js";
 export {

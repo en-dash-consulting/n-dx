@@ -2,8 +2,10 @@
  * The fake MCP server (fake-mcp-http-server.ts) behind a fake OAuth 2.1
  * authorization server on the same 127.0.0.1 origin, for the connection OAuth
  * tests: protected-resource and authorization-server metadata, dynamic client
- * registration, authorization code with S256 PKCE, and rotating refresh
- * tokens. The MCP endpoint answers 401 to anything but a live access token.
+ * registration and/or client ID metadata documents and pre-registered
+ * clients, authorization code with S256 PKCE, the `iss` response parameter,
+ * and rotating refresh tokens. The MCP endpoint answers 401 to anything but a
+ * live access token.
  *
  * No browser is involved: {@link FakeOAuthMcpServer.approve} plays the user
  * approving the authorization URL and returns what the redirect would carry.
@@ -25,8 +27,12 @@ export interface FakeOAuthMcpServer {
   issued: string[];
   /** Lifetime given to new access tokens, in seconds. */
   expiresIn: number;
-  /** Play the user approving `authorizationUrl`: the code and state its redirect carries. */
-  approve(authorizationUrl: string): { code: string; state: string };
+  /** The authorization server's issuer, as its metadata states it. */
+  issuer: string;
+  /** Every authorization URL approved, in order. */
+  authorizations: URL[];
+  /** Play the user approving `authorizationUrl`: the code, state and (when the server sends it) iss its redirect carries. */
+  approve(authorizationUrl: string): { code: string; state: string; iss?: string };
   /** Every access token issued so far now answers 401. */
   expireAccessTokens(): void;
   /** Every refresh token issued so far is now refused with invalid_grant. */
@@ -42,11 +48,33 @@ function json(res: ServerResponse, status: number, body: unknown): true {
   return true;
 }
 
-export async function startFakeOAuthMcpServer(): Promise<FakeOAuthMcpServer> {
+export interface FakeOAuthOptions {
+  /** Advertise and accept client ID metadata documents (an HTTPS client_id). Default false. */
+  metadataDocuments?: boolean;
+  /** Offer dynamic client registration. Default true. */
+  registration?: boolean;
+  /** Client ids registered beforehand. */
+  preRegistered?: string[];
+  /** Send `iss` with the code and advertise authorization_response_iss_parameter_supported. Default false. */
+  issParameter?: boolean;
+  /** The authorization server's scopes_supported; unset advertises none. */
+  scopesSupported?: string[];
+}
+
+const isHttpsUrl = (value: string): boolean => {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+export async function startFakeOAuthMcpServer(options: FakeOAuthOptions = {}): Promise<FakeOAuthMcpServer> {
   const accessTokens = new Set<string>();
   const refreshTokens = new Set<string>();
   const codes = new Map<string, { challenge: string; clientId: string; redirectUri: string }>();
-  const clients = new Set<string>();
+  const clients = new Set<string>(options.preRegistered ?? []);
+  const knownClient = (clientId: string) => clients.has(clientId) || (options.metadataDocuments === true && isHttpsUrl(clientId));
   let base = "";
 
   const issue = (res: ServerResponse) => {
@@ -69,14 +97,17 @@ export async function startFakeOAuthMcpServer(): Promise<FakeOAuthMcpServer> {
         issuer: base,
         authorization_endpoint: `${base}/authorize`,
         token_endpoint: `${base}/token`,
-        registration_endpoint: `${base}/register`,
+        ...(options.registration !== false && { registration_endpoint: `${base}/register` }),
+        ...(options.metadataDocuments && { client_id_metadata_document_supported: true }),
+        ...(options.issParameter && { authorization_response_iss_parameter_supported: true }),
+        ...(options.scopesSupported && { scopes_supported: options.scopesSupported }),
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code", "refresh_token"],
         code_challenge_methods_supported: ["S256"],
         token_endpoint_auth_methods_supported: ["none"],
       });
     }
-    if (path === "/register" && req.method === "POST") {
+    if (path === "/register" && req.method === "POST" && options.registration !== false) {
       const metadata = JSON.parse(await readAll(req)) as Record<string, unknown>;
       const clientId = token("client");
       clients.add(clientId);
@@ -86,7 +117,7 @@ export async function startFakeOAuthMcpServer(): Promise<FakeOAuthMcpServer> {
       const form = new URLSearchParams(await readAll(req));
       const grant = form.get("grant_type") ?? "";
       fake.grants.push(grant);
-      if (!clients.has(form.get("client_id") ?? "")) return json(res, 401, { error: "invalid_client" });
+      if (!knownClient(form.get("client_id") ?? "")) return json(res, 401, { error: "invalid_client" });
       if (grant === "authorization_code") {
         const code = codes.get(form.get("code") ?? "");
         codes.delete(form.get("code") ?? "");
@@ -123,19 +154,22 @@ export async function startFakeOAuthMcpServer(): Promise<FakeOAuthMcpServer> {
     grants: [],
     issued: [],
     expiresIn: 3600,
+    issuer: base,
+    authorizations: [],
     approve(authorizationUrl) {
       const url = new URL(authorizationUrl);
       const state = url.searchParams.get("state");
       const challenge = url.searchParams.get("code_challenge");
       const clientId = url.searchParams.get("client_id") ?? "";
       const redirectUri = url.searchParams.get("redirect_uri") ?? "";
-      if (url.searchParams.get("code_challenge_method") !== "S256" || !challenge || !state || !clients.has(clientId)) {
+      if (url.searchParams.get("code_challenge_method") !== "S256" || !challenge || !state || !knownClient(clientId)) {
         throw new Error(`the fake authorization server would refuse ${authorizationUrl}`);
       }
+      fake.authorizations.push(url);
       const code = token("code");
       codes.set(code, { challenge, clientId, redirectUri });
       fake.issued.push(code);
-      return { code, state };
+      return { code, state, ...(options.issParameter && { iss: base }) };
     },
     expireAccessTokens: () => accessTokens.clear(),
     revokeRefreshTokens: () => refreshTokens.clear(),

@@ -14,14 +14,16 @@
  *   PUT    /api/connections/:id/tools/:tool      { class?, policy? } (null clears) -> { tool }
  *   PUT    /api/connections/:id/profile          { profile: name | null } -> { connection }
  *   PUT    /api/connections/:id/token            { token } -> { connection }
- *   POST   /api/connections/:id/oauth/start      { redirectUrl } -> { authorizationUrl }
- *   POST   /api/connections/:id/oauth/finish     { code, state } -> { connection }
+ *   POST   /api/connections/:id/oauth/start      { redirectUrl, basePath? } -> { authorizationUrl }
+ *   POST   /api/connections/:id/oauth/finish     { code, state, iss? } -> { connection }
  *   POST   /api/connections/:id/sign-out         -> { connection }
  *
  * Every route needs the per-user token or a browser session (the request gate
  * in request-security.ts); none is public. The OAuth redirect lands on the
- * dashboard's own page shell, which posts the code and state here with its
- * session in the header, so the server never acts on a credential in a URL.
+ * fixed loopback callback, `/oauth/callback`, which serves the dashboard's
+ * page shell (relayed by the hub from its origin root); the page posts the
+ * code, state and iss here with its session in the header, so the server
+ * never acts on a credential in a URL.
  * Governed by `web.sidecar` (route-feature-gates.ts).
  *
  * Writes go to the untracked `.n-dx.local.json` only (local-config-write.ts)
@@ -53,7 +55,8 @@ import {
   type ConnectionInfo,
   type ConnectionTool,
 } from "./connections/connection-service.js";
-import { ConnectionSignInError } from "./connections/oauth-provider.js";
+import { ConnectionSignInError, type SignInRoute } from "./connections/oauth-provider.js";
+import { OAUTH_CALLBACK_PATH, detectViewerBasePath, projectIdFromBasePath, workspaceKeyFromBasePath } from "../shared/index.js";
 import type { ToolClass, ToolRunPolicy, ToolSource } from "./connections/tool-policy.js";
 import { LocalConfigError } from "./local-config-write.js";
 import { errorMessage, errorResponse, jsonResponse, readJsonObject } from "./response-utils.js";
@@ -73,8 +76,8 @@ const TEST_PATH = `${CONNECTIONS_PREFIX}/test`;
 const ID_PATH = /^\/api\/connections\/([^/]+)(?:\/(oauth\/start|oauth\/finish|sign-out|test|profile|token|tools))?$/;
 const TOOL_PATH = /^\/api\/connections\/([^/]+)\/tools\/([^/]+)$/;
 
-/** Hostnames a sign-in may return to: the dashboard is served on loopback only. */
-const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]"]);
+/** Hostnames a sign-in may return to: the two loopback callbacks n-dx's client metadata document lists. */
+const CALLBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost"]);
 
 /** The longest token accepted: far above any real one, far below a request body. */
 const MAX_TOKEN_LENGTH = 8192;
@@ -197,19 +200,32 @@ function decoded(value: string): string | undefined {
   }
 }
 
-/** `signInRedirectUrl`'s check, shared with the tests. */
+/**
+ * The sign-in's redirect URL, or why it is refused: the fixed loopback
+ * callback, `http://127.0.0.1:<port>/oauth/callback` or the same on
+ * `localhost`, as n-dx's client ID metadata document lists it (any port).
+ */
 export function signInRedirectUrl(value: unknown): URL | string {
-  if (typeof value !== "string" || !value) return `"redirectUrl" must be a URL`;
+  const problem = `"redirectUrl" must be http://127.0.0.1:<port>${OAUTH_CALLBACK_PATH} or the same on localhost`;
+  if (typeof value !== "string" || !value) return problem;
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return `"redirectUrl" must be a URL`;
+    return problem;
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return `"redirectUrl" must be http or https`;
-  if (!LOOPBACK_HOSTNAMES.has(url.hostname)) return `"redirectUrl" must be a loopback dashboard address`;
-  if (url.username || url.password || url.hash) return `"redirectUrl" must carry no credentials or fragment`;
+  if (url.protocol !== "http:" || !CALLBACK_HOSTNAMES.has(url.hostname) || url.pathname !== OAUTH_CALLBACK_PATH) return problem;
+  if (url.username || url.password || url.search || url.hash) return `"redirectUrl" must carry no credentials, query or fragment`;
   return url;
+}
+
+/** Where the viewer that starts a sign-in is mounted, as the state's routing fields; a string when it is not a base path. */
+export function signInRoute(value: unknown): SignInRoute | string {
+  if (value === undefined || value === "") return {};
+  if (typeof value !== "string" || detectViewerBasePath(value) !== value) return `"basePath" must be the dashboard's base path`;
+  const project = projectIdFromBasePath(value);
+  const workspace = workspaceKeyFromBasePath(value);
+  return { ...(project && { project }), ...(workspace && { workspace }) };
 }
 
 export async function handleConnectionsRoute(
@@ -382,8 +398,10 @@ export async function handleConnectionsRoute(
   if (action === "oauth/start") {
     const redirect = signInRedirectUrl(body.redirectUrl);
     if (typeof redirect === "string") return refuse(res, 400, redirect);
+    const route = signInRoute(body.basePath);
+    if (typeof route === "string") return refuse(res, 400, route);
     try {
-      jsonResponse(res, 200, { authorizationUrl: await service.beginSignIn(id, redirect.href) });
+      jsonResponse(res, 200, { authorizationUrl: await service.beginSignIn(id, redirect.href, route) });
     } catch (err) {
       return refuse(res, 502, `Could not start the sign-in: ${redactSecrets(errorMessage(err))}`);
     }
@@ -391,12 +409,13 @@ export async function handleConnectionsRoute(
   }
 
   if (action === "oauth/finish") {
-    const { code, state } = body;
+    const { code, state, iss } = body;
     if (typeof code !== "string" || !code || typeof state !== "string" || !state) {
       return refuse(res, 400, `"code" and "state" must be non-empty strings`);
     }
+    if (iss !== undefined && typeof iss !== "string") return refuse(res, 400, `"iss" must be a string`);
     try {
-      await service.finishSignIn(id, code, state);
+      await service.finishSignIn(id, code, state, iss);
     } catch (err) {
       // The sign-in error is already scrubbed of the code and stored secrets.
       if (err instanceof ConnectionSignInError) return refuse(res, 400, err.message);

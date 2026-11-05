@@ -39,6 +39,12 @@ class, the run/ask/never policy and the form card for writes.
   [Through the broker](#through-the-broker). A malformed hint is skipped with
   a warning naming it.
 - `profile` (optional) names a [server profile](#server-profiles).
+- `oauth` (optional, `auth: "oauth"` only) changes the client n-dx signs in
+  as: `{ "clientMetadataUrl": "https://…/client.json" }` (an HTTPS URL with a
+  path, no credentials or fragment) or `{ "clientId": "…" }` (a public client
+  registered with the authorization server beforehand). One or the other; an
+  invalid block skips the connection with a warning naming why. See
+  [Client identity](#client-identity).
 
 ## Server profiles
 
@@ -54,6 +60,8 @@ no code path knows any server. It carries:
   `release-published`, `run-failed-twice`) to a tracker status, the `facts` each
   event needs (input property and sources) and `defaults` (`reviewer`,
   `estimateScale`).
+- `oauth` (optional): `readScopes`, `writeScopes` and the `writeTools` that
+  need the write scopes. See [Scopes](#scopes).
 
 Built-ins ship in `src/server/tracker/profiles/` (`caos` first). A user adds
 `<ndx home>/tracker-profiles/<name>.json`. A bare name resolves to the built-in
@@ -300,8 +308,8 @@ section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
 | `PUT /api/connections/:id/profile` `{ profile \| null }` | `{ connection }` with the profile's check against the server's tools |
 | `PUT /api/connections/:id/token` `{ token }` | `{ connection }`; the token is not in the answer |
 | `GET`, `PUT /api/connections/sync` `{ rules, connection? }` | tracker sync's per-event `off \| dry-run \| on`, writing `trackerSync.rules` |
-| `POST /api/connections/:id/oauth/start` `{ redirectUrl }` | `{ authorizationUrl }` |
-| `POST /api/connections/:id/oauth/finish` `{ code, state }` | `{ connection }` |
+| `POST /api/connections/:id/oauth/start` `{ redirectUrl, basePath? }` | `{ authorizationUrl }` |
+| `POST /api/connections/:id/oauth/finish` `{ code, state, iss? }` | `{ connection }` |
 | `POST /api/connections/:id/sign-out` | `{ connection }` |
 
 - **Writes land in `.n-dx.local.json` only.** `local-config-write.ts` edits one
@@ -326,14 +334,15 @@ section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
   answer carries a token, refresh token, code or fingerprint.
 - **The return is a page, not a route.** Sign in sends the tab (the same tab,
   whose `sessionStorage` holds the session) to the authorization URL, which
-  returns to `<origin><base>/project?connection=<id>`, under the hub's `/p/<id>/`
-  when the page is. That address is the public page shell and the server acts
-  on nothing in its query. The page removes `connection`, `code` and `state`
-  from the address bar, then posts the code and state to `oauth/finish` with
-  its session in the header, and shows the result above the list.
-- **Loopback only.** `oauth/start` refuses a `redirectUrl` that is not http(s)
-  on `127.0.0.1`, `localhost` or `[::1]`, or that carries credentials or a
-  fragment.
+  returns to the fixed callback (see [Callback](#callback)). That address is
+  the public page shell and the server acts on nothing in its query. The page
+  takes `code`, `state` and `iss` out of the address bar, moves to Settings >
+  Project, posts them to `oauth/finish` with its session in the header, and
+  shows the result above the list.
+- **The fixed loopback callback only.** `oauth/start` refuses a `redirectUrl`
+  other than `http://127.0.0.1:<port>/oauth/callback` or the same on
+  `localhost`, with no credentials, query or fragment, and a `basePath` that
+  is not a dashboard base path.
 - **One service per project.** The routes and the broker share
   `workspaceConnectionService`, so a sign-in reaches the next Sidecar turn.
 
@@ -370,21 +379,80 @@ section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
   Claude and a Codex session see the same tools. Nothing in it names a
   particular tracker, tool or status.
 - **OAuth on the SDK's own flow.** `oauth-provider.ts` implements the SDK's
-  `OAuthClientProvider` and lets `auth()` do discovery (protected-resource,
-  then authorization-server metadata), dynamic client registration,
-  authorization code with S256 PKCE, and refresh; nothing is hand-rolled.
-  `beginSignIn(id, redirectUrl)` returns the authorization URL,
-  `finishSignIn(id, code, state)` exchanges the code and reconnects, and
+  `OAuthClientProvider` and lets `auth()` do the client (a metadata document
+  or dynamic client registration), authorization code with S256 PKCE, and
+  refresh; nothing is hand-rolled. `beginSignIn` runs the SDK's discovery
+  (protected-resource, then authorization-server metadata) first, to choose
+  the scopes, and hands it to `auth()`.
+  `beginSignIn(id, redirectUrl, route)` returns the authorization URL,
+  `finishSignIn(id, code, state, iss)` exchanges the code and reconnects, and
   `signOut(id)` forgets the entry. The redirect returns to a dashboard page that
-  finishes the sign-in through an authenticated route (no new public route).
-- **One record, bound to its URL.** The client registration and tokens are one
-  JSON value in `connection:<id>`, with the URL they were issued for. When the
-  configured URL no longer matches, nothing is sent and the connection reads
-  `needs-sign-in`. A new registration is stored only with the tokens it earns,
-  so a sign-in that is never finished stores nothing.
+  finishes the sign-in through an authenticated route.
+- **One record, bound to its URL, client and scopes.** The client, the tokens,
+  and the URL, client identity and scopes they were issued for are one JSON
+  value in `connection:<id>`. When the configured URL or client identity no
+  longer matches, or the connection now needs a scope the record lacks,
+  nothing is sent and the connection reads `needs-sign-in` ("sign in again").
+  A new client is stored only with the tokens it earns, so a sign-in that is
+  never finished stores nothing. A record from before identities were stored
+  counts as n-dx's own document.
 - **State and verifier stay in memory.** Each is single-use and expires after
   10 minutes; a wrong, reused, expired or other connection's state is refused
   and stores nothing. A state is spent by its first use, right or wrong.
+- **`iss` is checked (RFC 9207).** An `iss` on the return must equal the
+  authorization server's `issuer`, and a server that advertises
+  `authorization_response_iss_parameter_supported` must send one; otherwise
+  the sign-in is refused and nothing is stored.
+
+### Client identity
+
+n-dx signs in as its client ID metadata document,
+`https://docs.n-dx.dev/oauth/client.json` (`CLIENT_METADATA_URL`), whose
+`redirect_uris` are `http://127.0.0.1/oauth/callback` and
+`http://localhost/oauth/callback` on any port (RFC 8252). Where the
+authorization server advertises `client_id_metadata_document_supported`, the
+SDK sends that URL as the `client_id` and registers nothing; elsewhere it falls
+back to dynamic client registration. A connection's `oauth.clientMetadataUrl`
+names another document; `oauth.clientId` a pre-registered public client, which
+is then the only client used. The identity (`metadata-document <url>` or
+`client-id <id>`) is stored with the tokens, so changing it means signing in
+again.
+
+### Callback
+
+Every sign-in returns to `http://127.0.0.1:<port>/oauth/callback`, or
+`localhost` when the dashboard was opened there (the session lives in that
+origin's `sessionStorage`), on the origin the dashboard is served from. The
+state (`src/shared/oauth-callback.ts`) is
+`<project>~<workspace>~<connection>~<nonce>`: the routing fields are plain
+text, percent-encoded, and only the nonce is secret; the server holds the whole
+state single-use.
+
+- **Served directly**, the project server answers `/oauth/callback` with the
+  public page shell. The viewer reads the state; when it names another
+  worktree, the page moves to `/w/<key>/oauth/callback` with the query intact,
+  so the sign-in finishes on the workspace that started it.
+- **Through the hub**, the callback lands on the hub's origin root. The hub
+  answers `GET /oauth/callback` itself (`src/hub/oauth-callback.ts`), after its
+  request guard and without a credential: it forwards the browser, query
+  intact, to `/p/<project>/oauth/callback` for the project the state names, or
+  for the sole registered project when it names none. An unknown project, a
+  missing one among several, or no state is a plain error page. It reads no
+  token, cookie or code and stores nothing.
+
+### Scopes
+
+When the server's metadata lists `scopes_supported` (protected resource first,
+then authorization server) and the connection's profile names `oauth` scopes,
+the sign-in asks for the needed scopes the server lists
+(`src/server/tracker/oauth-scopes.ts`); otherwise the SDK's default applies.
+A profile's read scopes are always needed; its write scopes too while one of
+its `writeTools` has a policy other than `never` (before the server lists its
+tools, a write tool's policy is its override, else `ask`), or tracker sync
+goes through the connection with a rule that is not `off`. The CAOS profile
+reads `caos:work-items:read` and `caos:context:read`, and adds
+`caos:work-items:create`, `caos:work-items:edit` and `caos:work-items:move`. A
+change that needs a scope the stored sign-in lacks reads "sign in again".
 - **Headless by default.** The server never opens a browser. Every connect,
   the hub's automation included, uses a provider that throws where the SDK
   would send a user to sign in, so a caller with no valid refresh token gets

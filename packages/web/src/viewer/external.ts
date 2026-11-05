@@ -41,8 +41,9 @@ export type {
 export * as V1 from "../schema/v1.js";
 
 // ── Shared types and constants (via barrel) ───────────────────────────────
-export type { FeatureToggle, FeaturesResponse, ViewId, ViewerScope, SourcevisionScopeViewId } from "../shared/index.js";
-export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES, buildValidViews, resolveViewAlias } from "../shared/index.js";
+export type { FeatureToggle, FeaturesResponse, ViewId, ViewerScope } from "../shared/index.js";
+export { DATA_FILES, ALL_DATA_FILES, buildValidViews, resolveViewAlias } from "../shared/index.js";
+export { OAUTH_CALLBACK_PATH, parseSignInState } from "../shared/index.js";
 export type { RunOptions, RunOptionKey, RunMode, HubMemoryPressure } from "../shared/index.js";
 export { RUN_OPTION_SPECS, checkRunOptions, workCommandArgs, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "../shared/index.js";
 export { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";

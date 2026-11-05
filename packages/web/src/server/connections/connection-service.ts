@@ -44,8 +44,10 @@ import {
   SIGN_IN_AGAIN,
   SIGN_IN_LOST,
   type SignInKind,
+  type SignInRoute,
 } from "./oauth-provider.js";
 import { resolveToolPolicies, type ToolPolicy } from "./tool-policy.js";
+import { connectionOAuthScopes } from "../tracker/oauth-scopes.js";
 
 /** The longest tool name the Claude and OpenAI tool APIs accept. */
 export const MAX_WIRE_NAME_LENGTH = 64;
@@ -113,6 +115,8 @@ export interface ConnectionServiceOptions {
   now?: () => number;
   /** Where warnings go. Defaults to stderr. Never receives a credential value. */
   warn?: (message: string) => void;
+  /** The scopes an OAuth connection's sign-in needs. Defaults to its server profile's (tracker/oauth-scopes.ts). */
+  oauthScopes?: (config: HttpConnectionConfig) => string[];
 }
 
 /** The `<id>__<tool>` name a tool is carried under. */
@@ -190,7 +194,12 @@ export class ConnectionService {
     this.callTimeoutMs = options.callTimeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
     this.listRetryMs = options.listRetryMs ?? DEFAULT_LIST_RETRY_MS;
     this.now = options.now ?? Date.now;
-    this.oauth = new ConnectionOAuth({ credentials: options.credentials, now: this.now });
+    this.oauth = new ConnectionOAuth({
+      credentials: options.credentials,
+      now: this.now,
+      scopesFor: options.oauthScopes
+        ?? ((config) => connectionOAuthScopes(options.projectDir, config, { ndxHome: options.credentials?.ndxHome })),
+    });
     const configs = options.connections ?? loadConnections(options.projectDir, { warn: this.warn });
     for (const config of configs) {
       this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" }, failures: 0, sent: [] });
@@ -374,19 +383,21 @@ export class ConnectionService {
 
   /**
    * Start an OAuth sign-in for `connection`: the authorization URL to send the
-   * user to, which returns to `redirectUrl`. The server opens no browser.
+   * user to, which returns to `redirectUrl` with a state naming `route`. The
+   * server opens no browser.
    */
-  async beginSignIn(connection: string, redirectUrl: string): Promise<string> {
-    return this.oauth.beginSignIn(this.oauthConfig(connection), redirectUrl);
+  async beginSignIn(connection: string, redirectUrl: string, route: SignInRoute = {}): Promise<string> {
+    return this.oauth.beginSignIn(this.oauthConfig(connection), redirectUrl, route);
   }
 
   /**
-   * Finish `connection`'s sign-in with the redirect's `code` and `state`, then
-   * reconnect it. Throws ConnectionSignInError, storing nothing, for a state
-   * that is wrong, reused or expired.
+   * Finish `connection`'s sign-in with the callback's `code`, `state` and
+   * `iss`, then reconnect it. Throws ConnectionSignInError, storing nothing,
+   * for a state that is wrong, reused or expired, or an `iss` that does not
+   * name the authorization server.
    */
-  async finishSignIn(connection: string, code: string, state: string): Promise<ConnectionState> {
-    await this.oauth.finishSignIn(this.oauthConfig(connection), code, state);
+  async finishSignIn(connection: string, code: string, state: string, iss?: string): Promise<ConnectionState> {
+    await this.oauth.finishSignIn(this.oauthConfig(connection), code, state, iss);
     const slot = this.slots.get(connection)!;
     this.reset(slot, { state: "unavailable", reason: "not connected yet" });
     await this.ensure(slot);

@@ -14,11 +14,20 @@ import {
   ConnectionService,
   ConnectionUnavailableError,
 } from "../../../../src/server/connections/connection-service.js";
-import { ConnectionSignInError, NOT_SIGNED_IN, SIGN_IN_TTL_MS, URL_CHANGED } from "../../../../src/server/connections/oauth-provider.js";
-import { startFakeOAuthMcpServer, type FakeOAuthMcpServer } from "../../../helpers/fake-oauth-mcp-server.js";
+import {
+  CLIENT_CHANGED,
+  CLIENT_METADATA_URL,
+  ConnectionSignInError,
+  NOT_SIGNED_IN,
+  SCOPES_CHANGED,
+  SIGN_IN_TTL_MS,
+  URL_CHANGED,
+} from "../../../../src/server/connections/oauth-provider.js";
+import { parseSignInState } from "../../../../src/shared/index.js";
+import { startFakeOAuthMcpServer, type FakeOAuthMcpServer, type FakeOAuthOptions } from "../../../helpers/fake-oauth-mcp-server.js";
 import { removeTempDir } from "../../../helpers/temp-dir.js";
 
-const REDIRECT = "http://127.0.0.1:3117/connections/oauth/callback";
+const REDIRECT = "http://127.0.0.1:3117/oauth/callback";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -31,8 +40,8 @@ function tempDir(prefix: string): string {
   return dir;
 }
 
-async function oauthServer(): Promise<FakeOAuthMcpServer> {
-  const server = await startFakeOAuthMcpServer();
+async function oauthServer(options?: FakeOAuthOptions): Promise<FakeOAuthMcpServer> {
+  const server = await startFakeOAuthMcpServer(options);
   cleanups.push(() => server.close());
   return server;
 }
@@ -45,18 +54,30 @@ interface Setup {
   clock: { now: number };
 }
 
-/** A service over one `docs` OAuth connection to `url`, sharing `ndxHome` when given (another process). */
-function service(url: string, shared?: { ndxHome: string; clock: { now: number } }): Setup {
+interface ServiceOptions {
+  /** Shares `ndxHome` and the clock with another service (another process). */
+  shared?: { ndxHome: string; clock: { now: number } };
+  /** More of the `docs` entry: an `oauth` override, a profile. */
+  entry?: Record<string, unknown>;
+  /** The scopes the sign-in needs. */
+  scopes?: () => string[];
+}
+
+/** A service over one `docs` OAuth connection to `url`. */
+function service(url: string, sharedOrOptions?: Setup | ServiceOptions): Setup {
+  const options: ServiceOptions = sharedOrOptions && "svc" in sharedOrOptions ? { shared: sharedOrOptions } : (sharedOrOptions ?? {});
   const projectDir = tempDir("ndx-oauth-project-");
-  const ndxHome = shared?.ndxHome ?? tempDir("ndx-oauth-home-");
-  const clock = shared?.clock ?? { now: 1_700_000_000_000 };
-  writeFileSync(join(projectDir, ".n-dx.local.json"), JSON.stringify({ connections: { docs: { transport: "http", url, auth: "oauth" } } }));
+  const ndxHome = options.shared?.ndxHome ?? tempDir("ndx-oauth-home-");
+  const clock = options.shared?.clock ?? { now: 1_700_000_000_000 };
+  const docs = { transport: "http", url, auth: "oauth", ...options.entry };
+  writeFileSync(join(projectDir, ".n-dx.local.json"), JSON.stringify({ connections: { docs } }));
   const warnings: string[] = [];
   const svc = new ConnectionService({
     projectDir,
     credentials: { ndxHome },
     warn: (message) => warnings.push(message),
     now: () => clock.now,
+    ...(options.scopes && { oauthScopes: options.scopes }),
   });
   cleanups.push(() => svc.close());
   return { svc, projectDir, ndxHome, warnings, clock };
@@ -69,8 +90,8 @@ function stored(ndxHome: string): Record<string, any> | undefined {
 }
 
 async function signIn(svc: ConnectionService, fake: FakeOAuthMcpServer) {
-  const { code, state } = fake.approve(await svc.beginSignIn("docs", REDIRECT));
-  return svc.finishSignIn("docs", code, state);
+  const { code, state, iss } = fake.approve(await svc.beginSignIn("docs", REDIRECT));
+  return svc.finishSignIn("docs", code, state, iss);
 }
 
 function text(result: { content: unknown }): string {
@@ -93,7 +114,8 @@ describe("OAuth connections", () => {
     expect(authorizationUrl.origin + authorizationUrl.pathname).toBe(new URL("/authorize", fake.url).href);
     expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
     expect(authorizationUrl.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(authorizationUrl.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    // No project or workspace: served directly, on the anchor.
+    expect(authorizationUrl.searchParams.get("state")).toMatch(/^~~docs~[A-Za-z0-9_-]{43}$/);
     expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(REDIRECT);
     expect(fake.hits["/register"]).toBe(1);
     // Nothing is stored until the sign-in is finished.
@@ -254,7 +276,7 @@ describe("OAuth connections", () => {
       reason: expect.stringContaining("sign in again"),
       signIn: "again",
     });
-    expect(stored(ndxHome)).toEqual({ kind: "oauth", url: fake.url, redirectUrl: REDIRECT, client });
+    expect(stored(ndxHome)).toEqual({ kind: "oauth", url: fake.url, redirectUrl: REDIRECT, identity: `metadata-document ${CLIENT_METADATA_URL}`, client });
 
     // Signing in again reuses the kept registration.
     expect(await signIn(svc, fake)).toEqual({ state: "connected" });
@@ -313,5 +335,108 @@ describe("OAuth connections", () => {
     ].join("\n");
     expect(fake.issued.length).toBeGreaterThan(4);
     for (const secret of fake.issued) expect(surfaces).not.toContain(secret);
+  });
+});
+
+describe("OAuth client identity, callback state, iss and scopes", () => {
+  it("signs in with n-dx's client ID metadata document where the server supports it and has no registration", async () => {
+    const fake = await oauthServer({ metadataDocuments: true, registration: false, issParameter: true });
+    const { svc, ndxHome } = service(fake.url);
+
+    const authorizationUrl = new URL(await svc.beginSignIn("docs", REDIRECT, { project: "app", workspace: "feature/x" }));
+    expect(authorizationUrl.searchParams.get("client_id")).toBe(CLIENT_METADATA_URL);
+    expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(REDIRECT);
+    expect(parseSignInState(authorizationUrl.searchParams.get("state"))).toMatchObject({ project: "app", workspace: "feature/x", connection: "docs" });
+    expect(fake.hits["/register"]).toBeUndefined();
+
+    const { code, state, iss } = fake.approve(authorizationUrl.href);
+    expect(await svc.finishSignIn("docs", code, state, iss)).toEqual({ state: "connected" });
+    expect(stored(ndxHome)).toMatchObject({
+      kind: "oauth",
+      url: fake.url,
+      redirectUrl: REDIRECT,
+      identity: `metadata-document ${CLIENT_METADATA_URL}`,
+      client: { client_id: CLIENT_METADATA_URL },
+      tokens: { access_token: expect.stringMatching(/^at-/) },
+    });
+    expect(text(await svc.callTool("docs", "read_item", { id: "3" }))).toBe("item 3");
+  });
+
+  it("refuses an iss that is not the authorization server's, or a missing one where it promises one, and stores nothing", async () => {
+    const fake = await oauthServer({ metadataDocuments: true, issParameter: true });
+    const { svc, ndxHome } = service(fake.url);
+
+    const wrong = fake.approve(await svc.beginSignIn("docs", REDIRECT));
+    await expect(svc.finishSignIn("docs", wrong.code, wrong.state, "https://evil.example")).rejects.toBeInstanceOf(ConnectionSignInError);
+    // Spent by that use: the right iss does not reopen it.
+    await expect(svc.finishSignIn("docs", wrong.code, wrong.state, wrong.iss)).rejects.toThrow(/unknown, already used or expired/);
+
+    const missing = fake.approve(await svc.beginSignIn("docs", REDIRECT));
+    await expect(svc.finishSignIn("docs", missing.code, missing.state)).rejects.toBeInstanceOf(ConnectionSignInError);
+    expect(stored(ndxHome)).toBeUndefined();
+    expect(fake.grants).toEqual([]);
+  });
+
+  it("an iss on a server that does not promise one must still name it", async () => {
+    const fake = await oauthServer();
+    const { svc, ndxHome } = service(fake.url);
+    const first = fake.approve(await svc.beginSignIn("docs", REDIRECT));
+    await expect(svc.finishSignIn("docs", first.code, first.state, "https://evil.example")).rejects.toBeInstanceOf(ConnectionSignInError);
+    expect(stored(ndxHome)).toBeUndefined();
+    const second = fake.approve(await svc.beginSignIn("docs", REDIRECT));
+    expect(await svc.finishSignIn("docs", second.code, second.state, fake.issuer)).toEqual({ state: "connected" });
+  });
+
+  it("honours an oauth.clientMetadataUrl override, and a change of client identity reads 'sign in again'", async () => {
+    const fake = await oauthServer({ metadataDocuments: true, registration: false });
+    const own = "https://example.test/n-dx/client.json";
+    const signedIn = service(fake.url, { entry: { oauth: { clientMetadataUrl: own } } });
+    const authorizationUrl = await signedIn.svc.beginSignIn("docs", REDIRECT);
+    expect(new URL(authorizationUrl).searchParams.get("client_id")).toBe(own);
+    const { code, state } = fake.approve(authorizationUrl);
+    expect(await signedIn.svc.finishSignIn("docs", code, state)).toEqual({ state: "connected" });
+    expect(stored(signedIn.ndxHome)!.identity).toBe(`metadata-document ${own}`);
+    await signedIn.svc.close();
+
+    // The same store, the override removed: n-dx's own document is another client.
+    const sentBefore = fake.mcp.authorizations.length;
+    const changed = service(fake.url, { shared: signedIn });
+    expect((await changed.svc.listConnections())[0].status).toEqual({ state: "needs-sign-in", reason: CLIENT_CHANGED, signIn: "again" });
+    expect(fake.mcp.authorizations.length).toBe(sentBefore);
+  });
+
+  it("honours an oauth.clientId override: the pre-registered client, never a registration or a document", async () => {
+    const fake = await oauthServer({ metadataDocuments: true, preRegistered: ["pre-registered-1"] });
+    const { svc, ndxHome } = service(fake.url, { entry: { oauth: { clientId: "pre-registered-1" } } });
+    expect(await signIn(svc, fake)).toEqual({ state: "connected" });
+    expect(fake.authorizations[0].searchParams.get("client_id")).toBe("pre-registered-1");
+    expect(fake.hits["/register"]).toBeUndefined();
+    expect(stored(ndxHome)).toMatchObject({ identity: "client-id pre-registered-1", client: { client_id: "pre-registered-1" } });
+  });
+
+  it("a server with dynamic registration only still registers, and the record names n-dx's identity", async () => {
+    const fake = await oauthServer();
+    const { svc, ndxHome } = service(fake.url);
+    expect(await signIn(svc, fake)).toEqual({ state: "connected" });
+    expect(fake.hits["/register"]).toBe(1);
+    expect(fake.authorizations[0].searchParams.get("client_id")).toMatch(/^client-/);
+    expect(stored(ndxHome)!.identity).toBe(`metadata-document ${CLIENT_METADATA_URL}`);
+  });
+
+  it("asks for the needed scopes the server lists, records them, and reads 'sign in again' when more are needed", async () => {
+    const fake = await oauthServer({ metadataDocuments: true, scopesSupported: ["items:read", "items:write", "other"] });
+    let needed = ["items:read", "not-listed"];
+    const { svc, ndxHome } = service(fake.url, { scopes: () => needed });
+    expect(await signIn(svc, fake)).toEqual({ state: "connected" });
+    expect(fake.authorizations[0].searchParams.get("scope")).toBe("items:read");
+    expect(stored(ndxHome)!.scopes).toEqual(["items:read", "not-listed"]);
+
+    needed = ["items:read"];
+    expect((await svc.listConnections())[0].status).toEqual({ state: "connected" });
+    needed = ["items:read", "items:write"];
+    svc.reconnect("docs");
+    expect((await svc.listConnections())[0].status).toEqual({ state: "needs-sign-in", reason: SCOPES_CHANGED, signIn: "again" });
+    expect(await signIn(svc, fake)).toEqual({ state: "connected" });
+    expect(fake.authorizations[1].searchParams.get("scope")).toBe("items:read items:write");
   });
 });

@@ -8,6 +8,11 @@
       "estimate": { "optionsFrom": { "tool": "get_creation_options", "path": "estimates" } }
     }
   },
+  "oauth": {
+    "readScopes": ["caos:work-items:read", "caos:context:read"],
+    "writeScopes": ["caos:work-items:create", "caos:work-items:edit", "caos:work-items:move"],
+    "writeTools": ["create_work_item", "edit_work_item", "move_work_item"]
+  },
   "tracker": {
     "createTool": "create_work_item",
     "moveTool": "move_work_item",

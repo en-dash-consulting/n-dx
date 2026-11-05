@@ -4,6 +4,10 @@
  * authorization server and a fake MCP server: every route needs a credential,
  * a sign-in started and finished through them stores tokens and reads
  * connected, and no response carries a token, refresh token or code.
+ *
+ * The authorization server supports client ID metadata documents and has no
+ * registration endpoint (as CAOS's does), so the sign-in uses n-dx's document
+ * and the fixed loopback callback, whose page the server serves publicly.
  */
 
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -12,11 +16,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { storedCredential } from "@n-dx/llm-client";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
-import { SIGN_IN_AGAIN } from "../../src/server/connections/oauth-provider.js";
+import { CLIENT_METADATA_URL, SIGN_IN_AGAIN } from "../../src/server/connections/oauth-provider.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
 import { enforceRouteFeatureGate } from "../../src/server/route-feature-gates.js";
-import { handleConnectionsRoute, signInRedirectUrl } from "../../src/server/routes-connections.js";
+import { handleConnectionsRoute, signInRedirectUrl, signInRoute } from "../../src/server/routes-connections.js";
+import { handleStaticRoute, type StaticAssets } from "../../src/server/routes-static.js";
 import type { ServerContext } from "../../src/server/types.js";
+import { parseSignInState } from "../../src/shared/index.js";
 import { startFakeOAuthMcpServer, type FakeOAuthMcpServer } from "../helpers/fake-oauth-mcp-server.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 
@@ -33,10 +39,13 @@ function writeConfig(sidecar: boolean): void {
   writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { web: { sidecar } } }));
 }
 
+const SHELL = "<!doctype html><title>n-dx shell</title>";
+const assets = { getViewerHtml: () => SHELL } as unknown as StaticAssets;
+
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "connections-routes-"));
   ndxHome = mkdtempSync(join(tmpdir(), "connections-routes-home-"));
-  fake = await startFakeOAuthMcpServer();
+  fake = await startFakeOAuthMcpServer({ metadataDocuments: true, registration: false, issParameter: true });
   writeConfig(true);
   writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({
     connections: {
@@ -49,7 +58,7 @@ beforeEach(async () => {
   server = await startRouteTestServer(async (req, res) => {
     if (handleRequestSecurity(req, res, { token: TOKEN })) return true;
     // As start.ts: a request without a credential gets the page shell or nothing.
-    if (isPublicOnlyRequest(req)) return refusePublicOnly(req, res);
+    if (isPublicOnlyRequest(req)) return handleStaticRoute(req, res, ctx, assets) || refusePublicOnly(req, res);
     if (enforceRouteFeatureGate(req, res, ctx)) return true;
     return handleConnectionsRoute(req, res, ctx, { connectionsFor: () => service });
   });
@@ -66,7 +75,15 @@ afterEach(async () => {
 const post = (path: string, body: unknown, headers: Record<string, string> = auth) =>
   fetch(`${server.baseUrl}${path}`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-const REDIRECT = () => `${server.baseUrl}/p/alpha/project?connection=docs`;
+const REDIRECT = () => `${server.baseUrl}/oauth/callback`;
+
+/** Start a sign-in as the dashboard does, and play the user approving it. */
+async function approvedSignIn(basePath?: string) {
+  const started = await post("/api/connections/docs/oauth/start", { redirectUrl: REDIRECT(), ...(basePath !== undefined && { basePath }) });
+  expect(started.status).toBe(200);
+  const { authorizationUrl } = await started.json();
+  return { authorizationUrl: new URL(authorizationUrl), ...fake.approve(authorizationUrl) };
+}
 
 describe("connections routes", () => {
   it("refuse every request without the per-user token or a session", async () => {
@@ -106,13 +123,23 @@ describe("connections routes", () => {
     expect(before.connections[0]).toMatchObject({ id: "docs", state: "needs-sign-in", signIn: "first" });
     expect(before.configFile).toBe(".n-dx.local.json");
 
-    const started = await post("/api/connections/docs/oauth/start", { redirectUrl: REDIRECT() });
-    expect(started.status).toBe(200);
-    const { authorizationUrl } = await started.json();
-    expect(new URL(authorizationUrl).searchParams.get("redirect_uri")).toBe(REDIRECT());
-    const { code, state } = fake.approve(authorizationUrl);
+    const { authorizationUrl, code, state, iss } = await approvedSignIn("/p/alpha/w/feature");
+    // n-dx's metadata document is the client; nothing registers.
+    expect(authorizationUrl.searchParams.get("client_id")).toBe(CLIENT_METADATA_URL);
+    expect(REDIRECT()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/oauth\/callback$/);
+    expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(REDIRECT());
+    expect(fake.hits["/register"]).toBeUndefined();
+    expect(parseSignInState(state)).toMatchObject({ project: "alpha", workspace: "feature", connection: "docs" });
 
-    const finished = await post("/api/connections/docs/oauth/finish", { code, state });
+    // The authorization server sends the browser to the callback: the public page shell.
+    const callbackUrl = new URL(REDIRECT());
+    callbackUrl.search = new URLSearchParams({ code, state, ...(iss && { iss }) }).toString();
+    const page = await fetch(callbackUrl);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toBe(SHELL);
+
+    // The page posts what it read, with its session.
+    const finished = await post("/api/connections/docs/oauth/finish", { code, state, iss });
     const finishedText = await finished.text();
     expect(finished.status, finishedText).toBe(200);
     expect(JSON.parse(finishedText).connection).toMatchObject({ id: "docs", label: "Docs", state: "connected" });
@@ -130,7 +157,7 @@ describe("connections routes", () => {
     }
 
     // The state is spent: a replay is refused, naming no secret.
-    const replay = await post("/api/connections/docs/oauth/finish", { code, state });
+    const replay = await post("/api/connections/docs/oauth/finish", { code, state, iss });
     expect(replay.status).toBe(400);
     expect(await replay.text()).not.toContain(code);
 
@@ -141,8 +168,8 @@ describe("connections routes", () => {
   });
 
   it("reads 'sign in again' once the refresh token is revoked", async () => {
-    const { code, state } = fake.approve(await (await post("/api/connections/docs/oauth/start", { redirectUrl: REDIRECT() })).json().then((b) => b.authorizationUrl));
-    expect((await post("/api/connections/docs/oauth/finish", { code, state })).status).toBe(200);
+    const { code, state, iss } = await approvedSignIn();
+    expect((await post("/api/connections/docs/oauth/finish", { code, state, iss })).status).toBe(200);
     fake.revokeRefreshTokens();
     fake.expireAccessTokens();
     await service.close();
@@ -154,20 +181,51 @@ describe("connections routes", () => {
   it("refuses a sign-in for an unknown or non-OAuth connection, and a redirect off loopback", async () => {
     expect((await post("/api/connections/nope/oauth/start", { redirectUrl: REDIRECT() })).status).toBe(404);
     expect((await post("/api/connections/plain/oauth/start", { redirectUrl: REDIRECT() })).status).toBe(400);
-    expect((await post("/api/connections/docs/oauth/start", { redirectUrl: "https://example.com/project" })).status).toBe(400);
+    expect((await post("/api/connections/docs/oauth/start", { redirectUrl: "https://example.com/oauth/callback" })).status).toBe(400);
+    expect((await post("/api/connections/docs/oauth/start", { redirectUrl: REDIRECT(), basePath: "/p/a/extra" })).status).toBe(400);
     expect((await post("/api/connections/docs/oauth/finish", { code: "c" })).status).toBe(400);
+    expect((await post("/api/connections/docs/oauth/finish", { code: "c", state: "s", iss: 7 })).status).toBe(400);
     expect((await fetch(`${server.baseUrl}/api/connections/docs/sign-out`, { headers: auth })).status).toBe(405);
+  });
+
+  it("refuses a mismatched iss and stores nothing", async () => {
+    const { code, state } = await approvedSignIn();
+    const refused = await post("/api/connections/docs/oauth/finish", { code, state, iss: "https://evil.example" });
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).not.toContain(code);
+    expect(storedCredential("connection:docs", { ndxHome })).toBeUndefined();
+    expect(fake.grants).toEqual([]);
   });
 });
 
 describe("signInRedirectUrl", () => {
-  it("accepts a loopback dashboard address only", () => {
-    expect(signInRedirectUrl("http://127.0.0.1:3117/p/a/project?connection=docs")).toBeInstanceOf(URL);
-    expect(signInRedirectUrl("http://localhost:3117/project")).toBeInstanceOf(URL);
-    expect(signInRedirectUrl("http://[::1]:3117/project")).toBeInstanceOf(URL);
-    expect(typeof signInRedirectUrl("http://evil.example/project")).toBe("string");
-    expect(typeof signInRedirectUrl("javascript:alert(1)")).toBe("string");
-    expect(typeof signInRedirectUrl("http://u:p@127.0.0.1/project")).toBe("string");
-    expect(typeof signInRedirectUrl(42)).toBe("string");
+  it("accepts the fixed loopback callback only, on any port", () => {
+    expect(signInRedirectUrl("http://127.0.0.1:3117/oauth/callback")).toBeInstanceOf(URL);
+    expect(signInRedirectUrl("http://localhost:49152/oauth/callback")).toBeInstanceOf(URL);
+    for (const refused of [
+      "http://[::1]:3117/oauth/callback",
+      "https://127.0.0.1:3117/oauth/callback",
+      "http://127.0.0.1:3117/p/a/oauth/callback",
+      "http://127.0.0.1:3117/oauth/callback?connection=docs",
+      "http://127.0.0.1:3117/project",
+      "http://evil.example/oauth/callback",
+      "http://u:p@127.0.0.1/oauth/callback",
+      "javascript:alert(1)",
+      42,
+    ]) {
+      expect(typeof signInRedirectUrl(refused), String(refused)).toBe("string");
+    }
+  });
+});
+
+describe("signInRoute", () => {
+  it("reads the project and workspace from the dashboard's base path", () => {
+    expect(signInRoute(undefined)).toEqual({});
+    expect(signInRoute("")).toEqual({});
+    expect(signInRoute("/p/app")).toEqual({ project: "app" });
+    expect(signInRoute("/w/feature")).toEqual({ workspace: "feature" });
+    expect(signInRoute("/p/app/w/feature")).toEqual({ project: "app", workspace: "feature" });
+    expect(typeof signInRoute("/p/app/project")).toBe("string");
+    expect(typeof signInRoute(7)).toBe("string");
   });
 });

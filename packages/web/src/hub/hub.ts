@@ -42,6 +42,7 @@ import type { HealedRecord, HubConfigProblem, HubRegistry, ProjectRecord } from 
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
 import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
+import { answerOAuthCallback, type CallbackProjects } from "./oauth-callback.js";
 import { CredentialStore } from "../shared/index.js";
 import { FrameKeys, parseKeyedPath } from "./frame-keys.js";
 import type { FrameKeyOptions } from "./frame-keys.js";
@@ -208,6 +209,17 @@ function postExecute(
 }
 
 /** A response's JSON body when it is an object; null for anything else. */
+/** The registered projects, as the OAuth callback page reads them. */
+function callbackProjects(hub: Hub): CallbackProjects {
+  return {
+    has: (id) => hub.getProject(id) !== null,
+    sole: () => {
+      const projects = hub.listProjects();
+      return projects.length === 1 ? projects[0].id : null;
+    },
+  };
+}
+
 async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await res.json();
@@ -636,6 +648,9 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       if (guardFrameKeyRequest(req, res, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))) return;
     } else {
       if (guardHubRequest(req, res, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url))) return;
+      // The one public page the hub answers itself, with or without a
+      // credential: it forwards a sign-in's return to its project and reads nothing.
+      if (answerOAuthCallback(req, res, callbackProjects(hub))) return;
       // No credential: only what is public — the home page shell and proxied
       // requests the project server answers with its own public shell or a 401.
       if (isPublicOnlyHubRequest(req)) {

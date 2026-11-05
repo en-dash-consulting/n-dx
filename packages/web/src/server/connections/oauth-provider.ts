@@ -1,25 +1,39 @@
 /**
  * MCP OAuth for `auth: "oauth"` connections, on the SDK's own flow
  * (`auth()` in @modelcontextprotocol/sdk/client/auth.js): protected-resource
- * and authorization-server discovery, dynamic client registration,
- * authorization code + PKCE (S256) and refresh.
+ * and authorization-server discovery, authorization code + PKCE (S256) and
+ * refresh.
+ *
+ * The client n-dx signs in as: its client ID metadata document,
+ * {@link CLIENT_METADATA_URL}, used as the client_id wherever the
+ * authorization server advertises `client_id_metadata_document_supported`,
+ * else dynamic client registration. A connection's `oauth` config overrides
+ * it with another document or a pre-registered client id.
  *
  * What persists is one JSON record in the credential store entry
- * `connection:<id>` (connection-credentials.ts): the client registration, the
- * tokens and the URL they were issued for. Tokens bound to another URL are
- * never sent; the connection reads needs-sign-in. A sign-in's state and code
- * verifier live in memory only, single-use, for {@link SIGN_IN_TTL_MS}.
+ * `connection:<id>` (connection-credentials.ts): the client, the tokens, and
+ * the URL, client identity and scopes they were issued for. A record issued
+ * for another URL or identity, or for fewer scopes than the connection needs
+ * now, is never used; the connection reads needs-sign-in. A sign-in's state
+ * and code verifier live in memory only, single-use, for {@link SIGN_IN_TTL_MS}.
  *
  * The server never opens a browser. A sign-in is started by the dashboard
- * ({@link ConnectionOAuth.beginSignIn}) and finished by its redirect
- * ({@link ConnectionOAuth.finishSignIn}); every other caller is headless and
- * gets needs-sign-in where a user would be asked.
+ * ({@link ConnectionOAuth.beginSignIn}) and finished by the fixed loopback
+ * callback's page ({@link ConnectionOAuth.finishSignIn}); the state carries
+ * the project, workspace and connection the return belongs to
+ * (shared/oauth-callback.ts). Every other caller is headless and gets
+ * needs-sign-in where a user would be asked.
  *
  * See docs/architecture/sidecar-connections.md.
  */
 
 import { randomBytes } from "node:crypto";
-import { auth, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
+import {
+  auth,
+  discoverOAuthServerInfo,
+  type OAuthClientProvider,
+  type OAuthDiscoveryState,
+} from "@modelcontextprotocol/sdk/client/auth.js";
 import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type {
   OAuthClientInformationMixed,
@@ -27,6 +41,7 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { CredentialStoreOptions } from "@n-dx/llm-client";
+import { formatSignInState, type SignInState } from "../../shared/index.js";
 import { errorMessage } from "../response-utils.js";
 import type { HttpConnectionConfig } from "./connection-config.js";
 import {
@@ -36,6 +51,13 @@ import {
   withoutConnectionToken,
 } from "./connection-credentials.js";
 
+/**
+ * n-dx's client ID metadata document. Its redirect_uris are the loopback
+ * callbacks, http://127.0.0.1/oauth/callback and http://localhost/oauth/callback,
+ * on any port (RFC 8252).
+ */
+export const CLIENT_METADATA_URL = "https://docs.n-dx.dev/oauth/client.json";
+
 /** How long a started sign-in can be finished. */
 export const SIGN_IN_TTL_MS = 10 * 60_000;
 /** An access token this close to its expiry is refreshed before it is sent. */
@@ -44,6 +66,8 @@ export const REFRESH_SKEW_MS = 30_000;
 export const NOT_SIGNED_IN = "not signed in yet; sign in from the dashboard";
 export const SIGN_IN_AGAIN = "the sign-in expired or was revoked; sign in again";
 export const URL_CHANGED = "the connection's URL changed since sign-in; sign in again";
+export const CLIENT_CHANGED = "the connection's OAuth client changed since sign-in; sign in again";
+export const SCOPES_CHANGED = "the connection needs scopes it was not signed in with; sign in again";
 
 /**
  * Whether a connection needs its first sign-in or lost one it had. The
@@ -91,6 +115,10 @@ interface OAuthRecord {
   url: string;
   /** The redirect URL the client was registered with. */
   redirectUrl: string;
+  /** The client identity ({@link clientIdentity}) it was issued to; unset on older records, read as the default. */
+  identity?: string;
+  /** The scopes the connection needed when it signed in; unset when it needed none. */
+  scopes?: string[];
   client: OAuthClientInformationMixed;
   tokens?: OAuthTokens;
   /** When the access token expires, in ms, when the server said. */
@@ -102,6 +130,9 @@ interface SignInFlow {
   connection: string;
   url: string;
   redirectUrl: string;
+  identity: string;
+  /** The scopes the connection needed when the sign-in started. */
+  scopes: string[];
   state: string;
   expiresAt: number;
   client?: OAuthClientInformationMixed;
@@ -117,7 +148,12 @@ export interface ConnectionOAuthOptions {
   credentials?: CredentialStoreOptions;
   /** The clock, in ms (tests). */
   now?: () => number;
+  /** The scopes a connection's sign-in needs (tracker/oauth-scopes.ts); none when unset. */
+  scopesFor?: (config: HttpConnectionConfig) => string[];
 }
+
+/** Where a sign-in's return belongs: the routing fields of its state. */
+export type SignInRoute = Pick<SignInState, "project" | "workspace">;
 
 export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -132,6 +168,15 @@ function isRecord(value: Record<string, unknown> | undefined): value is Record<s
     && typeof client?.client_id === "string";
 }
 
+/** Which client `config` signs in as, as a record stores it: a change means signing in again. */
+export function clientIdentity(config: Pick<HttpConnectionConfig, "oauth">): string {
+  if (config.oauth && "clientId" in config.oauth) return `client-id ${config.oauth.clientId}`;
+  return `metadata-document ${config.oauth?.clientMetadataUrl ?? CLIENT_METADATA_URL}`;
+}
+
+/** The identity a record was issued to: one from before identities were recorded was the default. */
+const recordIdentity = (record: OAuthRecord): string => record.identity ?? clientIdentity({});
+
 function clientMetadataFor(redirectUrl: string): OAuthClientMetadata {
   return {
     client_name: "n-dx",
@@ -145,6 +190,7 @@ function clientMetadataFor(redirectUrl: string): OAuthClientMetadata {
 export class ConnectionOAuth {
   readonly credentials: CredentialStoreOptions;
   private readonly now: () => number;
+  private readonly scopesFor: (config: HttpConnectionConfig) => string[];
   private readonly flows = new Map<string, SignInFlow>();
   private readonly refreshing = new Map<string, Promise<PreparedOAuth>>();
   /**
@@ -158,6 +204,7 @@ export class ConnectionOAuth {
   constructor(options: ConnectionOAuthOptions = {}) {
     this.credentials = options.credentials ?? {};
     this.now = options.now ?? Date.now;
+    this.scopesFor = options.scopesFor ?? (() => []);
   }
 
   /**
@@ -178,19 +225,34 @@ export class ConnectionOAuth {
     return refresh;
   }
 
-  /** Start a sign-in: the authorization URL to send the user to, with S256 PKCE and a state. */
-  async beginSignIn(config: HttpConnectionConfig, redirectUrl: string): Promise<string> {
+  /**
+   * Start a sign-in: the authorization URL to send the user to, with S256
+   * PKCE and a state that carries `route` and the connection. The scopes the
+   * connection needs are asked for when the server lists them.
+   */
+  async beginSignIn(config: HttpConnectionConfig, redirectUrl: string, route: SignInRoute = {}): Promise<string> {
     const redirect = new URL(redirectUrl);
     if (redirect.protocol !== "http:" && redirect.protocol !== "https:") throw new Error("the redirect URL must be http or https");
     this.sweep();
+    const scopes = this.scopesFor(config);
     const flow: SignInFlow = {
       connection: config.id,
       url: config.url,
       redirectUrl: redirect.href,
-      state: randomBytes(32).toString("base64url"),
+      identity: clientIdentity(config),
+      scopes,
+      state: formatSignInState({ ...route, connection: config.id, nonce: randomBytes(32).toString("base64url") }),
       expiresAt: this.now() + SIGN_IN_TTL_MS,
     };
-    const result = await auth(new SignInProvider(this, config, flow), { serverUrl: config.url });
+    // Discovered here rather than by auth(), to choose the scopes; auth() reuses it.
+    const info = await discoverOAuthServerInfo(config.url);
+    flow.discovery = { ...info, authorizationServerUrl: String(info.authorizationServerUrl) };
+    const supported = info.resourceMetadata?.scopes_supported ?? info.authorizationServerMetadata?.scopes_supported;
+    const requested = supported ? scopes.filter((scope) => supported.includes(scope)) : [];
+    const result = await auth(new SignInProvider(this, config, flow), {
+      serverUrl: config.url,
+      ...(requested.length > 0 && { scope: requested.join(" ") }),
+    });
     if (result !== "REDIRECT" || !flow.authorizationUrl || !flow.codeVerifier) {
       throw new Error("the authorization server did not start a sign-in");
     }
@@ -199,17 +261,26 @@ export class ConnectionOAuth {
   }
 
   /**
-   * Finish a sign-in with the redirect's `code` and `state`. A state that is
-   * unknown, already used, expired or for another connection is refused and
-   * nothing is stored; a state is spent by its first use either way.
+   * Finish a sign-in with the callback's `code`, `state` and `iss`. A state
+   * that is unknown, already used, expired or for another connection, and an
+   * `iss` that is not the authorization server's issuer (or is missing where
+   * the server promises one, RFC 9207), are refused and nothing is stored; a
+   * state is spent by its first use either way.
    */
-  async finishSignIn(config: HttpConnectionConfig, code: string, state: string): Promise<void> {
+  async finishSignIn(config: HttpConnectionConfig, code: string, state: string, iss?: string): Promise<void> {
     const flow = this.flows.get(state);
     this.flows.delete(state);
     if (!flow || flow.connection !== config.id || this.now() > flow.expiresAt) {
       throw new ConnectionSignInError("this sign-in is unknown, already used or expired; start it again");
     }
     if (flow.url !== config.url) throw new ConnectionSignInError("the connection's URL changed during sign-in; start it again");
+    if (flow.identity !== clientIdentity(config)) {
+      throw new ConnectionSignInError("the connection's OAuth client changed during sign-in; start it again");
+    }
+    const metadata = flow.discovery?.authorizationServerMetadata as (Record<string, unknown> & { issuer?: string }) | undefined;
+    if (iss === undefined ? metadata?.authorization_response_iss_parameter_supported === true : iss !== metadata?.issuer) {
+      throw new ConnectionSignInError("the sign-in did not come back from the connection's authorization server; start it again");
+    }
     let result: string;
     try {
       result = await auth(new SignInProvider(this, config, flow), { serverUrl: config.url, authorizationCode: code });
@@ -296,7 +367,10 @@ export class ConnectionOAuth {
   signInReason(config: HttpConnectionConfig, record: OAuthRecord | undefined): SignInNeeded | undefined {
     if (!record) return { reason: NOT_SIGNED_IN, signIn: "first" };
     if (record.url !== config.url) return { reason: URL_CHANGED, signIn: "again" };
+    if (recordIdentity(record) !== clientIdentity(config)) return { reason: CLIENT_CHANGED, signIn: "again" };
     if (!record.tokens) return SIGN_IN_LOST;
+    const granted = new Set(record.scopes ?? []);
+    if (this.scopesFor(config).some((scope) => !granted.has(scope))) return { reason: SCOPES_CHANGED, signIn: "again" };
     return undefined;
   }
 
@@ -426,14 +500,25 @@ class SignInProvider implements OAuthClientProvider {
     return clientMetadataFor(this.flow.redirectUrl);
   }
 
+  /** The SDK sends it as the client_id where the server supports metadata documents, and registers elsewhere. */
+  get clientMetadataUrl(): string | undefined {
+    const override = this.config.oauth;
+    if (override && "clientId" in override) return undefined;
+    return override?.clientMetadataUrl ?? CLIENT_METADATA_URL;
+  }
+
   state(): string {
     return this.flow.state;
   }
 
   clientInformation(): OAuthClientInformationMixed | undefined {
+    const override = this.config.oauth;
+    // A pre-registered client is the only one this connection signs in as.
+    if (override && "clientId" in override) return this.flow.client ?? { client_id: override.clientId };
     if (this.flow.client || this.flow.ignoreStoredClient) return this.flow.client;
     const record = this.owner.boundRecord(this.config);
-    return record?.redirectUrl === this.flow.redirectUrl ? record.client : undefined;
+    if (!record || recordIdentity(record) !== this.flow.identity) return undefined;
+    return record.redirectUrl === this.flow.redirectUrl ? record.client : undefined;
   }
 
   /** A new registration is kept with the flow and stored only with the tokens it earns. */
@@ -448,7 +533,14 @@ class SignInProvider implements OAuthClientProvider {
   saveTokens(tokens: OAuthTokens): void {
     const client = this.clientInformation();
     if (!client) throw new Error("no client registration for this sign-in");
-    const record: OAuthRecord = { kind: "oauth", url: this.flow.url, redirectUrl: this.flow.redirectUrl, client };
+    const record: OAuthRecord = {
+      kind: "oauth",
+      url: this.flow.url,
+      redirectUrl: this.flow.redirectUrl,
+      identity: this.flow.identity,
+      ...(this.flow.scopes.length > 0 && { scopes: this.flow.scopes }),
+      client,
+    };
     this.owner.write(this.config.id, this.owner.withExpiry(record, tokens));
   }
 
