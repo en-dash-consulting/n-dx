@@ -170,6 +170,7 @@ a.ndx-card:hover { transform: translateY(-1px); }
   border-radius: var(--graview-radius, 10px);
   background: var(--graview-panel);
 }
+.ndx-iso-note { margin: 0 0 0.5rem; color: var(--graview-ink-muted); font-size: 0.86rem; }
 .ndx-empty {
   padding: 1.1rem 1.2rem; display: grid; gap: 0.35rem; color: var(--graview-ink-muted);
   border: 1px dashed var(--graview-edge); border-radius: var(--graview-radius, 10px);

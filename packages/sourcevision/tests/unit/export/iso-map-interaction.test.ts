@@ -490,12 +490,14 @@ describe("iso map focus over areas and sub-zones", () => {
     stranger.close();
   });
 
-  it("stays where it is for an id the map does not have, a prototype key included", () => {
-    focus("db");
+  it("stays in its scene for an id the map does not draw, a prototype key included, and selects nothing rather than the last zone", () => {
     for (const id of ["nowhere", "constructor", "__proto__", "toString"]) {
+      focus("db");
+      expect(selected(), id).toBe("DB");
       focus(id);
       expect(crumbs(), id).toContain("Core area");
-      expect(selected(), id).toBe("DB");
+      expect(selected(), id).not.toBe("DB");
+      expect(doc.documentElement.classList.contains("idle"), id).toBe(true);
     }
     expect(errors).toEqual([]);
   });

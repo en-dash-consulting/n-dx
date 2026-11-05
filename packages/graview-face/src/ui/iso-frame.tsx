@@ -55,6 +55,19 @@ export function IsoFrame({ focus, height, wheelZoom = false, title }: { focus?: 
   const available = useIsoMap();
   const frame = useRef<HTMLIFrameElement | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // The zone this page asked for, when the map answered that it does not draw it (a sub-zone of a lopsided split).
+  const [undrawn, setUndrawn] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setUndrawn(undefined);
+    const heard = (ev: MessageEvent) => {
+      const d = ev.data as { type?: unknown; focus?: unknown; found?: unknown } | null;
+      if (ev.source !== frame.current?.contentWindow || !d || d.type !== "ndx-iso-focus" || d.focus !== focus) return;
+      setUndrawn(d.found === false ? focus : undefined);
+    };
+    window.addEventListener("message", heard);
+    return () => window.removeEventListener("message", heard);
+  }, [focus]);
 
   // Say the scheme, the zoom and the focus once the map has loaded, and the scheme again whenever the face changes it.
   useEffect(() => {
@@ -70,6 +83,11 @@ export function IsoFrame({ focus, height, wheelZoom = false, title }: { focus?: 
 
   if (available === "no") return <Empty command="ndx analyze .">No code map yet: sourcevision has not analyzed this project, or the projection was emitted before it did.</Empty>;
   if (available === "checking") return <div className="ndx-iso" style={{ height }} aria-busy="true" />;
-  // Scripts only: the map runs its own, but in an opaque origin it cannot read this page's door key or call the door.
-  return <iframe ref={frame} className="ndx-iso" sandbox="allow-scripts" src={ISO_MAP_URL} title={title} style={{ height }} onLoad={() => setLoaded(true)} />;
+  // Scripts, and popups for the map's links to source: in an opaque origin it cannot read this page's door key or call the door.
+  return (
+    <>
+      {undrawn ? <p className="ndx-iso-note">The code map does not draw this zone on its own: it sits inside its parent's block.</p> : null}
+      <iframe ref={frame} className="ndx-iso" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" src={ISO_MAP_URL} title={title} style={{ height }} onLoad={() => setLoaded(true)} />
+    </>
+  );
 }
