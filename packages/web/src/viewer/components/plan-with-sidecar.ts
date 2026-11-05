@@ -28,8 +28,8 @@ export interface PlanFirstTurnState {
   session: { endedAt?: string; lens?: string; target?: { ref?: string } } | null;
   /** The area the capture targets; null for the whole plan. */
   area: string | null;
-  /** The drawer's error line: set when the PATCH re-lensing the open session failed. */
-  error: string | null;
+  /** Why the PATCH re-lensing the open session failed; null while it follows or is pending. */
+  followError: string | null;
 }
 
 /** What to do with the waiting text. */
@@ -55,7 +55,7 @@ export function planFirstTurn(s: PlanFirstTurnState): PlanFirstTurn {
   if (!held) return { action: "send" };
   if (held.endedAt) return { action: "new-session" };
   if (held.lens === "plan" && (held.target?.ref ?? "") === (s.area ?? "")) return { action: "send" };
-  if (s.error) return { action: "fail", reason: `Plan with Sidecar could not start: ${s.error}` };
+  if (s.followError) return { action: "fail", reason: `Plan with Sidecar could not start: ${s.followError}` };
   return { action: "wait" };
 }
 

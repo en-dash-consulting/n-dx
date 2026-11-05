@@ -94,7 +94,7 @@ describe("Plan with Sidecar attachment", () => {
 });
 
 describe("Plan with Sidecar first turn", () => {
-  const base = { drawerOpen: true, ready: true, lens: "plan", busy: false, session: null, area: null, error: null };
+  const base = { drawerOpen: true, ready: true, lens: "plan", busy: false, session: null, area: null, followError: null };
   const wait = { action: "wait" };
   const send = { action: "send" };
 
@@ -127,7 +127,7 @@ describe("Plan with Sidecar first turn", () => {
   });
 
   it("says why when the open session could not follow the attachment", () => {
-    const next = planFirstTurn({ ...base, session: { lens: "general" }, error: "Request failed (500)" });
+    const next = planFirstTurn({ ...base, session: { lens: "general" }, followError: "Request failed (500)" });
     expect(next).toEqual({ action: "fail", reason: "Plan with Sidecar could not start: Request failed (500)" });
   });
 });

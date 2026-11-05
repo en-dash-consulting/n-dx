@@ -80,6 +80,8 @@ interface Server {
   hubTabs?: Array<{ name: string; label: string }>;
   /** The keyed page's answer; unset is a 200. A pending promise is a sidecar still starting. */
   pageAnswer?: () => Response | Promise<Response>;
+  /** While set, PATCH /api/sidecar/sessions/:id answers 500 with this error. */
+  patchError?: string;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -150,6 +152,7 @@ function stubServer(): void {
     if (other) return json(other[2] ? { cards: [] } : { sessions: server.otherSessions[other[1]] ?? [] });
     const own = /^\/api\/sidecar\/sessions\/([\w-]+)(\/end)?$/.exec(url);
     if (own && (method === "PATCH" || own[2])) {
+      if (method === "PATCH" && server.patchError) return json({ error: server.patchError }, 500);
       const entry = server.sessions.find((e) => e.session.id === own[1])!;
       if (own[2]) entry.session.endedAt = "2026-10-28T12:00:00.000Z";
       else Object.assign(entry.session, body);
@@ -236,8 +239,12 @@ async function settle(): Promise<void> {
 
 // ── Harness: what main.ts renders for Sidecar ─────────────────────────────
 
+/** The hook state the last render of Shell saw, for tests that call its methods as main.ts does. */
+let lastSidecar: ReturnType<typeof useSidecarShell>["sidecar"] | null = null;
+
 function Shell({ view, page }: { view: ViewId; page?: Partial<SidecarPageSelection> }) {
   const shell = useSidecarShell(useFeatureToggle("web.sidecar", false), { view, zone: null, taskId: null, ...page });
+  lastSidecar = shell.sidecar;
   return h("div", null,
     h(TopNav, { view, validViews: VALID, onNavigate: vi.fn(), onOpenSearch: vi.fn(), sidecar: shell.button }),
     h(SidecarDock, { open: shell.drawer.open, sidecar: shell.sidecar, onClose: shell.drawer.close },
@@ -1567,6 +1574,35 @@ describe("attachment and lens", () => {
     expect(patches()).toEqual([expect.objectContaining({
       url: "/api/sidecar/sessions/s1", body: { lens: "describe", target: { ref: "t1" } },
     })]);
+  });
+
+  it("reports why the open session refused to follow, and not an unrelated earlier error", async () => {
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("prd");
+    // An unrelated drawer error is no reason for the follow to have failed.
+    await act(async () => { lastSidecar!.reportError("Card decision refused"); });
+    expect(lastSidecar!.followError).toBeNull();
+    server.patchError = "Session is busy";
+    await act(async () => { render(h(Shell, { view: "prd", page: { taskId: "t1" } }), root); });
+    await settle();
+    expect(lastSidecar!.followError).toBe("Session is busy");
+    expect(root.querySelector(".sidecar-error")?.textContent).toBe("Session is busy");
+  });
+
+  it("newSession starts a session on the attachment's lens and target in place of an ended one", async () => {
+    server.sessions = [{ session: session({ id: "s1", endedAt: "2026-10-28T11:00:00.000Z" }), running: false }];
+    await mount("prd", { taskId: "t1" });
+    await pressCmdJ();
+    await act(async () => { await lastSidecar!.openSession("s1"); });
+    await settle();
+    expect(lastSidecar!.session?.id).toBe("s1");
+    let ok = false;
+    await act(async () => { ok = await lastSidecar!.newSession(); });
+    await settle();
+    expect(ok).toBe(true);
+    expect(server.requests.find((r) => r.method === "POST" && r.url === "/api/sidecar/sessions")?.body)
+      .toMatchObject({ lens: "describe", target: { ref: "t1" } });
+    expect(lastSidecar!.session?.id).toBe("new");
   });
 
   it("a task picked in the tree after the page opened attaches, and re-targets the open session on each pick", async () => {

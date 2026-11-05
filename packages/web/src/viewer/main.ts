@@ -221,7 +221,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       busy: sidecar.running || sidecar.sending,
       session: sidecar.session,
       area: planWith.area,
-      error: sidecar.error,
+      followError: sidecar.followError,
     });
     if (next.action === "wait") return;
     if (next.action === "new-session") {
@@ -234,7 +234,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     setPlanText(null);
     if (next.action === "fail") sidecar.reportError(next.reason);
     else void sidecar.send(planText);
-  }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending, sidecar.error]);
+  }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending, sidecar.followError]);
   const planSessionStarted = useRef(false);
   // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar". A change sent to
   // Place or a run sent to Diagnose would outrank the Plan lens, so a click lets both go.
