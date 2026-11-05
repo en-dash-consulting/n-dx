@@ -11,6 +11,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import type {
+  AreaDetailWire,
   CapabilityDetailWire,
   ChangeRowWire,
   ChangeSummaryWire,
@@ -27,6 +28,7 @@ import type {
 } from "../../../src/server/routes-rex/placement.js";
 import type { ChangePlacementErrorKind } from "../../../src/server/rex-gateway.js";
 import type {
+  AreaDetail,
   CapabilityDetail,
   ChangePlacement,
   ChangePlacements,
@@ -50,6 +52,7 @@ const sameMap: Same<ProductMapWire, ProductMap> = true;
 const sameChange: Same<ChangeRowWire, ChangeRow> = true;
 const sameCapability: Same<CapabilityDetailWire, CapabilityDetail> = true;
 const sameSummary: Same<ChangeSummaryWire, ChangeSummary> = true;
+const sameArea: Same<AreaDetailWire, AreaDetail> = true;
 const samePlacement: Same<ChangePlacementWire, ChangePlacement> = true;
 const samePlacements: Same<ChangePlacementsWire, ChangePlacements> = true;
 const samePlace:Same<PlaceChangeRequestWire, PlaceChangeRequest> = true;
@@ -59,7 +62,7 @@ const sameProposed: Same<ProposeChangeResultWire, ProposeChangeResult> = true;
 const sameDraft: Same<PlacementDraftWire, PlacementDraft> = true;
 // The refusal kinds the viewer words a hint for are rex's, which the 422 answer carries.
 const sameRefusalKind: Same<ChangePlacementErrorKind, PlacementRefusalKind> = true;
-void [sameMap, sameChange, sameCapability, sameSummary, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
+void [sameMap, sameChange, sameCapability, sameSummary, sameArea, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const AREA_ID = "a0000000-0000-4000-8000-000000000001";
@@ -638,6 +641,101 @@ describe("v2 product reads", () => {
         .toBe("A valid card is charged once");
     });
   });
+
+  describe("GET /product/area/<slug-or-id>", () => {
+    const CONSTRAINT_ID = "a0000000-0000-4000-8000-000000000010";
+    const OTHER_CONSTRAINT_ID = "a0000000-0000-4000-8000-000000000011";
+    const OTHER_AREA_ID = "a0000000-0000-4000-8000-000000000020";
+    const INBOX_ID = "c0000000-0000-4000-8000-000000000030";
+
+    const write = (path: string, lines: string[]): void => {
+      mkdirSync(join(rexDir, path, ".."), { recursive: true });
+      writeFileSync(join(rexDir, path), [...lines, ""].join("\n"));
+    };
+
+    /**
+     * Adds to the fixture: a constraint binding Checkout, a second area with a
+     * constraint of its own, code on the capability and an Inbox change whose
+     * best guess is "Pay by card".
+     */
+    beforeEach(() => {
+      const card = join(rexDir, "product", "checkout", "pay-by-card.md");
+      writeFileSync(card, readFileSync(card, "utf-8").replace('criteria: [', 'realizedBy: ["src/pay/card.ts"]\ncriteria: ['));
+      write("product/no-card-storage.md", [
+        "---", `id: "${CONSTRAINT_ID}"`, 'type: "constraint"', 'title: "No card storage"', 'slug: "no-card-storage"',
+        'statement: "Card numbers never touch our disk."', `appliesTo: ["${AREA_ID}"]`, "---",
+      ]);
+      write("product/catalogue/index.md", [
+        "---", `id: "${OTHER_AREA_ID}"`, 'type: "area"', 'title: "Catalogue"', 'slug: "catalogue"', "---",
+      ]);
+      write("product/catalogue/images-load-fast.md", [
+        "---", `id: "${OTHER_CONSTRAINT_ID}"`, 'type: "constraint"', 'title: "Images load fast"', 'slug: "images-load-fast"',
+        `appliesTo: ["${OTHER_AREA_ID}"]`, "---",
+      ]);
+      write("changes/save-a-card/index.md", [
+        "---", `id: "${INBOX_ID}"`, 'type: "change"', 'title: "Pay by card with a saved card"', 'slug: "save-a-card"',
+        'intent: "A shopper can pay by card without typing the card again."', "---",
+      ]);
+      write("changes/save-a-card/state.yaml", ['schema: "rex/v2"', "items:", `  "${INBOX_ID}":`, "    needsPlacement: true"]);
+    });
+
+    it("answers the area's capabilities, constraints, open changes, Inbox guesses and code", async () => {
+      const { status, body } = await get("product/area/checkout");
+      expect(status).toBe(200);
+      expect(body.layout).toBe("v2");
+      const area = body.area as AreaDetail;
+      expect(area).toMatchObject({
+        id: AREA_ID,
+        slug: "checkout",
+        title: "Checkout",
+        summary: "Taking payment for a basket.",
+        stewards: [],
+        counts: { capabilities: 1, constraints: 1, met: 0, changing: 1, defective: 0, openChanges: 1 },
+        recentlyApplied: [],
+        code: [{ capabilityId: CAPABILITY_ID, path: "src/pay/card.ts" }],
+      });
+      expect(area.capabilities).toEqual([expect.objectContaining({
+        id: CAPABILITY_ID,
+        statement: "A shopper can pay for a basket with a card.",
+        status: "changing",
+        health: "ok",
+        criteriaCount: 2,
+        openChanges: [{ id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", stage: "in-progress", delta: "modified" }],
+      })]);
+      // The Catalogue constraint binds another area only.
+      expect(area.constraints.map((c) => c.id)).toEqual([CONSTRAINT_ID]);
+      expect(area.openChanges).toEqual([{ id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", stage: "in-progress", delta: "modified" }]);
+      expect(area.inbox).toEqual([expect.objectContaining({
+        id: INBOX_ID,
+        title: "Pay by card with a saved card",
+        target: { id: CAPABILITY_ID, title: "Pay by card", type: "capability" },
+      })]);
+    });
+
+    it("resolves the area by id and display id, and lists an applied change as recently applied", async () => {
+      applyChange();
+      for (const ref of [AREA_ID, "A1"]) {
+        const area = (await get(`product/area/${ref}`)).body.area as AreaDetail;
+        expect(area.id).toBe(AREA_ID);
+        expect(area.openChanges).toEqual([]);
+        expect(area.recentlyApplied).toEqual([{
+          id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", appliedAt: "2026-10-05T12:00:00.000Z", shippedIn: "1.2.0",
+        }]);
+      }
+    });
+
+    it("keeps another area's guesses and constraints out", async () => {
+      const area = (await get("product/area/catalogue")).body.area as AreaDetail;
+      expect(area).toMatchObject({ id: OTHER_AREA_ID, capabilities: [], openChanges: [], inbox: [], code: [] });
+      expect(area.constraints.map((c) => c.id)).toEqual([OTHER_CONSTRAINT_ID]);
+    });
+
+    it.each(["no-such-area", CAPABILITY_ID])("answers 404 for %s", async (ref) => {
+      const { status, body } = await get(`product/area/${ref}`);
+      expect(status).toBe(404);
+      expect(body.error).toContain(ref);
+    });
+  });
 });
 
 describe("product reads on a v1 project", () => {
@@ -659,7 +757,7 @@ describe("product reads on a v1 project", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it.each(["product", "changes", "changes/summary", "product/capability/A1.1"])("GET /%s answers layout v1 and nothing else", async (path) => {
+  it.each(["product", "changes", "changes/summary", "product/capability/A1.1", "product/area/checkout"])("GET /%s answers layout v1 and nothing else", async (path) => {
     const res = await fetch(`${base}/${path}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ layout: "v1" });

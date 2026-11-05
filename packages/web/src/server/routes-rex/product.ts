@@ -6,6 +6,7 @@
  *   GET /api/rex/changes                 → { layout: "v2", changes }
  *   GET /api/rex/changes/summary         → { layout: "v2", summary }
  *   GET /api/rex/product/capability/<id> → { layout: "v2", capability }
+ *   GET /api/rex/product/area/<slug-or-id> → { layout: "v2", area }
  *   POST /api/rex/product/edit           → { layout: "v2", outcome, drafts, capability }
  *
  * The POST is the capability page's edit form: it runs rex's `handleProductEdit`
@@ -43,6 +44,8 @@ import {
   findNextWorkTask,
   openClaimsStore,
   resolveClaimHolder,
+  computeEdges,
+  suggestPlacement,
 } from "../rex-gateway.js";
 import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
 
@@ -201,10 +204,61 @@ export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaC
   code: Array<{ path: string; role?: string }>;
 }
 
+/** An Inbox change whose top placement candidate sits in the area: rex's best guess, not a placement. */
+export interface AreaInboxGuessWire {
+  id: string;
+  displayId?: string;
+  title: string;
+  target: { id: string; title: string; type: "capability" | "constraint" };
+  relation: "touches" | "amends";
+  strength: "strong" | "possible" | "weak";
+}
+
+/** An applied change that amended or touched the area or a node in it. */
+export interface AreaAppliedChangeWire {
+  id: string;
+  displayId?: string;
+  title: string;
+  appliedAt?: string;
+  shippedIn?: string;
+}
+
+/** `GET /api/rex/product/area/<slug-or-id>`: everything the area view renders. */
+export interface AreaDetailWire {
+  id: string;
+  slug: string;
+  displayId?: string;
+  title: string;
+  summary?: string;
+  stewards: string[];
+  counts: {
+    capabilities: number;
+    constraints: number;
+    met: number;
+    changing: number;
+    defective: number;
+    openChanges: number;
+  };
+  /** Live capabilities whose nearest area is this one, in tree order. */
+  capabilities: CapabilityRowWire[];
+  /** Constraints that bind the area or any of its capabilities (rex's `boundBy`). */
+  constraints: ConstraintRowWire[];
+  /** Open changes amending or touching the area or its capabilities, in tree order. */
+  openChanges: OpenChangeOverlayWire[];
+  inbox: AreaInboxGuessWire[];
+  /** The {@link RECENT_APPLIED_LIMIT} most recently applied, newest first. */
+  recentlyApplied: AreaAppliedChangeWire[];
+  /** The files each capability lists in `realizedBy`. Empty until code is linked. */
+  code: Array<{ capabilityId: string; path: string }>;
+}
+
 // ── Mapping ──────────────────────────────────────────────────────────
 
 /** Applied changes the capability page lists; rex's page-size ceiling. */
 const HISTORY_LIMIT = 100;
+
+/** Applied changes the area view lists. */
+const RECENT_APPLIED_LIMIT = 5;
 
 /**
  * A change's stage, the views' provisional vocabulary (see `ChangeStage` in
@@ -583,9 +637,109 @@ export function buildCapabilityDetail(tree: V2Tree, ref: string): CapabilityDeta
   };
 }
 
+/**
+ * One live area, by id, display id, alias or frozen slug, or `undefined` when
+ * `ref` names none. Its capabilities and constraint rows are the product map's,
+ * so the area view and Plan's map cannot disagree about a capability.
+ */
+export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | undefined {
+  const index = indexTree(tree);
+  const resolved = index.resolve(ref);
+  const area = resolved?.type === "area"
+    ? resolved
+    : index.entries.find(({ node, root }) => root === "product" && node.type === "area" && node.slug === ref)?.node;
+  if (!area || area.type !== "area") return undefined;
+
+  const map = buildProductMap(tree, undefined);
+  const section = map.areas.find((a) => a.id === area.id);
+  if (!section) return undefined;
+
+  // The nodes this area owns: itself and every product node whose nearest area it is.
+  const parentOf = new Map(index.entries.map((e) => [e.node.id, e.parent]));
+  const nearestArea = (id: string): string | undefined => {
+    for (let p = parentOf.get(id); p; p = parentOf.get(p.id)) if (p.type === "area") return p.id;
+    return undefined;
+  };
+  const owned = new Set([area.id]);
+  for (const { node, root } of index.entries) {
+    if (root === "product" && node.type !== "area" && nearestArea(node.id) === area.id) owned.add(node.id);
+  }
+  const relatesHere = (change: ChangeRuleNode): boolean =>
+    (change.amends ?? []).some((a) => owned.has(index.resolve(a.target)?.id ?? "")) ||
+    (change.touches ?? []).some((t) => owned.has(index.resolve(t)?.id ?? ""));
+
+  const edges = computeEdges(tree);
+  const bound = new Set([area.id, ...section.capabilities.map((c) => c.id)].flatMap((id) => edges.boundBy[id] ?? []));
+  const constraints = map.constraints.filter((c) => bound.has(c.id));
+
+  const changes = changesOf(index);
+  const openChanges: OpenChangeOverlayWire[] = [];
+  const inbox: AreaInboxGuessWire[] = [];
+  const applied: ChangeRuleNode[] = [];
+  for (const change of changes) {
+    const brief = { id: change.id, ...(change.displayId ? { displayId: change.displayId } : {}), title: change.title };
+    if (isAppliedChange(change)) {
+      if (relatesHere(change)) applied.push(change);
+      continue;
+    }
+    if (!isOpenChange(change)) continue;
+    if (awaitsPlacement(index, change)) {
+      const suggestion = suggestPlacement(tree, change.id);
+      const top = suggestion.shortlist[0];
+      const target = top ? index.resolve(top.target) : undefined;
+      if (target && (target.type === "capability" || target.type === "constraint") && owned.has(target.id)) {
+        inbox.push({ ...brief, target: { id: target.id, title: target.title, type: target.type }, relation: suggestion.relation, strength: top.strength });
+      }
+    } else if (relatesHere(change)) {
+      const delta = (change.amends ?? []).find((a) => owned.has(index.resolve(a.target)?.id ?? ""))?.delta;
+      openChanges.push({ ...brief, stage: stageOf(change), ...(delta ? { delta } : {}) });
+    }
+  }
+  const recentlyApplied = applied
+    .sort((a, b) => (b.appliedAt ?? "").localeCompare(a.appliedAt ?? ""))
+    .slice(0, RECENT_APPLIED_LIMIT)
+    .map((change) => ({
+      id: change.id,
+      ...(change.displayId ? { displayId: change.displayId } : {}),
+      title: change.title,
+      ...(change.appliedAt ? { appliedAt: change.appliedAt } : {}),
+      ...(change.shippedIn ? { shippedIn: change.shippedIn } : {}),
+    }));
+
+  const code = section.capabilities.flatMap((c) => {
+    const files = index.resolve(c.id)?.realizedBy;
+    return Array.isArray(files) ? files.filter((f): f is string => typeof f === "string").map((path) => ({ capabilityId: c.id, path })) : [];
+  });
+
+  const caps = section.capabilities;
+  return {
+    id: section.id,
+    slug: section.slug,
+    ...(section.displayId ? { displayId: section.displayId } : {}),
+    title: section.title,
+    ...(section.summary ? { summary: section.summary } : {}),
+    stewards: section.stewards ?? [],
+    counts: {
+      capabilities: caps.length,
+      constraints: constraints.length,
+      met: caps.filter((c) => c.status === "met").length,
+      changing: caps.filter((c) => c.status === "changing").length,
+      defective: [...caps, ...constraints].filter((n) => n.health === "defective").length,
+      openChanges: openChanges.length,
+    },
+    capabilities: caps,
+    constraints,
+    openChanges,
+    inbox,
+    recentlyApplied,
+    code,
+  };
+}
+
 // ── Routes ───────────────────────────────────────────────────────────
 
 const CAPABILITY_PREFIX = "product/capability/";
+const AREA_PREFIX = "product/area/";
 
 /** Handle the v2 product reads. Returns false when the path is not one of them. */
 export function routeProductReads(
@@ -596,7 +750,8 @@ export function routeProductReads(
 ): boolean | Promise<boolean> {
   if (method !== "GET") return false;
   const capabilityRef = path.startsWith(CAPABILITY_PREFIX) ? decodeURIComponent(path.slice(CAPABILITY_PREFIX.length)) : undefined;
-  if (path !== "product" && path !== "changes" && path !== "changes/summary" && !capabilityRef) return false;
+  const areaRef = path.startsWith(AREA_PREFIX) ? decodeURIComponent(path.slice(AREA_PREFIX.length)) : undefined;
+  if (path !== "product" && path !== "changes" && path !== "changes/summary" && !capabilityRef && !areaRef) return false;
 
   return (async () => {
     if ((await prdLayout(ctx.rexDir)) !== "v2") {
@@ -619,6 +774,10 @@ export function routeProductReads(
       const holder = resolveClaimHolder(ctx.projectDir);
       const claimed = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
       jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys())) });
+    } else if (areaRef) {
+      const area = buildAreaDetail(model.tree, areaRef);
+      if (area) jsonResponse(res, 200, { layout: "v2", area });
+      else errorResponse(res, 404, `"${areaRef}" names no live area.`);
     } else {
       const capability = buildCapabilityDetail(model.tree, capabilityRef!);
       if (capability) jsonResponse(res, 200, { layout: "v2", capability });

@@ -470,6 +470,53 @@ export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
   code: CodeSite[];
 }
 
+/** An Inbox change whose top placement candidate sits in the area: rex's best guess, not a placement. */
+export interface AreaInboxGuess {
+  id: string;
+  displayId?: string;
+  title: string;
+  target: { id: string; title: string; type: "capability" | "constraint" };
+  relation: PlacementRelation;
+  strength: PlacementStrength;
+}
+
+/** An applied change that amended or touched the area or a node in it. */
+export interface AreaAppliedChange {
+  id: string;
+  displayId?: string;
+  title: string;
+  appliedAt?: string;
+  shippedIn?: string;
+}
+
+/** Everything the area view renders; the server computes every field. */
+export interface AreaDetail {
+  id: string;
+  slug: string;
+  displayId?: string;
+  title: string;
+  summary?: string;
+  stewards: string[];
+  counts: {
+    capabilities: number;
+    constraints: number;
+    met: number;
+    changing: number;
+    defective: number;
+    openChanges: number;
+  };
+  capabilities: CapabilityRow[];
+  /** Constraints that bind the area or any of its capabilities. */
+  constraints: ConstraintRow[];
+  /** Open changes amending or touching the area or its capabilities. */
+  openChanges: OpenChangeOverlay[];
+  inbox: AreaInboxGuess[];
+  /** The five most recently applied, newest first. */
+  recentlyApplied: AreaAppliedChange[];
+  /** The files each capability lists in `realizedBy`. Empty until code is linked. */
+  code: Array<{ capabilityId: string; path: string }>;
+}
+
 /**
  * A direct edit to a product node, as the capability page submits it.
  *

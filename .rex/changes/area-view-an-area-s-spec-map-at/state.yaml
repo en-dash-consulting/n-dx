@@ -10,7 +10,14 @@ items:
     lastModified: "2026-11-05T01:05:50.213Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "50c98ea3-d30c-4eea-8df7-fece3958d327":
-    lastModified: "2026-11-05T01:05:26.188Z"
+    status: "completed"
+    startedAt: "2026-11-05T13:10:16.427Z"
+    completedAt: "2026-11-05T13:28:07.789Z"
+    endedAt: "2026-11-05T13:28:07.789Z"
+    activeIntervals: [{"end":"2026-11-05T13:28:07.789Z","start":"2026-11-05T13:10:16.427Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "GET /api/rex/product/area/<slug-or-id> (buildAreaDetail in routes-rex/product.ts): capabilities and constraint rows from the product map, binding constraints from rex computeEdges.boundBy, open changes, Inbox guesses from suggestPlacement's top candidate, five most recent applied, realizedBy code links. 404 unknown, { layout: \"v1\" } on v1. AreaDetail viewer mirror type. 5 route tests."
+    lastModified: "2026-11-05T13:28:07.789Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "79842c6f-d3e5-4b7f-961a-5521d5bdd0cc":
     lastModified: "2026-11-05T01:05:53.642Z"

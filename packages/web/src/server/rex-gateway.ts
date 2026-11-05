@@ -51,6 +51,9 @@ export type { PRDStore } from "@n-dx/rex";
 // derived product status, never recomputed in web (routes-rex/product.ts).
 export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, awaitsPlacement, specHash, nodeSpec } from "@n-dx/rex";
 export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
+// The area view: which constraints bind a product node (`boundBy`) is rex's
+// rule, the one `get_capability` reports (routes-rex/product.ts).
+export { computeEdges } from "@n-dx/rex";
 // The capability page's edit form: rex decides what a spec edit does (editorial
 // re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
 export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
@@ -68,7 +71,7 @@ export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
 // through rex's own rule (the one `rex change place` and MCP `place_change`
 // run), so the shortlist, the strength bands and the refusals stay rex's.
 export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError, placementStrength } from "@n-dx/rex";
-export type { ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate } from "@n-dx/rex";
+export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
 export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
 export type { RecordProposalInput, RecordProposalOptions, RecordProposalResult } from "@n-dx/rex";
 export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
