@@ -23,7 +23,10 @@ items:
     lastModified: "2026-11-05T15:17:49.542Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0a8a9c7c-6e0a-4717-a428-0dbd836584a6":
-    lastModified: "2026-11-05T14:07:38.107Z"
+    startedAt: "2026-11-05T16:54:31.848Z"
+    activeIntervals: [{"end":"2026-11-05T17:10:53.148Z","start":"2026-11-05T16:54:31.848Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T17:10:54.195Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "18fc7905-b4e4-4e8a-8dbe-b541ea9a671f":
     status: "completed"
@@ -56,7 +59,7 @@ items:
     lastModified: "2026-11-05T14:53:15.277Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b5e6519-b13e-4ca2-a70a-40988f4dcea8":
-    lastModified: "2026-11-05T15:24:37.103Z"
+    lastModified: "2026-11-05T16:56:53.480Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c72e349-bf76-42ba-8274-2d40b7c3127e":
     lastModified: "2026-11-05T01:06:03.990Z"
@@ -81,4 +84,7 @@ items:
     activeIntervals: [{"end":"2026-11-05T16:43:29.532Z","start":"2026-11-05T15:37:07.782Z"},{"end":"2026-11-05T16:54:05.631Z","start":"2026-11-05T16:54:05.631Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
     lastModified: "2026-11-05T16:54:05.631Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dd36321e-8552-4124-9ad9-5c3a78c14bfb":
+    lastModified: "2026-11-05T16:56:53.480Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
