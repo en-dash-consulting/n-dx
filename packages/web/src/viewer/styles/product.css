@@ -712,3 +712,80 @@
 
 .ch-needs-placement-link { background: none; font: inherit; font-size: inherit; cursor: pointer; }
 .ch-needs-placement-link:hover { background: color-mix(in srgb, var(--orange) 12%, transparent); }
+
+/* ── Product area map (views/product-area-map.ts) ──────────────── */
+
+.pam { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.pam-blocks { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Width follows capability count (flex-grow, set inline); the basis keeps a
+ * one-capability block readable. */
+.pam-block {
+  flex-basis: 8rem;
+  min-width: 6rem;
+  min-height: 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-1);
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pam-block:hover { background: var(--bg-hover); }
+.pam-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pam-label { font-weight: 600; overflow-wrap: anywhere; }
+.pam-size { color: var(--text-muted); font-size: var(--font-sm); }
+
+.pam-met { border-color: var(--green); }
+.pam-changing { border-color: var(--accent); }
+.pam-proposed { border-color: var(--text-muted); }
+.pam-defective { border-color: var(--red); }
+.pam-block.pam-met { background: color-mix(in srgb, var(--green) 12%, var(--bg-surface)); }
+.pam-block.pam-changing { background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface)); }
+.pam-block.pam-proposed { background: color-mix(in srgb, var(--text-muted) 10%, var(--bg-surface)); }
+.pam-block.pam-defective { background: color-mix(in srgb, var(--red) 14%, var(--bg-surface)); }
+
+/* Open changes touching the area. */
+.pam-open {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  min-width: 1.4em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg-surface);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.pam-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+.pam-legend li { display: flex; align-items: center; gap: var(--space-1); }
+.pam-swatch { width: 0.9em; height: 0.9em; border-radius: 2px; border: 2px solid; }
+.pam-swatch.pam-met { background: var(--green); }
+.pam-swatch.pam-changing { background: var(--accent); }
+.pam-swatch.pam-proposed { background: var(--text-muted); }
+.pam-swatch.pam-defective { background: var(--red); }
+.pam-legend-open { position: static; }
+
+.pm-area-focused { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-md); }

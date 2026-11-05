@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "product-map";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -115,6 +115,11 @@ export interface StageTile {
    * full-screen itself — the panel is its view's embedded form.
    */
   chromeless?: boolean;
+  /**
+   * The panel is `view`'s embedded form but keeps the tile's header (Plan's
+   * product area map), so the tile still places `view` on the page.
+   */
+  embedsView?: boolean;
   /**
    * A strip of links (Plan's lifecycle strip): full width above the grid, sized
    * by its content rather than a grid row, with no header or full-screen. It
@@ -175,7 +180,7 @@ export interface StageDef {
  * only links to its view through "Open" (Next steps, Languages) does not.
  */
 export function tilePlacesView(tile: StageTile): boolean {
-  return !tile.panel || !!tile.chromeless;
+  return !tile.panel || !!tile.chromeless || !!tile.embedsView;
 }
 
 /**
@@ -224,7 +229,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     tiles: [
       // On both layouts: a v1 tree reads Pending, In progress and Next.
       { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
-      { view: "product", cols: 12, rows: 2, v2Only: true, requiresServer: true },
+      // The area map; "Open" and full-screen show the whole Product page.
+      { view: "product", panel: "product-map", title: "Product", embedsView: true, cols: 12, rows: 2, v2Only: true, requiresServer: true },
       { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
       { view: "changes", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
       { view: "validation", cols: 6 },

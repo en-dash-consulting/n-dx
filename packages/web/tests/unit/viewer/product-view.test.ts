@@ -195,7 +195,7 @@ describe("capability ordering", () => {
     };
     const totals = productTotals({
       areas: [{
-        id: "a", title: "A", capabilities: [
+        id: "a", slug: "a", title: "A", capabilities: [
           row({ id: "one", title: "One", openChanges: [shared] }),
           row({ id: "two", title: "Two", openChanges: [shared, { ...shared, id: "ch-2" }] }),
         ],
@@ -209,7 +209,7 @@ describe("capability ordering", () => {
 
   it("counts defective constraints alongside defective capabilities", () => {
     const totals = productTotals({
-      areas: [{ id: "a", title: "A", capabilities: [row({ health: "defective" })] }],
+      areas: [{ id: "a", slug: "a", title: "A", capabilities: [row({ health: "defective" })] }],
       constraints: [
         { id: "c1", title: "C1", health: "defective", appliesTo: "all" },
         { id: "c2", title: "C2", health: "ok", appliesTo: "all" },

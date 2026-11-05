@@ -84,6 +84,8 @@ export interface ConstraintRowWire {
 
 export interface AreaSectionWire {
   id: string;
+  /** The area's frozen v2 slug: the folder it lives in, and the address of its page. */
+  slug: string;
   displayId?: string;
   title: string;
   summary?: string;
@@ -271,6 +273,7 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
     if (row.type === "area") {
       const section: AreaSectionWire = {
         id: row.id,
+        slug: node?.slug ?? row.id,
         ...(row.displayId ? { displayId: row.displayId } : {}),
         title: row.title,
         ...(row.summary ? { summary: row.summary } : {}),

@@ -69,11 +69,13 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { LifecycleStrip } from "./lifecycle-strip.js";
+import { ProductAreaMap } from "./product-area-map.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
+import { areaSlugOfTab } from "../route-state.js";
 
 import {
   WorkflowView,
@@ -181,6 +183,9 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
     case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
+    case "product-map": return opened
+      ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability })
+      : h(ProductAreaMap, { navigateTo: ctx.navigateTo });
   }
 }
 
@@ -264,8 +269,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   // Keyed apart from "requirements", which renders the same page in the same
   // slot: without the key, moving between the two routes would keep the
   // previous route's tab.
-  "product": ({ setOpenCapability }) =>
-    h(ProductPage, { key: "product", onCapabilityChange: setOpenCapability }),
+  "product": ({ setOpenCapability, selectedTab }) =>
+    h(ProductPage, { key: "product", onCapabilityChange: setOpenCapability, areaSlug: areaSlugOfTab(selectedTab ?? null) }),
 
   "changes": ({ navigateTo }) =>
     h(ChangesPage, { navigateTo }),

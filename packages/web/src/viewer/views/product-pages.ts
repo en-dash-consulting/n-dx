@@ -142,9 +142,11 @@ function ProductTabs({ tab, onTab, children }: {
  * project, which has no product layer, the same tabs show: Map says to
  * migrate, Requirements reads v1 data and renders the requirements view.
  */
-export function ProductPage({ onCapabilityChange, initialTab = "map" }: {
+export function ProductPage({ onCapabilityChange, initialTab = "map", areaSlug = null }: {
   onCapabilityChange?: (id: string | null) => void;
   initialTab?: ProductTab;
+  /** Opens the page at this area (`/product/area/<slug>`), until the area has a view of its own. */
+  areaSlug?: string | null;
 }) {
   const [tab, setTab] = useState<ProductTab>(initialTab);
   const [capabilityId, setCapabilityId] = useState<string | null>(null);
@@ -171,7 +173,7 @@ export function ProductPage({ onCapabilityChange, initialTab = "map" }: {
       ? h(RequirementsView, null)
       : h("div", null,
           h(StaleNotice, { message: load.refreshError }),
-          h(ProductView, { map: load.data, onSelectCapability: setCapabilityId }),
+          h(ProductView, { map: load.data, onSelectCapability: setCapabilityId, focusArea: areaSlug }),
         ),
   );
 }

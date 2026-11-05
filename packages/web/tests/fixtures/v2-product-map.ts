@@ -25,6 +25,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
   areas: [
     {
       id: "area-define",
+      slug: "define-the-product",
       displayId: "A1",
       title: "Define the product",
       summary: "Capturing intent as a map people can read without reading history.",
@@ -82,6 +83,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
     },
     {
       id: "area-execute",
+      slug: "execute-the-work",
       displayId: "A2",
       title: "Execute the work",
       summary: "Running tasks autonomously and recording what they cost.",

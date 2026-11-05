@@ -69,11 +69,11 @@ function placement(id: string, shortlist: PlacementCandidate[], opts: { tied?: b
 
 const MAP: ProductMap = {
   areas: [
-    { id: "area-pay", title: "Payments", capabilities: [
+    { id: "area-pay", slug: "payments", title: "Payments", capabilities: [
       { id: "cap-refund", title: "Refunds", statement: "Refund an order", status: "met", health: "ok", criteriaCount: 1, openChanges: [] },
       { id: "cap-gift", title: "Gift cards", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
     ] },
-    { id: "area-ship", title: "Shipping", capabilities: [
+    { id: "area-ship", slug: "shipping", title: "Shipping", capabilities: [
       { id: "cap-label", title: "Shipping labels", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
     ] },
   ],

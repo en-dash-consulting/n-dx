@@ -467,7 +467,7 @@ describe("StagePage", () => {
   it("renders Plan as the capture bar, then Product, Inbox, Open changes and Validation tiles", async () => {
     await mount(page("plan"));
     expect(sectionViews()).toEqual(["analysis"]);
-    expect(planTiles()).toEqual(["product", "inbox", "changes", "validation"]);
+    expect(planTiles()).toEqual(["product-map", "inbox", "changes", "validation"]);
     const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
     expect(spans).toEqual(["stage-tile--c12 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1"]);
     expect(root.querySelector('.stage-tile[data-tile="changes"] .stage-tile-title')?.textContent).toBe("Open changes");

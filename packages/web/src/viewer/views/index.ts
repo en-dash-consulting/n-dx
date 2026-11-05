@@ -39,6 +39,8 @@ export {
   tilePlacesView,
   visibleStages,
 } from "./stages.js";
+export type { AreaBlockModel, BlockStatus } from "./product-area-map.js";
+export { AreaBlock, BlockLegend, blockName, blockStatus } from "./product-area-map.js";
 export type { IsoMapControls, IsoMapSource } from "./iso-map-url.js";
 export {
   ISO_MAP_DEFAULTS,

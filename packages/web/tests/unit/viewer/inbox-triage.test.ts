@@ -47,7 +47,7 @@ function placement(id: string, shortlist: PlacementCandidate[], tags?: string[])
 }
 
 const MAP: ProductMap = {
-  areas: [{ id: "area-pay", title: "Payments", capabilities: [
+  areas: [{ id: "area-pay", slug: "payments", title: "Payments", capabilities: [
     { id: "cap-refund", title: "Refunds", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
   ] }],
   constraints: [],

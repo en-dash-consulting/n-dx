@@ -122,6 +122,7 @@ describe("v2 product reads", () => {
     expect(map.constraints).toEqual([]);
     expect(map.areas).toEqual([{
       id: AREA_ID,
+      slug: "checkout",
       displayId: "A1",
       title: "Checkout",
       summary: "Taking payment for a basket.",

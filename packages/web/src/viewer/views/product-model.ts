@@ -157,6 +157,8 @@ export interface ConstraintRow {
 /** An area and the capabilities under it. */
 export interface AreaSection {
   id: string;
+  /** Frozen v2 slug: the area's address, `/product/area/<slug>`. */
+  slug: string;
   displayId?: string;
   title: string;
   summary?: string;

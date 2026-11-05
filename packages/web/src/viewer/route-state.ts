@@ -25,7 +25,16 @@ const COMMANDS_PATH_TABS: ReadonlySet<string> = new Set(["reference"]);
  * bar settles on the page the viewer actually shows.
  */
 export function routeTab(view: ViewId, subId: string | null): string | null {
+  if (view === "product" && subId && AREA_PATH.test(subId)) return subId;
   return view === "commands" && subId && COMMANDS_PATH_TABS.has(subId) ? subId : null;
+}
+
+/** An area's page, `/product/area/<slug>`; its sub-path rides in the route's tab. */
+const AREA_PATH = /^area\/[^/]+$/;
+
+/** The slug an `area/<slug>` tab names, or null when the tab is not an area's. */
+export function areaSlugOfTab(tab: string | null): string | null {
+  return tab && AREA_PATH.test(tab) ? tab.slice("area/".length) : null;
 }
 
 /**
@@ -142,6 +151,8 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   if (slashIdx > 0) {
     const view = base as ViewId;
     if (validViews.has(view) && sub && DEEP_LINK_VIEWS.has(view)) return { view, subId: sub };
+    // An area's page. Until it has its own view it is the Product page at that area.
+    if (view === "product" && validViews.has(view) && AREA_PATH.test(sub)) return { view, subId: sub };
   }
   return null;
 }

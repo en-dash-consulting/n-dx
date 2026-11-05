@@ -13,6 +13,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { useEffect, useRef } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import {
   CAPABILITY_HEALTH_LABELS,
@@ -94,11 +95,23 @@ function CapabilityRowCells({ row, onSelect }: {
   );
 }
 
-function Area({ area, onSelectCapability }: {
+function Area({ area, onSelectCapability, focused }: {
   area: AreaSection;
   onSelectCapability?: (id: string) => void;
+  focused: boolean;
 }) {
-  return h("section", { class: "pm-area", "aria-label": area.title },
+  const ref = useRef<HTMLElement>(null);
+  // Arriving from the area map: bring the area into view.
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView?.({ block: "start" });
+  }, [focused]);
+  return h("section", {
+    ref,
+    id: `product-area-${area.slug}`,
+    class: `pm-area${focused ? " pm-area-focused" : ""}`,
+    "aria-label": area.title,
+    ...(focused ? { "aria-current": "location" } : {}),
+  },
     h("h3", { class: "section-header" },
       area.title,
       area.displayId ? h("span", { class: "pm-display-id" }, area.displayId) : null,
@@ -170,10 +183,12 @@ function Constraints({ constraints }: { constraints: ConstraintRow[] }) {
 
 // ── View ─────────────────────────────────────────────────────────────
 
-export function ProductView({ map, onSelectCapability }: {
+export function ProductView({ map, onSelectCapability, focusArea = null }: {
   map: ProductMap;
   /** Opens the capability page. Omitted, titles render as plain text. */
   onSelectCapability?: (id: string) => void;
+  /** Slug of the area to scroll to and mark. */
+  focusArea?: string | null;
 }) {
   const totals = productTotals(map);
   const empty = map.areas.length === 0 && map.constraints.length === 0;
@@ -215,7 +230,7 @@ export function ProductView({ map, onSelectCapability }: {
             ),
           ),
           map.areas.map((area) =>
-            h(Area, { key: area.id, area, onSelectCapability })),
+            h(Area, { key: area.id, area, onSelectCapability, focused: focusArea === area.slug })),
           h(Constraints, { constraints: map.constraints }),
         ),
   );

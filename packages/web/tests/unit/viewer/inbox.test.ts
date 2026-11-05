@@ -133,7 +133,7 @@ describe("the Plan tile", () => {
     expect(tile.classList.contains("stage-tile--r2")).toBe(true);
     expect(tile.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
     expect(tile.querySelector(".stage-tile-blurb")?.textContent).toBe("Changes with no place on the product map yet. ndx work skips their tasks until each is placed.");
-    expect(tile.previousElementSibling?.getAttribute("data-tile")).toBe("product");
+    expect(tile.previousElementSibling?.getAttribute("data-tile")).toBe("product-map");
     expect(tile.nextElementSibling?.getAttribute("data-tile")).toBe("changes");
   });
 });
