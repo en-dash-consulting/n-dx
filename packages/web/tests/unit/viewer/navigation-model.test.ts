@@ -356,10 +356,11 @@ describe("rendered surfaces take their labels from the model", () => {
         await settle();
         const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen .stage-section-tab")];
         act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
-        const expectedViews = [tile.view, ...tile.tabs!.map((t) => t.view)];
+        // A tab is named by its view unless the model gives it a label (Open changes: List, Tree).
+        const expectedNames = [{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].map((t) => t.label ?? viewLabel(t.view));
         // A tile that did not open renders no tabs, so this comparison also
         // fails loudly rather than passing having checked nothing.
-        if (tabButtons.map((b) => b.textContent).join("|") !== expectedViews.map((v) => viewLabel(v)).join("|")) {
+        if (tabButtons.map((b) => b.textContent).join("|") !== expectedNames.join("|")) {
           wrong.push(`${stage}/${tile.view}: tabs ${tabButtons.map((b) => b.textContent).join(", ")}`);
         }
       }

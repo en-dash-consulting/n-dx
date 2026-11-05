@@ -18,6 +18,7 @@ import {
   STAGES,
   visibleStages,
   tileForScope,
+  tilesForLayout,
   stageProduct,
   viewLabel,
   viewBlurb,
@@ -31,7 +32,7 @@ import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
-import { TileGrid, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
+import { TileGrid, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -200,13 +201,13 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
     && (!s.featureGate || gates[s.featureGate])
     && !(s.requiresServer && deployed),
   );
-  const tiles = (def.tiles ?? []).flatMap((t) => tileForScope(stage, t, validViews) ?? []).filter((t) =>
+  const tilesFor = (layout: "v1" | "v2") => tilesForLayout(def, layout).flatMap((t) => tileForScope(stage, t, validViews) ?? []).filter((t) =>
     (!t.featureGate || gates[t.featureGate])
     && !(t.requiresServer && deployed)
     && !(t.hiddenWhenDeployed && deployed),
   );
   const tabsOf = (tile: StageTile): StageTab[] =>
-    [{ view: tile.view }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
+    [{ view: tile.view, label: tile.tabLabel }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
 
   return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
@@ -235,9 +236,26 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       return h(s.badge ? BadgedSection : Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
     def.tiles
-      ? h(TileGrid, { stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
+      ? def.v1Tiles
+        ? h(LayoutTileGrid, {
+            stage, tiles: tilesFor("v2"), v1Tiles: tilesFor("v1"), deployed, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen,
+          })
+        : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
       : null,
   );
+}
+
+type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; deployed: boolean };
+
+/**
+ * A grid whose tiles follow the project's PRD layout, read from project status
+ * so only a stage with `v1Tiles` subscribes. A static export has no status and
+ * no server-backed v2 tiles, so it takes the v1 set; while status is loading,
+ * v2 stands, as the sections it replaces did.
+ */
+function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridProps) {
+  const layout = useProjectStatus()?.rex.layout;
+  return h(TileGrid, { ...grid, tiles: deployed || layout === "v1" ? v1Tiles : tiles });
 }
 
 // ── Landing ────────────────────────────────────────────────────

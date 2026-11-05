@@ -462,21 +462,38 @@ describe("StagePage", () => {
     expect(map.getAttribute("aria-label")).toBe("Codebase map");
   });
 
-  it("opens a section's view on its own page", async () => {
-    const navigateTo = vi.fn();
-    await mount(page("plan", ALL, navigateTo));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="validation"] .stage-section-open')!.click(); });
-    expect(navigateTo).toHaveBeenCalledWith("validation");
+  const planTiles = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+
+  it("renders Plan as the capture bar, then Product, Inbox, Open changes and Validation tiles", async () => {
+    await mount(page("plan"));
+    expect(sectionViews()).toEqual(["analysis"]);
+    expect(planTiles()).toEqual(["product", "inbox", "changes", "validation"]);
+    const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
+    expect(spans).toEqual(["stage-tile--c12 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1"]);
+    expect(root.querySelector('.stage-tile[data-tile="changes"] .stage-tile-title')?.textContent).toBe("Open changes");
   });
 
-  it("embeds the Tasks tree, open on arrival, in a bounded-height body it can fill", async () => {
+  it("opens Open changes full-screen with List and Tree tabs", async () => {
     await mount(page("plan"));
-    expect(rendered).toContain("prd");
-    const body = root.querySelector('.stage-section[data-view="prd"] .stage-section-body');
-    // The tree's virtual scroller sizes itself from this container; without a
-    // bounded height it measures zero and shows no items.
-    expect(body?.classList.contains("stage-section-body--fill")).toBe(true);
-    expect(body?.querySelector('[data-rendered="prd"]')).not.toBeNull();
+    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes"] .stage-tile-head')!.click(); });
+    const full = root.querySelector(".stage-tile-fullscreen")!;
+    const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);
+    act(() => { tabs[1]!.click(); });
+    expect(full.querySelector('[data-rendered="prd"]')).not.toBeNull();
+  });
+
+  it("a v1 project shows a Tasks tile in place of the Product, Inbox and Open changes tiles", async () => {
+    stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
+    await mount(page("plan"));
+    expect(planTiles()).toEqual(["prd", "validation"]);
+    const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
+    expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
+    expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");
+  });
+
+  it("keeps Tasks under Plan though Plan lists it only as a tab", () => {
+    expect(stageForView("prd")).toBe("plan");
   });
 
   it("renders Tune as a tile grid after its lead, with Spend and Shipped beside Runs", async () => {

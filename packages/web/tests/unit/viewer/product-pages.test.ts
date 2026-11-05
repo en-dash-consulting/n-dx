@@ -80,17 +80,17 @@ afterEach(() => {
 
 describe("routing", () => {
   it("places Product and Changes on the Plan stage as server-backed rex views", () => {
-    const plan = STAGES.plan.sections.filter((s) => s.view === "product" || s.view === "changes");
+    const plan = STAGES.plan.tiles!.filter((t) => t.view === "product" || t.view === "changes");
     expect(plan).toEqual([
-      { view: "product", requiresServer: true },
-      { view: "changes", requiresServer: true },
+      { view: "product", cols: 12, rows: 2, v2Only: true, requiresServer: true },
+      { view: "changes", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);
     expect(buildValidViews("rex").has("changes")).toBe(true);
   });
 
   it("Plan no longer lists Requirements, yet still owns its route and keeps it valid", () => {
-    expect(STAGES.plan.sections.map((s) => s.view)).not.toContain("requirements");
+    expect(STAGES.plan.tiles!.map((t) => t.view)).not.toContain("requirements");
     expect(stageViews("plan")).toContain("requirements");
     expect(buildValidViews(null).has("requirements")).toBe(true);
     expect(buildValidViews("rex").has("requirements")).toBe(true);

@@ -98,7 +98,7 @@ function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase
               tabIndex: selected ? 0 : -1,
               onClick: () => setActive(t.view),
               onKeyDown: (e: KeyboardEvent) => tabListKeyDown(e, tabs, i, setActive),
-            }, viewLabel(t.view));
+            }, t.label ?? viewLabel(t.view));
           }),
         )
       : null,

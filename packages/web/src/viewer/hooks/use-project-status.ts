@@ -57,6 +57,8 @@ export interface RexStatus {
   nextTaskTitle: string | null;
   /** Inbox counts; the server omits them on a v1 tree. */
   inbox?: { open: number; appliedUnplaced: number };
+  /** The PRD's layout; present when a PRD exists. */
+  layout?: "v1" | "v2";
 }
 
 export interface HenchStatus {

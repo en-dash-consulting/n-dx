@@ -32,6 +32,8 @@ export type StageProduct = "sourcevision" | "rex" | "hench";
 export interface StageTab {
   /** The tab's own label, blurb and glyph come from its `view-meta.ts` entry. */
   view: ViewId;
+  /** The tab's name where its view's own label would not read as one (Tasks → "Tree"). */
+  label?: string;
   /**
    * Dropped in a static export — the isometric map is built by the server on
    * demand, same exemption the old 2D/3D toggle carried for its 3D side.
@@ -123,8 +125,12 @@ export interface StageTile {
    * and full page.
    */
   tabs?: readonly StageTab[];
+  /** The name of the tile's own view as the first of its `tabs`, like `StageTab.label`. */
+  tabLabel?: string;
   /** A live count in the tile header, read from project status like a section's. */
   badge?: StageSectionBadge;
+  /** Shown only on a v2 project; a v1 project draws the stage's `v1Tiles` in their place. */
+  v2Only?: boolean;
   featureGate?: string;
   requiresServer?: boolean;
   hiddenWhenDeployed?: boolean;
@@ -138,6 +144,12 @@ export interface StageDef {
    * plain lead section, instead of the stacked collapsible `sections`.
    */
   tiles?: readonly StageTile[];
+  /**
+   * Tiles drawn instead of the `v2Only` ones on a v1 project, which has no
+   * Inbox, changes or product map. These reuse views the v2 tiles already
+   * place (Tasks is the Open changes tile's tab), so they add no placement.
+   */
+  v1Tiles?: readonly StageTile[];
   /**
    * Views that belong to this stage with no place on its page — still opened
    * by route and named under this stage in the breadcrumb (the flat Graph,
@@ -153,6 +165,18 @@ export interface StageDef {
  */
 export function tilePlacesView(tile: StageTile): boolean {
   return !tile.panel || !!tile.chromeless;
+}
+
+/**
+ * The tiles a stage draws for a project's PRD layout: on v1 the `v2Only` tiles
+ * give way to `v1Tiles`, which take the first such tile's place.
+ */
+export function tilesForLayout(def: StageDef, layout: "v1" | "v2"): readonly StageTile[] {
+  const tiles = def.tiles ?? [];
+  if (layout === "v2" || !def.v1Tiles) return tiles;
+  const first = tiles.findIndex((t) => t.v2Only);
+  const kept = tiles.filter((t) => !t.v2Only);
+  return first < 0 ? kept : [...kept.slice(0, first), ...def.v1Tiles, ...kept.slice(first)];
 }
 
 /** Loop order. The side stage links step through it and wrap. */
@@ -183,16 +207,19 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
   },
   plan: {
     id: "plan",
-    sections: [
-      { view: "analysis", plain: true },
-      // Right after the capture bar, which captures into it; open while it holds anything.
-      { view: "inbox", requiresServer: true, badge: "inbox", openWhenNonEmpty: true },
-      { view: "prd", open: true, fill: true },
-      { view: "product", requiresServer: true },
-      { view: "changes", requiresServer: true },
-      { view: "validation" },
+    // The capture bar, then tiles. Product leads at full width (PP15); the
+    // Inbox sits beside Open changes, which carries the PRD tree as a tab.
+    sections: [{ view: "analysis", plain: true }],
+    tiles: [
+      { view: "product", cols: 12, rows: 2, v2Only: true, requiresServer: true },
+      { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
+      { view: "changes", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+      { view: "validation", cols: 6 },
     ],
-    // A tab of the Product page; its route still opens that tab.
+    // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
+    v1Tiles: [{ view: "prd", cols: 8, rows: 2 }],
+    // A tab of the Product page; its route still opens that tab. Tasks (`prd`)
+    // keeps its route and breadcrumb under Plan as a tab of Open changes.
     alsoOwns: ["requirements"],
   },
   work: {
@@ -333,7 +360,7 @@ export function stageViews(id: StageId): ViewId[] {
   const def = STAGES[id];
   return [...new Set<ViewId>([
     ...def.sections.map((s) => s.view),
-    ...(def.tiles ?? []).flatMap((t) => [t.view, ...(t.tabs ?? []).map((x) => x.view)]),
+    ...[...(def.tiles ?? []), ...(def.v1Tiles ?? [])].flatMap((t) => [t.view, ...(t.tabs ?? []).map((x) => x.view)]),
     ...(def.alsoOwns ?? []),
   ])];
 }

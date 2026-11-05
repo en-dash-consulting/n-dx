@@ -250,7 +250,8 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
             expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1);
             for (const tab of tabs) {
               const view = tab.getAttribute("data-tab")!;
-              expect(accessibleName(tab, hidden)).toBe(viewLabel(view as never));
+              const named = [{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].find((t) => t.view === view);
+              expect(accessibleName(tab, hidden)).toBe(named?.label ?? viewLabel(view as never));
             }
           }
         });

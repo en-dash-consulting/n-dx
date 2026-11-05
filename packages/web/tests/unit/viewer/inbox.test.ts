@@ -111,30 +111,28 @@ afterEach(() => {
 
 // ── Placement on Plan ────────────────────────────────────────────────
 
-describe("the Plan section", () => {
-  it("sits after the capture bar and before Tasks, server-backed, with the Inbox badge", () => {
-    const views = STAGES.plan.sections.map((s) => s.view);
-    expect(views.slice(0, 3)).toEqual(["analysis", "inbox", "prd"]);
-    expect(STAGES.plan.sections[1]).toEqual({ view: "inbox", requiresServer: true, badge: "inbox", openWhenNonEmpty: true });
+describe("the Plan tile", () => {
+  it("sits after the product map, server-backed, with the Inbox badge", () => {
+    expect(STAGES.plan.tiles!.map((t) => t.view)).toEqual(["product", "inbox", "changes", "validation"]);
+    expect(STAGES.plan.tiles![1]).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true });
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
     expect(viewBlurb("inbox")).toBe("Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.");
   });
 
-  it("shows the open Inbox count and its blurb, with the CLI name, in its header while collapsed", async () => {
+  it("shows the open Inbox count and its blurb, with the CLI name, in the tile header", async () => {
     serveInbox([], [], { open: 19, appliedUnplaced: 156 });
     routes["/api/project"] = { cliName: "ndx" };
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "plan:inbox": false }));
     await mount(h(StagePage, {
       stage: "plan", validViews: buildValidViews(null), navigateTo: vi.fn(),
       renderView: (view) => h("div", { "data-rendered": view }),
     }));
-    const section = root.querySelector<HTMLElement>('.stage-section[data-view="inbox"]')!;
-    expect(section.querySelector(".stage-section-toggle")?.getAttribute("aria-expanded")).toBe("false");
-    expect(section.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
-    expect(section.querySelector(".stage-section-blurb")?.textContent).toContain("ndx work skips their tasks");
-    expect(section.previousElementSibling?.getAttribute("data-view")).toBe("analysis");
-    expect(section.nextElementSibling?.getAttribute("data-view")).toBe("prd");
+    const tile = root.querySelector<HTMLElement>('.stage-tile[data-tile="inbox"]')!;
+    expect(tile.classList.contains("stage-tile--c4")).toBe(true);
+    expect(tile.classList.contains("stage-tile--r2")).toBe(true);
+    expect(tile.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
+    expect(tile.previousElementSibling?.getAttribute("data-tile")).toBe("product");
+    expect(tile.nextElementSibling?.getAttribute("data-tile")).toBe("changes");
   });
 });
 
