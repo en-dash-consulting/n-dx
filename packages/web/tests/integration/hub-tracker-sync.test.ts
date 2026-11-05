@@ -19,11 +19,14 @@ interface Child {
   dir: string;
   /** Tick requests that arrived, as "METHOD path token". */
   ticks: string[];
+  /** Called after each tick arrives; see {@link ticksReach}. */
+  onTick: Array<() => void>;
 }
 
 async function startChild(prefix: string, token: string, options: { healthy: boolean }): Promise<Child> {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   const ticks: string[] = [];
+  const onTick: Array<() => void> = [];
   const server = createServer((req, res) => {
     const url = (req.url || "/").split("?")[0];
     const json = (status: number, body: unknown): void => {
@@ -35,6 +38,7 @@ async function startChild(prefix: string, token: string, options: { healthy: boo
     if (url === "/api/tracker/sync/tick") {
       // The prefix is set only by the hub's proxy: a tick posted straight to the child would carry none.
       ticks.push(`${req.method} ${url} ${req.headers["x-ndx-token"]} via ${req.headers["x-forwarded-prefix"] ?? "(direct)"}`);
+      for (const notify of onTick.splice(0)) notify();
       return json(200, { state: "ran", entries: [], queued: 0 });
     }
     json(404, { error: "not found" });
@@ -45,18 +49,20 @@ async function startChild(prefix: string, token: string, options: { healthy: boo
       resolve(typeof addr === "object" && addr ? addr.port : 0);
     });
   });
-  return { server, port, dir, ticks };
+  return { server, port, dir, ticks, onTick };
 }
 
 function rules(child: Child, value: Record<string, string>): void {
   writeFileSync(join(child.dir, ".n-dx.local.json"), JSON.stringify({ trackerSync: { connection: "caos", rules: value } }));
 }
 
-async function waitFor(check: () => boolean, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!check()) {
-    if (Date.now() > deadline) throw new Error("timed out waiting");
-    await new Promise((resolve) => setTimeout(resolve, 20));
+/**
+ * Resolves once `child` has received `count` ticks. Gated on the tick
+ * arriving, not a clock: a hub that never ticks fails on the test timeout.
+ */
+async function ticksReach(child: Child, count: number): Promise<void> {
+  while (child.ticks.length < count) {
+    await new Promise<void>((resolve) => child.onTick.push(resolve));
   }
 }
 
@@ -101,10 +107,10 @@ describe("hub tracker sync clock", () => {
   it("ticks only a healthy project with a rule on, through the proxy with the per-user token, then each interval", async () => {
     hub = await startHub({ port: 0, homeDir: home, tokenFile: join(home, "auth.token"), healthIntervalMs: 40, trackerSync: { intervalMs: 300 } });
 
-    await waitFor(() => on.ticks.length >= 1, 4_000);
+    await ticksReach(on, 1);
     expect(on.ticks[0]).toBe(`POST /api/tracker/sync/tick ${token} via /p/on`);
     // A second tick comes only after the interval.
-    await waitFor(() => on.ticks.length >= 2, 4_000);
+    await ticksReach(on, 2);
     expect(off.ticks).toEqual([]);
     expect(down.ticks).toEqual([]);
   });
