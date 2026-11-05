@@ -2,7 +2,7 @@ schema: "rex/v2"
 items:
   "0943b9b0-e71e-4bb2-ab30-7047910ffdf1":
     issues: ["https://www.notion.so/3f7a80b7192481948d5cc046d3a68c0a","https://www.notion.so/3f7a80b71924818487c7f0e1c2d5db03","https://www.notion.so/3f7a80b719248147aad1d64b44332ec6","https://www.notion.so/3f7a80b7192481b18321d6a2f010c472","https://www.notion.so/3f7a80b71924810aa352f54b4bbead6e"]
-    lastModified: "2026-11-05T07:17:42.839Z"
+    lastModified: "2026-11-05T08:27:38.694Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "38fce780-09ae-4f8f-842b-64321c23a839":
     status: "completed"
@@ -52,6 +52,9 @@ items:
     activeIntervals: [{"end":"2026-11-05T08:03:27.750Z","start":"2026-11-05T07:51:20.122Z"}]
     lastModified: "2026-11-05T08:03:27.750Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5dc38be7-f9d3-4b0e-b45f-40f8e4a1435b":
+    lastModified: "2026-11-05T08:37:32.959Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6aa7f142-e208-405d-98a8-e4cebb8f8c79":
     status: "completed"
     startedAt: "2026-11-05T01:52:20.740Z"
@@ -86,10 +89,12 @@ items:
     lastModified: "2026-11-05T06:29:05.038Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a294dc86-f527-475e-acd0-afbc4391493d":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T08:15:48.364Z"
-    activeIntervals: [{"start":"2026-11-05T08:15:48.364Z"}]
-    lastModified: "2026-11-05T08:15:48.997Z"
+    completedAt: "2026-11-05T08:37:13.607Z"
+    endedAt: "2026-11-05T08:37:13.607Z"
+    activeIntervals: [{"end":"2026-11-05T08:32:24.691Z","start":"2026-11-05T08:15:48.364Z"},{"end":"2026-11-05T08:37:13.607Z","start":"2026-11-05T08:37:13.607Z"}]
+    lastModified: "2026-11-05T08:37:13.607Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bce137b2-541b-4d20-b978-8518eec4838d":
     status: "completed"
