@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { PlanWithSidecarButton, PlanWithSidecarContext } from "../../../src/viewer/components/plan-with-sidecar.js";
+import { PlanWithSidecarButton, PlanWithSidecarContext, planFirstTurnReady } from "../../../src/viewer/components/plan-with-sidecar.js";
 import { SmartAddInput } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
-import { pageItemFor, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+import { pageItemFor, pageItemKey, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 
 let root: HTMLDivElement;
 beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); });
@@ -68,19 +68,53 @@ describe("Plan with Sidecar attachment", () => {
   const registry = [{ id: "plan", available: true }];
 
   it("asks with the Plan lens on the capture bar's page, whatever page it is", () => {
-    const item = pageItemFor({ view: "analysis", zone: null, taskId: null, plan: { area: null } });
+    const item = pageItemFor({ view: "analysis", zone: null, taskId: null, plan: { area: null, seq: 1 } });
     expect(item).toMatchObject({ kind: "plan", lens: "plan" });
     expect(item?.ref).toBeUndefined();
     expect(resolveLens(wantedLensFor(item, false), registry, item).running).toBe("plan");
   });
 
   it("targets the area from an area-scoped capture and still asks with Plan, not Explain", () => {
-    const item = pageItemFor({ view: "product", zone: null, taskId: null, plan: { area: "area-1" } });
+    const item = pageItemFor({ view: "product", zone: null, taskId: null, plan: { area: "area-1", seq: 1 } });
     expect(item).toMatchObject({ kind: "area", ref: "area-1" });
     expect(wantedLensFor(item, false)).toBe("plan");
   });
 
   it("an area attached without a lens asks with Explain", () => {
     expect(wantedLensFor({ kind: "area", ref: "a", label: "a" }, false)).toBe("explain");
+  });
+
+  it("gives each click its own key, so a lens chosen on Plan does not outlive asking again", () => {
+    const page = { view: "plan" as const, zone: null, taskId: null };
+    const onPage = pageItemKey(pageItemFor(page));
+    const first = pageItemKey(pageItemFor({ ...page, plan: { area: null, seq: 1 } }));
+    const second = pageItemKey(pageItemFor({ ...page, plan: { area: null, seq: 2 } }));
+    expect(new Set([onPage, first, second]).size).toBe(3);
+  });
+});
+
+describe("Plan with Sidecar first turn", () => {
+  const base = { drawerOpen: true, ready: true, lens: "plan", busy: false, session: null, area: null };
+
+  it("goes at once when there is no session yet", () => {
+    expect(planFirstTurnReady(base)).toBe(true);
+  });
+
+  it("waits for the drawer, the registry and an idle session", () => {
+    expect(planFirstTurnReady({ ...base, drawerOpen: false })).toBe(false);
+    expect(planFirstTurnReady({ ...base, ready: false })).toBe(false);
+    expect(planFirstTurnReady({ ...base, busy: true })).toBe(false);
+  });
+
+  it("waits while the attachment runs another lens", () => {
+    expect(planFirstTurnReady({ ...base, lens: "general" })).toBe(false);
+  });
+
+  it("waits until the open session has followed to the Plan lens and the area", () => {
+    const area = "area-1";
+    expect(planFirstTurnReady({ ...base, area, session: { lens: "general" } })).toBe(false);
+    expect(planFirstTurnReady({ ...base, area, session: { lens: "plan" } })).toBe(false);
+    expect(planFirstTurnReady({ ...base, area, session: { lens: "plan", target: { ref: area } } })).toBe(true);
+    expect(planFirstTurnReady({ ...base, session: { lens: "plan", target: { ref: area } } })).toBe(false);
   });
 });

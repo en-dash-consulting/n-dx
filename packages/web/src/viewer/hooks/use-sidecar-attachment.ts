@@ -32,6 +32,17 @@ export interface SidecarPageItem {
   label: string;
   /** A lens the operator asked for by name ("Diagnose in Sidecar"), ahead of the kind's default. */
   lens?: string;
+  /**
+   * What a lens choice and a removal are held against, when not `kind:ref`.
+   * An explicit request gives each click its own, so a choice made on the
+   * page (General on Plan) cannot outlive the operator asking again.
+   */
+  key?: string;
+}
+
+/** The key a lens choice or a removal is held against. */
+export function pageItemKey(item: SidecarPageItem | null): string {
+  return item ? item.key ?? `${item.kind}:${item.ref ?? ""}` : "";
 }
 
 export const GENERAL_LENS = "general";
@@ -49,8 +60,12 @@ export interface SidecarPageSelection {
   changeId?: string | null;
   /** The task whose failed run "Diagnose in Sidecar" attached, by id; asks with Diagnose run on any page. */
   diagnoseTaskId?: string | null;
-  /** "Plan with Sidecar" on a capture bar: asks with the Plan lens, aimed at `area` when the capture was area-scoped. */
-  plan?: { area: string | null } | null;
+  /**
+   * "Plan with Sidecar" on a capture bar: asks with the Plan lens, aimed at
+   * `area` when the capture was area-scoped. `seq` counts the clicks, so each
+   * one starts again from the Plan lens.
+   */
+  plan?: { area: string | null; seq: number } | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
@@ -59,9 +74,10 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
   if (page.diagnoseTaskId) return { kind: "task", ref: page.diagnoseTaskId, label: page.diagnoseTaskId, lens: "diagnose-run" };
   if (page.plan) {
+    const key = `plan-with:${page.plan.area ?? ""}:${page.plan.seq}`;
     return page.plan.area
-      ? { kind: "area", ref: page.plan.area, label: page.plan.area, lens: "plan" }
-      : { kind: "plan", label: "Plan", lens: "plan" };
+      ? { kind: "area", ref: page.plan.area, label: page.plan.area, lens: "plan", key }
+      : { kind: "plan", label: "Plan", lens: "plan", key };
   }
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };
@@ -178,7 +194,7 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   const [removedKey, setRemovedKey] = useState<string | null>(null);
 
   const pageItem = pageItemFor(page);
-  const key = pageItem ? `${pageItem.kind}:${pageItem.ref ?? ""}` : "";
+  const key = pageItemKey(pageItem);
   const taskRef = pageItem?.kind === "task" ? pageItem.ref ?? null : null;
 
   useEffect(() => {

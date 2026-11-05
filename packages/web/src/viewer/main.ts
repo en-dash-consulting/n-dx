@@ -31,6 +31,7 @@ import {
   SidecarDock,
   PlaceWithSidecarContext,
   PlanWithSidecarContext,
+  planFirstTurnReady,
   DiagnoseInSidecarContext,
 } from "./components/index.js";
 import {
@@ -166,7 +167,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // The task whose failed run "Diagnose in Sidecar" attached (Diagnose run lens); dropped with the page.
   const [diagnoseTask, setDiagnoseTask] = useState<string | null>(null);
   // "Plan with Sidecar" on a capture bar: the Plan lens, aimed at an area when the capture was scoped to one; dropped with the page.
-  const [planWith, setPlanWith] = useState<{ area: string | null } | null>(null);
+  const [planWith, setPlanWith] = useState<{ area: string | null; seq: number } | null>(null);
   // The text that bar typed, waiting to go as the session's first turn once the session holds that lens and target.
   const [planText, setPlanText] = useState<string | null>(null);
   const {
@@ -205,16 +206,30 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // the change), so the turn opens with the Plan lens and its target rather than racing them.
   const { sidecar, drawer } = sidecarShell;
   useEffect(() => {
-    if (planText === null || !planWith || !drawer.open || !sidecar.attachment.ready) return;
-    if (sidecar.attachment.lens.running !== "plan" || sidecar.running || sidecar.sending) return;
-    const held = sidecar.session;
-    if (held && (held.endedAt || held.lens !== "plan" || (held.target?.ref ?? "") !== (planWith.area ?? ""))) return;
+    if (planText === null || !planWith) return;
+    if (!planFirstTurnReady({
+      drawerOpen: drawer.open,
+      ready: sidecar.attachment.ready,
+      lens: sidecar.attachment.lens.running,
+      busy: sidecar.running || sidecar.sending,
+      session: sidecar.session,
+      area: planWith.area,
+    })) return;
     setPlanText(null);
     void sidecar.send(planText);
   }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending]);
-  // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar".
+  // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar". A change sent to
+  // Place or a run sent to Diagnose would outrank the Plan lens, so a click lets both go.
   const planWithSidecar = useMemo(
-    () => (sidecarShell.button ? { plan: (text: string, area?: string) => { setPlanWith({ area: area ?? null }); setPlanText(text); showSidecar(); } } : null),
+    () => (sidecarShell.button ? {
+      plan: (text: string, area?: string) => {
+        setOpenChange(null);
+        setDiagnoseTask(null);
+        setPlanWith((prev) => ({ area: area ?? null, seq: (prev?.seq ?? 0) + 1 }));
+        setPlanText(text);
+        showSidecar();
+      },
+    } : null),
     [sidecarShell.button !== null, showSidecar],
   );
   // Null while Sidecar is off, so no failed run offers "Diagnose in Sidecar".

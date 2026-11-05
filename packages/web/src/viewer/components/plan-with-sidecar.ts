@@ -16,6 +16,32 @@ export interface PlanWithSidecar {
   plan: (text: string, areaId?: string) => void;
 }
 
+/** What decides whether the waiting text can go as the turn. */
+export interface PlanFirstTurnState {
+  drawerOpen: boolean;
+  /** The lens registry has answered. */
+  ready: boolean;
+  /** The lens the attachment runs now. */
+  lens: string;
+  busy: boolean;
+  /** The open session, if any: its lens and target ref. */
+  session: { endedAt?: string; lens?: string; target?: { ref?: string } } | null;
+  /** The area the capture targets; null for the whole plan. */
+  area: string | null;
+}
+
+/**
+ * The text goes once the attachment runs Plan and the open session (when
+ * there is one) has followed it to Plan and the target. Before that the turn
+ * would open with the old lens or target.
+ */
+export function planFirstTurnReady(s: PlanFirstTurnState): boolean {
+  if (!s.drawerOpen || !s.ready || s.busy || s.lens !== "plan") return false;
+  const held = s.session;
+  if (!held) return true;
+  return !held.endedAt && held.lens === "plan" && (held.target?.ref ?? "") === (s.area ?? "");
+}
+
 /** Null while `web.sidecar` is off. */
 export const PlanWithSidecarContext = createContext<PlanWithSidecar | null>(null);
 
