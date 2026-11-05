@@ -163,7 +163,62 @@ describe("v2 product reads", () => {
         touches: [],
         taskCount: 1,
         completedTaskCount: 0,
+        // The change itself carries no acceptance criteria; only its task does.
+        criteriaGap: true,
+        openBlockers: 0,
       }],
+    });
+  });
+
+  describe("GET /changes gap fields", () => {
+    const changeDir = () => join(rexDir, "changes", "add-apple-pay");
+    const taskPath = () => join(changeDir(), "wire-the-button.md");
+    const indexPath = () => join(changeDir(), "index.md");
+    const row = async () => (await get("changes")).body.changes[0] as ChangeRowWire;
+    const withChangeCriteria = (): void => {
+      writeFileSync(indexPath(), readFileSync(indexPath(), "utf-8").replace(
+        'priority: "high"\n', 'priority: "high"\nacceptanceCriteria:\n  - "Apple Pay completes a purchase"\n',
+      ));
+    };
+    const blockerId = "c0000000-0000-4000-8000-0000000000b1";
+    /** A sibling change that blocks the fixture's task, with the given status. */
+    const addBlocker = (status: "pending" | "completed"): void => {
+      writeFileSync(taskPath(), readFileSync(taskPath(), "utf-8").replace(
+        'type: "task"\n', `type: "task"\nblockedBy: ["${blockerId}"]\n`,
+      ));
+      const dir = join(rexDir, "changes", "blocker");
+      mkdirSync(dir);
+      writeFileSync(join(dir, "index.md"), [
+        "---", `id: "${blockerId}"`, 'type: "change"', 'title: "Blocker"', 'slug: "blocker"', "---", "",
+      ].join("\n"));
+      writeFileSync(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${blockerId}":`, `    status: "${status}"`, ""].join("\n"));
+    };
+
+    it("reports no gap when the change and its open task both carry criteria", async () => {
+      withChangeCriteria();
+      expect(await row()).toMatchObject({ criteriaGap: false, openBlockers: 0 });
+    });
+
+    it("reports no gap for a task-less change that has its own criteria", async () => {
+      withChangeCriteria();
+      rmSync(taskPath());
+      expect(await row()).toMatchObject({ taskCount: 0, criteriaGap: false });
+    });
+
+    it("reports a gap when an open task has no criteria", async () => {
+      withChangeCriteria();
+      writeFileSync(taskPath(), readFileSync(taskPath(), "utf-8").replace(/acceptanceCriteria:\n {2}- .*\n/, ""));
+      expect((await row()).criteriaGap).toBe(true);
+    });
+
+    it("counts an open blocker on a task", async () => {
+      addBlocker("pending");
+      expect((await row()).openBlockers).toBe(1);
+    });
+
+    it("does not count a completed blocker", async () => {
+      addBlocker("completed");
+      expect((await row()).openBlockers).toBe(0);
     });
   });
 

@@ -174,6 +174,7 @@ describe("ChangesView", () => {
   it("labels an awaiting-apply change as waiting for a steward, between in-progress and applied", () => {
     const row = (id: string, stage: ChangeRow["stage"]): ChangeRow => ({
       id, title: id, stage, plannedRelease: "2.0.0", amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+      criteriaGap: false, openBlockers: 0,
     });
     const el = mount(h(ChangesView, {
       changes: [row("a", "applied"), row("b", "awaiting-apply"), row("c", "in-progress")],
@@ -254,6 +255,7 @@ describe("ChangesView", () => {
 describe("ChangesView filters", () => {
   const row = (id: string, stage: ChangeRow["stage"], plannedRelease?: string): ChangeRow => ({
     id, title: id, stage, plannedRelease, amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+    criteriaGap: false, openBlockers: 0,
   });
   const MIXED = [
     row("o1", "ready", "1.0.0"), row("a1", "applied", "1.0.0"), row("a2", "shipped", "1.0.0"),
@@ -349,6 +351,8 @@ describe("groupChangesByRelease", () => {
     touches: [],
     taskCount: 0,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
     ...over,
   });
 

@@ -24,7 +24,7 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
     id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
-    amends: [], touches: [], taskCount: 2, completedTaskCount: 0, ...extra,
+    amends: [], touches: [], taskCount: 2, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
 

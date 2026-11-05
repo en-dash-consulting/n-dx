@@ -118,6 +118,10 @@ export interface ChangeRowWire {
   touches: Array<{ id: string; title: string }>;
   taskCount: number;
   completedTaskCount: number;
+  /** No acceptance criteria on the change, or on one of its open tasks. */
+  criteriaGap: boolean;
+  /** Distinct blockers, on the change or its open tasks, that are not completed. */
+  openBlockers: number;
 }
 
 /** The stages an open change can be in. */
@@ -362,6 +366,30 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
   return { inbox, stages, open, next };
 }
 
+/**
+ * The gap chips' inputs. `criteriaGap`: the change has no acceptance criteria, or
+ * an open task under it has none. A task-less change with its own criteria has no
+ * gap; it runs as its own unit. `openBlockers`: distinct `blockedBy` ids on the
+ * change or its open tasks whose node is not completed. A ref that resolves to
+ * nothing cannot be shown complete, so it counts.
+ */
+function gapOf(index: TreeIndex, change: ChangeRuleNode, tasks: RuleNode[]): { criteriaGap: boolean; openBlockers: number } {
+  const openTasks = tasks.filter((t) => t.status !== "completed");
+  const hasCriteria = (node: RuleNode): boolean =>
+    (node.type === "change" || node.type === "task" || node.type === "subtask") && (node.acceptanceCriteria?.length ?? 0) > 0;
+  const blockers = new Set<string>();
+  for (const node of [change, ...openTasks]) {
+    for (const ref of node.blockedBy ?? []) {
+      const blocker = index.resolve(ref);
+      if (!blocker || blocker.status !== "completed") blockers.add(blocker?.id ?? ref);
+    }
+  }
+  return {
+    criteriaGap: !hasCriteria(change) || openTasks.some((t) => !hasCriteria(t)),
+    openBlockers: blockers.size,
+  };
+}
+
 /** Every live, not cancelled change: open ones and applied ones. */
 export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
@@ -393,6 +421,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         touches: (change.touches ?? []).map((ref) => titleOf(index, ref)),
         taskCount: tasks.length,
         completedTaskCount: tasks.filter((t) => t.status === "completed").length,
+        ...gapOf(index, change, tasks),
       };
     });
 }

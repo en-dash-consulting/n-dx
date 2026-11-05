@@ -191,6 +191,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 4,
     completedTaskCount: 1,
+    criteriaGap: true,
+    openBlockers: 0,
   },
   {
     id: "change-stewards",
@@ -205,6 +207,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 0,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-run-field",
@@ -219,6 +223,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 3,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 1,
   },
   {
     id: "change-usage-cursors",
@@ -232,6 +238,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 2,
     completedTaskCount: 1,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-jev-client",
@@ -246,6 +254,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [{ id: "constraint-architecture-integrity", title: "Architecture integrity" }],
     taskCount: 2,
     completedTaskCount: 2,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-windows-ports",
@@ -259,6 +269,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 1,
     completedTaskCount: 1,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-forked-sessions",
@@ -277,6 +289,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     ],
     taskCount: 1,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-timeline",
@@ -290,6 +304,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 0,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
   },
 ];
 
