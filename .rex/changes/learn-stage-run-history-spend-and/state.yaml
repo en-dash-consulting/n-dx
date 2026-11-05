@@ -24,6 +24,9 @@ items:
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (54):\n- renders Token Usage from direct canonical /token-usage navigation\n- redirects legacy Rex token links to canonical global /token-usage\n- renders health panel after fetch resolves\n- displays health level badge\n- shows degraded health level\n- shows unhealthy health level\n- displays active connection count\n- renders connection bar when peak > 0\n… and 46 more"
     lastModified: "2026-11-05T06:35:57.559Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "28ab2232-830a-42b8-a80e-f2f4cf3902e7":
+    lastModified: "2026-11-05T07:35:34.916Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2cce9d4d-2f92-4c74-86bc-d319cb9409da":
     lastModified: "2026-11-05T01:53:01.278Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -74,11 +77,15 @@ items:
     lastModified: "2026-11-05T01:01:56.305Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1540b54-73c8-4a6d-b6b7-d9f71426c8cf":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T07:10:41.289Z"
-    activeIntervals: [{"start":"2026-11-05T07:10:41.289Z"}]
-    lastModified: "2026-11-05T07:10:41.954Z"
+    completedAt: "2026-11-05T07:45:51.116Z"
+    endedAt: "2026-11-05T07:45:51.116Z"
+    activeIntervals: [{"end":"2026-11-05T07:45:51.116Z","start":"2026-11-05T07:10:41.289Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Re-cut UX2' tiers (hints ≥1600 with Sidecar; search label + run label drop <1440; tab padding <1200; tab glyphs ≤960); tabs no longer shrink above 768 px, project context shrinks to 100 px with ellipsis; spec adds 40-char name case at 1100."
+    lastModified: "2026-11-05T07:45:51.116Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5c7b061-22b2-4b84-93cd-55793d328d68":
-    lastModified: "2026-11-05T06:59:17.539Z"
+    lastModified: "2026-11-05T07:35:34.916Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

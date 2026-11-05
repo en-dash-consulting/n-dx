@@ -558,7 +558,8 @@
 
 /* ── Width tiers (UX2') ──────────────────────────────────────────────────
  * Four stage tabs, Live and the Sidecar button share the bar, so it sheds
- * optional text as it narrows; the tabs themselves never scroll:
+ * optional text as it narrows, so the tabs need not scroll (they still do as
+ * a last resort, when badges outgrow a tier, rather than push the page wide):
  *   ≥1600      everything shows
  *   <1600      stage hints drop (with the Sidecar on; off, shell.css drops
  *              them at a 1400 px bar)

@@ -8,9 +8,11 @@
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  /* Gives way before the stage tabs, which do not shrink (UX2', sidecar.css). */
+  /* Gives way before the stage tabs (UX2', sidecar.css). Flex shrink is
+     weighted by size, so only an overwhelming factor leaves the tabs whole
+     until this reaches its floor; a small one still clips a tab by a pixel. */
   min-width: 100px;
-  flex: 0 1 auto;
+  flex: 0 1000000 auto;
   max-width: 260px;
   padding: 0 var(--space-4);
   border-right: 1px solid var(--border);

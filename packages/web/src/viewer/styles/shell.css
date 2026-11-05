@@ -50,10 +50,12 @@
 .topnav-guide { display: flex; align-items: center; margin-left: auto; padding-right: var(--space-2); }
 .topnav-guide + .topnav-search { margin-left: 0; }
 
-/* The tabs keep their width: the project context and search give way first,
-   and the width tiers (sidecar.css) shed text so they never have to scroll.
-   Only at 768 px and below (Narrow screens) do they shrink and scroll. */
-.topnav-tabs { display: flex; align-self: stretch; flex: none; }
+/* The project context gives way first (breadcrumb.css) and the width tiers
+   (sidecar.css) shed text, so the tabs keep their width. They still shrink and
+   scroll as a last resort — when badges or a long run status outgrow the tier —
+   rather than pushing the Sidecar button off the page. */
+.topnav-tabs { display: flex; align-self: stretch; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
+.topnav-tabs::-webkit-scrollbar { display: none; }
 .topnav-tab { flex: none; }
 .topnav-tab {
   display: flex;
@@ -676,10 +678,6 @@
 
 @media (max-width: 768px) {
   .topnav { gap: var(--space-2); padding: 0 var(--space-2); }
-  /* Too narrow for every tab: they shrink and scroll sideways inside the bar
-     instead of pushing the page wider than the screen. */
-  .topnav-tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-  .topnav-tabs::-webkit-scrollbar { display: none; }
   .topnav-brand-text { display: none; }
   .topnav-tab { padding: 0 var(--space-2); }
   .main--staged { padding-left: calc(16px + var(--stage-link-w)); padding-right: calc(16px + var(--stage-link-w)); }
@@ -696,9 +694,12 @@
 /* Phones: the side stage links would sit on top of the content, and the top
    navigation already reaches every stage — drop them and their gutters. */
 @media (max-width: 560px) {
-  /* Top nav: tighter still; search collapses to its icon. */
+  /* Top nav: the tabs scroll sideways inside the bar instead of pushing the
+     page wider than the screen; search collapses to its icon. */
   .topnav { padding: 0 var(--space-2); gap: var(--space-1); }
   .topnav-brand { padding-right: var(--space-1); min-width: 36px; }
+  .topnav-tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .topnav-tabs::-webkit-scrollbar { display: none; }
   .topnav-tab { flex: none; gap: 4px; }
   .topnav-tab-glyph { display: none; }
   .topnav-divider { margin: 0 var(--space-1); }

@@ -41,7 +41,8 @@ async function sidecarProject(name?: string): Promise<{ fixture: FixtureProject;
   return { fixture, dashboard: await startDashboard(fixture.dir) };
 }
 
-async function expectBarFits(page: Page, baseUrl: string, width: number): Promise<void> {
+/** Open Work at `width` and wait for the bar to settle. */
+async function openSettledBar(page: Page, baseUrl: string, width: number): Promise<void> {
   await page.setViewportSize({ width, height: 900 });
   await page.goto(`${baseUrl}/work`, { waitUntil: "domcontentloaded" });
 
@@ -52,6 +53,10 @@ async function expectBarFits(page: Page, baseUrl: string, width: number): Promis
   await expect(page.locator('.topnav [aria-label^="Branch:"]')).toBeVisible();
   await expect(page.locator('.topnav-run [aria-label^="Run project"]')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+}
+
+async function expectBarFits(page: Page, baseUrl: string, width: number): Promise<void> {
+  await openSettledBar(page, baseUrl, width);
 
   const m = await page.evaluate(() => {
     const nav = document.querySelector(".topnav") as HTMLElement;
@@ -108,6 +113,32 @@ test.describe("short project name", () => {
   for (const width of WIDTHS) {
     test(`top nav fits at ${width}px with Tune and the Sidecar button`, async ({ page }) => {
       await expectBarFits(page, dashboard.baseUrl, width);
+    });
+  }
+
+  // Badges the fixture cannot produce (an open Inbox count, a running Live
+  // count) can outgrow a tier's spare room. Then the tabs scroll as a last
+  // resort; the page must not widen and push the Sidecar button off screen.
+  for (const width of [961, 769]) {
+    test(`with badges at ${width}px the page does not widen`, async ({ page }) => {
+      await openSettledBar(page, dashboard.baseUrl, width);
+      const m = await page.evaluate(() => {
+        const badge = (host: Element | null, cls: string, text: string) => {
+          const el = document.createElement("span");
+          el.className = cls;
+          el.textContent = text;
+          host!.appendChild(el);
+        };
+        badge(document.querySelector('.topnav-tab[data-stage="plan"]'), "topnav-tab-count", "12");
+        badge(document.querySelector(".topnav-tab-live"), "live-count", "2");
+        return {
+          page: document.documentElement.scrollWidth - window.innerWidth,
+          sidecarRight: document.querySelector(".topnav-sidecar")!.getBoundingClientRect().right,
+          viewport: window.innerWidth,
+        };
+      });
+      expect(m.page, JSON.stringify(m)).toBeLessThanOrEqual(0);
+      expect(m.sidecarRight).toBeLessThanOrEqual(m.viewport);
     });
   }
 });
