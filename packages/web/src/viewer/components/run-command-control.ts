@@ -71,21 +71,35 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
         ? "Stopped"
         : status?.exitCode === 0
           ? "Finished"
-          : chosen
-            ? `Found ${kindLabel(chosen.kind)} command`
-            : "";
+          : typeof status?.exitCode === "number"
+            ? `Failed (exit ${status.exitCode})`
+            : chosen
+              ? `Found ${kindLabel(chosen.kind)} command`
+              : "";
+
+  // The label is hidden below 1440 px (UX2'), so the state also shows as a
+  // modifier class (colour) and in the tooltip.
+  const failed = !running && (Boolean(status?.error)
+    || (typeof status?.exitCode === "number" && status.exitCode !== 0 && !status.stopped));
+  const finished = !running && !failed && status?.exitCode === 0;
+  const stateClass = running ? " runcmd-btn--running"
+    : failed ? " runcmd-btn--error"
+    : finished ? " runcmd-btn--finished"
+    : "";
+  const title = [statusText, chosen ? `${chosen.label} — from ${chosen.source}` : ""]
+    .filter(Boolean).join(" · ") || undefined;
 
   return h("div", { class: "runcmd" },
     h("button", {
       type: "button",
-      class: `runcmd-btn${running ? " runcmd-btn--running" : ""}`,
+      class: `runcmd-btn${stateClass}`,
       onClick: () => setOpen(!open),
       "aria-expanded": String(open),
       "aria-haspopup": "true",
       // Below 1440 px the label is hidden and the button is its glyph (UX2'),
       // so the name cannot come from the text.
       "aria-label": statusText ? `Run project: ${statusText}` : "Run project",
-      title: chosen ? `${chosen.label} — from ${chosen.source}` : undefined,
+      title,
     },
       running
         ? h("span", { class: "runcmd-spinner", "aria-hidden": "true" })

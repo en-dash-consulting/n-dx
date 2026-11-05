@@ -247,6 +247,23 @@ describe("TopNav", () => {
     expect(root.querySelector(".runcmd-start")?.textContent).toBe("Run npm run dev");
   });
 
+  it("marks a failed run on the button and in its title, not only in the label", async () => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          status: { running: false, exitCode: 1, label: "npm run dev" },
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn.classList.contains("runcmd-btn--error")).toBe(true);
+    expect(btn.title).toContain("Failed (exit 1)");
+  });
+
   it("keeps the run-project control, disabled, in a static export", async () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
     await mount(nav("home"));

@@ -41,6 +41,22 @@
   color: var(--accent);
 }
 
+/* Visible without the label (hidden below 1440 px, UX2'). */
+.runcmd-btn--error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.runcmd-btn--finished {
+  border-color: var(--green, var(--accent));
+  color: var(--green, var(--accent));
+}
+
+.runcmd-btn--error .runcmd-glyph,
+.runcmd-btn--finished .runcmd-glyph {
+  opacity: 1;
+}
+
 .runcmd-label {
   overflow: hidden;
   text-overflow: ellipsis;

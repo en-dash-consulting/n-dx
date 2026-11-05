@@ -563,7 +563,12 @@
  *   ≥1600      everything shows
  *   <1600      stage hints drop (with the Sidecar on; off, shell.css drops
  *              them at a 1400 px bar)
- *   <1440      search label drops to its ⌘K; run control to its ▶ glyph
+ *   <1440      search label drops to its ⌘K; run control to its ▶ glyph. The
+ *              run status stays visible as a coloured border/glyph
+ *              (runcmd-btn--error, --finished, --running) and in the title.
+ *              Decision: the rule applies with web.sidecar off too, so the
+ *              bar's width tiers stay one set; those users see the same
+ *              colour and title at 1200–1439 px, not the label.
  *   <1200      tab padding tightens
  *   ≤960       tab glyphs drop; the Sidecar button is its glyph and badge
  * At every width the project context gives way before the tabs, down to
