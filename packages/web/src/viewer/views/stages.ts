@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -115,6 +115,12 @@ export interface StageTile {
    * full-screen itself — the panel is its view's embedded form.
    */
   chromeless?: boolean;
+  /**
+   * A strip of links (Plan's lifecycle strip): full width above the grid, sized
+   * by its content rather than a grid row, with no header or full-screen. It
+   * places no view; `view` is only where it belongs.
+   */
+  band?: boolean;
   /** Grid columns spanned, of 12 (default 4: three tiles a row). */
   cols?: TileCols;
   /** Grid rows spanned (default 1). Every row has the same fixed height. */
@@ -216,6 +222,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     // Inbox sits beside Open changes, which carries the PRD tree as a tab.
     sections: [{ view: "analysis", plain: true }],
     tiles: [
+      // On both layouts: a v1 tree reads Pending, In progress and Next.
+      { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
       { view: "product", cols: 12, rows: 2, v2Only: true, requiresServer: true },
       { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
       { view: "changes", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },

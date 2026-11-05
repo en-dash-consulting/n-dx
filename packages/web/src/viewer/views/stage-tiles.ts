@@ -21,7 +21,7 @@
  * stays out of a cycle with view-registry.ts.
  */
 
-import { h } from "preact";
+import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { NavigateTo, ViewId } from "../types.js";
@@ -194,6 +194,12 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   // Called before the chromeless return so the hook order never depends on the tile.
   const cliName = useCliName();
 
+  if (tile.band && tile.panel) {
+    return h("section", { class: "stage-band", "data-tile": key, "aria-label": title },
+      renderPanel(tile.panel, false, grid),
+    );
+  }
+
   if (tile.chromeless && tile.panel) {
     return h("section", { class: `stage-tile stage-tile--chromeless ${span}`, "data-tile": key, "aria-label": title },
       renderPanel(tile.panel, false, grid),
@@ -257,20 +263,26 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
   // closing still returns focus to the tile the reader started from.
   const grid: TileGridApi = { openTile: (key) => { if (tiles.some((t) => tileKey(t) === key)) setFullScreen(key); } };
 
-  return h("div", { class: "stage-tiles", "data-stage": stage },
-    tiles.map((tile) => {
-      const key = tileKey(tile);
-      return h(Tile, {
-        key,
-        grid,
-        stage,
-        tile,
-        onOpen: (opener: HTMLElement) => { openerRef.current = opener; setFullScreen(key); },
-        renderView,
-        renderPanel,
-        renderSummary,
-      });
-    }),
+  // Bands sit above the grid: its rows are one fixed height, a strip is not.
+  const tileOf = (tile: StageTile) => {
+    const key = tileKey(tile);
+    return h(Tile, {
+      key,
+      grid,
+      stage,
+      tile,
+      onOpen: (opener: HTMLElement) => { openerRef.current = opener; setFullScreen(key); },
+      renderView,
+      renderPanel,
+      renderSummary,
+    });
+  };
+  const bands = tiles.filter((t) => t.band);
+
+  return h(Fragment, null,
+    bands.length > 0 ? h("div", { class: "stage-bands" }, bands.map(tileOf)) : null,
+    h("div", { class: "stage-tiles", "data-stage": stage },
+    tiles.filter((t) => !t.band).map(tileOf),
     full
       ? h(FullScreenTile, {
           // Keyed by tile, so switching tiles remounts the content (tabs reset).
@@ -288,5 +300,6 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
           navigateTo,
         })
       : null,
+    ),
   );
 }

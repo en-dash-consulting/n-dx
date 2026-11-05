@@ -514,10 +514,11 @@ describe("the Analysis stage is a tile dashboard", () => {
   it("marks the server-built views so static exports hide them", () => {
     // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Product,
     // Changes, Inbox and Workspaces by `requiresServer` (Product, Changes and
-    // Inbox read rex's v2 model per request).
+    // Inbox read rex's v2 model per request). A panel that only links to its
+    // view (the lifecycle strip) is not that view's placement.
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
-      ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer).map((t) => t.view),
+      ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
     ]);
     expect(serverBuilt.sort()).toEqual(["ask", "changes", "inbox", "product", "workspaces"]);
   });

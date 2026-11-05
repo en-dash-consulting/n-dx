@@ -52,6 +52,14 @@ describe("TileGrid", () => {
     expect(tile("files").className).toContain("stage-tile--r2");
   });
 
+  it("draws a band above the grid, outside its fixed rows, with no header to open it", () => {
+    mount({ tiles: [{ view: "changes", panel: "flow", title: "Lifecycle", band: true }, ...TILES] });
+    const band = root.querySelector<HTMLElement>(".stage-bands > .stage-band[data-tile='flow']")!;
+    expect(band.querySelector(".panel-flow")).not.toBeNull();
+    expect(band.querySelector(".stage-tile-head")).toBeNull();
+    expect(root.querySelector(".stage-tiles [data-tile='flow']")).toBeNull();
+  });
+
   it("shows a summary where one exists, else the view as a preview", () => {
     mount();
     expect(tile("problems").querySelector(".summary")?.textContent).toBe("5 critical");

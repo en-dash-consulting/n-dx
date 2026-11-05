@@ -16,9 +16,11 @@ import { useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
+  CHANGE_STAGE_ORDER,
   groupChangesByRelease,
   isAppliedStage,
   type ChangeRow,
+  type OpenChangeStage,
   type ReleaseGroup,
   type StageGroup,
 } from "./product-model.js";
@@ -194,6 +196,18 @@ function Release({ group, mode, onSelectChange }: {
 const FILTER_STORAGE_KEY = "ndx.changes.filter";
 const UNSCHEDULED_FILTER = "unscheduled";
 const RELEASE_PREFIX = "release:";
+const STAGE_PREFIX = "stage:";
+const OPEN_STAGES = CHANGE_STAGE_ORDER.filter((s): s is OpenChangeStage => !isAppliedStage(s));
+
+/** The filter that shows one open stage; Plan's lifecycle strip opens the page on it. */
+export function stageFilter(stage: OpenChangeStage): string {
+  return `${STAGE_PREFIX}${stage}`;
+}
+
+function stageOfFilter(filter: string): OpenChangeStage | null {
+  const name = filter.startsWith(STAGE_PREFIX) ? filter.slice(STAGE_PREFIX.length) : "";
+  return OPEN_STAGES.find((s) => s === name) ?? null;
+}
 
 function filterOf(group: ReleaseGroup): string {
   return group.release ? `${RELEASE_PREFIX}${group.release}` : UNSCHEDULED_FILTER;
@@ -207,7 +221,8 @@ function readStoredFilter(): string {
   }
 }
 
-function storeFilter(value: string): void {
+/** Remember the filter the page opens on next. */
+export function storeFilter(value: string): void {
   try {
     localStorage.setItem(FILTER_STORAGE_KEY, value);
   } catch {
@@ -245,11 +260,14 @@ export function ChangesView({ changes, onSelectChange }: {
 
   // A remembered release that no longer exists falls back to the default.
   const known = new Set(groups.map(filterOf));
-  const filter = stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
+  const stage = stageOfFilter(stored);
+  const filter = stage || stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
   const pick = (value: string) => { setStored(value); storeFilter(value); };
 
-  const mode: GroupMode = filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
-  const shown = groups.filter((g) =>
+  // A stage counts placed changes only: one rex holds for placement is the Inbox's.
+  const staged = stage ? changes.filter((c) => c.stage === stage && !c.awaitsPlacement) : null;
+  const mode: GroupMode = stage || filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
+  const shown = (staged ? groupChangesByRelease(staged) : groups).filter((g) =>
     mode === "open" ? g.appliedCount < g.changeCount
     : mode === "applied" ? g.appliedCount > 0
     : filterOf(g) === filter);
@@ -269,6 +287,9 @@ export function ChangesView({ changes, onSelectChange }: {
           h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
             h(FilterChip, { value: "open", label: "Open", count: openTotal, active: filter === "open", onPick: pick }),
             h(FilterChip, { value: "applied", label: "Applied", count: appliedTotal, active: filter === "applied", onPick: pick }),
+            stage && staged
+              ? h(FilterChip, { value: filter, label: CHANGE_STAGE_LABELS[stage], count: staged.length, active: true, onPick: pick })
+              : null,
             groups.map((g) => h(FilterChip, {
               key: filterOf(g), value: filterOf(g), label: g.label, count: g.changeCount,
               active: filter === filterOf(g), onPick: pick,
