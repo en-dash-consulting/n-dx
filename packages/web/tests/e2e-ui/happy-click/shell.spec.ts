@@ -1,5 +1,5 @@
 /**
- * Happy-click: the shell chrome, Home and the three stage pages.
+ * Happy-click: the shell chrome, Home and the four stage pages.
  *
  * Top-nav tabs, the Home stage cards, the previous/next stage links, every
  * stage section's expand/tab/open controls, the bottom bar (commands sheet,
@@ -21,8 +21,8 @@ import {
 } from "../helpers/fixture-project.js";
 import { trackConsoleErrors } from "../helpers/console-errors.js";
 
-const STAGES = ["analyze", "plan", "work"] as const;
-const STAGE_LABEL: Record<(typeof STAGES)[number], string> = { analyze: "Analysis", plan: "Plan", work: "Work" };
+const STAGES = ["analyze", "plan", "work", "tune"] as const;
+const STAGE_LABEL: Record<(typeof STAGES)[number], string> = { analyze: "Analysis", plan: "Plan", work: "Work", tune: "Tune" };
 
 let fixture: FixtureProject;
 let dashboard: RunningDashboard;
@@ -53,7 +53,7 @@ test("top-nav tabs and the brand switch stages and Home", async ({ page }) => {
   }
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.locator(".stage-card")).toHaveCount(3);
+  await expect(page.locator(".stage-card")).toHaveCount(STAGES.length);
   expect(tracker.errors).toEqual([]);
 });
 
@@ -68,21 +68,22 @@ test("Home stage cards open their stage", async ({ page }) => {
   expect(tracker.errors).toEqual([]);
 });
 
-test("previous/next stage links step and wrap through the three stages", async ({ page }) => {
+test("previous/next stage links step and wrap through the four stages", async ({ page }) => {
   const tracker = trackConsoleErrors(page);
   await gotoView(page, "analyze");
-  const order = ["plan", "work", "analyze"];
+  const order = ["plan", "work", "tune", "analyze"];
   for (const next of order) {
     await page.locator("button.stage-link-next").click();
     await expect(page).toHaveURL(new RegExp(`/${next}$`));
   }
   await page.locator("button.stage-link-prev").click();
-  await expect(page).toHaveURL(/\/work$/);
-  await expect(page.locator("button.stage-link-prev")).toHaveAttribute("aria-label", "Previous stage: Plan");
+  await expect(page).toHaveURL(/\/tune$/);
+  await expect(page.locator("button.stage-link-prev")).toHaveAttribute("aria-label", "Previous stage: Work");
   expect(tracker.errors).toEqual([]);
 });
 
-for (const stage of STAGES) {
+// Tune is a lead plus tiles, with no collapsible sections to click.
+for (const stage of STAGES.filter((s) => s !== "tune")) {
   test(`${stage} stage: every section expands, tabs switch, Open deep-links`, async ({ page }) => {
     test.setTimeout(60_000);
     const tracker = trackConsoleErrors(page);
