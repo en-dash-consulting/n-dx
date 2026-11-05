@@ -33,7 +33,8 @@ async function startChild(prefix: string, token: string, options: { healthy: boo
     if (req.headers["x-ndx-token"] !== token) return json(401, { error: "unauthorized" });
     if (url === "/api/status") return options.healthy ? json(200, { projectDir: dir }) : json(503, { error: "down" });
     if (url === "/api/tracker/sync/tick") {
-      ticks.push(`${req.method} ${url} ${req.headers["x-ndx-token"]}`);
+      // The prefix is set only by the hub's proxy: a tick posted straight to the child would carry none.
+      ticks.push(`${req.method} ${url} ${req.headers["x-ndx-token"]} via ${req.headers["x-forwarded-prefix"] ?? "(direct)"}`);
       return json(200, { state: "ran", entries: [], queued: 0 });
     }
     json(404, { error: "not found" });
@@ -101,7 +102,7 @@ describe("hub tracker sync clock", () => {
     hub = await startHub({ port: 0, homeDir: home, tokenFile: join(home, "auth.token"), healthIntervalMs: 40, trackerSync: { intervalMs: 300 } });
 
     await waitFor(() => on.ticks.length >= 1, 4_000);
-    expect(on.ticks[0]).toBe(`POST /api/tracker/sync/tick ${token}`);
+    expect(on.ticks[0]).toBe(`POST /api/tracker/sync/tick ${token} via /p/on`);
     // A second tick comes only after the interval.
     await waitFor(() => on.ticks.length >= 2, 4_000);
     expect(off.ticks).toEqual([]);
