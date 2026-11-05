@@ -30,6 +30,8 @@ export interface SidecarPageItem {
   kind: SidecarPageItemKind;
   ref?: string;
   label: string;
+  /** A lens the operator asked for by name ("Diagnose in Sidecar"), ahead of the kind's default. */
+  lens?: string;
 }
 
 export const GENERAL_LENS = "general";
@@ -45,12 +47,15 @@ export interface SidecarPageSelection {
   worktree?: string | null;
   /** The change awaiting placement attached by "Place with Sidecar", by id. */
   changeId?: string | null;
+  /** The task whose failed run "Diagnose in Sidecar" attached, by id; asks with Diagnose run on any page. */
+  diagnoseTaskId?: string | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
 export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null {
   // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
   if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
+  if (page.diagnoseTaskId) return { kind: "task", ref: page.diagnoseTaskId, label: page.diagnoseTaskId, lens: "diagnose-run" };
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };
   }
@@ -66,6 +71,7 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
 
 /** The lens id a page item asks for, before the registry is consulted. */
 export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boolean): string {
+  if (item?.lens) return item.lens;
   switch (item?.kind) {
     case "task": return lastRunFailed ? "diagnose-run" : "describe";
     case "capability":

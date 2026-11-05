@@ -9,12 +9,16 @@ import { h } from "preact";
 import type { ComponentChild, ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { appUrl } from "../base-path.js";
-import { useCliName } from "../hooks/index.js";
+import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { viewPathname } from "../route-state.js";
 import type { NavigateTo } from "../types.js";
 import { ROBOT_WRANGLER_SECTIONS, type RobotWranglerSection } from "./robot-wrangler-sections.js";
 import {
+  summarizeSidecarTooling,
   summarizeTooling,
+  type SidecarToolingLine,
+  type ToolingConnection,
+  type ToolingSidecarSettings,
   type ToolingAuth,
   type ToolingCatalog,
   type ToolingConfig,
@@ -79,11 +83,61 @@ function SettingsLink({ section, navigateTo, children }: {
   }, children);
 }
 
-export function ToolingPanel({ navigateTo, extra }: {
+/** A link to a settings page, kept as a real anchor so it opens in a new tab like any other. */
+function PageLink({ view, navigateTo, children }: {
+  view: "workflow" | "project";
   navigateTo: NavigateTo;
-  /** Where S8's Sidecar and connections lines join the tile. */
-  extra?: ComponentChild;
+  children?: ComponentChildren;
 }): ComponentChild {
+  return h("a", {
+    class: "tooling-link",
+    href: appUrl(viewPathname(view, null)),
+    onClick: (e: MouseEvent) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      navigateTo(view);
+    },
+  }, children);
+}
+
+/**
+ * The Sidecar's vendor, model, mode and caps (Settings › Workflow › Sidecar) and
+ * each connection with its sign-in state (Settings › Project). Reads nothing
+ * while `web.sidecar` is off, and nothing is drawn if the settings cannot be read.
+ */
+function SidecarTooling({ catalog, navigateTo }: { catalog: ToolingCatalog | null; navigateTo: NavigateTo }): ComponentChild {
+  const enabled = useFeatureToggle("web.sidecar", false);
+  const [line, setLine] = useState<SidecarToolingLine | null>(null);
+
+  useEffect(() => {
+    if (!enabled) { setLine(null); return; }
+    let cancelled = false;
+    (async () => {
+      const [settings, connections] = await Promise.all([
+        getJson<ToolingSidecarSettings>("/api/sidecar/settings"),
+        getJson<{ connections?: ToolingConnection[] }>("/api/connections"),
+      ]);
+      if (cancelled || !settings) return;
+      setLine(summarizeSidecarTooling(settings, catalog, connections?.connections ?? []));
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, catalog]);
+
+  if (!enabled || !line) return null;
+  return h("div", { class: "tooling-sidecar", "data-testid": "tooling-sidecar" },
+    h("p", { class: "tooling-line tooling-sidecar-settings" },
+      h(PageLink, { view: "workflow", navigateTo }, "Sidecar"),
+      `: ${line.vendor}${line.model ? ` (${line.model})` : ""} · mode ${line.mode} · ${line.caps}`),
+    line.connections.length === 0
+      ? h("p", { class: "tooling-line tooling-connections-none" },
+          h(PageLink, { view: "project", navigateTo }, "No connections"))
+      : h("ul", { class: "tooling-connections", "aria-label": "Sidecar connections" },
+          line.connections.map((c) => h("li", { key: c.id, class: "tooling-connection", "data-connection": c.id },
+            h(PageLink, { view: "project", navigateTo }, c.label),
+            h("span", { class: `tooling-state tooling-state--${c.state}`, title: c.detail }, c.stateLabel)))));
+}
+
+export function ToolingPanel({ navigateTo }: { navigateTo: NavigateTo }): ComponentChild {
   const cliName = useCliName();
   const [load, setLoad] = useState<Load>({ state: "loading" });
 
@@ -134,6 +188,5 @@ export function ToolingPanel({ navigateTo, extra }: {
       " (change with ", h("code", null, `${cliName} config`), ")"),
     h("p", { class: "tooling-line tooling-review" },
       h(SettingsLink, { section: "review", navigateTo }, summary.review)),
-    // Reserved for S8: the Sidecar's settings and C1's connections.
-    h("div", { class: "tooling-extra", "data-slot": "sidecar-connections" }, extra ?? null));
+    h(SidecarTooling, { catalog: load.state === "ready" ? load.catalog : null, navigateTo }));
 }

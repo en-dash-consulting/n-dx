@@ -126,6 +126,7 @@ export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
 export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
 export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
 export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
+export { DiagnoseInSidecarContext, DiagnoseInSidecarButton, RunVerdictChip, isFailedRun, newestRunIds } from "./diagnose-in-sidecar.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";

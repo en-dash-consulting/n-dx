@@ -1008,6 +1008,9 @@
 
 .tooling-line { margin: 0; }
 .tooling-extra:empty { display: none; }
+.tooling-sidecar { display: flex; flex-direction: column; gap: var(--space-1); }
+.tooling-connections { margin: 0; padding: 0; list-style: none; }
+.tooling-connection { display: flex; gap: var(--space-2); align-items: baseline; }
 
 /* ── Delivery & infrastructure panel ─────────────────────────── */
 

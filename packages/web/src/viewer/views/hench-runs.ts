@@ -21,7 +21,12 @@ import {
   CopyLinkButton,
   ActiveTasksPanel,
   TaskStartControl,
+  DiagnoseInSidecarButton,
+  RunVerdictChip,
+  isFailedRun,
+  newestRunIds,
 } from "../components/index.js";
+import type { RunVerdict } from "../components/prd-tree/run-verdict-banner.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import type { ActiveRun } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
@@ -63,6 +68,8 @@ interface RunSummary {
   };
   /** Vendor active for this run (e.g. "claude", "codex"). */
   vendor?: string;
+  /** The run classifier's verdict on a run that did not complete; absent on older records. */
+  diagnosis?: RunVerdict;
   /** Token diagnostic status: complete, partial, or unavailable. */
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
@@ -507,10 +514,12 @@ function RunMetrics({ runs }: { runs: RunSummary[] }) {
 }
 
 /** Individual run card in the list. */
-function RunCard({ run, isSelected, isHighlighted, showWorktree, onClick, navigateTo, cardRef }: {
+function RunCard({ run, isSelected, isHighlighted, isNewestOfTask, showWorktree, onClick, navigateTo, cardRef }: {
   run: RunSummary;
   isSelected: boolean;
   isHighlighted?: boolean;
+  /** The task's newest run: the one Diagnose in Sidecar reads. */
+  isNewestOfTask?: boolean;
   /** Render the worktree chip. Off when every loaded run is from one worktree — the chip would say the same thing on every card. */
   showWorktree?: boolean;
   onClick: () => void;
@@ -567,6 +576,10 @@ function RunCard({ run, isSelected, isHighlighted, showWorktree, onClick, naviga
 
     // Bottom row: metadata chips
     h("div", { class: "hench-run-meta" },
+      isFailedRun(run.status) ? h(RunVerdictChip, { diagnosis: run.diagnosis }) : null,
+      isFailedRun(run.status) && isNewestOfTask && run.taskId
+        ? h(DiagnoseInSidecarButton, { taskId: run.taskId })
+        : null,
       h("span", { class: "hench-run-chip" }, fmtDuration(run.startedAt, run.finishedAt)),
       h("span", { class: "hench-run-chip" }, `${run.turns} turns`),
       h("span", { class: "hench-run-chip" }, fmtTokens(totalTokens) + " tokens"),
@@ -1326,6 +1339,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   const worktreeOptions = useMemo(() => collectWorktreeOptions(runs), [runs]);
   const multipleWorktrees = worktreeOptions.length > 1;
+  // Over every loaded run, not the filtered list, so a filter never promotes an older run.
+  const newestIds = useMemo(() => newestRunIds(runs), [runs]);
 
   // Scroll the deep-linked run card into view when it renders
   const scrolledRef = useRef(false);
@@ -1547,6 +1562,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
           run,
           isSelected: selectedRunId === run.id,
           isHighlighted: isHL,
+          isNewestOfTask: newestIds.has(run.id),
           showWorktree: multipleWorktrees,
           onClick: () => handleSelectRun(run.id),
           navigateTo,

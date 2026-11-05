@@ -30,10 +30,75 @@ export interface ToolingConfig {
 /** The slice of one `GET /api/llm/catalog` vendor entry this reads. */
 export interface ToolingCatalogEntry {
   cli?: { found: boolean; version: string | null };
+  defaultModel?: string;
   readiness?: { state: "ready" | "needs-setup" | "unreachable"; summary: string };
 }
 
 export type ToolingCatalog = Partial<Record<ToolingVendorId, ToolingCatalogEntry>>;
+
+/** The slice of `GET /api/sidecar/settings` the tile reads. */
+export interface ToolingSidecarSettings {
+  mode: string;
+  contextCeiling: { worktree: number; hub: number };
+  idleMs: number;
+}
+
+/** The slice of one `GET /api/connections` row the tile reads. */
+export interface ToolingConnection {
+  id: string;
+  label: string;
+  state: "connected" | "unavailable" | "needs-sign-in";
+  reason?: string;
+  tools: number;
+}
+
+export interface SidecarToolingLine {
+  vendor: string;
+  /** The model a new session starts on; null when the catalog could not be read. */
+  model: string | null;
+  mode: string;
+  caps: string;
+  connections: Array<{ id: string; label: string; state: ToolingConnection["state"]; stateLabel: string; detail: string }>;
+}
+
+/** Sessions run on Claude Code: the resumable vendor (a Codex session is refused). */
+const SIDECAR_VENDOR_LABEL = "Claude Code";
+
+const CONNECTION_STATE_LABEL: Record<ToolingConnection["state"], string> = {
+  connected: "Connected",
+  "needs-sign-in": "Signed out",
+  unavailable: "Unavailable",
+};
+
+function compactTokens(n: number): string {
+  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+}
+
+function idleLabel(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  return minutes % 60 === 0 ? `${minutes / 60} h` : `${minutes} min`;
+}
+
+/** The Sidecar's saved settings and each connection's sign-in state, as the tile words them. */
+export function summarizeSidecarTooling(
+  settings: ToolingSidecarSettings,
+  catalog: ToolingCatalog | null,
+  connections: readonly ToolingConnection[],
+): SidecarToolingLine {
+  return {
+    vendor: SIDECAR_VENDOR_LABEL,
+    model: catalog?.claude?.defaultModel ?? null,
+    mode: settings.mode,
+    caps: `context ${compactTokens(settings.contextCeiling.worktree)} worktree · ${compactTokens(settings.contextCeiling.hub)} hub · idle after ${idleLabel(settings.idleMs)}`,
+    connections: connections.map((c) => ({
+      id: c.id,
+      label: c.label,
+      state: c.state,
+      stateLabel: CONNECTION_STATE_LABEL[c.state],
+      detail: c.state === "connected" ? `${c.tools} ${c.tools === 1 ? "tool" : "tools"}` : c.reason ?? "",
+    })),
+  };
+}
 
 /** Result of the credential check for the active vendor; null when it was not read. */
 export type ToolingAuth = { ok: boolean; detail: string | null } | null;

@@ -171,10 +171,66 @@ describe("ToolingPanel", () => {
     await waitFor(() => expect(text(".stage-tile-empty")).toContain("Could not read"));
   });
 
-  it("leaves a slot for the Sidecar and connections lines", async () => {
-    stub(CONFIG, CATALOG);
-    render(h(ToolingPanel, { navigateTo, extra: h("p", { class: "s8" }, "Sidecar on") }), root);
-    await waitFor(() => expect(root.querySelector('[data-slot="sidecar-connections"] .s8')).not.toBeNull());
+  describe("Sidecar lines", () => {
+    const SIDECAR_SETTINGS = { mode: "ask", contextCeiling: { worktree: 100000, hub: 40000 }, idleMs: 7_200_000 };
+    const CONNECTIONS = {
+      connections: [
+        { id: "linear", label: "Linear", state: "connected", tools: 4 },
+        { id: "notion", label: "Notion", state: "needs-sign-in", reason: "signed out", tools: 0 },
+        { id: "jira", label: "Jira", state: "unavailable", reason: "not connected yet", tools: 0 },
+      ],
+    };
+
+    function stubSidecar(on: boolean, connections: unknown = CONNECTIONS) {
+      const catalog = { ...CATALOG, claude: { ...CATALOG.claude, defaultModel: "claude-sonnet" } };
+      fetchSpy.mockImplementation((url: string) => {
+        const body = url.includes("/api/features") ? { toggles: [{ key: "web.sidecar", enabled: on }] }
+          : url.includes("/api/sidecar/settings") ? SIDECAR_SETTINGS
+          : url.includes("/api/connections") ? connections
+          : url.includes("/catalog") ? catalog
+          : url.includes("/commands/auth") ? { ok: true }
+          : CONFIG;
+        return Promise.resolve({ ok: body !== null, json: () => Promise.resolve(body) });
+      });
+    }
+
+    it("lists the Sidecar's vendor, model, mode and caps and each connection's sign-in state", async () => {
+      stubSidecar(true);
+      mount();
+      await waitFor(() => expect(root.querySelectorAll(".tooling-connection")).toHaveLength(3));
+      expect(text(".tooling-sidecar-settings")).toContain("Claude Code (claude-sonnet) · mode ask");
+      expect(text(".tooling-sidecar-settings")).toContain("context 100k worktree · 40k hub · idle after 2 h");
+      expect(text('[data-connection="linear"] .tooling-state')).toBe("Connected");
+      expect(text('[data-connection="notion"] .tooling-state')).toBe("Signed out");
+      expect(text('[data-connection="jira"] .tooling-state')).toBe("Unavailable");
+      expect(root.querySelector('[data-connection="jira"] .tooling-state')?.getAttribute("title")).toBe("not connected yet");
+    });
+
+    it("links the Sidecar line to Workflow and connections to Project", async () => {
+      stubSidecar(true);
+      mount();
+      await waitFor(() => expect(root.querySelectorAll(".tooling-connection")).toHaveLength(3));
+      root.querySelector<HTMLAnchorElement>(".tooling-sidecar-settings a")?.click();
+      expect(navigateTo).toHaveBeenLastCalledWith("workflow");
+      root.querySelector<HTMLAnchorElement>('[data-connection="linear"] a')?.click();
+      expect(navigateTo).toHaveBeenLastCalledWith("project");
+    });
+
+    it("says there are no connections when none are declared", async () => {
+      stubSidecar(true, { connections: [] });
+      mount();
+      await waitFor(() => expect(text(".tooling-connections-none")).toBe("No connections"));
+    });
+
+    it("draws nothing and reads no Sidecar route while web.sidecar is off", async () => {
+      stubSidecar(false);
+      mount();
+      await waitFor(() => expect(root.querySelectorAll(".tooling-vendor")).toHaveLength(3));
+      await new Promise<void>((r) => setTimeout(r, 30));
+      expect(root.querySelector('[data-testid="tooling-sidecar"]')).toBeNull();
+      const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+      expect(urls.some((u) => u.includes("/api/sidecar") || u.includes("/api/connections"))).toBe(false);
+    });
   });
 });
 

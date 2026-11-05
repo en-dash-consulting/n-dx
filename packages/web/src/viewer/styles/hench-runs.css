@@ -1076,6 +1076,25 @@
   font-weight: 500;
 }
 
+/* The run classifier's verdict on a failed run. */
+.hench-run-verdict-chip {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.hench-run-diagnose-sidecar {
+  font: inherit;
+  font-size: 12px;
+  padding: 0 var(--space-2);
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.hench-run-diagnose-sidecar:hover,
+.hench-run-diagnose-sidecar[aria-pressed="true"] { border-color: var(--accent); }
+
 /* Actions in detail view */
 .hench-detail-actions {
   display: flex;
