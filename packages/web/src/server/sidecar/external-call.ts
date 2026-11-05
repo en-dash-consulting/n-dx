@@ -13,7 +13,9 @@
  * the card can show it. The result itself reaches the session unchanged.
  *
  * Nothing here is specific to any tracker: hints and tool names come from the
- * operator's connection config and the server's own tool list.
+ * operator's connection config, the server profile it names (data, checked
+ * against the server's tool list in tracker/server-profiles.ts) and the
+ * server's own tool list.
  *
  * See docs/architecture/sidecar-connections.md.
  */
@@ -22,6 +24,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { SidecarCallProblem, SidecarExternalCall, SidecarFieldOption } from "../../shared/index.js";
 import type { FieldHint, FieldHints } from "../connections/connection-config.js";
 import type { ConnectionService, ConnectionTool } from "../connections/connection-service.js";
+import { profileFieldHints, type ProfileOptions } from "../tracker/server-profiles.js";
 
 /** The longest a picker's list is drawn; a longer result is cut. */
 export const MAX_FIELD_OPTIONS = 200;
@@ -137,19 +140,36 @@ async function readOptions(
   }
 }
 
+/**
+ * The hints for `tool`'s card: the connection's server profile's hints for the
+ * tool, when the profile fits the server, under the connection's own hints,
+ * which win for the same property.
+ */
+function cardHints(
+  tool: ConnectionTool,
+  tools: readonly ConnectionTool[],
+  context: ReturnType<ConnectionService["callContext"]>,
+  options: ProfileOptions,
+): FieldHints {
+  const own = context?.fieldHints ?? {};
+  if (!context?.profile) return own;
+  const serverTools = tools.filter((t) => t.connection === tool.connection);
+  return { ...profileFieldHints(context.profile, tool.tool, serverTools, options), ...own };
+}
+
 /** The card's connection, workspace, schema and picker choices for `tool`. */
 export async function buildExternalCall(
   tool: ConnectionTool,
   tools: readonly ConnectionTool[],
   connections: Pick<ConnectionService, "callContext" | "callTool">,
   signal?: AbortSignal,
-  limits: { hintTimeoutMs?: number } = {},
+  settings: { hintTimeoutMs?: number } & ProfileOptions = {},
 ): Promise<SidecarExternalCall> {
-  const timeoutMs = limits.hintTimeoutMs ?? HINT_READ_TIMEOUT_MS;
+  const timeoutMs = settings.hintTimeoutMs ?? HINT_READ_TIMEOUT_MS;
   const context = connections.callContext(tool.connection);
   const inputSchema = tool.inputSchema as Json;
   const properties = isRecord(inputSchema.properties) ? inputSchema.properties : {};
-  const hints: FieldHints = context?.fieldHints ?? {};
+  const hints = cardHints(tool, tools, context, settings);
   const named = Object.entries(hints).filter(([property]) => property in properties);
   const read = await Promise.all(
     named.map(async ([property, hint]) => [property, await readOptions(property, hint, tools, tool.connection, connections, signal, timeoutMs)] as const),

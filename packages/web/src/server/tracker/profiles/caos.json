@@ -1,0 +1,49 @@
+{
+  "label": "CAOS",
+  "fieldHints": {
+    "create_work_item": {
+      "epicId": { "optionsFrom": { "tool": "list_epics", "path": "items" } },
+      "type": { "optionsFrom": { "tool": "get_creation_options", "path": "types" } },
+      "priority": { "optionsFrom": { "tool": "get_creation_options", "path": "priorities" } },
+      "estimate": { "optionsFrom": { "tool": "get_creation_options", "path": "estimates" } }
+    }
+  },
+  "tracker": {
+    "createTool": "create_work_item",
+    "moveTool": "move_work_item",
+    "readTool": "get_work_item",
+    "editTool": "edit_work_item",
+    "requestIdProperty": "requestId",
+    "itemIdProperty": "workItemId",
+    "createStatusProperty": "initialStatus",
+    "moveStatusProperty": "toStatus",
+    "statusMap": {
+      "change-captured": "backlog",
+      "run-started": "inProgress",
+      "pr-opened": "readyForReview",
+      "pr-merged": "pendingDelivery",
+      "release-published": "done",
+      "run-failed-twice": "blocked"
+    },
+    "facts": {
+      "change-captured": [
+        { "fact": "title", "property": "title", "from": ["item"] },
+        { "fact": "epic", "property": "epicId", "from": ["feature-map"] },
+        { "fact": "estimate", "property": "estimate", "from": ["loe"] }
+      ],
+      "pr-opened": [
+        { "fact": "reviewer", "property": "review.reviewerNotionUserId", "from": ["profile-default", "codeowners"] },
+        { "fact": "reviewLink", "property": "review.reviewLink", "from": ["pr-url"] }
+      ],
+      "release-published": [
+        { "fact": "deliveryNote", "property": "delivery.note", "from": ["release"] }
+      ],
+      "run-failed-twice": [
+        { "fact": "stalledKind", "property": "stalled.kind", "from": ["constant"], "value": "blocked" },
+        { "fact": "blockedBy", "property": "stalled.blockedBy", "from": ["run-diagnosis"] },
+        { "fact": "whoCanUnblock", "property": "stalled.whoCanUnblock", "from": ["run-diagnosis"] }
+      ]
+    },
+    "defaults": {}
+  }
+}

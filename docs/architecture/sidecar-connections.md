@@ -38,6 +38,34 @@ class, the run/ask/never policy and the form card for writes.
 - `fieldHints` (optional) fills pickers on a write card; see
   [Through the broker](#through-the-broker). A malformed hint is skipped with
   a warning naming it.
+- `profile` (optional) names a [server profile](#server-profiles).
+
+## Server profiles
+
+A profile is data for one kind of server (`src/server/tracker/server-profiles.ts`);
+no code path knows any server. It carries:
+
+- `fieldHints` by write tool, then property, in the connection hint shape. A
+  connection's own hint wins for the same property.
+- `tracker` (optional): `createTool`, `moveTool`, `readTool`, `editTool`, the
+  `requestIdProperty` filled with `ndx:<project>:<rexId>:<event>`, the
+  `itemIdProperty`, the status properties, a `statusMap` from every ndx event
+  (`change-captured`, `run-started`, `pr-opened`, `pr-merged`,
+  `release-published`, `run-failed-twice`) to a tracker status, the `facts` each
+  event needs (input property and sources) and `defaults` (`reviewer`,
+  `estimateScale`).
+
+Built-ins ship in `src/server/tracker/profiles/` (`caos` first). A user adds
+`<ndx home>/tracker-profiles/<name>.json`. A bare name resolves to the built-in
+of that name, else the user's file; `user:<name>` is the user's file only, so a
+user profile never replaces a built-in by accident.
+
+A profile is used only when it fits the server's tool list: every tool it
+names is listed, every property it names is declared, and the status map
+covers every event with a status the server accepts. Otherwise
+`GET /api/connections` reports `profile.state: "invalid"` with a problem naming
+each gap, its hints are not used, and the connection works attended as one
+without a profile: reads run and writes raise the plain form card.
 
 ## Tool class and policy
 
@@ -93,7 +121,8 @@ wire name, after the broker's own tools. A hub session gets none.
   result's first list. Only a read-class tool of the same connection whose policy
   is `run` is called (a hint never makes a call the operator would be asked about); a hint that finds no choices leaves a plain field, and the
   card is never held up on it. With no hints the plain schema form renders. A
-  profile ships its own hints; none live in the broker.
+  [server profile](#server-profiles) adds its hints under the connection's; none
+  live in the broker.
 - **Problems.** When an approved call's result is an error carrying a
   `problems` list (structured content, or JSON text such as
   `{"error":"validation_failed","problems":[…]}`), the card shows each problem

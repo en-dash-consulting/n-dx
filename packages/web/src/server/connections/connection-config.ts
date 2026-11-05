@@ -36,8 +36,14 @@ interface ConnectionBase {
   /** What the operator calls it; the id when unset. */
   label: string;
   auth: ConnectionAuth;
-  /** Pickers for write-card properties; unset when the connection has none. */
+  /** Pickers for write-card properties; unset when the connection has none. They win over the profile's. */
   fieldHints?: FieldHints;
+  /**
+   * The server profile it uses, by name: data that adds per-tool field hints
+   * (and, for a tracker, a mapping). Only the name is read here; whoever uses
+   * the profile loads it and checks it against the server's tool list.
+   */
+  profile?: string;
   /**
    * Per-tool class and policy overrides, as written. tool-policy.ts checks them
    * against the server's tool list and warns about each bad entry.
@@ -105,7 +111,7 @@ function stringRecord(value: unknown): Record<string, string> | undefined {
 }
 
 /** `raw` as hints; an entry that is not one is left out and named in `skipped`. */
-function parseFieldHints(raw: unknown, skipped: string[]): FieldHints | undefined {
+export function parseFieldHints(raw: unknown, skipped: string[]): FieldHints | undefined {
   if (raw === undefined) return undefined;
   const block = asRecord(raw);
   if (!block) {
@@ -137,6 +143,9 @@ function parseConnection(id: string, raw: unknown, warnHint: (message: string) =
   const skippedHints: string[] = [];
   const fieldHints = parseFieldHints(entry.fieldHints, skippedHints);
   for (const reason of skippedHints) warnHint(reason);
+  const profile = typeof entry.profile === "string" ? entry.profile.trim() : undefined;
+  if (entry.profile !== undefined && !profile) warnHint("profile must be a non-empty string naming a server profile");
+  const extras = { ...(fieldHints && { fieldHints }), ...(profile && { profile }) };
 
   if (entry.transport === "http") {
     if (typeof entry.url !== "string") return "an http connection needs a url";
@@ -148,7 +157,7 @@ function parseConnection(id: string, raw: unknown, warnHint: (message: string) =
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return "its url must be http or https";
     if (url.username || url.password) return "its url must not carry credentials; use auth \"token\"";
-    return { id, label, auth, tools: entry.tools, ...(fieldHints && { fieldHints }), transport: "http", url: url.href };
+    return { id, label, auth, tools: entry.tools, ...extras, transport: "http", url: url.href };
   }
 
   if (entry.transport === "stdio") {
@@ -159,7 +168,7 @@ function parseConnection(id: string, raw: unknown, warnHint: (message: string) =
     if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string")) return "args must be a list of strings";
     const env = entry.env === undefined ? {} : stringRecord(entry.env);
     if (!env) return "env must map names to string values";
-    return { id, label, auth: "none", tools: entry.tools, ...(fieldHints && { fieldHints }), transport: "stdio", command: entry.command, args, env };
+    return { id, label, auth: "none", tools: entry.tools, ...extras, transport: "stdio", command: entry.command, args, env };
   }
 
   return `transport must be "http" or "stdio"`;

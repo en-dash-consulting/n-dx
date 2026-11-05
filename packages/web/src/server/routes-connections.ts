@@ -13,7 +13,8 @@
  * Governed by `web.sidecar` (route-feature-gates.ts).
  *
  * A response carries no token, refresh token or code: a connection is its
- * id, label, transport, auth, state, reason and tool count.
+ * id, label, transport, auth, state, reason, tool count and whether the
+ * server profile it names fits the server.
  *
  * See docs/architecture/sidecar-connections.md.
  */
@@ -21,9 +22,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename } from "node:path";
 import { redactSecrets, resolveLayout } from "@n-dx/llm-client";
-import { workspaceConnectionService, type ConnectionInfo, type ConnectionService } from "./connections/connection-service.js";
+import { workspaceConnectionService, type ConnectionInfo, type ConnectionService, type ConnectionTool } from "./connections/connection-service.js";
 import { ConnectionSignInError } from "./connections/oauth-provider.js";
 import { errorMessage, errorResponse, jsonResponse, readJsonObject } from "./response-utils.js";
+import { resolveServerProfile } from "./tracker/server-profiles.js";
 import type { ServerContext } from "./types.js";
 
 export const CONNECTIONS_PREFIX = "/api/connections";
@@ -38,6 +40,11 @@ export interface ConnectionsRouteOptions {
   connectionsFor?: (projectDir: string) => ConnectionService;
 }
 
+/** Whether a connection's server profile fits its server; unchecked until its tools are listed. */
+export type ConnectionProfileView =
+  | { name: string; state: "ok" | "unchecked" }
+  | { name: string; state: "invalid"; problem: string };
+
 /** A connection as a route answers it. */
 export interface ConnectionView {
   id: string;
@@ -49,9 +56,20 @@ export interface ConnectionView {
   /** On a needs-sign-in row: a first sign-in, or one that was lost. The badge reads this, not the reason. */
   signIn?: "first" | "again";
   tools: number;
+  /** The server profile it names, if any. An invalid one is not used; the connection still works attended. */
+  profile?: ConnectionProfileView;
 }
 
-function view(info: ConnectionInfo): ConnectionView {
+function profileView(name: string, tools: readonly ConnectionTool[]): ConnectionProfileView {
+  if (tools.length === 0) return { name, state: "unchecked" };
+  const resolution = resolveServerProfile(name, tools);
+  return resolution.state === "ok" ? { name, state: "ok" } : { name, state: "invalid", problem: resolution.problem };
+}
+
+/** `info` as a view. Reads the tools the service already holds; connects nothing `info` did not. */
+async function view(info: ConnectionInfo, service: ConnectionService): Promise<ConnectionView> {
+  const profile = service.callContext(info.id)?.profile;
+  const tools = profile && info.tools > 0 ? await service.listTools([info.id]) : [];
   return {
     id: info.id,
     label: info.label,
@@ -61,6 +79,7 @@ function view(info: ConnectionInfo): ConnectionView {
     ...("reason" in info.status && { reason: info.status.reason }),
     ...("signIn" in info.status && { signIn: info.status.signIn }),
     tools: info.tools,
+    ...(profile && { profile: profileView(profile, tools) }),
   };
 }
 
@@ -98,7 +117,7 @@ export async function handleConnectionsRoute(
   if (pathname === CONNECTIONS_PREFIX) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${CONNECTIONS_PREFIX}`);
     jsonResponse(res, 200, {
-      connections: (await service.listConnections()).map(view),
+      connections: await Promise.all((await service.listConnections()).map((info) => view(info, service))),
       // The file connections are declared in, for the page to name.
       configFile: basename(resolveLayout(ctx.projectDir).localConfigFile),
     });
@@ -139,11 +158,11 @@ export async function handleConnectionsRoute(
       if (err instanceof ConnectionSignInError) return refuse(res, 400, err.message);
       return refuse(res, 502, `Could not finish the sign-in: ${redactSecrets(errorMessage(err).split(code).join("[code]"))}`);
     }
-    jsonResponse(res, 200, { connection: view(service.connection(id)!) });
+    jsonResponse(res, 200, { connection: await view(service.connection(id)!, service) });
     return true;
   }
 
   await service.signOut(id);
-  jsonResponse(res, 200, { connection: view(service.connection(id)!) });
+  jsonResponse(res, 200, { connection: await view(service.connection(id)!, service) });
   return true;
 }

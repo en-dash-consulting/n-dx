@@ -59,6 +59,99 @@ export function addCallCardTools(server) {
   );
 }
 
+const CAOS_STATUSES = [
+  "backlog", "ready", "inProgress", "waitingOnOthers", "pause", "blocked",
+  "readyForReview", "inReview", "pendingDelivery", "done", "canceled",
+];
+const CAOS_READ = { readOnlyHint: true };
+const CAOS_WRITE = { readOnlyHint: false, destructiveHint: false };
+const requestId = z.string().min(8).max(128);
+
+/**
+ * CAOS's work-item tools by name and input schema (its MCP contract), with
+ * canned answers: the server the built-in CAOS profile is checked against.
+ * Never the real server.
+ */
+export function addCaosTools(server) {
+  server.registerTool(
+    "get_work_item",
+    { description: "Get work item.", inputSchema: { workItemId: z.string() }, annotations: CAOS_READ },
+    async ({ workItemId }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status: "backlog" }) }] }),
+  );
+  server.registerTool(
+    "list_epics",
+    { description: "List epics.", inputSchema: { query: z.string().optional(), cursor: z.string().optional() }, annotations: CAOS_READ },
+    async () => ({
+      content: [{ type: "text", text: "epics" }],
+      structuredContent: { items: [{ id: "ep-1", name: "ndx 0.10.0 - Sidecar" }, { id: "ep-2", name: "ndx 1.0.0 - Freeze" }], nextCursor: null, total: 2 },
+    }),
+  );
+  server.registerTool(
+    "get_creation_options",
+    { description: "Get creation options.", inputSchema: {}, annotations: CAOS_READ },
+    async () => ({
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          types: ["Story", "Bug", "Task"],
+          priorities: ["High", "Medium", "Low"],
+          estimates: ["1", "2", "3", "5", "8"],
+          statuses: CAOS_STATUSES.map((status) => ({ status, label: status })),
+        }),
+      }],
+    }),
+  );
+  server.registerTool(
+    "create_work_item",
+    {
+      description: "Create work item.",
+      inputSchema: {
+        requestId,
+        title: z.string(),
+        epicId: z.string(),
+        type: z.enum(["Story", "Bug", "Task"]).optional(),
+        priority: z.enum(["High", "Medium", "Low"]).optional(),
+        estimate: z.enum(["1", "2", "3", "5", "8"]).optional(),
+        description: z.string().optional(),
+        acceptanceCriteria: z.string().optional(),
+        assigneeNotionUserId: z.string().optional(),
+        initialStatus: z.enum(CAOS_STATUSES).optional(),
+      },
+      annotations: CAOS_WRITE,
+    },
+    async ({ title }) => ({ content: [{ type: "text", text: JSON.stringify({ id: "wi-1", title, created: true }) }] }),
+  );
+  server.registerTool(
+    "edit_work_item",
+    {
+      description: "Edit work item.",
+      inputSchema: { requestId, workItemId: z.string(), patch: z.object({ title: z.string().optional() }) },
+      annotations: CAOS_WRITE,
+    },
+    async ({ workItemId }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId }) }] }),
+  );
+  server.registerTool(
+    "move_work_item",
+    {
+      description: "Move work item.",
+      inputSchema: {
+        requestId,
+        workItemId: z.string(),
+        toStatus: z.enum(CAOS_STATUSES),
+        review: z.object({ reviewerNotionUserId: z.string(), reviewLink: z.string().optional() }).optional(),
+        stalled: z.object({
+          kind: z.enum(["waitingOnOthers", "pause", "blocked"]),
+          blockedBy: z.string().optional(),
+          whoCanUnblock: z.string().optional(),
+        }).optional(),
+        delivery: z.object({ note: z.string() }).optional(),
+      },
+      annotations: CAOS_WRITE,
+    },
+    async ({ workItemId, toStatus }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status: toStatus }) }] }),
+  );
+}
+
 /** A fake MCP server; `extra` lets a fixture add its own test hooks. */
 export function createFakeMcpServer(name = "fake-connection", extra) {
   const server = new McpServer({ name, version: "1.0.0" });

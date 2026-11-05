@@ -66,6 +66,22 @@ describe("loadConnections", () => {
     expect(warnings[1]).toContain('"worse"');
   });
 
+  it("reads the profile a connection names, and skips a malformed one with a warning", () => {
+    const dir = project({
+      local: {
+        connections: {
+          caos: { transport: "http", url: "https://example.test/mcp", profile: " caos " },
+          odd: { transport: "http", url: "https://example.test/mcp", profile: 7 },
+        },
+      },
+    });
+    const warnings: string[] = [];
+    const [caos, odd] = loadConnections(dir, { warn: (m) => warnings.push(m) });
+    expect(caos.profile).toBe("caos");
+    expect(odd).not.toHaveProperty("profile");
+    expect(warnings).toEqual([expect.stringContaining('Connection "odd": profile must be')]);
+  });
+
   it("leaves fieldHints unset when the connection has none", () => {
     const dir = project({ local: { connections: { docs: { transport: "http", url: "https://example.test/mcp" } } } });
     expect(loadConnections(dir, { warn: () => undefined })[0]).not.toHaveProperty("fieldHints");

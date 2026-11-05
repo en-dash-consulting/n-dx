@@ -4,3 +4,6 @@ export function createFakeMcpServer(name?: string, extra?: (server: McpServer) =
 
 /** The call-card tools: a rich write, two list reads for field hints, and a write that fails validation. */
 export function addCallCardTools(server: McpServer): void;
+
+/** CAOS's work-item tools by name and input schema, answering canned data; never the real server. */
+export function addCaosTools(server: McpServer): void;

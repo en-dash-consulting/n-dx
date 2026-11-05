@@ -216,16 +216,17 @@ export class ConnectionService {
   /**
    * What a call card names about `connection`: its label, the host of an http
    * server's url (never the url, which a path or query could carry more in)
-   * and the field hints the operator configured. Reads config only; undefined
-   * for an unknown id.
+   * the field hints the operator configured and the server profile it names.
+   * Reads config only; undefined for an unknown id.
    */
-  callContext(connection: string): { label: string; host?: string; fieldHints: FieldHints } | undefined {
+  callContext(connection: string): { label: string; host?: string; fieldHints: FieldHints; profile?: string } | undefined {
     const config = this.slots.get(connection)?.config;
     if (!config) return undefined;
     return {
       label: config.label,
       ...(config.transport === "http" && { host: new URL(config.url).host }),
       fieldHints: config.fieldHints ?? {},
+      ...(config.profile && { profile: config.profile }),
     };
   }
 
