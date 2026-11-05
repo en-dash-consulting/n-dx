@@ -73,7 +73,7 @@ Each step above has a CLI command and an MCP tool. All of them work on a v2 PRD 
 | Place it | `rex change place <change> --target=<node> --relation=touches\|amends` | `place_change` (with target) |
 | Place an applied change that was never placed | `rex change place <change> --target=<node> --relation=touches` (`amends` is refused: its amendments already reached the map) | `place_change` (with target, `touches`) |
 | Propose a new capability or constraint when nothing fits | `rex change place <change> --propose --type=capability\|constraint --under=<area> --title="…"` | `place_change` (with `propose`) |
-| Apply it as a steward | `rex change apply <change>` | `apply_change` |
+| Apply it as a steward | `rex change apply <change>`, or **Apply…** in the dashboard's change detail panel (previews first) | `apply_change` |
 | Edit a requirement directly | `rex product edit <node> --statement="…"` or `--capability-criterion="<id>: <text>"` | — |
 
 Two flags look alike and mean different things. `--capability-criterion` edits a capability's capability criteria, its standing spec. `--criterion` on `rex add` sets a change's or task's acceptance criteria, its "done when".
