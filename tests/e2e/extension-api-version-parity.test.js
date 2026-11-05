@@ -12,9 +12,16 @@ import { describe, it, expect } from "vitest";
 
 import { EXTENSION_API_VERSION as coreVersion } from "../../packages/core/extension-env.js";
 import { EXTENSION_API_VERSION as hubVersion } from "../../packages/web/dist/hub/extensions.js";
+import { DEFAULT_SIDECAR_IDLE_STOP_MINUTES as coreIdle } from "../../packages/core/extension-dispatch.js";
+import { DEFAULT_IDLE_STOP_MINUTES as hubIdle } from "../../packages/web/dist/hub/frame-keys.js";
 
 describe("extension apiVersion parity", () => {
   it("the hub's apiVersion is core's EXTENSION_API_VERSION", () => {
     expect(hubVersion).toBe(coreVersion);
+  });
+
+  // A frame key with no manifest idleStopMinutes goes stale on the default the sidecar idles out on.
+  it("the hub's frame-key idle default is core's DEFAULT_SIDECAR_IDLE_STOP_MINUTES", () => {
+    expect(hubIdle).toBe(coreIdle);
   });
 });

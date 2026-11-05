@@ -21,16 +21,18 @@
 
 import { h } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { useProjectStatus } from "../components/index.js";
+import { StrengthChip, useProjectStatus } from "../components/index.js";
+import type { GuessStrength } from "../components/index.js";
+import { useRefetchableProductRead } from "../hooks/index.js";
+import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { Pending, StaleNotice, useRefetchableProductRead, type Load } from "./product-pages.js";
-import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate, PlacementStrength } from "./product-model.js";
+import { Pending, StaleNotice } from "./product-pages.js";
+import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
 
 /** A guess's strength; `tied` when the top two candidates share a score. */
-export type GuessStrength = PlacementStrength | "tied";
 
 /** IB7: strongest first, then possible, tied, weak. */
 const STRENGTH_RANK: Record<GuessStrength, number> = { strong: 0, possible: 1, tied: 2, weak: 3 };
@@ -75,14 +77,6 @@ export function sortInbox(rows: readonly InboxRow[]): InboxRow[] {
 }
 
 // ── Rows ─────────────────────────────────────────────────────────────
-
-/** Dot and word together: the strength never rests on colour alone. */
-export function StrengthChip({ strength }: { strength: GuessStrength }) {
-  return h("span", { class: `inbox-strength inbox-strength-${strength}`, "data-strength": strength },
-    h("span", { class: "inbox-strength-dot", "aria-hidden": "true" }),
-    strength,
-  );
-}
 
 function GuessLine({ row }: { row: InboxRow }) {
   if (!row.shortlist) return h("span", { class: "inbox-guess inbox-guess-pending" }, "Finding a place…");

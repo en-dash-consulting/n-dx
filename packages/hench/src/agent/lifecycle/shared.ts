@@ -74,7 +74,8 @@ import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAI
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
 import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
-import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
+import { section, subsection, stream, detail, info, warn, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
+import { recordRunDiagnosis } from "./run-diagnosis.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { displayTaskInfo } from "./task-display.js";
@@ -4998,6 +4999,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
+
+  // Why it failed and what to do next, for `hench runs diagnose` and the task
+  // page's verdict banner. Narration: a verdict that cannot be formed must not
+  // change how the run ended, so the failure is reported and the run saved.
+  try {
+    const diagnosis = await recordRunDiagnosis({ projectDir, henchDir, run, store: opts.store });
+    if (diagnosis) info(`Verdict: ${diagnosis.class} — ${diagnosis.summary}`);
+  } catch (err) {
+    warn(`Run verdict not recorded: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   await saveRun(henchDir, run);
 
   // The last event, before the stream is closed below. A reader tailing the

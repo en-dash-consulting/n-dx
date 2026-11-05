@@ -30,6 +30,8 @@ import { guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
+import { handleBranchHealthRoute } from "./routes-branch-health.js";
+import { handleChangesetsRoute } from "./routes-changesets.js";
 import { handleRunCommandsRoute, shutdownRunCommands } from "./routes-run-commands.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
@@ -49,12 +51,20 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
-import { enforceRouteFeatureGate } from "./route-feature-gates.js";
+import { enforceRouteFeatureGate, featureDisabledUpgradeResponse } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
-import { handleSidecarRoute } from "./routes-sidecar.js";
+import { handleConnectionsRoute } from "./routes-connections.js";
+import { handleTrackerRoute } from "./routes-tracker.js";
+import {
+  handleSidecarRoute,
+  isHubSidecarPath,
+  releaseHubSessionHostForSidecarOff,
+  releaseHubSessionHostOnShutdown,
+  type SidecarWorkspaces,
+} from "./routes-sidecar.js";
 import { isSidecarBrokerRequest } from "./sidecar/broker-credential.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
@@ -160,6 +170,14 @@ export function registerShutdownHandlers(
     closeWorktreeRunWatchers();
     // Leases taken by GET /api/hench/runs/:id/log|events.
     stopRunTailWatches();
+    // The hub session host lock, if this server holds it: released once its
+    // interrupted hub turns settle, so the hub's next pick claims it at once
+    // without two servers writing the session.
+    try {
+      if (await releaseHubSessionHostOnShutdown(actualPort)) console.log("[shutdown] hub session host lock released");
+    } catch (err) {
+      console.error(`[shutdown] failed to release the hub session host lock: ${(err as Error).message}`);
+    }
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
@@ -831,6 +849,11 @@ function liveSourcesOf(registry: WorkspaceRegistry): LiveSources {
   return { listWorkspaces: () => registry.list() };
 }
 
+/** The Sidecar's Diagnose branch lens finds the attached worktree in the registry, never by importing it. */
+function sidecarWorkspacesOf(registry: WorkspaceRegistry): SidecarWorkspaces {
+  return { listWorkspaces: () => registry.list() };
+}
+
 async function handleApiRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -848,14 +871,21 @@ async function handleApiRoutes(
   // rather than for whichever precondition its handler would have checked
   // first. `ctx` is already the addressed workspace's, so the toggle is read
   // from the project the request named. See route-feature-gates.ts.
-  if (enforceRouteFeatureGate(req, res, ctx)) return true;
+  if (enforceRouteFeatureGate(req, res, ctx)) {
+    // Only web.sidecar gates the hub session routes. The hub moves on to
+    // another host, which can claim the lock once this server gives it up.
+    if (isHubSidecarPath((req.url || "/").split("?")[0])) releaseHubSessionHostAfterRefusal(ctx);
+    return true;
+  }
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleBranchHealthRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleRunCommandsRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
+  if (handleChangesetsRoute(req, res, ctx)) return true;
   if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
   if (isInScope(ctx.scope, "hench") && await handleLiveTaskRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
@@ -897,7 +927,12 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast, {
+    workspaces: sidecarWorkspacesOf(registry),
+    hub: { drawerHtml: () => assets?.getHubSessionHtml() ?? null },
+  }))) return true;
+  if (await handleScopedRoute(true, () => handleConnectionsRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleTrackerRoute(req, res, ctx))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
   if (assets && handleStaticRoute(req, res, ctx, assets)) return true;
   return false;
@@ -1038,9 +1073,31 @@ function createHttpServer(
   });
 
   server.on("upgrade", (req, socket, head) => {
-    ws.handleUpgrade(req, socket, head);
+    ws.handleUpgrade(req, socket, head, () => hubSessionUpgradeRefusal(req, registry));
   });
   return server;
+}
+
+/** Give up the hub session host lock in the background after web.sidecar refused a hub session request. */
+function releaseHubSessionHostAfterRefusal(ctx: ServerContext): void {
+  releaseHubSessionHostForSidecarOff(ctx).catch((err: Error) => {
+    console.error(`[sidecar] failed to release the hub session host lock: ${err.message}`);
+  });
+}
+
+/**
+ * The web.sidecar refusal for a hub session upgrade, as handleApiRoutes
+ * answers the same paths over HTTP, so the hub's upgrade failover moves on to
+ * another host. Null for every other path: those upgrades are the dashboard's
+ * own socket, which no toggle governs.
+ */
+function hubSessionUpgradeRefusal(req: IncomingMessage, registry: WorkspaceRegistry): string | null {
+  const pathname = stripWorkspaceSlot(req.url || "/").url.split("?")[0];
+  if (!isHubSidecarPath(pathname)) return null;
+  const { ctx } = registry.resolveWorkspace(req);
+  const refusal = featureDisabledUpgradeResponse(pathname, ctx);
+  if (refusal !== null) releaseHubSessionHostAfterRefusal(ctx);
+  return refusal;
 }
 
 function logStartup(

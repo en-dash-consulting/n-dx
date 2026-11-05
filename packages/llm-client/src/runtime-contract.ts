@@ -521,7 +521,7 @@ const VENDOR_ERROR_PATTERNS: ReadonlyArray<readonly [RegExp, FailureCategory]> =
   [/not logged in|login required/i, "auth"],
 
   // Rate limiting
-  [/rate.limit|too many requests|\b429\b/i, "rate_limit"],
+  [/rate.limit|too many requests|\b429\b|session limit/i, "rate_limit"],
 
   // Timeout
   [/timeout|timed? ?out|ETIMEDOUT/i, "timeout"],

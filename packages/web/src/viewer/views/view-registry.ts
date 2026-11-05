@@ -100,6 +100,10 @@ export interface ViewRenderContext {
   setOpenCapability?: (id: string | null) => void;
   /** The PRD page reports the item selected in its tree, which the route does not carry. */
   setOpenTask?: (id: string | null) => void;
+  /** Attach a Workspaces worktree card to Sidecar (null detaches); absent while Sidecar is off. */
+  attachWorktree?: (key: string | null) => void;
+  /** The worktree card attached to Sidecar, by workspace key. */
+  attachedWorktree?: string | null;
   /**
    * Whether the detail panel (a file, zone or PRD item) is showing beside the
    * page, so a full-screen dashboard tile leaves room for it.
@@ -194,8 +198,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
       : null,
   ),
 
-  "workspaces": () =>
-    h(WorkspacesView, null),
+  "workspaces": ({ attachWorktree, attachedWorktree }) =>
+    h(WorkspacesView, { onAttachSidecar: attachWorktree, attachedWorktree: attachedWorktree ?? null }),
 
   "live": ({ data, navigateTo, jobs }) =>
     h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),

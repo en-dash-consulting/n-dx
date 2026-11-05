@@ -179,4 +179,26 @@ describe("Hench runs diagnostics in API", () => {
     expect(data.runs[0].vendor).toBe("codex");
     expect(data.runs[0].tokenDiagnosticStatus).toBe("unavailable");
   });
+
+  it("carries the run file's diagnosis verdict in the summary, and drops a malformed one", async () => {
+    const runsDir = join(tmpDir, ".hench", "runs");
+    const diagnosis = {
+      class: "no-changes",
+      summary: "The run made no commits.",
+      evidence: ["commits: 0"],
+      actions: [{ kind: "tighten-done-when", label: "Tighten the task's done-when" }],
+      attempt: { n: 1, of: 2 },
+    };
+    const base = {
+      taskId: "t5", taskTitle: "Verdict", status: "failed", turns: 2, model: "sonnet",
+      tokenUsage: { input: 1, output: 1 }, toolCalls: [],
+    };
+    await writeFile(join(runsDir, "run-verdict.json"), JSON.stringify({ ...base, id: "run-verdict", startedAt: "2026-10-28T10:00:00.000Z", diagnosis }));
+    await writeFile(join(runsDir, "run-bad.json"), JSON.stringify({ ...base, id: "run-bad", startedAt: "2026-10-28T09:00:00.000Z", diagnosis: { class: 3 } }));
+
+    const data = await (await fetch(`http://127.0.0.1:${port}/api/hench/runs?taskId=t5`)).json();
+    expect(data.runs.map((r: { id: string }) => r.id)).toEqual(["run-verdict", "run-bad"]);
+    expect(data.runs[0].diagnosis).toEqual(diagnosis);
+    expect(data.runs[1].diagnosis).toBeUndefined();
+  });
 });

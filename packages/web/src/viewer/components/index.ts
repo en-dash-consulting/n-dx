@@ -48,6 +48,7 @@ export {
   buildShareableUrl,
   type CopyLinkButtonProps,
 } from "./copy-link-button.js";
+export { CopyTextButton, type CopyTextButtonProps } from "./copy-text-button.js";
 export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
 export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
@@ -118,8 +119,17 @@ export { TopNav } from "./top-nav.js";
 export type { TopNavProps } from "./top-nav.js";
 export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
+export { TrackerLinkList, TrackerLinksEditor, resetTrackerLabel, useTrackerLabel } from "./tracker-links.js";
+export type { TrackerLinksEditorProps } from "./tracker-links.js";
 export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
+export { StrengthChip } from "./strength-chip.js";
+export type { GuessStrength } from "./strength-chip.js";
+export { HubSessionDrawer, HubCeilingMeter, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
+export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
+export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
+export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
+export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";

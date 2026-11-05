@@ -100,6 +100,7 @@ describe("POST /api/hench/execute — run options", () => {
       tokenBudget: 0,
       fresh: true,
       allowDirty: true,
+      requireUnblocked: true,
       contextNotes: "Prefer the existing helper.",
     };
     // The test covers the whole table: a key added to it without a case here fails.
@@ -126,8 +127,43 @@ describe("POST /api/hench/execute — run options", () => {
       "--token-budget=0",
       "--fresh",
       "--allow-dirty",
+      "--require-unblocked",
       contextFlag,
     ]);
+  });
+
+  describe("requireUnblocked", () => {
+    beforeEach(async () => {
+      await writeTasks([
+        { id: "task-a", title: "Schema first", status: "pending", level: "task" },
+        { id: "task-done", title: "Already done", status: "completed", level: "task" },
+        { id: "task-1", title: "Options task", status: "pending", level: "task", blockedBy: ["task-a", "task-done"] },
+      ]);
+    });
+
+    it("refuses a task with a blocker not completed, naming it, and spawns nothing", async () => {
+      const res = await execute({ taskId: "task-1", options: { requireUnblocked: true } });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toContain('"Schema first" (task-a, pending)');
+      expect(body.error).not.toContain("task-done");
+      expect(body.blockedBy).toEqual([{ id: "task-a", title: "Schema first", status: "pending" }]);
+      expect(spawnManagedMock).not.toHaveBeenCalled();
+    });
+
+    it("starts the same task without it, as an explicit ndx work --task does", async () => {
+      expect((await execute({ taskId: "task-1" })).status).toBe(202);
+      expect(spawnedFlags()).toEqual([]);
+    });
+
+    it("starts it once every blocker is completed, passing --require-unblocked", async () => {
+      await writeTasks([
+        { id: "task-done", title: "Already done", status: "completed", level: "task" },
+        { id: "task-1", title: "Options task", status: "pending", level: "task", blockedBy: ["task-done"] },
+      ]);
+      expect((await execute({ taskId: "task-1", options: { requireUnblocked: true } })).status).toBe(202);
+      expect(spawnedFlags()).toEqual(["--require-unblocked"]);
+    });
   });
 
   it("spawns exactly workCommandArgs — the builder the Prepare task modal prints", async () => {

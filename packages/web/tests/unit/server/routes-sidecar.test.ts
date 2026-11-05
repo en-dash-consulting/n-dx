@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, symlinkSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -22,6 +22,7 @@ import {
   CODEX_SIDECAR_UNAVAILABLE,
   createAnnouncingBroker,
   handleSidecarRoute,
+  readWorktreeBranchHealth,
   sidecarTurnSpendRecorder,
   type SidecarCardMessage,
   type SidecarFramesMessage,
@@ -125,6 +126,15 @@ const noEffects: SidecarActions = {
   startWork: async () => ({ ok: true, text: "Started it." }),
   reviewChangeSet: async () => ({ layout: "v1", items: [{ title: "x", type: "epic" }] }),
   writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
+  checkPlacement: async () => "this test places nothing",
+  writePlacement: async () => ({ ok: true, text: "Placed it.", ids: ["x"] }),
+  checkLink: async () => "this test links nothing",
+  writeLink: async () => ({ ok: true, text: "Linked it.", ids: ["x"] }),
+  readRunPlan: async () => "this test plans nothing",
+  githubReadsAllowed: () => false,
+  branchHealthEnabled: () => true,
+  githubRead: async () => ({ ok: true, text: "Read it." }),
+  postGithub: async () => ({ ok: true, text: "Posted it." }),
 };
 
 function newRegistry(): SidecarSessionRegistry {
@@ -290,8 +300,48 @@ describe("lens registry", () => {
     const { lenses } = await res.json() as { lenses: Array<{ id: string; available: boolean; needs?: string }> };
     expect(lenses.map((l) => l.id)).toEqual([...LENS_IDS]);
     expect(lenses.find((l) => l.id === "plan")).toEqual({ id: "plan", available: true });
-    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the queue planner" });
+    // Guide reads the queue planner, which is behind hench.readyNext (off by default).
+    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the hench.readyNext feature turned on" });
+    expect(lenses.find((l) => l.id === "diagnose-run")).toEqual({
+      id: "diagnose-run",
+      available: true,
+      target: { kind: "task", needs: "a task to diagnose" },
+    });
     expect((await fetch(`${server.baseUrl}/api/sidecar/lenses`, { method: "POST" })).status).toBe(405);
+  });
+
+  it("offers Guide, with no task to attach, once hench.readyNext is on, with no restart", async () => {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { hench: { readyNext: true } } }));
+    const { lenses } = await (await fetch(`${server.baseUrl}/api/sidecar/lenses`)).json() as { lenses: Array<{ id: string }> };
+    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: true });
+  });
+
+  it("offers Diagnose branch, needing a worktree attached, only while git.branchHealth is on", async () => {
+    const diagnoseBranch = async () => ((await (await fetch(`${server.baseUrl}/api/sidecar/lenses`)).json()) as { lenses: Array<{ id: string }> })
+      .lenses.find((l) => l.id === "diagnose-branch");
+    expect(await diagnoseBranch()).toEqual({ id: "diagnose-branch", available: false, needs: "the git.branchHealth feature turned on" });
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { git: { branchHealth: true } } }));
+    expect(await diagnoseBranch()).toEqual({
+      id: "diagnose-branch",
+      available: true,
+      target: { kind: "worktree", needs: "a branch or worktree" },
+    });
+  });
+});
+
+describe("readWorktreeBranchHealth", () => {
+  /** A git that knows no commit: the worktree has no branch to report on. */
+  const noGit = async () => ({ launched: true, error: null, exitCode: 128, stdout: "", stderr: "fatal: not a git repository" });
+
+  it("finds the attached worktree in the workspace list, never under another key", async () => {
+    const workspaces = { listWorkspaces: () => [{ key: "other", path: join(root, "other") }] };
+    expect(await readWorktreeBranchHealth(ctx, workspaces, "missing", false, noGit)).toBe('"missing" names no worktree of this repository');
+    expect(await readWorktreeBranchHealth(ctx, workspaces, "other", false, noGit)).toBe("other has no branch to report on: fatal: not a git repository");
+  });
+
+  it("knows the session's own workspace without the list", async () => {
+    const own = { ...ctx, workspace: "here" };
+    expect(await readWorktreeBranchHealth(own, undefined, "here", false, noGit)).toBe("here has no branch to report on: fatal: not a git repository");
   });
 });
 
@@ -517,7 +567,7 @@ describe("broker", () => {
     return (result.content as Array<{ text: string }>)[0].text;
   }
 
-  it("serves the nine broker tools while a turn runs, and refuses with no turn running", async () => {
+  it("serves the eleven broker tools while a turn runs, and refuses with no turn running", async () => {
     const idle = await createSession();
     const refused = await fetch(`${server.baseUrl}/api/sidecar/sessions/${idle}/mcp`, {
       method: "POST",
@@ -531,7 +581,7 @@ describe("broker", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
-      "propose_edit", "propose_prd_change", "run_command", "start_work",
+      "propose_edit", "propose_link", "propose_prd_change", "propose_run_plan", "run_command", "start_work",
     ]);
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });
@@ -547,6 +597,8 @@ describe("broker", () => {
     expect(cards).toEqual([
       expect.objectContaining({ id: cardId, tool: "start_work", kind: "work", allowListKey: null, status: "pending" }),
     ]);
+    // The card carries the options start will use, so its title shows the defaulted --require-unblocked.
+    expect(cards[0]!.runOptions).toEqual({ requireUnblocked: true });
 
     // Work can never be allow-listed, whatever the operator asks.
     const remember = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", remember: true } });
@@ -558,6 +610,20 @@ describe("broker", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/denied card .*later/);
 
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("puts the options start will use on a work card: an explicit requireUnblocked false drops the default", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "t1", options: { requireUnblocked: false, review: true } } });
+    const { cardId } = await cardAnnounced(id, "pending");
+    const { cards } = await (await api(`/${id}/cards`)).json() as { cards: SidecarCard[] };
+    expect(cards.find((c) => c.id === cardId)?.runOptions).toEqual({ review: true });
+
+    await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "deny" } });
+    await call;
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });
   });

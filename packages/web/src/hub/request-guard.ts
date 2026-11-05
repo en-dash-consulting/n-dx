@@ -211,6 +211,59 @@ export function guardHubRequest(
 }
 
 /**
+ * The Origin rule for a frame-keyed request (`/x/<name>/~f/<key>/…`). Its page
+ * is sandboxed without `allow-same-origin`, so a browser sends `Origin: null`
+ * from it; that, no Origin, and the hub's own are accepted. Any other origin
+ * on a mutating method is refused, as on every other path.
+ */
+function frameOriginRefused(req: Pick<IncomingMessage, "headers" | "method">, hubPort: number | undefined, upgrade: boolean): boolean {
+  const method = (req.method || "GET").toUpperCase();
+  if (!upgrade && SAFE_METHODS.has(method)) return false;
+  return classifyOrigin(req, hubPort) === "untrusted" && singleHeader(req.headers.origin) !== "null";
+}
+
+/**
+ * The gate for a frame-keyed request, in place of {@link guardHubRequest}:
+ * the Host rule, then the key in place of the token (`live` says whether it
+ * is live and bound to the path's extension — 401 otherwise), then the Origin
+ * rule above. A page with an opaque origin (`Origin: null`) can read a
+ * response only if it names that origin, so the hub adds the CORS headers
+ * here and the extension needs none: `Access-Control-Allow-Origin: null` and
+ * `Vary: Origin`, never `Allow-Credentials` (the key in the path is the
+ * credential; no cookie is involved). A preflight from such a page is
+ * answered here, 204, and never reaches the sidecar. Returns true when the
+ * request has been answered.
+ */
+export function guardFrameKeyRequest(req: IncomingMessage, res: ServerResponse, hubPort: number | undefined, live: boolean): boolean {
+  if (!hostAllowed(req, hubPort)) return rejectHost(res);
+  if (!live) return rejectUnauthenticated(res);
+  if (frameOriginRefused(req, hubPort, false)) return reject(res);
+  if (singleHeader(req.headers.origin) !== "null") return false;
+  res.setHeader("Access-Control-Allow-Origin", "null");
+  res.setHeader("Vary", "Origin");
+  const requested = singleHeader(req.headers["access-control-request-method"]);
+  if ((req.method || "GET").toUpperCase() !== "OPTIONS" || requested === undefined) return false;
+  res.setHeader("Access-Control-Allow-Methods", requested);
+  const headers = singleHeader(req.headers["access-control-request-headers"]);
+  if (headers !== undefined) res.setHeader("Access-Control-Allow-Headers", headers);
+  res.setHeader("Access-Control-Max-Age", "600");
+  res.writeHead(204).end();
+  return true;
+}
+
+/** {@link guardFrameKeyRequest} for a WebSocket handshake, as {@link upgradeRefusal} reports it. */
+export function frameKeyUpgradeRefusal(
+  req: Pick<IncomingMessage, "headers" | "method">,
+  hubPort: number | undefined,
+  live: boolean,
+): "421 Misdirected Request" | "401 Unauthorized" | "403 Forbidden" | null {
+  if (!hostAllowed(req, hubPort)) return "421 Misdirected Request";
+  if (!live) return "401 Unauthorized";
+  if (frameOriginRefused(req, hubPort, true)) return "403 Forbidden";
+  return null;
+}
+
+/**
  * Why a WebSocket handshake is refused, as the status line to answer with, or
  * null when it may proceed.
  *

@@ -24,14 +24,14 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import { getWorkspaceKey } from "../base-path.js";
+import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { openWebSocket } from "../session.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
 import type { SidecarAttachment, SidecarPageSelection } from "./use-sidecar-attachment.js";
-import type { SidecarChangeSet, SidecarChangeSetEdit } from "../external.js";
+import type { QueuePlan, SidecarChangeSet, SidecarChangeSetEdit } from "../external.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-sidecar.ts and server/sidecar/session-registry.ts
@@ -68,6 +68,26 @@ export interface SidecarRuntimeEvent {
   toolCall?: { tool: string; input: Record<string, unknown>; id?: string };
   toolResult?: { tool: string; output: string; durationMs: number; id?: string };
   failure?: { message?: string };
+  /** On `token_usage`: what the call sent in and got back. */
+  tokenUsage?: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+}
+
+/**
+ * The context the session's next turn resumes with: what the last call of its
+ * last turn sent in, the measure the server holds against the ceiling
+ * (`contextTokens` in server/sidecar/context-refresh.ts). A refresh starts the
+ * next turn cold, so nothing carries over it; the checkpoint turn's own calls
+ * are not the conversation's.
+ */
+export function latestContextTokens(frames: readonly SidecarFrame[]): number {
+  for (let i = frames.length - 1; i >= 0; i -= 1) {
+    const frame = frames[i];
+    if (frame.type === "context-refreshed") return 0;
+    if (frame.type !== "event" || frame.checkpoint) continue;
+    const usage = frame.event.type === "token_usage" ? frame.event.tokenUsage : undefined;
+    if (usage) return usage.input + (usage.cacheCreationInput ?? 0) + (usage.cacheReadInput ?? 0);
+  }
+  return 0;
 }
 
 export type SidecarFrame =
@@ -80,11 +100,69 @@ export type SidecarCardKind =
   | "command"
   | "work"
   | "change-set"
+  | "run-plan"
   | "placement"
   | "edit"
+  | "link"
   | "network-read"
   | "draft-post"
-  | "migration-decision";
+  | "draft-file"
+  | "migration-decision"
+  | "external-call";
+
+/** A capability criterion in a placement; mirrors `SidecarCriterion` in shared/sidecar-card.ts. */
+export interface PlacementCriterion { id: string; text: string }
+
+/** What a placement card writes; mirrors `SidecarPlacementRequest` in shared/sidecar-card.ts. */
+export type SidecarPlacementRequest =
+  | {
+      action: "place";
+      target: string;
+      relation?: "touches" | "amends";
+      summary?: string;
+      proposed?: string;
+      criteria?: { add?: PlacementCriterion[]; replace?: PlacementCriterion[]; remove?: string[] };
+    }
+  | {
+      action: "propose";
+      type: "capability" | "constraint";
+      under: string;
+      title: string;
+      summary?: string;
+      proposed?: string;
+      criteria?: { add: PlacementCriterion[] };
+    };
+
+/** Rex's dry run of a placement; mirrors `SidecarPlacementCheck` in shared/sidecar-card.ts. */
+export type SidecarPlacementCheck =
+  | { ok: true; action: "place"; target: string; title: string; relation: "touches" | "amends"; base?: string; warnings: string[] }
+  | { ok: true; action: "propose"; type: "capability" | "constraint"; under: string; title: string; warnings: string[] }
+  | { ok: false; kind: string; error: string };
+
+/** A placement card's placement; mirrors `SidecarPlacement` in shared/sidecar-card.ts. */
+export interface SidecarPlacement {
+  change: string;
+  request: SidecarPlacementRequest;
+  reasons: string[];
+  check: SidecarPlacementCheck;
+}
+
+/** A link card's item, tracker ref and the tracker's label; mirrors `SidecarLink` in shared/sidecar-card.ts. */
+export interface SidecarLink { itemId: string; title: string; ref: string; label: string | null }
+
+/** One choice of an external-call card's picker; mirrors `SidecarFieldOption` in shared/sidecar-card.ts. */
+export interface SidecarFieldOption { value: string | number | boolean; label: string }
+
+/** An external-call card's connection, host, input schema and picker choices; mirrors `SidecarExternalCall` in shared/sidecar-card.ts. */
+export interface SidecarExternalCall {
+  label: string;
+  host?: string;
+  inputSchema: Record<string, unknown>;
+  options?: Record<string, SidecarFieldOption[]>;
+}
+
+/** One problem of a server's validation error; mirrors `SidecarCallProblem` in shared/sidecar-card.ts. */
+export interface SidecarCallProblem { field?: string; message: string }
 
 /** A permission card; mirrors `SidecarCard` in server/sidecar/broker.ts. */
 export interface SidecarCard {
@@ -97,19 +175,34 @@ export interface SidecarCard {
   allowListKey: string | null;
   /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
   preview?: string;
+  /** A work card's run options as the server will start them, defaults applied. */
+  runOptions?: Record<string, unknown>;
   /** A change-set card's items as approval writes them. */
   changeSet?: SidecarChangeSet;
+  /** A run-plan card's plan, as the planner printed it when the card was raised. */
+  runPlan?: QueuePlan;
+  /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
+  placement?: SidecarPlacement;
+  /** A link card's item and tracker ref as approval writes them. */
+  link?: SidecarLink;
+  /** An external-call card's connection, workspace host, input schema and picker choices. */
+  externalCall?: SidecarExternalCall;
+  /** The lane (0-based) the operator started from a run-plan card. */
+  lane?: number;
   status: "pending" | "approved" | "denied" | "withdrawn";
   raisedAt: string;
   decidedAt?: string;
   reason?: string;
   /** Approved with "always allow". */
   remembered?: true;
-  /** The operator edited the change set before approving it. */
+  /** The operator edited the change set, placement, path or call arguments before approving it. */
   edited?: true;
-  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
-  carriedOut?: { ok: boolean; ids?: string[] };
+  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote, `problems` an external server's validation errors. */
+  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
 }
+
+/** A placement as one body: the shape `POST /api/rex/changes/:id/placement/check` takes, and a placement approval's edits. */
+export type PlacementEditBody = Record<string, unknown>;
 
 /** The operator's answer to the first waiting card. */
 export interface SidecarCardDecision {
@@ -119,7 +212,15 @@ export interface SidecarCardDecision {
   /** "Always allow": only when the card has an allowListKey. */
   remember?: boolean;
   /** A change-set approval's item edits; the approval writes the edited values. */
-  edits?: SidecarChangeSetEdit[];
+  edits?: SidecarChangeSetEdit[] | PlacementEditBody;
+  /** A placement edit's dry run as the operator reviewed it; the server refuses the approval when its re-check moved from it. */
+  reviewed?: SidecarPlacementCheck;
+  /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
+  lane?: number;
+  /** A draft-file approval's path as edited on the card; the draft is saved there. */
+  path?: string;
+  /** An external-call approval's arguments as edited on the card; the tool is called with these. */
+  arguments?: Record<string, unknown>;
 }
 
 /**
@@ -184,6 +285,26 @@ export function sidecarSetupNeed(
 }
 
 const SESSIONS = "/api/sidecar/sessions";
+
+/**
+ * Where a drawer's sessions live and how it hears about them. The worktree's
+ * by default; the hub drawer's are reached through the hub at `/hub/session/`.
+ */
+export interface SidecarEndpoint {
+  /** The session routes' collection path. */
+  sessions: string;
+  /** The socket that announces the sessions' frames and cards. */
+  socketUrl: () => string;
+  /**
+   * A vendor and lens the session is created with and keeps: there is no
+   * picker to read a catalog for and no page item to attach.
+   */
+  fixed?: { vendor: string; lens: string };
+}
+
+/** This worktree's sessions on this viewer's own server. */
+export const WORKTREE_SIDECAR: SidecarEndpoint = { sessions: SESSIONS, socketUrl: getWebSocketUrl };
+
 /**
  * Vendors with a resumable CLI session, in picker order. A resume id belongs
  * to one vendor CLI, so these are the only vendors Sidecar can offer.
@@ -320,6 +441,8 @@ export function isSidecarShortcut(e: Pick<KeyboardEvent, "key" | "metaKey" | "ct
 export interface SidecarDrawerState {
   open: boolean;
   toggle: () => void;
+  /** Open it, as a page's "Ask Sidecar" control does after attaching its item. */
+  show: () => void;
   close: () => void;
 }
 
@@ -327,6 +450,7 @@ export interface SidecarDrawerState {
 export function useSidecarDrawerState(enabled: boolean): SidecarDrawerState {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((o) => !o), []);
+  const show = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
@@ -340,7 +464,7 @@ export function useSidecarDrawerState(enabled: boolean): SidecarDrawerState {
     return () => document.removeEventListener("keydown", handler);
   }, [enabled, toggle]);
 
-  return { open: enabled && open, toggle, close };
+  return { open: enabled && open, toggle, show, close };
 }
 
 // ---------------------------------------------------------------------------
@@ -372,8 +496,8 @@ export interface SidecarState {
    * `unavailable` when the manifest could not be read (read once per page load).
    */
   commandManifest: SidecarCommandManifest | "loading" | "unavailable" | null;
-  /** Decide the open session's first waiting card. */
-  decide: (cardId: string, decision: SidecarCardDecision) => Promise<void>;
+  /** Decide the open session's first waiting card; false when the server refused the decision. */
+  decide: (cardId: string, decision: SidecarCardDecision) => Promise<boolean>;
   lastTurn: SidecarTurnEnd | null;
   error: string | null;
   /** The agent the picker shows: the open session's, else the one the first prompt will create. */
@@ -411,8 +535,18 @@ const RECONNECT_MAX_MS = 30_000;
 
 const newTail = (sessionId: string | null): Tail => ({ sessionId, cursor: 0, inFlight: false, again: false });
 
-export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSelection): SidecarState {
-  const attachment = useSidecarAttachment(enabled, open, page);
+export function useSidecar(
+  enabled: boolean,
+  open: boolean,
+  page: SidecarPageSelection,
+  endpoint: SidecarEndpoint = WORKTREE_SIDECAR,
+): SidecarState {
+  // Read through a ref: a caller passing a fresh object each render must not re-run every effect.
+  const endpointRef = useRef(endpoint);
+  endpointRef.current = endpoint;
+  const sessionsPath = useCallback(() => endpointRef.current.sessions, []);
+  const fixed = endpoint.fixed ?? null;
+  const attachment = useSidecarAttachment(enabled && !fixed, open, page);
   const attachmentRef = useRef(attachment);
   attachmentRef.current = attachment;
   const [session, setSession] = useState<SidecarSession | null>(null);
@@ -449,7 +583,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     tail.inFlight = true;
     const sessionId = tail.sessionId;
     const body = await getJson<{ frames: SidecarFrame[]; cursor: number; running: boolean }>(
-      `${SESSIONS}/${encodeURIComponent(sessionId)}/frames?after=${tail.cursor}`,
+      `${sessionsPath()}/${encodeURIComponent(sessionId)}/frames?after=${tail.cursor}`,
     );
     // A switch of session while this was in flight started a new tail.
     if (tailRef.current !== tail) return;
@@ -486,12 +620,12 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   const fetchWaiting = useCallback(async () => {
     const reads = cardReadsRef.current;
     const read = ++reads.started;
-    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(sessionsPath());
     if (!list || !mountedRef.current) return;
     const open = tailRef.current.sessionId;
     const ids = list.sessions.filter((e) => !e.session.endedAt || e.session.id === open).map((e) => e.session.id);
     const cards = await Promise.all(ids.map(async (id) => {
-      const body = await getJson<{ cards: SidecarCard[] }>(`${SESSIONS}/${encodeURIComponent(id)}/cards`);
+      const body = await getJson<{ cards: SidecarCard[] }>(`${sessionsPath()}/${encodeURIComponent(id)}/cards`);
       return [id, body ? orderCards(body.cards) : []] as const;
     }));
     if (!mountedRef.current || read < reads.applied) return;
@@ -500,7 +634,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   }, []);
 
   const loadSessions = useCallback(async () => {
-    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(sessionsPath());
     if (!list || !mountedRef.current) return;
     // Keep the open session while it is still open; otherwise take the latest.
     const current = tailRef.current.sessionId;
@@ -552,7 +686,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     const connect = (isReconnect: boolean): void => {
       if (typeof WebSocket === "undefined") return; // no socket: the drawer still reads when it opens
       try {
-        ws = openWebSocket();
+        ws = openWebSocket(endpointRef.current.socketUrl());
       } catch {
         scheduleReconnect();
         return;
@@ -607,6 +741,12 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     if (!enabled || !open) return;
     if (tailRef.current.sessionId) void fetchFrames();
     void loadSessions();
+    const pinned = endpointRef.current.fixed;
+    if (pinned) {
+      // No picker: the server's default model for the one vendor the session runs on.
+      setPicked((prev) => prev ?? { vendor: pinned.vendor, model: "" });
+      return;
+    }
     void (async () => {
       // The server caches the CLI probe for minutes; a CLI last seen missing is
       // probed again, so installing it and reopening the drawer clears state A.
@@ -621,11 +761,16 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   /** Create a session on `agent` and follow it; null, with the error set, when the server refuses. */
   const createSession = useCallback(async (agent: SidecarAgent): Promise<SidecarSession | null> => {
     const { lens, item } = attachmentRef.current;
-    const created = await postJson<SidecarSessionEntry>(SESSIONS, {
+    const fixedLens = endpointRef.current.fixed?.lens;
+    const created = await postJson<SidecarSessionEntry>(sessionsPath(), {
       vendor: agent.vendor,
       ...(agent.model && { model: agent.model }),
-      ...(lens.running !== GENERAL_LENS && { lens: lens.running }),
-      ...(item?.ref && { target: { ref: item.ref } }),
+      ...(fixedLens
+        ? { lens: fixedLens }
+        : {
+            ...(lens.running !== GENERAL_LENS && { lens: lens.running }),
+            ...(item?.ref && { target: { ref: item.ref } }),
+          }),
     });
     if (!created.ok) { setError(created.error); return null; }
     follow(created.data.session, created.data.running);
@@ -649,11 +794,12 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     try {
       let id = tailRef.current.sessionId;
       if (!id) {
-        const created = await createSession(pickedRef.current ?? { vendor: await defaultVendor(), model: "" });
+        const vendor = endpointRef.current.fixed?.vendor ?? await defaultVendor();
+        const created = await createSession(pickedRef.current ?? { vendor, model: "" });
         if (!created) return false;
         id = created.id;
       }
-      const started = await postJson<SidecarSessionEntry>(`${SESSIONS}/${encodeURIComponent(id)}/turns`, { prompt: text });
+      const started = await postJson<SidecarSessionEntry>(`${sessionsPath()}/${encodeURIComponent(id)}/turns`, { prompt: text });
       if (!started.ok) { setError(started.error); return false; }
       setSession(started.data.session);
       setRunning(true);
@@ -668,7 +814,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   const stop = useCallback(async () => {
     const id = tailRef.current.sessionId;
     if (!id) return;
-    const res = await postJson<{ interrupted: boolean }>(`${SESSIONS}/${encodeURIComponent(id)}/interrupt`, {});
+    const res = await postJson<{ interrupted: boolean }>(`${sessionsPath()}/${encodeURIComponent(id)}/interrupt`, {});
     if (!res.ok) setError(res.error);
   }, []);
 
@@ -677,7 +823,8 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   // available yet). One PATCH per change; an ended session is left alone.
   // Not before the registry answers: until then every lens reads as
   // unavailable, and the session would be re-lensed to General and back.
-  const asks = attachment.asks && attachment.ready;
+  // A fixed lens is the session's for good: nothing on the page re-lenses it.
+  const asks = !fixed && attachment.asks && attachment.ready;
   const wantLens = attachment.lens.running;
   const wantRef = attachment.item?.ref ?? "";
   const heldLens = session?.lens ?? GENERAL_LENS;
@@ -692,36 +839,42 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     if (wantLens !== heldLens) fields.lens = wantLens;
     if (wantRef !== heldRef) fields.target = wantRef ? { ref: wantRef } : {};
     if (Object.keys(fields).length === 0) return;
-    void patchJson<SidecarSessionEntry>(`${SESSIONS}/${encodeURIComponent(openId)}`, fields).then((res) => {
+    void patchJson<SidecarSessionEntry>(`${sessionsPath()}/${encodeURIComponent(openId)}`, fields).then((res) => {
       if (!mountedRef.current) return;
       if (!res.ok) { setError(res.error); return; }
       if (res.data.session.id === tailRef.current.sessionId) setSession(res.data.session);
     });
   }, [enabled, open, asks, syncKey, openId, wantLens, wantRef, heldLens, heldRef]);
 
-  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision) => {
+  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision): Promise<boolean> => {
     const id = tailRef.current.sessionId;
-    if (!id) return;
+    if (!id) return false;
     const reason = decision.reason?.trim();
     const res = await postJson<{ card: SidecarCard }>(
-      `${SESSIONS}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
+      `${sessionsPath()}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
       {
         decision: decision.approve ? "approve" : "deny",
         ...(reason && { reason }),
         ...(decision.remember && { remember: true }),
-        ...(decision.approve && decision.edits?.length && { edits: decision.edits }),
+        // An empty list of change-set edits is no edit; a placement's edit is one object.
+        ...(decision.approve && decision.edits && (!Array.isArray(decision.edits) || decision.edits.length > 0) && { edits: decision.edits }),
+        ...(decision.approve && decision.reviewed && { reviewed: decision.reviewed }),
+        ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
+        ...(decision.approve && decision.path !== undefined && { path: decision.path }),
+        ...(decision.approve && decision.arguments !== undefined && { arguments: decision.arguments }),
       },
     );
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return res.ok;
     setError(res.ok ? null : res.error);
     // The settle is also announced on the socket; reading before returning
     // keeps the card from looking undecided until that arrives, so a second
     // ⌘↵ in the meantime cannot answer the same card again.
     await fetchWaiting();
+    return res.ok;
   }, [fetchWaiting]);
 
   const openSession = useCallback(async (id: string): Promise<boolean> => {
-    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(sessionsPath());
     if (!mountedRef.current) return false;
     const entry = list?.sessions.find((e) => e.session.id === id);
     if (!entry) { setError(`Session ${id} is no longer available`); return false; }
@@ -783,12 +936,32 @@ export interface SidecarShell {
 }
 
 /**
+ * The session `?sidecar=<id>` names: the hub's "Open in worktree sidecar"
+ * sends the operator to this dashboard with the session it handed off to.
+ */
+export function handedOffSessionParam(search: string): string | null {
+  const id = new URLSearchParams(search).get("sidecar");
+  return id && /^[\w-]+$/.test(id) ? id : null;
+}
+
+/**
  * `enabled`: `web.sidecar`, read by main.ts through `useFeatureToggle`, and a
- * server to hold a session (not a static export).
+ * server to hold a session (not a static export). A page loaded with
+ * `?sidecar=<id>` opens the drawer on that session once enabled.
  */
 export function useSidecarShell(enabled: boolean, page: SidecarPageSelection = NO_PAGE): SidecarShell {
   const drawer = useSidecarDrawerState(enabled);
   const sidecar = useSidecar(enabled, drawer.open, page);
+  const handedOffRef = useRef(typeof location === "undefined" ? null : handedOffSessionParam(location.search));
+  const { show } = drawer;
+  const { openSession } = sidecar;
+  useEffect(() => {
+    const id = handedOffRef.current;
+    if (!enabled || !id) return;
+    handedOffRef.current = null;
+    show();
+    void openSession(id);
+  }, [enabled, show, openSession]);
   const button = enabled ? { open: drawer.open, waiting: sidecar.waiting, onToggle: drawer.toggle } : null;
   return { drawer, sidecar, button };
 }

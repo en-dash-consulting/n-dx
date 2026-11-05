@@ -44,6 +44,7 @@ const DOC = {
         { id: "t-done", title: "Done task", level: "task" as const, status: "completed" as const },
         { id: "t-blocked", title: "Blocked task", level: "task" as const, status: "blocked" as const },
         { id: "t-deferred", title: "Deferred task", level: "task" as const, status: "deferred" as const },
+        { id: "t-waiting", title: "Waiting task", level: "task" as const, status: "pending" as const, blockedBy: ["t-progress", "t-done", "t-deferred"] },
       ],
     },
   ],
@@ -173,6 +174,7 @@ describe("the resolution report", () => {
       tokenBudget: { value: 0, source: "hench.tokenBudget" },
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
+      requireUnblocked: { value: false, source: "built-in" },
       resetDeferred: { value: false, source: "built-in" },
     });
     // llm.<vendor>.auth has no per-run flag, so it sits beside `resolved`.
@@ -211,6 +213,7 @@ describe("the resolution report", () => {
       "token-budget": "1000",
       fresh: "true",
       "allow-dirty": "true",
+      "require-unblocked": "true",
       "reset-deferred": "true",
     });
 
@@ -228,7 +231,7 @@ describe("the resolution report", () => {
     expect(codes(r)).toEqual(["provider-unsupported"]);
     expect(r.command).toBe(
       "ndx work --task=t-pending --auto --model=opus --provider=api --permission-mode=plan --review " +
-        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --reset-deferred ${projectDir}`,
+        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --require-unblocked --reset-deferred ${projectDir}`,
     );
   });
 
@@ -427,6 +430,32 @@ describe("refusals are reported, not thrown", () => {
     const r = await resolve({ task: "t-deferred", "reset-deferred": "true" });
     expect(codes(r)).toEqual([]);
     expect(r.resolved.resetDeferred).toEqual({ value: true, source: "cli-flag" });
+  });
+
+  describe("blocked, under --require-unblocked", () => {
+    it("names each blocker that is not completed, and keeps the flag in the command", async () => {
+      const r = await resolve({ task: "t-waiting", "require-unblocked": "true" });
+      expect(codes(r)).toEqual(["blocked"]);
+      expect(r.refusals[0].message).toContain("t-progress (in_progress)");
+      expect(r.refusals[0].message).toContain("t-deferred (deferred)");
+      expect(r.refusals[0].message).not.toContain("t-done");
+      expect(r.command).toContain("--require-unblocked");
+      expect(r.resolved.requireUnblocked).toEqual({ value: true, source: "cli-flag" });
+    });
+
+    it("is not reported without --require-unblocked", async () => {
+      expect(codes(await resolve({ task: "t-waiting" }))).toEqual([]);
+    });
+
+    it("is not reported when every blocker is completed", async () => {
+      expect(codes(await resolve({ task: "t-pending", "require-unblocked": "true" }))).toEqual([]);
+    });
+
+    it("matches the run, which refuses the same task", async () => {
+      await expect(
+        cmdRun(projectDir, { task: "t-waiting", auto: "true", "require-unblocked": "true" }),
+      ).rejects.toThrow(/blocked by unfinished work: t-progress \(in_progress\), t-deferred \(deferred\)/);
+    });
   });
 
   it("an in-progress task is actionable: the run resumes it", async () => {

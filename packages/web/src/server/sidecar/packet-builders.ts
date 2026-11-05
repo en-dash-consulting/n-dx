@@ -1,5 +1,5 @@
 /**
- * The Explain, Describe and Plan packet builders.
+ * The Explain, Describe, Diagnose run and Plan packet builders.
  *
  * Each reads through a {@link PacketSources}, renders plain text sections in
  * order of importance (the cap trims from the end, see `packet.ts`) and makes
@@ -13,12 +13,25 @@
 
 import { capabilityReport, indexTree, isAppliedChange, productReport } from "../rex-gateway.js";
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
+import { OWN_WORKTREE_NOTE } from "../../shared/index.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
-import { DESCRIBE_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS } from "./lens-instructions.js";
-import type { PacketSources, PrdRead, ResolveRead } from "./packet-sources.js";
+import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS, GUIDE_INSTRUCTIONS } from "./lens-instructions.js";
+import type {
+  PacketSources,
+  PrdRead,
+  ResolveRead,
+  RunGateRead,
+  RunLivenessRead,
+  RunReviewRead,
+  RunSettingsRead,
+  RunVerdictRead,
+  TaskRunRead,
+} from "./packet-sources.js";
 
 export const EXPLAIN_CAP = 8_000;
 export const DESCRIBE_CAP = 8_000;
+export const DIAGNOSE_RUN_CAP = 8_000;
+export const GUIDE_CAP = 6_000;
 export const PLAN_CAP = 10_000;
 
 /** What the operator pointed the lens at: an item id, display id or alias. Plan may have none. */
@@ -556,6 +569,270 @@ function blockersBody(prd: PrdRead, node: RuleNode): string {
     bullets(blockedBy, "nothing"),
     ...(dependsOn.length > 0 ? ["Depends on:", bullets(dependsOn, "")] : []),
   ].join("\n");
+}
+
+// ── Diagnose run ─────────────────────────────────────────────────────
+
+/** The broker card each classifier action kind goes through; the instructions say the same. */
+const ACTION_CARDS: Readonly<Record<string, string>> = {
+  "close-verified": "propose_prd_change (change-set card)",
+  "follow-up-run": "propose_prd_change (change-set card)",
+  "split-task": "propose_prd_change (change-set card)",
+  "tighten-done-when": "propose_prd_change (change-set card)",
+  "re-run": "start_work (work card)",
+  fresh: "start_work with fresh: true (work card)",
+  "raise-tier": "start_work with a higher-tier model (work card)",
+  "verify-on-main": "run_command (command card)",
+  "release-claim": "run_command (command card)",
+  "clean-tree": "run_command (command card)",
+};
+
+function verdictBody(diagnosis: RunVerdictRead, settings: RunSettingsRead): string {
+  const { n, of } = diagnosis.attempt;
+  return [
+    `Class: ${diagnosis.class}`,
+    `Summary: ${oneLine(diagnosis.summary, 400)}`,
+    n >= of ? `Attempt ${n} of ${of}: next is a fix or a split. Do not offer a re-run or --fresh.` : `Attempt ${n} of ${of}`,
+    "Evidence:",
+    bullets(diagnosis.evidence.map((e) => oneLine(e, 300)), "(none recorded)"),
+    "Ranked next actions (the classifier's order):",
+    diagnosis.actions.length > 0
+      ? diagnosis.actions
+          .map((a, i) => `${i + 1}. [${a.kind}] ${oneLine(a.label, 200)} → ${ACTION_CARDS[a.kind] ?? "no card: name it for the operator"}`)
+          .join("\n")
+      : "(none ranked)",
+    ...(Object.keys(settings).length > 0
+      ? [`The failed run's settings. Pass them as the options of start_work for a re-run or --fresh: ${JSON.stringify(settings)}`]
+      : []),
+  ].join("\n");
+}
+
+/** Why a run carries no verdict, as far as its status and liveness say. */
+function noVerdictReason(run: TaskRunRead["run"], liveness: RunLivenessRead | null): string {
+  if (run.status === "completed") return "it completed, and hench classifies only runs that did not";
+  if (run.status === "running") {
+    if (liveness?.liveness === "orphaned") return "its record says running, but its process is gone";
+    return liveness && liveness.liveness !== "live"
+      ? `it is recorded as running and its process could not be confirmed gone (${oneLine(liveness.reason, 200)})`
+      : "it is still running";
+  }
+  return "it ended without one, most likely before hench classified runs";
+}
+
+/** What the verdict section says first about a run recorded as running whose process is gone. */
+function orphanNote(runId: string, liveness: RunLivenessRead): string {
+  return `Run ${runId} is recorded as running, but its process is gone: ${oneLine(liveness.reason, 300)} Ending it from Live records the end; hench classifies it as that end would record it.`;
+}
+
+/** Where the run was made: its worktree, and whether it is the session's own. */
+function worktreeLine(worktree: TaskRunRead["worktree"]): string[] {
+  if (!worktree) return [];
+  const branch = worktree.branch ? ` on ${worktree.branch}` : "";
+  return [`Worktree: ${worktree.name}${branch} (${worktree.path})${worktree.own ? ", this session's" : ", not this session's"}`];
+}
+
+function gateBody(gate: RunGateRead): string {
+  const verdict = !gate.ran ? "did not run" : gate.passed ? "passed" : "failed";
+  return [
+    `Gate: ${verdict}${gate.note ? ` (${oneLine(gate.note, 200)})` : ""}`,
+    ...(gate.command ? [`Command: ${oneLine(gate.command, 300)}`] : []),
+    ...(gate.text !== null
+      ? [
+          `Recorded ${gate.textKind}${
+            gate.cutChars === 0
+              ? ""
+              : gate.textKind === "failure digest"
+                ? `, first ${gate.text.length} characters (${gate.cutChars} cut from the end)`
+                : `, last ${gate.text.length} characters (${gate.cutChars} cut from the front)`
+          }:`,
+          gate.text,
+        ]
+      : [gate.passed ? "Nothing failed." : "The run recorded no gate output."]),
+  ].join("\n");
+}
+
+function reviewBody(review: RunReviewRead): string {
+  return [
+    `${review.unrepaired.length} of ${review.total} finding${review.total === 1 ? "" : "s"} unrepaired.`,
+    ...(review.summary ? [`Reviewer's summary: ${oneLine(review.summary, 400)}`] : []),
+    bullets(
+      review.unrepaired.map(
+        (f) => `[${f.verdict}${f.severity ? ` · ${f.severity}` : ""} · action ${f.action}] ${oneLine(f.title, 200)}${f.location ? ` (${f.location})` : ""}`,
+      ),
+      "No must-fix finding is unrepaired and no finding's action failed.",
+    ),
+  ].join("\n");
+}
+
+/**
+ * Diagnose run: why the attached task's newest run did not complete, from
+ * hench's run classifier (`RunRecord.diagnosis`, `hench runs diagnose`), with
+ * the gate's failure text, the review's unrepaired findings and the run's
+ * last events.
+ *
+ * Knowledge packets omit error text (PK4). This one deliberately carries the
+ * gate text, the start of the failure digest (or the end of the output tail),
+ * capped: the diagnosis is about that error, and the text is local,
+ * redacted, and goes only to the vendor the project is configured with. See
+ * docs/architecture/web-server.md, "Sidecar Diagnose run packet".
+ */
+export async function buildDiagnoseRunPacket(
+  sources: PacketSources,
+  target: PacketTarget,
+  now: string,
+  signal?: AbortSignal,
+): Promise<Packet> {
+  const lens = "diagnose-run";
+  const head = `${header(lens, target)}\n\n${DIAGNOSE_RUN_INSTRUCTIONS}`;
+  const done = (sections: PacketSection[]): Packet => assemblePacket({ lens, cap: DIAGNOSE_RUN_CAP, header: head, sections });
+  if (!target.ref) return done([gap("task", "Task", "Diagnose run needs a task to diagnose", now, PRD_SOURCE)]);
+
+  // The PRD resolves a display id to the task's id; without one, the ref is taken as the id runs record.
+  const prd = await sources.prd();
+  const found = prd ? findNode(prd.tree.changes, target.ref) : null;
+  if (prd && !found) return done([gap("task", "Task", `"${target.ref}" names no task`, now, PRD_SOURCE)]);
+  const taskId = found?.node.id ?? target.ref;
+  const sections: PacketSection[] = found
+    ? [prdSection("task", "Task", `${label(found.node)}\nStatus: ${nodeStatus(found.node)}`, now)]
+    : [gap("task", "Task", "no readable PRD; runs are read for the id as given", now, PRD_SOURCE)];
+
+  const read = await sources.taskRun(taskId);
+  const runsSource = sources.sourcePaths.runs;
+  if (!read) {
+    return done([
+      ...sections,
+      gap("verdict", "Run verdict", "no run of this task is recorded in any worktree of this repository, so there is nothing to diagnose. Once a run has ended, `hench runs diagnose <run-id>` classifies it", now, runsSource),
+    ]);
+  }
+
+  const { run } = read;
+  const at = run.finishedAt ?? run.startedAt;
+  const runSection = (id: string, title: string, body: string, source = run.path): PacketSection => ({
+    id,
+    title,
+    body,
+    provenance: { source, generatedAt: at },
+    staleness: FRESH,
+  });
+  // A run from a hench that predates the classifier records no verdict, and `hench runs
+  // diagnose` prints one without writing it. Ask for it once the run has ended, in the
+  // worktree that holds it. A record left running by a process that died (Live's verdict,
+  // `orphaned`) has ended too; a completed run, or a running one whose process may be
+  // alive, is never classified.
+  const diagnoseCommand = `hench runs diagnose ${run.id} --format=json`;
+  const orphaned = run.status === "running" && read.liveness?.liveness === "orphaned";
+  const classifiable = run.status !== "completed" && (run.status !== "running" || orphaned);
+  const spawned = !read.diagnosis && classifiable ? await sources.diagnose(run.id, read.dir, signal) : null;
+  const diagnosis = read.diagnosis ?? spawned;
+  const note = orphaned && read.liveness ? `${orphanNote(run.id, read.liveness)}\n` : "";
+  sections.push(
+    runSection(
+      "run",
+      "Newest run",
+      [
+        `Run ${run.id}: ${run.status}`,
+        ...worktreeLine(read.worktree),
+        `Started ${run.startedAt}${run.finishedAt ? `, finished ${run.finishedAt}` : ""}`,
+        ...(read.liveness ? [`Process: ${read.liveness.liveness} (${oneLine(read.liveness.reason, 300)})`] : []),
+        ...(run.error ? [`Error: ${oneLine(run.error, 300)}`] : []),
+      ].join("\n"),
+    ),
+    diagnosis
+      ? runSection(
+          "verdict",
+          "Run verdict (the run classifier)",
+          `${note}${verdictBody(diagnosis, read.settings)}`,
+          read.diagnosis ? `${run.path} (diagnosis)` : `\`${diagnoseCommand}\``,
+        )
+      : gap(
+          "verdict",
+          "Run verdict",
+          `${note}run ${run.id} has no recorded verdict: ${noVerdictReason(run, read.liveness)}. ${
+            classifiable ? `Running \`${diagnoseCommand}\` failed or timed out` : `\`hench runs diagnose ${run.id}\` classifies it once it has ended`
+          }`,
+          now,
+          run.path,
+        ),
+    read.gate
+      ? runSection("gate", "Test gate", gateBody(read.gate), `${run.path} (testGate)`)
+      : gap("gate", "Test gate", "the run recorded no test gate", now, run.path),
+    read.review
+      ? runSection("review", "Review findings (must-fix and unrepaired)", reviewBody(read.review), read.review.path)
+      : gap("review", "Review findings", "the run has no readable review report", now, run.path),
+  );
+  const events = read.events;
+  if (!events) {
+    sections.push(gap("events", "Last events", "the run recorded no event stream", now, run.path));
+  } else {
+    sections.push({
+      id: "events",
+      title: "Last events",
+      body: bullets(
+        events.last.map((e) => `${e.at} ${e.kind}: ${oneLine(e.summary, 200)}${e.detail ? ` (${oneLine(e.detail, 120)})` : ""}`),
+        "The stream holds no events.",
+      ),
+      provenance: { source: events.path, generatedAt: events.last.at(-1)?.at || at },
+      staleness: FRESH,
+    });
+  }
+  return done(sections);
+}
+
+// ── Guide ────────────────────────────────────────────────────────────
+
+const PLAN_QUEUE_COMMAND = "ndx work --plan-queue --format=json";
+
+/**
+ * Guide: the queue planner's plan (lanes with their commands and reasons, what
+ * it left out and why, active runs against the limit), as hench's planner
+ * printed it. The lens's target is the whole ready list, so no ref is needed.
+ */
+export async function buildGuidePacket(
+  sources: PacketSources,
+  target: PacketTarget,
+  now: string,
+  signal?: AbortSignal,
+): Promise<Packet> {
+  const lens = "guide";
+  const head = `${header(lens, target)}\n\n${GUIDE_INSTRUCTIONS}`;
+  const source = `\`${PLAN_QUEUE_COMMAND}\``;
+  const done = (sections: PacketSection[]): Packet => assemblePacket({ lens, cap: GUIDE_CAP, header: head, sections });
+  const plan = await sources.queuePlan(signal);
+  if (!plan) return done([gap("plan", "Queue plan", `the planner did not answer. Run \`${PLAN_QUEUE_COMMAND}\` to see why`, now, source)]);
+
+  const section = (id: string, title: string, body: string): PacketSection => ({
+    id,
+    title,
+    body,
+    provenance: { source, generatedAt: now },
+    staleness: FRESH,
+  });
+  const sections = [
+    section("summary", "Plan summary", `${oneLine(plan.summary, 300)}\nActive runs: ${plan.activeRuns} of ${plan.runLimit}`),
+  ];
+  if (plan.lanes.length === 0 && plan.excluded.length === 0) {
+    sections.push(section("ready", "Ready list", "The ready list is empty: no task is ready to run, so there is no lane to plan and no run-plan card to raise."));
+    return done(sections);
+  }
+  sections.push(
+    section(
+      "lanes",
+      "Lanes",
+      plan.lanes.length === 0
+        ? "No lane: every ready task was left out. There is nothing to start, so raise no run-plan card."
+        : plan.lanes
+            .map((lane, i) =>
+              [
+                `Lane ${i + 1} (change ${lane.changeId}): ${lane.command}`,
+                ...(lane.ownWorktree ? [`  ${OWN_WORKTREE_NOTE}`] : []),
+                ...lane.tasks.map((t) => `  - ${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`),
+              ].join("\n"),
+            )
+            .join("\n"),
+    ),
+    section("excluded", "Left out of every lane", bullets(plan.excluded.map((t) => `${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`), "No ready task was left out.")),
+  );
+  return done(sections);
 }
 
 // ── Plan ─────────────────────────────────────────────────────────────

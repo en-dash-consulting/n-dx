@@ -1,0 +1,18 @@
+schema: "rex/v2"
+items:
+  "2bb9aea2-5f2e-4ee6-8a70-af611b8c6473":
+    lastModified: "2026-11-05T00:22:39.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8c476b8a-538c-457d-83ae-4cb71925cca5":
+    status: "completed"
+    startedAt: "2026-11-05T00:14:45.105Z"
+    completedAt: "2026-11-05T00:27:03.649Z"
+    endedAt: "2026-11-05T00:27:03.649Z"
+    activeIntervals: [{"end":"2026-11-05T00:27:03.649Z","start":"2026-11-05T00:14:45.105Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Guide packet, run-plan card and runPlanResult honour ownWorktree; startWork/previewWork refuse and warn on a live run in this checkout."
+    lastModified: "2026-11-05T00:27:03.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f3d9768f-177c-4cf1-8e47-8eb7b263366a":
+    lastModified: "2026-11-05T00:22:39.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

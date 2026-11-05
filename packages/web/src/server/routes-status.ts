@@ -125,6 +125,8 @@ export interface RexStatus {
   items: PRDItemAttribution[];
   /** Inbox counts. Present on a v2 tree only; omitted on v1. */
   inbox?: InboxCounts;
+  /** The PRD's layout, present when a PRD exists. A v1 tree has not been migrated. */
+  layout?: "v1" | "v2";
 }
 
 export interface HenchStatus {
@@ -550,10 +552,12 @@ export function buildServerInfo(ctx: ServerContext): ServerInfo {
 
 async function buildProjectStatus(ctx: ServerContext): Promise<ProjectStatus> {
   const inbox = await readInboxCounts(ctx);
+  const rex = extractRexStatus(ctx);
+  const layout = rex.exists ? await prdLayout(ctx.rexDir) : undefined;
   return {
     projectDir: ctx.projectDir,
     sv: extractSvStatus(ctx),
-    rex: { ...extractRexStatus(ctx), ...(inbox ? { inbox } : {}) },
+    rex: { ...rex, ...(inbox ? { inbox } : {}), ...(layout ? { layout } : {}) },
     hench: extractHenchStatus(ctx),
     server: buildServerInfo(ctx),
     initialized: isProjectInitialized(ctx),

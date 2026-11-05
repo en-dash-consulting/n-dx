@@ -12,7 +12,8 @@
   ],
   "dependentRequired": {
     "hub": ["sidecar"],
-    "projectLinks": ["sidecar"]
+    "projectLinks": ["sidecar"],
+    "sidecarTab": ["sidecar"]
   },
   "properties": {
     "apiVersion": {
@@ -70,6 +71,19 @@
             "description": "Path under the extension's /x/<name>/ mount. {projectId} and {repoRoot} are the only placeholders.",
             "$ref": "#/$defs/urlPath"
           }
+        }
+      }
+    },
+    "sidecarTab": {
+      "description": "The one tab the extension adds to the Sidecar drawer, shown as a sandboxed page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "path"],
+      "properties": {
+        "label": { "$ref": "#/$defs/text" },
+        "path": {
+          "description": "Path under the extension's /x/<name>/ mount. {projectId} and {repoRoot} are the only placeholders.",
+          "$ref": "#/$defs/urlPath"
         }
       }
     },

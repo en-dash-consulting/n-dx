@@ -76,7 +76,9 @@ export type {
   SidecarStatus,
   SidecarManagerOptions,
 } from "./sidecars.js";
-export { EXTENSION_API_VERSION, ndxCliLister, buildExtensionsAnswer, resolveProjectLink } from "./extensions.js";
+export { EXTENSION_API_VERSION, ndxCliLister, buildExtensionsAnswer, resolveProjectLink, resolveFrameUrl } from "./extensions.js";
+export { FrameKeys, parseKeyedPath, FRAME_KEY_SEGMENT, FRAME_KEY_HARD_CAP_MS, DEFAULT_IDLE_STOP_MINUTES } from "./frame-keys.js";
+export type { FrameKeyOptions, IssuedFrameKey } from "./frame-keys.js";
 export type {
   ExtensionStateName,
   ExtensionManifest,
@@ -88,8 +90,24 @@ export type {
   ExtensionView,
   ExtensionsAnswer,
 } from "./extensions.js";
-export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
-export type { ProxyDecision, SidecarForward } from "./proxy.js";
+export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, MAX_HUB_SESSION_BODY_BYTES, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER, FRAME_CSP } from "./proxy.js";
+export type { ProxyDecision, SidecarForward, UpgradeGate } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
+export {
+  HubSessionHostPicker,
+  HUB_SESSION_FEATURE,
+  probeHubLens,
+  claimHubSessionHost,
+  hubSessionHostLockPath,
+  hubSidecarDir,
+  hubLedgerPath,
+  readHubSessionHostLock,
+  releaseHubSessionHost,
+} from "./session-host.js";
+export type { ClaimHubSessionHostInput, HubLensProbeOptions, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";
+export { hubUsagePath, recordHubUsage, readHubUsageTotals } from "./usage-ledger.js";
+export { TrackerSyncClock, hasActiveTrackerRule, proxiedTickPost, TRACKER_TICK_INTERVAL_MS, TRACKER_TICK_PATH } from "./tracker-sync.js";
+export type { TrackerSyncClockOptions, TrackerTickOutcome, TrackerTickPost } from "./tracker-sync.js";
+export type { HubUsageRecord, HubUsageTotals } from "./usage-ledger.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
 export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

@@ -40,6 +40,7 @@ function placement(id: string, shortlist: PlacementCandidate[], tags?: string[])
     layout: "v2",
     change: { id, title: `Change ${id}`, status: "pending", taskCount: 2, ...(tags ? { tags } : {}) },
     relation: "touches",
+    relationRule: "a rule",
     tied: false,
     shortlist,
   };

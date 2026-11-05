@@ -54,6 +54,27 @@ describe("ActivityView (execution-log viewer)", () => {
     expect(rows[0].textContent).toContain("99988877");
   });
 
+  it("renders a Sidecar placement entry that carries decision fields like any other", async () => {
+    const decided = {
+      timestamp: "2026-08-14T13:00:00Z",
+      event: "change_placed",
+      itemId: "aaaabbbbcccc",
+      detail: "touches A1.1 (via Sidecar)",
+      decidedBy: "sidecar:s1",
+      approvedBy: "Ada <ada@example.com>",
+      reasons: ["The change retries a declined card."],
+    };
+    stubFetch(() => ({ status: 200, body: { entries: [...LOG.entries, decided] } }));
+    act(() => { render(h(ActivityView, null), root); });
+    await settle();
+
+    const rows = Array.from(root.querySelectorAll("tbody tr"));
+    expect(rows).toHaveLength(4);
+    expect(rows[0].textContent).toContain("change_placed");
+    expect(rows[0].textContent).toContain("touches A1.1 (via Sidecar)");
+    expect(root.textContent).not.toContain("Could not load the execution log");
+  });
+
   it("filters by event", async () => {
     stubFetch(() => ({ status: 200, body: LOG }));
     act(() => { render(h(ActivityView, null), root); });

@@ -32,6 +32,7 @@ import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-c
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
+import { readDiagnosis } from "./run-diagnosis.js";
 import { resolveWebPaths } from "./paths.js";
 import { ensureWorktreeRunWatcher, pruneWorktreeRunWatchers } from "./routes-hench.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -61,6 +62,8 @@ export interface WorktreeLatestRun {
    * or null. Present only on records written by a hench that records it.
    */
   claimLostTo: string | null;
+  /** The run classifier's verdict class (`RunRecord.diagnosis.class`), or null when the run has none. */
+  diagnosisClass: string | null;
 }
 
 /** Hench run history recorded under one worktree's `.hench/runs/`. */
@@ -162,6 +165,8 @@ export interface RunDigest {
   finishedAt: string | null;
   lastActivityAt: string | null;
   claimLostTo: string | null;
+  /** The run classifier's verdict class, or null when the record carries no diagnosis. */
+  diagnosisClass: string | null;
   turns: number | null;
   model: string | null;
   vendor: string | null;
@@ -291,6 +296,7 @@ function digestRun(run: Record<string, unknown>): RunDigest {
     finishedAt: str(run.finishedAt),
     lastActivityAt: str(run.lastActivityAt),
     claimLostTo: claimLostHolder(run.claimLost),
+    diagnosisClass: readDiagnosis(run.diagnosis)?.class ?? null,
     turns: num(run.turns),
     model: str(run.model),
     vendor: str(run.vendor) ?? str(diagnostics.vendor),
@@ -400,6 +406,7 @@ function summariseRuns(worktreePath: string): WorktreeRunsSummary {
         startedAt: best.startedAt,
         finishedAt: best.finishedAt,
         claimLostTo: best.claimLostTo,
+        diagnosisClass: best.diagnosisClass,
       };
   return { total, running, lastFinishedAt, latest };
 }

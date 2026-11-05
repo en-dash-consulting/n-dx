@@ -1,0 +1,75 @@
+schema: "rex/v2"
+items:
+  "160d553d-6d40-41b0-9a3b-17914361667c":
+    status: "completed"
+    startedAt: "2026-11-03T20:22:44.563Z"
+    completedAt: "2026-11-03T20:34:42.522Z"
+    endedAt: "2026-11-03T20:34:42.522Z"
+    activeIntervals: [{"end":"2026-11-03T20:34:42.522Z","start":"2026-11-03T20:22:44.563Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Drawer tab strip + sandboxed extension iframe tabs (sidecar-extension-tabs.ts), tests in sidecar-drawer.test.ts"
+    lastModified: "2026-11-03T20:34:42.522Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1adb4370-bc12-4322-9e21-e375e70e2131":
+    status: "completed"
+    startedAt: "2026-11-03T20:38:57.709Z"
+    completedAt: "2026-11-03T20:38:57.709Z"
+    endedAt: "2026-11-03T20:38:57.709Z"
+    activeIntervals: [{"end":"2026-11-03T20:38:57.709Z","start":"2026-11-03T20:38:57.709Z"}]
+    appliedAt: "2026-11-03T20:38:57.709Z"
+    appliedAmendsHash: "41dfdf4d305481893e4651dfba45de55ffbf1c82febe80318093855ce7b9931d"
+    issues: ["https://www.notion.so/407a80b719248169b6beef5b0e83a89f","https://www.notion.so/407a80b71924817193ebfb12d8062f7b"]
+    lastModified: "2026-11-03T20:38:57.709Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4a463baa-a59a-4432-8708-bb066fed91a0":
+    status: "completed"
+    startedAt: "2026-11-03T18:10:52.960Z"
+    completedAt: "2026-11-03T19:36:52.370Z"
+    endedAt: "2026-11-03T19:36:52.370Z"
+    activeIntervals: [{"end":"2026-11-03T19:06:50.930Z","start":"2026-11-03T18:10:52.960Z"},{"end":"2026-11-03T19:36:52.370Z","start":"2026-11-03T19:36:52.370Z"}]
+    lastModified: "2026-11-03T19:36:52.370Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "66cd459f-dc77-4f8f-aa8e-7936cfc242b8":
+    status: "completed"
+    startedAt: "2026-11-03T17:33:03.661Z"
+    completedAt: "2026-11-03T17:51:13.796Z"
+    endedAt: "2026-11-03T17:51:13.796Z"
+    activeIntervals: [{"end":"2026-11-03T17:43:00.498Z","start":"2026-11-03T17:33:03.661Z"},{"end":"2026-11-03T17:51:13.796Z","start":"2026-11-03T17:51:13.796Z"}]
+    lastModified: "2026-11-03T17:51:13.796Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bad7db13-1603-40a6-95cc-a436d40eafa9":
+    status: "completed"
+    startedAt: "2026-11-03T19:37:43.657Z"
+    completedAt: "2026-11-03T19:46:33.202Z"
+    endedAt: "2026-11-03T19:46:33.202Z"
+    activeIntervals: [{"end":"2026-11-03T19:46:33.202Z","start":"2026-11-03T19:37:43.657Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture declares sidecarTab; serve.js serves /tab showing X-Ndx-Base-Path; e2e in extension-fixture.test.js issues a frame key, loads the tab keyed without a token, and sees 401 for the key on /p/<id>/api/status. Commit 5884e89c6."
+    lastModified: "2026-11-03T19:46:33.202Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bb7ecdb1-ded5-41ed-9469-ee8fe7253d7a":
+    status: "completed"
+    startedAt: "2026-11-03T17:51:25.728Z"
+    completedAt: "2026-11-03T18:08:20.327Z"
+    endedAt: "2026-11-03T18:08:20.327Z"
+    activeIntervals: [{"end":"2026-11-03T18:00:55.284Z","start":"2026-11-03T17:51:25.728Z"},{"end":"2026-11-03T18:08:20.327Z","start":"2026-11-03T18:08:20.327Z"}]
+    lastModified: "2026-11-03T18:08:20.327Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e6241dbf-f601-41e3-9fab-5761e940b71c":
+    status: "completed"
+    startedAt: "2026-11-03T19:51:47.493Z"
+    completedAt: "2026-11-03T20:21:17.471Z"
+    endedAt: "2026-11-03T20:21:17.471Z"
+    activeIntervals: [{"end":"2026-11-03T20:21:17.471Z","start":"2026-11-03T19:51:47.493Z"}]
+    lastModified: "2026-11-03T20:21:17.471Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ed2982c1-4e8b-41d9-b027-11c71598f963":
+    status: "completed"
+    startedAt: "2026-11-03T20:35:20.007Z"
+    completedAt: "2026-11-03T20:38:57.709Z"
+    endedAt: "2026-11-03T20:38:57.709Z"
+    activeIntervals: [{"end":"2026-11-03T20:38:57.709Z","start":"2026-11-03T20:35:20.007Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ready extension tab shows a Reload control beside Pop out; it bumps attempt, re-requests the frame key and reloads the iframe with the new keyed URL."
+    lastModified: "2026-11-03T20:38:57.709Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

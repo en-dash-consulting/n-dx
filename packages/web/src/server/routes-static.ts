@@ -8,7 +8,7 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
 import { isKnownViewPath, resolveViewAlias, buildValidViews } from "../shared/view-routing.js";
-import { injectSessionScript } from "../shared/index.js";
+import { OAUTH_CALLBACK_PATH, injectSessionScript } from "../shared/index.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
 (function(){
@@ -44,6 +44,8 @@ export interface StaticAssets {
   resolvedPackageRoot: string;
   getViewerHtml: () => string;
   getLandingHtml: () => string | null;
+  /** The drawer-only hub session page, built beside the viewer; null when it is not there. */
+  getHubSessionHtml: () => string | null;
   findAssetPath: (filename: string) => string | null;
 }
 
@@ -120,6 +122,16 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     return cachedLandingHtml;
   }
 
+  // Beside whichever index.html was found: built in dist/viewer/, the unbuilt template in src/viewer/.
+  const hubSessionPath = resolve(viewerDir, "hub-session.html");
+  let cachedHubSessionHtml: string | null | undefined;
+  function getHubSessionHtml(): string | null {
+    if (dev || cachedHubSessionHtml === undefined) {
+      cachedHubSessionHtml = existsSync(hubSessionPath) ? readFileSync(hubSessionPath, "utf-8") : null;
+    }
+    return cachedHubSessionHtml;
+  }
+
   function findAssetPath(filename: string): string | null {
     const inViewer = resolve(resolvedViewerDir, filename);
     const inRoot = resolve(resolvedPackageRoot, filename);
@@ -133,6 +145,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     resolvedPackageRoot,
     getViewerHtml,
     getLandingHtml,
+    getHubSessionHtml,
     findAssetPath,
   };
 }
@@ -220,6 +233,14 @@ export function handleStaticRoute(
       res.writeHead(404);
       res.end("Not found");
     }
+    return true;
+  }
+
+  // A connection sign-in's fixed callback: the viewer reads the code, state
+  // and iss and posts them with its session (views/connections.ts).
+  if (pathOnly === OAUTH_CALLBACK_PATH) {
+    res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-store" });
+    res.end(assets.getViewerHtml());
     return true;
   }
 

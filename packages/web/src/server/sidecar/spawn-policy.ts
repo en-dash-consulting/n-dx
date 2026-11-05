@@ -25,6 +25,12 @@
  * flags, so a resumed turn runs under the user's `~/.codex/config.toml`. The
  * routes refuse Codex sessions until resume re-applies this policy (PRD item
  * 31307b89).
+ *
+ * **Hub scope.** The hub session works from the hub snapshot and must not
+ * read any repository, so its Claude spawn gets no built-in tool at all
+ * (`--tools ""`): the broker is all it has. Codex cannot be confined that
+ * far — its read-only sandbox still reads every file — so a hub session is
+ * Claude-only ({@link hubVendorRefusal}).
  */
 
 import { chmodSync, writeFileSync } from "node:fs";
@@ -32,10 +38,23 @@ import { join } from "node:path";
 import { compileCodexPolicyFlags } from "@n-dx/llm-client";
 import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy } from "@n-dx/llm-client";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
+import type { SidecarScope } from "./context-refresh.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
 /** The built-in Claude tools a Sidecar session keeps: reads only. */
 export const SIDECAR_READ_TOOLS = ["Read", "Grep", "Glob"] as const;
+
+/** The built-in Claude tools a hub-scope session keeps: none. */
+export const HUB_SIDECAR_TOOLS: readonly string[] = [];
+
+/** Why a hub-scope session cannot run on `vendor`, or null when it can. */
+export function hubVendorRefusal(vendor: string): string | null {
+  if (vendor === "claude") return null;
+  if (vendor === "codex") {
+    return "A hub session cannot run on Codex: its read-only sandbox can still read repositories, and the hub session works from the hub snapshot alone";
+  }
+  return `A hub session runs on Claude only, not "${vendor}"`;
+}
 
 /** Codex: read-only, never asks, no network, no writable root, no command or file tool beyond reads. */
 const SIDECAR_CODEX_POLICY: ExecutionPolicy = {
@@ -77,11 +96,14 @@ export function writeBrokerMcpConfig(dir: string, sessionId: string, endpoint?: 
   return path;
 }
 
-/** The vendor flags every Sidecar turn runs with. */
-export function sidecarSpawnFlags(mcpConfigPath: string): { claude: ClaudeTurnFlags; codex: CodexTurnFlags } {
+/** The vendor flags every Sidecar turn runs with; a hub-scope session gets no built-in tool. */
+export function sidecarSpawnFlags(
+  mcpConfigPath: string,
+  scope: SidecarScope = "worktree",
+): { claude: ClaudeTurnFlags; codex: CodexTurnFlags } {
   return {
     claude: {
-      tools: SIDECAR_READ_TOOLS,
+      tools: scope === "hub" ? HUB_SIDECAR_TOOLS : SIDECAR_READ_TOOLS,
       settingSources: [],
       mcpConfigPath,
       allowedTools: [`mcp__${SIDECAR_BROKER_NAME}`],

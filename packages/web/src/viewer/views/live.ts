@@ -32,7 +32,10 @@ import {
   type LiveRunFull,
   type LiveSnapshot,
 } from "../hooks/index.js";
+import { useFeatureToggle } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
+import { READY_NEXT_FEATURE, ReadyNext } from "./live-ready-next.js";
+import { TrackerActivitySection } from "./live-tracker.js";
 import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
@@ -336,6 +339,7 @@ function AttentionSection({ snapshot, navigateTo, refresh }: { snapshot: LiveSna
 // ── Side column ──────────────────────────────────────────────────────
 
 function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: NavigateTo }) {
+  const readyNext = useFeatureToggle(READY_NEXT_FEATURE, false);
   const [paused, setPaused] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -364,11 +368,15 @@ function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: N
   }, [paused]);
 
   const { next } = snapshot.queue;
-  return h("section", { class: "live-side-section", "aria-labelledby": "live-queue-h" },
-    h("h3", { id: "live-queue-h", class: "live-side-title" }, "Up next"),
-    next.length === 0
-      ? h("p", { class: "live-muted" }, "Nothing actionable in the PRD.")
-      : h("ol", { class: "live-queue" }, next.map((t: LiveNextTask) =>
+  // Ready next takes the Up next list's place; the loop control stays.
+  const readyKey = [...next.map((t) => t.id), ...snapshot.runs.map((r) => r.runId)].join(",");
+  const list = readyNext
+    ? h(ReadyNext, { refreshKey: readyKey, navigateTo })
+    : [
+      h("h3", { key: "h", id: "live-queue-h", class: "live-side-title" }, "Up next"),
+      next.length === 0
+        ? h("p", { key: "l", class: "live-muted" }, "Nothing actionable in the PRD.")
+        : h("ol", { key: "l", class: "live-queue" }, next.map((t: LiveNextTask) =>
         h("li", { key: t.id },
           h("a", {
             class: "live-queue-item",
@@ -377,6 +385,9 @@ function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: N
           }, h("span", { class: "live-card-title" }, t.title),
             chainLabel(t.epicChain) ? h("span", { class: "live-card-chain" }, chainLabel(t.epicChain)) : null),
         ))),
+    ];
+  return h("section", { class: "live-side-section", "aria-labelledby": readyNext ? "live-ready-h" : "live-queue-h" },
+    list,
     paused === null ? null : h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", onClick: toggle },
       paused ? "Resume loop" : "Pause loop after current"),
     paused ? h("p", { class: "live-muted" }, "New tasks are paused; running ones finish.") : null,
@@ -518,6 +529,7 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
                     ? h(RunCard, { key: item.key, run: item.run, navigateTo })
                     : h(JobCard, { key: item.key, job: item.job, navigateTo }))))
                 : null,
+            h(TrackerActivitySection, { refreshKey: snapshot.generatedAt, navigateTo }),
           ),
           h("aside", { class: "live-side", "aria-label": "Queue and history" },
             h(Queue, { snapshot, navigateTo }),

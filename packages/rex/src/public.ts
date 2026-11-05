@@ -108,7 +108,7 @@ export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOption
 
 export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
 export type {
-  ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, RecordPlacementInput, RecordPlacementResult,
+  ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, SuggestedPlacementRow, RecordPlacementInput, RecordPlacementResult,
   RecordProposalInput, RecordProposalOptions, RecordProposalResult, PlacementDraft, DraftedProposal,
 } from "./core/change-place.js";
 export { draftChangePlacement } from "./analyze/place-draft.js";

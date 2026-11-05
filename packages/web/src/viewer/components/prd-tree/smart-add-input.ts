@@ -25,7 +25,7 @@ import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from "./change-placement.js";
-import { useProductRead } from "../../views/product-pages.js";
+import { useProductRead } from "../../hooks/index.js";
 import type { PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
 
 // ── Types ────────────────────────────────────────────────────────────

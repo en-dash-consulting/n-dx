@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "5e9d55ad-c415-4d6d-b126-8cb65dc4f2c7":
+    status: "completed"
+    startedAt: "2026-11-05T01:02:18.641Z"
+    completedAt: "2026-11-05T01:02:18.641Z"
+    endedAt: "2026-11-05T01:02:18.641Z"
+    activeIntervals: [{"end":"2026-11-05T01:02:18.641Z","start":"2026-11-05T01:02:18.641Z"}]
+    appliedAt: "2026-11-05T01:02:18.641Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-05T01:02:18.641Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f0c744b1-e8ed-4eaa-9e01-039e25a6574e":
+    status: "completed"
+    startedAt: "2026-11-05T00:54:51.527Z"
+    completedAt: "2026-11-05T01:02:18.641Z"
+    endedAt: "2026-11-05T01:02:18.641Z"
+    activeIntervals: [{"end":"2026-11-05T01:02:18.641Z","start":"2026-11-05T00:54:51.527Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "stopSidecar() clears s.crashed; new hub-sidecars test covers crash then stop during held revalidation"
+    lastModified: "2026-11-05T01:02:18.641Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

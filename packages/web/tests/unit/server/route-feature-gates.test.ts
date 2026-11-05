@@ -26,6 +26,7 @@ import {
   enforceRouteFeatureGate,
   findRouteFeatureGate,
 } from "../../../src/server/route-feature-gates.js";
+import { FEATURE_DISABLED_HEADER } from "../../../src/shared/index.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -71,6 +72,10 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/sidecar/sessions/abc/frames", "web.sidecar"],
   ["/api/commands/sidecar-command/status", "web.sidecar"],
   ["/api/commands/sidecar-command/stop", "web.sidecar"],
+  ["/api/tracker/sync/tick", "web.sidecar"],
+  ["/api/tracker/activity", "web.sidecar"],
+  ["/api/hench/plan-queue", "hench.readyNext"],
+  ["/api/branch-health", "git.branchHealth"],
 ];
 
 /** A server that answers 200 "reached" for anything the gate lets past. */
@@ -129,6 +134,8 @@ describe("route feature gates", () => {
     const res = await fetch(`http://127.0.0.1:${port}${path}`);
 
     expect(res.status).toBe(403);
+    // The hub's session-host picker reads the refused flag from this header.
+    expect(res.headers.get(FEATURE_DISABLED_HEADER)).toBe(feature);
     const body = await res.json();
     expect(body.feature).toBe(feature);
     expect(body.kind).toBe("feature_disabled");

@@ -137,6 +137,31 @@ async function getActiveLocks(henchDir: string): Promise<LockFileData[]> {
   return active;
 }
 
+/**
+ * The number of lock files naming a live PID, read without touching anything:
+ * no directory is created and no stale lock removed. For advisory readers
+ * (`ndx work --plan-queue`) that must write no file; a run's own count goes
+ * through {@link ProcessLimiter.activeCount}, which also cleans up.
+ */
+export async function countActiveLocksReadOnly(henchDir: string): Promise<number> {
+  let entries: string[];
+  try {
+    entries = await readdir(locksDir(henchDir));
+  } catch {
+    return 0; // No locks directory: nothing has ever run here.
+  }
+  let live = 0;
+  for (const file of entries.filter((f) => f.endsWith(".lock"))) {
+    try {
+      const data = JSON.parse(await readFile(join(locksDir(henchDir), file), "utf-8")) as LockFileData;
+      if (isPidAlive(data.pid)) live++;
+    } catch {
+      // A corrupt lock holds no live process; the next run's limiter removes it.
+    }
+  }
+  return live;
+}
+
 // ---------------------------------------------------------------------------
 // ProcessLimiter
 // ---------------------------------------------------------------------------

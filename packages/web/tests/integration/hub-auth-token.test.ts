@@ -117,6 +117,47 @@ describe("hub with a per-user token", () => {
     expect((await ok.json()).projectDir).toBe(repo);
   });
 
+  it("refuses the connections routes through the proxy without a credential; a sign-in's return is only the shell", async () => {
+    expect((await fetch(`${base()}/p/alpha/api/connections`)).status).toBe(401);
+    const navigation = await fetch(`${base()}/p/alpha/api/connections`, { headers: { Accept: "text/html", "Sec-Fetch-Mode": "navigate" } });
+    expect(navigation.status).toBe(401);
+    for (const action of ["oauth/start", "oauth/finish", "sign-out"]) {
+      const res = await fetch(`${base()}/p/alpha/api/connections/docs/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: `http://127.0.0.1:${hub.port}` },
+        body: JSON.stringify({ code: "c", state: "s", redirectUrl: `${base()}/oauth/callback` }),
+      });
+      expect(res.status, action).toBe(401);
+    }
+    // With the token the request reaches the project server, whose web.sidecar gate answers.
+    const gated = await fetch(`${base()}/p/alpha/api/connections`, withToken());
+    expect(gated.status).toBe(403);
+    expect(gated.headers.get("x-ndx-feature-disabled")).toBe("web.sidecar");
+  });
+
+  it("relays a sign-in's return at the hub origin to the project's callback page, reading no credential", async () => {
+    const query = `?code=the-code&state=${encodeURIComponent(`alpha~~docs~${"n".repeat(43)}`)}&iss=${encodeURIComponent("https://as.example")}`;
+    // The authorization server's redirect: a cross-site navigation with no credential.
+    const relayed = await fetch(`${base()}/oauth/callback${query}`, {
+      redirect: "manual",
+      headers: { Accept: "text/html", "Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate" },
+    });
+    expect(relayed.status).toBe(302);
+    expect(relayed.headers.get("location")).toBe(`/p/alpha/oauth/callback${query}`);
+    expect(relayed.headers.get("set-cookie")).toBeNull();
+
+    // The project's callback is its public page shell; it acts on nothing in its URL.
+    const landing = await fetch(`${base()}/p/alpha/oauth/callback${query}`, { headers: { Accept: "text/html" } });
+    expect(landing.status).toBe(200);
+    const html = await landing.text();
+    expect(html).toContain("ndxAuth");
+    expect(html).not.toContain("the-code");
+
+    const unknown = await fetch(`${base()}/oauth/callback?code=c&state=${encodeURIComponent(`gamma~~docs~${"n".repeat(43)}`)}`, { redirect: "manual" });
+    expect(unknown.status).toBe(404);
+    expect(await unknown.text()).toContain("Sign-in not finished");
+  });
+
   it("serves the page shell to a navigation without a credential, and nothing else", async () => {
     const page = await fetch(`${base()}/p/alpha/`, { headers: { Accept: "text/html" } });
     expect(page.status).toBe(200);

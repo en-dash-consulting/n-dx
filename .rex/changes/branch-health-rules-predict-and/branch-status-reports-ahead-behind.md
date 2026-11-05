@@ -1,0 +1,18 @@
+---
+id: "18f3e71f-7f60-4940-8dbb-2e6f93ed8fe6"
+type: "task"
+title: "Branch status reports ahead/behind, predicted conflicts, stack containment and PR checks per worktree"
+slug: "branch-status-reports-ahead-behind"
+description: "Rule-based, LLM-free branch status collector in the web server (`packages/web/src/server/branch-health/`). It is the data source that the Sidecar's Diagnose branch lens (L2) and the hub will narrate later. git and gh run only through the `@n-dx/llm-client` exec helpers that `routes-git.ts` and `routes-worktrees.ts` already use; web imports no `node:child_process`. `GET /api/branch-health` answers for the workspace the request addresses (`X-Ndx-Workspace`, as the Workspaces view fetches per worktree).\n\nLocal facts, with no network:\n- branch and head;\n- base, with `baseSource`: the PR base when GitHub reads are on, else the upstream when it names another branch, else origin's default branch;\n- ahead/behind via `rev-list --left-right --count`;\n- predicted conflicts via `git merge-tree --write-tree <base> <head>`: each file with its stages. It never touches the worktree, the index or HEAD;\n- stack containment: for each layer below in the base chain, whether that layer is an ancestor of head (`merge-base --is-ancestor`). A base set without the content is not a stack.\n\nGitHub facts, read only when the project allowance `web.sidecarGithubReads` is true:\n- `gh pr view --json number,url,baseRefName,isCrossRepository,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup`;\n- for each failing check, `gh run view --log-failed`, with the tail capped at 80 lines and 8,000 characters.\n\nA failing check is classed as behind-base, policy-test, codeql, touched-test, fork-no-ci or unclassified. The UI sits behind `git.branchHealth`. CAOS story: https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8."
+acceptanceCriteria:
+  - "`GET /api/branch-health` returns JSON {branch, head, base, baseSource, ahead, behind, conflicts [{path, stages}], stack [{branch, contained}], github}. It answers 403 while `git.branchHealth` is off and is listed in `ROUTE_FEATURE_GATES`."
+  - "Works offline: with `web.sidecarGithubReads` off, or gh missing, it runs no gh command and still returns base, ahead/behind, conflicts and stack. `github` is null with a reason (tested with a stub exec that fails on any gh call)."
+  - "Predicted conflicts come from `git merge-tree --write-tree`. A temp-repo test with one conflicting and one clean file lists only the conflicting file and leaves the worktree, index and HEAD unchanged."
+  - "Stack containment: a temp-repo test with a three-layer stack reports every layer contained, then reports one not contained after a lower layer gains a commit the upper one lacks."
+  - "With `web.sidecarGithubReads` true, PR fields come from `gh pr view --json`. Each failing check carries a log tail capped at 80 lines and 8,000 characters (tested with a 10,000-line stub log)."
+  - "Each failing check carries a class: behind-base, policy-test, codeql, touched-test, fork-no-ci or unclassified. A unit test per class uses fixture gh output."
+  - "Web imports no `node:child_process`; git and gh run through the `@n-dx/llm-client` exec helpers. `architecture-policy` and `domain-isolation` pass unchanged."
+  - "`git.branchHealth` is registered in `routes-features.ts` (package git, default off, experimental). With it on, each Workspaces card shows a health strip that expands to the full status; with it off the card is unchanged. Viewer tests cover both."
+  - "A patch changeset carries release-note lines for `GET /api/branch-health` and the Workspaces health strip. The reasoning goes in `docs/`, and nothing is added to `packages/web/AGENTS.md`."
+priority: "high"
+---

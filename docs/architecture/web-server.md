@@ -139,7 +139,9 @@ Content-Security-Policy. The built viewer and hub pages ship an inline
 bootstrap script and inline styles, so the page policy keeps `'unsafe-inline'`
 for scripts and styles and is otherwise same-origin (plus `data:`/`blob:`
 images and loopback WebSockets). `/data/*` responses switch to a strict policy
-that allows nothing, because they are data, not documents. The preview server
+that allows nothing, because they are data, not documents. The hub session's
+drawer page alone may be framed, by its own origin (`SAMEORIGIN`,
+`frame-ancestors 'self'`): the hub home docks it in an iframe. The preview server
 adds `https:` sources, since a design document may load from a CDN.
 
 ## Repository trust
@@ -155,6 +157,154 @@ URL, never a configured `api_endpoint`. A restricted answer is not cached, so
 accepting the config shows the probed result at once. CLIs are never
 resolved from the analyzed project — it is what the dashboard serves, not what
 it runs.
+
+## Sidecar Diagnose run packet
+
+Knowledge packets omit error text (PK4). The Diagnose run packet is a
+deliberate exception: it carries the newest run's gate failure digest (or
+output tail when hench extracted no digest), capped at 2,400 characters —
+the digest's start, which lists the failing tests, or the tail's end —
+because the diagnosis is about that error. The text is local,
+passes through `redactDeep`, and goes only to the vendor the project is
+configured with. The packet's other sections are the run classifier's
+verdict (`RunRecord.diagnosis`), the review's unrepaired findings and the
+run's last events, each read from disk in `sidecar/packet-sources.ts`; web
+still imports nothing from hench.
+
+The newest run is the task's newest in any worktree of the repository: the
+packet reads the worktrees Runs (`?scope=repo`) and Live read
+(`resolveRunTargets`, injected as `SpawnedReads.runTargets`), and the run
+section names the worktree. A record at `running` is judged with Live's
+liveness mirror (`judgeRunInTarget`, as `SpawnedReads.judgeRun`).
+
+A run from a hench that predates the classifier records no verdict. When the
+newest run has ended without completing, the verdict comes from
+`hench runs diagnose <id> --format=json <worktree>`, spawned in the run's
+worktree through `SpawnedReads` (`diagnoseTaskRun` in `routes-hench-prep.ts`,
+beside the resolve and preview spawns) and named as the section's
+provenance. A failed or timed-out spawn leaves a gap naming the command. A
+running record whose process is gone (`orphaned`) has ended too: it is
+classified, and the verdict section says it is recorded as running and that
+ending it from Live records the end. A completed run, or a running one whose
+process may be alive, is never classified. The verdict section also lists the failed run's settings (`model`
+when a flag chose it, `review` and `reviewModel` when it had a review plan; a
+pair review repeats as `reviewMode: "pair"` with its `reviewVendor`) for the
+model to pass to `start_work` on a re-run or `--fresh`. The spawned verdict
+passes through `redactDeep` like the recorded one: its evidence quotes the
+run's error.
+
+## Sidecar Diagnose branch and GitHub cards
+
+The Diagnose branch packet (`sidecar/branch-packet.ts`) is the second PK4
+exception: each failing check carries the end of its failed-job log, at most
+1,200 characters of the tail branch health already capped, through
+`redactDeep`. Its target is a workspace key; `SidecarWorkspaces`, injected by
+start.ts, names the worktree, and fix cards are offered only when that
+worktree is the session's own, because a card runs in the session's worktree
+(no cross-workspace write action). A source conflict never gets a card.
+
+GitHub reads have one allowance, `web.sidecarGithubReads`, saved to the
+user's local config; the shared config's `true` applies only in a trusted
+checkout (`network-reads` trust finding). The packet runs gh
+only under it; `github_read` runs without a card under it and raises a
+network-read card otherwise. `github_read` is `per-project` in the broker
+policy, so an allow-list rule for it is ignored. A `pr` read also sits behind
+`git.branchHealth`: while it is off the broker answers "Nothing was read" before
+raising a card. A `check` read names the class "failing on main" only when its
+base is origin's default branch, else "failing on the base (<base>)".
+`draft_github_post` is never
+allowed without its card: Approve posts the card's own input under the
+operator's gh login (`gh pr comment` or `gh pr review --comment`, body on
+stdin); Copy and Discard deny it.
+
+## Hub session
+
+`/hub/session/…` on the hub is the hub-scope Sidecar session, one per machine.
+The hub spawns no vendor CLI for it: `hub/proxy.ts` forwards it, HTTP and
+WebSocket, to `/api/sidecar/hub/…` on the project server `hub/session-host.ts`
+picks. That is the holder of `<ndx home>/hub/sidecar/host.lock` (pid and port)
+while it is healthy, else the first healthy registered project, skipping one
+the proxy just failed to reach until its next health check. All session state
+is under `<ndx home>/hub/sidecar/`, so a new host resumes it from disk. The
+holder gives the lock up once any hub turn running on it has settled: on
+graceful shutdown (after interrupting the turn, waiting at most 5 s, and
+refusing new hub requests meanwhile), and when its web.sidecar gate refuses a
+hub session route. A crashed holder, or one whose turn outlasts the wait, is
+replaced as a dead pid. The
+path mapping and the lock's location are in `src/shared/base-path.ts`, which
+the host's routes (`server/routes-sidecar.ts`) read too. The hub judges the
+browser's credential and forwards the per-user token to the host, as it does
+for `/p/<id>/`.
+
+Its spend is the machine's: a host appends each turn to
+`<ndx home>/hub/usage.jsonl` (`hub/usage-ledger.ts`), never its own usage
+ledger, and the hub home shows the total.
+
+The hub home offers it only when `probeHubLens` (`hub/session-host.ts`) gets a
+yes from the host it would pick (`/lens`): a header toggle (⌘J) docks an
+iframe of `/hub/session/drawer`, the drawer-only viewer page the host builds
+beside the dashboard (`viewer/hub-session.ts`). `hub/home.ts` stays
+server-rendered with no Preact; the frame posts `HUB_SESSION_CLOSE_MESSAGE` to
+undock. The host injects the page's paths into it, so they do not cross
+`viewer/external.ts`, and the session script, so the frame signs in from its
+tab. With auth on, a navigation gets the deferred home with the toggle hidden;
+its first overview read after sign-in (`?hubSession=1`) runs the same probe and
+shows it. The frame's navigation is the one credential-less `/hub/session/`
+request the hub serves: a GET wanting HTML of `/drawer`, fetched from the host
+with the token. That page holds only static paths; everything else there is 401.
+
+### Hub session: drafts only
+
+The hub session's broker is scoped (`BROKER_SCOPE_TOOLS` in
+`sidecar/broker-policy.ts`): it is offered `run_command`, `draft_github_post`,
+`save_draft` and `ledger_append`, and never `start_work`, `propose_edit`,
+`propose_prd_change`, `place_change_card`, `propose_link` or `migration_decision`. Calls name a
+`project`, resolved to its repository root through the hub's overview
+(`sidecar/hub-actions.ts`), never from a path the agent gives.
+
+- `run_command` accepts only `HUB_COMMAND_ARGV` (`ndx status`,
+  `git worktree list`, `git status --short --branch`). Any other argv, or a
+  project the hub does not name, is refused before a card is raised. The
+  allow-list key is `{ project, argv }`, so a rule covers one project.
+- `draft_github_post` posts only on Approve, with cwd at the project's
+  repository root.
+- `save_draft` writes nothing before Approve. The card shows the absolute path
+  (a relative one lands in `<ndx home>/hub/drafts/`), the operator can change
+  it, an existing file is never overwritten, and it is never allow-listable.
+  A path is refused when any segment, or any segment of its nearest existing
+  ancestor's real path, is `.git` compared case-insensitively after an NTFS
+  stream suffix and trailing dots and spaces are stripped.
+
+## Sidecar Guide and the run-plan card
+
+The Guide packet (6k cap) is the queue planner's plan as hench printed it:
+lanes with their commands and reasons, the tasks left out and why, active
+runs against the limit. It is read through `readQueuePlan` in
+`routes-hench.ts`, the same spawn and parse `GET /api/hench/plan-queue`
+uses, injected as `SpawnedReads.queuePlan` (web has no `node:child_process`
+and no hench import). Its target is the whole ready list, so no ref is
+needed. While `hench.readyNext` is off, `GET /api/sidecar/lenses` reports the
+lens unavailable and naming that toggle, and `buildLensPacket` reads
+nothing: no packet, no planner spawn. The gate is `SpawnedReads.featureEnabled`
+because packet code imports no route.
+
+`propose_run_plan` raises a run-plan card and is never allow-listable. The
+model gives no commands: the broker reads the planner itself (refusing with
+no card when it has no lane or the toggle is off) and the card carries that
+plan. Copy commands is the page's own clipboard write, with no broker call.
+Start lane approves the card with `lane`, and the tool result then names that
+lane's first task alone for a `start_work` card, listing the rest with their
+exact commands for a later turn. A first step carrying a flag a work card
+cannot (`--require-unblocked`) is not started from a card. Nothing starts
+without an approved work card, whose preview shows active runs against
+`guard.maxConcurrentProcesses`; approving one that would make a run past the
+limit is refused, naming the limit and the runs that hold it. The count is the
+repository's, not the worktree's: live lock holders in every worktree of
+`git worktree list` (`repositoryRunSlotUsage`), the same locks the planner's
+`activeRuns` reads, plus runs this server spawned that hold no lock yet. On the
+run-plan card a chosen lane reads "Work card raised" until its first task's work
+card is approved and the run started ("Started"); a denied or withdrawn work
+card clears it.
 
 ## HTTP-request concurrency
 
@@ -246,6 +396,109 @@ Because it is about every worktree, it is also the one socket consumer that must
 should move B's card while the viewer sits on A. It reads the `workspace` tag
 itself (`frameWorkspace`) and refreshes only that workspace's slice, falling back
 to a whole-board reload for a `"*"` frame or an unrecognised key.
+
+## Branch health
+
+`GET /api/branch-health` (`routes-branch-health.ts`, logic in
+`server/branch-health/`) reports one worktree's branch by fixed rules, with no
+model: the data the Sidecar's Diagnose branch lens and the hub narrate later.
+The Workspaces board asks it once per card, by header, while `git.branchHealth`
+is on; the route gate refuses it with 403 while the toggle is off.
+
+- **The toggle is per worktree.** The board reads `git.branchHealth` from its
+  own workspace, but the gate reads the addressed worktree's `.n-dx.json`,
+  which is tracked, so each worktree has its own copy. With the anchor's toggle
+  on and a branch worktree's still off, that card answers 403
+  `feature_disabled` and shows a neutral "off in this worktree" note, not an
+  error. Enable the flag in that worktree (or merge the `.n-dx.json` change
+  into its branch) to see its strip. The gate is not widened to follow the
+  viewer's toggle: it always reads the project the request addresses.
+
+- **Local facts need no network.** Branch, head, base, ahead/behind
+  (`rev-list --left-right --count`), predicted conflicts and stack containment
+  come from git alone, so the strip still answers offline.
+- **The base is chosen in a fixed order:** the PR's base when GitHub reads are
+  on, else the PR base a GitHub read cached, else the upstream when it names another branch, else origin's default
+  branch. `baseSource` says which, because a branch whose upstream is its own
+  remote copy has no useful upstream base.
+- **Conflicts are predicted, not rehearsed.** `git merge-tree --write-tree`
+  merges in the object store and returns the conflicted paths with their index
+  stages. It leaves the worktree, the index and HEAD untouched, so a `GET` that
+  predicts a merge stays read-only where it matters; the only trace is
+  unreferenced objects that `git gc` collects. When merge-tree gives no
+  prediction, `conflictsUnavailable` says why: a timeout as a timeout, and the
+  git 2.38 hint only when git exits 129 or its stderr names `--write-tree`.
+- **Each conflict is classified, with a fix a person runs.**
+  `branch-health/conflicts.ts` is a pure function over each file's stages and
+  the diff3-style conflicted result merge-tree wrote, plus the project config:
+  it reads no file, runs no process and writes nothing. Fixes assume
+  `git merge <base>` on this branch (ours = this branch, theirs = the base).
+  First match wins:
+
+  | Class | When | Fix |
+  |-------|------|-----|
+  | `generated` | the path matches a `web.generatedFiles` glob | `checkout --theirs`, the declared command, `git add`; listed after every other fix |
+  | `prd-state` | a v2 `state.yaml` while `merge.rex-state.driver` is unset | register the driver, `checkout --merge`, `git diff --check HEAD` (stops on markers the driver left, since `checkout --merge` exits 0 regardless), `git add`. With the driver set it is `source` |
+  | `duplicate-capture` | add/add on a PRD item file, same title, different ids | keep the base's id (`checkout --theirs`), `git add`, `rex validate --post-merge --repair` (prunes the state row and `blockedBy` refs naming the dropped id), `git add -u` on the rex directory, `rex validate --post-merge` |
+  | `prd-children-table` | a v1 `prd_tree` `index.md` whose hunks are all `## Children` rows, and the base changed nothing above the table (else `source`: keeping this branch's copy would drop it) | `checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate` |
+  | `allowlist-union` | every hunk only adds list entries on both sides: each line a YAML `- ` scalar item, a quoted string, a number or literal, or a one-line `[…]`/`{…}` element, or the lines together a run of JSON array elements. Never a lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`); an added code block or mapping is `source` | a unified diff against this branch's copy: ours, then theirs; an entry both sides added (ignoring whitespace and a trailing comma) is listed once, and when that leaves the base nothing to add the fix is `git checkout --ours` then `git add` |
+  | `source` | everything else | none; names the other local worktrees whose branch changed the path (the API lists all; the Workspaces expansion shows three and counts the rest) |
+
+  Stage blobs and other worktrees' diffs are read at most eight git processes
+  at a time, and other worktrees only when a `source` conflict needs naming.
+  Each other-worktree diff is kept server-wide, keyed by the base and branch
+  tip commits (`branch-health/diff-cache.ts`, the 1024 most recently used), so
+  a board of W cards runs each diff once rather than W times, and a moved base
+  or tip is a new key, never a stale answer. A failed diff is not kept.
+  `web.generatedFiles` is `[{ "paths": [globs], "command": [argv] }]`; with no
+  declaration nothing is `generated`. This repository declares the prompt
+  baseline, the iso-map skill script and `pnpm-lock.yaml`
+  (`pnpm install --lockfile-only`).
+- **A stack is content, not configuration.** Each layer below in the base
+  chain is checked with `merge-base --is-ancestor`. A branch whose base is set
+  to a lower layer but lacks that layer's commits is reported not contained:
+  restacking is the fix, and a base setting alone would hide it. The chain
+  follows each layer's PR base (GitHub reads on) or its upstream, and stops at
+  origin's default branch, which is the trunk and not a layer.
+- **gh runs only with `web.sidecarGithubReads` true.** That one project
+  allowance governs every GitHub read the Sidecar makes. With it off, or gh
+  missing or signed out, `github` is null and `githubReason` says why.
+- **gh runs only on request.** Without `?github=1` the route answers local
+  facts and sets `githubDeferred` when reads are allowed. The board asks that
+  way on mount and adds `?github=1` when a card's strip is first expanded, so
+  opening a board of many worktrees runs no gh command. A GitHub read
+  remembers each PR base it finds, per worktree and branch, in the server's
+  memory; later local-only answers, and GitHub reads whose `gh pr view` fails
+  (offline, an expired token), use it for the base (`baseSource:
+  "pr-cached"`) and each stack layer. A branch gh reports has no PR never uses
+  it, since that PR may have merged or closed. Before any GitHub read, a local-only answer
+  falls back to upstreams and origin's default branch, and `baseNote` says the
+  PR base is not read yet, so a stacked branch's strip does not pass off
+  `origin/main` as its base.
+- **A failing check is classed on the whole log.** gh's per-line job, step and
+  timestamp prefix and colour codes are removed first, whether gh wrote the
+  escape as the 0x1b byte or as literal `^[` text. policy-test needs a policy
+  suite among the failing test files: a log names passing suites on its ✓
+  lines too. A failing-file line may carry a vitest project label between
+  `FAIL` and the path (`FAIL  llm-client:shared tests/x.test.ts`).
+  Behind-base wording ("out of date with", "is behind", …) counts only on
+  `##[error]` annotation lines and in the check name: a failing test's own
+  output can say the same words. An annotation that opens with an error
+  name (`##[error]AssertionError: …`, vitest's github-actions reporter in CI)
+  is a test failure and does not count. When no
+  policy suite or touched test explains the failure, behind-base also fires when the PR's
+  `mergeStateStatus` is `BEHIND` or a stack layer is not contained, and the
+  evidence names which. A test path printed by a package's
+  runner (`packages/p test: FAIL tests/x.test.ts`) matches only that
+  package's `packages/p/tests/x.test.ts`. Only the stored `logTail` is cut, to
+  the last 80 lines and 8,000 characters.
+- **A failing check gets one class, first rule wins:** `fork-no-ci`,
+  `codeql`, `behind-base`, `policy-test`, `touched-test`, else
+  `unclassified`, each with the fact that decided it (`branch-health/checks.ts`).
+  The order puts what no code change on the branch can fix first.
+- **git and gh run through `@n-dx/llm-client`'s `exec`.** Web imports no
+  `node:child_process`; the collector takes the exec function as an option
+  so tests stub gh and run git for real against temporary repositories.
 
 ## web-server zone stability
 

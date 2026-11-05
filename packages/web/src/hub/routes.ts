@@ -5,6 +5,7 @@
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
+ *                                     (with ?hubSession=1, whether the hub session can run)
  *   GET    /api/hub/new-project     — where a new project would go: the suggested
  *                                     parent, and (with ?parent=&name=) the exact
  *                                     absolute path those would create
@@ -22,11 +23,14 @@
  *                                     its resolved dashboard links
  *   POST   /api/hub/extensions/:name/stop
  *                                   — stop that extension's sidecar
+ *   POST   /api/hub/extensions/:name/frame?project=<id>
+ *                                   — a frame key for its Sidecar drawer tab,
+ *                                     answered as the finished keyed URL
  *   POST   /api/hub/mounts/:name    — where a browser opens that sidecar:
  *                                     `/x/<name>/~<key>/` with the token on
  *                                     (the sign-in page asks for it)
  *
- * **Versioned.** `GET`/`POST /projects` and both `/extensions` routes are the
+ * **Versioned.** `GET`/`POST /projects` and the `/extensions` routes are the
  * extension API (docs/architecture/extensions.md, "Versioned hub API"): each
  * answer carries `apiVersion`, and a breaking change to any of them bumps it.
  * Their contract tests are packages/web/tests/integration/hub-extension-api.test.ts.
@@ -62,8 +66,10 @@ import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
 import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject, writeHubMarkerFiles } from "./new-project.js";
 import type { NewProjectPlan } from "./new-project.js";
-import { EXTENSION_API_VERSION, buildExtensionsAnswer } from "./extensions.js";
+import { EXTENSION_API_VERSION, buildExtensionsAnswer, resolveFrameUrl } from "./extensions.js";
 import { SidecarManager } from "./sidecars.js";
+import { DEFAULT_IDLE_STOP_MINUTES } from "./frame-keys.js";
+import { probeHubLens } from "./session-host.js";
 
 const HUB_PREFIX = "/api/hub";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -365,6 +371,57 @@ async function handleExtensions(res: ServerResponse, hub: Hub, projectId: string
   return true;
 }
 
+/**
+ * POST /api/hub/extensions/:name/frame?project=<id> — issue a frame key for
+ * that extension's Sidecar drawer tab and answer the finished URL, so no
+ * client builds one. 404 unless the project is registered and the extension
+ * is enabled (approved and compatible) with a sidecar and a `sidecarTab`.
+ */
+async function handleFrameKey(res: ServerResponse, hub: Hub, name: string, projectId: string | null): Promise<boolean> {
+  if (projectId === null) {
+    error(res, 400, "project is required: ?project=<id>, or address /p/<id>/api/hub/…");
+    return true;
+  }
+  const project = hub.getProject(projectId);
+  if (!project) {
+    error(res, 404, `No project registered as "${projectId}"`);
+    return true;
+  }
+  if (!SidecarManager.isName(name)) {
+    error(res, 404, `No extension is named "${name}"`);
+    return true;
+  }
+  const listed = await hub.listExtensions();
+  if (!listed.ok) {
+    error(res, 503, listed.error);
+    return true;
+  }
+  const ext = listed.extensions.find((e) => e.name === name);
+  if (!ext) {
+    hub.frameKeys.revoke(name);
+    error(res, 404, `No extension is named "${name}"`);
+    return true;
+  }
+  if (ext.state !== "enabled") {
+    hub.frameKeys.revoke(name);
+    json(res, 404, { error: `The ${name} extension is ${ext.state}: ${ext.reason}`, state: ext.state });
+    return true;
+  }
+  const tab = ext.manifest?.sidecar ? ext.manifest.sidecarTab : undefined;
+  if (!tab) {
+    error(res, 404, `The ${name} extension declares no Sidecar drawer tab`);
+    return true;
+  }
+  const idleMinutes = ext.manifest?.sidecar?.idleStopMinutes ?? DEFAULT_IDLE_STOP_MINUTES;
+  const issued = hub.frameKeys.issue(name, project.id, idleMinutes * 60_000);
+  json(res, 200, {
+    apiVersion: EXTENSION_API_VERSION,
+    url: resolveFrameUrl(name, issued.key, tab.path, project),
+    expiresAt: new Date(issued.expiresAt).toISOString(),
+  });
+  return true;
+}
+
 /** Handle a `/api/hub/*` request. Returns false when the path is not the hub's. */
 export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
   const [rawUrl, rawQuery = ""] = (req.url || "/").split("?");
@@ -428,8 +485,16 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     }
     // Stopping one that is not running is not an error: the caller wants it
     // stopped, and it is. The next request to `/x/<name>/` starts it again.
+    // Core asks for this on disable, remove and a changed approval, so the
+    // extension's frame keys are dropped with it; a tab asks for a new one.
+    hub.frameKeys.revoke(name);
     json(res, 200, { apiVersion: EXTENSION_API_VERSION, name, stopped: await hub.sidecars.stop(name) });
     return true;
+  }
+
+  const frameMatch = path.match(/^\/extensions\/([^/]+)\/frame$/);
+  if (frameMatch && method === "POST") {
+    return handleFrameKey(res, hub, safeDecodeSegment(frameMatch[1]), new URLSearchParams(rawQuery).get("project") ?? scopedProjectId);
   }
 
   // The sign-in page at `/x/<name>/` asks for the keyed mount here, with the
@@ -449,9 +514,16 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // Feeds the home page, and its refresh tick: `html` is the same markup the
   // page was served with, rendered once here rather than a second time in the
   // browser, so there is one renderer and not two that can disagree.
+  // `?hubSession=1` (the deferred home's first read) also asks the hub
+  // session's host whether it can run the hub lens, as the served page does.
   if (path === "/overview" && method === "GET") {
-    const overview = await buildHubOverview(hub.listProjects(), (port) => fetchChildSnapshot(port, 2_000, hub.token));
-    json(res, 200, { ...overview, html: renderCards(overview) });
+    const projects = hub.listProjects();
+    const withSession = new URLSearchParams(rawQuery).get("hubSession") === "1";
+    const [overview, hubSession] = await Promise.all([
+      buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token)),
+      withSession ? probeHubLens(hub.sessionHosts, projects, { token: hub.token }) : undefined,
+    ]);
+    json(res, 200, { ...overview, html: renderCards(overview), ...(hubSession !== undefined && { hubSession }) });
     return true;
   }
 

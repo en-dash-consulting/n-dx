@@ -103,6 +103,7 @@ Any publisher can ship an extension; nothing in the contract is specific to one 
 | `commands[]` | Each `name` becomes `ndx <name>`; `bin` is a path inside the package, run with the same Node as n-dx |
 | `sidecar` | Optional web server the hub mounts at `/x/<name>/` |
 | `hub`, `projectLinks` | Optional entries on the hub home and on each project's dashboard; `{projectId}` and `{repoRoot}` are the only placeholders |
+| `sidecarTab` | Optional single `{ label, path }` tab in the Sidecar drawer, same path rules as `projectLinks`; needs `sidecar` |
 | `configSchema` | Optional JSON Schema for the extension's config section |
 
 **Where n-dx looks, highest precedence first**
@@ -295,5 +296,5 @@ Let separately installed npm packages add `ndx <name>` commands, a hub-mounted w
 - Should extensions add skills to `.claude/skills` and `.agents/skills` at init, and how does that interact with the generated instruction files?
 - Is idle stop enough to bound memory with many sidecars, or should the hub's admission queue (`admission.ts`) also govern sidecar starts?
 - Do project-source extensions belong in v1 at all, given they widen the trust surface? User-source alone covers every named consumer.
-- Should the project dashboard ever embed an extension page (an iframe tab), or stay links-only?
+- Should the project dashboard ever embed an extension page (an iframe tab), or stay links-only? *Answered for the Sidecar drawer only:* one `sidecarTab` per extension, served through a frame key with an opaque origin ([Hub and API](../extensions/hub-api.md#frame-keys)). The dashboard page itself stays links-only.
 - Where does `@n-dx/extension-kit` live, and does it ship with v1 or after the first two outside extensions?

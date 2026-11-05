@@ -37,7 +37,7 @@ function changeSetCard(changeSet: SidecarChangeSet, over: Partial<SidecarCard> =
 
 let host: HTMLElement | null = null;
 
-async function draw(card: SidecarCard, decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => {})) {
+async function draw(card: SidecarCard, decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => true)) {
   host = document.createElement("div");
   document.body.appendChild(host);
   await act(async () => {

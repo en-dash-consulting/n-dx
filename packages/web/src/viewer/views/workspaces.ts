@@ -20,7 +20,8 @@
  * `/api/workspaces` (the registry's keys), `/api/worktrees` (git state and
  * run counts) and `/api/hench/memory` (the machine's memory, not a
  * worktree's). The per-workspace fetches are the execution status, the
- * concurrency count, and the PRD delta.
+ * concurrency count, the PRD delta, and — while `git.branchHealth` is on —
+ * each card's branch health strip (`workspace-branch-health.ts`).
  *
  * ## Why this view does not filter WebSocket frames
  *
@@ -41,6 +42,8 @@ import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
+import { useFeatureToggle } from "../hooks/index.js";
+import { BRANCH_HEALTH_FEATURE, BranchHealthStrip } from "./workspace-branch-health.js";
 import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
@@ -472,16 +475,23 @@ function LiveRun({ card, live, onStop, stopping }: {
   );
 }
 
-function WorkspaceCardView({ card, doFetch, onChanged }: {
+function WorkspaceCardView({ card, doFetch, onChanged, branchHealth, onAttachSidecar, attached }: {
   card: WorkspaceCard;
   doFetch: Fetcher;
   onChanged: () => void;
+  /** `git.branchHealth`: show the health strip. Off renders the card unchanged. */
+  branchHealth: boolean;
+  /** Attach this card to Sidecar; absent while Sidecar is off. */
+  onAttachSidecar?: (key: string | null) => void;
+  /** This card is the one attached to Sidecar. */
+  attached: boolean;
 }) {
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const status = cardStatus(card);
   const headingId = `workspace-card-${card.key}`;
   const since = formatSince(card.runs.lastFinishedAt);
+  const healthFetch = useCallback((path: string) => workspaceFetch(doFetch, card.key, path), [doFetch, card.key]);
 
   const stop = useCallback(async () => {
     if (!card.live) return;
@@ -547,11 +557,29 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
         : null,
     ),
 
+    branchHealth
+      ? h(BranchHealthStrip, {
+          workspace: card.key,
+          branch: card.branch,
+          revision: `${card.runs.total}|${card.runs.lastFinishedAt ?? ""}`,
+          doFetch: healthFetch,
+        })
+      : null,
+
     h("div", { class: "workspace-card-actions" },
       h("a", {
         class: "workspace-card-open",
         href: workspaceViewUrl(card, "prd", currentPathname()),
       }, "Open workspace"),
+      onAttachSidecar
+        ? h("button", {
+            type: "button",
+            class: "workspace-card-sidecar",
+            "aria-pressed": attached,
+            onClick: () => onAttachSidecar(card.key),
+            "aria-label": `Ask Sidecar why ${card.key}'s branch fails CI or conflicts`,
+          }, attached ? "Attached to Sidecar" : "Ask Sidecar")
+        : null,
       card.live || !card.nextTask
         ? null
         : h(TaskStartControl, {
@@ -579,10 +607,19 @@ export interface WorkspacesViewProps {
   fetcher?: Fetcher;
   /** Injected for tests; defaults to a live WebSocket. */
   socketFactory?: (url: string) => WebSocket;
+  /**
+   * Attach a worktree card to Sidecar, whose Diagnose branch lens reads that
+   * worktree; null detaches. Absent while Sidecar is off: no card offers it.
+   */
+  onAttachSidecar?: (key: string | null) => void;
+  /** The card attached to Sidecar, by workspace key. */
+  attachedWorktree?: string | null;
 }
 
 /** Board of worktree cards under a machine strip. */
-export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) {
+export function WorkspacesView({ fetcher, socketFactory, onAttachSidecar, attachedWorktree = null }: WorkspacesViewProps) {
+  // The attachment is this page's: leaving it detaches the card.
+  useEffect(() => () => onAttachSidecar?.(null), [onAttachSidecar]);
   const [cards, setCards] = useState<WorkspaceCard[]>([]);
   const [stats, setStats] = useState<MachineStats>({
     agentsRunning: 0, memory: null, uncommittedTrees: 0, prdOnlyOnBranches: 0,
@@ -598,6 +635,7 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
     [fetcher],
   );
   const currentKey = getWorkspaceKey();
+  const branchHealth = useFeatureToggle(BRANCH_HEALTH_FEATURE, false);
   /**
    * Per-workspace state carried between loads, so a frame about one worktree
    * can refresh that worktree's four endpoints and leave the others' answers
@@ -712,9 +750,12 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
         card,
         doFetch,
         onChanged: () => void load(card.key),
+        branchHealth,
+        onAttachSidecar,
+        attached: attachedWorktree === card.key,
       })),
     );
-  }, [loading, error, cards, doFetch, load]);
+  }, [loading, error, cards, doFetch, load, branchHealth, onAttachSidecar, attachedWorktree]);
 
   return h("div", { class: "workspaces-container" },
     h("header", { class: "workspaces-header" },

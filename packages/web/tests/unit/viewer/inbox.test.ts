@@ -36,6 +36,7 @@ function placement(id: string, strength: PlacementStrength | null, opts: { tied?
     layout: "v2",
     change: { id, title: `Change ${id}`, status: "pending", taskCount: 1, tags: opts.tags },
     relation: "touches",
+    relationRule: "a rule",
     tied: opts.tied ?? false,
     shortlist: strength === null ? [] : [{
       target: `cap-${id}`, type: "capability", title: `Home for ${id}`, area: "Checkout",

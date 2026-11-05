@@ -1,8 +1,8 @@
 /**
  * What the Sidecar drawer is attached to, and the lens it asks with.
  *
- * The page the operator is on names an item (a task, a capability, a zone, or
- * the Plan and Live pages as a whole). That item becomes the session's target,
+ * The page the operator is on names an item (a task, a capability, a zone, a
+ * Workspaces worktree card, or the Plan and Live pages as a whole). That item becomes the session's target,
  * and the page picks the default lens. The lens list is the server's registry
  * (`GET /api/sidecar/lenses`), never a list kept here: a lens the registry
  * reports as unavailable is shown as "not available yet" and the session runs
@@ -19,9 +19,11 @@ export interface SidecarLensInfo {
   id: string;
   available: boolean;
   needs?: string;
+  /** The item kind the lens needs attached, and what it says while none is. */
+  target?: { kind: string; needs: string };
 }
 
-export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live";
+export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change";
 
 /** The thing the current page is about. `ref` is what the lens packet is pointed at; Plan and Live have none. */
 export interface SidecarPageItem {
@@ -39,10 +41,16 @@ export interface SidecarPageSelection {
   taskId: string | null;
   /** The capability opened inside the Product page, which has no route of its own. */
   capabilityId?: string | null;
+  /** The worktree card attached on the Workspaces page, by workspace key. */
+  worktree?: string | null;
+  /** The change awaiting placement attached by "Place with Sidecar", by id. */
+  changeId?: string | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
 export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null {
+  // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
+  if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };
   }
@@ -50,6 +58,7 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   if (page.view === "product" && page.capabilityId) {
     return { kind: "capability", ref: page.capabilityId, label: page.capabilityId };
   }
+  if (page.view === "workspaces" && page.worktree) return { kind: "worktree", ref: page.worktree, label: page.worktree };
   if (page.view === "plan") return { kind: "plan", label: "Plan" };
   if (page.view === "live" || page.view === "live-analyze") return { kind: "live", label: "Live" };
   return null;
@@ -63,6 +72,8 @@ export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boole
     case "zone": return "explain";
     case "plan": return "plan";
     case "live": return "guide";
+    case "worktree": return "diagnose-branch";
+    case "change": return "place";
     default: return GENERAL_LENS;
   }
 }
@@ -78,15 +89,23 @@ export interface ResolvedLens {
 }
 
 /**
- * Settle `wanted` against the registry. A lens the registry does not list is
- * unavailable too, and so is every lens until the registry has answered —
- * except General, which sends no packet.
+ * Settle `wanted` against the registry and the attached `item`. A lens the
+ * registry does not list is unavailable too, and so is every lens until the
+ * registry has answered — except General, which sends no packet. A lens that
+ * needs an item of a kind (Diagnose run: a task) is unavailable without one.
  */
-export function resolveLens(wanted: string, registry: readonly SidecarLensInfo[] | null): ResolvedLens {
+export function resolveLens(
+  wanted: string,
+  registry: readonly SidecarLensInfo[] | null,
+  item: SidecarPageItem | null = null,
+): ResolvedLens {
   if (wanted === GENERAL_LENS) return { wanted, running: GENERAL_LENS };
   const entry = registry?.find((l) => l.id === wanted);
-  if (entry?.available) return { wanted, running: wanted };
-  return { wanted, running: GENERAL_LENS, needs: entry?.needs ?? "a lens this build knows" };
+  if (!entry?.available) return { wanted, running: GENERAL_LENS, needs: entry?.needs ?? "a lens this build knows" };
+  if (entry.target && (item?.kind !== entry.target.kind || !item.ref)) {
+    return { wanted, running: GENERAL_LENS, needs: entry.target.needs };
+  }
+  return { wanted, running: wanted };
 }
 
 /** `diagnose-run` → `Diagnose run`. */
@@ -175,13 +194,13 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   const wanted = choice && choice.key === key
     ? choice.lens
     : wantedLensFor(pageItem, taskRef !== null && failedTask === taskRef);
-  const lens = useMemo(() => resolveLens(wanted, registry), [wanted, registry]);
+  const lens = useMemo(() => resolveLens(wanted, registry, item), [wanted, registry, item?.kind, item?.ref]);
 
   const chooseLens = useCallback((id: string): boolean => {
-    if (resolveLens(id, registry).running !== id) return false;
+    if (resolveLens(id, registry, item).running !== id) return false;
     setChoice({ key, lens: id });
     return true;
-  }, [registry, key]);
+  }, [registry, key, item?.kind, item?.ref]);
   const removeItem = useCallback(() => setRemovedKey(key), [key]);
 
   return { item, asks: pageItem !== null, ready: registry !== null, lenses: registry ?? [], lens, chooseLens, removeItem };

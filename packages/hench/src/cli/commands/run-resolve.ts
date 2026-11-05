@@ -29,7 +29,7 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
-import { explicitTaskRefusal } from "../../agent/planning/brief.js";
+import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
 import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
@@ -60,6 +60,7 @@ export type RunRefusalCode =
   | "prd-unreadable"
   | "not-actionable"
   | "claimed-elsewhere"
+  | "blocked"
   | "tree-not-conformant"
   | "vendor-unset"
   | "vendor-cli-missing"
@@ -132,6 +133,7 @@ export interface ResolvedSettings {
   tokenBudget: Resolved<number>;
   fresh: Resolved<boolean>;
   allowDirty: Resolved<boolean>;
+  requireUnblocked: Resolved<boolean>;
   resetDeferred: Resolved<boolean>;
 }
 
@@ -223,6 +225,7 @@ const RUN_OPTIONS: readonly RunOption[] = [
   { key: "tokenBudget", flag: "token-budget", type: "integer", scope: "task", description: "Token budget for the run; 0 means unlimited." },
   { key: "fresh", flag: "fresh", type: "boolean", scope: "launch", description: "Discard the cached orientation session so the run re-orients." },
   { key: "allowDirty", flag: "allow-dirty", type: "boolean", scope: "launch", description: "Start even though the working tree has uncommitted changes." },
+  { key: "requireUnblocked", flag: "require-unblocked", type: "boolean", scope: "launch", description: "With --task: refuse to start the task while any of its blockers is not completed." },
   { key: "resetDeferred", flag: "reset-deferred", type: "boolean", scope: "launch", description: "Reset deferred and failing tasks to pending before the run." },
 ];
 
@@ -333,6 +336,10 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     if (named && !(await wouldBeReset(named.item, named.parents, flags, dir))) {
       const changeNotActionable = explicitTaskRefusal(named.item);
       if (changeNotActionable) refuse("not-actionable", changeNotActionable);
+    }
+    if (flags["require-unblocked"] === "true") {
+      const blocked = openBlockersRefusal(entry.item, prdItems, v2Tree);
+      if (blocked) refuse("blocked", blocked);
     }
     if (claim) {
       const heldId = enclosing?.changeId ?? entry.item.id;
@@ -494,6 +501,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     tokenBudget: withFallback(settings.tokenBudget, "tokenBudget"),
     fresh: flagged("fresh"),
     allowDirty: flagged("allow-dirty"),
+    requireUnblocked: flagged("require-unblocked"),
     resetDeferred: flagged("reset-deferred"),
   };
 

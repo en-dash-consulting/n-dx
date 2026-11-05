@@ -90,6 +90,7 @@ export default defineConfig({
             { text: "PRD Write Concurrency", link: "/architecture/prd-write-concurrency" },
             { text: "Graview Projection", link: "/architecture/graview-projection" },
             { text: "Extensions", link: "/architecture/extensions" },
+            { text: "Sidecar Connections", link: "/architecture/sidecar-connections" },
           ],
         },
         {

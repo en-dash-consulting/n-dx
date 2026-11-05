@@ -1,0 +1,18 @@
+---
+id: "d62623bb-3542-4c31-8461-83eb874fe2c3"
+type: "task"
+title: "Predicted merge conflicts are classified, each with a deterministic offered fix"
+slug: "predicted-merge-conflicts-are"
+description: "A pure, LLM-free conflict classifier over the conflicts task 22 predicts (each file's merge-tree stages and conflicted result), in `packages/web/src/server/branch-health/`. It writes nothing. Each class carries an offered fix: ordered argv steps, or a unified diff. A person runs the fix by hand today; the L2 lens will raise it as a command card. The classes come from this repo's recurring conflicts:\n\n- prd-children-table: a v1 `.rex/prd_tree` `index.md` whose conflicting hunks all lie inside `## Children`. Fix: `git checkout --ours`, then `rex validate --post-merge --repair`, then `rex validate`.\n- prd-state: a v2 `state.yaml` while `merge.rex-state.driver` is unregistered. Fix: register the driver and redo the merge.\n- duplicate-capture: an add/add conflict on a PRD item file whose sides have the same title and different ids. It keeps the base side's id and names the rex command that removes the other copy.\n- allowlist-union: every conflicting hunk only adds lines on both sides. Fix: the union, ours then theirs, as a unified diff.\n- generated: the path matches `web.generatedFiles` (`[{paths: globs, command: argv}]` in `.n-dx.json`). Fix: `checkout --theirs`, run the command, then `git add`, after every other file's fix.\n- source: everything else. It never gets a fix, and names the local worktrees whose branch also changed the file.\n\nThis repo declares the prompt baseline (`node scripts/prompt-census.mjs --write`) and the iso-map script (`node scripts/build-iso-skill.mjs`). CAOS story: https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9."
+acceptanceCriteria:
+  - "Each conflicted file carries {path, class, reason, fix}. The class is prd-children-table, prd-state, duplicate-capture, allowlist-union, generated or source. The fix is {steps: argv[][]} or {diff}, and a source file has none."
+  - "The classifier is a pure function over the merge-tree stages and the project config: it reads no file, runs no process and writes nothing. There is a unit test per class from fixture stages."
+  - "prd-children-table: a temp-repo test merges two branches that each add a child under one v1 parent. Running the fix's steps leaves no conflict markers and a table listing both children, and `rex validate` exits 0."
+  - "A v1 `index.md` with any conflicting hunk outside `## Children` is classed source, not prd-children-table (tested)."
+  - "allowlist-union: when every conflicting hunk only adds lines on both sides, the fix is the ours-then-theirs union as a unified diff. A hunk that removes or changes a base line makes the file source. Both cases are tested, and nothing is written."
+  - "generated: a path in `web.generatedFiles` gets [checkout --theirs, the declared command, git add], ordered after every other fix. With no declaration, nothing is classed generated. This repo's `.n-dx.json` declares the prompt baseline and the iso-map script."
+  - "duplicate-capture names both ids and keeps the base side's. prd-state with the rex-state driver unregistered gives the steps to register it; with the driver registered, the file is classed source (all tested)."
+  - "Source conflicts never get a fix: a test asserts that no source file has steps or a diff. Each one names the other local worktrees whose branch changed that path."
+  - "With `git.branchHealth` on, the Workspaces expansion lists each conflicted file with its class and fix: steps as copyable commands, diffs collapsed. The patch changeset carries release-note lines for the conflict classes."
+priority: "high"
+---

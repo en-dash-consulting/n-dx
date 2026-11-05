@@ -19,10 +19,20 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, sidecarSetupNeed } from "../hooks/index.js";
-import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
-import { SidecarCards } from "./sidecar-cards.js";
+import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/sidecar.js";
+import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
+import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
+import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
+import {
+  TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultIsError,
+} from "./sidecar-tool-names.js";
+import type { ToolLineCard } from "./sidecar-tool-names.js";
+import { useHubProjects } from "./project-switcher.js";
+import {
+  ExtensionTabPanel, ExtensionTabStrip, SIDECAR_TAB, extensionFramePath, useExtensionTabs,
+} from "./sidecar-extension-tabs.js";
+import { getBasePath } from "../base-path.js";
 
 export const SIDECAR_WIDTH_DEFAULT = 440;
 export const SIDECAR_WIDTH_MIN = 360;
@@ -123,14 +133,35 @@ export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, To
   return paired;
 }
 
-/** A tool call: collapsed to its name and a one-line summary, expanded to the raw input and result. */
-function SidecarToolRow({ seq, call, result }: {
+/**
+ * The card each tool call raised, by the call's `seq`: the earliest card of
+ * the same tool and input not yet claimed by an earlier call.
+ */
+export function pairToolCards<C extends ToolLineCard>(frames: readonly SidecarFrame[], cards: readonly C[]): Map<number, C> {
+  const free = [...cards];
+  const paired = new Map<number, C>();
+  for (const frame of frames) {
+    if (frame.type !== "event" || frame.checkpoint) continue;
+    const { event } = frame;
+    if (event.type !== "tool_use" || !event.toolCall) continue;
+    const parsed = parseToolName(event.toolCall.tool);
+    const index = free.findIndex((card) => cardIsForCall(card, parsed, event.toolCall!.input));
+    if (index >= 0) paired.set(frame.seq, free.splice(index, 1)[0]!);
+  }
+  return paired;
+}
+
+/** A tool call: a status dot, a readable name and status, and a one-line summary; expanded, the raw wire name, input and result. */
+function SidecarToolRow({ seq, call, result, card, connectionLabels }: {
   seq: number;
   call: NonNullable<SidecarRuntimeEvent["toolCall"]>;
   result: ToolResult | undefined;
+  card?: ToolLineCard;
+  connectionLabels?: Readonly<Record<string, string>>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const bodyId = `sidecar-tool-${seq}`;
+  const status = toolLineStatus(card, result !== undefined, result !== undefined && toolResultIsError(result.output));
   return h("li", { class: "sidecar-tool", "data-seq": seq },
     h("button", {
       type: "button",
@@ -139,11 +170,15 @@ function SidecarToolRow({ seq, call, result }: {
       "aria-controls": bodyId,
       onClick: () => setExpanded((v) => !v),
     },
-      h("span", { class: "sidecar-tool-name" }, call.tool),
+      h("span", { class: "sidecar-tool-dot", "data-status": status, "aria-hidden": "true" }),
+      h("span", { class: "sidecar-tool-name" }, parseToolName(call.tool, connectionLabels).label),
+      h("span", { class: "sidecar-tool-status" }, TOOL_STATUS_TEXT[status]),
       h("span", { class: "sidecar-tool-summary" }, summarizeToolInput(call.input)),
     ),
     expanded
       ? h("div", { class: "sidecar-tool-body", id: bodyId },
+          h("div", { class: "sidecar-tool-label" }, "Tool"),
+          h("code", { class: "sidecar-tool-wire" }, call.tool),
           h("div", { class: "sidecar-tool-label" }, "Input"),
           h("pre", { class: "sidecar-tool-input" }, JSON.stringify(call.input, null, 2)),
           h("div", { class: "sidecar-tool-label" }, "Result"),
@@ -156,7 +191,12 @@ function SidecarToolRow({ seq, call, result }: {
 }
 
 /** One frame as a transcript row; null for frames the conversation does not show. */
-export function SidecarFrameRow({ frame, result }: { frame: SidecarFrame; result?: ToolResult }) {
+export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
+  frame: SidecarFrame;
+  result?: ToolResult;
+  card?: ToolLineCard;
+  connectionLabels?: Readonly<Record<string, string>>;
+}) {
   switch (frame.type) {
     case "user":
       return h("li", { class: "sidecar-msg sidecar-msg-user", "data-seq": frame.seq }, frame.text);
@@ -172,7 +212,7 @@ export function SidecarFrameRow({ frame, result }: { frame: SidecarFrame; result
         return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, event.text);
       }
       if (event.type === "tool_use" && event.toolCall) {
-        return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result });
+        return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result, card, connectionLabels });
       }
       if (event.type === "failure") {
         return h("li", { class: "sidecar-msg sidecar-msg-failure", role: "alert", "data-seq": frame.seq },
@@ -200,6 +240,12 @@ function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
   setMenuOpen: (open: boolean) => void;
 }) {
   const { item, lens, lenses, chooseLens, removeItem } = attachment;
+  // What a menu entry cannot run on yet: its source, or the item it needs attached.
+  const noteFor = (entry: { id: string; available: boolean }): string | null => {
+    if (!entry.available) return "not available yet";
+    const needs = entry.id === GENERAL_LENS ? undefined : resolveLens(entry.id, lenses, item).needs;
+    return needs ? `needs ${needs}` : null;
+  };
   return h("div", { class: "sidecar-attachment" },
     item
       ? h("span", { class: "sidecar-chip sidecar-chip-item", "data-kind": item.kind },
@@ -225,18 +271,20 @@ function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
         lens.needs ? h("span", { class: "sidecar-chip-note" }, "not available yet") : null),
       menuOpen
         ? h("ul", { class: "sidecar-lens-menu", role: "listbox", "aria-label": "Lens" },
-            [{ id: GENERAL_LENS, available: true }, ...lenses.filter((l) => l.id !== GENERAL_LENS)].map((entry) =>
-              h("li", { key: entry.id, role: "presentation" },
+            [{ id: GENERAL_LENS, available: true }, ...lenses.filter((l) => l.id !== GENERAL_LENS)].map((entry) => {
+              const note = noteFor(entry);
+              return h("li", { key: entry.id, role: "presentation" },
                 h("button", {
                   type: "button",
                   role: "option",
                   class: "sidecar-lens-option",
                   "aria-selected": entry.id === lens.wanted ? "true" : "false",
-                  "aria-disabled": entry.available ? undefined : "true",
+                  "aria-disabled": note ? "true" : undefined,
                   "data-lens": entry.id,
-                  disabled: !entry.available,
+                  disabled: note !== null,
                   onClick: () => { if (chooseLens(entry.id)) setMenuOpen(false); },
-                }, lensLabel(entry.id), entry.available ? null : h("span", { class: "sidecar-chip-note" }, "not available yet")))))
+                }, lensLabel(entry.id), note ? h("span", { class: "sidecar-chip-note" }, note) : null));
+            }))
         : null),
   );
 }
@@ -256,6 +304,16 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [listing, setListing] = useState(false);
   const [lensMenu, setLensMenu] = useState(false);
   const transcriptRef = useRef<HTMLOListElement>(null);
+  const hub = useHubProjects();
+  const tabs = useExtensionTabs(hub);
+  const [selected, setSelected] = useState(SIDECAR_TAB);
+  // A tab asks for its frame key on its first open and is kept after that.
+  const [opened, setOpened] = useState<string[]>([]);
+  const active = tabs.some((t) => t.name === selected) ? selected : SIDECAR_TAB;
+  const selectTab = (id: string) => {
+    setSelected(id);
+    if (id !== SIDECAR_TAB) setOpened((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
 
   const applyWidth = useCallback((next: number) => {
     const w = clampSidecarWidth(next);
@@ -310,8 +368,10 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   };
 
   const results = pairToolResults(sidecar.frames);
+  const toolCards = pairToolCards(sidecar.frames, sidecar.cards);
+  const connectionLabels = connectionLabelsFromCards(sidecar.cards);
   const rows: ComponentChildren[] = sidecar.frames.map((frame) =>
-    h(SidecarFrameRow, { key: frame.seq, frame, result: results.get(frame.seq) }));
+    h(SidecarFrameRow, { key: frame.seq, frame, result: results.get(frame.seq), card: toolCards.get(frame.seq), connectionLabels }));
   const { agent, catalog } = sidecar;
   const models = agent ? catalog?.[agent.vendor]?.models ?? [] : [];
   // A session's own model may not be in the live list; keep it selectable.
@@ -348,30 +408,46 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       }, "Sessions"),
       h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Sidecar", title: "Close (⌘J)" }, "×"),
     ),
+    h(ExtensionTabStrip, { tabs, active, onSelect: selectTab }),
+    ...tabs.filter((t) => opened.includes(t.name)).map((t) =>
+      h(ExtensionTabPanel, {
+        key: t.name,
+        tab: t,
+        framePath: extensionFramePath(getBasePath(), hub.projects, t.name),
+        visible: active === t.name,
+      })),
+    // Hidden, not unmounted, while an extension tab shows: the conversation
+    // and the composer's text survive the switch.
+    h("div", { class: "sidecar-panel sidecar-chat-panel", hidden: active !== SIDECAR_TAB },
     listing ? h(SidecarSessions, { sidecar, onOpened: () => setListing(false) }) : null,
     ...(listing ? [] : [
     agent
       ? h("div", { class: "sidecar-agent" },
-          h("select", {
-            class: "sidecar-vendor",
-            "aria-label": "Vendor",
-            value: agent.vendor,
-            onChange: (e: Event) => { void sidecar.chooseAgent((e.target as HTMLSelectElement).value); },
-          }, SIDECAR_VENDORS.filter((v) => catalog?.[v] || v === agent.vendor).map((v) =>
-            h("option", { key: v, value: v, selected: v === agent.vendor }, v))),
-          h("select", {
-            class: "sidecar-model",
-            "aria-label": "Model",
-            value: agent.model,
-            disabled: modelOptions.length === 0,
-            onChange: (e: Event) => { void sidecar.chooseAgent(agent.vendor, (e.target as HTMLSelectElement).value); },
-          }, modelOptions.map((m) => h("option", { key: m, value: m, selected: m === agent.model }, m))),
+          h("div", { class: "sidecar-field" },
+            h("label", { class: "sidecar-field-label", for: "sidecar-vendor" }, "Agent"),
+            h("select", {
+              id: "sidecar-vendor",
+              class: "sidecar-vendor",
+              value: agent.vendor,
+              onChange: (e: Event) => { void sidecar.chooseAgent((e.target as HTMLSelectElement).value); },
+            }, SIDECAR_VENDORS.filter((v) => catalog?.[v] || v === agent.vendor).map((v) =>
+              h("option", { key: v, value: v, selected: v === agent.vendor }, vendorLabel(v))))),
+          h("div", { class: "sidecar-field sidecar-field-model" },
+            h("label", { class: "sidecar-field-label", for: "sidecar-model" }, "Model"),
+            h("select", {
+              id: "sidecar-model",
+              class: "sidecar-model",
+              value: agent.model,
+              disabled: modelOptions.length === 0,
+              onChange: (e: Event) => { void sidecar.chooseAgent(agent.vendor, (e.target as HTMLSelectElement).value); },
+            }, modelOptions.map((m) =>
+              h("option", { key: m, value: m, title: m, selected: m === agent.model }, modelLabel(m))))),
         )
       : null,
     h("ol", { class: "sidecar-transcript", ref: transcriptRef, "aria-live": "polite", "aria-label": "Transcript" },
       rows.length > 0 ? rows : h("li", { class: "sidecar-empty" }, "Ask about this project. Each turn runs your vendor CLI."),
     ),
-    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide }),
+    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide, send: cardTurnSender(sidecar) }),
     setupNeed
       ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
           h("p", { class: "sidecar-setup-title" },
@@ -397,11 +473,12 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },
     },
+      h("div", { class: "sidecar-composer-card" },
       h(SidecarAttachmentBar, { attachment: sidecar.attachment, menuOpen: lensMenu, setMenuOpen: setLensMenu }),
       h("textarea", {
         class: "sidecar-input",
         "aria-label": "Message Sidecar",
-        placeholder: blocked ? `Install the ${blocked.cli} CLI first` : busy ? "A turn is running…" : "Message Sidecar",
+        placeholder: blocked ? `Install the ${blocked.cli} CLI first` : busy ? "A turn is running…" : "Ask about this project, or tell the agent what to do…",
         value: draft,
         disabled: busy,
         rows: 3,
@@ -421,13 +498,16 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
         },
       }),
       h("div", { class: "sidecar-composer-actions" },
+        h("span", { class: "sidecar-composer-hint" }, "Enter to send · Shift+Enter for a new line"),
         sidecar.running
           ? h("button", { type: "button", class: "sidecar-stop", onClick: () => { void sidecar.stop(); } }, "Stop")
           : null,
         h("button", { type: "submit", class: "sidecar-send", disabled: busy || !draft.trim() }, "Send"),
       ),
+      ),
     ),
     ]),
+    ),
   );
 }
 

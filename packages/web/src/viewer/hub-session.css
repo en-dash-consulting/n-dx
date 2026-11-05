@@ -1,0 +1,72 @@
+/* The drawer-only hub session page (hub-session.ts), framed by the hub home.
+ * Its own entry, beside the page as index.html's styles/index.css is not:
+ * the dashboard's tokens and Sidecar drawer styles, plus the hub drawer's
+ * head and composer meta. Colours are theme tokens only, so dark and light
+ * both apply. */
+
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/a11y.css";
+@import "./styles/sidecar.css";
+
+/* The drawer is the page: it fills the frame, and the hub home owns the dock's edge. */
+.hub-session-page #app { flex-direction: row; }
+.hub-session-drawer {
+  flex: 1;
+  width: 100%;
+  border-left: 0;
+  box-shadow: none;
+}
+
+.hub-session-head { flex-direction: column; align-items: stretch; }
+.hub-session-title-row { display: flex; align-items: center; gap: var(--space-2); }
+.hub-session-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.sidecar-chip-scope-hub {
+  border-color: var(--purple);
+  background: color-mix(in srgb, var(--purple) 18%, transparent);
+  font-weight: 600;
+}
+.sidecar-chip-snapshot { color: var(--text-dim); }
+
+.hub-session-composer-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.hub-session-mode { white-space: nowrap; }
+
+.hub-ceiling { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); }
+.hub-ceiling-bar {
+  width: 72px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.hub-ceiling-fill { display: block; height: 100%; background: var(--accent); }
+.hub-ceiling[data-level="mid"] .hub-ceiling-fill { background: var(--orange); }
+.hub-ceiling[data-level="high"] .hub-ceiling-fill { background: var(--red); }
+.hub-ceiling-text { font-variant-numeric: tabular-nums; }
+
+/* The snapshot's worktrees, each with "Open in worktree sidecar". */
+.hub-worktrees { border-bottom: 1px solid var(--border); padding: var(--space-1) var(--space-3); font-size: 12px; }
+.hub-worktrees-summary { cursor: pointer; color: var(--text-dim); padding: var(--space-1) 0; }
+.hub-worktrees-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.hub-worktree { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) 0; border-top: 1px solid var(--border); }
+.hub-worktree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-worktree-delta { color: var(--orange); font-weight: 700; }
+.hub-worktree-open {
+  flex: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px var(--space-2);
+  cursor: pointer;
+}
+.hub-worktree-open:disabled { color: var(--text-muted); cursor: default; }

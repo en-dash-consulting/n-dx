@@ -11,7 +11,7 @@
 import { h } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
-import type { CallGraph, Finding, Zone, ZoneCrossing } from "../external.js";
+import type { CallGraph, ExternalImport, Finding, Zone, ZoneCrossing } from "../external.js";
 import {
   CollapsibleSection,
   buildFileToZoneMap,
@@ -258,7 +258,7 @@ function buildExplorerData(
   fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
   zones: LoadedData["zones"],
 ): { zoneDataList: ZoneData[]; unzonedFiles: FileInfo[] } {
-  const funcsByFile = new Map<string, import("../../schema/v1.js").FunctionNode[]>();
+  const funcsByFile = new Map<string, CallGraph["functions"]>();
   for (const fn of callGraph.functions) {
     let list = funcsByFile.get(fn.file);
     if (!list) { list = []; funcsByFile.set(fn.file, list); }
@@ -373,7 +373,7 @@ function buildExplorerData(
  */
 export function buildFileConnectionMap(
   callGraph: CallGraph,
-  externalImports: import("../../schema/v1.js").ExternalImport[],
+  externalImports: ExternalImport[],
   fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
   zones: LoadedData["zones"],
 ): FileConnectionMap {

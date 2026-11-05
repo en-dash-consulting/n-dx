@@ -41,6 +41,7 @@ export function usage(): void {
           { name: "status [dir]", description: "Show recent run history" },
           { name: "show <run-id> [dir]", description: "Show full details of a specific run; --repoint finds where its commits went after a rebase (--write applies)" },
           { name: "review pending <run-id>", description: "List findings an autonomous review deferred for capture" },
+          { name: "runs diagnose <run-id>", description: "Classify why a run did not complete and rank the next action" },
           { name: "cache [subcommand]", description: "Inspect or clear the session cache (list, clear)" },
           { name: "check-runs [dir]", description: "Audit runs recorded as running in every worktree; --fix ends dead ones" },
           { name: "backfill-commits [dir]", description: "Fill commits on run records written without one, from the main branch's history" },
