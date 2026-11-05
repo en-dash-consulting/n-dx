@@ -98,6 +98,8 @@ describe("ChangeTrackerChip", () => {
     expect(calls.filter((c) => c.method === "POST").map((c) => c.url)).toEqual(["/api/tracker/changes/ch-1/create"]);
     expect(root.querySelector('[data-action="send"]')?.textContent).toBe("Run create_work_item");
     expect(calls.some((c) => c.url === "/api/tracker/cards/decide")).toBe(false);
+    // The open form takes the full width beneath a flex row (stage-tiles.css), not a column of it.
+    expect(root.querySelector(".create-in-tracker")?.classList.contains("create-in-tracker-open")).toBe(true);
   });
 
   it("draws nothing without a tracker connection", async () => {

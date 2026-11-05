@@ -114,6 +114,8 @@ export const DENY_CLASS: string[] = [
   "iso-hero-btn",
   // Sidecar: a turn runs the vendor CLI and spends tokens.
   "sidecar-send",
+  // "Create in tracker" raises a waiting card (and its Run sends it to the tracker); needs a tracker connection the fixture lacks.
+  "create-in-tracker-button",
   // Sidecar cards: approving lets the agent act; "always allow" writes the allow-list.
   "sidecar-card-approve",
   "sidecar-card-always",

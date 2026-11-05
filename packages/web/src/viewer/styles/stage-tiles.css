@@ -1211,6 +1211,13 @@
 .cg-bar { width: 72px; height: 6px; accent-color: var(--accent); }
 .cg-chip { padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--text-muted); }
 .cg-gap { color: var(--text); }
+/* Tracker link chip beside the stage chip; "Create in tracker" opens its card form full width beneath the row. */
+.tracker-chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--text-muted); }
+.tracker-chip .tracker-link { color: var(--accent); }
+.tracker-chip-state { color: var(--text); }
+.change-tracker-chip { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2); }
+.create-in-tracker { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.create-in-tracker-open { flex: 1 0 100%; display: block; }
 .cg-more { margin-top: var(--space-2); padding: 0; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 
 /* Plan health: one light per check (a dot, a label and a state that is also

@@ -111,7 +111,7 @@ export function CreateInTrackerButton({ changeId, read, onCreated }: { changeId:
     }
   };
 
-  return h("span", { class: "create-in-tracker" },
+  return h("span", { class: card ? "create-in-tracker create-in-tracker-open" : "create-in-tracker" },
     card
       ? h(TrackerCardForm, { entry: card, onDone: () => { setCard(null); onCreated?.(); }, onCancel: () => setCard(null) })
       : h("button", { type: "button", class: "ch-change-link create-in-tracker-button", disabled: busy, onClick: () => { void raise(); } },
