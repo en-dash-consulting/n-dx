@@ -1,19 +1,22 @@
 schema: "rex/v2"
 items:
   "1b1bb5e6-c2f0-46de-95b8-82bd4c25d229":
-    status: "in_progress"
     startedAt: "2026-11-05T21:55:13.645Z"
-    activeIntervals: [{"start":"2026-11-05T21:55:13.645Z"}]
-    lastModified: "2026-11-05T21:55:14.382Z"
+    activeIntervals: [{"end":"2026-11-05T23:19:34.895Z","start":"2026-11-05T21:55:13.645Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- shows field-level error styling after blur on empty title\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T23:19:35.437Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "263b50eb-5ebc-4606-a207-f1f57d4a4127":
     lastModified: "2026-11-05T01:07:10.038Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2fc2b2e0-e31f-43a8-8978-885afd888c4b":
+    lastModified: "2026-11-05T23:12:04.536Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "42ae74c1-1803-4dc0-b9fa-40fbd8c8ad97":
     lastModified: "2026-11-05T01:07:20.399Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "464a9480-8e07-49cd-9889-21d2ae55f316":
-    lastModified: "2026-11-05T01:06:58.349Z"
+    lastModified: "2026-11-05T23:12:04.536Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4920123a-a3aa-45d3-bc9b-a576bec549aa":
     lastModified: "2026-11-05T01:07:27.237Z"
