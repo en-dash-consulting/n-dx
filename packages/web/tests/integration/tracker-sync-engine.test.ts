@@ -8,7 +8,7 @@
  * the event queued.
  */
 
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { resolveStore } from "@n-dx/rex";
@@ -21,6 +21,7 @@ import type { TrackerEventRecord } from "../../src/server/tracker/rules.js";
 import { collectTrackerEvents } from "../../src/server/tracker/event-sources.js";
 import { findItemByRef } from "../../src/server/tracker/item-links.js";
 import { itemLinkRefs, type LinkFields } from "../../src/server/tracker/link-refs.js";
+import { USER_PROFILES_DIR } from "../../src/server/tracker/server-profiles.js";
 import { addCaosTools, type CaosReply } from "../fixtures/connections/fake-mcp-tools.mjs";
 import { startFakeMcpHttpServer, type FakeMcpHttpServer } from "../helpers/fake-mcp-http-server.js";
 import { removeTestDir } from "../helpers/server-route-test-support.js";
@@ -283,6 +284,50 @@ describe("an approved create links the change", () => {
       name: "move_work_item",
       arguments: { requestId: `ndx:ndx:${CHANGE}:run-started`, workItemId: "WM-7", toStatus: "inProgress" },
     });
+  });
+
+  it("links an opaque id through the URL the profile builds, so a later run start moves that item", async () => {
+    const id = "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0";
+    const url = "https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0";
+    settings({ "change-captured": "on", "run-started": "on" });
+    replies.create_work_item = json({ id });
+    const runs = join(root, ".hench", "runs");
+    mkdirSync(runs, { recursive: true });
+    const collect = () => collectTrackerEvents({ projectDir: root, rexDir: rexDir(), events: ["run-started"], githubReads: false });
+    expect((await collect()).records).toEqual([]);
+
+    await tick(captured);
+    const decided = await approve();
+    expect(decided).toMatchObject({ ok: true, entry: { result: "ok", workItemId: id } });
+    expect(decided.ok && decided.entry.problems).toBeFalsy();
+    expect(await issuesOf(CHANGE)).toEqual([url]);
+
+    writeFileSync(join(runs, "r-1.json"), JSON.stringify({ id: "r-1", taskId: CHANGE, status: "running", startedAt: new Date().toISOString() }));
+    const { records } = await collect();
+    expect(records).toEqual([{ event: "run-started", rexId: CHANGE, ref: url }]);
+    const { entries } = await tick(...records);
+    expect(entries).toEqual([expect.objectContaining({ rule: "move", result: "ok" })]);
+    expect(toolCalls().at(-1)).toEqual({
+      name: "move_work_item",
+      arguments: { requestId: `ndx:ndx:${CHANGE}:run-started`, workItemId: id, toStatus: "inProgress" },
+    });
+  });
+
+  it("keeps an opaque id unlinked, naming the problem, under a profile with no item URL template", async () => {
+    const caos = JSON.parse(readFileSync(resolve(__dirname, "../../src/server/tracker/profiles/caos.json"), "utf8"));
+    delete caos.tracker.itemUrlTemplate;
+    mkdirSync(join(ndxHome, USER_PROFILES_DIR), { recursive: true });
+    writeFileSync(join(ndxHome, USER_PROFILES_DIR, "plain.json"), JSON.stringify(caos));
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ trackerSync: { connection: "caos", profile: "user:plain", project: "ndx", rules: { "change-captured": "on" } } }));
+    const id = "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0";
+    replies.create_work_item = json({ id });
+    await tick(captured);
+    const decided = await approve();
+    expect(decided).toMatchObject({
+      ok: true,
+      entry: { result: "ok", workItemId: id, problems: [{ message: expect.stringMatching(new RegExp(`^created ${id}, but could not link ${CHANGE} to it: .*tracker key`)) }] },
+    });
+    expect(await issuesOf(CHANGE)).toEqual([]);
   });
 
   it("records the created item and names the link failure when the link cannot be written", async () => {

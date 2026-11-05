@@ -86,6 +86,56 @@ export interface TrackerMapping {
   defaults: { reviewer?: string; estimateScale?: string[] };
   /** Declared limits of the tracker; none when it can do everything ndx asks. */
   limits: TrackerLimit[];
+  /**
+   * An http(s) URL for a work item, built from its id: `{id}` is the id as
+   * given, `{compactId}` the id without dashes. Lets an opaque id, which is no
+   * work ref, become a link (see trackerItemUrl).
+   */
+  itemUrlTemplate?: string;
+}
+
+const ITEM_URL_PLACEHOLDERS = ["{id}", "{compactId}"] as const;
+
+/** The one placeholder `template` holds, or why it is no item URL template. */
+function templatePlaceholder(template: string): (typeof ITEM_URL_PLACEHOLDERS)[number] | { problem: string } {
+  const held = ITEM_URL_PLACEHOLDERS.filter((p) => template.split(p).length === 2);
+  const repeated = ITEM_URL_PLACEHOLDERS.some((p) => template.split(p).length > 2);
+  if (held.length !== 1 || repeated) return { problem: "tracker.itemUrlTemplate must hold exactly one {id} or {compactId}" };
+  if (!/^https?:\/\/[^\s/?#{}]+/.test(template) || !URL.canParse(template.replace(held[0], "x"))) {
+    return { problem: "tracker.itemUrlTemplate must be an http(s) URL" };
+  }
+  return held[0];
+}
+
+/** The URL `mapping` builds for work item `id`, or undefined when it has no template. */
+export function trackerItemUrl(mapping: Pick<TrackerMapping, "itemUrlTemplate">, id: string): string | undefined {
+  const template = mapping.itemUrlTemplate;
+  if (!template) return undefined;
+  const placeholder = templatePlaceholder(template);
+  if (typeof placeholder !== "string") return undefined;
+  const value = placeholder === "{compactId}" ? id.replaceAll("-", "") : id;
+  return template.replace(placeholder, encodeURIComponent(value));
+}
+
+const COMPACT_UUID = /^([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})$/i;
+
+/**
+ * The work item id a linked `ref` names for the tracker's tools: the id inside
+ * a URL the profile's template built, else `ref` itself (a key, or a URL the
+ * tracker takes as given). A `{compactId}` that is a dashless UUID gets its
+ * dashes back; any other compact id is passed on as it reads.
+ */
+export function trackerItemIdOfRef(mapping: Pick<TrackerMapping, "itemUrlTemplate">, ref: string): string {
+  const template = mapping.itemUrlTemplate;
+  if (!template) return ref;
+  const placeholder = templatePlaceholder(template);
+  if (typeof placeholder !== "string") return ref;
+  const [prefix, suffix] = template.split(placeholder);
+  if (!ref.startsWith(prefix) || !ref.endsWith(suffix) || ref.length <= prefix.length + suffix.length) return ref;
+  const id = decodeURIComponent(ref.slice(prefix.length, ref.length - suffix.length));
+  if (placeholder === "{id}") return id;
+  const uuid = COMPACT_UUID.exec(id);
+  return uuid ? uuid.slice(1).join("-") : id;
 }
 
 /**
@@ -200,6 +250,10 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
   if (!Array.isArray(limits) || limits.some((limit) => !(TRACKER_LIMITS as readonly unknown[]).includes(limit))) {
     problems.push(`tracker.limits must be a list drawn from ${TRACKER_LIMITS.join(", ")}`);
   }
+  if (raw.itemUrlTemplate !== undefined) {
+    const placeholder = isString(raw.itemUrlTemplate) ? templatePlaceholder(raw.itemUrlTemplate) : { problem: "tracker.itemUrlTemplate must be a non-empty string when set" };
+    if (typeof placeholder !== "string") problems.push(placeholder.problem);
+  }
   if (problems.length > 0) return undefined;
   return {
     createTool: raw.createTool as string,
@@ -214,6 +268,7 @@ function parseMapping(raw: unknown, problems: string[]): TrackerMapping | undefi
     facts,
     defaults: defaults as TrackerMapping["defaults"],
     limits: limits as TrackerLimit[],
+    ...(isString(raw.itemUrlTemplate) && { itemUrlTemplate: raw.itemUrlTemplate }),
   };
 }
 

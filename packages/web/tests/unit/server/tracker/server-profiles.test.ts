@@ -8,6 +8,8 @@ import {
   loadServerProfile,
   resolveServerProfile,
   TRACKER_EVENTS,
+  trackerItemIdOfRef,
+  trackerItemUrl,
   USER_PROFILES_DIR,
   type ProfileTool,
   type ServerProfile,
@@ -149,5 +151,43 @@ describe("a profile that does not fit", () => {
     const resolution = resolveServerProfile("desk", desk, { ndxHome });
     expect(resolution).toMatchObject({ state: "invalid" });
     expect(resolution.state === "invalid" && resolution.problem).toMatch(/fieldHints\.new_ticket: .*"title".*tracker\.facts names pr-landed/);
+  });
+
+  it("is refused for an item URL template that is no http(s) URL or holds no single placeholder", () => {
+    for (const [template, problem] of [
+      ["notion://{id}", /must be an http\(s\) URL/],
+      ["https://desk.example/items/", /exactly one \{id\} or \{compactId\}/],
+      ["https://desk.example/{id}/{compactId}", /exactly one/],
+      ["https://desk.example/{id}/{id}", /exactly one/],
+      [42, /non-empty string/],
+    ] as const) {
+      userProfile("desk", { ...deskProfile, tracker: { ...deskProfile.tracker, itemUrlTemplate: template } });
+      const resolution = resolveServerProfile("desk", desk, { ndxHome });
+      expect(resolution.state === "invalid" && resolution.problem).toMatch(problem);
+    }
+  });
+});
+
+describe("item URL template", () => {
+  const uuid = "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0";
+
+  it("builds the CAOS item's Notion page URL from its id, and reads the id back from it", () => {
+    const caos = (loadServerProfile("caos", { ndxHome }) as ServerProfile).tracker!;
+    const url = trackerItemUrl(caos, uuid);
+    expect(url).toBe("https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0");
+    expect(trackerItemIdOfRef(caos, url!)).toBe(uuid);
+  });
+
+  it("puts {id} in as given, and returns any ref the template did not build unchanged", () => {
+    const mapping = { itemUrlTemplate: "https://desk.example/t/{id}/view" };
+    expect(trackerItemUrl(mapping, "a b")).toBe("https://desk.example/t/a%20b/view");
+    expect(trackerItemIdOfRef(mapping, "https://desk.example/t/a%20b/view")).toBe("a b");
+    expect(trackerItemIdOfRef(mapping, "WM-7")).toBe("WM-7");
+    expect(trackerItemIdOfRef(mapping, "https://other.example/t/x/view")).toBe("https://other.example/t/x/view");
+  });
+
+  it("builds nothing and reads every ref as itself without a template", () => {
+    expect(trackerItemUrl({}, uuid)).toBeUndefined();
+    expect(trackerItemIdOfRef({}, "https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0")).toBe("https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0");
   });
 });

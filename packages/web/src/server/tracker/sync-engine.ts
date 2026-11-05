@@ -28,7 +28,8 @@ import { callProblems, IDEMPOTENCY_KEY_PROPERTIES, resultData } from "../sidecar
 import { appendTrackerActivity, pendingCards, readTrackerActivity, SETTLED_RESULTS, type TrackerActivityEntry, type TrackerResult } from "./activity-log.js";
 import { planTrackerEvent, type PlannedCall, type TrackerEventRecord } from "./rules.js";
 import { changeItemLink } from "./item-links.js";
-import { checkServerProfile, loadServerProfile, type ProfileOptions, type ServerProfile, type TrackerMapping } from "./server-profiles.js";
+import { normalizeWorkRef } from "./link-refs.js";
+import { checkServerProfile, loadServerProfile, trackerItemUrl, type ProfileOptions, type ServerProfile, type TrackerMapping } from "./server-profiles.js";
 import { loadTrackerSync, type TrackerSyncConfig } from "./sync-config.js";
 
 /** The connection service calls sync makes. */
@@ -375,7 +376,9 @@ async function decideOnce(options: CardDecisionOptions, requestId: string, decis
     entry = { ...base, call, result: outcome.result, ...(outcome.problems && { problems: outcome.problems }) };
     if (outcome.workItemId && call.tool === ready.mapping.createTool) {
       entry.workItemId = outcome.workItemId;
-      const linked = await changeItemLink(options.rexDir, card.rexId, outcome.workItemId, "link");
+      // An opaque id is no work ref; the profile's template turns it into one.
+      const ref = normalizeWorkRef(outcome.workItemId) ?? trackerItemUrl(ready.mapping, outcome.workItemId) ?? outcome.workItemId;
+      const linked = await changeItemLink(options.rexDir, card.rexId, ref, "link");
       if (!linked.ok) {
         entry.problems = [...(entry.problems ?? []), { message: `created ${outcome.workItemId}, but could not link ${card.rexId} to it: ${linked.error}` }];
       }

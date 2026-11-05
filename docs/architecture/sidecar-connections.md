@@ -58,8 +58,10 @@ no code path knows any server. It carries:
   `itemIdProperty`, the status properties, a `statusMap` from every ndx event
   (`change-captured`, `run-started`, `pr-opened`, `pr-merged`,
   `release-published`, `run-failed-twice`) to a tracker status, the `facts` each
-  event needs (input property and sources) and `defaults` (`reviewer`,
-  `estimateScale`).
+  event needs (input property and sources), `defaults` (`reviewer`,
+  `estimateScale`) and an optional `itemUrlTemplate`: an http(s) URL holding
+  one `{id}` (the id as given) or `{compactId}` (the id without dashes). CAOS
+  items are Notion pages, so its template is `https://www.notion.so/{compactId}`.
 - `oauth` (optional): `readScopes`, `writeScopes` and the `writeTools` that
   need the write scopes. See [Scopes](#scopes).
 
@@ -126,9 +128,12 @@ untracked `.n-dx.local.json` only, as connections do:
   (`duplicate: true` or an `error` starting `duplicate`), is confirmed with the
   profile's `readTool` before it is logged.
 - An approved create card links the change to the confirmed work item (its
-  `issues`, under the PRD lock), so the move rules that follow find it. The
-  entry records `workItemId`; a link that cannot be written leaves the entry
-  `ok` with a problem naming the failure.
+  `issues`, under the PRD lock), so the move rules that follow find it. An id
+  that is no work ref (CAOS replies with an opaque UUID) is linked as the URL
+  the profile's `itemUrlTemplate` builds, and a move on that link sends the id
+  read back out of the URL. The entry records `workItemId`; a link that cannot
+  be written, including an opaque id under a profile with no template, leaves
+  the entry `ok` with a problem naming the failure.
 - A refusal logs its problems list and settles the event: it is never planned
   again, with the same arguments or other ones. So do `ok`, `duplicate` and
   `card`. An unreachable connection, or one that needs sign-in, logs that once
