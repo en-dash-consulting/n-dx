@@ -280,6 +280,8 @@ export async function handleConnectionsRoute(
     }
     try {
       const settings = writeSyncRules(ctx.projectDir, rules as Record<string, unknown>, connection as string | undefined);
+      // A rule turned on can need scopes the connection's sign-in lacks.
+      service.reload();
       jsonResponse(res, 200, { ...settings, connections: service.connectionIds() });
     } catch (err) {
       return refuseWrite(res, err);

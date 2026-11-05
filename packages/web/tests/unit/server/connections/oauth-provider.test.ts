@@ -439,4 +439,20 @@ describe("OAuth client identity, callback state, iss and scopes", () => {
     expect(await signIn(svc, fake)).toEqual({ state: "connected" });
     expect(fake.authorizations[1].searchParams.get("scope")).toBe("items:read items:write");
   });
+
+  it("a live connection reads 'sign in again' on reload once it needs a scope its sign-in lacks", async () => {
+    const fake = await oauthServer({ metadataDocuments: true, scopesSupported: ["items:read", "items:write"] });
+    let needed = ["items:read"];
+    const { svc } = service(fake.url, { scopes: () => needed });
+    expect(await signIn(svc, fake)).toEqual({ state: "connected" });
+    expect(text(await svc.callTool("docs", "read_item", { id: "1" }))).toBe("item 1");
+
+    // A sync rule or a write tool turned on in Settings: config the server never sees, so the client was kept.
+    needed = ["items:read", "items:write"];
+    svc.reload();
+    expect(svc.connection("docs")?.status).toEqual({ state: "needs-sign-in", reason: SCOPES_CHANGED, signIn: "again" });
+    const sent = fake.mcp.authorizations.length;
+    await expect(svc.callTool("docs", "read_item", { id: "2" })).rejects.toBeInstanceOf(ConnectionUnavailableError);
+    expect(fake.mcp.authorizations.length).toBe(sent);
+  });
 });

@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { storedCredential } from "@n-dx/llm-client";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
-import { CLIENT_METADATA_URL, SIGN_IN_AGAIN } from "../../src/server/connections/oauth-provider.js";
+import { CLIENT_METADATA_URL, SCOPES_CHANGED, SIGN_IN_AGAIN } from "../../src/server/connections/oauth-provider.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
 import { enforceRouteFeatureGate } from "../../src/server/route-feature-gates.js";
 import { handleConnectionsRoute, signInRedirectUrl, signInRoute } from "../../src/server/routes-connections.js";
@@ -186,6 +186,32 @@ describe("connections routes", () => {
     expect((await post("/api/connections/docs/oauth/finish", { code: "c" })).status).toBe(400);
     expect((await post("/api/connections/docs/oauth/finish", { code: "c", state: "s", iss: 7 })).status).toBe(400);
     expect((await fetch(`${server.baseUrl}/api/connections/docs/sign-out`, { headers: auth })).status).toBe(405);
+  });
+
+  it("reads 'sign in again' once a sync rule turned on needs write scopes the sign-in lacks", async () => {
+    await service.close();
+    const never = { policy: "never" };
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({
+      connections: {
+        docs: {
+          transport: "http", url: fake.url, auth: "oauth", label: "Docs", profile: "caos",
+          tools: { create_work_item: never, edit_work_item: never, move_work_item: never },
+        },
+      },
+      trackerSync: { project: "demo", connection: "docs" },
+    }));
+    service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {} });
+    const { code, state, iss } = await approvedSignIn();
+    expect((await post("/api/connections/docs/oauth/finish", { code, state, iss })).status).toBe(200);
+
+    const put = await fetch(`${server.baseUrl}/api/connections/sync`, {
+      method: "PUT",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ rules: { "pr-opened": "on" } }),
+    });
+    expect(put.status).toBe(200);
+    const docs = (await (await fetch(`${server.baseUrl}/api/connections`, { headers: auth })).json()).connections[0];
+    expect(docs).toMatchObject({ state: "needs-sign-in", reason: SCOPES_CHANGED, signIn: "again" });
   });
 
   it("refuses a mismatched iss and stores nothing", async () => {

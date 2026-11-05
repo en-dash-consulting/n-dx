@@ -250,6 +250,14 @@ export class ConnectionService {
     const ordered = configs.map((config) => [config.id, this.slots.get(config.id)!] as const);
     this.slots.clear();
     for (const [id, slot] of ordered) this.slots.set(id, slot);
+    // A kept OAuth client whose sign-in no longer covers what the connection
+    // needs (a scope a sync rule or write tool now wants) is not used again.
+    for (const slot of this.slots.values()) {
+      const { config } = slot;
+      if (!slot.live || config.transport !== "http" || config.auth !== "oauth") continue;
+      const needed = this.oauth.signInReason(config, this.oauth.storedRecord(config.id));
+      if (needed) this.reset(slot, { state: "needs-sign-in", ...needed });
+    }
   }
 
   /** Resolve the policies of a slot's listed tools against its current `tools` overrides. */
