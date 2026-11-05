@@ -47,7 +47,7 @@ export function specGaps(summary: ChangeSummary): SpecGaps {
     { key: "review", label: "Amendments awaiting review", count: summary.stages["awaiting-apply"], filter: stageFilter("awaiting-apply") },
   ];
   const { total, uncovered } = summary.requirements;
-  if (total > 0) rows.push({ key: "requirements", label: "Capabilities without a requirement", count: uncovered });
+  if (total > 0) rows.push({ key: "requirements", label: "Capabilities without an automated requirement", count: uncovered });
   return { rows: rows.filter((r) => r.count > 0), readyLine: total === 0 };
 }
 

@@ -398,6 +398,20 @@ describe("v2 product reads", () => {
       expect(summary.open.map((c) => c.id)).toEqual([CHANGE_ID]);
     });
 
+    it("counts only automated and metric requirements, as rex ready does", async () => {
+      const file = join(rexDir, "product", "checkout", "pay-by-card.md");
+      const req = (id: string, validationType: string) =>
+        `{"id":"${id}","title":"${id}","category":"technical","validationType":"${validationType}","acceptanceCriteria":["x"]}`;
+      const original = readFileSync(file, "utf8");
+      // The requirements line goes just before the closing frontmatter fence.
+      const withReqs = (reqs: string[]) =>
+        writeFileSync(file, original.replace(/\n---\n*$/, `\nrequirements: [${reqs.join(",")}]\n---\n`));
+      withReqs([req("r1", "manual")]);
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).requirements).toEqual({ total: 0, uncovered: 1 });
+      withReqs([req("r1", "manual"), req("r2", "automated")]);
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).requirements).toEqual({ total: 1, uncovered: 0 });
+    });
+
     it("counts a change whose task is in_progress under in-progress, not proposed", async () => {
       writeTaskStartedState();
       const summary = (await get("changes/summary")).body.summary as ChangeSummary;

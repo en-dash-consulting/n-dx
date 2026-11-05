@@ -303,6 +303,29 @@ describe("ChangesView filters", () => {
     expect(el.querySelector(".ch-applied-toggle")!.textContent).toBe("2 applied ▸");
   });
 
+  it("a gap filter, as Specs to tighten stores it, shows only the placed open changes with that gap", () => {
+    const gaps = [
+      { ...row("bare", "proposed"), criteriaGap: true },
+      { ...row("tasks", "in-progress"), criteriaGap: true, taskCount: 2 },
+      { ...row("blocked", "ready"), openBlockers: 1 },
+      { ...row("held", "proposed"), criteriaGap: true, awaitsPlacement: true },
+      { ...row("done", "applied"), criteriaGap: true },
+      row("clean", "proposed"),
+    ];
+    const cases: Array<[string, string[]]> = [
+      ["gap:no-criteria", ["bare"]],
+      ["gap:task-criteria", ["tasks"]],
+      ["gap:blocked", ["blocked"]],
+    ];
+    for (const [filter, expected] of cases) {
+      localStorage.setItem("ndx.changes.filter", filter);
+      const el = mount(h(ChangesView, { changes: gaps }));
+      expect(chip(el, filter).getAttribute("aria-pressed"), filter).toBe("true");
+      expect(ids(el), filter).toEqual(expected);
+      cleanupRenderedDiv(el);
+    }
+  });
+
   it("remembers the choice per viewer in localStorage", () => {
     const first = mount(h(ChangesView, { changes: MIXED }));
     pick(first, "release:1.0.0");

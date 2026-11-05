@@ -176,7 +176,7 @@ export interface ChangeSummaryWire {
   open: GlanceChangeWire[];
   /** `null` when nothing is actionable outside another worktree's claims. */
   next: NextPickWire | null;
-  /** Structured requirements on the product layer, and the capabilities that hold none. */
+  /** Automated and metric requirements on the product layer, and the capabilities that hold none. */
   requirements: { total: number; uncovered: number };
 }
 
@@ -382,14 +382,18 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
   return { ...(body ? { statement: body } : {}), areas, constraints };
 }
 
-/** Requirements on live capabilities and constraints, and how many capabilities hold none. */
+/**
+ * Automated and metric requirements on live capabilities and constraints, and how
+ * many capabilities hold none. Manual ones are left out: `rex ready`
+ * (`core/ready.ts`) only counts these two kinds, and the tile explains Ready.
+ */
 function requirementCoverage(index: TreeIndex): { total: number; uncovered: number } {
   let total = 0;
   let uncovered = 0;
   for (const { node, root } of index.entries) {
     if (root !== "product") continue;
     if (node.type !== "capability" && node.type !== "constraint") continue;
-    const count = node.requirements?.length ?? 0;
+    const count = (node.requirements ?? []).filter((r) => r.validationType === "automated" || r.validationType === "metric").length;
     total += count;
     if (node.type === "capability" && count === 0) uncovered++;
   }
