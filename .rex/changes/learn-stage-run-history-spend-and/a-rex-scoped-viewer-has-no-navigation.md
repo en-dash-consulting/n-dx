@@ -7,6 +7,7 @@ description: "Verdict: should-fix (medium). Found by adversarial review of 03b6c
 acceptanceCriteria:
   - "With buildValidViews(\"rex\"), some visible stage places merge-graph and activity (stageForView returns a stage for each)"
   - "A unit test renders the rex-scoped dashboard and finds a navigable entry for the PRD Graph and the Execution Log"
+  - "tests/integration/token-usage-route-regression.test.ts passes unchanged: in a Rex-scoped viewer Tune draws only the tiles whose views the scope has (PRD Graph, Execution Log), no Spend tile, and /token-usage lights no stage."
 priority: "medium"
 tags:
   - "ndx-adversarial-review"

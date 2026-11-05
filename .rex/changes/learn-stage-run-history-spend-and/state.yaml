@@ -22,7 +22,7 @@ items:
     startedAt: "2026-11-05T05:51:58.974Z"
     activeIntervals: [{"end":"2026-11-05T06:10:11.740Z","start":"2026-11-05T05:51:58.974Z"},{"end":"2026-11-05T06:35:56.954Z","start":"2026-11-05T06:34:51.295Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (54):\n- renders Token Usage from direct canonical /token-usage navigation\n- redirects legacy Rex token links to canonical global /token-usage\n- renders health panel after fetch resolves\n- displays health level badge\n- shows degraded health level\n- shows unhealthy health level\n- displays active connection count\n- renders connection bar when peak > 0\n… and 46 more"
-    lastModified: "2026-11-05T06:35:57.559Z"
+    lastModified: "2026-11-05T10:08:04.885Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "28ab2232-830a-42b8-a80e-f2f4cf3902e7":
     status: "completed"
