@@ -155,7 +155,7 @@ describe("CommandsView", () => {
     document.body.appendChild(root);
     vi.stubGlobal("fetch", vi.fn());
     act(() => {
-      render(h(CommandsView, { jobs: emptyJobTray() }), root);
+      render(h(CommandsView, { jobs: emptyJobTray(), navigateTo: () => {}, tab: "run" }), root);
     });
     expect(root.textContent).toContain("Refresh Data");
     expect(root.textContent).toContain("Export Dashboard");
@@ -195,27 +195,28 @@ describe("CommandsView", () => {
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     }
 
-    it("opens on Run, and the Reference tab renders the command reference", async () => {
-      history.replaceState(null, "", "/commands");
-      act(() => { render(h(CommandsView, { jobs: emptyJobTray() }), root); });
+    it("shows the tab the route names, and tab clicks navigate rather than keep local state", async () => {
+      const navigateTo = vi.fn();
+      act(() => { render(h(CommandsView, { jobs: emptyJobTray(), navigateTo, tab: "run" }), root); });
       const reference = root.querySelector<HTMLButtonElement>("#commands-tab-reference")!;
       expect(reference.getAttribute("aria-selected")).toBe("false");
       expect(root.textContent).toContain("Refresh Data");
 
       act(() => { reference.click(); });
-      await flush();
-      expect(reference.getAttribute("aria-selected")).toBe("true");
-      expect(root.textContent).toContain("myapp init");
-      expect(root.textContent).not.toContain("Refresh Data");
-      expect(fetchMock).toHaveBeenCalledWith("/api/commands/manifest");
+      expect(navigateTo).toHaveBeenLastCalledWith("commands", { tab: "reference" });
+      expect(reference.getAttribute("aria-selected")).toBe("false");
+
+      act(() => { root.querySelector<HTMLButtonElement>("#commands-tab-run")!.click(); });
+      expect(navigateTo).toHaveBeenLastCalledWith("commands", undefined);
     });
 
-    it("opens on Reference at /commands/reference, where /command-reference lands", async () => {
-      history.replaceState(null, "", "/commands/reference");
-      act(() => { render(h(CommandsView, { jobs: emptyJobTray() }), root); });
+    it("renders the command reference when the route's tab is reference", async () => {
+      act(() => { render(h(CommandsView, { jobs: emptyJobTray(), navigateTo: () => {}, tab: "reference" }), root); });
       await flush();
       expect(root.querySelector("#commands-tab-reference")!.getAttribute("aria-selected")).toBe("true");
       expect(root.textContent).toContain("myapp init");
+      expect(root.textContent).not.toContain("Refresh Data");
+      expect(fetchMock).toHaveBeenCalledWith("/api/commands/manifest");
     });
   });
 });

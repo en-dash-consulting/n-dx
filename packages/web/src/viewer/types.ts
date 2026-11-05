@@ -39,7 +39,7 @@ export interface AskSeed {
   labels?: Record<string, string>;
 }
 
-export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; askSeed?: AskSeed }) => void;
+export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; tab?: string; askSeed?: AskSeed }) => void;
 
 export interface FileDetail {
   type: "file";

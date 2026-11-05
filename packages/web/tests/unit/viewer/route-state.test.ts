@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ViewId } from "../../../src/viewer/types.js";
-import { parseLegacyHashRoute, parsePathnameRoute, resolveLocationRoute } from "../../../src/viewer/route-state.js";
+import { parseLegacyHashRoute, parsePathnameRoute, resolveLocationRoute, routeTab } from "../../../src/viewer/route-state.js";
+import { entryUrl } from "../../../src/viewer/hooks/use-route-state.js";
 
 const VIEWS = new Set<ViewId>([
   "overview",
@@ -16,6 +17,32 @@ const VIEWS = new Set<ViewId>([
   "prd",
   "hench-runs",
 ]);
+
+describe("route-state: Settings › Commands tab", () => {
+  const views = new Set<ViewId>(["commands", "command-reference", "home"]);
+  const entry = (tab: string | null) => ({
+    view: "commands" as ViewId, file: null, zone: null, runId: null, taskId: null, tab, askSeed: null,
+  });
+
+  it("reads the Reference tab from /commands/reference and the alias", () => {
+    const direct = parsePathnameRoute("/commands/reference", views)!;
+    expect(routeTab(direct.view, direct.subId)).toBe("reference");
+    const alias = parsePathnameRoute("/command-reference", views)!;
+    expect(alias.view).toBe("commands");
+    expect(routeTab(alias.view, alias.subId)).toBe("reference");
+  });
+
+  it("treats bare, unknown and other-view sub-paths as no tab", () => {
+    expect(routeTab("commands", null)).toBeNull();
+    expect(routeTab("commands", "bogus")).toBeNull();
+    expect(routeTab("prd", "reference")).toBeNull();
+  });
+
+  it("emits the tab in the entry's URL, so a reload keeps it", () => {
+    expect(entryUrl(entry("reference"))).toBe("/commands/reference");
+    expect(entryUrl(entry(null))).toBe("/commands");
+  });
+});
 
 describe("route-state", () => {
   it("parses direct PR Markdown hash route", () => {

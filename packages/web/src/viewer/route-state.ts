@@ -16,6 +16,18 @@ export function isTaskRouteView(view: ViewId): boolean {
   return view === "prd" || view === "live-task" || view === "work";
 }
 
+/** Tabs Settings › Commands names in its sub-path; the Run tab is the bare `/commands`. */
+const COMMANDS_PATH_TABS: ReadonlySet<string> = new Set(["reference"]);
+
+/**
+ * The tab a route opens on a view that keeps its tab in the path (`/commands/reference`).
+ * Null for every other view, and for an unrecognised sub-path, so the address
+ * bar settles on the page the viewer actually shows.
+ */
+export function routeTab(view: ViewId, subId: string | null): string | null {
+  return view === "commands" && subId && COMMANDS_PATH_TABS.has(subId) ? subId : null;
+}
+
 /**
  * The Work page, with the Prepare task modal open at `/work/prep/<taskId>`.
  * Any other sub-path is the bare Work page: the modal is the only thing a

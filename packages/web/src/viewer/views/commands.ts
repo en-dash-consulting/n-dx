@@ -17,6 +17,7 @@ import { useState, useCallback, useEffect } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { useCliName, findOperation } from "../hooks/index.js";
 import type { ActiveOperation, JobTray } from "../hooks/index.js";
+import type { NavigateTo } from "../types.js";
 import { CommandReferenceView } from "./command-reference.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -734,13 +735,12 @@ const COMMANDS_TABS: readonly { id: CommandsTab; label: string }[] = [
   { id: "reference", label: "Reference" },
 ];
 
-/** `/commands/reference` (where `/command-reference` lands) opens the Reference tab. */
-function initialTab(): CommandsTab {
-  return location.pathname.replace(/\/+$/, "").endsWith("/commands/reference") ? "reference" : "run";
-}
-
-export function CommandsView({ jobs }: { jobs: JobTray }) {
-  const [tab, setTab] = useState<CommandsTab>(initialTab);
+/**
+ * The tab lives in the route (`/commands/reference`, where `/command-reference`
+ * lands), so a reload, a shared link and Back/Forward all reopen it.
+ */
+export function CommandsView({ jobs, navigateTo, tab }: { jobs: JobTray; navigateTo: NavigateTo; tab: CommandsTab }) {
+  const setTab = (next: CommandsTab) => navigateTo("commands", next === "run" ? undefined : { tab: next });
 
   return h("div", { class: "commands-container" },
     h("div", { class: "view-header" },

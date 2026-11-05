@@ -95,6 +95,8 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /** The tab the route names on a view that keeps it in its path (Commands: `reference`). */
+  selectedTab?: string | null;
   /** The Product page reports the capability it has open, so Sidecar can attach it. */
   setOpenCapability?: (id: string | null) => void;
   /** The PRD page reports the item selected in its tree, which the route does not carry. */
@@ -306,8 +308,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "workflow": ({ navigateTo }) =>
     h(WorkflowView, { navigateTo }),
 
-  "commands": ({ jobs }) =>
-    h(CommandsView, { jobs }),
+  "commands": ({ jobs, navigateTo, selectedTab }) =>
+    h(CommandsView, { jobs, navigateTo, tab: selectedTab === "reference" ? "reference" : "run" }),
 
   "command-reference": () =>
     h(CommandReferenceView, null),

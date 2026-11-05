@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
-import { isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, viewPathname } from "../route-state.js";
+import { isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, routeTab, viewPathname } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
 import { resolveViewAliasRoute } from "../external.js";
 import { guardedLeave } from "./use-leave-guard.js";
@@ -19,6 +19,8 @@ export interface RouteState {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /** The tab a view keeps in its path (Settings › Commands: `reference`); null is its first tab. */
+  selectedTab: string | null;
   /**
    * The item the Ask panel was entered with, when it was entered from one.
    *
@@ -34,17 +36,18 @@ export interface RouteState {
 }
 
 /** The full shape carried in a history entry — and the route state it drives. */
-interface HistoryEntry {
+export interface HistoryEntry {
   view: ViewId;
   file: string | null;
   zone: string | null;
   runId: string | null;
   taskId: string | null;
+  tab: string | null;
   askSeed: AskSeed | null;
 }
 
-function entryUrl(entry: HistoryEntry): string {
-  const subId = entry.runId ?? entry.taskId;
+export function entryUrl(entry: HistoryEntry): string {
+  const subId = entry.runId ?? entry.taskId ?? entry.tab;
   return viewPathname(entry.view, subId);
 }
 
@@ -74,10 +77,16 @@ function getInitialTaskId(validViews: Set<ViewId>): string | null {
   return parsed.subId;
 }
 
+function getInitialTab(validViews: Set<ViewId>): string | null {
+  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
+  return parsed ? routeTab(parsed.view, parsed.subId) : null;
+}
+
 export function useRouteState(validViews: Set<ViewId>): RouteState {
   const [view, setView] = useState<ViewId>(() => getInitialView(validViews));
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => getInitialRunId(validViews));
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => getInitialTaskId(validViews));
+  const [selectedTab, setSelectedTab] = useState<string | null>(() => getInitialTab(validViews));
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [askSeed, setAskSeed] = useState<AskSeed | null>(null);
@@ -88,11 +97,11 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
   // that point — the browser has already moved it to the popped entry by the
   // time the event fires.
   const currentRef = useRef<HistoryEntry>({
-    view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed,
+    view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, tab: selectedTab, askSeed,
   });
   useEffect(() => {
-    currentRef.current = { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed };
-  }, [view, selectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed]);
+    currentRef.current = { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, tab: selectedTab, askSeed };
+  }, [view, selectedFile, selectedZone, selectedRunId, selectedTaskId, selectedTab, askSeed]);
 
   const applyEntry = useCallback((raw: HistoryEntry, push: boolean) => {
     const entry = { ...raw, view: normalizeLiveView(raw.view, raw.taskId) };
@@ -100,6 +109,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setSelectedZone(entry.zone);
     setSelectedRunId(entry.runId);
     setSelectedTaskId(entry.taskId);
+    setSelectedTab(entry.tab);
     setAskSeed(entry.askSeed);
     setView(entry.view);
     currentRef.current = entry;
@@ -110,21 +120,25 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     // A caller may still pass an old id (the bottom-bar's freshness/completion
     // indicators do, via INDICATOR_VIEWS) — resolve it to the stage that
     // absorbed it so the URL and the lit tab both land on the current view.
-    const resolved = resolveViewAliasRoute(targetView, validViews)?.view ?? targetView;
+    // An alias that lands on a tab (`command-reference`) carries that tab along.
+    const alias = resolveViewAliasRoute(targetView, validViews);
+    const resolved = alias?.view ?? targetView;
     const entry: HistoryEntry = {
       view: resolved,
       file: opts?.file ?? null,
       zone: opts?.zone ?? null,
       runId: opts?.runId ?? null,
       taskId: opts?.taskId ?? null,
+      tab: routeTab(resolved, opts?.tab ?? alias?.sub ?? null),
       askSeed: opts?.askSeed ?? null,
     };
     guardedLeave(() => applyEntry(entry, true));
   }, [validViews, applyEntry]);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
-    const resolved = resolveViewAliasRoute(id, validViews)?.view ?? id;
-    const entry: HistoryEntry = { view: resolved, file: null, zone: null, runId: null, taskId: null, askSeed: null };
+    const alias = resolveViewAliasRoute(id, validViews);
+    const resolved = alias?.view ?? id;
+    const entry: HistoryEntry = { view: resolved, file: null, zone: null, runId: null, taskId: null, tab: routeTab(resolved, alias?.sub ?? null), askSeed: null };
     guardedLeave(() => applyEntry(entry, true));
   }, [validViews, applyEntry]);
 
@@ -140,12 +154,14 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         zone: null,
         runId: isRunView ? hashRoute.subId : null,
         taskId: isTaskView ? hashRoute.subId : null,
+        tab: routeTab(hashRoute.view, hashRoute.subId),
         askSeed: null,
       };
       setSelectedFile(entry.file);
       setSelectedZone(entry.zone);
       setSelectedRunId(entry.runId);
       setSelectedTaskId(entry.taskId);
+      setSelectedTab(entry.tab);
       setAskSeed(entry.askSeed);
       setView(entry.view);
       currentRef.current = entry;
@@ -153,7 +169,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     } else {
       // Seed the initial history entry — preserve deep-link path if present
       const entry: HistoryEntry = {
-        view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null,
+        view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, tab: selectedTab, askSeed: null,
       };
       currentRef.current = entry;
       history.replaceState(entry, "", appUrl(entryUrl(entry)));
@@ -168,6 +184,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
             zone?: string | null;
             runId?: string | null;
             taskId?: string | null;
+            tab?: string | null;
             askSeed?: AskSeed | null;
           };
           if (s.view && validViews.has(s.view as ViewId)) {
@@ -177,6 +194,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
               zone: s.zone ?? null,
               runId: s.runId ?? null,
               taskId: s.taskId ?? null,
+              tab: s.tab ?? null,
               askSeed: s.askSeed ?? null,
             };
           }
@@ -192,6 +210,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
           zone: null,
           runId: isRunView ? parsed.subId : null,
           taskId: isTaskView ? parsed.subId : null,
+          tab: routeTab(parsed.view, parsed.subId),
           askSeed: null,
         };
       };
@@ -203,6 +222,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         setSelectedZone(target.zone);
         setSelectedRunId(target.runId);
         setSelectedTaskId(target.taskId);
+        setSelectedTab(target.tab);
         setAskSeed(target.askSeed);
         setView(target.view);
         currentRef.current = target;
@@ -229,5 +249,5 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { view, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, handleSidebarNav };
+  return { view, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, selectedTab, askSeed, navigateTo, handleSidebarNav };
 }
