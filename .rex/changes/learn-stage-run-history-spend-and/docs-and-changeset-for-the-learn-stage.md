@@ -1,11 +1,11 @@
 ---
 id: "a520e32b-17c3-41a8-a192-2f5784b2765d"
 type: "task"
-title: "Docs and changeset for the Learn stage"
+title: "Docs and changeset for the Tune stage"
 slug: "docs-and-changeset-for-the-learn-stage"
-description: "Update the dashboard docs and the in-app guide for the four-stage loop, Learn's tiles and where each moved view now lives. Add a patch changeset for @n-dx/web."
+description: "Update the dashboard docs and the in-app guide for the four-stage loop, Tune's purpose (fit the workflow to the project and its tooling), its tiles and where each moved view now lives. Add a patch changeset for @n-dx/web."
 acceptanceCriteria:
-  - "Dashboard docs and the in-app guide describe Learn and the new homes of Runs, Spend, Tuning, Shipped, All Commands and Requirements"
+  - "Dashboard docs and the in-app guide describe Tune and the new homes of Runs, Spend, Suggestions, Shipped, All Commands and Requirements"
   - "A patch changeset names @n-dx/web"
 priority: "medium"
 source: "ndx-capture"
