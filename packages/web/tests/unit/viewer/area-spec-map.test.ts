@@ -73,6 +73,14 @@ describe("SpecMap", () => {
     expect(blocks[0]!.getAttribute("aria-label")).toBe("Automatic placement: 2 criteria, changing, 1 open change");
   });
 
+  it("leaves a retired capability off the map rather than drawing it as proposed", () => {
+    const el = mount({ capabilities: [...CAPS, row({ id: "gone", title: "Gone", status: "retired" })] });
+    const blocks = [...el.querySelectorAll<HTMLButtonElement>(".pam-block")];
+    expect(blocks.map((b) => b.dataset.block)).not.toContain("gone");
+    expect(blocks).toHaveLength(CAPS.length);
+    expect(el.querySelector('[data-status="proposed"][data-block="gone"]')).toBeNull();
+  });
+
   it("draws binding constraints as bands above the map", () => {
     const el = mount();
     const bands = el.querySelector(".asm-bands")!;

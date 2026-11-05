@@ -67,7 +67,16 @@ export interface SpecMapProps {
   onSelect: (capabilityId: string) => void;
 }
 
-export function SpecMap({ capabilities, constraints, selectedId = null, onSelect }: SpecMapProps) {
+/**
+ * Retired capabilities stay off the map. `blockStatus` ignores retired rows,
+ * so one would otherwise be drawn as a "proposed" block, read as unbuilt work.
+ */
+export function liveCapabilities(rows: readonly CapabilityRow[]): CapabilityRow[] {
+  return rows.filter((row) => row.status !== "retired");
+}
+
+export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect }: SpecMapProps) {
+  const capabilities = liveCapabilities(allCapabilities);
   return h("section", { class: "asm", "aria-label": "Spec map" },
     h(ConstraintBands, { constraints }),
     capabilities.length === 0
