@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
 import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement, suggestPlacements } from "../../../src/core/change-place.js";
 import { placementStrength } from "../../../src/core/placement.js";
-import { checkV2Rules, indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+
+const indexTreeCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock("../../../src/schema/v2-rules.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/schema/v2-rules.js")>();
+  return { ...actual, indexTree: (...args: Parameters<typeof actual.indexTree>) => { indexTreeCalls.count++; return actual.indexTree(...args); } };
+});
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ slug: fields.id as string, ...fields }) as RuleNode;
 const NOW = new Date("2026-10-09T00:00:00.000Z");
@@ -201,6 +207,28 @@ describe("suggestPlacements", () => {
     const t = inbox();
     const batch = suggestPlacements(t, refs, 1, { area: "pay" });
     for (const ref of refs) expect(batch.get(ref)).toEqual(single(t, ref, 1, { area: "pay" }));
+  });
+
+  it("builds the tree index, placement nodes and amender map once per call, not once per ref", () => {
+    const t = inbox();
+    // placementNodes reads each capability's and constraint's title once per build;
+    // openAmenders reads each change's amends once per build.
+    const reads = { nodes: 0, amenders: 0 };
+    const count = (n: RuleNode, field: "title" | "amends", key: keyof typeof reads): void => {
+      let value = (n as unknown as Record<string, unknown>)[field];
+      Object.defineProperty(n, field, { get: () => { reads[key]++; return value; }, set: (v) => { value = v; }, enumerable: true, configurable: true });
+    };
+    const placeable = (t.product[0].children ?? []).filter((n) => n.type === "capability" || n.type === "constraint");
+    for (const n of placeable) count(n, "title", "nodes");
+    for (const n of t.changes) count(n, "amends", "amenders");
+
+    indexTreeCalls.count = 0;
+    suggestPlacements(t, refs);
+
+    expect(refs.length).toBeGreaterThan(2);
+    expect(indexTreeCalls.count).toBe(1);
+    expect(reads.nodes).toBe(placeable.length);
+    expect(reads.amenders).toBe(t.changes.filter(isOpenChange).length);
   });
 
   it("refuses the whole call for an area that is not live", () => {
