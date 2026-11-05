@@ -126,6 +126,31 @@ describe("Validation & Dependency Graph API routes", () => {
       expect(hierarchyCheck.errors[0].itemId).toBe("feat-1");
     });
 
+    it("reports unknown blockedBy references apart from duplicate ids and self-references", async () => {
+      const task = (id: string, blockedBy?: string[]) => ({ id, title: id, level: "task", status: "pending", blockedBy });
+      const prd = (tasks: unknown[]) => makePRD([{
+        id: "epic-1", title: "Epic", level: "epic", status: "pending",
+        children: [{ id: "feat-1", title: "Feature", level: "feature", status: "pending", children: tasks }],
+      }]);
+      const checks = async (tasks: unknown[]) => {
+        await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd(tasks)));
+        const data = await (await fetch(`http://127.0.0.1:${port}/api/rex/validate`)).json();
+        const find = (name: string) => data.checks.find((c: { name: string }) => c.name === name);
+        return { dag: find("DAG integrity"), unresolved: find("unresolved dependencies") };
+      };
+
+      const duplicate = await checks([task("task-1"), task("task-1"), task("task-2", ["task-2"])]);
+      expect(duplicate.dag.pass).toBe(false);
+      expect(duplicate.dag.errors).toHaveLength(2);
+      expect(duplicate.unresolved).toMatchObject({ pass: true, errors: [] });
+
+      const unknown = await checks([task("task-1", ["missing"])]);
+      expect(unknown.dag.pass).toBe(true);
+      expect(unknown.unresolved.pass).toBe(false);
+      expect(unknown.unresolved.errors).toHaveLength(1);
+      expect(unknown.unresolved.errors[0]).toMatchObject({ itemId: "task-1", itemTitle: "task-1" });
+    });
+
     it("detects blockedBy cycles", async () => {
       await writeFile(
         join(rexDir, "prd.json"),

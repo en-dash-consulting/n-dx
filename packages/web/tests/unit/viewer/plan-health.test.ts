@@ -17,6 +17,7 @@ function report(over: Partial<Record<string, number>> = {}, ranAt = "2026-11-05T
     ranAt,
     checks: [
       check("DAG integrity", over.dag ?? 0),
+      check("unresolved dependencies", over.unresolved ?? 0),
       check("hierarchy placement", over.orphans ?? 0),
       check("blockedBy cycles", over.cycles ?? 0),
       check("stuck tasks", 0, "warn"),
@@ -33,6 +34,12 @@ describe("healthLights", () => {
       { id: "dependencies", label: "Unresolved dependencies", state: "ok", count: 0 },
       { id: "release-plans", label: "Stale release plans", state: "warn", count: 3 },
     ]);
+  });
+
+  it("reads Unresolved dependencies from unknown references, not DAG integrity", () => {
+    const dependencies = (r: HealthReport) => healthLights(r).find((l) => l.id === "dependencies");
+    expect(dependencies(report({ dag: 1 }))).toMatchObject({ state: "ok", count: 0 });
+    expect(dependencies(report({ unresolved: 1 }))).toMatchObject({ state: "fail", count: 1 });
   });
 
   it("draws three lights when the project has no release-plans check", () => {

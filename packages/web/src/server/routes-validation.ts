@@ -170,8 +170,16 @@ function findStuckItems(items: PRDItem[], now?: number): StuckResult[] {
   return stuck;
 }
 
-function validateDAG(items: PRDItem[]): { valid: boolean; errors: Array<{ message: string; itemId?: string }> } {
-  const errors: Array<{ message: string; itemId?: string }> = [];
+type DagError = { message: string; itemId?: string };
+
+/**
+ * Dependency-graph faults, split so each has its own check: `integrity` holds
+ * duplicate ids and self-references, `unresolved` holds blockedBy references
+ * to an id the PRD does not contain.
+ */
+function validateDAG(items: PRDItem[]): { integrity: DagError[]; unresolved: DagError[] } {
+  const errors: DagError[] = [];
+  const unresolved: DagError[] = [];
   const allIds = collectAllIds(items);
 
   // Check for duplicates
@@ -193,13 +201,13 @@ function validateDAG(items: PRDItem[]): { valid: boolean; errors: Array<{ messag
         if (dep === item.id) {
           errors.push({ message: `Self-reference: "${item.id}" blocks itself`, itemId: item.id });
         } else if (!allIds.has(dep)) {
-          errors.push({ message: `Orphan reference: "${item.id}" blocked by unknown "${dep}"`, itemId: item.id });
+          unresolved.push({ message: `Orphan reference: "${item.id}" blocked by unknown "${dep}"`, itemId: item.id });
         }
       }
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { integrity: errors, unresolved };
 }
 
 function runValidation(items: PRDItem[], extraChecks: CheckResult[] = []): {
@@ -209,16 +217,22 @@ function runValidation(items: PRDItem[], extraChecks: CheckResult[] = []): {
 } {
   const checks: CheckResult[] = [];
 
-  // DAG integrity
+  // DAG integrity and unresolved dependencies
   const dagResult = validateDAG(items);
+  const withTitle = (e: DagError) => ({
+    message: e.message,
+    itemId: e.itemId,
+    itemTitle: e.itemId ? findItemById(items, e.itemId)?.title : undefined,
+  });
   checks.push({
     name: "DAG integrity",
-    pass: dagResult.valid,
-    errors: dagResult.errors.map((e) => ({
-      message: e.message,
-      itemId: e.itemId,
-      itemTitle: e.itemId ? findItemById(items, e.itemId)?.title : undefined,
-    })),
+    pass: dagResult.integrity.length === 0,
+    errors: dagResult.integrity.map(withTitle),
+  });
+  checks.push({
+    name: "unresolved dependencies",
+    pass: dagResult.unresolved.length === 0,
+    errors: dagResult.unresolved.map(withTitle),
   });
 
   // Hierarchy placement

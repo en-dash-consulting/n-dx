@@ -36,14 +36,15 @@ export interface HealthLight {
 
 /**
  * Which validate check each light reads. Orphans are items placed under a
- * parent their type does not allow; unresolved dependencies are the DAG
- * integrity check (unknown or self-referencing blockedBy). Release plans only
+ * parent their type does not allow; unresolved dependencies are blockedBy
+ * references to an unknown id (duplicate ids and self-references stay in DAG
+ * integrity, which no light reads). Release plans only
  * exist on a v2 project, so a report without that check draws three lights.
  */
 const LIGHTS: ReadonlyArray<{ id: HealthLight["id"]; label: string; check: string }> = [
   { id: "cycles", label: "Cycles", check: "blockedBy cycles" },
   { id: "orphans", label: "Orphans", check: "hierarchy placement" },
-  { id: "dependencies", label: "Unresolved dependencies", check: "DAG integrity" },
+  { id: "dependencies", label: "Unresolved dependencies", check: "unresolved dependencies" },
   { id: "release-plans", label: "Stale release plans", check: "release plans" },
 ];
 

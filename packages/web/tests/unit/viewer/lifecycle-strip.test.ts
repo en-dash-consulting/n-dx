@@ -18,6 +18,7 @@ const SUMMARY: ChangeSummary = {
   inbox: 3,
   stages: { proposed: 4, ready: 0, "in-progress": 2, "awaiting-apply": 1 },
   open: [],
+  requirements: { total: 0, uncovered: 0 },
   next: {
     id: "task-9", title: "Wire the strip", type: "task", changeId: "c1", changeTitle: "Glance",
     reason: "in_progress", summary: "Already in progress",
