@@ -164,6 +164,12 @@ function isConnectionFailure(err: unknown): boolean {
   return !(err instanceof Error && err.name === "AbortError");
 }
 
+/** What a connection's transport depends on: a change here needs a new client. */
+function connectionIdentity(config: ConnectionConfig): Omit<ConnectionConfig, "tools" | "profile" | "fieldHints" | "label"> {
+  const { tools: _tools, profile: _profile, fieldHints: _fieldHints, label: _label, ...rest } = config;
+  return rest;
+}
+
 /** The longest reason kept: a status line plus a short server message. */
 const MAX_REASON_LENGTH = 300;
 
@@ -204,8 +210,11 @@ export class ConnectionService {
 
   /**
    * Re-read the declared connections (or use `configs`): a connection whose
-   * declaration is unchanged keeps its client; a removed or changed one is
-   * closed, and a changed or new one connects afresh on its next use. The
+   * declaration is unchanged keeps its client, as does one whose tools,
+   * profile, field hints or label alone changed (its tools' policies are
+   * resolved again in place); a removed one, or one whose transport, address
+   * or auth changed, is closed and connects afresh on its next use, as does a
+   * new one. The
    * Settings page calls this after it writes config, so the broker, which
    * shares this service, sees the change without a restart.
    */
@@ -214,6 +223,12 @@ export class ConnectionService {
     for (const [id, slot] of [...this.slots]) {
       const next = wanted.get(id);
       if (next && JSON.stringify(next) === JSON.stringify(slot.config)) continue;
+      if (next && JSON.stringify(connectionIdentity(next)) === JSON.stringify(connectionIdentity(slot.config))) {
+        // Only what the server never sees changed: keep the client, so a call in flight finishes.
+        slot.config = next;
+        this.reresolvePolicies(slot);
+        continue;
+      }
       this.reset(slot, { state: "unavailable", reason: "not connected yet" });
       this.slots.delete(id);
     }
@@ -226,6 +241,21 @@ export class ConnectionService {
     const ordered = configs.map((config) => [config.id, this.slots.get(config.id)!] as const);
     this.slots.clear();
     for (const [id, slot] of ordered) this.slots.set(id, slot);
+  }
+
+  /** Resolve the policies of a slot's listed tools against its current `tools` overrides. */
+  private reresolvePolicies(slot: Slot): void {
+    const id = slot.config.id;
+    const apply = (tools: ConnectionTool[]): ConnectionTool[] => {
+      const policies = resolveToolPolicies(
+        tools.map((tool) => ({ name: tool.tool, annotations: tool.annotations })),
+        slot.config.tools,
+        (message) => this.warnOnce(`${message} (connection ${id})`),
+      );
+      return tools.map((tool) => ({ ...tool, policy: policies.get(tool.tool)! }));
+    };
+    if (slot.live) slot.live.tools = apply(slot.live.tools);
+    slot.known = slot.live ? slot.live.tools : slot.known && apply(slot.known);
   }
 
   /** Drop `connection`'s client so its next use connects afresh, e.g. after its stored token changed. */

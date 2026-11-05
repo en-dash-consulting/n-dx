@@ -415,4 +415,67 @@ describe("ConnectionService", () => {
     await expect.poll(async () => warnings.some((w) => w.includes(`local__${long}`))).toBe(true);
     expect((await svc.listTools()).some((t) => t.tool === long)).toBe(false);
   });
+
+  describe("reload while a call is in flight", () => {
+    /** A fake whose `slow` tool answers only when `release()` is called. */
+    async function slowServer() {
+      let release!: () => void;
+      const gate = new Promise<void>((done) => (release = done));
+      const server = await startFakeMcpHttpServer({
+        extraTools: (mcp) =>
+          mcp.registerTool("slow", { description: "Answers when released." }, async () => {
+            await gate;
+            return { content: [{ type: "text", text: "done" }] };
+          }),
+      });
+      cleanups.push(() => server.close());
+      return { server, release };
+    }
+
+    const declared = (url: string, extra: Record<string, unknown> = {}) => [
+      { id: "docs", label: "docs", auth: "none" as const, transport: "http" as const, url, ...extra },
+    ];
+    const initializes = (server: FakeMcpHttpServer) => server.methods.filter((m) => m === "initialize").length;
+
+    it("finishes a call and keeps the client when only a tool's policy, profile or label changed", async () => {
+      const { server, release } = await slowServer();
+      const { svc } = service({ docs: { transport: "http", url: server.url } });
+      await svc.listTools();
+      const before = initializes(server);
+      const call = svc.callTool("docs", "slow", {});
+      await expect.poll(() => server.calls.length).toBe(1);
+
+      svc.reload(declared(server.url, { tools: { slow: { policy: "never" } }, profile: "caos", label: "Docs" }));
+      release();
+
+      expect(text(await call)).toBe("done");
+      expect((await svc.listTools()).find((t) => t.tool === "slow")?.policy).toMatchObject({ policy: "never" });
+      expect(initializes(server)).toBe(before);
+    });
+
+    it("reconnects on next use when the url changes", async () => {
+      const first = await httpServer();
+      const second = await httpServer();
+      const { svc } = service({ docs: { transport: "http", url: first.url } });
+      await svc.listTools();
+
+      svc.reload(declared(second.url));
+      await svc.listTools();
+
+      expect(initializes(second)).toBe(1);
+    });
+
+    it("reconnects on next use when auth changes", async () => {
+      const server = await httpServer();
+      const { svc } = service({ docs: { transport: "http", url: server.url } });
+      await svc.listTools();
+      expect(svc.connection("docs")?.status).toMatchObject({ state: "connected" });
+
+      svc.reload(declared(server.url, { auth: "token" }));
+      await svc.listTools();
+
+      // The old client was dropped; with no stored token the new declaration cannot connect.
+      expect(svc.connection("docs")?.status).not.toMatchObject({ state: "connected" });
+    });
+  });
 });

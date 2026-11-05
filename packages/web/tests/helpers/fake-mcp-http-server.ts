@@ -16,6 +16,8 @@ export interface FakeMcpHttpServer {
   authorizations: Array<string | undefined>;
   /** Every tools/call the server received, in order. */
   calls: Array<{ name: string; arguments: Record<string, unknown> }>;
+  /** The JSON-RPC method of every message received, in order ("initialize" counts connects). */
+  methods: string[];
   /** Accept every request and never answer it while set; `authorizations` still counts them. */
   silent?: boolean;
   /** Answer 401 to every request while set. */
@@ -45,6 +47,7 @@ export async function startFakeMcpHttpServer(options: FakeMcpHttpServerOptions =
     url: "",
     authorizations: [],
     calls: [],
+    methods: [],
     close: () =>
       new Promise((resolve) => {
         server.closeAllConnections();
@@ -68,6 +71,7 @@ export async function startFakeMcpHttpServer(options: FakeMcpHttpServerOptions =
     let isCall = false;
     for (const message of Array.isArray(body) ? body : [body]) {
       const { method, params } = (message ?? {}) as { method?: string; params?: { name: string; arguments?: Record<string, unknown> } };
+      if (method) fake.methods.push(method);
       if (method === "tools/call" && params) {
         isCall = true;
         fake.calls.push({ name: params.name, arguments: params.arguments ?? {} });
