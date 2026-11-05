@@ -360,7 +360,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     // not registered with it rather than "no server" beside "another process".
     const status = runStart(["status", worktreeA]).stdout;
     expect(status).toContain(`hub is running on port ${hubPort}`);
-    expect(status).toContain("not registered");
+    expect(status).toContain("no registration with it is recorded");
   });
 
   it("stop in the last worktree unregisters the project, and the hub exits with its last project", async () => {

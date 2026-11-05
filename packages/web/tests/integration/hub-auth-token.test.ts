@@ -236,6 +236,9 @@ describe("hub with a per-user token", () => {
     const pkg = JSON.parse(readFileSync(join(WEB_PKG, "package.json"), "utf-8"));
     const health = await (await fetch(`${base()}/api/hub/health`, withToken())).json();
     expect(health.build.version).toBe(pkg.version);
-    expect(health.build).toHaveProperty("sourceHash");
+    // assertFreshServerBuild() guarantees the stamp, so a null here means the
+    // hub stopped finding it — and ndx start would skip the hash comparison.
+    const stamp = JSON.parse(readFileSync(join(WEB_PKG, "dist", ".build-stamp.json"), "utf-8"));
+    expect(health.build.sourceHash).toBe(stamp.sourceHash);
   });
 });

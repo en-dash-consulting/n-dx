@@ -163,10 +163,10 @@ describe("ndx start — per-user token (e2e)", { timeout: 180_000 }, () => {
 
     // Before registering, the hub is this user's own process on the port —
     // not "another process", and not "no server".
-    const before = runStart(["status", second]);
+    const before = runStart(["status", `--port=${hubPort}`, second]);
     expect(before.code, before.stderr + before.stdout).toBe(0);
     expect(before.stdout).toContain(`hub is running on port ${hubPort}`);
-    expect(before.stdout).toContain("not registered");
+    expect(before.stdout).toContain("no registration with it is recorded");
     expect(before.stdout).not.toContain("another process");
 
     // With two projects registered, the root nonce is the hub's own to mint;

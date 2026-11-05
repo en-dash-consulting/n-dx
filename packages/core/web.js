@@ -960,7 +960,8 @@ async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FI
     // and on the default port, the hub *is* the process on the port, which
     // the generic note below would call "another process".
     const hub = showMcp ? await findOwnRunningHub(hubHome(), hubPortFlag) : null;
-    for (const line of formatUnrecordedStatus({ port, hub, portInUse: await isPortInUse(port) })) log(line);
+    const shownDir = resolve(dir) === resolve(process.cwd()) ? "." : dir;
+    for (const line of formatUnrecordedStatus({ port, hub, portInUse: await isPortInUse(port), dir: shownDir })) log(line);
     return;
   }
 
@@ -1001,21 +1002,31 @@ async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FI
  * What `ndx start status` says for a directory with no pid or marker file.
  * Pure, so the wording is unit-tested.
  *
+ * "No registration is recorded", not "not registered": the record is the
+ * marker file in the directory, and the hub's registry may still hold the
+ * project after the marker was deleted (a `git clean`). Running the start
+ * command is right either way — registering again is idempotent.
+ *
  * @param {object} args
  * @param {number} args.port            The dashboard port this directory would use.
  * @param {{ port: number, pid: number } | null} args.hub  This user's hub, when one answers.
  * @param {boolean} args.portInUse      Whether something listens on `port`.
+ * @param {string} [args.dir]           The directory, as the start command should name it.
  * @returns {string[]}
  */
-export function formatUnrecordedStatus({ port, hub, portInUse }) {
+export function formatUnrecordedStatus({ port, hub, portInUse, dir = "." }) {
+  const lines = [];
   if (hub) {
-    return [
-      `The n-dx hub is running on port ${hub.port} (PID ${hub.pid}), but this directory is not registered with it.`,
-      "  Run 'ndx start .' to register it.",
-    ];
+    const target = /\s/.test(dir) ? `"${dir}"` : dir;
+    lines.push(
+      `The n-dx hub is running on port ${hub.port} (PID ${hub.pid}), but no registration with it is recorded for this directory.`,
+      `  Run 'ndx start ${target}' to register it.`,
+    );
+  } else {
+    lines.push("No background server recorded.");
   }
-  const lines = ["No background server recorded."];
-  if (portInUse) lines.push(`Note: Port ${port} is in use by another process.`);
+  // The hub on another port says nothing about who holds this one.
+  if (portInUse && hub?.port !== port) lines.push(`Note: Port ${port} is in use by another process.`);
   return lines;
 }
 
@@ -1209,6 +1220,39 @@ function checkoutOf(web) {
 }
 
 /**
+ * Which server a fix is for, and the commands that stop and start it.
+ *
+ * @typedef {object} ServerCommands
+ * @property {"hub" | "here"} kind  The per-user hub, or a single-project (or preview) server.
+ * @property {string} stop          The command that stops it.
+ * @property {string} start         The command that starts it again as the same kind of server.
+ */
+
+/** @type {ServerCommands} */
+export const HUB_SERVER_COMMANDS = { kind: "hub", stop: "ndx hub stop", start: "ndx start" };
+
+/**
+ * The single-project or preview server `ndx <commandName>` started, by the
+ * commands that address it again. `--here` is always named: a bare `ndx start`
+ * registers with the hub instead.
+ *
+ * @param {string} commandName  "start" or "web".
+ * @param {boolean} isPreview
+ * @returns {ServerCommands}
+ */
+export function hereServerCommands(commandName, isPreview) {
+  const mode = isPreview ? "--preview" : "--here";
+  return { kind: "here", stop: `ndx ${commandName} ${mode} stop`, start: `ndx ${commandName} ${mode}` };
+}
+
+/**
+ * The rebuild for a source-linked install: web and every workspace package it
+ * depends on. Web alone type-checks against its dependencies' dist/ and runs
+ * their dist/ at run time, so building only web fails or leaves them stale.
+ */
+const WEB_REBUILD_COMMAND = `pnpm --filter "@n-dx/web..." build`;
+
+/**
  * The commands that bring a server back in line with this ndx. Pure, so the
  * wording is unit-tested.
  *
@@ -1218,21 +1262,17 @@ function checkoutOf(web) {
  * server", could not work there.
  *
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web  The web build this ndx spawns.
- * @param {"hub" | "here"} kind  Which server: the per-user hub, or a single-project one.
+ * @param {ServerCommands} server  Which server, and how to stop and start it.
  * @returns {string}
  */
-export function serverRefreshFix(web, kind) {
-  const restart = kind === "hub" ? "'ndx hub stop', then 'ndx start'" : "'ndx start stop', then 'ndx start'";
-  if (web.sourceLinked && web.current === false) {
-    const where = checkoutOf(web);
-    return `rebuild it with 'pnpm --filter @n-dx/web build'${where ? ` in ${where}` : ""}, then ${restart}`;
-  }
-  if (kind === "hub") return `restart the hub: ${restart}`;
+export function serverRefreshFix(web, server) {
+  const restart = `'${server.stop}', then '${server.start}'`;
+  const rebuild = `run '${WEB_REBUILD_COMMAND}'${checkoutOf(web) ? ` in ${checkoutOf(web)}` : ""}`;
+  if (web.sourceLinked && web.lagging === true) return `${rebuild}, then ${restart}`;
+  if (server.kind === "hub") return `restart the hub: ${restart}`;
   // A single-project server was just spawned from the dist/ on disk, so a
   // restart would start the same build again.
-  return web.sourceLinked
-    ? `rebuild n-dx ('pnpm build' in ${checkoutOf(web) ?? "the checkout"}), then ${restart}`
-    : "reinstall n-dx so @n-dx/web matches this ndx";
+  return web.sourceLinked ? `${rebuild}, then ${restart}` : "reinstall n-dx so @n-dx/web matches this ndx";
 }
 
 /**
@@ -1263,14 +1303,19 @@ export function noNonceNote(status, fix) {
  * runs older code than this CLI, which surfaces later as routes the CLI
  * expects and the server lacks — first among them the landing nonce.
  *
+ * Only a `dist/` that is `lagging` — last written before the newest source
+ * edit — is warned about. A watch build (`pnpm dev`) never writes the build
+ * stamp but keeps `dist/` current, and warning there on every start would
+ * teach people to ignore the warning.
+ *
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web
- * @param {"hub" | "here"} kind
+ * @param {ServerCommands} server
  * @returns {string | null}
  */
-export function staleWebDistWarning(web, kind) {
-  if (!web.sourceLinked || web.current !== false) return null;
-  return `Warning: ${join(web.packageDir, "dist")} is not a build of its current source, so the server runs older code than this ndx.\n` +
-    `  To fix: ${serverRefreshFix(web, kind)}.`;
+export function staleWebDistWarning(web, server) {
+  if (!web.sourceLinked || web.lagging !== true) return null;
+  return `Warning: ${join(web.packageDir, "dist")} is older than its source, so the server runs older code than this ndx.\n` +
+    `  To fix: ${serverRefreshFix(web, server)}.`;
 }
 
 /**
@@ -2270,7 +2315,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // The web build this ndx would spawn. A source-linked install whose dist/
   // lags its source starts a hub older than this CLI; say so before it does.
   const web = packageBuildIdentity(resolve(__dir, tools.web));
-  const staleDist = staleWebDistWarning(web, "hub");
+  const staleDist = staleWebDistWarning(web, HUB_SERVER_COMMANDS);
   if (staleDist) console.error(staleDist);
   try {
     hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
@@ -2308,7 +2353,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // than this CLI expects. Only a reused hub can differ; one just spawned is
   // the build on disk, which the stale-dist check above already judged.
   const mismatch = !hub.spawned && health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
-  if (mismatch) console.error(`Warning: ${mismatch}.\n  To fix: ${serverRefreshFix(web, "hub")}.`);
+  if (mismatch) console.error(`Warning: ${mismatch}.\n  To fix: ${serverRefreshFix(web, HUB_SERVER_COMMANDS)}.`);
   try {
     await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
   } catch {
@@ -2325,7 +2370,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
   log(`  URL: ${dashboardUrl}`);
-  if (token && !nonce) log(noNonceNote(nonceStatus, serverRefreshFix(web, "hub")));
+  if (token && !nonce) log(noNonceNote(nonceStatus, serverRefreshFix(web, HUB_SERVER_COMMANDS)));
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");
@@ -2570,7 +2615,8 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // The web build about to be spawned; a source-linked dist/ that lags its
   // source runs older code than this CLI.
   const web = packageBuildIdentity(resolve(__dir, tools.web));
-  const staleDist = staleWebDistWarning(web, "here");
+  const hereServer = hereServerCommands(commandName, isPreview);
+  const staleDist = staleWebDistWarning(web, hereServer);
   if (staleDist) console.error(staleDist);
 
   // --- Background mode ---
@@ -2619,7 +2665,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
         ? await mintNonceFromSpawnedServer(port, child.pid)
         : { nonce: null, status: 0 };
       log(`  URL: ${urlWithNonce(`http://127.0.0.1:${port}/`, fallbackNonce)}`);
-      if (hereToken && !fallbackNonce) log(noNonceNote(fallbackStatus, serverRefreshFix(web, "here")));
+      if (hereToken && !fallbackNonce) log(noNonceNote(fallbackStatus, serverRefreshFix(web, hereServer)));
       log(`Use '${stopCmd}' to stop it.`);
       return 0;
     }
@@ -2637,7 +2683,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       ? await mintNonceFromSpawnedServer(actualPort, child.pid)
       : { nonce: null, status: 0 };
     log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
-    if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, "here")));
+    if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, hereServer)));
 
     // The preview serves one HTML document — no MCP endpoints to advertise.
     if (isPreview) {

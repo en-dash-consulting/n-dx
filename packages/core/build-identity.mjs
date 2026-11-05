@@ -18,7 +18,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
 /** Source extensions that a build turns into dist/ output. */
@@ -76,11 +76,53 @@ export function readStampHash(distDir) {
 
 /**
  * Whether `distDir` is a build of the current `srcDir`: false when the stamp is
- * missing, unreadable, or records different source content.
+ * missing, unreadable, or records different source content — and when the
+ * source cannot be hashed (a file removed mid-walk, a dangling symlink), which
+ * a gate must read as "rebuild", never as a crash.
  */
 export function isBuildCurrent(srcDir, distDir) {
   const stamped = readStampHash(distDir);
-  return stamped !== null && stamped === sourceHash(srcDir);
+  if (stamped === null) return false;
+  try {
+    return stamped === sourceHash(srcDir);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The newest modification time of any file under `dir` whose name `accept`
+ * admits, in ms, or 0 when there is none. Skips node_modules. Unreadable
+ * entries are skipped rather than thrown.
+ *
+ * @param {string} dir
+ * @param {(name: string) => boolean} accept
+ * @returns {number}
+ */
+function newestMtime(dir, accept) {
+  let newest = 0;
+  const walk = (current) => {
+    let entries;
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name === "node_modules") continue;
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (accept(entry.name)) {
+        try {
+          newest = Math.max(newest, statSync(full).mtimeMs);
+        } catch {
+          // Removed mid-walk: it no longer counts.
+        }
+      }
+    }
+  };
+  walk(dir);
+  return newest;
 }
 
 /**
@@ -106,7 +148,10 @@ function packageRootOf(start) {
  * @property {string | null} version      Its package version.
  * @property {string | null} sourceHash   What its dist/ stamp records; null without a stamp (a published install).
  * @property {boolean} sourceLinked       Whether src/ sits beside dist/ — a checkout, not a published package.
- * @property {boolean | null} current     For a source-linked install, whether dist/ is a build of src/; null otherwise.
+ * @property {boolean | null} current     For a source-linked install, whether dist/ is a build of src/; null otherwise,
+ *                                        and null when the source could not be hashed.
+ * @property {boolean | null} lagging     For a source-linked install whose stamp does not match, whether dist/ was
+ *                                        last written before the newest source edit — see {@link packageBuildIdentity}.
  */
 
 /**
@@ -117,12 +162,19 @@ function packageRootOf(start) {
  * Hashing the source is only done for a source-linked install, the one case
  * where dist/ can lag the source it sits beside.
  *
+ * `current` is the stamp's strict answer, the one the test gates use: only a
+ * full build writes the stamp. `lagging` is the softer answer a user-facing
+ * warning wants. A watch build (`pnpm dev` runs `tsc --watch`) keeps dist/
+ * current without ever writing the stamp, so it reads as not current; but it
+ * rewrites dist/ after each source edit, so dist/ is not older than the
+ * source. A dist/ last written before the newest source edit is lagging.
+ *
  * @param {string} entry
  * @returns {PackageBuildIdentity}
  */
 export function packageBuildIdentity(entry) {
   const packageDir = packageRootOf(dirname(entry));
-  if (!packageDir) return { packageDir: null, name: null, version: null, sourceHash: null, sourceLinked: false, current: null };
+  if (!packageDir) return { packageDir: null, name: null, version: null, sourceHash: null, sourceLinked: false, current: null, lagging: null };
   let name = null;
   let version = null;
   try {
@@ -136,6 +188,17 @@ export function packageBuildIdentity(entry) {
   const distDir = join(packageDir, "dist");
   const stamped = readStampHash(distDir);
   const sourceLinked = existsSync(srcDir) && existsSync(distDir);
-  const current = sourceLinked ? stamped !== null && stamped === sourceHash(srcDir) : null;
-  return { packageDir, name, version, sourceHash: stamped, sourceLinked, current };
+  let current = null;
+  if (sourceLinked) {
+    try {
+      current = stamped !== null && stamped === sourceHash(srcDir);
+    } catch {
+      // A source file removed mid-walk, or a dangling symlink: unknown, not stale.
+      current = null;
+    }
+  }
+  const lagging = current === false
+    ? newestMtime(distDir, (n) => n !== BUILD_STAMP_FILE) < newestMtime(srcDir, (n) => SOURCE_EXTENSIONS.test(n))
+    : null;
+  return { packageDir, name, version, sourceHash: stamped, sourceLinked, current, lagging };
 }
