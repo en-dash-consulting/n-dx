@@ -442,7 +442,8 @@ describe("prepareReads", () => {
     expect(read?.liveness?.reason).toContain(`Hench process ${dead} is no longer running`);
 
     await sources.diagnose("stuck", read!.dir);
-    expect(diagnosed).toEqual([{ runId: "stuck", dir: realpathSync(sibling) }]);
+    // git lists the worktree by its long path; only .native expands a Windows 8.3 temp dir (RUNNER~1).
+    expect(diagnosed).toEqual([{ runId: "stuck", dir: realpathSync.native(sibling) }]);
   });
 });
 
