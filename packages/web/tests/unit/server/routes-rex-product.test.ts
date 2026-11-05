@@ -289,6 +289,8 @@ describe("v2 product reads", () => {
             plannedRelease: "1.2.0",
             taskCount: 1,
             completedTaskCount: 0,
+            criteriaGap: false,
+            openBlockers: 0,
           }],
           next: {
             id: TASK_ID,

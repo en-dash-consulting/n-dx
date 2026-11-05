@@ -80,7 +80,8 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
 /** A tile's whole content: its panel, or its view with the tile's tabs. */
 function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
   const [active, setActive] = useState<ViewId>(tile.view);
-  if (tile.panel) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
+  // An opened panel tile that lists tabs (Open changes: List, Tree) shows them.
+  if (tile.panel && !(opened && tile.tabs?.length)) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
   const shown = tabs.some((t) => t.view === active) ? active : tile.view;
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1

@@ -257,7 +257,7 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
             stage, validViews: VALID, navigateTo: () => {}, renderView: () => null,
           }));
           for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
-            openTile(tile.view);
+            openTile(tile.panel ?? tile.view);
             const tabs = [...root.querySelectorAll(".stage-tile-fullscreen [role=\"tab\"]")];
             expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1);
             for (const tab of tabs) {

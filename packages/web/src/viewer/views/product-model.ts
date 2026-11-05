@@ -234,6 +234,8 @@ export interface GlanceChange {
   plannedRelease?: string;
   taskCount: number;
   completedTaskCount: number;
+  criteriaGap: boolean;
+  openBlockers: number;
 }
 
 /** The unit `ndx work` would run next, and why rex picked it. */
@@ -646,6 +648,40 @@ export function groupChangesByRelease(changes: readonly ChangeRow[]): ReleaseGro
   }
 
   return groups;
+}
+
+/** One release heading of Plan's glance. */
+export interface GlanceGroup {
+  label: string;
+  changes: GlanceChange[];
+}
+
+/**
+ * Group the glance's changes by planned release: newest release first
+ * (`compareReleases`, reversed), Unscheduled last. The glance reads like a
+ * roadmap, so what is next leads and the backlog trails. A blank release is
+ * unscheduled and surrounding whitespace is trimmed, as in
+ * `groupChangesByRelease`. Changes keep the order given within a group.
+ */
+export function groupGlanceByRelease(changes: readonly GlanceChange[]): GlanceGroup[] {
+  const byRelease = new Map<string, GlanceChange[]>();
+  const unscheduled: GlanceChange[] = [];
+  for (const change of changes) {
+    const release = change.plannedRelease?.trim();
+    if (!release) unscheduled.push(change);
+    else byRelease.set(release, [...(byRelease.get(release) ?? []), change]);
+  }
+  const groups = [...byRelease.entries()]
+    .sort(([a], [b]) => compareReleases(b, a))
+    .map(([label, rows]) => ({ label, changes: rows }));
+  if (unscheduled.length > 0) groups.push({ label: UNSCHEDULED_RELEASE_LABEL, changes: unscheduled });
+  return groups;
+}
+
+/** The one gap chip a row shows: blocked outranks no criteria. */
+export function glanceGap(change: Pick<GlanceChange, "criteriaGap" | "openBlockers">): "blocked" | "no-criteria" | null {
+  if (change.openBlockers > 0) return "blocked";
+  return change.criteriaGap ? "no-criteria" : null;
 }
 
 /**

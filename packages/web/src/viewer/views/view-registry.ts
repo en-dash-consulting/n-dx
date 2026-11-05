@@ -69,6 +69,7 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { LifecycleStrip } from "./lifecycle-strip.js";
+import { ChangesGlance } from "./changes-glance.js";
 import { ProductAreaMap } from "./product-area-map.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
@@ -186,6 +187,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "product-map": return opened
       ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability })
       : h(ProductAreaMap, { navigateTo: ctx.navigateTo });
+    case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
   }
 }
 

@@ -355,7 +355,7 @@ describe("rendered surfaces take their labels from the model", () => {
       await settle();
       for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
         // Tabs live in the full-screen view; open it, read them, close it.
-        act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${tile.view}"] .stage-tile-head`)?.click(); });
+        act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${tile.panel ?? tile.view}"] .stage-tile-head`)?.click(); });
         await settle();
         const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen .stage-section-tab")];
         act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });

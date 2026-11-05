@@ -467,15 +467,15 @@ describe("StagePage", () => {
   it("renders Plan as the capture bar, then Product, Inbox, Open changes and Validation tiles", async () => {
     await mount(page("plan"));
     expect(sectionViews()).toEqual(["analysis"]);
-    expect(planTiles()).toEqual(["product-map", "inbox", "changes", "validation"]);
+    expect(planTiles()).toEqual(["product-map", "inbox", "changes-glance", "validation"]);
     const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
     expect(spans).toEqual(["stage-tile--c12 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1"]);
-    expect(root.querySelector('.stage-tile[data-tile="changes"] .stage-tile-title')?.textContent).toBe("Open changes");
+    expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
   });
 
   it("opens Open changes full-screen with List and Tree tabs", async () => {
     await mount(page("plan"));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes"] .stage-tile-head')!.click(); });
+    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes-glance"] .stage-tile-head')!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
     expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);

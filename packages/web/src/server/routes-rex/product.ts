@@ -139,6 +139,9 @@ export interface GlanceChangeWire {
   plannedRelease?: string;
   taskCount: number;
   completedTaskCount: number;
+  /** As on `ChangeRowWire`: the glance's gap chips read these two. */
+  criteriaGap: boolean;
+  openBlockers: number;
 }
 
 /** The unit `ndx work` would run next, and why rex picked it. */
@@ -349,6 +352,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
       taskCount: tasks.length,
       completedTaskCount: tasks.filter((t) => t.status === "completed").length,
+      ...gapOf(index, change, tasks),
     });
   }
 
