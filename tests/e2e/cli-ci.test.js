@@ -314,6 +314,42 @@ describe("n-dx ci", () => {
     });
   });
 
+  // POSIX only: chmod 000 does not stop the owner on Windows, and root reads anything.
+  describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)("gateway-imports step, unreadable sources", () => {
+    let tmpDir;
+    let step;
+
+    beforeAll(async () => {
+      tmpDir = await freshProject();
+      const agent = join(tmpDir, "packages", "hench", "src", "agent");
+      const locked = join(tmpDir, "packages", "hench", "src", "locked");
+      await mkdir(agent, { recursive: true });
+      await mkdir(locked, { recursive: true });
+      await writeFile(join(agent, "hidden.ts"), 'export async function f() { return await import("@n-dx/rex"); }\n');
+      await writeFile(join(locked, "inner.ts"), 'export { x } from "@n-dx/rex";\n');
+      await chmod(join(agent, "hidden.ts"), 0o000);
+      await chmod(locked, 0o000);
+      const args = ["--format=json", "--quiet", tmpDir];
+      const result = runResult(args);
+      // Undo the chmod so afterAll can remove the fixture.
+      await chmod(locked, 0o755);
+      step = parseReport(result, args).steps.find((s) => s.name === "gateway-imports");
+    });
+
+    afterAll(async () => {
+      await removeTmpDir(tmpDir);
+    });
+
+    it("fails on a file and a directory it cannot read, naming each once", () => {
+      expect(step.ok).toBe(false);
+      expect(step.detail).toBe("2 files could not be read");
+      expect(step.violations.map((v) => v.message).sort()).toEqual([
+        expect.stringMatching(/^cannot read packages\/hench\/src\/agent\/hidden\.ts: EACCES/),
+        expect.stringMatching(/^cannot read packages\/hench\/src\/locked\/: EACCES/),
+      ]);
+    });
+  });
+
   // ── Restricted imports: a user project opting in through .n-dx.json ────────
 
   describe("restricted-imports opt-in", () => {
