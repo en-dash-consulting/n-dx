@@ -30,6 +30,8 @@
 .hench/mcp/
 # Warm-parent session cache, rewritten on every orientation. Machine-local.
 .hench/session-cache.json
+# Dashboard Sidecar session index and transcripts (self-ignoring; listed for clarity).
+.hench/sidecar/
 .hench-commit-msg.txt
 .ndx-commit-msg.txt
 

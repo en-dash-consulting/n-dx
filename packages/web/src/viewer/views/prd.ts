@@ -40,7 +40,10 @@ import {
   useFeatureToggle,
   useFacetState,
   useClaims,
+  useSidecarProposals,
 } from "../hooks/index.js";
+import { isDeployedMode } from "../deployed-mode.js";
+import { ghostRowsByParent } from "../components/prd-tree/ghost-rows.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
 import { useProductRead } from "./product-pages.js";
@@ -57,6 +60,8 @@ export interface PRDViewProps {
   initialTaskId?: string | null;
   /** Navigation callback for URL updates. */
   navigateTo?: NavigateTo;
+  /** Reports the item selected in the tree (null when none), which the route never carries. */
+  onSelectedItemChange?: (id: string | null) => void;
 }
 
 /** The ids of changes rex holds for placement, out of `GET /api/rex/changes`. */
@@ -67,7 +72,7 @@ function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
 
 const NO_INBOX: ReadonlySet<string> = new Set();
 
-export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo }: PRDViewProps) {
+export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo, onSelectedItemChange }: PRDViewProps) {
   // ── Toast notifications ────────────────────────────────────────
   const { toast, toastType, showToast } = useToast();
 
@@ -80,6 +85,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Feature toggles ────────────────────────────────────────────
   const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
+
+  // ── Sidecar's proposed items as ghost rows (UX5), behind web.sidecar ──
+  const proposals = useSidecarProposals(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
+  const ghostRows = useMemo(() => ghostRowsByParent(proposals), [proposals]);
 
   // ── Cross-worktree claims (read-only chips on claimed rows) ─────
   const { claimsById } = useClaims();
@@ -199,6 +208,13 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       (e.target as HTMLInputElement).blur();
     }
   }, [clearFacets]);
+
+  // ── Selected item, reported for Sidecar ────────────────────────
+  const { selectedItemId } = actions;
+  useEffect(() => {
+    onSelectedItemChange?.(selectedItemId);
+    return () => onSelectedItemChange?.(null);
+  }, [selectedItemId, onSelectedItemChange]);
 
   // ── Deep-link resolution ───────────────────────────────────────
   const { deepLinkError, setDeepLinkError, highlightedTaskId, deepLinkExpandIds } =
@@ -333,6 +349,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       activeBranch,
       onBranchChange: setActiveBranch,
       inboxIds,
+      ghostRows,
       titleInfo: h(InfoTip, { term: "epic / feature / task" }),
       // Search, facets and item actions — one wrapping row beneath the summary.
       controls: h("div", { class: "prd-filter-bar" },

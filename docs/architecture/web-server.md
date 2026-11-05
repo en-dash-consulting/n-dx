@@ -122,6 +122,14 @@ document's stylesheets and images load without headers.
   data rather than a page gets the same text as a 401 page. An expired or
   reused landing link says so.
 
+## Sidecar broker key
+
+A Sidecar session's CLI reaches the broker with a per-session key minted in
+`sidecar/broker-credential.ts`, not the dashboard token. The gate accepts it
+only on a `POST` to that session's raw `/api/sidecar/sessions/<id>/mcp` target;
+every other route, method or session answers 401. The session can read its own
+MCP config file, so that file never carries the token.
+
 ## Response headers
 
 `src/shared/response-headers.ts` is applied by both gates before any verdict is

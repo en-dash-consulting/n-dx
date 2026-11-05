@@ -42,6 +42,7 @@ const SERVER_ENTRY_URL = pathToFileURL(SERVER_ENTRY).href;
 const PROBES: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/capture-ask", "sourcevision.ask"],
   ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
+  ["/api/sidecar/sessions", "web.sidecar"],
 ];
 
 interface Probe {
@@ -141,5 +142,11 @@ describe("feature gate enforcement through the real dispatcher", () => {
       // longer what answers.
       expect(result!.status, `${path} was still refused with the flag on`).not.toBe(403);
     }
+
+    // The Sidecar route needs no fixture state, so it can prove it is wired
+    // into the dispatcher, not only that the gate lets it past.
+    const sidecar = probes.find((p) => p.path === "/api/sidecar/sessions");
+    expect(sidecar?.status).toBe(200);
+    expect(JSON.parse(sidecar!.body)).toEqual({ sessions: [] });
   }, 90_000);
 });

@@ -20,11 +20,12 @@
 import { h } from "preact";
 import { useCallback, useState } from "preact/hooks";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { HenchConfigSection, useHenchConfigForm } from "./hench-config.js";
 import { CliTimeoutsSection, useCliTimeoutsForm } from "./cli-timeout.js";
 import { HenchTemplatesSection } from "./hench-templates.js";
+import { SidecarSettingsSection, useSidecarSettingsForm } from "./sidecar-settings.js";
 import { RexSettingsSection, useRexSettingsForm } from "./rex-settings.js";
 
 export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
@@ -32,13 +33,17 @@ export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
   const work = useHenchConfigForm();
   const prd = useRexSettingsForm();
   const timeouts = useCliTimeoutsForm();
+  const sidecarOn = useFeatureToggle("web.sidecar", false);
+  const sidecar = useSidecarSettingsForm();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dirty = work.dirty || prd.dirty || timeouts.dirty;
+  const dirty = work.dirty || prd.dirty || timeouts.dirty || (sidecarOn && sidecar.dirty);
   const saveWork = work.save;
   const savePrd = prd.save;
   const saveTimeouts = timeouts.save;
+  const saveSidecar = sidecar.save;
+  const discardSidecar = sidecar.discard;
   const discardWork = work.discard;
   const discardPrd = prd.discard;
   const discardTimeouts = timeouts.discard;
@@ -53,10 +58,12 @@ export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
       // one file in flight together would lose whichever landed first.
       const [workSaved, timeoutsSaved] = await Promise.all([saveWork(), saveTimeouts()]);
       const prdSaved = await savePrd();
+      const sidecarSaved = sidecarOn ? await saveSidecar() : true;
       const failed = [
         workSaved ? null : "work settings",
         prdSaved ? null : "PRD settings",
         timeoutsSaved ? null : "CLI timeouts",
+        sidecarSaved ? null : "Sidecar settings",
       ].filter((part): part is string => part !== null);
       if (failed.length > 0) {
         setError(`Not saved: ${failed.join(" and ")} — see the error in that section.`);
@@ -64,14 +71,15 @@ export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
     } finally {
       setSaving(false);
     }
-  }, [saveWork, savePrd, saveTimeouts]);
+  }, [saveWork, savePrd, saveTimeouts, saveSidecar, sidecarOn]);
 
   const handleDiscard = useCallback(() => {
     discardWork();
     discardPrd();
     discardTimeouts();
+    discardSidecar();
     setError(null);
-  }, [discardWork, discardPrd, discardTimeouts]);
+  }, [discardWork, discardPrd, discardTimeouts, discardSidecar]);
 
   const robotWranglerLink = h("p", { class: "workflow-wrangler-link" },
     "Provider and model are set on ",
@@ -118,6 +126,13 @@ export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
         h("h2", { id: "workflow-timeouts-title", class: "workflow-section-title" }, "CLI timeouts"),
         h(CliTimeoutsSection, { form: timeouts }),
       ),
+
+      sidecarOn
+        ? h("section", { class: "workflow-section", "aria-labelledby": "workflow-sidecar-title" },
+          h("h2", { id: "workflow-sidecar-title", class: "workflow-section-title" }, "Sidecar"),
+          h(SidecarSettingsSection, { form: sidecar }),
+        )
+        : null,
 
       h("section", { class: "workflow-section", "aria-labelledby": "workflow-templates-title" },
         h("h2", { id: "workflow-templates-title", class: "workflow-section-title" }, "Templates"),

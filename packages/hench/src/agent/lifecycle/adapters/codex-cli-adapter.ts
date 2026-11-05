@@ -1,27 +1,19 @@
 /**
  * Codex CLI adapter — VendorAdapter implementation for the Codex CLI.
  *
- * Encapsulates all Codex CLI-specific logic:
- * - `buildSpawnConfig()` — compiles a PromptEnvelope + ExecutionPolicy into
- *   the `codex` binary's CLI args, environment, and stdin content.
- * - `parseEvent()` — parses a single JSONL line from Codex's `--json` output
- *   into a normalized RuntimeEvent, with heuristic fallback for unstructured output.
- * - `classifyError()` — delegates to the shared `classifyVendorError` taxonomy.
+ * Hench's policy on top of llm-client's Codex session driver:
+ * - `buildSpawnConfig()` — compiles the ExecutionPolicy into sandbox/approval
+ *   flags and hands the driver a fresh or resumed turn.
+ * - `parseEvent()` / `extractSessionId()` — the driver's JSONL parser (with
+ *   its heuristic fallback for unstructured output) and `thread.started`
+ *   capture, shared with the Sidecar's sessions.
+ * - `classifyError()` — the shared `classifyVendorError` taxonomy.
  *
- * ## Extraction provenance
- *
- * The core functions were extracted from `cli-loop.ts`:
- * - `buildSpawnConfig` ← `spawnCodex` spawn config + `compileCodexPolicyFlags`
- * - `parseEvent` ← `processCodexJsonLine` (adapted from CliRunResult mutation to RuntimeEvent return)
- * - Heuristic helpers ← `normalizeCodexResponse`, `parseMaybeJson`, `collectCodexBlocks`,
- *   `extractText`, `getBlockType` (used as fallback parse path)
- * - `classifyError` ← direct delegation to `classifyVendorError`
- *
- * The original functions remain in `cli-loop.ts` for backward compatibility until
- * the "Refactor cli-loop.ts to use adapter-based dispatch" task replaces them.
+ * `normalizeCodexResponse` and `parseMaybeJson` are re-exported from the
+ * driver for the callers that predate the move.
  *
  * @see packages/hench/src/agent/lifecycle/vendor-adapter.ts — VendorAdapter interface
- * @see packages/llm-client/src/runtime-contract.ts — RuntimeEvent, FailureCategory
+ * @see packages/llm-client/src/vendor-session-driver.ts — argv, parsing, session ids
  * @see docs/architecture/phase2-vendor-normalization.md — design rationale
  */
 
@@ -30,649 +22,26 @@ import type {
   PromptEnvelope,
   ExecutionPolicy,
   RuntimeEvent,
-  RuntimeEventType,
   FailureCategory,
-  LLMVendor,
 } from "../../../prd/llm-gateway.js";
 import {
   LLM_VENDOR,
   assemblePrompt,
   compileCodexPolicyFlags,
   classifyVendorError,
+  codexSessionDriver,
 } from "../../../prd/llm-gateway.js";
 
-// ── Constants ────────────────────────────────────────────────────────────
-
-const MAX_SUMMARY_LENGTH = 500;
-
-// ── Heuristic helpers (for fallback parsing of unstructured output) ──────
-
-/**
- * Safely parse a string that might be JSON. Returns the parsed value on
- * success or the original value on failure.
- */
-/** @internal Exported for backward compat in event-accumulator.ts */
-export function parseMaybeJson(value: unknown): unknown {
-  if (typeof value !== "string") {
-    return value;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  if (
-    !(trimmed.startsWith("{") && trimmed.endsWith("}")) &&
-    !(trimmed.startsWith("[") && trimmed.endsWith("]"))
-  ) {
-    return value;
-  }
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return value;
-  }
-}
-
-/**
- * Detect the type/kind of a Codex content block.
- * Codex uses several different field names for the block type.
- */
-function getBlockType(block: Record<string, unknown>): string | undefined {
-  const type = block.type ?? block.kind ?? block.event ?? block.block_type ?? block.role;
-  return typeof type === "string" ? type : undefined;
-}
-
-/**
- * Collect content blocks from a Codex response payload.
- * Handles the many different shapes Codex responses can take.
- */
-function collectCodexBlocks(payload: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(payload)) {
-    return payload.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null);
-  }
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-
-  const obj = payload as Record<string, unknown>;
-  const candidates = [
-    obj.content,
-    obj.blocks,
-    obj.events,
-    obj.output,
-    obj.items,
-    obj.response,
-    obj.data,
-    obj.message && typeof obj.message === "object" ? (obj.message as Record<string, unknown>).content : undefined,
-  ];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null);
-    }
-  }
-  return [];
-}
-
-/**
- * Extract text content from a Codex block, checking multiple field names.
- */
-function extractText(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (!value || typeof value !== "object") return "";
-  const obj = value as Record<string, unknown>;
-  if (typeof obj.text === "string") return obj.text;
-  if (typeof obj.content === "string") return obj.content;
-  if (typeof obj.delta === "string") return obj.delta;
-  if (typeof obj.output_text === "string") return obj.output_text;
-  return "";
-}
-
-// ── Normalized Codex response types ──────────────────────────────────────
-
-/** A single tool event extracted from a Codex response. */
-export interface NormalizedCodexToolEvent {
-  tool: string;
-  input: Record<string, unknown>;
-  output?: string;
-  status?: string;
-  eventType: string;
-}
-
-/** The result of normalizing an unstructured Codex response. */
-export interface NormalizedCodexResponse {
-  status: "completed" | "error" | "in_progress" | "unknown";
-  assistantText: string;
-  toolEvents: NormalizedCodexToolEvent[];
-  warnings: string[];
-  error?: string;
-}
-
-// ── normalizeCodexResponse ───────────────────────────────────────────────
-
-/**
- * Heuristic parser for unstructured Codex output.
- *
- * Used as a fallback when Codex does not emit structured JSONL events
- * (e.g. older Codex versions that don't support `--json`). Attempts to
- * extract text, tool events, and status from a variety of response shapes.
- *
- * @internal Exported for testing.
- */
-export function normalizeCodexResponse(raw: unknown): NormalizedCodexResponse {
-  const warnings: string[] = [];
-  const textParts: string[] = [];
-  const toolEvents: NormalizedCodexToolEvent[] = [];
-
-  const parsedRaw = parseMaybeJson(raw);
-  const parsed = typeof parsedRaw === "string" ? parseMaybeJson(parsedRaw.trim()) : parsedRaw;
-
-  if (typeof parsed === "string") {
-    return {
-      status: "completed",
-      assistantText: parsed,
-      toolEvents,
-      warnings,
-    };
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    return {
-      status: "unknown",
-      assistantText: "",
-      toolEvents,
-      warnings,
-    };
-  }
-
-  const obj = parsed as Record<string, unknown>;
-  const topLevelText = [obj.text, obj.output_text, obj.result, obj.summary, obj.message]
-    .map(extractText)
-    .find((text) => text.trim().length > 0);
-  if (topLevelText) {
-    textParts.push(topLevelText);
-  }
-
-  const blocks = collectCodexBlocks(obj);
-  for (const block of blocks) {
-    const type = getBlockType(block);
-    const normalizedType = type?.toLowerCase();
-
-    if (!normalizedType) {
-      warnings.push("Codex block missing type; ignoring block.");
-      continue;
-    }
-
-    if (normalizedType === "text" || normalizedType === "output_text" || normalizedType === "assistant_text" || normalizedType === "text_delta") {
-      const text = extractText(block);
-      if (text) {
-        textParts.push(text);
-      }
-      continue;
-    }
-
-    if (normalizedType === "tool_use" || normalizedType === "tool_call" || normalizedType === "function_call") {
-      const toolName = typeof block.name === "string"
-        ? block.name
-        : typeof block.tool === "string"
-          ? block.tool
-          : "unknown";
-      const inputCandidate = parseMaybeJson(block.input ?? block.arguments);
-      toolEvents.push({
-        tool: toolName,
-        input: inputCandidate && typeof inputCandidate === "object"
-          ? inputCandidate as Record<string, unknown>
-          : { value: inputCandidate },
-        status: typeof block.status === "string" ? block.status : "started",
-        eventType: normalizedType,
-      });
-      continue;
-    }
-
-    if (normalizedType === "tool_result" || normalizedType === "function_result") {
-      const outputText = extractText(block.output ?? block.content ?? block.result ?? block);
-      const toolName = typeof block.name === "string"
-        ? block.name
-        : typeof block.tool === "string"
-          ? block.tool
-          : "unknown";
-      toolEvents.push({
-        tool: toolName,
-        input: {},
-        output: outputText,
-        status: typeof block.status === "string" ? block.status : "completed",
-        eventType: normalizedType,
-      });
-      continue;
-    }
-
-    if (
-      normalizedType === "completion" ||
-      normalizedType === "completed" ||
-      normalizedType === "result" ||
-      normalizedType === "final"
-    ) {
-      const text = extractText(block.result ?? block.message ?? block);
-      if (text) {
-        textParts.push(text);
-      }
-      continue;
-    }
-
-    warnings.push(`Unknown Codex block type "${type}" ignored.`);
-  }
-
-  let status: NormalizedCodexResponse["status"] = "unknown";
-  if (obj.is_error === true || typeof obj.error === "string") {
-    status = "error";
-  } else if (typeof obj.status === "string") {
-    const s = obj.status.toLowerCase();
-    if (s.includes("error") || s.includes("failed")) status = "error";
-    else if (s.includes("complete") || s === "ok") status = "completed";
-    else if (s.includes("progress") || s.includes("running")) status = "in_progress";
-  } else if (typeof obj.stop_reason === "string") {
-    status = obj.stop_reason === "end_turn" ? "completed" : "in_progress";
-  } else if (textParts.length > 0 || toolEvents.length > 0) {
-    status = "completed";
-  }
-
-  const assistantText = textParts
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-    .join("\n");
-
-  const error = typeof obj.error === "string"
-    ? obj.error
-    : obj.is_error
-      ? extractText(obj.result) || "Codex response indicated an error"
-      : undefined;
-
-  return {
-    status,
-    assistantText,
-    toolEvents,
-    warnings,
-    error,
-  };
-}
-
-// ── parseCodexJsonLine (RuntimeEvent adapter) ────────────────────────────
-
-/**
- * Parse a single JSONL line from `codex exec --json` structured output
- * into a normalized RuntimeEvent.
- *
- * Adapted from `processCodexJsonLine` in cli-loop.ts. The original mutates
- * a CliRunResult and returns a boolean; this version returns a normalized
- * RuntimeEvent or null.
- *
- * Supported event types (Codex JSONL format):
- * - `item.started` — `command_execution` → `shell` tool_use
- * - `item.completed` — `agent_message` → assistant text; `command_execution` →
- *   `shell` tool_result; `file_change` → `apply_patch` tool_use (the livelock
- *   detector's progress signal on this vendor — see the branch's comment)
- * - `message` — assistant text + optional content blocks
- * - `function_call` — tool invocation
- * - `function_call_output` — tool result
- * - `error` — execution error
- * - `summary` / `response.completed` / `done` / `complete` — completion
- *
- * Returns `null` for lines that don't represent a meaningful event
- * (empty lines, non-JSON, unknown types).
- */
-function parseCodexJsonLine(
-  line: string,
-  turn: number,
-  _metadata: Record<string, unknown>,
-): RuntimeEvent | null {
-  if (!line.trim()) return null;
-
-  let event: Record<string, unknown>;
-  try {
-    event = JSON.parse(line);
-  } catch {
-    return null;
-  }
-
-  const type = event.type as string | undefined;
-  if (!type) return null;
-
-  const timestamp = new Date().toISOString();
-  const vendor: LLMVendor = LLM_VENDOR.CODEX;
-
-  switch (type) {
-    case "item.started": {
-      const item = event.item as Record<string, unknown> | undefined;
-      if (!item) return null;
-
-      const itemType = typeof item.type === "string" ? item.type : undefined;
-      const timestamp = new Date().toISOString();
-
-      if (itemType === "command_execution" && typeof item.command === "string") {
-        return {
-          type: "tool_use" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          toolCall: {
-            tool: "shell",
-            input: { command: item.command },
-          },
-        };
-      }
-
-      return null;
-    }
-
-    case "item.completed": {
-      const item = event.item as Record<string, unknown> | undefined;
-      if (!item) return null;
-
-      const itemType = typeof item.type === "string" ? item.type : undefined;
-      const timestamp = new Date().toISOString();
-
-      if (itemType === "agent_message" && typeof item.text === "string") {
-        return {
-          type: "assistant" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          text: item.text.slice(0, MAX_SUMMARY_LENGTH),
-        };
-      }
-
-      if (itemType === "command_execution") {
-        const outputCandidate =
-          (typeof item.aggregated_output === "string" && item.aggregated_output) ||
-          (typeof item.output === "string" && item.output) ||
-          (typeof item.stdout === "string" && item.stdout) ||
-          (typeof item.result === "string" && item.result) ||
-          (typeof item.text === "string" && item.text) ||
-          "";
-
-        return {
-          type: "tool_result" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          toolResult: {
-            tool: "shell",
-            output: outputCandidate.slice(0, 2000),
-            durationMs: 0,
-          },
-        };
-      }
-
-      // A patch Codex wrote to the working tree.
-      //
-      // The tool name is `apply_patch` because that name is already in
-      // PROGRESS_TOOLS in agent/analysis/livelock.ts, and this event exists to
-      // land in that set. Without it a Codex `file_change` is invisible to the
-      // detector: every command Codex runs arrives as one tool named `shell`,
-      // so a patch-then-retest loop reads as six identical
-      // `shell({"command":"pnpm test"})` calls with nothing written in between,
-      // and a run that was making progress every cycle is killed as a livelock
-      // (GH #370 review, finding 3).
-      //
-      // Only `item.completed`, and only when the patch did not fail — an edit
-      // that errored changed nothing, so it is not progress. `item.started` for
-      // a file_change stays unmapped for the same reason.
-      //
-      // No paired `tool_result` is emitted. EventAccumulator's look-ahead stops
-      // at the next `tool_use` and leaves `output` empty, which is the honest
-      // record for a change that produced no command output.
-      if (itemType === "file_change") {
-        const status = typeof item.status === "string" ? item.status.toLowerCase() : "";
-        if (status === "failed") return null;
-
-        const changes = Array.isArray(item.changes) ? item.changes : [];
-        return {
-          type: "tool_use" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          toolCall: {
-            tool: "apply_patch",
-            input: { changes },
-          },
-        };
-      }
-
-      return null;
-    }
-
-    case "message": {
-      // Extract text from content blocks (array of { type, text } objects)
-      const content = event.content as Array<{
-        type: string;
-        text?: string;
-        name?: string;
-        input?: Record<string, unknown>;
-        arguments?: string;
-      }> | undefined;
-
-      let text: string | undefined;
-      let firstToolCall: { tool: string; input: Record<string, unknown> } | undefined;
-
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if ((block.type === "text" || block.type === "output_text") && block.text) {
-            text = block.text.slice(0, MAX_SUMMARY_LENGTH);
-          } else if (block.type === "tool_use" || block.type === "function_call") {
-            if (!firstToolCall) {
-              const toolName = block.name || "unknown";
-              const rawInput = block.input ?? parseMaybeJson(block.arguments);
-              const toolInput = rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
-                ? rawInput as Record<string, unknown>
-                : {};
-              firstToolCall = { tool: toolName, input: toolInput };
-            }
-          }
-        }
-      }
-
-      // Direct text on the event (some Codex output shapes)
-      if (typeof event.text === "string" && !content) {
-        text = (event.text as string).slice(0, MAX_SUMMARY_LENGTH);
-      }
-
-      // If there's a tool call in the message, return it as a tool_use event
-      if (firstToolCall) {
-        return {
-          type: "tool_use" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          text,
-          toolCall: firstToolCall,
-        };
-      }
-
-      if (text) {
-        return {
-          type: "assistant" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          text,
-        };
-      }
-
-      // Message event with no extractable text or tools
-      return null;
-    }
-
-    case "function_call": {
-      const toolName = (event.name as string) || "unknown";
-      const rawArgs = parseMaybeJson(event.arguments);
-      const toolInput = rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs)
-        ? rawArgs as Record<string, unknown>
-        : {};
-      return {
-        type: "tool_use" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        toolCall: {
-          tool: toolName,
-          input: toolInput,
-        },
-      };
-    }
-
-    case "function_call_output": {
-      const output = (event.output as string) || (event.content as string) || "";
-      return {
-        type: "tool_result" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        toolResult: {
-          tool: "unknown", // Codex function_call_output doesn't include tool name
-          output: output.slice(0, 2000),
-          durationMs: 0,
-        },
-      };
-    }
-
-    case "error": {
-      const message = (event.message as string) || (event.error as string) || "Unknown error";
-      return {
-        type: "failure" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        failure: {
-          category: "unknown" as FailureCategory,
-          message,
-        },
-      };
-    }
-
-    case "turn.failed": {
-      const error = event.error as Record<string, unknown> | undefined;
-      const message =
-        (error && typeof error.message === "string" ? error.message : undefined) ||
-        (typeof event.message === "string" ? event.message : undefined) ||
-        "Unknown error";
-      return {
-        type: "failure" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        failure: {
-          category: "unknown" as FailureCategory,
-          message,
-        },
-      };
-    }
-
-    case "summary":
-    case "response.completed":
-    case "done":
-    case "complete": {
-      if (event.is_error === true) {
-        return {
-          type: "failure" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          failure: {
-            category: "unknown" as FailureCategory,
-            message: (event.result as string) || "Unknown error",
-          },
-        };
-      }
-
-      let summaryText: string | undefined;
-      if (typeof event.result === "string") {
-        summaryText = event.result.slice(0, MAX_SUMMARY_LENGTH);
-      } else if (typeof event.text === "string") {
-        summaryText = event.text.slice(0, MAX_SUMMARY_LENGTH);
-      }
-
-      return {
-        type: "completion" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        completionSummary: summaryText,
-      };
-    }
-
-    default:
-      return null;
-  }
-}
-
-// ── Heuristic fallback parseEvent ────────────────────────────────────────
-
-/**
- * Attempt to parse an unstructured line using the heuristic normalizer.
- *
- * This is the fallback path when the structured JSONL parser returns null.
- * It handles older Codex versions or non-standard output formats by running
- * the full normalizeCodexResponse heuristic on the line.
- */
-function parseHeuristicFallback(
-  line: string,
-  turn: number,
-): RuntimeEvent | null {
-  const normalized = normalizeCodexResponse(line);
-
-  const timestamp = new Date().toISOString();
-  const vendor: LLMVendor = LLM_VENDOR.CODEX;
-
-  // If the heuristic found tool events, return the first as a tool_use
-  if (normalized.toolEvents.length > 0) {
-    const first = normalized.toolEvents[0];
-    return {
-      type: "tool_use" as RuntimeEventType,
-      vendor,
-      turn,
-      timestamp,
-      text: normalized.assistantText || undefined,
-      toolCall: {
-        tool: first.tool,
-        input: first.input,
-      },
-    };
-  }
-
-  // If it found assistant text, return it
-  if (normalized.assistantText) {
-    return {
-      type: "assistant" as RuntimeEventType,
-      vendor,
-      turn,
-      timestamp,
-      text: normalized.assistantText.slice(0, MAX_SUMMARY_LENGTH),
-    };
-  }
-
-  // If it detected an error, return a failure
-  if (normalized.status === "error" && normalized.error) {
-    return {
-      type: "failure" as RuntimeEventType,
-      vendor,
-      turn,
-      timestamp,
-      failure: {
-        category: "unknown" as FailureCategory,
-        message: normalized.error,
-      },
-    };
-  }
-
-  return null;
-}
-
-// ── CodexCliAdapter ─────────────────────────────────────────────────────
+export { normalizeCodexResponse, parseMaybeJson } from "../../../prd/llm-gateway.js";
+export type {
+  NormalizedCodexResponse,
+  NormalizedCodexToolEvent,
+} from "../../../prd/llm-gateway.js";
 
 /**
  * VendorAdapter implementation for the Codex CLI.
  *
  * Stateless — all method inputs are passed as parameters.
- * Thread-safe — no mutable state.
  */
 export const codexCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CODEX,
@@ -689,120 +58,42 @@ export const codexCliAdapter: VendorAdapter = {
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
 
-    // Deliver the prompt via stdin (trailing "-" arg), never argv:
-    //   - Windows: cmd.exe treats embedded CR/LF in an argv token as a command
-    //     separator regardless of quoting (BatBadBut / CVE-2024-24576 class),
-    //     so multi-line prompt content in argv could execute as shell commands.
-    //   - All platforms: briefs are bounded at 400 KB (VENDOR_CONTEXT_CHAR_LIMITS
-    //     .codex), which exceeds ARG_MAX for a single argv element (E2BIG).
-    // Matches the claude adapter and the llm-client codex provider; cli-loop.ts
-    // pipes stdinContent when it is non-null.
-    const prompt = `SYSTEM:\n${systemPrompt}\n\nTASK:\n${taskPrompt}`;
-
-    // Compiles explicit sandbox/approval flags from the n-dx policy rather
-    // than relying on any Codex CLI preset shortcut.
-    //
     // policy.allowedGitSubcommands is intentionally not consulted — Codex has no
     // per-command allowlist surface (its safety model is the sandbox/approval
-    // flags above), so git-subcommand scoping is a Claude-CLI-only control. Under
-    // workspace-write, git mutations stay confined to the sandboxed workspace.
-    const policyFlags = compileCodexPolicyFlags(policy);
-
-    // opts.permissionMode is intentionally ignored — it is a Claude-CLI
-    // concept with no Codex equivalent; the run.ts caller drops it with a
-    // warning before reaching this adapter.
-
-    // Resume branch — the batch session strategy's route out of per-task cold
-    // starts. Codex cannot fork (it has no `--fork-session` equivalent), so
-    // resuming the previous task's thread is the only way to reuse context;
-    // `codex exec resume` appends to the transcript rather than branching it.
+    // flags), so git-subcommand scoping is a Claude-CLI-only control.
     //
-    // Two deliberate differences from the fresh-exec args, both dictated by
-    // the subcommand's own surface (`codex exec resume --help`, codex-cli
-    // 0.147.0):
-    //
-    //   1. No policy flags. Resume accepts neither `-s/--sandbox` nor
-    //      `--approve-for-me`; passing either aborts the spawn on argument
-    //      parsing. Sandbox and approval policy belong to the thread being
-    //      resumed, which is why the CLI dropped the flags here.
-    //   2. The session id is always explicit, never `--last`. `--last` picks
-    //      the newest recorded session *globally*, so any other codex run on
-    //      the machine — another loop, an interactive session — would silently
-    //      capture the chain and this task would append to a stranger's
-    //      transcript. A captured id cannot be hijacked that way.
-    if (opts.resumeSessionId) {
-      return {
-        binary: "codex",
-        args: [
-          "exec",
-          "resume",
-          opts.resumeSessionId,
-          "--json",
-          "--skip-git-repo-check",
-          ...(opts.model ? ["-m", opts.model] : []),
-          "-", // stdin sentinel — resume reads the follow-up prompt from stdin
-        ],
-        env: {},
-        stdinContent: prompt,
-        cwd: ".",
-      };
-    }
-
-    const args = [
-      "exec",
-      ...policyFlags,
-      "--json",
-      "--skip-git-repo-check",
-      ...(opts.model ? ["-m", opts.model] : []),
-      "-", // stdin sentinel — codex exec reads the prompt from stdin
-    ];
+    // opts.permissionMode and opts.forkSession are ignored: neither has a Codex
+    // equivalent. The batch strategy's resume is a plain `exec resume`, which
+    // appends to the thread; the driver drops the policy flags there because
+    // the resumed thread keeps its own.
+    const { binary, args, stdin } = codexSessionDriver.turnSpawn({
+      systemPrompt,
+      prompt: taskPrompt,
+      model: opts.model,
+      resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId } : undefined,
+      codex: { policyFlags: compileCodexPolicyFlags(policy) },
+    });
 
     return {
-      binary: "codex",
+      binary,
       args,
       env: {},
-      stdinContent: prompt,
+      // The prompt always travels on stdin; see the driver for why not argv.
+      stdinContent: stdin,
       cwd: ".",
     };
   },
 
-  parseEvent(
-    line: string,
-    turn: number,
-    metadata: Record<string, unknown>,
-  ): RuntimeEvent | null {
-    // Primary path: structured JSONL parsing
-    const structured = parseCodexJsonLine(line, turn, metadata);
-    if (structured) return structured;
-
-    // Fallback: heuristic parsing for unstructured output
-    if (line.trim()) {
-      return parseHeuristicFallback(line, turn);
-    }
-
-    return null;
+  parseEvent(line: string, turn: number): RuntimeEvent | null {
+    return codexSessionDriver.parseLine(line, turn);
   },
 
   /**
-   * Codex announces its thread once, on the first line of `--json` output:
-   *
-   *   {"type":"thread.started","thread_id":"01a05958-2931-73f1-9aba-38fa915bb8df"}
-   *
-   * `thread_id`, not `session_id` — the latter appears only in the on-disk
-   * rollout file (`session_meta.payload.session_id`), which is a different
-   * format from the stdout stream. Verified against codex-cli 0.147.0.
-   *
-   * Scoped to `thread.started` on purpose: reading the key off any line would
-   * let a later payload in the stream redirect the next `exec resume` at a
-   * different thread. Resuming re-emits the same id, so a resumed spawn
-   * reports the id it continued and the chain stays on one thread.
+   * Codex announces its thread once, as `{"type":"thread.started","thread_id":"…"}`.
+   * A resumed spawn re-emits the id it continued, so the chain stays on one thread.
    */
   extractSessionId(rawJson: unknown): string | undefined {
-    if (!rawJson || typeof rawJson !== "object") return undefined;
-    const event = rawJson as Record<string, unknown>;
-    if (event.type !== "thread.started") return undefined;
-    const id = event.thread_id;
-    return typeof id === "string" && id ? id : undefined;
+    return codexSessionDriver.extractSessionId(rawJson);
   },
 
   /**

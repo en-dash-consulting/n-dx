@@ -55,6 +55,11 @@ export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 // re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
 export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
 
+// ---- Rex trailer-commit evidence ---------------------------------------------
+// The commits whose `N-DX-Item` trailer names an item, and the files each
+// changed: the code evidence a Sidecar lens packet quotes (sidecar/packet-sources.ts).
+export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
+
 // ---- Rex change placement ---------------------------------------------------
 // The Inbox routes read a change's placement shortlist and place or propose it
 // through rex's own rule (the one `rex change place` and MCP `place_change`
@@ -67,6 +72,12 @@ export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@
 // "Draft with the model" (behind rex.placementDraft): the `prd.place` text
 // model drafts a pick or a proposal and writes nothing.
 export { draftChangePlacement } from "@n-dx/rex";
+
+// ---- Rex duplicate match ----------------------------------------------------
+// The Sidecar change-set card flags a proposed item that matches an existing
+// one by the rule smart add flags duplicates by.
+export { findDuplicateItem } from "@n-dx/rex";
+export type { DuplicateItemMatch } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it

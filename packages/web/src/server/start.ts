@@ -54,6 +54,8 @@ import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
+import { handleSidecarRoute } from "./routes-sidecar.js";
+import { isSidecarBrokerRequest } from "./sidecar/broker-credential.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
@@ -895,6 +897,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
   if (assets && handleStaticRoute(req, res, ctx, assets)) return true;
   return false;
@@ -956,7 +959,8 @@ function createHttpServer(
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      if (handleRequestSecurity(req, res, { token, credentials })) return;
+      // A Sidecar session's CLI presents its own broker credential, valid on its /mcp route only.
+      if (handleRequestSecurity(req, res, { token, credentials, scopedCredential: isSidecarBrokerRequest })) return;
       // No credential: the public shell (viewer HTML, landing page, images),
       // which signs itself in, and nothing else — not even the unknown-
       // workspace page, which lists worktree names.

@@ -41,6 +41,8 @@ import {
   PREP_MAX_IN_FLIGHT,
   PREP_PREVIEW_TIMEOUT_MS,
   PREP_RESOLVE_TIMEOUT_MS,
+  previewTaskRun,
+  resolveTaskRun,
 } from "../../../src/server/routes-hench-prep.js";
 import { HUB_ADMISSION_HEADER, formatHubAdmissionHeader } from "../../../src/shared/index.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -110,6 +112,31 @@ describe("hench prep routes", () => {
   afterEach(async () => {
     for (const s of served) await closeRouteTestServer(s.server);
     await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  describe("in-process reads (Sidecar Describe)", () => {
+    it("hand the caller's AbortSignal to the ndx spawn, so a stop kills it", async () => {
+      const signals: Array<AbortSignal | undefined> = [];
+      execMock.mockImplementation((_cmd: string, _args: string[], opts: { signal?: AbortSignal }) => {
+        signals.push(opts.signal);
+        return new Promise((resolve) => {
+          opts.signal?.addEventListener("abort", () =>
+            resolve({ stdout: "", stderr: "", exitCode: null, error: new Error("killed"), started: true }));
+        });
+      });
+      const controller = new AbortController();
+      const reads = Promise.all([
+        resolveTaskRun(ctx, "task-1", {}, controller.signal),
+        previewTaskRun(ctx, "task-1", {}, controller.signal),
+      ]);
+      for (let i = 0; i < 50 && signals.length < 2; i++) await new Promise((r) => setImmediate(r));
+      expect(signals).toEqual([controller.signal, controller.signal]);
+
+      controller.abort();
+      const [resolved, previewed] = await reads;
+      expect(resolved.ok).toBe(false);
+      expect(previewed.ok).toBe(false);
+    });
   });
 
   describe("GET /api/hench/prep/:taskId", () => {

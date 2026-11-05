@@ -412,6 +412,16 @@ export interface AggregateTokenUsage {
   cacheReadInputTokens?: number;
 }
 
+/** Sum of two {@link TokenUsage}s; cache fields appear only when non-zero. */
+export function addTokenUsage(total: TokenUsage, add: TokenUsage): TokenUsage {
+  const sum: TokenUsage = { input: total.input + add.input, output: total.output + add.output };
+  const creation = (total.cacheCreationInput ?? 0) + (add.cacheCreationInput ?? 0);
+  const read = (total.cacheReadInput ?? 0) + (add.cacheReadInput ?? 0);
+  if (creation) sum.cacheCreationInput = creation;
+  if (read) sum.cacheReadInput = read;
+  return sum;
+}
+
 /**
  * Create an empty AggregateTokenUsage accumulator.
  *

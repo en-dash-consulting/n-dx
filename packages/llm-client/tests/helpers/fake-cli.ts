@@ -29,6 +29,11 @@ export interface FakeCliOptions {
    * EPIPE. Defaults to false — enable it for the fakes that need to drain.
    */
   drainStdin?: boolean;
+  /**
+   * The whole ESM body of the fake, replacing stdout/stderr/exitCode/drainStdin.
+   * For fakes whose output depends on their argv or stdin.
+   */
+  script?: string;
 }
 
 /**
@@ -37,7 +42,7 @@ export interface FakeCliOptions {
  * @returns Absolute path to the shim (`<name>.cmd` on win32, `<name>` elsewhere).
  */
 export function writeFakeCli(dir: string, options: FakeCliOptions): string {
-  const { name, stdout = "", stderr = "", exitCode = 0, drainStdin = false } = options;
+  const { name, stdout = "", stderr = "", exitCode = 0, drainStdin = false, script } = options;
 
   // Behavior lives in a .mjs file so it is ESM on every platform — an
   // extensionless `#!/usr/bin/env node` script loads as CommonJS, where the
@@ -45,7 +50,7 @@ export function writeFakeCli(dir: string, options: FakeCliOptions): string {
   const impl = join(dir, `${name}-impl.mjs`);
   writeFileSync(
     impl,
-    [
+    script ?? [
       ...(drainStdin ? ["for await (const _chunk of process.stdin) { /* drain */ }"] : []),
       ...(stdout ? [`process.stdout.write(${JSON.stringify(stdout)});`] : []),
       ...(stderr ? [`process.stderr.write(${JSON.stringify(stderr)});`] : []),

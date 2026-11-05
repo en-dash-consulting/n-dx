@@ -170,8 +170,13 @@ function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void })
 }
 
 /** The Product page, and a capability's page opened from one of its rows. */
-export function ProductPage() {
+export function ProductPage({ onCapabilityChange }: { onCapabilityChange?: (id: string | null) => void }) {
   const [capabilityId, setCapabilityId] = useState<string | null>(null);
+  // The open capability is what the page is about; the shell attaches it to Sidecar.
+  useEffect(() => {
+    onCapabilityChange?.(capabilityId);
+    return () => onCapabilityChange?.(null);
+  }, [capabilityId, onCapabilityChange]);
   const load = useProductRead("/api/rex/product", (body) => body.map as ProductMap);
   if (load.state === "v1") return h(NoProductLayer, { title: "Product" });
   if (load.state !== "ready") return h(Pending, { load });

@@ -102,3 +102,5 @@ export {
   isKnownViewPath,
   resolveViewAlias,
 } from "./view-routing.js";
+export { SIDECAR_SESSION_ENDED_REASON } from "./sidecar-card.js";
+export type { SidecarChangeSet, SidecarChangeSetItem, SidecarChangeSetEdit, SidecarChangeSetPlacement } from "./sidecar-card.js";

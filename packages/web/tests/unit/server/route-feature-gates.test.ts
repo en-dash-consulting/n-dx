@@ -66,6 +66,11 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/apply-refinements", "sourcevision.ask"],
   ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
   ["/api/sv/pr-markdown/state", "sourcevision.prMarkdown"],
+  ["/api/sidecar/sessions", "web.sidecar"],
+  ["/api/sidecar/sessions/abc/turns", "web.sidecar"],
+  ["/api/sidecar/sessions/abc/frames", "web.sidecar"],
+  ["/api/commands/sidecar-command/status", "web.sidecar"],
+  ["/api/commands/sidecar-command/stop", "web.sidecar"],
 ];
 
 /** A server that answers 200 "reached" for anything the gate lets past. */
@@ -133,6 +138,16 @@ describe("route feature gates", () => {
     expect(body.suggestion).toContain(feature);
   });
 
+  it("refuses PATCH on a Sidecar session with 403 while web.sidecar is off, and passes it once on", async () => {
+    const url = `http://127.0.0.1:${port}/api/sidecar/sessions/abc`;
+    const refused = await fetch(url, { method: "PATCH", body: "{}" });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).feature).toBe("web.sidecar");
+
+    await setFeatures({ "web.sidecar": true });
+    expect((await fetch(url, { method: "PATCH", body: "{}" })).status).toBe(200);
+  });
+
   // ── Per route: passed through once the flag is on ───────────────────────
 
   it.each(GATED)("lets %s through once %s is enabled", async (path, feature) => {
@@ -152,11 +167,17 @@ describe("route feature gates", () => {
   });
 
   it("gates listed paths exactly, so a subpath or near-miss is ungated", async () => {
-    // Every gate is an exact list: an unlisted subpath falls through to the
-    // router's own 404 rather than answering 403 for a feature it is not part of.
+    // An exact list: an unlisted subpath falls through to the router's own
+    // 404 rather than answering 403 for a feature it is not part of.
     expect(findRouteFeatureGate("/api/sv/pr-markdown")).not.toBeNull();
     expect(findRouteFeatureGate("/api/sv/pr-markdown/unlisted")).toBeNull();
     expect(findRouteFeatureGate("/api/sv/pr-markdown-extra")).toBeNull();
+  });
+
+  it("gates a prefix with everything beneath it, but not a near-miss", () => {
+    expect(findRouteFeatureGate("/api/sidecar")?.feature).toBe("web.sidecar");
+    expect(findRouteFeatureGate("/api/sidecar/sessions/x/interrupt")?.feature).toBe("web.sidecar");
+    expect(findRouteFeatureGate("/api/sidecarx")).toBeNull();
   });
 
   it("gates on the path alone, ignoring the query string", async () => {

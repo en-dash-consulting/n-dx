@@ -6,7 +6,7 @@
  * @see src/viewer/views/product-pages.ts
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { h, render } from "preact";
+import { h, render, type FunctionComponent } from "preact";
 import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
 import { STAGES } from "../../../src/viewer/views/index.js";
@@ -360,7 +360,7 @@ describe("on a v1 project", () => {
     // synchronously. A fixed wait let the update land outside act(), which
     // armed preact's after-paint fallback timer (the frame-leak guard's
     // failure) and, on a slow runner, asserted before the CLI name arrived.
-    await act(async () => { render(h(Page, null), root); });
+    await act(async () => { render(h(Page as FunctionComponent, null), root); });
     await act(async () => { await getProjectMetadata(); });
     const empty = root.querySelector(".pm-no-product-layer");
     expect(empty?.textContent).toContain("ndx migrate");

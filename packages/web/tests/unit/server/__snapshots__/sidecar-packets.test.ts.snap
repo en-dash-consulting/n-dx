@@ -1,0 +1,321 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Describe > v1: carries a blocked task with its blocker named 1`] = `
+"# Sidecar context packet: describe · 33333333-3333-3333-3333-333333333333
+Built by code from the repository's own records. No model wrote it.
+
+## How to describe
+Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.
+- Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as "works", "properly" or "better" doing the work. Quote it and say what cannot be checked.
+- For every vague check, quote it and give the tightened wording in your reply, then say the operator applies it with \`rex update\` or the item editor. Do not call \`propose_prd_change\` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.
+- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.
+- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.
+
+## Task
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Password Login
+Status: blocked · priority critical
+Description: Build password-based authentication.
+Done when (checks):
+- [ ] Valid passwords authenticate users
+- [ ] Invalid passwords show a generic error
+
+## Likely files
+_source: task text, .rex/ (live read); git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- src/pay/button.ts
+- src/pay/wallet.ts
+
+## Parent chain
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- epic Auth Platform (in_progress)
+- feature Login Flow (pending)
+
+## Blockers and dependencies
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Blocked by:
+- dep-password-policy: not found
+
+## Tier
+_source: .rex/ (live read); ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Tier: none saved on the task
+Reason:
+- model "opus" comes from task.run
+
+## Run settings (ndx work --resolve)
+_source: ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- vendor = "claude" (from llm.vendor)
+- model = "opus" (from task.run)
+Refusals:
+- dirty-tree: The working tree has uncommitted changes.
+
+## Brief preview digest
+_source: ndx work --dry-run · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+37 characters, 5 lines.
+Headings:
+- # Task brief
+- ## Acceptance
+
+## Prior runs
+_source: .hench/runs/ · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- 11111111 2026-10-10T08:00 completed
+- 22222222 2026-10-09T08:00 failed"
+`;
+
+exports[`Describe > v2: carries the task, parents, blockers, resolved settings with sources, brief digest and runs 1`] = `
+"# Sidecar context packet: describe · c0000000-0000-4000-8000-000000000002
+Built by code from the repository's own records. No model wrote it.
+
+## How to describe
+Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.
+- Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as "works", "properly" or "better" doing the work. Quote it and say what cannot be checked.
+- For every vague check, quote it and give the tightened wording in your reply, then say the operator applies it with \`rex update\` or the item editor. Do not call \`propose_prd_change\` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.
+- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.
+- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.
+
+## Task
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Wire the button
+Status: pending
+Description: (none)
+Done when (checks):
+- [ ] The button appears on Safari only
+
+## Likely files
+_source: task text, .rex/ (live read); git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- src/pay/button.ts
+- src/pay/wallet.ts
+
+## Parent chain
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- change CH-1 Add Apple Pay (in_progress)
+
+## Blockers and dependencies
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Blocked by:
+nothing
+
+## Tier
+_source: .rex/ (live read); ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Tier: none saved on the task
+Reason:
+- model "opus" comes from task.run
+
+## Run settings (ndx work --resolve)
+_source: ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- vendor = "claude" (from llm.vendor)
+- model = "opus" (from task.run)
+Refusals:
+- dirty-tree: The working tree has uncommitted changes.
+
+## Brief preview digest
+_source: ndx work --dry-run · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+37 characters, 5 lines.
+Headings:
+- # Task brief
+- ## Acceptance
+
+## Prior runs
+_source: .hench/runs/ · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- 11111111 2026-10-10T08:00 completed
+- 22222222 2026-10-09T08:00 failed"
+`;
+
+exports[`Explain > constraint: states its statement, requirements, appliesTo and derived status, not the v1 item view 1`] = `
+"# Sidecar context packet: explain · d0000000-0000-4000-8000-000000000009
+Built by code from the repository's own records. No model wrote it.
+
+## How to explain
+Explain the target for someone who has not seen it: what it is, where it stands, what backs it.
+- Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
+- Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
+- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+
+## Constraint
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+K1 No card storage
+Statement: Card numbers are never stored.
+Applies to: all
+Requirements (standing, not done-when):
+- Tokenise at the edge: Only provider tokens reach our database.
+
+## Derived status and health
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+status proposed, health ok (rex's derivation, not stored)
+
+## Trailer-commit evidence
+_source: git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- aaaaaaaaa 2026-10-20 feat(web): wallet button (2 files)
+- bbbbbbbbb 2026-10-22 fix(web): safari only (1 file)
+
+## Sourcevision zones for the touched files
+_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z · stale: analysis 2026-10-21 predates the newest evidence commit 2026-10-22_
+
+- pay (Payments): 2 of 2 touched files; cohesion 0.8, coupling 0.2. Card and wallet payment."
+`;
+
+exports[`Explain > v1: states the epic with its acceptance criteria, evidence and zone 1`] = `
+"# Sidecar context packet: explain · 11111111-1111-1111-1111-111111111111
+Built by code from the repository's own records. No model wrote it.
+
+## How to explain
+Explain the target for someone who has not seen it: what it is, where it stands, what backs it.
+- Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
+- Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
+- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+
+## Product layer
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+There is no product layer on this tree: it is a v1 PRD, so it has no areas, capabilities or capability criteria.
+Explain from the PRD items and the sourcevision zones below. An item's acceptance criteria are its "done when", not capability criteria.
+
+## epic
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Auth Platform
+Status: in_progress
+Description: Authentication platform rollout.
+Done when (acceptance criteria, not capability criteria):
+(none)
+
+## Parent chain
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+(top level)
+
+## Children
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- feature Login Flow: pending
+
+## Trailer-commit evidence
+_source: git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- aaaaaaaaa 2026-10-20 feat(web): wallet button (2 files)
+- bbbbbbbbb 2026-10-22 fix(web): safari only (1 file)
+
+## Sourcevision zones for the touched files
+_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z · stale: analysis 2026-10-21 predates the newest evidence commit 2026-10-22_
+
+- pay (Payments): 2 of 2 touched files; cohesion 0.8, coupling 0.2. Card and wallet payment."
+`;
+
+exports[`Explain > v2: states the capability, its derived status, linked changes, evidence and zone 1`] = `
+"# Sidecar context packet: explain · a0000000-0000-4000-8000-000000000002
+Built by code from the repository's own records. No model wrote it.
+
+## How to explain
+Explain the target for someone who has not seen it: what it is, where it stands, what backs it.
+- Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
+- Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
+- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+
+## Capability
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+A1.1 Pay by card
+Statement: A shopper can pay for a basket with a card.
+
+## Capability criteria (standing requirements)
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Rex derives status per capability, not per criterion: each criterion carries the capability's verdict.
+- c1 [not verified] A valid card is charged once
+  because an open change is amending it. Evidence: change CH-1 Add Apple Pay: open
+- c2 [not verified] A declined card shows why
+  because an open change is amending it. Evidence: change CH-1 Add Apple Pay: open
+
+## Derived status and health
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+status changing, health ok (rex's derivation, not stored)
+
+## Linked changes
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- CH-1 Add Apple Pay: amends, open, release 1.2.0
+
+## Trailer-commit evidence
+_source: git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- aaaaaaaaa 2026-10-20 feat(web): wallet button (2 files)
+- bbbbbbbbb 2026-10-22 fix(web): safari only (1 file)
+
+## Sourcevision zones for the touched files
+_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z · stale: analysis 2026-10-21 predates the newest evidence commit 2026-10-22_
+
+- pay (Payments): 2 of 2 touched files; cohesion 0.8, coupling 0.2. Card and wallet payment."
+`;
+
+exports[`Plan > v1: the epic subtree around the target 1`] = `
+"# Sidecar context packet: plan · 33333333-3333-3333-3333-333333333333
+Built by code from the repository's own records. No model wrote it.
+
+## Epic subtree around the target
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- epic Auth Platform (in_progress)
+  - feature Login Flow (pending)
+    - task Password Login (blocked)
+      - subtask Add password form (completed)
+
+## Inbox and items needing placement
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Nothing awaits placement.
+
+## Recent changes
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+No change has been applied or completed.
+
+## Sibling titles (dedupe against these)
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- Password Login"
+`;
+
+exports[`Plan > v2: the product-map slice, placement queue, recent changes and sibling titles 1`] = `
+"# Sidecar context packet: plan · a0000000-0000-4000-8000-000000000002
+Built by code from the repository's own records. No model wrote it.
+
+## Product map around the target
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- area A1 Checkout
+  - capability A1.1 Pay by card (changing, ok)
+
+## Inbox and items needing placement
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Nothing awaits placement.
+
+## Recent changes
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+No change has been applied or completed.
+
+## Sibling titles (dedupe against these)
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- A1.1 Pay by card"
+`;
