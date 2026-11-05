@@ -715,6 +715,23 @@ describe("the change detail panel", () => {
     expect($(".task-add-child-note")?.textContent).toBe("Its tasks won't run until the change is placed.");
   });
 
+  it("offers Place on the map ↗, which opens placement mode for the change", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    const navigateTo = vi.fn();
+    await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn(), navigateTo }));
+    const toMap = $<HTMLButtonElement>(".cp-section .cp-place-on-map")!;
+    expect(toMap.textContent).toBe("Place on the map ↗");
+    await click(toMap);
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/a" });
+  });
+
+  it("has no Place on the map without a way to navigate", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));
+    expect($(".cp-section")).not.toBeNull();
+    expect($(".cp-place-on-map")).toBeNull();
+  });
+
   it("has no section and no note for a placed change", async () => {
     serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "t", title: "Refunds" }] })], []);
     await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));

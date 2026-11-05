@@ -1769,6 +1769,8 @@ a.tracker-link {
   font-size: var(--font-xs);
 }
 
+.cp-place-on-map { align-self: flex-start; }
+
 .cp-shortlist,
 .cp-relation {
   margin: 0;

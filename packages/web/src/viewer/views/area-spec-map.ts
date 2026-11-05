@@ -79,6 +79,8 @@ export interface SpecMapProps {
   /** The selected capability's id, if any. */
   selectedId?: string | null;
   onSelect: (capabilityId: string) => void;
+  /** Placement mode: the candidate capabilities to light, each with its note. */
+  lit?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -89,7 +91,7 @@ export function liveCapabilities(rows: readonly CapabilityRow[]): CapabilityRow[
   return rows.filter((row) => row.status !== "retired");
 }
 
-export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect }: SpecMapProps) {
+export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit }: SpecMapProps) {
   const capabilities = liveCapabilities(allCapabilities);
   return h("section", { class: "asm", "aria-label": "Spec map" },
     h(ConstraintBands, { constraints }),
@@ -98,7 +100,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
           allCapabilities.length === 0
             ? "This area has no capabilities yet."
             : "All of this area's capabilities are retired.")
-      : h("div", { class: "pam" },
+      : h("div", { class: `pam${lit ? " pam-placing" : ""}` },
           h("div", { class: "pam-blocks" },
             orderCapabilities(capabilities).map((row) =>
               h(AreaBlock, {
@@ -107,6 +109,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
                 basisRem: specBlockBasis(row.criteriaCount),
                 selected: row.id === selectedId,
                 onOpen: () => onSelect(row.id),
+                lit: lit?.get(row.id),
               }))),
           h(BlockLegend, null)));
 }

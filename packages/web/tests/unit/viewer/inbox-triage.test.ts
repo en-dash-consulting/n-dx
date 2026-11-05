@@ -227,6 +227,13 @@ describe("the Inbox page", () => {
     expect(document.activeElement).toBe($(".inbox-queue-list"));
   });
 
+  it("Place on the map ↗ opens placement mode for the selected change", async () => {
+    serveThree();
+    const navigateTo = await mountPage();
+    await click($(".inbox-detail .cp-place-on-map"));
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/c" });
+  });
+
   it("Skip leaves the change in the Inbox and moves on, wrapping at the end", async () => {
     serveThree();
     await mountPage();

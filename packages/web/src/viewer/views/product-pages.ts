@@ -9,7 +9,8 @@
  *
  * The capability page opens inside the Product page, from a row; Back
  * returns to the map. `/product/area/<slug>` shows that area's view
- * (area.ts) as the page.
+ * (area.ts) as the page; `/product/place/<changeId>` shows placement mode
+ * for an Inbox change (placement-mode.ts).
  *
  * @module viewer/views/product-pages
  */
@@ -25,6 +26,7 @@ import { ProductView } from "./product.js";
 import { CapabilityPage } from "./capability.js";
 import { ChangesView } from "./changes.js";
 import { AreaView } from "./area.js";
+import { PlacementMode } from "./placement-mode.js";
 import { RequirementsView } from "./requirements.js";
 import type { CapabilityDetail, ChangeRow, ProductEdit, ProductMap } from "./product-model.js";
 
@@ -144,16 +146,20 @@ function ProductTabs({ tab, onTab, children }: {
  * project, which has no product layer, the same tabs show: Map says to
  * migrate, Requirements reads v1 data and renders the requirements view.
  */
-export function ProductPage({ areaSlug = null, areaCapabilityId = null, onLeaveArea, navigateTo, ...rest }: ProductMapPageProps & {
+export function ProductPage({ areaSlug = null, areaCapabilityId = null, placeChangeId = null, onLeaveArea, navigateTo, ...rest }: ProductMapPageProps & {
   /** The capability `/product/area/<slug>/capability/<id>` selects in the area. */
   areaCapabilityId?: string | null;
   /** Opens a change's panel from the area's cards. */
   navigateTo?: NavigateTo;
   /** The area `/product/area/<slug>` names: the page is that area's view. */
   areaSlug?: string | null;
+  /** The change `/product/place/<id>` names: the page is placement mode for it. */
+  placeChangeId?: string | null;
   /** Leaves the area for the map (`/product`). */
   onLeaveArea?: () => void;
 }) {
+  // Keyed by change: Place & next starts the next change where its own shortlist says.
+  if (placeChangeId) return h(PlacementMode, { key: placeChangeId, changeId: placeChangeId, navigateTo });
   return areaSlug
     ? h(AreaView, { slug: areaSlug, onBack: onLeaveArea, navigateTo, initialCapabilityId: areaCapabilityId })
     : h(ProductMapPage, rest);

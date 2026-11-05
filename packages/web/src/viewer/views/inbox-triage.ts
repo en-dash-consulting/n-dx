@@ -1,7 +1,8 @@
 /**
  * The Inbox's own page, for clearing a backlog: the queue on the left in the
  * Plan section's order (IB7), and the selected change's "Where it goes"
- * section inline on the right. Place & next is the default action.
+ * section inline on the right. Place & next is the default action; "Place on
+ * the map ↗" in the section opens placement mode on the area view (WF1).
  *
  * Keyboard, inactive while typing in a field: J/K move, 1–5 pick a
  * candidate, T/A set touches/amends, Enter places and moves on, S skips
@@ -19,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { StrengthChip, useProjectStatus } from "../components/index.js";
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
+import { placementTab } from "../route-state.js";
 import { AppliedHistory, bestGuess, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 
@@ -262,6 +264,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
                 changeTitle: current.title,
                 onOpenChange: select,
                 onWritten: onWritten(current.id),
+                onPlaceOnMap: navigateTo ? (id: string) => navigateTo("product", { tab: placementTab(id) }) : undefined,
               }),
               h("div", { key: "bar", class: "inbox-detail-bar" },
                 h("button", {

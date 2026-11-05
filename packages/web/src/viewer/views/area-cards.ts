@@ -3,8 +3,7 @@
  *
  * - Moving now: open changes touching or amending the area, with stage chips.
  * - Waiting in the Inbox: Inbox changes whose best guess is in the area, each
- *   with Place. Placement mode (S7) has not landed, so Place opens the change's
- *   placement panel in the Tasks tree, as the Inbox page does.
+ *   with Place, which opens placement mode for it (WF1).
  * - Recently applied: the last five.
  * - Where it lives in code: the files capabilities list, or an empty state
  *   that says how code gets linked.

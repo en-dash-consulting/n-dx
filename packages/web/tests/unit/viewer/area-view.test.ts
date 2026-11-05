@@ -117,6 +117,18 @@ describe("AreaView", () => {
     expect(onDocumentEscape).not.toHaveBeenCalled();
   });
 
+  it("Place on the Inbox card opens placement mode for that change", async () => {
+    const inbox = [{
+      id: "change-loose", title: "Loose idea", relation: "touches" as const, strength: "possible" as const,
+      target: { id: AREA_DETAIL_FIXTURE.capabilities[0]!.id, title: AREA_DETAIL_FIXTURE.capabilities[0]!.title, type: "capability" as const },
+    }];
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: { ...AREA_DETAIL_FIXTURE, inbox } } });
+    const navigateTo = vi.fn();
+    await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug, navigateTo }));
+    act(() => root.querySelector<HTMLButtonElement>('[data-card="inbox"] .inbox-place')!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/change-loose" });
+  });
+
   it("reports an area the server cannot find", async () => {
     stubRoutes({});
     await mount(h(AreaView, { slug: "gone" }));

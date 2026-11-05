@@ -81,7 +81,7 @@ import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile
 import { analyzeTileSummary } from "./tile-summaries.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
-import { areaCapabilityOfTab, areaSlugOfTab } from "../route-state.js";
+import { areaCapabilityOfTab, areaSlugOfTab, placeChangeOfTab } from "../route-state.js";
 
 import {
   WorkflowView,
@@ -301,6 +301,7 @@ const REGISTRY: Record<string, ViewRenderer> = {
       onCapabilityChange: setOpenCapability,
       areaSlug: areaSlugOfTab(selectedTab ?? null),
       areaCapabilityId: areaCapabilityOfTab(selectedTab ?? null),
+      placeChangeId: placeChangeOfTab(selectedTab ?? null),
       onLeaveArea: () => navigateTo("product"),
       navigateTo,
     }),

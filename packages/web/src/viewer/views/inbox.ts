@@ -4,7 +4,8 @@
  * `ndx work` skips an Inbox change's tasks until it is placed, so this lists
  * each one with rex's best guess for its home, strongest guesses first (IB7):
  * those are the quickest to confirm. A row opens the change's detail panel in
- * the Tasks tree, where placement happens; nothing here writes.
+ * the Tasks tree; its Place opens placement mode on the area view (WF1,
+ * `/product/place/<id>`). Nothing here writes.
  *
  * Applied changes still flagged for placement are history: they stay out of
  * the open count and appear as a collapsed line that expands to a list (IB2).
@@ -26,6 +27,7 @@ import type { GuessStrength } from "../components/index.js";
 import { useRefetchableProductRead } from "../hooks/index.js";
 import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
+import { placementTab } from "../route-state.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
 
@@ -98,11 +100,12 @@ function shortId(change: ChangeRow): string {
   return change.displayId ?? change.id.slice(0, 8);
 }
 
-function Row({ row, onOpen }: { row: InboxRow; onOpen: (id: string) => void }) {
+function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => void; onPlace?: (id: string) => void }) {
   const { change } = row;
   const tags = row.shortlist && "placement" in row.shortlist ? row.shortlist.placement.change.tags ?? [] : [];
-  // The row is the target; the title and Place buttons give it keyboard
-  // reach, and their clicks bubble here.
+  // The row is the target; the title button gives it keyboard reach, and its
+  // click bubbles here. Place opens placement mode when the page can, and
+  // otherwise bubbles to the row too.
   return h("li", { class: "inbox-row", "data-change-id": change.id, onClick: () => onOpen(change.id) },
     h("div", { class: "inbox-row-head" },
       h("span", { class: "ch-display-id" }, shortId(change)),
@@ -116,6 +119,9 @@ function Row({ row, onOpen }: { row: InboxRow; onOpen: (id: string) => void }) {
         type: "button",
         class: "btn btn-sm inbox-place",
         "aria-label": `Place ${change.title}`,
+        onClick: onPlace
+          ? (e: MouseEvent) => { e.stopPropagation(); onPlace(change.id); }
+          : undefined,
       }, "Place"),
     ),
   );
@@ -133,11 +139,13 @@ export interface InboxViewProps {
   /** Show at most this many rows, then a link to the rest. Absent, show all. */
   limit?: number;
   onOpenChange: (id: string) => void;
+  /** Opens placement mode for a row's change (WF1); absent, Place opens the change like the row. */
+  onPlace?: (id: string) => void;
   /** Opens the Inbox on its own page; required for the "more" link. */
   onOpenAll?: () => void;
 }
 
-export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onOpenAll }: InboxViewProps) {
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll }: InboxViewProps) {
   const sorted = sortInbox(rows);
   const shown = limit === undefined ? sorted : sorted.slice(0, limit);
   const hidden = sorted.length - shown.length;
@@ -146,7 +154,7 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
     sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" }, "Inbox is empty")
       : h("ul", { class: "inbox-list" },
-          shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange })),
+          shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace })),
         ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
@@ -292,6 +300,7 @@ export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limi
       appliedRows: applied,
       limit,
       onOpenChange: (id) => navigateTo?.("prd", { taskId: id }),
+      onPlace: navigateTo ? (id) => navigateTo("product", { tab: placementTab(id) }) : undefined,
       onOpenAll: navigateTo ? () => navigateTo("inbox") : undefined,
     }),
   );

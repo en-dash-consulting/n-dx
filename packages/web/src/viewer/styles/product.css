@@ -869,3 +869,29 @@
 }
 .asm-band-defective { border-left-color: var(--red); }
 .asm-band-title { font-weight: 600; overflow-wrap: anywhere; }
+
+/* ── Placement mode (views/placement-mode.ts) ──────────────────── */
+
+.placing-container { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.placing-crumb { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1); font-size: var(--font-sm); color: var(--text-dim); }
+.placing-label {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.placing-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); gap: var(--space-3); align-items: start; }
+@media (max-width: 800px) { .placing-body { grid-template-columns: minmax(0, 1fr); } }
+.placing-map { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.placing-note { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
+.placing-map .pam { padding: 0; }
+
+/* Candidate homes are lit; every other block steps back. */
+.pam-placing .pam-block:not(.pam-lit) { opacity: 0.45; }
+.pam-block.pam-lit { box-shadow: 0 0 0 2px var(--accent); }
+.pam-lit-note { color: var(--accent); font-size: var(--font-sm); font-weight: 600; }
+@media (forced-colors: active) {
+  .pam-block.pam-lit { border: 3px solid Highlight; }
+}

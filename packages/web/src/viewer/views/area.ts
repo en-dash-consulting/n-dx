@@ -17,6 +17,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
 import { replaceAppHistory } from "../base-path.js";
+import { placementTab } from "../route-state.js";
 import type { AreaDetail } from "./product-model.js";
 import type { NavigateTo } from "../types.js";
 import { SpecMap, liveCapabilities } from "./area-spec-map.js";
@@ -151,6 +152,7 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
   useInPlaceAddress(selectedId ? areaCapabilityPath(slug, selectedId) : null, areaPath(slug));
   const [capturing, setCapturing] = useState(false);
   const openChange = navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined;
+  const placeChange = navigateTo ? (id: string) => navigateTo("product", { tab: placementTab(id) }) : undefined;
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
   // A selection the loaded area does not list (a display id or alias in the
   // address, or a capability retired since) is no selection: clearing it also
@@ -192,8 +194,7 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
       h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
       selected
         ? h(AreaCapability, { key: selected.id, capabilityId: selected.id, title: selected.title, onClose: () => setSelectedId(null) })
-        // Place opens the change's placement panel until placement mode (S7) lands.
-        : h(AreaCards, { area, onOpenChange: openChange, onPlace: openChange }),
+        : h(AreaCards, { area, onOpenChange: openChange, onPlace: placeChange }),
     ),
   );
 }

@@ -25,6 +25,7 @@ import { IndexMdSectionsPanel } from "./index-md-sections.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
+import { placementTab } from "../../route-state.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1249,6 +1250,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           onOpenChange: (id: string) => onNavigateToItem?.(id),
           onWritten: onPrdChanged,
           onInboxState: setInInbox,
+          onPlaceOnMap: navigateTo ? (id: string) => navigateTo("product", { tab: placementTab(id) }) : undefined,
         })
       : null,
 

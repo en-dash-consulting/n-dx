@@ -4,7 +4,8 @@
  * on the product map, so this is where a person gives it one.
  *
  * Top to bottom: a note with the change's position in the Inbox ("N of M ·
- * Next ›"); rex's shortlist as radio rows; a search over every capability and
+ * Next ›") and, where the caller can open it, "Place on the map ↗" for
+ * placement mode on the area view (WF1); rex's shortlist as radio rows; a search over every capability and
  * constraint; the relation (Touches, or Amends with its summary, the target's
  * criteria to edit and an optional replacement statement); and the actions —
  * Place, Place & next, Place & add another (an extra touches, IB3) and
@@ -681,6 +682,8 @@ export interface ChangePlacementSectionProps {
   onWritten?: () => void;
   /** Reports whether the change is in the Inbox, for the panel's other notes. */
   onInboxState?: (inInbox: boolean) => void;
+  /** Opens placement mode on the area view; absent, the section offers no switch. */
+  onPlaceOnMap?: (id: string) => void;
 }
 
 /** What the section shows after a write, until the change's next read. */
@@ -693,7 +696,7 @@ interface Written {
  * The placement section of a change's detail panel. Key it by change id:
  * its state belongs to one change.
  */
-export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState }: ChangePlacementSectionProps) {
+export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
   const [proposing, setProposing] = useState(false);
@@ -786,6 +789,11 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
                     }, "Next ›")]
                   : null,
               )
+            : null,
+          onPlaceOnMap
+            ? h("button", {
+                type: "button", class: "ch-change-link cp-place-on-map", onClick: () => onPlaceOnMap(changeId),
+              }, "Place on the map ↗")
             : null,
         ),
     h(PlacementForms, {

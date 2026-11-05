@@ -25,7 +25,7 @@ const COMMANDS_PATH_TABS: ReadonlySet<string> = new Set(["reference"]);
  * bar settles on the page the viewer actually shows.
  */
 export function routeTab(view: ViewId, subId: string | null): string | null {
-  if (view === "product" && subId && AREA_PATH.test(subId)) return subId;
+  if (view === "product" && subId && isProductSubPath(subId)) return subId;
   return view === "commands" && subId && COMMANDS_PATH_TABS.has(subId) ? subId : null;
 }
 
@@ -34,6 +34,25 @@ export function routeTab(view: ViewId, subId: string | null): string | null {
  * `/product/area/<slug>/capability/<id>`; its sub-path rides in the route's tab.
  */
 const AREA_PATH = /^area\/([^/]+)(?:\/capability\/([^/]+))?$/;
+
+/** Placement mode for one Inbox change, `/product/place/<changeId>`. */
+const PLACE_PATH = /^place\/([^/]+)$/;
+
+/** A Product sub-path the route keeps: an area's, or placement mode's. */
+function isProductSubPath(sub: string): boolean {
+  return AREA_PATH.test(sub) || PLACE_PATH.test(sub);
+}
+
+/** The Product tab that opens placement mode for `changeId`. */
+export function placementTab(changeId: string): string {
+  return `place/${encodeURIComponent(changeId)}`;
+}
+
+/** The change a `place/<id>` tab places, or null when the tab is not placement mode's. */
+export function placeChangeOfTab(tab: string | null): string | null {
+  const id = tab && PLACE_PATH.exec(tab)?.[1];
+  return id ? decodeURIComponent(id) : null;
+}
 
 /**
  * The slug an `area/<slug>` tab names, decoded (the tab carries it as it sits
@@ -176,8 +195,8 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   if (slashIdx > 0) {
     const view = base as ViewId;
     if (validViews.has(view) && sub && DEEP_LINK_VIEWS.has(view)) return { view, subId: sub };
-    // An area's page. Until it has its own view it is the Product page at that area.
-    if (view === "product" && validViews.has(view) && AREA_PATH.test(sub)) return { view, subId: sub };
+    // An area's page, or placement mode. Until they have their own views they are the Product page.
+    if (view === "product" && validViews.has(view) && isProductSubPath(sub)) return { view, subId: sub };
   }
   return null;
 }

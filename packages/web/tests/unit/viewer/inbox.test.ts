@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import type { VNode } from "preact";
 import { act } from "preact/test-utils";
-import { InboxPage, sortInbox, type InboxRow } from "../../../src/viewer/views/inbox.js";
+import { InboxPage, InboxView, sortInbox, type InboxRow } from "../../../src/viewer/views/inbox.js";
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
 import { STAGES, viewBlurb, viewLabel } from "../../../src/viewer/views/index.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -207,13 +207,21 @@ describe("InboxPage on a v2 project", () => {
     expect(root.querySelector(".inbox-more")).toBeNull();
   });
 
-  it("a row, or its Place button, opens the change's detail panel in Tasks", async () => {
-    serveInbox([change("x")], [placement("x", "strong")]);
+  it("a row opens the change's detail panel in Tasks; its Place opens placement mode for it", async () => {
+    serveInbox([change("x"), change("y")], [placement("x", "strong"), placement("y", "weak")]);
     const navigateTo = vi.fn();
     await mount(h(InboxPage, { navigateTo }));
     act(() => { root.querySelector<HTMLElement>(".inbox-row")!.click(); });
+    act(() => { root.querySelectorAll<HTMLButtonElement>(".inbox-place")[1]!.click(); });
+    // Place does not also bubble to the row.
+    expect(navigateTo.mock.calls).toEqual([["prd", { taskId: "x" }], ["product", { tab: "place/y" }]]);
+  });
+
+  it("Place opens the row like a click when nothing can open placement mode", async () => {
+    const onOpenChange = vi.fn();
+    await mount(h(InboxView, { rows: [{ change: change("x") }], appliedUnplaced: 0, onOpenChange }));
     act(() => { root.querySelector<HTMLButtonElement>(".inbox-place")!.click(); });
-    expect(navigateTo.mock.calls).toEqual([["prd", { taskId: "x" }], ["prd", { taskId: "x" }]]);
+    expect(onOpenChange).toHaveBeenCalledWith("x");
   });
 
   it("names a shortlist that failed to load instead of a guess", async () => {
