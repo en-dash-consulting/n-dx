@@ -7,6 +7,7 @@
  *     profile?: "caos",                // defaults to the connection's own profile
  *     project?: "n-dx",                // the <project> in every requestId; defaults to the directory name
  *     featureMap?: { <release or change>: <tracker feature/epic id> },
+ *     reviewers?: { <CODEOWNERS handle, e.g. "@hal">: <tracker user id> },
  *     rules?: { <ndx event>: "off" | "dry-run" | "on" }
  *   }
  *
@@ -31,6 +32,8 @@ export interface TrackerSyncConfig {
   profile?: string;
   project: string;
   featureMap: Record<string, string>;
+  /** A CODEOWNERS handle to the tracker user id that stands for it. */
+  reviewers: Record<string, string>;
   rules: Record<TrackerEvent, TrackerRuleMode>;
 }
 
@@ -69,6 +72,13 @@ export function parseTrackerSync(raw: unknown, projectDir: string): TrackerSyncC
     else problems.push(`trackerSync.featureMap.${key} must be a tracker id`);
   }
 
+  const reviewers: Record<string, string> = {};
+  if (raw.reviewers !== undefined && !isRecord(raw.reviewers)) problems.push("trackerSync.reviewers must be an object keyed by CODEOWNERS handle");
+  for (const [handle, id] of Object.entries(isRecord(raw.reviewers) ? raw.reviewers : {})) {
+    if (isString(id)) reviewers[handle] = id;
+    else problems.push(`trackerSync.reviewers.${handle} must be a tracker user id`);
+  }
+
   const rules = rulesOff();
   if (raw.rules !== undefined && !isRecord(raw.rules)) problems.push("trackerSync.rules must be an object keyed by ndx event");
   for (const [event, mode] of Object.entries(isRecord(raw.rules) ? raw.rules : {})) {
@@ -83,6 +93,7 @@ export function parseTrackerSync(raw: unknown, projectDir: string): TrackerSyncC
     ...(isString(raw.profile) && { profile: raw.profile }),
     project: project as string,
     featureMap,
+    reviewers,
     rules,
   };
 }

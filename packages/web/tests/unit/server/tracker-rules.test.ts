@@ -21,8 +21,8 @@ function complete(event: TrackerEvent): TrackerEventRecord {
   };
 }
 
-function config(rules: Record<string, unknown> = {}, featureMap: Record<string, string> = {}): TrackerSyncConfig {
-  const parsed = parseTrackerSync({ connection: "caos", project: "ndx", rules, featureMap }, "/work/ndx");
+function config(rules: Record<string, unknown> = {}, featureMap: Record<string, string> = {}, reviewers: Record<string, string> = {}): TrackerSyncConfig {
+  const parsed = parseTrackerSync({ connection: "caos", project: "ndx", rules, featureMap, reviewers }, "/work/ndx");
   if ("problems" in parsed) throw new Error(parsed.problems.join("; "));
   return parsed;
 }
@@ -76,9 +76,19 @@ describe("planTrackerEvent", () => {
       });
     });
 
-    it("falls back to the CODEOWNERS owner when the profile names no reviewer", () => {
-      const plan = planTrackerEvent({ ...pr, sources: { ...pr.sources, codeowners: "@hal" } }, on, mapping);
-      expect(plan).toMatchObject({ action: "call", call: { args: { review: { reviewerNotionUserId: "@hal" } } } });
+    it("sends the mapped tracker user id for the CODEOWNERS owner, never the handle", () => {
+      const mapped = config({ "pr-opened": "on" }, {}, { "@hal": "u-hal" });
+      const plan = planTrackerEvent({ ...pr, sources: { ...pr.sources, codeowners: "@hal" } }, mapped, mapping);
+      expect(plan).toMatchObject({ action: "call", call: { args: { review: { reviewerNotionUserId: "u-hal" } } } });
+      expect(JSON.stringify(plan)).not.toContain("@hal");
+    });
+
+    it("becomes a card naming an unmapped CODEOWNERS handle, in dry-run too, with no id sent", () => {
+      for (const mode of ["on", "dry-run"]) {
+        const plan = planTrackerEvent({ ...pr, sources: { ...pr.sources, codeowners: "@hal" } }, config({ "pr-opened": mode }), mapping);
+        expect(plan).toMatchObject({ action: "card", missing: ["missing reviewer: map @hal to a user in the tracker in trackerSync.reviewers"] });
+        expect(JSON.stringify(plan)).not.toContain("reviewerNotionUserId");
+      }
     });
 
     it("makes the profile default win over CODEOWNERS", () => {

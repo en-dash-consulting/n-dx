@@ -63,7 +63,14 @@ items:
     lastModified: "2026-11-05T02:07:18.224Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "825ee61b-61ee-4914-966b-6faa332d961c":
-    lastModified: "2026-11-05T08:08:03.422Z"
+    status: "completed"
+    startedAt: "2026-11-05T08:09:04.275Z"
+    completedAt: "2026-11-05T08:15:42.111Z"
+    endedAt: "2026-11-05T08:15:42.111Z"
+    activeIntervals: [{"end":"2026-11-05T08:15:42.111Z","start":"2026-11-05T08:09:04.275Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: trackerSync.reviewers maps CODEOWNERS handle to tracker user id; unmapped handle is a card naming it."
+    lastModified: "2026-11-05T08:15:42.111Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "920b0ec3-0de3-4197-941a-89a90608ef74":
     lastModified: "2026-11-05T01:49:00.922Z"

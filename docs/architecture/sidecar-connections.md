@@ -101,6 +101,7 @@ untracked `.n-dx.local.json` only, as connections do:
   "profile": "caos",
   "project": "n-dx",
   "featureMap": { "0.10.0": "<epic id>" },
+  "reviewers": { "@hal": "<tracker user id>" },
   "rules": { "run-started": "dry-run", "pr-merged": "on" }
 }
 ```
@@ -145,7 +146,7 @@ is not off:
 
   | Fact | Source |
   |------|--------|
-  | reviewer | profile `defaults.reviewer`, else the CODEOWNERS owner of the PR's files (`.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS`; last matching rule wins) |
+  | reviewer | profile `defaults.reviewer`, else the CODEOWNERS owner of the PR's files (`.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS`; last matching rule wins), sent as the tracker user id `trackerSync.reviewers[<handle>]`; an unmapped handle is a card (`map @hal to a user in CAOS in trackerSync.reviewers`), never sent raw |
   | review link | the PR URL |
   | delivery note | `shipped in ndx <version>` from the release |
   | blocked reason, who can unblock | the failed run's diagnosis summary and best-ranked action |

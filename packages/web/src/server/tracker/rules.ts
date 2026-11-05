@@ -120,7 +120,13 @@ function resolveFact(
       case "profile-default":
         value = (mapping.defaults as Record<string, unknown>)[fact.fact] as string | undefined;
         break;
-      case "codeowners":
+      case "codeowners": {
+        // A CODEOWNERS owner is a GitHub handle; the tracker needs its own user id.
+        const owner = record.sources?.codeowners;
+        value = owner && config.reviewers[owner];
+        if (owner && !value) missing = `missing ${fact.fact}: map ${owner} to a user in ${label} in trackerSync.reviewers`;
+        break;
+      }
       case "pr-url":
         value = record.sources?.[source];
         break;
