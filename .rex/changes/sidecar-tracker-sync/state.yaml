@@ -2,7 +2,7 @@ schema: "rex/v2"
 items:
   "0943b9b0-e71e-4bb2-ab30-7047910ffdf1":
     issues: ["https://www.notion.so/3f7a80b7192481948d5cc046d3a68c0a","https://www.notion.so/3f7a80b71924818487c7f0e1c2d5db03","https://www.notion.so/3f7a80b719248147aad1d64b44332ec6","https://www.notion.so/3f7a80b7192481b18321d6a2f010c472","https://www.notion.so/3f7a80b71924810aa352f54b4bbead6e"]
-    lastModified: "2026-11-05T08:27:38.694Z"
+    lastModified: "2026-11-05T09:16:11.572Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "38fce780-09ae-4f8f-842b-64321c23a839":
     status: "completed"
@@ -13,6 +13,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "FieldHint optionsFrom gains optional literal `arguments` passed to the read call (external-call.ts); caos.json sets list_epics pageSize 100; checkServerProfile refuses an argument the read tool's input does not declare. Tests: server-profiles unit, tracker-server-profiles (150 epics -> 100 options), sidecar-external-call-hints (records arguments). Option A; no cursor following."
     lastModified: "2026-11-05T07:27:57.488Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "39667967-032d-49d8-bad5-d31af2df8b0e":
+    lastModified: "2026-11-05T09:22:06.494Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3b86452e-1829-499a-af72-1620953e00e7":
     status: "completed"
@@ -52,6 +55,9 @@ items:
     activeIntervals: [{"end":"2026-11-05T08:03:27.750Z","start":"2026-11-05T07:51:20.122Z"}]
     lastModified: "2026-11-05T08:03:27.750Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "543791ca-c73f-45af-998d-6022109e3758":
+    lastModified: "2026-11-05T09:22:12.414Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5dc38be7-f9d3-4b0e-b45f-40f8e4a1435b":
     status: "completed"
     startedAt: "2026-11-05T08:43:27.065Z"
@@ -83,10 +89,12 @@ items:
     lastModified: "2026-11-05T08:15:42.111Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "920b0ec3-0de3-4197-941a-89a90608ef74":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-05T08:54:24.324Z"
-    activeIntervals: [{"start":"2026-11-05T08:54:24.324Z"}]
-    lastModified: "2026-11-05T08:54:24.943Z"
+    completedAt: "2026-11-05T09:22:01.452Z"
+    endedAt: "2026-11-05T09:22:01.452Z"
+    activeIntervals: [{"end":"2026-11-05T09:21:27.641Z","start":"2026-11-05T08:54:24.324Z"},{"end":"2026-11-05T09:22:01.452Z","start":"2026-11-05T09:22:01.452Z"}]
+    lastModified: "2026-11-05T09:22:01.452Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "97291b04-5d49-45d3-b7f7-7950e76f9ea4":
     status: "completed"
