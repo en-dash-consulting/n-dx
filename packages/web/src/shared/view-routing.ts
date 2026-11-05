@@ -27,6 +27,8 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
 
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "plan",
+  // Tune holds the PRD Graph and Execution Log, which have no other stage here.
+  "tune",
   "rex-dashboard",
   "prd",
   "product",
