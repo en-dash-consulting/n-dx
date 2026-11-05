@@ -27,7 +27,7 @@
  */
 import { SyncEngine, systemAuthor, type RemoteLink, type SettledConflict, type SyncReport } from "@graview/core/sync";
 import { PermissionDeniedError, type AnySchema, type Store } from "@graview/core";
-import { applyInbound, isSyncedKind, linkBecause, mapping, SYNC_FIELDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
+import { applyInbound, because, isSyncedKind, linkBecause, mapping, SYNC_FIELDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 import { ndxRemote, type EmitOutcome, type NdxRemote, type NdxRemoteOptions } from "./ndx-system.js";
 
 export interface SyncStatus {
@@ -74,12 +74,15 @@ const SYNCED_LINK_ACT = /^(connect|disconnect)-(change|task)-/;
 type Planned = { readonly ops: readonly { readonly author: { kind: string; id: string }; readonly mutation?: { name: string }; readonly primitives: readonly Record<string, unknown>[] }[] };
 
 /**
- * NO LINK ON A SYNCED RECORD IS MADE HERE. The engine pushes a change's and a
- * task's fields; a link added or taken away on one would stay in the face,
- * never reach rex and never be put back. Graview's own guard holds links only
- * on read-only kinds, so this one refuses the rest the same way, before the
- * act is offered and when it is tried. Rex's own inbound changes pass, and so
- * does a record's removal, which takes its links with it.
+ * NO LINK IS MADE HERE. The engine pushes a change's and a task's fields, and
+ * nothing at all for the read-only kinds; a link added or taken away on any
+ * record would stay in the face, never reach rex, sourcevision, hench or git,
+ * and never be put back. Graview's own guard holds a read-only kind's fields
+ * but judges an edge only where the mapping lists `edges`, so this guard
+ * refuses every link when it is tried, with the owner's sentence, and hides
+ * the derived `connect-`/`disconnect-` acts on change and task (Graview
+ * already hides them on the kinds it owns). Rex's own inbound changes pass,
+ * and so does a record's removal, which takes its links with it.
  */
 export function holdSyncedLinks(store: Store<AnySchema>): () => void {
   const held = store as unknown as Record<string, unknown>;
@@ -98,8 +101,11 @@ export function holdSyncedLinks(store: Store<AnySchema>): () => void {
         const edge = primitive["edge"] as { kind: string; from: string; to: string };
         if (primitive["op"] === "remove-edge" && (removed.has(edge.from) || removed.has(edge.to))) continue;
         const kind = String((store.graph.getNode(edge.from) as unknown as Record<string, unknown> | undefined)?.["kind"] ?? "");
-        if (!isSyncedKind(kind)) continue;
-        throw new PermissionDeniedError({ mutation: op.mutation?.name ?? "", message: linkBecause(kind, edge.kind), wouldNeed: [] } as never);
+        if (!kind) continue;
+        // Graview's own guard holds a read-only kind's fields, not its links (it judges an edge only where a
+        // mapping lists `edges`), so a link on a zone or a run would land here and never reach its owner either.
+        const message = isSyncedKind(kind) ? linkBecause(kind, edge.kind) : because(kind);
+        throw new PermissionDeniedError({ mutation: op.mutation?.name ?? "", message, wouldNeed: [] } as never);
       }
     }
   };
@@ -118,7 +124,9 @@ export function holdSyncedLinks(store: Store<AnySchema>): () => void {
     const rex = principal?.kind === "system" && principal.id === SYSTEM;
     const link = SYNCED_LINK_ACT.exec(call.name);
     if (!verdict.ok || rex || !link) return verdict;
-    return { ok: false, refusal: { mutation: call.name, message: linkBecause(link[2]!, call.name.slice(link[0].length)), wouldNeed: [] } };
+    // The act names the relation in kebab case (`connect-task-blocked-by`); the sentence names it as the declaration does.
+    const relation = call.name.slice(link[0].length).replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+    return { ok: false, refusal: { mutation: call.name, message: linkBecause(link[2]!, relation), wouldNeed: [] } };
   };
   held["permittedMutations"] = (principal: unknown) =>
     (permittedMutations as (p: unknown) => readonly { name: string }[]).call(store, principal).filter((mutation) => !SYNCED_LINK_ACT.test(mutation.name));

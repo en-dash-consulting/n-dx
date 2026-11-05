@@ -266,10 +266,24 @@ describe("two-way sync with rex as the system of record", () => {
         ["archive-task", { id: task.id }],
         ["merge-task", { id: task.id, into: otherTask.id }],
         ["leave-alone-task", { id: task.id }],
-        ["connect-change-touches", { id: change.id, to: otherChange.id }],
-        ["connect-task-blocked-by", { id: task.id, to: otherTask.id }],
       ] as const) {
+        // Gone from the declaration (archives: false, tidying: "never"): no such act.
         expect(() => store.apply({ name, args } as never, { author: SEAT }), name).toThrow();
+      }
+      // The link acts exist and would apply without the guard: each is refused with rex's sentence.
+      const capability = (store.graph.nodesOfKind("capability" as never) as unknown as Item[])[0]!;
+      for (const [name, args, says] of [
+        ["connect-change-touches", { id: change.id, to: capability.id }, "ndx rex change place"],
+        ["connect-task-blocked-by", { id: task.id, to: otherTask.id }, "edit_item (blockedBy)"],
+      ] as const) {
+        let refused: unknown;
+        try {
+          store.apply({ name, args } as never, { author: SEAT });
+        } catch (error) {
+          refused = error;
+        }
+        expect(refused, name).toBeInstanceOf(PermissionDeniedError);
+        expect(String((refused as Error).message), name).toContain(says);
       }
       expect(store.graph.getNode(change.id)).toBeTruthy();
       expect(store.graph.getNode(task.id)).toBeTruthy();
@@ -277,6 +291,25 @@ describe("two-way sync with rex as the system of record", () => {
       const said = store.permits({ name: "connect-change-touches", args: { id: change.id, to: otherChange.id } } as never, SEAT);
       expect(said.ok).toBe(false);
       expect(JSON.stringify(said)).toContain("ndx rex change place");
+    } finally {
+      release();
+    }
+  });
+
+  it("refuses a link on a kind another tool owns too: Graview's guard holds its fields, this one its links", async () => {
+    const { store, sync } = await setUp();
+    const zones = store.graph.nodesOfKind("zone" as never) as unknown as Item[];
+    expect(zones.length).toBeGreaterThan(1);
+    const release = sync.guard();
+    try {
+      let refused: unknown;
+      try {
+        store.apply({ name: "connect-zone-crosses", args: { id: zones[0]!.id, to: zones[1]!.id } } as never, { author: SEAT });
+      } catch (error) {
+        refused = error;
+      }
+      expect(refused).toBeInstanceOf(PermissionDeniedError);
+      expect(String((refused as Error).message)).toContain("sourcevision");
     } finally {
       release();
     }

@@ -37,7 +37,10 @@ Rules that keep that honest:
   `mcpClient` in `dev/ndx-door.ts`, which holds the token; the browser never
   sees it). Every kind but change and task is a read-only resource whose
   `because` names the tool that owns it, and the engine guards the store, so
-  such an act is refused and never offered. A write rex refuses (a
+  such an act is refused and never offered. No link is made in the face on any
+  kind (`holdSyncedLinks`): only a change's or task's fields reach rex, so a
+  derived `connect-`/`disconnect-` act is hidden and refused with the owner's
+  sentence. A write rex refuses (a
   transition its table forbids, a completion it holds for a run's test gate)
   is put back to rex's value after the run, and `status: deleted` is never
   sent. The door admits only requests carrying the key it writes into the
