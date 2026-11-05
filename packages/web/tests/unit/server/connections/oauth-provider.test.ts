@@ -136,6 +136,22 @@ describe("OAuth connections", () => {
     expect(fake.grants).toEqual(["authorization_code"]);
   });
 
+  it("refuses the state of one connection's sign-in on another connection and stores nothing", async () => {
+    const fake = await oauthServer();
+    const projectDir = tempDir("ndx-oauth-project-");
+    const ndxHome = tempDir("ndx-oauth-home-");
+    const oauth = { transport: "http", url: fake.url, auth: "oauth" };
+    writeFileSync(join(projectDir, ".n-dx.local.json"), JSON.stringify({ connections: { docs: oauth, wiki: oauth } }));
+    const svc = new ConnectionService({ projectDir, credentials: { ndxHome }, warn: () => {} });
+    cleanups.push(() => svc.close());
+
+    const a = fake.approve(await svc.beginSignIn("docs", REDIRECT));
+    await expect(svc.finishSignIn("wiki", a.code, a.state)).rejects.toBeInstanceOf(ConnectionSignInError);
+    expect(storedCredential("connection:wiki", { ndxHome })).toBeUndefined();
+    expect(storedCredential("connection:docs", { ndxHome })).toBeUndefined();
+    expect(fake.grants).toEqual([]);
+  });
+
   it("refreshes an access token the server rejects, mid-session, without a sign-in", async () => {
     const fake = await oauthServer();
     const { svc, ndxHome } = service(fake.url);

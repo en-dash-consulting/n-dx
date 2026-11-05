@@ -27,7 +27,14 @@ items:
     lastModified: "2026-11-05T00:20:58.290Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "63203636-b90b-455d-9d06-f3c9272bddf5":
-    lastModified: "2026-11-05T00:21:58.659Z"
+    status: "completed"
+    startedAt: "2026-11-05T00:33:52.046Z"
+    completedAt: "2026-11-05T00:36:48.119Z"
+    endedAt: "2026-11-05T00:36:48.119Z"
+    activeIntervals: [{"end":"2026-11-05T00:36:48.119Z","start":"2026-11-05T00:33:52.046Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added a two-connection test: A's code and state finished on B throw ConnectionSignInError, nothing stored, no token grant."
+    lastModified: "2026-11-05T00:36:48.119Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "98f4d418-79b5-4c39-bcbd-aa5b91aa5e36":
     lastModified: "2026-11-04T17:39:20.554Z"
