@@ -8,6 +8,8 @@ acceptanceCriteria:
   - "A callTool aborted through its caller's signal leaves the connection's status connected and its client open (test against the fake HTTP server)"
   - "A call that genuinely times out (the service's own call timeout) still marks the connection unavailable"
   - "Stopping a turn mid external call does not change what Settings > Connections reports for that connection"
+touches:
+  - "8a7b15d7-faed-4ac0-a39d-498033396dc9"
 priority: "low"
 discoveredFrom: {"item":"b59456bd-36ac-4409-9707-6f30c2844f89","run":"96d0cf25-1e4f-4b59-8a6e-a844323da1b7"}
 tags:
