@@ -17,7 +17,6 @@ import type { ViewId, NavigateTo } from "../types.js";
 import {
   STAGES,
   visibleStages,
-  tileForScope,
   stageProduct,
   viewLabel,
   viewBlurb,
@@ -220,8 +219,9 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
     && (!s.featureGate || gates[s.featureGate])
     && !(s.requiresServer && deployed),
   );
-  const tiles = (def.tiles ?? []).flatMap((t) => tileForScope(t, validViews) ?? []).filter((t) =>
-    (!t.featureGate || gates[t.featureGate])
+  const tiles = (def.tiles ?? []).filter((t) =>
+    validViews.has(t.view)
+    && (!t.featureGate || gates[t.featureGate])
     && !(t.requiresServer && deployed)
     && !(t.hiddenWhenDeployed && deployed),
   );

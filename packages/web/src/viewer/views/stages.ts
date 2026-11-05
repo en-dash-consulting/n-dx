@@ -304,20 +304,6 @@ export function stageViews(id: StageId): ViewId[] {
   ])];
 }
 
-/**
- * The tile as this viewer can show it. A tile whose own view is out of scope
- * but one of its tabs is in scope (Runs without hench, with the Execution Log
- * as its tab) is promoted: the first in-scope tab becomes the tile's view and
- * the rest follow it. Null when nothing the tile lists is in scope. Panel
- * tiles are never promoted — they have no tabs.
- */
-export function tileForScope(tile: StageTile, validViews: ReadonlySet<ViewId>): StageTile | null {
-  if (validViews.has(tile.view)) return tile;
-  const [first, ...rest] = (tile.tabs ?? []).filter((t) => validViews.has(t.view));
-  if (!first) return null;
-  return { ...tile, view: first.view, tabs: rest, hiddenWhenDeployed: first.hiddenWhenDeployed ?? tile.hiddenWhenDeployed };
-}
-
 /** Stages with a page in this scope — the stage id is only a valid view in its own scope. */
 export function visibleStages(validViews: ReadonlySet<ViewId>): StageId[] {
   return STAGE_ORDER.filter((id) => validViews.has(id));
