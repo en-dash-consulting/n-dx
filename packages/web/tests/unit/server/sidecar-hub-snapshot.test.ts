@@ -41,6 +41,7 @@ function card(over: Partial<ProjectCard> = {}): ProjectCard {
     remoteHost: null,
     readiness: null,
     infrastructure: null,
+    initialized: true,
     ...over,
   };
 }
