@@ -10,6 +10,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { ConnectionConfig } from "../../src/server/connections/connection-config.js";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
 import { enforceRouteFeatureGate } from "../../src/server/route-feature-gates.js";
@@ -20,6 +21,8 @@ import { changeItemLink } from "../../src/server/tracker/item-links.js";
 import { enqueueTrackerEvent } from "../../src/server/tracker/sync-engine.js";
 import type { ServerContext } from "../../src/server/types.js";
 import { CredentialStore } from "../../src/shared/index.js";
+import { addCaosTools } from "../fixtures/connections/fake-mcp-tools.mjs";
+import { startFakeMcpHttpServer, type FakeMcpHttpServer } from "../helpers/fake-mcp-http-server.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 
 const TOKEN = "dashboard-token-0123456789abcdef";
@@ -160,6 +163,43 @@ describe("tracker cards", () => {
   it("answers the form only for a waiting card", async () => {
     const form = (id: string) => fetch(`${server.baseUrl}/api/tracker/cards/form?requestId=${encodeURIComponent(id)}`, { headers: auth });
     expect((await form(requestId)).status).toBe(409);
+  });
+
+  describe("against the fake CAOS server", () => {
+    let fake: FakeMcpHttpServer;
+    const form = (id: string) => fetch(`${server.baseUrl}/api/tracker/cards/form?requestId=${encodeURIComponent(id)}`, { headers: auth });
+
+    beforeEach(async () => {
+      fake = await startFakeMcpHttpServer({ extraTools: (s) => addCaosTools(s, {}) });
+      await service.close();
+      const caos = { id: "caos", label: "CAOS", auth: "none", transport: "http", url: fake.url, profile: "caos" } as ConnectionConfig;
+      service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {}, connections: [caos] });
+    });
+
+    afterEach(async () => {
+      await fake.close();
+    });
+
+    it("answers the card's tool with the connection label, its input schema and the profile's epic choices", async () => {
+      appendTrackerActivity(root, card);
+      const res = await form(requestId);
+      expect(res.status).toBe(200);
+      const { externalCall } = await res.json();
+      expect(externalCall.label).toBe("CAOS");
+      expect(externalCall.inputSchema.properties).toHaveProperty("epicId");
+      expect(externalCall.inputSchema.required).toEqual(expect.arrayContaining(["title", "epicId"]));
+      const epics = JSON.stringify(externalCall.options?.epicId);
+      expect(epics).toContain("ep-1");
+      expect(epics).toContain("ndx 1.0.0 - Freeze");
+    });
+
+    it("answers 422 naming a tool the server does not list", async () => {
+      const missing = "ndx:ndx:rex-3:change-captured";
+      appendTrackerActivity(root, { ...card, rexId: "rex-3", requestId: missing, call: { tool: "no_such_tool", args: { requestId: missing } } });
+      const res = await form(missing);
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toContain("no_such_tool");
+    });
   });
 
   it("logs an approval that cannot reach the connection and leaves the card waiting", async () => {
