@@ -22,6 +22,8 @@ import {
   stageProduct,
   viewLabel,
   viewBlurb,
+  viewLabelFor,
+  viewBlurbFor,
   viewGlyph,
   type StageId,
   type StageSection,
@@ -29,7 +31,7 @@ import {
   type StageTile,
 } from "./stages.js";
 import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
-import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
+import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
 import { TileGrid, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
@@ -77,7 +79,7 @@ export function BadgedSection(props: SectionProps) {
 
 /** The stage's lead section: the view itself, in the page, no dropdown. */
 function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "renderView">) {
-  return h("section", { class: "stage-section stage-section--plain", "data-view": section.view, "aria-label": viewLabel(section.view) },
+  return h("section", { class: "stage-section stage-section--plain", "data-view": section.view, "aria-label": viewLabelFor(section.view, useStatusLayout()) },
     renderView(section.view),
   );
 }
@@ -96,8 +98,9 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
   const bodyId = `stage-section-${stage}-${section.view}`;
   // Named by its view: the same string the breadcrumb shows once the "Open"
   // link has been followed.
-  const title = viewLabel(section.view);
-  const blurb = resolveCliLabel(viewBlurb(section.view), useCliName());
+  const layout = useStatusLayout();
+  const title = viewLabelFor(section.view, layout);
+  const blurb = resolveCliLabel(viewBlurbFor(section.view, layout), useCliName());
 
   const toggle = () => {
     const next = !open;
@@ -145,10 +148,10 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
         type: "button",
         class: "stage-section-open",
         onClick: () => navigateTo(section.view),
-        title: `Open ${viewLabel(section.view)} on its own page`,
+        title: `Open ${title} on its own page`,
         // Every section has an "Open ↗"; without this they are one repeated
         // name in a screen reader's list of controls.
-        "aria-label": `Open ${viewLabel(section.view)} on its own page`,
+        "aria-label": `Open ${title} on its own page`,
       }, "Open ↗"),
     ),
     open

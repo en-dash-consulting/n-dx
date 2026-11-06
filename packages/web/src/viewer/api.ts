@@ -39,7 +39,7 @@ export {
 // --- Hooks consumed by sibling zones (e.g. the shell components) ---
 export { useProjectMetadata, useCliName } from "./hooks/index.js";
 export { useFeatureToggle } from "./hooks/index.js";
-export { useProjectStatus } from "./hooks/index.js";
+export { useProjectStatus, useStatusLayout } from "./hooks/index.js";
 export { useLive, isAnalysisJob } from "./hooks/index.js";
 
 // --- Status indicator components (bottom-bar badges) ---
@@ -74,8 +74,8 @@ export {
   VIEW_META,
   PRODUCT_LABELS,
   viewMeta,
-  viewLabel,
-  viewBlurb,
+  viewLabelFor,
+  viewBlurbFor,
   viewGlyph,
   viewPixelIcon,
   viewProduct,

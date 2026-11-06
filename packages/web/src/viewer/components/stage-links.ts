@@ -7,7 +7,7 @@
 
 import { h } from "preact";
 import type { ViewId, StageId } from "../api.js";
-import { visibleStages, viewLabel } from "../api.js";
+import { visibleStages, viewLabelFor, useStatusLayout } from "../api.js";
 
 export interface StageLinksProps {
   stage: StageId | null;
@@ -16,6 +16,7 @@ export interface StageLinksProps {
 }
 
 export function StageLinks({ stage, validViews, onNavigate }: StageLinksProps) {
+  const layout = useStatusLayout();
   if (!stage) return null;
   // Step only through the stages this viewer has; wrap within them.
   const stages = visibleStages(validViews);
@@ -25,7 +26,7 @@ export function StageLinks({ stage, validViews, onNavigate }: StageLinksProps) {
   const next = stages[(i + 1) % stages.length];
 
   const link = (dir: "prev" | "next", target: StageId) => {
-    const name = `${dir === "prev" ? "Previous" : "Next"} stage: ${viewLabel(target)}`;
+    const name = `${dir === "prev" ? "Previous" : "Next"} stage: ${viewLabelFor(target, layout)}`;
     return h("button", {
       type: "button",
       class: `stage-link stage-link-${dir}`,
@@ -36,7 +37,7 @@ export function StageLinks({ stage, validViews, onNavigate }: StageLinksProps) {
     },
       dir === "prev" ? h("span", { class: "stage-link-arrow", "aria-hidden": "true" }, "←") : null,
       h("span", { class: "stage-link-dir", "aria-hidden": "true" }, dir),
-      h("span", { class: "stage-link-name", "aria-hidden": "true" }, viewLabel(target)),
+      h("span", { class: "stage-link-name", "aria-hidden": "true" }, viewLabelFor(target, layout)),
       dir === "next" ? h("span", { class: "stage-link-arrow", "aria-hidden": "true" }, "→") : null,
     );
   };

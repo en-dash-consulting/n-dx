@@ -28,9 +28,9 @@ import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { NavigateTo, ViewId } from "../types.js";
-import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
+import { viewLabel, viewLabelFor, viewBlurbFor, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
-import { useCliName, resolveCliLabel } from "../hooks/index.js";
+import { useCliName, useStatusLayout, resolveCliLabel } from "../hooks/index.js";
 import { LiveBadge } from "./stage-badge.js";
 
 /**
@@ -60,8 +60,8 @@ export function tileKey(tile: StageTile): string {
   return tile.panel ?? tile.view;
 }
 
-export function tileTitle(tile: StageTile): string {
-  return tile.title ?? viewLabel(tile.view);
+export function tileTitle(tile: StageTile, layout: "v1" | "v2"): string {
+  return tile.title ?? viewLabelFor(tile.view, layout);
 }
 
 // ── Full content ───────────────────────────────────────────────
@@ -94,13 +94,14 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
 
 /** A tile's whole content: its panel, or its view with the tile's tabs. */
 function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
+  const layout = useStatusLayout();
   const [active, setActive] = useState<ViewId>(tile.view);
   // An opened panel tile that lists tabs (Open changes: List, Tree) shows them.
   if (tile.panel && !(opened && tile.tabs?.length)) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
   const shown = tabs.some((t) => t.view === active) ? active : tile.view;
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1
-      ? h("div", { class: "stage-section-tablist stage-tile-tablist", role: "tablist", "aria-label": `${tileTitle(tile)} views` },
+      ? h("div", { class: "stage-section-tablist stage-tile-tablist", role: "tablist", "aria-label": `${tileTitle(tile, layout)} views` },
           tabs.map((t, i) => {
             const selected = t.view === shown;
             return h("button", {
@@ -115,7 +116,7 @@ function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase
               tabIndex: selected ? 0 : -1,
               onClick: () => setActive(t.view),
               onKeyDown: (e: KeyboardEvent) => tabListKeyDown(e, tabs, i, setActive),
-            }, t.label ?? viewLabel(t.view));
+            }, t.label ?? viewLabelFor(t.view, layout));
           }),
         )
       : null,
@@ -149,7 +150,8 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const title = tileTitle(tile);
+  const layout = useStatusLayout();
+  const title = tileTitle(tile, layout);
   const stageName = viewLabel(stage);
   return h("div", {
     class: `stage-tile-fullscreen${besideDetail ? " stage-tile-fullscreen--beside-detail" : ""}`,
@@ -218,7 +220,8 @@ interface TileProps {
 function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummary }: TileProps) {
   const key = tileKey(tile);
   const idBase = `stage-tile-${stage}-${key}`;
-  const title = tileTitle(tile);
+  const layout = useStatusLayout();
+  const title = tileTitle(tile, layout);
   const span = `stage-tile--c${tile.cols ?? 4} stage-tile--r${tile.rows ?? 1}`;
   // Called before the chromeless return so the hook order never depends on the tile.
   const cliName = useCliName();
@@ -249,7 +252,7 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
       h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
       h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
       tile.badge ? h(LiveBadge, { badge: tile.badge, id: `${idBase}-badge` }) : null,
-      tile.panel ? null : h("span", { class: "stage-tile-blurb" }, resolveCliLabel(viewBlurb(tile.view), cliName)),
+      tile.panel ? null : h("span", { class: "stage-tile-blurb" }, resolveCliLabel(viewBlurbFor(tile.view, layout), cliName)),
       h("span", { class: "stage-tile-open", "aria-hidden": "true" }, h(ActionIcon, { name: "expand" })),
     ),
     h("div", { class: `stage-tile-body${summary === null && !tile.panel ? " stage-tile-body--view" : ""}` },
