@@ -291,7 +291,13 @@ export function ThrottleControlsPanel() {
             const val = parseInt((e.target as HTMLInputElement).value, 10);
             setSliderValue(val);
           },
-          onChange: (e: Event) => {
+          // Sent once, when the drag ends. Not `onChange`: the dashboard loads
+          // preact/compat, which rewrites `onChange` on a range input to an
+          // `input` listener, so the PUT fired on every step of a drag and
+          // its `loading` state disabled the slider mid-drag. compat leaves
+          // `onChangeCapture` alone, and Preact binds it to the native
+          // `change` event.
+          onChangeCapture: (e: Event) => {
             const val = parseInt((e.target as HTMLInputElement).value, 10);
             handleConcurrencyChange(val);
           },
