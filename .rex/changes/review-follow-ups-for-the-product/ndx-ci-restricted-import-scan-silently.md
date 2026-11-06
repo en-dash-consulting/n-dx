@@ -8,9 +8,9 @@ acceptanceCriteria:
   - "Outside a git work tree, with ci.restrictedImports configured and a source directory made unreadable (chmod 000, POSIX only), `ndx ci --format=json` exits 1 and the architecture-policy step's violation names the directory and the read error (test)"
   - "A readable non-git project's architecture-policy step result is unchanged"
 priority: "low"
-discoveredFrom: {"item":"475f175a-f3de-4a25-97c3-1751dfe713fa","run":"32ff6e7c-fd63-4be9-9aeb-3b026d7a9c93"}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
 source: "ndx-adversarial-review"
+discoveredFrom: {"item":"475f175a-f3de-4a25-97c3-1751dfe713fa","run":"32ff6e7c-fd63-4be9-9aeb-3b026d7a9c93"}
 ---
