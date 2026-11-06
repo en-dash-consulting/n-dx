@@ -80,7 +80,7 @@ export const VIEW_META = {
     blurb: "Everything running now — agent tasks and analyses, across every worktree.",
   },
   "live-task": {
-    label: "Live Task",
+    label: "Live run",
     glyph: "▷",
     product: "global",
     blurb: "One running agent task, step by step.",

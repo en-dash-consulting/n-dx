@@ -222,6 +222,8 @@ export interface SidecarCard {
   preview?: string;
   /** A work card's run options as the server will start them, defaults applied. */
   runOptions?: Record<string, unknown>;
+  /** A work card's row: the task and the change it sits in. */
+  rowText?: string;
   /** A change-set card's items as approval writes them. */
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan, as the planner printed it when the card was raised. */

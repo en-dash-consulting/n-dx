@@ -19,7 +19,7 @@ export interface TaskStartControlProps {
   task: { id: string; status: string; blockedBy?: string[] };
   /** Resolves a blocker's id to its title; unknown ids show as the id. */
   titleOf?: (id: string) => string | null;
-  /** Start label for a task that has not begun. Defaults to "Start Task". */
+  /** Start label for a task that has not begun. Defaults to "Start". */
   label?: string;
   onStarted: () => void;
   workspace?: string;
