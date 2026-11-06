@@ -4163,17 +4163,29 @@ const CREDENTIAL_NAMES = new Set(["typesafe", "claude", "codex", "google"]);
  * the command still did what was asked. On failure the caller reports
  * `stderr`. The CLI never writes a credential value to either stream.
  *
+ * A spawn refused before it starts — on Windows, a path holding a `%NAME%`
+ * cmd.exe would expand — is a failure like any other: its message becomes
+ * `stderr`, so the caller prints one line rather than a stack.
+ *
+ * @param {string[]} args
+ * @param {string} [input]
+ * @param {typeof spawnSyncCli} [spawn]
  * @returns {{ code: number, stdout: string, stderr: string }}
  */
-function spawnCredentialsCli(args, input) {
+export function spawnCredentialsCli(args, input, spawn = spawnSyncCli) {
   const script = createRequire(import.meta.url).resolve(
     "@n-dx/llm-client/dist/cli/credentials.js",
   );
-  const result = spawnSyncCli(process.execPath, [script, ...args], {
-    encoding: "utf-8",
-    input: input ?? "",
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  let result;
+  try {
+    result = spawn(process.execPath, [script, ...args], {
+      encoding: "utf-8",
+      input: input ?? "",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch (err) {
+    return { code: 1, stdout: "", stderr: err instanceof Error ? err.message : String(err) };
+  }
   const code = typeof result.status === "number" ? result.status : 1;
   const stderr = String(result.stderr || result.error?.message || "");
   if (code === 0 && stderr) process.stderr.write(stderr);
@@ -4449,13 +4461,14 @@ async function fileApiKeys(dir, which) {
  * and overwriting it would put that key in the store as plaintext. A key the
  * store already holds is only removed from the file. A different stored key
  * is replaced only when `confirm` (a terminal) accepts a question naming both
- * fingerprints; without one the vendor is skipped. Never prints a value.
- * Returns whether nothing failed.
+ * fingerprints; a no skips the vendor, and with no `confirm` the vendor is
+ * skipped as a failure, since nobody chose. Never prints a value.
+ * Returns whether nothing failed. Exported for tests, which inject `confirm`.
  *
  * @param {string} dir
  * @param {((question: string) => Promise<boolean>) | null} confirm
  */
-async function importLocalApiKeys(dir, confirm) {
+export async function importLocalApiKeys(dir, confirm) {
   const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
   const status = spawnCredentialsCli(["status", "--json"]);
   if (status.code !== 0) {
@@ -4497,11 +4510,18 @@ async function importLocalApiKeys(dir, confirm) {
         `The credential store holds a different ${vendor} key (fingerprint ${shown}). ` +
         `Replace it with the one in ${label} (fingerprint ${fileFingerprint})? [y/N] `;
       if (!(confirm && (await confirm(question)))) {
-        console.log(
+        const skipped =
           `Skipped the ${vendor} key: the credential store holds a different one ` +
-            `(stored fingerprint ${shown}, ${label} fingerprint ${fileFingerprint}). ` +
-            `The key stays in ${label}, where it outranks the store; run ndx config credentials --import in a terminal to choose, or remove it there by hand.`,
-        );
+          `(stored fingerprint ${shown}, ${label} fingerprint ${fileFingerprint}). ` +
+          `The key stays in ${label}, where it outranks the store; run ndx config credentials --import in a terminal to choose, or remove it there by hand.`;
+        if (confirm) {
+          // The operator answered no: their choice, not a failure.
+          console.log(skipped);
+        } else {
+          // Nobody could choose, so the import did not finish.
+          allMoved = false;
+          console.error(skipped);
+        }
         continue;
       }
     }
@@ -4530,10 +4550,16 @@ async function readAnswer() {
   }
 }
 
-/** Ask a yes/no question on stderr; only a y or yes is a yes. */
-async function confirmOnTerminal(question) {
+/**
+ * Ask a yes/no question on stderr; only a y or yes is a yes. Exported for
+ * tests, which inject `read` in place of the terminal.
+ *
+ * @param {string} question
+ * @param {() => Promise<string>} [read]
+ */
+export async function confirmOnTerminal(question, read = readAnswer) {
   process.stderr.write(question);
-  return /^y(es)?$/i.test((await readAnswer()).trim());
+  return /^y(es)?$/i.test((await read()).trim());
 }
 
 /**

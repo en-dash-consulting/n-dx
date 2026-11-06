@@ -289,14 +289,22 @@ const DEFAULT_DENY_RES = compile(DEFAULT_ENV_DENY);
 const DEFAULT_ALLOW_RES = compile(DEFAULT_ENV_ALLOW);
 
 /**
+ * GitHub tokens Claude Code documents its subprocess scrub as leaving in
+ * place, so an allowed one still reaches the agent's commands.
+ */
+const SCRUB_KEEPS = new Set(["GITHUB_TOKEN", "GH_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"]);
+
+/**
  * Names in `env` kept only by an operator allow entry: credential-shaped by
- * the default deny list, and neither default plumbing nor the vendor's auth.
- * Claude Code's scrub removes credential-looking names from the commands the
- * agent runs, so these reach Claude Code but not those commands.
+ * the default deny list, and neither default plumbing, the vendor's auth nor a
+ * GitHub token the scrub keeps. Claude Code's scrub removes credential-looking
+ * names from the commands the agent runs, so these reach Claude Code but not
+ * those commands.
  */
 function scrubbedAllowedNames(env: NodeJS.ProcessEnv, authSet: ReadonlySet<string>): string[] {
   return Object.keys(env)
     .filter((name) => !authSet.has(name.toUpperCase()))
+    .filter((name) => !SCRUB_KEEPS.has(name.toUpperCase()))
     .filter((name) => DEFAULT_DENY_RES.some((re) => re.test(name)))
     .filter((name) => !DEFAULT_ALLOW_RES.some((re) => re.test(name)))
     .sort();
@@ -391,7 +399,8 @@ export function resolveVendorCliEnv(
     .filter((mode) => !mode.credentials.some((name) => present.has(name.toUpperCase())))
     .flatMap((mode) => mode.credentials);
   if (missing.length > 0) onStripped?.(missing, "missing-credentials");
-  if (env[CLAUDE_SUBPROCESS_ENV_SCRUB] === "1") {
+  // Only Claude Code reads the scrub flag; another vendor's commands keep everything.
+  if (vendor === LLM_VENDOR.CLAUDE && env[CLAUDE_SUBPROCESS_ENV_SCRUB] === "1") {
     const scrubbed = scrubbedAllowedNames(env, authSet);
     if (scrubbed.length > 0) onStripped?.(scrubbed, "scrubbed");
   }

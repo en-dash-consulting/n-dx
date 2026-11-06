@@ -186,7 +186,14 @@ items:
     lastModified: "2026-11-04T17:50:46.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7b397157-7309-4db5-913e-ac86d57f7f67":
-    lastModified: "2026-11-06T00:08:37.744Z"
+    status: "completed"
+    startedAt: "2026-11-06T01:14:57.465Z"
+    completedAt: "2026-11-06T01:35:07.762Z"
+    endedAt: "2026-11-06T01:35:07.762Z"
+    activeIntervals: [{"end":"2026-11-06T01:35:07.762Z","start":"2026-11-06T01:14:57.465Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Five #956 nits fixed with tests: landing setBusy(false) on credentialWarning; scrub report Claude-only and skips GitHub tokens; spawnCredentialsCli catches a refused spawn; non-terminal --import exits 1 on a differing key; terminal y replace tested via injected answer."
+    lastModified: "2026-11-06T01:35:07.762Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7ce15d95-320b-40e1-a256-28757ff37f89":
     lastModified: "2026-11-04T20:36:23.972Z"

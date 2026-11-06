@@ -356,6 +356,10 @@ describe("landing.ts setup wizard — Google key store result", () => {
     expect(successEl.hidden).toBe(false);
     expect(successEl.textContent).not.toContain("opening your dashboard");
     expect(successEl.querySelector("a")?.getAttribute("href")).toBe("/");
+
+    const submit = document.getElementById("wizard-submit") as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+    expect(submit.querySelector<HTMLElement>(".wizard-submit-spinner")?.hidden).toBe(true);
   });
 
   it("leaves a successful run unchanged", async () => {

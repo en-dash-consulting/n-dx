@@ -279,6 +279,28 @@ describe("resolveVendorCliEnv", () => {
       expect(out.flatMap(([names]) => names)).not.toContain("pw");
     });
 
+    it("never names an allowed GitHub token, which the scrub leaves in place", () => {
+      const out: Array<[string[], string]> = [];
+      resolveVendorCliEnv(
+        { vendor: "claude", claude: { auth: "api" } } as never,
+        { allow: ["DB_PASSWORD", "GITHUB_TOKEN", "GH_TOKEN"] },
+        { ...source, GITHUB_TOKEN: "ghp", GH_TOKEN: "gho" },
+        (names, kind) => out.push([names, kind]),
+      );
+      expect(out).toContainEqual([["DB_PASSWORD"], "scrubbed"]);
+    });
+
+    it("stays silent for a vendor other than Claude, even with the scrub flag exported", () => {
+      const out: string[] = [];
+      resolveVendorCliEnv(
+        { vendor: "codex" } as never,
+        { allow: ["DB_PASSWORD", "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] },
+        { ...source, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" },
+        (_n, kind) => out.push(kind),
+      );
+      expect(out).not.toContain("scrubbed");
+    });
+
     it("stays silent under auth cli, where nothing turns the scrub on", () => {
       expect(reports({ auth: "cli" }).filter(([, kind]) => kind === "scrubbed")).toEqual([]);
     });

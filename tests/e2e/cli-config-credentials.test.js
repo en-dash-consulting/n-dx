@@ -364,23 +364,59 @@ describe("ndx config credentials --import", () => {
     expect((await stat(storePath)).mtimeMs).toBe(mtime);
   }, DEFAULT_TIMEOUT);
 
-  it("never replaces a different stored key without a terminal to confirm, and names both fingerprints", async () => {
+  it("never replaces a different stored key without a terminal to confirm, names both fingerprints and fails", async () => {
     const STORED = "sk-ant-placeholder-stored-9876543210";
     expect(config(["credentials.claude", "--stdin"], STORED).code).toBe(0);
     const before = await storedClaude();
     await seed({ claude: { api_key: KEY } });
 
     const r = config(["credentials", "--import", cwd]);
-    expect(r.code, r.err).toBe(0);
+    // Nobody could choose, so the import did not finish.
+    expect(r.code, r.err).toBe(1);
     expect(await storedClaude()).toEqual(before);
     expect(await readFile(localPath(), "utf-8")).toContain(KEY);
-    const skipped = r.out.split("\n").find((l) => /Skipped the claude key/.test(l));
+    const skipped = r.err.split("\n").find((l) => /Skipped the claude key/.test(l));
     expect(skipped).toContain(`stored fingerprint ${fingerprintOf(STORED)}`);
     expect(skipped).toContain(`fingerprint ${fingerprintOf(KEY)}`);
     for (const text of [r.out, r.err]) {
       expect(text).not.toContain(KEY);
       expect(text).not.toContain(STORED);
     }
+  }, DEFAULT_TIMEOUT);
+
+  it("replaces a different stored key with the file's when the terminal answers y", async () => {
+    const STORED = "sk-ant-placeholder-stored-9876543210";
+    expect(config(["credentials.claude", "--stdin"], STORED).code).toBe(0);
+    await seed({ claude: { api_key: KEY } });
+
+    // The terminal's answer is injected; the credential CLI it drives is real.
+    const saved = { NDX_HOME: process.env.NDX_HOME, N_DX_HOME: process.env.N_DX_HOME };
+    process.env.NDX_HOME = home;
+    delete process.env.N_DX_HOME;
+    const questions = [];
+    try {
+      const { importLocalApiKeys, confirmOnTerminal } = await import("../../packages/core/config.js");
+      const confirm = (question) => {
+        questions.push(question);
+        return confirmOnTerminal(question, async () => "y\n");
+      };
+      expect(await importLocalApiKeys(cwd, confirm)).toBe(true);
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+
+    expect(questions).toHaveLength(1);
+    expect(questions[0]).toContain(`fingerprint ${fingerprintOf(STORED)}`);
+    expect(questions[0]).toContain(`fingerprint ${fingerprintOf(KEY)}`);
+    const store = await readFile(join(home, "credentials.json"), "utf-8");
+    expect(store).toContain(KEY);
+    expect(store).not.toContain(STORED);
+    const status = config(["credentials", cwd]).out;
+    expect(status).toMatch(new RegExp(`^claude: credential store.*${fingerprintOf(KEY)}`, "m"));
+    expect(await readFile(localPath(), "utf-8")).not.toContain(KEY);
   }, DEFAULT_TIMEOUT);
 
   it("leaves a git-tracked local file and the store alone, saying the file belongs to the repository", async () => {

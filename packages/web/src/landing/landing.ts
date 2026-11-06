@@ -243,6 +243,7 @@ function initSetupWizard(): void {
       if (data.credentialWarning) {
         // The typed key is lost unless the operator stores it by hand, so the
         // page stays put — a redirect would take the warning with it.
+        setBusy(false);
         if (warningEl) {
           warningEl.textContent = data.credentialWarning;
           warningEl.hidden = false;
