@@ -428,6 +428,20 @@ describe("on a v1 project", () => {
 describe("the Requirements tab", () => {
   const tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Product views"] [role="tab"]')];
 
+  it("stays reachable when the product read fails", async () => {
+    // No route for /api/rex/product: the stub answers 404, so the map read errors.
+    stubRoutes({});
+    await mount(h(ProductPage, null));
+    expect(tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(root.querySelector('#product-tabpanel [role="alert"]')?.textContent).toContain("not found");
+    expect(fetched).not.toContain("/api/rex/requirements/coverage");
+
+    act(() => { tabs()[1].click(); });
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
+    expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
+  });
+
   it("sits beside Map and renders the coverage and traceability reads", async () => {
     stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
     await mount(h(ProductPage, null));
