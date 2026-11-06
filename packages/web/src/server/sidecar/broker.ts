@@ -85,7 +85,7 @@ export interface SidecarCard {
    * card wrote, `problems` the list an external server's validation error
    * returned (the session got the result unchanged).
    */
-  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
+  carriedOut?: { ok: boolean; ids?: string[]; held?: boolean; problems?: SidecarCallProblem[] };
 }
 
 /** What the broker reads before raising a card, for the operator to see on it. */

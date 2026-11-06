@@ -26,7 +26,7 @@ export function StatusBody({ card }: { card: SidecarCard }) {
       ? h("p", { class: "sidecar-status-rule" }, "Rex allows this move without force.")
       : h("p", { class: "sidecar-status-rule sidecar-status-refused", role: "note" }, `Rex refuses this move: ${change.rule.message}`),
     h("p", { class: "sidecar-status-note" }, written
-      ? (written.ok ? "Status written." : "Nothing was written; the agent was told why.")
+      ? (written.held ? "Recorded; the hench run applies it after its test gate." : written.ok ? "Status written." : "Nothing was written; the agent was told why.")
       : change.rule.allowed
         ? "Approve writes the status through rex; completing an item runs rex's checks. Deny writes nothing."
         : "Approving fails with rex's message and writes nothing; Deny writes nothing."),

@@ -248,7 +248,7 @@ export interface SidecarCard {
   /** The operator edited the change set, placement, path or call arguments before approving it. */
   edited?: true;
   /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote, `problems` an external server's validation errors. */
-  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
+  carriedOut?: { ok: boolean; ids?: string[]; held?: boolean; problems?: SidecarCallProblem[] };
 }
 
 /** A placement as one body: the shape `POST /api/rex/changes/:id/placement/check` takes, and a placement approval's edits. */
