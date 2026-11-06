@@ -891,6 +891,13 @@
 .placing-map { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .placing-note { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
 .placing-map .pam { padding: 0; }
+/* The panel yields to a Sidecar placement card: one line, and the way back. */
+.placing-yield {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--accent); border-radius: var(--radius-md);
+  font-size: var(--font-sm); color: var(--text-dim);
+}
 
 /* Candidate homes are lit; blocks sharing words are near; every other block steps back. */
 .pam-placing .pam-block:not(.pam-lit):not(.pam-near):not(.pam-ghost):not(.pam-placed) { opacity: 0.45; }

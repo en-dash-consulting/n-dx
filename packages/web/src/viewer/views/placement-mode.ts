@@ -32,6 +32,15 @@
  * panel's controls. Place & add another keeps the panel open (WF8): every home
  * placed in the visit is marked on the map with the change's marker.
  *
+ * One placement surface at a time (SP2): while the Sidecar drawer holds a
+ * placement card for this change (Place lens), the panel shrinks to "Placing
+ * with Sidecar · decide in the drawer" with Place by hand, and the map follows
+ * the card's working copy both ways (sidecar-placement.ts's shared drafts).
+ * Place by hand, or the card ending unapproved (withdrawn after M1's 60 s,
+ * or denied), reopens the panel on the card's selection and edits through the
+ * WF10 draft. The card stays the Sidecar's write path; the panel's Place the
+ * operator's.
+ *
  * Leaving (Esc, the breadcrumb, another tab) with a pick or an edit in the
  * panel keeps it as a draft for the browser session (WF10, placement-draft.ts):
  * the Inbox row says "draft · …", and Place resumes it at the step it was left
@@ -41,8 +50,8 @@
  */
 
 import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
-import { useProductRead } from "../hooks/index.js";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
+import { useProductRead, type SidecarCard, type SidecarPlacementRequest } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
 import {
@@ -55,7 +64,16 @@ import {
   type ProposalGhost,
   type PlacementTarget,
 } from "../components/prd-tree/change-placement.js";
-import { StrengthChip } from "../components/index.js";
+import {
+  SidecarPlacementContext,
+  StrengthChip,
+  draftOnTarget,
+  useCardDraft,
+  useCardDrafts,
+  type PlacementDraft,
+} from "../components/index.js";
+import { savePlacementDraft, type PlacementDraftState } from "../components/prd-tree/placement-draft.js";
+import type { CriterionDraft } from "../components/prd-tree/change-placement.js";
 import { useInbox, type InboxRow } from "./inbox.js";
 import { isTypingTarget, pressPanelShortcut, useShortcuts } from "./inbox-triage.js";
 import { AreaBlock, BlockLegend, areaBlock } from "./product-area-map.js";
@@ -197,6 +215,68 @@ export function placingLabel(index: number, total: number, title: string): strin
   return index >= 0 ? `Placing ${index + 1} of ${total} · ${title}` : `Placing · ${title}`;
 }
 
+/** The open session's latest placement card for `changeId`, whatever its status; null when it has none. */
+export function placementCardFor(cards: readonly SidecarCard[], changeId: string): SidecarCard | null {
+  for (let i = cards.length - 1; i >= 0; i--) {
+    if (cards[i].placement?.change === changeId) return cards[i];
+  }
+  return null;
+}
+
+/** A capability on the map as a panel target; null for an id no area holds. */
+export function mapTarget(map: ProductMap, id: string): PlacementTarget | null {
+  const area = areaOfTarget(map, id);
+  const row = area?.capabilities.find((c) => c.id === id);
+  return area && row ? targetOfRow(row, area.title, []) : null;
+}
+
+/**
+ * The panel's saved draft (WF10) for what a placement card holds, so Place by
+ * hand, or the card's end, opens the panel on the card's selection and edits.
+ * `row` is the target as the panel reads it (its shortlist row, or the map's
+ * capability). The criteria edits carry over only when the target's criteria
+ * are known; otherwise the panel reads them afresh.
+ */
+export function panelDraftOfCard(draft: PlacementDraft, request: SidecarPlacementRequest, row: PlacementTarget | null): PlacementDraftState {
+  if (draft.mode === "propose") {
+    const kept = request.action === "propose" ? request : null;
+    return {
+      step: "propose",
+      type: draft.type,
+      under: draft.under,
+      title: draft.title,
+      statement: kept?.proposed ?? "",
+      criteria: (kept?.criteria?.add ?? []).map((c) => c.text).join("\n"),
+    };
+  }
+  const target = row ?? { target: draft.target, type: "capability" as const, title: draft.label ?? draft.target, area: "" };
+  const criteria: CriterionDraft[] = row?.criteria
+    ? [
+        ...row.criteria.map((c) => ({
+          id: c.id,
+          text: draft.replace[c.id] ?? c.text,
+          original: c.text,
+          ...(draft.remove.includes(c.id) ? { removed: true } : {}),
+        })),
+        ...draft.add.map((c) => ({ id: c.id, text: c.text })),
+      ]
+    : [];
+  return {
+    step: "place",
+    target,
+    relation: draft.relation,
+    summary: request.summary ?? "",
+    proposed: draft.statement ?? "",
+    criteria,
+  };
+}
+
+/** What the card's amendment does to its target's criteria count, for the selected block; null when it amends nothing. */
+export function cardPendingCriteria(draft: PlacementDraft | null): PendingCriteria | null {
+  if (!draft || draft.mode !== "place" || draft.relation !== "amends" || !draft.target) return null;
+  return { target: draft.target, delta: draft.add.length - draft.remove.length };
+}
+
 // ── Pieces ───────────────────────────────────────────────────────────
 
 /** Every area as a block, the ones holding candidates lit with their count. Choosing one zooms in. */
@@ -327,7 +407,62 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   // The homes the change was placed on in this visit, each marked on the map (WF8).
   const [homes, setHomes] = useState<ReadonlySet<string>>(new Set());
   const panelRef = useRef<HTMLElement>(null);
-  const ghostArea = map && ghost ? map.areas.find((a) => a.id === ghost.under) : undefined;
+
+  // SP2: a Sidecar placement card for this change takes the decision while it waits. The panel
+  // yields to one line, and the map follows the card's working copy, which a block pick edits.
+  const share = useContext(SidecarPlacementContext);
+  const drafts = useCardDrafts();
+  const card = placementCardFor(share?.cards ?? [], changeId);
+  const waiting = card?.status === "pending" ? card : null;
+  // The card handed to the panel by Place by hand: the panel is the operator's again.
+  const [handed, setHanded] = useState<string | null>(null);
+  // Bumped on a hand-over, so the panel mounts afresh on the draft the card left.
+  const [panelRun, setPanelRun] = useState(0);
+  const yielding = waiting !== null && handed !== waiting.id;
+  const cardCopy = useCardDraft(drafts, yielding ? waiting : null);
+  const handOver = (from: SidecarCard) => {
+    const copy = drafts.get(from);
+    const shortlistNow = placement?.shortlist ?? [];
+    const row = copy.mode === "place"
+      ? shortlistNow.find((c) => c.target === copy.target) ?? (map ? mapTarget(map, copy.target) : null)
+      : null;
+    savePlacementDraft(changeId, panelDraftOfCard(copy, from.placement!.request, row));
+    if (row) setSelection(row);
+    setHanded(from.id);
+    setPanelRun((n) => n + 1);
+  };
+  // A card that ends while the panel yields to it, withdrawn after M1's 60 s or denied, leaves the
+  // panel ready with what it held. An approved one placed the change: the panel shows where.
+  const yieldedTo = useRef<SidecarCard | null>(null);
+  useEffect(() => {
+    if (yielding) { yieldedTo.current = waiting; return; }
+    const ended = yieldedTo.current;
+    yieldedTo.current = null;
+    if (!ended) return;
+    const now = (share?.cards ?? []).find((c) => c.id === ended.id);
+    // Handed over by Place by hand: the card still waits in the drawer, with its copy.
+    if (now?.status === "pending") return;
+    if (now?.status !== "approved") handOver(ended);
+    drafts.drop(ended.id);
+  }, [yielding, waiting?.id]);
+  const cardTarget = cardCopy?.mode === "place" && cardCopy.target ? cardCopy.target : null;
+  // The card's row lights its block: the map moves to the area that holds it.
+  useEffect(() => {
+    if (!cardTarget || !map) return;
+    const area = areaOfTarget(map, cardTarget);
+    if (area) setZoom(area.slug);
+  }, [cardTarget, map !== null]);
+  /** A block or chip picked while the card decides selects the card's row. */
+  const pickForCard = (target: string, title: string) => {
+    if (waiting) drafts.set(waiting, (prev) => draftOnTarget(prev, target, title));
+  };
+  const cardGhost: ProposalGhost | null = cardCopy?.mode === "propose" && cardCopy.type === "capability"
+    ? { title: cardCopy.title.trim() || (shown?.change.title ?? ""), under: cardCopy.under }
+    : null;
+  const shownGhost = yielding ? cardGhost : ghost;
+  const shownPending = yielding ? cardPendingCriteria(cardCopy) : pending;
+
+  const ghostArea = map && shownGhost ? map.areas.find((a) => a.id === shownGhost.under) : undefined;
   // The ghost lives in the area the form names: choosing another area moves the map, and the ghost, there.
   useEffect(() => { if (ghostArea) setZoom(ghostArea.slug); }, [ghostArea?.slug]);
   // The map's last pick of an area, which an open proposal form follows (WF6). The opening zoom and the
@@ -391,7 +526,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const groups = map && placement ? candidatesByArea(placement.shortlist, map) : [];
   const zoomedArea = zoom && map ? map.areas.find((a) => a.slug === zoom) : undefined;
   const shortlist = placement?.shortlist ?? [];
-  const selectedId = selection?.target ?? null;
+  const selectedId = yielding ? cardTarget : selection?.target ?? null;
 
   return h("div", { class: "placing-container", "data-placing": changeId, "data-level": zoom ? "area" : zoom === null ? "map" : "pending" },
     h("nav", { class: "placing-crumb", "aria-label": "Breadcrumb" },
@@ -416,7 +551,10 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
             ]
           : null,
         zoom && map
-          ? h(OtherAreaChips, { key: "chips", others: otherAreaCandidates(shortlist, map, zoom), selectedId, onPick: choose })
+          ? h(OtherAreaChips, {
+              key: "chips", others: otherAreaCandidates(shortlist, map, zoom), selectedId,
+              onPick: yielding ? (c: PlacementCandidate) => pickForCard(c.target, c.title) : choose,
+            })
           : null,
         zoom
           ? h(ZoomedArea, {
@@ -425,18 +563,23 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
               group: groups.find((g) => g.area.slug === zoom),
               tied: !!placement?.tied,
               // The title the proposal is typing, so near-duplicates stay in view.
-              changeText: ghost?.title ?? shown.change.title,
+              changeText: shownGhost?.title ?? shown.change.title,
               selectedId,
-              pending,
-              ghost: ghost && ghostArea?.slug === zoom ? { title: ghost.title } : null,
+              pending: shownPending,
+              ghost: shownGhost && ghostArea?.slug === zoom ? { title: shownGhost.title } : null,
               placed: homes,
-              onSelect: (row: CapabilityRow, areaTitle: string) => choose(targetOfRow(row, areaTitle, shortlist)),
+              onSelect: (row: CapabilityRow, areaTitle: string) => (yielding
+                ? pickForCard(row.id, row.title)
+                : choose(targetOfRow(row, areaTitle, shortlist))),
             })
           : null,
       ),
       h("aside", { ref: panelRef, class: "placing-panel", "aria-label": "Where it goes" },
-        h(ChangePlacementSection, {
-          key: changeId,
+        yielding && waiting ? h("div", { class: "placing-yield", role: "status" },
+          h("span", null, "Placing with Sidecar · decide in the drawer"),
+          h("button", { type: "button", class: "ch-change-link placing-by-hand", onClick: () => handOver(waiting) }, "Place by hand"),
+        ) : h(ChangePlacementSection, {
+          key: `${changeId}:${panelRun}`,
           changeId,
           changeTitle: shown.change.title,
           onOpenChange: (id: string) => navigateTo?.("product", { tab: placementTab(id) }),

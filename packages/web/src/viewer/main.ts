@@ -30,6 +30,8 @@ import {
   ServerUnavailableNotice,
   SidecarDock,
   PlaceWithSidecarContext,
+  SidecarPlacementContext,
+  createCardDrafts,
   PlanWithSidecarContext,
   planFirstTurn,
   DescribeInSidecarContext,
@@ -278,6 +280,14 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     () => (sidecarShell.button ? { place: (id: string) => { setDescribeChange(null); setOpenChange(id); showSidecar(); }, attached: openChange } : null),
     [sidecarShell.button !== null, showSidecar, openChange],
   );
+  // The drawer's placement cards and one working copy per card, shared with placement mode (SP2).
+  // Null while Sidecar is off, so the candidate panel never yields.
+  const [cardDrafts] = useState(createCardDrafts);
+  const placementCards = sidecar.cards;
+  const placementShare = useMemo(
+    () => (sidecarShell.button ? { cards: placementCards.filter((c) => c.kind === "placement"), drafts: cardDrafts } : null),
+    [sidecarShell.button !== null, placementCards],
+  );
   // Null while Sidecar is off, so the Workspaces cards offer no attach control.
   const attachWorktree = useMemo(
     () => (sidecarShell.button ? (key: string | null) => {
@@ -359,7 +369,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
+  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -438,7 +448,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  ))))));
+  )))))));
 }
 
 const root = document.getElementById("app");

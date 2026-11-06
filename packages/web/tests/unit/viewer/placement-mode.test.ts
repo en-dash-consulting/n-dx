@@ -17,6 +17,8 @@ import {
   mapLevelNote,
   nearNotes,
   otherAreaCandidates,
+  panelDraftOfCard,
+  placementCardFor,
   placementStart,
   placingLabel,
   sharedWords,
@@ -36,8 +38,15 @@ import type {
   PlacementCandidate,
   ProductMap,
 } from "../../../src/viewer/views/product-model.js";
-import type { SidecarPlacementCheck } from "../../../src/viewer/hooks/sidecar.js";
-import { CHECK_DEBOUNCE_MS } from "../../../src/viewer/components/sidecar-placement.js";
+import type { SidecarCard, SidecarPlacementCheck, SidecarPlacementRequest } from "../../../src/viewer/hooks/sidecar.js";
+import {
+  CHECK_DEBOUNCE_MS,
+  PlacementBody,
+  SidecarPlacementContext,
+  createCardDrafts,
+  type CardDrafts,
+  type PlacementDraft,
+} from "../../../src/viewer/components/sidecar-placement.js";
 
 vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -1039,5 +1048,142 @@ describe("PlacementMode", () => {
     serve([change("a")], [placement("a", [candidate("cap-label")])]);
     await mount(h(ProductPage, { placeChangeId: "a", navigateTo: vi.fn() }));
     expect($(".placing-container")?.dataset.placing).toBe("a");
+  });
+});
+
+// ── One placement surface (SP2) ──────────────────────────────────────
+
+function sidecarCard(over: Partial<SidecarCard> = {}): SidecarCard {
+  return {
+    id: "p1", sessionId: "s1", tool: "place_change_card", kind: "placement", input: {}, allowListKey: null,
+    placement: {
+      change: "a",
+      request: { action: "place", target: "cap-refund", relation: "amends", proposed: "Refunds go back to the card" },
+      reasons: ["It refunds."],
+      check: { ok: true, action: "place", target: "cap-refund", title: "Refunds", relation: "amends", warnings: [] },
+    },
+    status: "pending", raisedAt: "2026-11-05T00:00:00.000Z", ...over,
+  };
+}
+
+describe("panelDraftOfCard", () => {
+  const request: SidecarPlacementRequest = { action: "place", target: "cap-refund", relation: "amends", summary: "Why" };
+  const draft: PlacementDraft = {
+    mode: "place", target: "cap-refund", relation: "amends", statement: "Refunds go back to the card",
+    replace: { c1: "Reworded" }, remove: ["c2"], add: [{ id: "c3", text: "Added" }],
+    type: "capability", under: "", title: "",
+  };
+
+  it("carries the card's target, relation, statement, summary and criteria edits into the panel's draft", () => {
+    const row = candidate("cap-refund", { criteria: [{ id: "c1", text: "One" }, { id: "c2", text: "Two" }] });
+    expect(panelDraftOfCard(draft, request, row)).toEqual({
+      step: "place", target: row, relation: "amends", summary: "Why", proposed: "Refunds go back to the card",
+      criteria: [
+        { id: "c1", text: "Reworded", original: "One" },
+        { id: "c2", text: "Two", original: "Two", removed: true },
+        { id: "c3", text: "Added" },
+      ],
+    });
+  });
+
+  it("leaves the criteria for the panel to read when the target's are unknown, and keeps a proposal as one", () => {
+    expect(panelDraftOfCard({ ...draft, label: "Gift cards", target: "cap-gift" }, request, null)).toMatchObject({
+      target: { target: "cap-gift", title: "Gift cards" }, criteria: [],
+    });
+    const propose: SidecarPlacementRequest = {
+      action: "propose", type: "capability", under: "area-pay", title: "Gift receipts", proposed: "S",
+      criteria: { add: [{ id: "c1", text: "x" }, { id: "c2", text: "y" }] },
+    };
+    expect(panelDraftOfCard({ ...draft, mode: "propose", under: "area-pay", title: "Gift receipts" }, propose, null))
+      .toEqual({ step: "propose", type: "capability", under: "area-pay", title: "Gift receipts", statement: "S", criteria: "x\ny" });
+  });
+
+  it("finds the latest placement card for the change, whatever its status", () => {
+    const first = sidecarCard({ id: "p1", status: "withdrawn" });
+    const second = sidecarCard({ id: "p2" });
+    const other = sidecarCard({ id: "p3", placement: { ...second.placement!, change: "b" } });
+    expect(placementCardFor([first, second, other], "a")?.id).toBe("p2");
+    expect(placementCardFor([other], "a")).toBeNull();
+  });
+});
+
+const SP2_SHORTLIST = [
+  candidate("cap-refund", { score: 9, title: "Refunds", criteria: [{ id: "c1", text: "A refund is issued" }] }),
+  candidate("cap-gift", { strength: "possible", score: 2, title: "Gift cards" }),
+];
+
+describe("PlacementMode with a Sidecar placement card (SP2)", () => {
+  let store: CardDrafts;
+
+  /** Placement mode beside the drawer's card bodies, sharing one store as main.ts does. */
+  async function show(cards: SidecarCard[]): Promise<void> {
+    await mount(h(SidecarPlacementContext.Provider, { value: { cards, drafts: store } },
+      h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }),
+      h("div", { class: "drawer" },
+        cards.filter((c) => c.status === "pending").map((card) =>
+          h(PlacementBody, { key: card.id, card, editable: true, onEdit: () => {}, edit: null })))));
+  }
+
+  beforeEach(() => {
+    store = createCardDrafts();
+    serve([change("a")], [placement("a", SP2_SHORTLIST)], () => ({ ok: true, action: "place", target: "cap-gift", title: "Gift cards", relation: "touches", warnings: [] }));
+    const served = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) =>
+      url === "/api/rex/changes/a/placement"
+        ? new Response(JSON.stringify(placement("a", SP2_SHORTLIST)), { status: 200, headers: { "Content-Type": "application/json" } })
+        : served(url, init)));
+  });
+
+  const pressed = () => $$('.pam-block[aria-pressed="true"]').map((el) => el.dataset.block);
+  const cardRow = () => $<HTMLInputElement>(".drawer .sidecar-place-row input:checked")?.value;
+
+  it("shrinks the panel to one line with Place by hand while the card waits", async () => {
+    await show([sidecarCard()]);
+    expect($(".placing-panel .placing-yield")?.textContent).toContain("Placing with Sidecar · decide in the drawer");
+    expect($(".placing-panel .placing-by-hand")?.textContent).toBe("Place by hand");
+    expect($(".placing-panel .cp-section")).toBeNull();
+  });
+
+  it("keeps the panel for a card about another change", async () => {
+    await show([sidecarCard({ placement: { ...sidecarCard().placement!, change: "b" } })]);
+    expect($(".placing-yield")).toBeNull();
+    expect($(".placing-panel .cp-section")).not.toBeNull();
+  });
+
+  it("lights the card's selected row on the map, and a block picked on the map selects the card's row", async () => {
+    await show([sidecarCard()]);
+    expect(pressed()).toEqual(["cap-refund"]);
+    expect(cardRow()).toBe("cap-refund");
+
+    await act(async () => { $<HTMLInputElement>('.drawer .sidecar-place-row input[value="cap-gift"]')!.click(); });
+    await settle();
+    expect(pressed()).toEqual(["cap-gift"]);
+
+    await act(async () => { $<HTMLButtonElement>('.pam-block[data-block="cap-refund"]')!.click(); });
+    await settle();
+    expect(cardRow()).toBe("cap-refund");
+    expect(pressed()).toEqual(["cap-refund"]);
+  });
+
+  it("Place by hand reopens the panel with the card's selection and edits; the card still waits", async () => {
+    await show([sidecarCard()]);
+    await act(async () => { $<HTMLButtonElement>(".placing-by-hand")!.click(); });
+    await settle();
+    expect($(".placing-yield")).toBeNull();
+    expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-refund");
+    expect($<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="amends"]')!.checked).toBe(true);
+    expect($<HTMLTextAreaElement>(".cp-card.is-checked .cp-amends textarea")!.value).toBe("Refunds go back to the card");
+    expect($(".drawer .sidecar-place")).not.toBeNull();
+    expect(pressed()).toEqual(["cap-refund"]);
+  });
+
+  it("a card withdrawn while the panel yields leaves the panel open with what the card held", async () => {
+    await show([sidecarCard()]);
+    await act(async () => { $<HTMLInputElement>('.drawer .sidecar-place-row input[value="cap-gift"]')!.click(); });
+    await settle();
+    await show([sidecarCard({ status: "withdrawn", reason: "no answer in 60 s" })]);
+    expect($(".placing-yield")).toBeNull();
+    expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
+    expect(pressed()).toEqual(["cap-gift"]);
   });
 });
