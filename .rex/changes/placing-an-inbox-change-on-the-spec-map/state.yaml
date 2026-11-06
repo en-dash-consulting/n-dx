@@ -37,10 +37,13 @@ items:
     lastModified: "2026-11-06T00:09:58.810Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cc097ef0-8d88-4c42-ba95-6bd6bcf1db59":
+    status: "completed"
     startedAt: "2026-11-06T00:04:00.438Z"
-    activeIntervals: [{"end":"2026-11-06T00:19:18.089Z","start":"2026-11-06T00:04:00.438Z"}]
+    completedAt: "2026-11-06T00:23:10.249Z"
+    endedAt: "2026-11-06T00:23:10.249Z"
+    activeIntervals: [{"end":"2026-11-06T00:19:18.089Z","start":"2026-11-06T00:04:00.438Z"},{"end":"2026-11-06T00:23:10.249Z","start":"2026-11-06T00:23:10.249Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
-    lastModified: "2026-11-06T00:19:19.058Z"
+    lastModified: "2026-11-06T00:23:10.249Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fe39744e-059c-46ec-ad96-a04ce74cd1e4":
     status: "completed"
