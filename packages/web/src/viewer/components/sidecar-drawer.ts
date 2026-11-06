@@ -390,7 +390,9 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = shownWidth;
-    const move = (ev: PointerEvent) => resizeTo(startWidth + (startX - ev.clientX));
+    // The listener outlives this render, so the drag tracks wide mode itself.
+    let stillWide = isWide;
+    const move = (ev: PointerEvent) => { stillWide = resizeTo(startWidth + (startX - ev.clientX), stillWide); };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -402,13 +404,15 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   // A wide drawer is past the resize range. The edge follows the pointer
   // between the range and the full wide width, never shrinking on a widening
   // move; wide mode ends only once the width is back inside the range.
-  const resizeTo = (next: number) => {
-    if (isWide && next > SIDECAR_WIDTH_MAX) {
+  // Returns whether the drawer is still wide.
+  const resizeTo = (next: number, wideNow = isWide): boolean => {
+    if (wideNow && next > SIDECAR_WIDTH_MAX) {
       setWideWidth(next >= fullWidth ? null : next);
-      return;
+      return true;
     }
     setWideWidth(null);
     applyWidth(next);
+    return false;
   };
 
   const onResizeKey = (e: KeyboardEvent) => {

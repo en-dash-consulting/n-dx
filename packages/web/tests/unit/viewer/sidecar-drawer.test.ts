@@ -496,6 +496,9 @@ describe("wide mode", () => {
     await move(900);
     expect((drawer() as HTMLElement).style.width).toBe("560px");
     expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
+    // Out of wide mode, the same drag resizes within 360–640.
+    await move(800);
+    expect((drawer() as HTMLElement).style.width).toBe("640px");
     window.dispatchEvent(new MouseEvent("pointerup"));
   });
 
