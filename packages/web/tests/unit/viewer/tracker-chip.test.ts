@@ -19,6 +19,7 @@ let calls: Array<{ url: string; method: string }>;
 let sidecar: boolean;
 let chips: unknown;
 let liveState: unknown;
+let decided: unknown;
 
 /** The toggle's read, then the chips' read, each settle a few turns after the render. */
 async function settle(): Promise<void> {
@@ -39,6 +40,7 @@ beforeEach(() => {
   sidecar = true;
   chips = { tracker: { label: "CAOS" }, changes: {} };
   liveState = { state: null, problem: "not stubbed" };
+  decided = { result: "ok" };
   clearProjectMetadataCache();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const u = String(url);
@@ -51,6 +53,8 @@ beforeEach(() => {
     else if (u === "/api/project") body = { cliName: "ndx" };
     else if (u.endsWith("/create")) {
       body = { requestId: "ndx:ndx:ch-1:change-captured", entry: { call: { tool: "create_work_item", args: { title: "T" } } } };
+    } else if (u === "/api/tracker/cards/decide") {
+      body = { entry: decided };
     } else if (u.startsWith("/api/tracker/cards/form")) {
       body = { externalCall: { tool: "create_work_item", label: "CAOS", inputSchema: { type: "object", properties: { title: { type: "string" } } } } };
     }
@@ -147,6 +151,33 @@ describe("ChangeTrackerChip", () => {
     expect(calls.some((c) => c.url === "/api/tracker/cards/decide")).toBe(false);
     // The open form takes the full width beneath a flex row (stage-tiles.css), not a column of it.
     expect(root.querySelector(".create-in-tracker")?.classList.contains("create-in-tracker-open")).toBe(true);
+  });
+
+  const run = async (): Promise<void> => {
+    await mount();
+    act(() => { create()!.click(); });
+    await settle();
+    act(() => { (root.querySelector('[data-action="send"]') as HTMLButtonElement).click(); });
+    await settle();
+  };
+
+  it("keeps the form open and shows the problem when the tracker refuses the create", async () => {
+    decided = { result: "refused", problems: [{ message: "title is required" }] };
+    await run();
+    expect(root.querySelector('[data-action="send"]')).not.toBeNull();
+    expect(root.querySelector(".live-error")?.textContent).toContain("title is required");
+  });
+
+  it("says to link by hand when an ok create's link failed", async () => {
+    decided = { result: "ok", problems: [{ message: "created WM-9, but could not link ch-1 to it: locked" }] };
+    await run();
+    expect(root.querySelector('[data-action="send"]')).not.toBeNull();
+    expect(root.querySelector(".live-error")?.textContent).toContain("Link it by hand");
+  });
+
+  it("closes the form on an ok create with no problems", async () => {
+    await run();
+    expect(root.querySelector('[data-action="send"]')).toBeNull();
   });
 
   it("draws nothing without a tracker connection", async () => {

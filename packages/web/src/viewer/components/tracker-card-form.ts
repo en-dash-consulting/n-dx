@@ -21,6 +21,25 @@ export async function errorOf(res: Response, fallback: string): Promise<string> 
   return `${fallback} (${res.status})`;
 }
 
+interface DecidedEntry {
+  result?: string;
+  problems?: Array<{ message: string }>;
+}
+
+/**
+ * Why an approved call did not finish cleanly, or null when it did: an `ok` or
+ * `duplicate` result with no problems. An `ok` create whose link failed made the
+ * work item, so the operator is told to link it by hand.
+ */
+function problemOf(entry: DecidedEntry | undefined): string | null {
+  const result = entry?.result ?? "ok";
+  const detail = (entry?.problems ?? []).map((p) => p.message).join("; ");
+  if (result === "ok" || result === "duplicate") {
+    return detail ? `${detail}. Link it by hand.` : null;
+  }
+  return `The tracker did not run the call (${result})${detail ? `: ${detail}` : ""}`;
+}
+
 export interface TrackerCardFormProps {
   /** The card: its request id and the call the rules planned. */
   entry: { requestId: string; call: { tool: string; args: Record<string, unknown> } };
@@ -56,8 +75,11 @@ export function TrackerCardForm({ entry, onDone, onCancel }: TrackerCardFormProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: entry.requestId, action: "approve", args: edit }),
       });
-      if (res.ok) onDone();
-      else setError(await errorOf(res, "Could not run the call"));
+      if (!res.ok) { setError(await errorOf(res, "Could not run the call")); return; }
+      const { entry: decided } = (await res.json()) as { entry?: DecidedEntry };
+      const problem = problemOf(decided);
+      if (problem) setError(problem);
+      else onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not run the call");
     } finally {
