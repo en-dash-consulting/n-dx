@@ -30,6 +30,12 @@
  * The section follows a target chosen on the map (`selection`), reports its
  * own choices (`onChoose`) and the pending criteria count (`onPendingCriteria`).
  *
+ * In the wide panel, Place & add another keeps an umbrella change open: each
+ * extra home is a touches (`/place`), the panel lists the homes with Remove
+ * (`/unplace`) until Done, and `onHomes` reports them so the map marks each.
+ * "Draft with the model" there adds its pick as a card marked "model", never
+ * checked for the person, and only while Sidecar (whose Place lens drafts) is off.
+ *
  * Once the change leaves the Inbox the section shrinks to one line naming
  * where it was placed.
  *
@@ -37,14 +43,14 @@
  */
 
 import { Fragment, h, type ComponentChildren } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useCliName, useFeatureToggle, useProductRead } from "../../hooks/index.js";
 import type { SidecarPlacementCheck } from "../../hooks/sidecar.js";
 import { CHECK_DEBOUNCE_MS, checkPlacementRequest, dryRunLine } from "../sidecar-placement.js";
 import { isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
 import { Pending } from "../../views/product-pages.js";
 import { StrengthChip } from "../strength-chip.js";
-import { PlaceWithSidecarButton } from "../place-with-sidecar.js";
+import { PlaceWithSidecarButton, PlaceWithSidecarContext } from "../place-with-sidecar.js";
 import type {
   CapabilityDetail,
   ChangePlacement,
@@ -416,7 +422,7 @@ function RelationChoice({ name, relation, onChange, target }: {
  * matched words, statement and what Touches and Amends would do. The checked
  * card holds the relation choice in place of the two effect lines.
  */
-export function CandidateCard({ name, target, checked, onChoose, relationChoice, touchesOnly }: {
+export function CandidateCard({ name, target, checked, onChoose, relationChoice, touchesOnly, model = false }: {
   name: string;
   target: PlacementTarget;
   checked: boolean;
@@ -425,16 +431,19 @@ export function CandidateCard({ name, target, checked, onChoose, relationChoice,
   relationChoice: ComponentChildren;
   /** Only Touches applies, so the card names no Amends effect. */
   touchesOnly: boolean;
+  /** The model's one-shot pick: the card says so, and it is never checked until a person checks it. */
+  model?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // A block chosen on the map brings its card into view.
   useEffect(() => { if (checked) ref.current?.scrollIntoView?.({ block: "nearest" }); }, [checked]);
   const area = target.area || (target.type === "constraint" ? "Constraint" : "");
-  return h("div", { ref, class: `cp-card${checked ? " is-checked" : ""}`, "data-target": target.target },
+  return h("div", { ref, class: `cp-card${checked ? " is-checked" : ""}${model ? " is-model" : ""}`, "data-target": target.target },
     h("label", { class: "cp-card-head" },
       h("input", { type: "radio", name, value: target.target, checked, onChange: () => onChoose(target) }),
       h("span", { class: "cp-target-title" }, target.title),
       target.strength ? h(StrengthChip, { strength: target.strength }) : h("span", { class: "cp-target-kind" }, target.type),
+      model ? h("span", { class: "cp-model-mark", title: "Picked by the model" }, "model") : null,
     ),
     area ? h("div", { class: "cp-card-area" }, area) : null,
     target.reasons?.length ? h("div", { class: "cp-card-words" }, matched(target.reasons)) : null,
@@ -536,6 +545,16 @@ interface PlaceFormProps {
   onChoose?: (t: PlacementTarget) => void;
   /** Reports how an Amends edit moves the target's criteria count; null when nothing is amended. */
   onPendingCriteria?: (pending: PendingCriteria | null) => void;
+  /** Homes placed so far in an add-another session, listed above the cards with Remove. */
+  homes?: readonly PlacedHome[];
+  onRemoveHome?: (home: PlacedHome) => void;
+}
+
+/** One home the change was placed on in this visit. */
+export interface PlacedHome {
+  target: string;
+  title: string;
+  relation: PlacementRelation;
 }
 
 /** The capability the proposal form would add, as the spec map draws it: a dashed ghost block in `under`'s area. */
@@ -559,7 +578,7 @@ function initialRelation(placement: ChangePlacement | null, wide: boolean): Plac
   return placement && strongUntiedPick(placement) ? placement.relation : null;
 }
 
-function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone, draftEnabled, onDraftProposal, wide = false, selection, onChoose, onPendingCriteria }: PlaceFormProps) {
+function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone, draftEnabled, onDraftProposal, wide = false, selection, onChoose, onPendingCriteria, homes = [], onRemoveHome }: PlaceFormProps) {
   const placement = read && "placement" in read ? read.placement : null;
   const shortlist = placement?.shortlist ?? [];
   // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
@@ -576,8 +595,12 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const [draftNote, setDraftNote] = useState<DraftNote | null>(null);
   const draft = useDraft(changeId);
   const criteriaRef = useRef<HTMLDivElement>(null);
+  // With Sidecar on, its Place lens drafts; the one-shot model draft is the Sidecar-off path in the wide panel.
+  const sidecarOn = useContext(PlaceWithSidecarContext) !== null;
+  // The model's pick in the wide panel: a card marked "model", never checked for the person.
+  const [modelPick, setModelPick] = useState<PlacementTarget | null>(null);
   // Drafting is for open changes: rex refuses an applied one, and an extra place only touches.
-  const canDraft = draftEnabled && !touchesOnly && !another;
+  const canDraft = draftEnabled && !touchesOnly && !another && !(wide && sidecarOn);
 
   const askModel = async () => {
     setDraftNote(null);
@@ -587,7 +610,8 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
     const row = answer.pick !== undefined
       ? answer.shortlist.find((c) => c.target === answer.pick) ?? shortlist.find((c) => c.target === answer.pick)
       : undefined;
-    if (row) setChosen(row);
+    if (row && wide) setModelPick(row);
+    else if (row) setChosen(row);
     setDraftNote({ text: draftNoteText(answer, row?.title), warnings: answer.warnings });
   };
 
@@ -727,7 +751,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
     return h(Fragment, null, choice, editing ? amendsEditor : null, editing ? h(DryRunLine, { check: dryRun ?? null }) : null);
   };
   const targetRow = (t: PlacementTarget, checked: boolean) => wide
-    ? h(CandidateCard, { key: t.target, name, target: t, checked, onChoose: setChosen, relationChoice: another || touchesOnly ? null : cardChoice(t), touchesOnly: touchesOnly || another })
+    ? h(CandidateCard, { key: t.target, name, target: t, checked, onChoose: setChosen, relationChoice: another || touchesOnly ? null : cardChoice(t), touchesOnly: touchesOnly || another, model: t.target === modelPick?.target })
     : h(TargetRow, { key: t.target, name, target: t, checked, onChoose: setChosen });
 
   return h("div", { class: `cp-form${wide ? " cp-wide" : ""}` },
@@ -744,7 +768,21 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
         ? h("div", { class: "cp-shortlist-warning", role: "note", "data-warning": "weak" },
             "Weak matches only. Check them, or search.")
         : null,
+      homes.length
+        ? h("ul", { class: "cp-homes", "aria-label": "Placed so far" },
+            homes.map((home) =>
+              h("li", { key: home.target, class: "cp-home", "data-target": home.target },
+                h("span", { class: "cp-home-text" }, `${home.relation === "amends" ? "Amends" : "Touches"} ${home.title}`),
+                // Only a touches can be taken back here; an amendment is edited in the change.
+                home.relation === "touches" && onRemoveHome
+                  ? h("button", { type: "button", class: "ch-change-link cp-home-remove", "aria-label": `Remove ${home.title}`, onClick: () => onRemoveHome(home) }, "Remove")
+                  : null)))
+        : null,
       shortlist.map((c) => targetRow(c, chosen?.target === c.target)),
+      // The model's pick off the shortlist joins the cards, unchecked; once chosen it shows as the search pick below.
+      modelPick && !shortlist.some((c) => c.target === modelPick.target) && chosen?.target !== modelPick.target
+        ? targetRow(modelPick, false)
+        : null,
       searchPick ? targetRow(searchPick, true) : null,
       canDraft ? h(DraftButton, { busy: draft.busy, onClick: askModel }) : null,
       canDraft && draftNote ? h(DraftNoteView, { note: draftNote }) : null,
@@ -919,6 +957,8 @@ export interface ChangePlacementSectionProps {
   onPendingCriteria?: (pending: PendingCriteria | null) => void;
   /** Reports the capability the proposal form would add, so the map can draw it as a ghost block. */
   onGhost?: (ghost: ProposalGhost | null) => void;
+  /** Reports the ids of the homes this change was placed on in this visit, so the map can mark each. */
+  onHomes?: (targets: string[]) => void;
   /** The area id "Nothing fits" proposes under until the form says otherwise: the map's zoomed area. */
   proposeUnder?: string;
 }
@@ -933,13 +973,15 @@ interface Written {
  * The placement section of a change's detail panel. Key it by change id:
  * its state belongs to one change.
  */
-export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, proposeUnder }: ChangePlacementSectionProps) {
+export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, onHomes, proposeUnder }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
   const [proposing, setProposing] = useState(false);
   const [another, setAnother] = useState(false);
   const [written, setWritten] = useState<Written | null>(null);
   const [drafted, setDrafted] = useState<PlacementDraft | null>(null);
+  const [homes, setHomes] = useState<PlacedHome[]>([]);
+  const [removeRefusal, setRemoveRefusal] = useState<Refusal | null>(null);
   const draftEnabled = useFeatureToggle(PLACEMENT_DRAFT_FEATURE, false);
 
   const row = inbox.load.state === "ready" ? inbox.load.data.find((c) => c.id === changeId) : undefined;
@@ -958,6 +1000,9 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
   useEffect(() => { if (live) setRead(live); }, [live]);
 
   useEffect(() => { onInboxState?.(!!row?.awaitsPlacement); }, [row?.awaitsPlacement]);
+  const homeKey = homes.map((home) => home.target).join(",");
+  useEffect(() => { onHomes?.(homes.map((home) => home.target)); }, [homeKey]);
+  useEffect(() => () => onHomes?.([]), []);
 
   const showForm = inInbox || appliedUnplaced || another;
   const touchesOnly = !!row?.appliedAt;
@@ -988,10 +1033,23 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
   const onPlaced = (result: PlaceChangeResult, target: PlacementTarget, mode: PlaceMode) => {
     const note: Written = { line: `Placed: ${result.relation} ${target.title}`, ...(result.warnings ? { warnings: result.warnings } : {}) };
     afterWrite();
+    // Every home placed while adding more is listed, with Remove, until Done.
+    if (mode === "another" || another) {
+      setHomes((prev) => [...prev.filter((home) => home.target !== target.target), { target: target.target, title: target.title, relation: result.relation }]);
+    }
     if (mode === "next") { setWritten(note); openNext(position.next); return; }
-    if (mode === "another") { setAnother(true); setWritten(note); return; }
+    // The wide panel's session stays open on every extra home until Done; the compact one closes on Place.
+    if (mode === "another" || (another && layout === "wide")) { setAnother(true); setWritten(note); return; }
     setAnother(false);
     setWritten(note);
+  };
+
+  const removeHome = async (home: PlacedHome) => {
+    const answer = await post<{ change: string; target: string }>(`/api/rex/changes/${encodeURIComponent(changeId)}/unplace`, { target: home.target });
+    if (!answer.ok) { setRemoveRefusal(answer.refusal); return; }
+    setRemoveRefusal(null);
+    setHomes((prev) => prev.filter((kept) => kept.target !== home.target));
+    afterWrite();
   };
 
   const onProposed = (result: ProposeChangeResult, next: boolean) => {
@@ -1033,13 +1091,16 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
               }, "Place on the map ↗")
             : null,
         ),
+    removeRefusal ? h(RefusalNote, { refusal: removeRefusal }) : null,
     h(PlacementForms, {
       proposing: proposing && !another,
       place: {
         changeId, changeTitle, read, another, touchesOnly, hasNext: position.next !== null,
         onPlaced,
         onNothingFits: () => { setDrafted(null); setProposing(true); },
-        onDone: () => setAnother(false),
+        // Done with no home left (all removed) puts the change back in the Inbox.
+        onDone: () => { setAnother(false); if (!homes.length) setWritten(null); },
+        homes: another ? homes : [], onRemoveHome: removeHome,
         draftEnabled,
         onDraftProposal: (draft) => { setDrafted(draft); setProposing(true); },
         wide: layout === "wide", selection, onChoose, onPendingCriteria,

@@ -159,6 +159,29 @@ describe("placement routes on a v2 project", () => {
     expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
   });
 
+  it("POST unplace takes back a touches: the change returns to the Inbox, logs and broadcasts", async () => {
+    await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" });
+    frames.length = 0;
+    const { status, body } = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
+    expect(status).toBe(200);
+    expect(body).toEqual({ change: inboxId, target: CAPABILITY_ID });
+
+    const item = await (await resolveStore(rexDir)).getItem(inboxId);
+    expect(item?.needsPlacement).toBe(true);
+    expect(item?.touches ?? []).toEqual([]);
+    expect(logEvents().at(-1)).toMatchObject({ event: "change_unplaced", itemId: inboxId });
+    expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
+  });
+
+  it("POST unplace refuses a node the change does not touch, and a body with no target, writing nothing", async () => {
+    const refused = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
+    expect(refused.status).toBe(422);
+    expect(refused.body.kind).toBe("not-a-target");
+    expect((await json(await send(`changes/${inboxId}/unplace`, {}))).status).toBe(400);
+    expect((await json(await send(`changes/nope/unplace`, { target: CAPABILITY_ID }))).status).toBe(404);
+    expect(frames).toEqual([]);
+  });
+
   it("POST place amends a capability with a criteria delta", async () => {
     const { status, body } = await json(await send(`changes/${inboxId}/place`, {
       target: CAPABILITY_ID,

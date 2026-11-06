@@ -636,6 +636,176 @@ describe("PlacementMode", () => {
     });
   });
 
+  /** Extra answers over `serve`'s: `routes` by URL, with every POST recorded. */
+  function also(routes: Record<string, unknown>): Array<{ url: string; body: unknown }> {
+    const base = globalThis.fetch;
+    const posts: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") posts.push({ url, body: init.body ? JSON.parse(String(init.body)) : undefined });
+      const body = routes[url];
+      if (body === undefined) return base(url, init);
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+    return posts;
+  }
+
+  const press = async (key: string) => {
+    await act(async () => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })); });
+    await settle();
+  };
+
+  describe("keys (#896) in placement mode", () => {
+    const TWO = [candidate("cap-refund", { score: 9 }), candidate("cap-gift", { strength: "possible", score: 2 })];
+
+    it("1–5 pick a card, T and A set the relation, Enter places and opens the next change", async () => {
+      serve([change("a"), change("b")], [placement("a", TWO), placement("b", [candidate("cap-vat")])]);
+      const posts = also({});
+      const navigateTo = vi.fn();
+      await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+
+      await press("2");
+      expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
+      await press("t");
+      expect($('.cp-card.is-checked .cp-relation')?.dataset.relation).toBe("touches");
+      await press("a");
+      expect($('.cp-card.is-checked .cp-relation')?.dataset.relation).toBe("amends");
+      await press("t");
+
+      await press("Enter");
+      expect(posts.filter((p) => p.url.endsWith("/place"))).toEqual([
+        { url: "/api/rex/changes/a/place", body: { target: "cap-gift", relation: "touches" } },
+      ]);
+      expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/b" });
+    });
+
+    it("J and K open the next and the previous Inbox change; N opens the proposal form", async () => {
+      serve([change("a"), change("b"), change("c")], [placement("a", TWO), placement("b", TWO), placement("c", TWO)]);
+      const navigateTo = vi.fn();
+      await mount(h(PlacementMode, { changeId: "b", navigateTo }));
+      await press("j");
+      expect(navigateTo).toHaveBeenLastCalledWith("product", { tab: "place/c" });
+      await press("k");
+      expect(navigateTo).toHaveBeenLastCalledWith("product", { tab: "place/a" });
+      await press("n");
+      expect($(".cp-propose")).not.toBeNull();
+    });
+
+    it("leaves a key typed into a field to the field", async () => {
+      serve([change("a"), change("b")], [placement("a", TWO), placement("b", TWO)]);
+      const navigateTo = vi.fn();
+      await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+      const input = $<HTMLInputElement>(".cp-search-input")!;
+      await act(async () => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "j", bubbles: true, cancelable: true })); });
+      expect(navigateTo).not.toHaveBeenCalled();
+    });
+  });
+
+  it("Place & next writes the place and opens the next change, which starts where its own shortlist says", async () => {
+    serve([change("a"), change("b")], [placement("a", [candidate("cap-label")]), placement("b", [candidate("cap-vat")])]);
+    const posts = also({});
+    const navigateTo = vi.fn();
+    await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-label"] input[type="radio"]')!.click(); });
+    await settle();
+    await act(async () => { $<HTMLButtonElement>(".cp-place-next")!.click(); });
+    await settle();
+    expect(posts.map((p) => p.url)).toContain("/api/rex/changes/a/place");
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/b" });
+
+    // The route keys placement mode by change, so the next one decides its own start (WF2).
+    await mount(h(PlacementMode, { key: "b", changeId: "b", navigateTo }));
+    expect($(".placing-container")?.dataset.placing).toBe("b");
+    expect(crumb()).toEqual(["Plan", "Product map", "Tax"]);
+  });
+
+  describe("Place & add another (WF8)", () => {
+    const TWO = [candidate("cap-refund", { score: 9 }), candidate("cap-gift", { strength: "possible", score: 2 })];
+    const marked = () => $$(".pam-block.pam-placed").map((el) => el.dataset.block);
+    const homes = () => $$(".cp-home").map((el) => el.querySelector(".cp-home-text")?.textContent);
+
+    async function placeFirst() {
+      serve([change("a")], [placement("a", TWO)]);
+      const posts = also({ "/api/rex/changes/a/unplace": { change: "a", target: "cap-refund" } });
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLButtonElement>(".cp-place-another")!.click(); });
+      await settle();
+      return posts;
+    }
+
+    it("lists each placed home with Remove and marks its block with the change's marker", async () => {
+      await placeFirst();
+      expect(homes()).toEqual(["Touches Home cap-refund"]);
+      expect(marked()).toEqual(["cap-refund"]);
+      expect($('.pam-block[data-block="cap-refund"] .pam-placed-mark')?.textContent).toContain("this change");
+
+      // An extra home is a touches, whatever relation the first one had.
+      await act(async () => { $<HTMLButtonElement>('.pam-block[data-block="cap-gift"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLButtonElement>(".cp-place")!.click(); });
+      await settle();
+      expect(homes()).toEqual(["Touches Home cap-refund", "Touches Home cap-gift"]);
+      expect(marked()).toEqual(["cap-refund", "cap-gift"]);
+    });
+
+    it("Remove takes the home back through /unplace and clears its marker", async () => {
+      const posts = await placeFirst();
+      await act(async () => { $<HTMLButtonElement>(".cp-home-remove")!.click(); });
+      await settle();
+      expect(posts.find((p) => p.url.endsWith("/unplace"))).toEqual({ url: "/api/rex/changes/a/unplace", body: { target: "cap-refund" } });
+      expect(homes()).toEqual([]);
+      expect(marked()).toEqual([]);
+    });
+
+    it("Done ends the session but keeps the markers", async () => {
+      await placeFirst();
+      await act(async () => { $<HTMLButtonElement>(".cp-done")!.click(); });
+      await settle();
+      expect($(".cp-homes")).toBeNull();
+      expect(marked()).toEqual(["cap-refund"]);
+    });
+  });
+
+  describe("the one-shot model draft (WF9)", () => {
+    const DRAFT = "/api/rex/changes/a/placement/draft";
+    const rows = [candidate("cap-refund", { score: 9 }), candidate("cap-gift", { strength: "possible", score: 2 })];
+    const toggle = { "/api/features": { toggles: [{ key: "rex.placementDraft", enabled: true }] } };
+    const draftBody = (pick: string, shortlist: PlacementCandidate[]) =>
+      ({ layout: "v2", change: "a", relation: "touches", tied: false, shortlist, pick, model: "m", warnings: [] });
+
+    it("adds the model's pick as a card marked model and never selects it", async () => {
+      serve([change("a")], [placement("a", [rows[0]])]);
+      also({ ...toggle, [DRAFT]: draftBody("cap-gift", rows) });
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect($$(".cp-card[data-target='cap-gift']")).toEqual([]);
+
+      await act(async () => { $$<HTMLButtonElement>("button").find((b) => b.textContent === "Draft with the model")!.click(); });
+      await settle();
+      const card = $('.cp-card[data-target="cap-gift"]')!;
+      expect(card.querySelector(".cp-model-mark")?.textContent).toBe("model");
+      expect($$(".cp-card.is-checked")).toEqual([]);
+      expect($<HTMLButtonElement>(".cp-place")!.disabled).toBe(true);
+      expect($(".cp-draft-note")?.textContent).toContain("Picked by the model (m)");
+
+      // Choosing it is the person's act; it keeps its mark.
+      await act(async () => { card.querySelector<HTMLInputElement>('input[type="radio"]')!.click(); });
+      await settle();
+      expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
+      expect($(".cp-card.is-checked .cp-model-mark")).not.toBeNull();
+    });
+
+    it("marks the shortlist's own card when the model picks a candidate already on it", async () => {
+      serve([change("a")], [placement("a", rows)]);
+      also({ ...toggle, [DRAFT]: draftBody("cap-gift", rows) });
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await act(async () => { $$<HTMLButtonElement>("button").find((b) => b.textContent === "Draft with the model")!.click(); });
+      await settle();
+      expect($$(".cp-model-mark").map((el) => el.closest<HTMLElement>(".cp-card")?.dataset.target)).toEqual(["cap-gift"]);
+      expect($$(".cp-card.is-checked")).toEqual([]);
+    });
+  });
+
   it("is what the Product page shows at /product/place/<id>", async () => {
     serve([change("a")], [placement("a", [candidate("cap-label")])]);
     await mount(h(ProductPage, { placeChangeId: "a", navigateTo: vi.fn() }));

@@ -87,6 +87,8 @@ export interface SpecMapProps {
   pending?: { id: string; note: string } | null;
   /** Placement mode: the capability the proposal form would add, drawn as a dashed ghost block. */
   ghost?: { title: string } | null;
+  /** Placement mode: capabilities the change is already placed on, each marked with the change's marker. */
+  placed?: ReadonlySet<string>;
 }
 
 /** The ghost block: a capability that is only proposed, so it is not a button and opens nothing. */
@@ -110,7 +112,7 @@ export function liveCapabilities(rows: readonly CapabilityRow[]): CapabilityRow[
   return rows.filter((row) => row.status !== "retired");
 }
 
-export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit, near, pending, ghost }: SpecMapProps) {
+export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit, near, pending, ghost, placed }: SpecMapProps) {
   const capabilities = liveCapabilities(allCapabilities);
   return h("section", { class: "asm", "aria-label": "Spec map" },
     h(ConstraintBands, { constraints }),
@@ -131,6 +133,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
                 lit: lit?.get(row.id),
                 near: near?.get(row.id),
                 pending: pending?.id === row.id ? pending.note : undefined,
+                placed: placed?.has(row.id),
               })),
             ghost ? h(GhostBlock, { key: "ghost", title: ghost.title }) : null),
           h(BlockLegend, null)));

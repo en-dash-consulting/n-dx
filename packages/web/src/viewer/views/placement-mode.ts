@@ -26,6 +26,12 @@
  * form and draws a dashed ghost block in the area the form names, titled as
  * the form is; blocks sharing words with that title stay marked near.
  *
+ * Place & next opens the next Inbox change here, strongest first, and its
+ * own shortlist decides where its map starts (WF2). #896's keys work on the
+ * panel: J/K (and S) open another change, 1–5, T/A, N, / and Enter press the
+ * panel's controls. Place & add another keeps the panel open (WF8): every home
+ * placed in the visit is marked on the map with the change's marker.
+ *
  * @module viewer/views/placement-mode
  */
 
@@ -45,6 +51,7 @@ import {
 } from "../components/prd-tree/change-placement.js";
 import { StrengthChip } from "../components/index.js";
 import { useInbox, type InboxRow } from "./inbox.js";
+import { pressPanelShortcut, useShortcuts } from "./inbox-triage.js";
 import { AreaBlock, BlockLegend, areaBlock } from "./product-area-map.js";
 import { SpecMap, liveCapabilities } from "./area-spec-map.js";
 import { Pending } from "./product-pages.js";
@@ -165,6 +172,15 @@ export function otherAreaCandidates(shortlist: readonly PlacementCandidate[], ma
     .filter(({ area }) => area?.slug !== slug);
 }
 
+/** The change `delta` places from `changeId` in the Inbox order, wrapping; null when no other change waits. */
+export function neighbourChange(order: readonly string[], changeId: string, delta: 1 | -1): string | null {
+  const others = order.filter((id) => id !== changeId);
+  if (!others.length) return null;
+  const index = order.indexOf(changeId);
+  if (index < 0) return delta > 0 ? others[0] : others[others.length - 1];
+  return order[(index + delta + order.length) % order.length];
+}
+
 /** The breadcrumb's placing label: the change's place in the Inbox, then its title. */
 export function placingLabel(index: number, total: number, title: string): string {
   return index >= 0 ? `Placing ${index + 1} of ${total} · ${title}` : `Placing · ${title}`;
@@ -196,7 +212,7 @@ function AreaLevel({ map, groups, onZoom }: { map: ProductMap; groups: readonly 
  * The zoomed area's spec map: its candidates lit with their rank, blocks
  * sharing words with the change marked near, and the panel's pick selected.
  */
-function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, ghost, onSelect }: {
+function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, ghost, placed, onSelect }: {
   slug: string;
   group: AreaCandidates | undefined;
   tied: boolean;
@@ -207,6 +223,8 @@ function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, ghost,
   pending: PendingCriteria | null;
   /** The proposal form's capability, drawn as a ghost block when it is proposed under this area. */
   ghost: { title: string } | null;
+  /** The capabilities this change was already placed on, each marked on the map. */
+  placed: ReadonlySet<string>;
   onSelect: (row: CapabilityRow, areaTitle: string) => void;
 }) {
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
@@ -220,6 +238,7 @@ function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, ghost,
     constraints,
     selectedId,
     ghost,
+    placed,
     pending: amended && pending ? { id: amended.id, note: pendingCriteriaNote(amended.criteriaCount, pending.delta) } : null,
     onSelect: (id: string) => {
       const row = capabilities.find((c) => c.id === id);
@@ -289,6 +308,9 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const [pending, setPending] = useState<PendingCriteria | null>(null);
   // The capability the proposal form would add, while Nothing fits has it open.
   const [ghost, setGhost] = useState<ProposalGhost | null>(null);
+  // The homes the change was placed on in this visit, each marked on the map (WF8).
+  const [homes, setHomes] = useState<ReadonlySet<string>>(new Set());
+  const panelRef = useRef<HTMLElement>(null);
   const ghostArea = map && ghost ? map.areas.find((a) => a.id === ghost.under) : undefined;
   // The ghost lives in the area the form names: choosing another area moves the map, and the ghost, there.
   useEffect(() => { if (ghostArea) setZoom(ghostArea.slug); }, [ghostArea?.slug]);
@@ -298,6 +320,15 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
     const area = map ? areaOfTarget(map, target.target) : null;
     if (area) setZoom(area.slug);
   };
+  // #896's keys, on the panel beside the map: J/K and S open another Inbox change, the rest press its controls.
+  useShortcuts((shortcut) => {
+    if (shortcut.kind === "move" || shortcut.kind === "skip") {
+      const to = neighbourChange(inbox.rows.map((r) => r.change.id), changeId, shortcut.kind === "skip" ? 1 : shortcut.delta);
+      if (to) navigateTo?.("product", { tab: placementTab(to) });
+      return;
+    }
+    pressPanelShortcut(panelRef.current, shortcut);
+  });
   useEffect(() => {
     if (zoom !== undefined || !map || !read) return;
     const start = placement ? placementStart(placement, map) : { level: "map" as const };
@@ -359,11 +390,12 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
               selectedId,
               pending,
               ghost: ghost && ghostArea?.slug === zoom ? { title: ghost.title } : null,
+              placed: homes,
               onSelect: (row: CapabilityRow, areaTitle: string) => choose(targetOfRow(row, areaTitle, shortlist)),
             })
           : null,
       ),
-      h("aside", { class: "placing-panel", "aria-label": "Where it goes" },
+      h("aside", { ref: panelRef, class: "placing-panel", "aria-label": "Where it goes" },
         h(ChangePlacementSection, {
           key: changeId,
           changeId,
@@ -374,6 +406,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           onChoose: choose,
           onPendingCriteria: setPending,
           onGhost: setGhost,
+          onHomes: (targets: string[]) => setHomes(new Set(targets)),
           // Nothing fits proposes under the zoomed area, so the ghost lands where the map is.
           proposeUnder: zoomedArea?.id,
         })),

@@ -105,6 +105,52 @@ function press(scope: HTMLElement, selectors: readonly string[]): void {
   }
 }
 
+/**
+ * The shortcuts that press a control of the placement section: pick, relation,
+ * place, nothing fits and search. True when `shortcut` was one of them. The
+ * Inbox page and placement mode share this, so a key does what its button does
+ * in both. A pick takes a shortlist row in the compact form and a card in the wide.
+ */
+export function pressPanelShortcut(scope: HTMLElement | null, shortcut: Shortcut): boolean {
+  switch (shortcut.kind) {
+    case "pick":
+      scope?.querySelectorAll<HTMLInputElement>(".cp-shortlist .cp-target input, .cp-shortlist .cp-card-head input")[shortcut.n - 1]?.click();
+      return true;
+    case "relation":
+      if (scope) press(scope, [`.cp-relation input[value="${shortcut.relation}"]`]);
+      return true;
+    case "place":
+      if (scope) press(scope, [".cp-place-next", ".cp-propose-next", ".cp-place", ".cp-propose-btn"]);
+      return true;
+    case "nothing-fits":
+      if (scope) press(scope, [".cp-nothing-fits"]);
+      return true;
+    case "search":
+      scope?.querySelector<HTMLInputElement>(".cp-search-input:not([disabled])")?.focus();
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Listen for the shortcuts while mounted; a dialog over the page owns the keyboard. */
+export function useShortcuts(run: (shortcut: Shortcut) => void): void {
+  // Bound once; the ref sees this render's state.
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      const shortcut = shortcutFor(e);
+      if (!shortcut) return;
+      e.preventDefault();
+      runRef.current(shortcut);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+}
+
 // ── Queue ────────────────────────────────────────────────────────────
 
 const optionId = (id: string) => `inbox-q-${id}`;
@@ -168,44 +214,13 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
     setSelected(order[(from + order.length) % order.length]);
   };
 
-  const run = (shortcut: Shortcut) => {
-    const scope = detailRef.current;
+  useShortcuts((shortcut) => {
     switch (shortcut.kind) {
       case "move": step(shortcut.delta); return;
       case "skip": step(1); return;
-      case "pick":
-        scope?.querySelectorAll<HTMLInputElement>(".cp-shortlist .cp-target input")[shortcut.n - 1]?.click();
-        return;
-      case "relation":
-        if (scope) press(scope, [`.cp-relation input[value="${shortcut.relation}"]`]);
-        return;
-      case "place":
-        if (scope) press(scope, [".cp-place-next", ".cp-propose-next", ".cp-place", ".cp-propose-btn"]);
-        return;
-      case "nothing-fits":
-        if (scope) press(scope, [".cp-nothing-fits"]);
-        return;
-      case "search":
-        scope?.querySelector<HTMLInputElement>(".cp-search-input:not([disabled])")?.focus();
-        return;
+      default: pressPanelShortcut(detailRef.current, shortcut);
     }
-  };
-
-  // Bound once; the ref sees this render's state.
-  const runRef = useRef(run);
-  runRef.current = run;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // A dialog over the page owns the keyboard.
-      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
-      const shortcut = shortcutFor(e);
-      if (!shortcut) return;
-      e.preventDefault();
-      runRef.current(shortcut);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  });
 
   if (load.state === "v1") return null;
   if (load.state !== "ready") return h(Pending, { load });

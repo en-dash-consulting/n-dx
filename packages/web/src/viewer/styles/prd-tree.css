@@ -1991,6 +1991,11 @@ a.tracker-link {
   gap: var(--space-2);
 }
 
+.cp-homes { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cp-home { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); font-size: var(--font-sm); }
+.cp-home-text { overflow-wrap: anywhere; }
+.cp-model-mark { font-size: var(--font-xs); font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 var(--space-1); }
+
 .cp-placed-line {
   font-size: var(--font-sm);
   color: var(--text-dim);

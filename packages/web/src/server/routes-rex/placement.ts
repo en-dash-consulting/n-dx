@@ -7,6 +7,8 @@
  *                                         every open change awaiting placement, from one model load
  *   POST /api/rex/changes/:id/place     → { change, target, relation, warnings? }
  *   POST /api/rex/changes/:id/propose   → { change, proposed: { target, under, title, type }, warnings? }
+ *   POST /api/rex/changes/:id/unplace   → { change, target }
+ *                                         takes back one touches ("Place & add another"'s Remove)
  *   POST /api/rex/changes/:id/placement/draft
  *                                       → { layout: "v2", change, relation, tied, shortlist, pick?, proposal?, model?, warnings }
  *                                         the `prd.place` model's draft; writes nothing. Spends tokens, so it
@@ -641,6 +643,48 @@ async function handlePlacementCheck(changeRef: string, req: IncomingMessage, res
   return true;
 }
 
+/**
+ * `POST /api/rex/changes/:id/unplace` `{ target }`: take back one touches a
+ * "Place & add another" session added. Only a touches goes: an amendment is
+ * edited, not removed here. A change left with no home returns to the Inbox.
+ */
+async function handleUnplace(changeRef: string, req: IncomingMessage, res: ServerResponse, ctx: ServerContext, broadcast?: WebSocketBroadcaster): Promise<boolean> {
+  const json = parseJson(await readBody(req, res));
+  const target = typeof json === "string" ? undefined : json.target;
+  if (typeof json === "string" || typeof target !== "string" || !target.trim()) {
+    errorResponse(res, 400, typeof json === "string" ? json : "target must be a capability or constraint id");
+    return true;
+  }
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  try {
+    const now = new Date();
+    const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
+      const tree = structuredClone(model.tree);
+      const index = indexTree(tree);
+      const change = index.resolve(changeRef);
+      if (!change || change.type !== "change") throw new ChangePlacementError(`No change "${changeRef}"`, "no-such-change");
+      const node = index.resolve(target);
+      const rest = (change.touches ?? []).filter((ref) => index.resolve(ref) !== node);
+      if (!node || rest.length === (change.touches ?? []).length) {
+        const plain = `Change ${change.displayId ?? change.id} does not touch "${target}"`;
+        throw new ChangePlacementError(plain, "not-a-target", plain);
+      }
+      if (rest.length) change.touches = rest;
+      else delete change.touches;
+      if (!change.amends?.length && !rest.length) change.needsPlacement = true;
+      return { tree, result: { change: change.id, target: node.id } };
+    }, { now: () => now });
+    await publish(ctx, { timestamp: now.toISOString(), itemId: result.change, event: "change_unplaced", detail: `touches ${result.target} (via web)` }, broadcast);
+    jsonResponse(res, 200, result);
+  } catch (err) {
+    refuse(res, err);
+  }
+  return true;
+}
+
 /** The toggle "Draft with the model" sits behind, here and in the detail panel. */
 export const PLACEMENT_DRAFT_FEATURE = "rex.placementDraft";
 
@@ -678,7 +722,7 @@ async function handlePlacementDraft(changeRef: string, res: ServerResponse, ctx:
 
 // ── Router ───────────────────────────────────────────────────────────
 
-const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|placement\/draft|placement\/check)$/;
+const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|unplace|placement\/draft|placement\/check)$/;
 
 /** Handle the placement routes. Returns false when the path is not one of them. */
 export function routePlacement(
@@ -698,5 +742,6 @@ export function routePlacement(
   if (method !== "POST") return false;
   if (action === "placement/draft") return handlePlacementDraft(changeRef, res, ctx);
   if (action === "placement/check") return handlePlacementCheck(changeRef, req, res, ctx);
+  if (action === "unplace") return handleUnplace(changeRef, req, res, ctx, broadcast);
   return handlePlacementWrite(action as "place" | "propose", changeRef, req, res, ctx, broadcast);
 }
