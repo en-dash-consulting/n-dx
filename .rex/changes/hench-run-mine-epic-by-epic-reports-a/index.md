@@ -9,8 +9,10 @@ acceptanceCriteria:
   - "tests/e2e/run-flag-conflicts.test.ts passes against a fresh hench build"
 touches:
   - "9cea889f-17de-4b92-a97e-b7279e158578"
+  - "9af68a23-2d1f-4853-90a0-c81f118aaa6c"
 priority: "medium"
 discoveredFrom: {"item":"8b4233b1-cb6a-4b38-a21b-7d0143d48bd4","run":"c55a2422-4c93-4de9-919d-15092fc230f9"}
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
