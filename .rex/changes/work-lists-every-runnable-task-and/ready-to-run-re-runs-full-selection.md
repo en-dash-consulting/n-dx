@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "Loading every Ready to run row on a tree with 3,000 actionable tasks runs the selection and the hench runs scan once, not once per 50 rows (server test counting findActionableWork / run-record reads)"
   - "A live refresh while the list is expanded issues one ready request, not one per page (viewer test)"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
