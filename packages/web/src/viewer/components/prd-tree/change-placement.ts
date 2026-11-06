@@ -607,6 +607,8 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const [summary, setSummary] = useState(saved?.summary ?? "");
   const [proposed, setProposed] = useState(saved?.proposed ?? "");
   const [drafts, setDrafts] = useState<CriterionDraft[]>([]);
+  // The target the drafts belong to; until it matches the choice, the criteria are still being read.
+  const [draftsFor, setDraftsFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [draftNote, setDraftNote] = useState<DraftNote | null>(null);
@@ -657,19 +659,26 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   // The target's criteria seed the Amends form; a search pick reads them.
   useEffect(() => {
     setRefusal(null);
-    if (!chosen) { setDrafts([]); return; }
+    if (!chosen) { setDrafts([]); setDraftsFor(null); return; }
     // Resuming a draft: its edited criteria stand in for the seed, once.
     if (savedCriteria.current && chosen.target === saved?.target.target) {
       setDrafts(savedCriteria.current);
+      setDraftsFor(chosen.target);
       savedCriteria.current = null;
       // This commit still holds the empty list: saving it would overwrite the edits being restored.
       justRestored.current = true;
       return;
     }
     savedCriteria.current = null;
-    const seed = (list: Array<{ id: string; text: string }>) =>
+    const target = chosen.target;
+    const seed = (list: Array<{ id: string; text: string }>) => {
       setDrafts(list.map((c) => ({ id: c.id, text: c.text, original: c.text })));
+      setDraftsFor(target);
+    };
     if (chosen.criteria) { seed(chosen.criteria); return; }
+    // The previous target's edits must not outlive the choice while the read is open.
+    setDrafts([]);
+    setDraftsFor(null);
     let live = true;
     readCriteria(chosen.target).then((list) => { if (live) seed(list); });
     return () => { live = false; };
@@ -678,6 +687,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const name = `cp-target-${changeId}`;
   const searchPick = chosen && !shortlist.some((c) => c.target === chosen.target) ? chosen : null;
   const visible = drafts.filter((d) => !d.removed);
+  const criteriaLoading = !!chosen && draftsFor !== chosen.target;
 
   const editDraft = (i: number, text: string) => {
     const id = visible[i].id;
@@ -697,7 +707,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   if (body?.relation === "amends") {
     if (summary.trim()) body.summary = summary.trim();
     if (proposed.trim()) body.proposed = proposed.trim();
-    const delta = criteriaDelta(drafts);
+    const delta = criteriaLoading ? undefined : criteriaDelta(drafts);
     if (delta) body.criteria = delta;
   }
   // The wide card re-checks an amendment on every edit (WF5); the server decides, the viewer recomputes nothing.
@@ -741,7 +751,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const invalidCriteria = refusal?.kind === "nothing-to-modify";
   const criteriaId = `cp-criteria-${changeId}`;
   // An amendment in the wide card waits for rex to accept its dry run.
-  const cannotPlace = !body || busy || (amending && !dryRun?.ok);
+  const cannotPlace = !body || busy || (effectiveRelation === "amends" && criteriaLoading) || (amending && !dryRun?.ok);
   const relationName = `cp-relation-${changeId}`;
   const relationChoice = (target?: PlacementTarget) => another || touchesOnly
     ? null

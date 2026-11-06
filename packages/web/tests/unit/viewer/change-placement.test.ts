@@ -490,6 +490,41 @@ describe("placing", () => {
     expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
   });
 
+  it("holds Place, and never sends the previous target's criteria, while a new target's criteria are read", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "Refunds post" }] })])], {
+      "/api/rex/product/capability/cap-refund": { layout: "v2", capability: { criteria: [{ id: "c1", text: "Refund an order" }] } },
+    });
+    // Hold the capability read open until released.
+    const served = vi.mocked(fetch);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/rex/product/capability/cap-refund") await gate;
+      return served(url, init);
+    }));
+    await mountSection("a");
+    await pick("cap-1");
+    await click($('.cp-relation input[value="amends"]'));
+    await click(button("+ criterion"));
+    await type($(".cp-amends .task-criterion-add-input"), "Gift cards refund");
+    await click($(".cp-amends .task-criterion-add-confirm"));
+
+    await type($(".cp-search-input"), "refund");
+    await click(button("Refunds"));
+
+    expect($$(".cp-amends .task-criterion-text")).toEqual([]);
+    expect(button("Place")?.disabled).toBe(true);
+    await click(button("Place"));
+    expect(posts).toEqual([]);
+
+    release();
+    await settle();
+    expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
+    expect(button("Place")?.disabled).toBe(false);
+    await click(button("Place"));
+    expect(posts[0].body).toEqual({ target: "cap-refund", relation: "amends" });
+  });
+
   it("Amends with neither statement nor criteria is refused inline in rex's words, pointing at the criteria", async () => {
     serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "x" }] })])]);
     await mountSection("a");
