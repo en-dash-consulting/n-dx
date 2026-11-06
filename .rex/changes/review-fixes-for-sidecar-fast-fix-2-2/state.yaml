@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-06T17:30:25.907Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4df7a49b-1b9a-47f5-be5a-3ed4493a3974":
-    lastModified: "2026-11-06T17:30:21.215Z"
+    status: "completed"
+    startedAt: "2026-11-06T17:30:46.547Z"
+    completedAt: "2026-11-06T17:33:08.213Z"
+    endedAt: "2026-11-06T17:33:08.213Z"
+    activeIntervals: [{"end":"2026-11-06T17:33:08.213Z","start":"2026-11-06T17:30:46.547Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "markdown.ts: ol gets start from first item's number when not 1; list/paragraph-break patterns accept leading whitespace. Two viewer tests added."
+    lastModified: "2026-11-06T17:33:08.213Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9cd5af28-170d-4a2c-8779-61f655f6f080":
     lastModified: "2026-11-06T17:30:23.059Z"

@@ -37,6 +37,21 @@ describe("Sidecar reply markdown", () => {
     expect(a.getAttribute("rel")).toContain("noopener");
   });
 
+  it("continues a numbered list split by a code fence", () => {
+    const row = reply(["1. Install", "", "```sh", "pnpm i", "```", "", "2. Run"].join("\n"));
+    const lists = row.querySelectorAll("ol");
+    expect(lists).toHaveLength(2);
+    expect(lists[0].hasAttribute("start")).toBe(false);
+    expect(lists[1].getAttribute("start")).toBe("2");
+  });
+
+  it("renders indented sub-bullets as list items, not literal text", () => {
+    const row = reply(["- parent", "  - detail", "    * deeper"].join("\n"));
+    expect(row.querySelectorAll("ul.sidecar-md-list li")).toHaveLength(3);
+    expect(row.querySelector("p")).toBeNull();
+    expect(row.textContent).not.toContain("- detail");
+  });
+
   it("renders raw HTML as text", () => {
     const row = reply('<img src=x onerror="alert(1)"> <script>boom()</script>');
     expect(row.querySelector("img, script")).toBeNull();

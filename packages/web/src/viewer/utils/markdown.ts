@@ -28,7 +28,10 @@ const SAFE_LINK = /^(https?:\/\/|mailto:)/i;
 const INLINE =
   /`([^`\n]+)`|\*\*([^*\n]+?)\*\*|\*([^*\s][^*\n]*?)\*|\[([^\]\n]+)\]\(([^)\s]+)\)/;
 
-const LIST_KINDS = [["ul", /^[-*+]\s+(.+)$/], ["ol", /^\d+\.\s+(.+)$/]] as const;
+const BULLET_ITEM = /^\s*[-*+]\s+(.+)$/;
+const NUMBERED_ITEM = /^\s*(\d+)\.\s+(.+)$/;
+/** Both accept leading whitespace: an indented sub-bullet stays a list item (nesting is flattened). */
+const LIST_KINDS = [["ul", BULLET_ITEM], ["ol", NUMBERED_ITEM]] as const;
 
 export function renderInlineMarkdown(text: string, keyBase = "i"): ComponentChildren[] {
   const out: ComponentChildren[] = [];
@@ -107,14 +110,20 @@ export function renderMarkdown(markdown: string, options: MarkdownOptions = {}):
       const [tag, pattern] = listKind;
       const listKey = `${tag}-${key += 1}`;
       const items: ComponentChildren[] = [];
+      let start: number | undefined;
       while (i < lines.length) {
         const match = (lines[i] ?? "").match(pattern);
         if (!match) break;
+        // Numbered items capture their number first; bullets have only the text.
+        const text = match[match.length - 1];
+        if (tag === "ol" && items.length === 0) start = Number(match[1]);
         const k = `${listKey}-${items.length}`;
-        items.push(h("li", { key: k }, renderInlineMarkdown(match[1].trim(), k)));
+        items.push(h("li", { key: k }, renderInlineMarkdown(text.trim(), k)));
         i += 1;
       }
-      blocks.push(h(tag, { class: `${prefix}-list`, key: listKey }, items));
+      // A list split by a code fence keeps its numbering: `2. Run` starts at 2.
+      const listProps: { class: string; key: string; start?: number } = { class: `${prefix}-list`, key: listKey };
+      blocks.push(h(tag, start !== undefined && start !== 1 ? { ...listProps, start } : listProps, items));
       continue;
     }
 
@@ -122,7 +131,7 @@ export function renderMarkdown(markdown: string, options: MarkdownOptions = {}):
     while (i < lines.length) {
       const candidate = lines[i] ?? "";
       const candidateTrimmed = candidate.trim();
-      if (!candidateTrimmed || /^(#{1,6})\s+/.test(candidate) || /^```/.test(candidateTrimmed) || /^[-*+]\s+/.test(candidate) || /^\d+\.\s+/.test(candidate)) {
+      if (!candidateTrimmed || /^(#{1,6})\s+/.test(candidate) || /^```/.test(candidateTrimmed) || BULLET_ITEM.test(candidate) || NUMBERED_ITEM.test(candidate)) {
         break;
       }
       paragraphLines.push(candidateTrimmed);
