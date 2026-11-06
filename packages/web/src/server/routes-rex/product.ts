@@ -539,10 +539,10 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
   let inbox = 0;
   for (const change of changesOf(index)) {
     if (!isOpenChange(change)) continue;
-    if (awaitsPlacement(index, change)) {
-      inbox++;
-      continue;
-    }
+    // The Inbox count is get_prd_status's; only a held change leaves the stages,
+    // since one with nowhere to place it is worked like any other.
+    if (isInboxChange(change)) inbox++;
+    if (awaitsPlacement(index, change)) continue;
     const stage = stageOf(change);
     if (stage === "applied" || stage === "shipped") continue;
     stages[stage]++;

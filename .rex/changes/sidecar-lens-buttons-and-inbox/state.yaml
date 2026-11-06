@@ -10,15 +10,22 @@ items:
     resolutionDetail: "rex change inbox (text + JSON, v1 not-applicable), createdAt stamped on new changes, age on GET changes/placements, tests, docs, changeset"
     lastModified: "2026-11-06T05:19:28.484Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "40e8886f-b154-4533-b6b0-5c77ba1faf9c":
+    lastModified: "2026-11-06T05:25:15.654Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "469f3744-d709-42b0-a2b1-7b382870dd14":
     issues: ["https://www.notion.so/3f7a80b7192481fea2d1d0effbc05cec","https://www.notion.so/3f7a80b7192481d2b9dae4d27953f7a1","https://www.notion.so/3f7a80b7192481e7940ff74b8d2c8445"]
-    lastModified: "2026-11-05T18:06:58.555Z"
+    lastModified: "2026-11-06T05:25:15.654Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6917ec09-6f4c-4020-a98f-9b513e36f6dd":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T05:19:35.805Z"
-    activeIntervals: [{"start":"2026-11-06T05:19:35.805Z"}]
-    lastModified: "2026-11-06T05:19:36.455Z"
+    completedAt: "2026-11-06T05:25:43.415Z"
+    endedAt: "2026-11-06T05:25:43.415Z"
+    activeIntervals: [{"end":"2026-11-06T05:25:43.415Z","start":"2026-11-06T05:19:35.805Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Inbox rows show age, score and Place with Sidecar; shared isInboxChange rule with parity test; empty state explains held changes."
+    lastModified: "2026-11-06T05:25:43.415Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a19056bd-24e5-4e73-a578-7d66484c432a":
     lastModified: "2026-11-05T18:05:10.965Z"

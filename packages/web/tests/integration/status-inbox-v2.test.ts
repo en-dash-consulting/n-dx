@@ -113,6 +113,8 @@ describe("v2 Inbox counts", () => {
       const { changes } = (await get("/api/rex/changes")) as { changes: ChangeRowWire[] };
       expect(changes.filter((c) => c.inbox).map((c) => c.id)).toEqual([HELD]);
       expect(changes.filter((c) => c.awaitsPlacement)).toEqual([]);
+      // Plan's lifecycle strip counts the Inbox by the same rule.
+      expect((await get("/api/rex/changes/summary")).summary.inbox).toBe(web);
     });
   });
 
