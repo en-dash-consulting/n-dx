@@ -6,4 +6,4 @@
  * two equal.
  */
 export const OWN_WORKTREE_NOTE =
-  "Run this lane in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
+  "Run this track in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
