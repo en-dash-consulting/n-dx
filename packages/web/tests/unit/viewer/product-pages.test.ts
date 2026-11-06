@@ -129,6 +129,28 @@ describe("on a v2 project", () => {
     expect(root.querySelector(".pm-container")).not.toBeNull();
   });
 
+  it("a capability's Inbox draft opens the change through navigateTo", async () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+    const capability = {
+      ...CAPABILITY_DETAIL_FIXTURE,
+      inboxChanges: [{ id: "change-spec-draft", title: "Build the revised spec", delta: "modified" }],
+    };
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+      [capabilityUrl]: { layout: "v2", capability },
+    });
+    const navigateTo = vi.fn();
+    await mount(h(ProductPage, { navigateTo }));
+
+    const row = [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+      .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!;
+    act(() => { row.click(); });
+    await settle();
+
+    act(() => { root.querySelector<HTMLButtonElement>(".cap-inbox-changes button.ch-change-link")!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "change-spec-draft" });
+  });
+
   it("a capability that fails to load still offers the way back to the map", async () => {
     stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
     await mount(h(ProductPage, null));

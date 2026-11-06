@@ -208,7 +208,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       const slug = grid.focus?.id;
       return slug
         ? h(AreaInPlace, { slug, onOpenPage: () => ctx.navigateTo("product", { tab: `area/${encodeURIComponent(slug)}` }), navigateTo: ctx.navigateTo })
-        : h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability });
+        : h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo });
     }
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
