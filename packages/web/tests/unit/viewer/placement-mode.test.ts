@@ -1002,6 +1002,14 @@ describe("PlacementMode", () => {
       expect(sessionStorage.getItem(KEY)).toBeNull();
     });
 
+    it("resumes a proposal under its saved area, not the area the map opens on", async () => {
+      sessionStorage.setItem(KEY, JSON.stringify({ step: "propose", type: "capability", under: "area-tax", title: "Gift receipts", statement: "", criteria: "" }));
+      serve([change("a")], [placement("a", TWO)]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect($<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!.value).toBe("area-tax");
+      expect(crumb()).toEqual(["Plan", "Product map", "Tax"]);
+    });
+
     it("a change placed by another route loses its draft once the Inbox is read", async () => {
       sessionStorage.setItem(KEY, JSON.stringify({ step: "propose", type: "capability", under: "", title: "Gift receipts", statement: "", criteria: "" }));
       // `a` is no longer waiting; `b` is.

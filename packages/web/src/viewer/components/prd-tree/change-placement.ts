@@ -869,11 +869,13 @@ interface ProposeFormProps {
   onGhost?: (ghost: ProposalGhost | null) => void;
   /** The area the form opens under when no draft names one: placement mode's zoomed area. */
   defaultUnder?: string;
+  /** A map pick of an area made while the form is open moves the form's area to it. */
+  followPick?: AreaPick | null;
   /** The form as a leaving left it (WF10); it opens on this. */
   saved?: ProposeStepDraft | null;
 }
 
-function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost, defaultUnder, saved }: ProposeFormProps) {
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost, defaultUnder, followPick, saved }: ProposeFormProps) {
   const initial = drafted?.proposal;
   const [type, setType] = useState<"capability" | "constraint">(saved?.type ?? initial?.type ?? "capability");
   const [under, setUnder] = useState(saved?.under ?? initial?.under ?? defaultUnder ?? "");
@@ -888,14 +890,14 @@ function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed
   const draft = useDraft(changeId);
   const areas = map?.areas ?? [];
 
-  // The map moving to another area while the form is open takes the form with it, so both name one area (WF6).
-  // Only a change of the map's area counts: the form's own choice moves the map, never the other way round.
-  const followed = useRef(defaultUnder);
+  // A map pick of an area while the form is open takes the form with it, so both name one area (WF6).
+  // Only picks made after the form opened count: the map's opening zoom never overrides a resumed draft's area.
+  const followed = useRef(followPick?.n);
   useEffect(() => {
-    if (defaultUnder === followed.current) return;
-    followed.current = defaultUnder;
-    if (defaultUnder) setUnder(defaultUnder);
-  }, [defaultUnder]);
+    if (!followPick || followPick.n === followed.current) return;
+    followed.current = followPick.n;
+    setUnder(followPick.under);
+  }, [followPick?.n]);
   // The form closing, by Back or by a write, clears the ghost.
   useEffect(() => { onGhost?.(type === "capability" ? { title: title.trim() || changeTitle, under } : null); }, [type, title, under]);
   useEffect(() => () => onGhost?.(null), []);
@@ -1012,6 +1014,14 @@ export interface ChangePlacementSectionProps {
   onHomes?: (targets: string[]) => void;
   /** The area id "Nothing fits" proposes under until the form says otherwise: the map's zoomed area. */
   proposeUnder?: string;
+  /** The area the map's last pick zoomed into, numbered so a pick of the same area again still counts; an open proposal form follows it. */
+  followPick?: AreaPick | null;
+}
+
+/** A map pick of an area: its id and a count that grows with every pick. */
+export interface AreaPick {
+  under: string;
+  n: number;
 }
 
 /** What the section shows after a write, until the change's next read. */
@@ -1024,7 +1034,7 @@ interface Written {
  * The placement section of a change's detail panel. Key it by change id:
  * its state belongs to one change.
  */
-export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, onHomes, proposeUnder }: ChangePlacementSectionProps) {
+export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, onHomes, proposeUnder, followPick }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
   // A draft left on the proposal step resumes there (WF10).
@@ -1166,7 +1176,7 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       propose: {
         changeId, changeTitle, hasNext: position.next !== null,
         onProposed, onBack: () => { setSavedPropose(null); setProposing(false); },
-        draftEnabled, drafted, onGhost, defaultUnder: proposeUnder, saved: savedPropose,
+        draftEnabled, drafted, onGhost, defaultUnder: proposeUnder, followPick, saved: savedPropose,
       },
     }),
   );

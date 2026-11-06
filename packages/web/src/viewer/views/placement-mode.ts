@@ -50,6 +50,7 @@ import {
   inboxPosition,
   pendingCriteriaNote,
   strongUntiedPick,
+  type AreaPick,
   type PendingCriteria,
   type ProposalGhost,
   type PlacementTarget,
@@ -329,11 +330,19 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const ghostArea = map && ghost ? map.areas.find((a) => a.id === ghost.under) : undefined;
   // The ghost lives in the area the form names: choosing another area moves the map, and the ghost, there.
   useEffect(() => { if (ghostArea) setZoom(ghostArea.slug); }, [ghostArea?.slug]);
+  // The map's last pick of an area, which an open proposal form follows (WF6). The opening zoom and the
+  // form's own choice move the map without a pick, so neither overrides the form.
+  const [areaPick, setAreaPick] = useState<AreaPick | null>(null);
+  const pickArea = (slug: string) => {
+    setZoom(slug);
+    const area = map?.areas.find((a) => a.slug === slug);
+    if (area) setAreaPick((p) => ({ under: area.id, n: (p?.n ?? 0) + 1 }));
+  };
   /** A pick from the panel, a chip or a block: select it and move the map to its area. */
   const choose = (target: PlacementTarget) => {
     setSelection(target);
     const area = map ? areaOfTarget(map, target.target) : null;
-    if (area) setZoom(area.slug);
+    if (area) pickArea(area.slug);
   };
   // #896's keys, on the panel beside the map: J/K and S open another Inbox change, the rest press its controls.
   useShortcuts((shortcut) => {
@@ -400,7 +409,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
         zoom === null && map
           ? [
               h("p", { key: "note", class: "placing-note", role: "note" }, mapLevelNote(placement, failure)),
-              h(AreaLevel, { key: "areas", map, groups, onZoom: setZoom }),
+              h(AreaLevel, { key: "areas", map, groups, onZoom: pickArea }),
             ]
           : null,
         zoom && map
@@ -436,6 +445,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           onHomes: (targets: string[]) => setHomes(new Set(targets)),
           // Nothing fits proposes under the zoomed area, so the ghost lands where the map is.
           proposeUnder: zoomedArea?.id,
+          followPick: areaPick,
         })),
     ),
   );
