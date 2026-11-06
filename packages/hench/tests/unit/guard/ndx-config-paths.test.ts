@@ -255,6 +255,12 @@ describe("the agent may not run a command that reads a stored credential", () =>
     "security find-generic-passwor? -w",
     "security 'find'* -w",
     "security f? -w",
+    // An expansion before the subcommand can add or drop an option word (files
+    // named -q, or -qp and -vp), so the guard cannot know which word runs.
+    "security [-]q f list-keychains",
+    "security -*p fi list-keychains",
+    "security -p * list-keychains",
+    "security list-keychain? -d user",
     "op read op://vault/item/field",
     "/opt/homebrew/bin/op read x",
     "'/opt/homebrew/bin/op' item list",
@@ -298,8 +304,8 @@ describe("the agent may not run a command that reads a stored credential", () =>
     expect(() => guard.checkCommand("security '{find-generic-password,-s}' -w")).not.toThrow();
     expect(() => guard.checkCommand("security \"fin[d]-generic-password\" -w")).not.toThrow();
     expect(() => guard.checkCommand("security find-generic-passwor\\? -w")).not.toThrow();
-    // An expansion that cannot name the subcommand, and commands that are not denied.
-    expect(() => guard.checkCommand("security list-keychain? -d user")).not.toThrow();
+    // An expansion after the subcommand that cannot name it, and commands that are not denied.
+    expect(() => guard.checkCommand("security list-keychains -d user*")).not.toThrow();
     expect(() => guard.checkCommand("node scripts/build-*.mjs")).not.toThrow();
     expect(() => guard.checkCommand("git log -- 'fin[d]*' src/{a,b}.ts")).not.toThrow();
     // Outside the allowlist, so the credential check alone is under test here.

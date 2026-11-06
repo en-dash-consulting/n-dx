@@ -402,10 +402,14 @@ items:
     lastModified: "2026-11-04T19:47:10.790Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f4a77d97-b2a2-4009-8784-3a3a779884f2":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T00:52:03.128Z"
-    activeIntervals: [{"start":"2026-11-06T00:52:03.128Z"}]
-    lastModified: "2026-11-06T00:52:03.739Z"
+    completedAt: "2026-11-06T01:00:13.013Z"
+    endedAt: "2026-11-06T01:00:13.013Z"
+    activeIntervals: [{"end":"2026-11-06T01:00:13.013Z","start":"2026-11-06T00:52:03.128Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "commandWords records a per-word over-approximating pattern for unquoted { * ? [ (POSIX only); a denied program's later word whose pattern could name a denied token (or a security abbreviation of it) is refused."
+    lastModified: "2026-11-06T01:00:13.013Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5330af8-f470-4d06-bf27-55c21e9f2efc":
     status: "completed"

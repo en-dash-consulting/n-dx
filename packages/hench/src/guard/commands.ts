@@ -316,6 +316,19 @@ const SECURITY_COMMANDS = [
   "requirement-evaluate", "filevault",
 ];
 
+/** Where `security`'s subcommand word sits in `args`, after its global options. */
+function securitySubcommandIndex(args: readonly string[]): number {
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i]!;
+    if (arg === "--") return i + 1;
+    if (!arg.startsWith("-") || arg === "-") break;
+    const takesValue = arg.indexOf("p", 1);
+    i += takesValue !== -1 && takesValue === arg.length - 1 ? 2 : 1;
+  }
+  return i;
+}
+
 /**
  * The subcommand `security <args>` runs, as `security` resolves it: global
  * options parsed as its `getopt("hilp:qvR")` does (BSD getopt stops at the
@@ -323,15 +336,7 @@ const SECURITY_COMMANDS = [
  * table entry the word is a prefix of. `null` when no subcommand is named.
  */
 function securitySubcommand(args: readonly string[]): string | null {
-  let i = 0;
-  while (i < args.length) {
-    const arg = args[i]!;
-    if (arg === "--") { i++; break; }
-    if (!arg.startsWith("-") || arg === "-") break;
-    const takesValue = arg.indexOf("p", 1);
-    i += takesValue !== -1 && takesValue === arg.length - 1 ? 2 : 1;
-  }
-  const word = args[i];
+  const word = args[securitySubcommandIndex(args)];
   if (word === undefined) return null;
   const folded = word.toLowerCase();
   return SECURITY_COMMANDS.find((name) => name.startsWith(folded)) ?? word;
@@ -352,8 +357,15 @@ function runsDeniedPrefix(words: readonly CommandWord[], prefix: readonly string
   if (args.some((arg) => arg.pattern && mayExpandToDenied(arg.pattern, program, prefix.slice(1)))) {
     return true;
   }
-  if (words.length < prefix.length) return false;
   const texts = args.map((arg) => arg.text);
+  // An expansion among security's global options, or as the subcommand, can
+  // add or drop an option word (a file named `-q`, `-qp`), which moves the
+  // subcommand: `security [-]q f list-keychains` runs `f`.
+  if (program === "security" && prefix.length > 1 &&
+      args.slice(0, securitySubcommandIndex(texts) + 1).some((arg) => arg.pattern)) {
+    return true;
+  }
+  if (words.length < prefix.length) return false;
   if (containsRun(texts, prefix.slice(1))) return true;
   return program === "security" && prefix.length > 1 && securitySubcommand(texts) === prefix[1];
 }
