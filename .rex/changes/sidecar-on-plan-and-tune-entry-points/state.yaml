@@ -42,6 +42,9 @@ items:
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
     lastModified: "2026-11-05T17:35:28.302Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8722270b-60ea-428e-904e-deb8ded883d8":
+    lastModified: "2026-11-06T02:22:01.719Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a7bb7079-fcc5-4b3d-83c1-784fa7ab1f5f":
     lastModified: "2026-11-05T01:08:18.734Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -64,7 +67,7 @@ items:
     lastModified: "2026-11-05T19:06:21.933Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c226b635-1423-4093-8c70-50d677a34ba4":
-    lastModified: "2026-11-05T19:21:20.916Z"
+    lastModified: "2026-11-06T02:22:01.719Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d3112cec-53b7-4ce9-b011-209af418fa1b":
     status: "completed"
