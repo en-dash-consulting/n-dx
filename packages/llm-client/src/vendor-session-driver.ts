@@ -99,8 +99,9 @@ export interface CodexTurnFlags {
   /**
    * Sandbox and approval flags for a fresh `codex exec`
    * (see `compileCodexPolicyFlags`). Dropped on resume, where `exec resume`
-   * rejects them; the driver adds `codexShellEnvFlags` there itself, so a
-   * resumed agent's commands never see the Codex key. A resumed turn does not
+   * rejects them. The driver adds `codexShellEnvFlags` to every turn, fresh
+   * or resumed, so the agent's commands never see the Codex key whatever
+   * flags the caller passes. A resumed turn does not
    * keep the thread's starting policy:
    * `exec resume` reads sandbox and approval from the invocation's config, so
    * the user's `~/.codex/config.toml` decides. Re-applying the policy on
@@ -570,13 +571,26 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
     binary: "codex",
     args: [
       "exec",
-      ...(input.codex?.policyFlags ?? []),
+      ...withCodexShellEnvFlags(input.codex?.policyFlags ?? []),
       "--json", "--skip-git-repo-check",
       ...modelArgs,
       "-", // codex exec reads the prompt from stdin
     ],
     stdin,
   };
+}
+
+/**
+ * A fresh turn's policy flags, ending with {@link codexShellEnvFlags} whatever
+ * the caller passed: `startVendorSession` is public, and flags without them
+ * would let the agent's commands read the Codex key. `compileCodexPolicyFlags`
+ * output already ends with them, so it passes through unchanged.
+ */
+function withCodexShellEnvFlags(policyFlags: readonly string[]): string[] {
+  const envFlags = codexShellEnvFlags();
+  const tail = policyFlags.slice(-envFlags.length);
+  const present = tail.length === envFlags.length && tail.every((flag, i) => flag === envFlags[i]);
+  return present ? [...policyFlags] : [...policyFlags, ...envFlags];
 }
 
 /**

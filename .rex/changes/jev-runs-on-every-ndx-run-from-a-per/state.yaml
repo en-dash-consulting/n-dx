@@ -12,7 +12,14 @@ items:
     lastModified: "2026-11-04T22:33:30.428Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "076f5980-a069-4a02-acb0-7d93094c1722":
-    lastModified: "2026-11-06T00:08:30.701Z"
+    status: "completed"
+    startedAt: "2026-11-06T00:43:03.481Z"
+    completedAt: "2026-11-06T00:51:27.204Z"
+    endedAt: "2026-11-06T00:51:27.204Z"
+    activeIntervals: [{"end":"2026-11-06T00:51:27.204Z","start":"2026-11-06T00:43:03.481Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "vendor-session-driver fresh Codex turn appends codexShellEnvFlags() unless the policy flags already end with them (compileCodexPolicyFlags output passes through unchanged, so hench's argv snapshot is unaffected)."
+    lastModified: "2026-11-06T00:51:27.204Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "09879815-d6cd-42b4-ab26-a156cdce8e61":
     lastModified: "2026-11-06T00:08:35.221Z"

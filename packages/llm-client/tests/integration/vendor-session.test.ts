@@ -237,7 +237,13 @@ describe("codex sessions", () => {
     expect(second.sessionId).toBe("thread-1");
 
     const [a, b] = calls();
-    expect(a.argv).toEqual(["exec", "-s", "read-only", "--json", "--skip-git-repo-check", "-"]);
+    // Both turns carry the overrides that blank the Codex key in the agent's
+    // commands, whatever policy flags the caller passed.
+    expect(a.argv).toEqual([
+      "exec", "-s", "read-only",
+      ...codexShellEnvFlags(),
+      "--json", "--skip-git-repo-check", "-",
+    ]);
     expect(a.stdin).toBe("SYSTEM:\nsys\n\nTASK:\nhello");
     // A resumed turn drops the sandbox flag but keeps the overrides that
     // blank the Codex key in the agent's commands: config is per process.
