@@ -57,6 +57,7 @@ describe("ndx work --plan-queue", () => {
       {
         command: "n-dx work --task=c0000000-0000-4000-8000-000000000002 --auto .",
         changeId: "c0000000-0000-4000-8000-000000000001",
+        changeTitle: "Add Apple Pay",
         ownWorktree: false,
         tasks: [expect.objectContaining({ id: "c0000000-0000-4000-8000-000000000002", title: "Wire the button" })],
       },
