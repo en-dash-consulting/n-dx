@@ -158,6 +158,18 @@ describe("navigation model: labels", () => {
     expect(viewLabel("activity")).toBe("Execution Log");
   });
 
+  // Spend lives on Tune and the command list in Settings › Commands; a stage
+  // blurb that still offers them sends users to the wrong stage (#961).
+  it("stage blurbs do not advertise what moved to Tune and Settings", () => {
+    expect(viewBlurb("plan")).not.toMatch(/planning commands/i);
+    expect(viewBlurb("work")).not.toMatch(/costs?|spend/i);
+  });
+
+  it("the home blurb counts the four stages", () => {
+    expect(viewBlurb("home")).toMatch(/four stages/i);
+    expect(viewBlurb("home")).not.toMatch(/three/i);
+  });
+
   // No label carries the placeholder today (the settings pages that did were
   // merged into Project), so this holds vacuously until one does again.
   it("resolves the {cli} placeholder in every label that carries one", () => {

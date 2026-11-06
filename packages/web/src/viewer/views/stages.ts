@@ -1,7 +1,7 @@
 /**
  * The dashboard's layout, as data.
  *
- * Three stages in a loop — Analysis → Plan → Work → Analysis — each a page
+ * Four stages in a loop — Analysis → Plan → Work → Tune → Analysis — each a page
  * that composes existing product views as collapsible sections. Every view
  * keeps its own route (`/zones`, `/hench-runs/<id>`, …); a section is a
  * window onto it with an "Open" link to the full page. Settings views are not
