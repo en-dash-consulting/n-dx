@@ -131,6 +131,11 @@ export interface StageTile {
   badge?: StageSectionBadge;
   /** Shown only on a v2 project; a v1 project draws the stage's `v1Tiles` in their place. */
   v2Only?: boolean;
+  /**
+   * Dropped while the project has no PRD: the view would only tell the user to
+   * migrate a PRD that does not exist.
+   */
+  requiresPrd?: boolean;
   featureGate?: string;
   requiresServer?: boolean;
   hiddenWhenDeployed?: boolean;
@@ -220,7 +225,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     // Product stays, because its tablist is how a v1 project reaches Requirements.
     v1Tiles: [
       { view: "prd", cols: 8, rows: 2 },
-      { view: "product", cols: 4, rows: 2, requiresServer: true },
+      { view: "product", cols: 4, rows: 2, requiresServer: true, requiresPrd: true },
     ],
     // A tab of the Product page; its route still opens that tab. Tasks (`prd`)
     // keeps its route and breadcrumb under Plan as a tab of Open changes.

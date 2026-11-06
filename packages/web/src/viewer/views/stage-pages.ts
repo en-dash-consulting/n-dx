@@ -253,15 +253,18 @@ type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; depl
  * no server-backed v2 tiles, so it takes the v1 set. Before the first status
  * arrives the layout is unknown: only the layout-agnostic tiles mount, because
  * a v2 tile's preview fires v2-only requests a v1 project cannot answer. A
- * status with no layout means no PRD yet, which takes the v2 set. A later null
- * (a failed poll, a server restart) keeps the last known layout: swapping tile
- * sets would unmount the open tile and lose its state.
+ * project with no PRD (`rex.exists === false`, which carries no layout) takes
+ * the v1 set without its PRD-only tiles, so Tasks shows its "no PRD yet" empty
+ * state and nothing says to migrate. A later null (a failed poll, a server
+ * restart) keeps the last known state: swapping tile sets would unmount the
+ * open tile and lose its state.
  */
 function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridProps) {
-  const known = useRef<"v1" | "v2" | undefined>(undefined);
+  const known = useRef<"v1" | "v2" | "none" | undefined>(undefined);
   const status = useProjectStatus();
-  if (status) known.current = status.rex?.layout ?? "v2";
+  if (status) known.current = status.rex?.exists === false ? "none" : status.rex?.layout ?? "v2";
   const shown = deployed || known.current === "v1" ? v1Tiles
+    : known.current === "none" ? v1Tiles.filter((t) => !t.requiresPrd)
     : known.current === "v2" ? tiles
     : tiles.filter((t) => !t.v2Only);
   return h(TileGrid, { ...grid, tiles: shown });

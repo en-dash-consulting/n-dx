@@ -75,8 +75,18 @@ describe("Plan tiles before the first status", () => {
     for (const v of V2_ONLY) expect(tiles()).toContain(v);
   });
 
-  it("shows the v2 tiles when status arrives with no PRD (no layout)", () => {
+  it("shows Tasks, and no tile that says to migrate, when status arrives with no PRD", () => {
     status = { rex: { exists: false } } as unknown as Pick<ProjectStatus, "rex">;
+    mount();
+    // Tasks carries the "no PRD yet" empty state; Product would say to run migrate.
+    expect(tiles()).toContain("prd");
+    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
+  });
+
+  it("brings the v2 tiles in once a PRD appears", () => {
+    status = { rex: { exists: false } } as unknown as Pick<ProjectStatus, "rex">;
+    mount();
+    status = { rex: { exists: true, layout: "v2" } } as unknown as Pick<ProjectStatus, "rex">;
     mount();
     for (const v of V2_ONLY) expect(tiles()).toContain(v);
   });
