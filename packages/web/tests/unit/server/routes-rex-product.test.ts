@@ -783,6 +783,22 @@ describe("v2 product reads", () => {
       })]);
     });
 
+    it("counts a held change that amends a capability here only in the Inbox", async () => {
+      // A Product-page edit drafts this shape: held for placement, amending the capability it edited.
+      write("changes/save-a-card/index.md", [
+        "---", `id: "${INBOX_ID}"`, 'type: "change"', 'title: "Pay by card with a saved card"', 'slug: "save-a-card"',
+        'intent: "A shopper can pay by card without typing the card again."',
+        `amends: [{"target":"${CAPABILITY_ID}","delta":"modified","summary":"Saved cards"}]`, "---",
+      ]);
+      const area = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(area.inbox.map((c) => c.id)).toEqual([INBOX_ID]);
+      expect(area.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
+      expect(area.counts.openChanges).toBe(1);
+      const section = ((await get("product")).body.map as ProductMap).areas.find((a) => a.id === AREA_ID)!;
+      expect(section.openChangeIds).toEqual([CHANGE_ID]);
+      expect(section.capabilities[0]!.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
+    });
+
     it("leaves a retired capability out of the capability count", async () => {
       const RETIRED_ID = "a0000000-0000-4000-8000-000000000004";
       const REMOVER_ID = "c0000000-0000-4000-8000-000000000040";

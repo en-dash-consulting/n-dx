@@ -315,12 +315,16 @@ function stageOf(change: RuleNode): ChangeStageWire {
 }
 
 /**
- * Open and not yet shipped: a change at one of the {@link OpenChangeStageWire}
- * stages. Rex's `isOpenChange` keeps a shipped but unapplied change open; the
- * map's badges, Moving now and the Product total count what Open changes'
- * Open filter and the lifecycle strip count, so they leave it out.
+ * Open, placed and not yet shipped: a change at one of the
+ * {@link OpenChangeStageWire} stages. Rex's `isOpenChange` keeps a shipped but
+ * unapplied change open, and an Inbox change held for placement may already
+ * amend a node (a Product-page edit drafts one). The map's badges, Moving now
+ * and the Product total count what Open changes' Open filter and the
+ * lifecycle strip count, so they leave both out: a held change counts only in
+ * the Inbox.
  */
-const isMovingChange = (change: RuleNode): boolean => isOpenChange(change) && !change.shippedIn;
+const isMovingChange = (index: TreeIndex, change: RuleNode): boolean =>
+  isOpenChange(change) && !change.shippedIn && !awaitsPlacement(index, change);
 
 const isActive = (node: RuleNode): boolean =>
   node.status === "in_progress" || node.status === "failing";
@@ -356,7 +360,7 @@ function overlaysByNode(index: TreeIndex, changes: ChangeRuleNode[]): Map<string
     out.set(targetId, list);
   };
   for (const change of changes) {
-    if (!isMovingChange(change)) continue;
+    if (!isMovingChange(index, change)) continue;
     const base = {
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
@@ -393,7 +397,7 @@ function openChangesByArea(index: TreeIndex, changes: ChangeRuleNode[]): Map<str
   }
   const out = new Map<string, Set<string>>();
   for (const change of changes) {
-    if (!isMovingChange(change)) continue;
+    if (!isMovingChange(index, change)) continue;
     const refs = [
       ...(change.amends ?? []).map((a) => {
         const ref = a.delta === "added" ? a.under : a.target;
