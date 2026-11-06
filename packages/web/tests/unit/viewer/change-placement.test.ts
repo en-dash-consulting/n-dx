@@ -23,6 +23,7 @@ import {
   takePlacementRequest,
   takeTitleFocus,
 } from "../../../src/viewer/components/prd-tree/change-placement.js";
+import { PlaceWithSidecarContext } from "../../../src/viewer/components/place-with-sidecar.js";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -44,8 +45,8 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
-    amends: [], touches: [], taskCount: 1, completedTaskCount: 0, ...extra,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
+    amends: [], touches: [], taskCount: 1, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
 
@@ -69,13 +70,13 @@ function placement(id: string, shortlist: PlacementCandidate[], opts: { tied?: b
 
 const MAP: ProductMap = {
   areas: [
-    { id: "area-pay", title: "Payments", capabilities: [
+    { id: "area-pay", slug: "payments", title: "Payments", capabilities: [
       { id: "cap-refund", title: "Refunds", statement: "Refund an order", status: "met", health: "ok", criteriaCount: 1, openChanges: [] },
       { id: "cap-gift", title: "Gift cards", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
-    ] },
-    { id: "area-ship", title: "Shipping", capabilities: [
+    ], openChangeIds: [] },
+    { id: "area-ship", slug: "shipping", title: "Shipping", capabilities: [
       { id: "cap-label", title: "Shipping labels", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
-    ] },
+    ], openChangeIds: [] },
   ],
   constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all" }],
 };
@@ -166,6 +167,8 @@ const button = (label: string) => $$<HTMLButtonElement>("button").find((b) => b.
 beforeEach(() => {
   // A focus request is module state: no case may start with one pending.
   for (const id of ["a", "b", "c"]) takeTitleFocus(id);
+  // Placement drafts live in sessionStorage for the browser session: none may carry over.
+  sessionStorage.clear();
   clearProjectMetadataCache();
   root = document.createElement("div");
   document.body.appendChild(root);
@@ -246,7 +249,7 @@ describe("an Inbox change's panel", () => {
   });
 
   it("is a single Placed line for a change that has left the Inbox", async () => {
-    serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "cap-1", title: "Refunds" }] })], []);
+    serve([change("a", { awaitsPlacement: false, inbox: false, needsPlacement: false, touches: [{ id: "cap-1", title: "Refunds" }] })], []);
     const spies = await mountSection("a");
     expect($('[data-change-placement="placed"]')?.textContent).toBe("Placed: touches Refunds");
     expect($(".cp-note")).toBeNull();
@@ -341,7 +344,7 @@ describe("when the product map read fails", () => {
 // ── Writes ───────────────────────────────────────────────────────────
 
 describe("an applied change's panel", () => {
-  const applied = (id: string) => change(id, { stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z", awaitsPlacement: undefined });
+  const applied = (id: string) => change(id, { stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z", awaitsPlacement: undefined, inbox: undefined });
 
   it("offers touches only, with the explanatory note", async () => {
     serve([applied("a")], [placement("a", [candidate("cap-1")])]);
@@ -488,6 +491,41 @@ describe("placing", () => {
     expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
   });
 
+  it("holds Place, and never sends the previous target's criteria, while a new target's criteria are read", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "Refunds post" }] })])], {
+      "/api/rex/product/capability/cap-refund": { layout: "v2", capability: { criteria: [{ id: "c1", text: "Refund an order" }] } },
+    });
+    // Hold the capability read open until released.
+    const served = vi.mocked(fetch);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/rex/product/capability/cap-refund") await gate;
+      return served(url, init);
+    }));
+    await mountSection("a");
+    await pick("cap-1");
+    await click($('.cp-relation input[value="amends"]'));
+    await click(button("+ criterion"));
+    await type($(".cp-amends .task-criterion-add-input"), "Gift cards refund");
+    await click($(".cp-amends .task-criterion-add-confirm"));
+
+    await type($(".cp-search-input"), "refund");
+    await click(button("Refunds"));
+
+    expect($$(".cp-amends .task-criterion-text")).toEqual([]);
+    expect(button("Place")?.disabled).toBe(true);
+    await click(button("Place"));
+    expect(posts).toEqual([]);
+
+    release();
+    await settle();
+    expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
+    expect(button("Place")?.disabled).toBe(false);
+    await click(button("Place"));
+    expect(posts[0].body).toEqual({ target: "cap-refund", relation: "amends" });
+  });
+
   it("Amends with neither statement nor criteria is refused inline in rex's words, pointing at the criteria", async () => {
     serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "x" }] })])]);
     await mountSection("a");
@@ -603,6 +641,38 @@ describe("Nothing fits", () => {
   });
 });
 
+describe("Place with Sidecar replaces Draft with the model (SP3)", () => {
+  const toggle = (enabled: boolean) => ({ "/api/features": { toggles: [{ key: PLACEMENT_DRAFT_FEATURE, enabled }] } });
+  const sidecar = { attached: null, place: vi.fn() };
+  const mountWith = async (layout: "compact" | "wide", sidecarOn: boolean) => {
+    await mount(h(PlaceWithSidecarContext.Provider, { value: sidecarOn ? sidecar : null },
+      h(ChangePlacementSection, { changeId: "a", changeTitle: "Change a", onOpenChange: vi.fn(), layout })));
+  };
+
+  it.each(["compact", "wide"] as const)("%s: web.sidecar on shows Place with Sidecar, not the draft", async (layout) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountWith(layout, true);
+    expect(button("Place with Sidecar")).not.toBeNull();
+    expect(button("Draft with the model")).toBeNull();
+    await click(button("Nothing fits"));
+    expect(button("Draft with the model")).toBeNull();
+  });
+
+  it.each(["compact", "wide"] as const)("%s: web.sidecar off, placementDraft on shows the draft only", async (layout) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountWith(layout, false);
+    expect(button("Draft with the model")).not.toBeNull();
+    expect(button("Place with Sidecar")).toBeNull();
+  });
+
+  it.each(["compact", "wide"] as const)("%s: both off shows neither", async (layout) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(false));
+    await mountWith(layout, false);
+    expect(button("Draft with the model")).toBeNull();
+    expect(button("Place with Sidecar")).toBeNull();
+  });
+});
+
 describe("Draft with the model (rex.placementDraft)", () => {
   const DRAFT_URL = "/api/rex/changes/a/placement/draft";
   const toggle = (enabled: boolean) => ({ "/api/features": { toggles: [{ key: PLACEMENT_DRAFT_FEATURE, enabled }] } });
@@ -627,7 +697,7 @@ describe("Draft with the model (rex.placementDraft)", () => {
   });
 
   it("is hidden for an applied change, which takes touches only", async () => {
-    serve([change("a", { appliedAt: "2026-10-05T12:00:00.000Z", awaitsPlacement: undefined })], [placement("a", [candidate("cap-1")])], toggle(true));
+    serve([change("a", { appliedAt: "2026-10-05T12:00:00.000Z", awaitsPlacement: undefined, inbox: undefined })], [placement("a", [candidate("cap-1")])], toggle(true));
     await mountSection("a");
     expect($("[data-change-placement]")?.getAttribute("data-change-placement")).toBe("applied");
     expect(button("Draft with the model")).toBeNull();
@@ -715,8 +785,25 @@ describe("the change detail panel", () => {
     expect($(".task-add-child-note")?.textContent).toBe("Its tasks won't run until the change is placed.");
   });
 
+  it("offers Place on the map ↗, which opens placement mode for the change", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    const navigateTo = vi.fn();
+    await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn(), navigateTo }));
+    const toMap = $<HTMLButtonElement>(".cp-section .cp-place-on-map")!;
+    expect(toMap.textContent).toBe("Place on the map ↗");
+    await click(toMap);
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/a" });
+  });
+
+  it("has no Place on the map without a way to navigate", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));
+    expect($(".cp-section")).not.toBeNull();
+    expect($(".cp-place-on-map")).toBeNull();
+  });
+
   it("has no section and no note for a placed change", async () => {
-    serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "t", title: "Refunds" }] })], []);
+    serve([change("a", { awaitsPlacement: false, inbox: false, needsPlacement: false, touches: [{ id: "t", title: "Refunds" }] })], []);
     await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));
     expect($(".cp-section")).toBeNull();
     expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Refunds");

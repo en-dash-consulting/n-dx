@@ -264,6 +264,10 @@ describe.skipIf(!GIT_OK)("runMigrateLayout", () => {
     expect(ignore).toContain(".ndx/rex/execution-log*.jsonl");
     expect(ignore).toContain(".ndx/config.local.json");
     expect(ignore).toContain(".n-dx2.json");
+    // The dashboard's machine-local files are topped up, not left to the rewrite.
+    for (const entry of [".ndx/web-usage.jsonl", ".ndx/web.pid", ".ndx/web.port"]) {
+      expect(ignore.split("\n"), entry).toContain(entry);
+    }
     expect(ignore).toContain("packages/thing/.rex/execution-log*.jsonl");
     expect(readFileSync(join(dir, ".gitattributes"), "utf-8"))
       .toContain(".ndx/rex/prd_tree/** merge=rex-prd");
@@ -331,6 +335,47 @@ describe.skipIf(!GIT_OK)("runMigrateLayout", () => {
     // Nothing committed, and the index is as clean as it was — a restore that
     // left the rename staged would be the subtle half of this failure.
     expect(git(["rev-parse", "HEAD"], dir).trim()).toBe(head);
+    expect(git(["status", "--porcelain"], dir).trim()).toBe("");
+  }, 60_000);
+
+  /** Lay down the legacy fixture with hench's config holding `rexDir`, and commit it. */
+  async function committedProjectWithHenchRexDir(rexDir) {
+    initRepo(dir);
+    await legacyProject(dir);
+    await writeFile(join(dir, ".hench", "config.json"), JSON.stringify({ model: "sonnet", rexDir }, null, 2) + "\n");
+    git(["add", "-A"], dir);
+    git(["commit", "-q", "-m", "baseline"], dir);
+  }
+
+  const henchConfigAfter = () => JSON.parse(readFileSync(join(dir, ".ndx", "hench", "config.json"), "utf-8"));
+
+  it("rewrites hench's legacy-default rexDir to the new rex dir and commits it", async () => {
+    await committedProjectWithHenchRexDir(".rex");
+
+    expect(await runMigrateLayout(dir, []), logs.join("\n")).toBe(0);
+
+    expect(henchConfigAfter()).toEqual({ model: "sonnet", rexDir: ".ndx/rex" });
+    expect(git(["status", "--porcelain"], dir).trim()).toBe("");
+  }, 60_000);
+
+  it("leaves a custom hench rexDir alone", async () => {
+    await committedProjectWithHenchRexDir("planning");
+
+    expect(await runMigrateLayout(dir, []), logs.join("\n")).toBe(0);
+
+    expect(henchConfigAfter()).toEqual({ model: "sonnet", rexDir: "planning" });
+  }, 60_000);
+
+  it("restores hench's rexDir when verification fails", async () => {
+    await committedProjectWithHenchRexDir(".rex");
+    const before = readFileSync(join(dir, ".hench", "config.json"), "utf-8");
+    let call = 0;
+    const runCapture = async () => ({ code: call++ === 0 ? 0 : 1, stdout: "" });
+
+    expect(await runMigrateLayout(dir, [], { runCapture, tools: { rex: "rex" } })).toBe(1);
+
+    expect(existsSync(join(dir, ".ndx"))).toBe(false);
+    expect(readFileSync(join(dir, ".hench", "config.json"), "utf-8")).toBe(before);
     expect(git(["status", "--porcelain"], dir).trim()).toBe("");
   }, 60_000);
 

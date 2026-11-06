@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
-import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../../src/core/change-place.js";
+import { ChangePlacementError, recordPlacement, recordProposal, recordUnplacement, suggestPlacement, suggestPlacements } from "../../../src/core/change-place.js";
 import { placementStrength } from "../../../src/core/placement.js";
-import { checkV2Rules, indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+
+const indexTreeCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock("../../../src/schema/v2-rules.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/schema/v2-rules.js")>();
+  return { ...actual, indexTree: (...args: Parameters<typeof actual.indexTree>) => { indexTreeCalls.count++; return actual.indexTree(...args); } };
+});
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ slug: fields.id as string, ...fields }) as RuleNode;
 const NOW = new Date("2026-10-09T00:00:00.000Z");
@@ -105,6 +111,130 @@ describe("suggestPlacement", () => {
     const s = suggestPlacement(t, "ch");
     expect(s.shortlist.find((c) => c.target === "card")?.amendedBy).toEqual(["CH-2"]);
     for (const c of s.shortlist.filter((c) => c.target !== "card")) expect(c.amendedBy).toEqual([]);
+  });
+
+  describe("limited to an area", () => {
+    // Two areas that both match "card"; a constraint binding each, and one binding everything.
+    const twoAreas = (): V2Tree => {
+      const t = tree();
+      t.product.push(
+        node({
+          id: "shop",
+          type: "area",
+          slug: "storefront",
+          displayId: "A2",
+          title: "Storefront",
+          children: [
+            node({ id: "gift", type: "capability", title: "Gift card balance", statement: "A shopper reads a gift card balance" }),
+            node({ id: "shop-rule", type: "constraint", title: "Card pages load fast", appliesTo: ["shop"] }),
+          ],
+        }),
+        node({ id: "pay-rule", type: "constraint", title: "Card data stays encrypted", appliesTo: ["card"] }),
+        node({ id: "everywhere", type: "constraint", title: "Card copy is plain English", appliesTo: "all" }),
+      );
+      return t;
+    };
+
+    it("ranks only the area's capabilities and the constraints binding it", () => {
+      const all = suggestPlacement(twoAreas(), "ch").shortlist.map((c) => c.target);
+      expect(all).toEqual(expect.arrayContaining(["card", "gift", "shop-rule", "pay-rule"]));
+
+      const shop = suggestPlacement(twoAreas(), "ch", undefined, { area: "shop" }).shortlist.map((c) => c.target);
+      expect(shop).toContain("gift");
+      for (const id of shop) expect(["gift", "shop-rule", "everywhere"]).toContain(id);
+    });
+
+    it("names the area by its frozen slug or display id", () => {
+      const bySlug = suggestPlacement(twoAreas(), "ch", undefined, { area: "storefront" });
+      const byDisplayId = suggestPlacement(twoAreas(), "ch", undefined, { area: "A2" });
+      expect(bySlug.shortlist.map((c) => c.target)).toContain("gift");
+      expect(byDisplayId.shortlist).toEqual(bySlug.shortlist);
+    });
+
+    it("ranks a target outside the global top five when it is the area's", () => {
+      const t = twoAreas();
+      const pay = t.product[0]!;
+      for (let i = 0; i < 6; i++) {
+        pay.children!.push(node({ id: `wallet-${i}`, type: "capability", title: `Add wallets to card payment ${i}` }));
+      }
+      expect(suggestPlacement(t, "ch").shortlist.map((c) => c.target)).not.toContain("gift");
+      expect(suggestPlacement(t, "ch", undefined, { area: "shop" }).shortlist.map((c) => c.target)).toContain("gift");
+    });
+
+    it("refuses a reference that names no live area", () => {
+      expect(() => suggestPlacement(twoAreas(), "ch", undefined, { area: "card" })).toThrow(
+        expect.objectContaining({ kind: "not-an-area" }) as unknown as Error,
+      );
+      expect(() => suggestPlacement(twoAreas(), "ch", undefined, { area: "nowhere" })).toThrow(ChangePlacementError);
+    });
+  });
+});
+
+describe("suggestPlacements", () => {
+  // Several Inbox changes amending each other's candidates, plus one applied, one cancelled and one unknown ref.
+  const inbox = (): V2Tree => {
+    const t = tree();
+    t.changes.push(
+      node({ id: "ch2", type: "change", displayId: "CH-2", title: "Refund an order twice", needsPlacement: true, amends: [{ target: "card", delta: "modified", summary: "s", proposed: "p" }] }),
+      node({ id: "ch3", type: "change", title: "Split the store module", tags: ["code-health"], needsPlacement: true, amends: [{ target: "refund", delta: "modified", summary: "s", proposed: "p" }] }),
+      node({ id: "ch4", type: "change", displayId: "CH-4", title: "Card copy", needsPlacement: true, amends: [{ target: "card", delta: "modified", summary: "s", proposed: "p" }, { target: "A1.1", delta: "removed", summary: "s" }] }),
+      node({ id: "ch5", type: "change", title: "Old card refund work", ...APPLIED, needsPlacement: true }),
+      node({ id: "gone", type: "change", title: "Card refund", status: "cancelled", needsPlacement: true }),
+    );
+    return t;
+  };
+  const refs = ["CH-1", "ch2", "ch3", "CH-4", "ch5", "gone", "nowhere"];
+
+  const single = (t: V2Tree, ref: string, ...rest: [number?, { area?: string }?]) => {
+    try {
+      return { suggestion: suggestPlacement(t, ref, ...rest) };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  it("equals suggestPlacement for every ref, refusals included", () => {
+    const t = inbox();
+    const batch = suggestPlacements(t, refs);
+    expect([...batch.keys()]).toEqual(refs);
+    for (const ref of refs) expect(batch.get(ref)).toEqual(single(t, ref));
+    expect(batch.get("CH-4")).toMatchObject({ suggestion: { shortlist: expect.arrayContaining([expect.objectContaining({ target: "card", amendedBy: ["CH-2"] })]) } });
+    expect(batch.get("gone")).toMatchObject({ error: { kind: "change-not-open" } });
+    expect(batch.get("nowhere")).toMatchObject({ error: { kind: "no-such-change" } });
+  });
+
+  it("equals suggestPlacement with a shortlist size and an area", () => {
+    const t = inbox();
+    const batch = suggestPlacements(t, refs, 1, { area: "pay" });
+    for (const ref of refs) expect(batch.get(ref)).toEqual(single(t, ref, 1, { area: "pay" }));
+  });
+
+  it("builds the tree index, placement nodes and amender map once per call, not once per ref", () => {
+    const t = inbox();
+    // placementNodes reads each capability's and constraint's title once per build;
+    // openAmenders reads each change's amends once per build.
+    const reads = { nodes: 0, amenders: 0 };
+    const count = (n: RuleNode, field: "title" | "amends", key: keyof typeof reads): void => {
+      let value = (n as unknown as Record<string, unknown>)[field];
+      Object.defineProperty(n, field, { get: () => { reads[key]++; return value; }, set: (v) => { value = v; }, enumerable: true, configurable: true });
+    };
+    const placeable = (t.product[0].children ?? []).filter((n) => n.type === "capability" || n.type === "constraint");
+    for (const n of placeable) count(n, "title", "nodes");
+    for (const n of t.changes) count(n, "amends", "amenders");
+
+    indexTreeCalls.count = 0;
+    suggestPlacements(t, refs);
+
+    expect(refs.length).toBeGreaterThan(2);
+    expect(indexTreeCalls.count).toBe(1);
+    expect(reads.nodes).toBe(placeable.length);
+    expect(reads.amenders).toBe(t.changes.filter(isOpenChange).length);
+  });
+
+  it("refuses the whole call for an area that is not live", () => {
+    expect(() => suggestPlacements(inbox(), refs, undefined, { area: "nowhere" })).toThrow(
+      expect.objectContaining({ kind: "not-an-area" }) as unknown as Error,
+    );
   });
 });
 
@@ -224,6 +354,45 @@ describe("recordPlacement", () => {
 
   it("refuses a ref that is not a change", () => {
     expect(() => suggestPlacement(tree(), "card")).toThrow(/No live change "card"/);
+  });
+});
+
+describe("recordUnplacement", () => {
+  const amended = { amends: [{ target: "card", delta: "modified", summary: "s", proposed: "x" }] };
+
+  it("takes back one touches by any ref, leaving the input tree alone", () => {
+    const input = tree({ touches: ["card", "refund"], needsPlacement: undefined });
+    const out = recordUnplacement(input, "CH-1", "A1.1", NOW);
+    expect({ change: out.change, target: out.target }).toEqual({ change: "ch", target: "card" });
+    expect(changeIn(out.tree).touches).toEqual(["refund"]);
+    expect(changeIn(out.tree).needsPlacement).toBeUndefined();
+    expect(changeIn(input).touches).toEqual(["card", "refund"]);
+  });
+
+  it("returns a change left with no home to the Inbox", () => {
+    const { tree: next } = recordUnplacement(tree({ touches: ["card"], needsPlacement: undefined }), "ch", "card", NOW);
+    expect(changeIn(next)).not.toHaveProperty("touches");
+    expect(changeIn(next).needsPlacement).toBe(true);
+  });
+
+  it("keeps a change that still amends something out of the Inbox", () => {
+    const { tree: next } = recordUnplacement(tree({ ...amended, touches: ["refund"], needsPlacement: undefined }), "ch", "refund", NOW);
+    expect(changeIn(next).needsPlacement).toBeUndefined();
+  });
+
+  it.each([
+    ["not-touched", "a target it does not touch", { touches: ["refund"] }, "card", /^Change CH-1 does not touch "card"$/],
+    ["not-touched", "a target it amends", { ...amended, touches: ["refund"] }, "card", /does not touch "card"/],
+    ["not-touched", "an unknown target", { touches: ["card"] }, "nope", /does not touch "nope"/],
+    ["change-not-open", "a cancelled change", { touches: ["card"], status: "cancelled" }, "card", /is cancelled; only an open or applied change is placed/],
+    ["no-such-change", "a deleted change", { touches: ["card"], status: "deleted" }, "card", /No live change "ch"/],
+    // Closed in v2 and back in the Inbox: the rules say a person must confirm its targets first.
+    ["rule-errors", "the last home of an applied change", { ...APPLIED, touches: ["card"], needsPlacement: undefined }, "card", /still needs placement/],
+  ])("refuses %s: %s", (kind, _label, changeFields, target, message) => {
+    const err = (() => { try { recordUnplacement(tree(changeFields), "ch", target, NOW); } catch (e) { return e as ChangePlacementError; } })();
+    expect(err).toBeInstanceOf(ChangePlacementError);
+    expect(err?.kind).toBe(kind);
+    expect(err?.message).toMatch(message);
   });
 });
 

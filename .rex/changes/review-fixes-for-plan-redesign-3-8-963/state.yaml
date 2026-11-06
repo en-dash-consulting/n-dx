@@ -1,0 +1,42 @@
+schema: "rex/v2"
+items:
+  "04541a56-4cb7-4fdc-a716-3446f32a321e":
+    status: "completed"
+    startedAt: "2026-11-06T03:50:05.396Z"
+    completedAt: "2026-11-06T03:50:32.341Z"
+    endedAt: "2026-11-06T03:50:32.341Z"
+    activeIntervals: [{"end":"2026-11-06T03:50:32.341Z","start":"2026-11-06T03:50:05.396Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Reworded docs/packages/web.md and the changeset: strip and glance read /api/rex/changes/summary, area map reads /api/rex/product."
+    lastModified: "2026-11-06T03:50:32.341Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94a2fc84-71b6-4dfe-a6ea-10f2f703a63b":
+    status: "completed"
+    startedAt: "2026-11-06T03:45:11.911Z"
+    completedAt: "2026-11-06T03:49:53.401Z"
+    endedAt: "2026-11-06T03:49:53.401Z"
+    activeIntervals: [{"end":"2026-11-06T03:49:53.401Z","start":"2026-11-06T03:45:11.911Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ChangesSummaryProvider around the plan stage reads the summary once; strip and glance consume it; test counts requests."
+    lastModified: "2026-11-06T03:49:53.401Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b57c204d-a3e0-4d6d-97b4-8315d315a100":
+    status: "completed"
+    startedAt: "2026-11-06T03:50:32.341Z"
+    completedAt: "2026-11-06T03:50:32.341Z"
+    endedAt: "2026-11-06T03:50:32.341Z"
+    activeIntervals: [{"end":"2026-11-06T03:50:32.341Z","start":"2026-11-06T03:50:32.341Z"}]
+    appliedAt: "2026-11-06T03:50:32.341Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T03:50:32.341Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d7d02895-a0f3-439a-bd3c-1e7d75c4cd05":
+    status: "completed"
+    startedAt: "2026-11-06T03:36:47.842Z"
+    completedAt: "2026-11-06T03:45:02.546Z"
+    endedAt: "2026-11-06T03:45:02.546Z"
+    activeIntervals: [{"end":"2026-11-06T03:45:02.546Z","start":"2026-11-06T03:36:47.842Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Server computes openChangeIds per area (touches/amends on the area or its nodes, added amendments at their resolved under); area map block draws from it."
+    lastModified: "2026-11-06T03:45:02.546Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1769,6 +1769,8 @@ a.tracker-link {
   font-size: var(--font-xs);
 }
 
+.cp-place-on-map { align-self: flex-start; }
+
 .cp-shortlist,
 .cp-relation {
   margin: 0;
@@ -1803,9 +1805,63 @@ a.tracker-link {
   cursor: pointer;
 }
 
-.cp-target.is-checked {
+.cp-target.is-checked,
+.cp-card.is-checked {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Placement mode's wide panel: one card per candidate. */
+.cp-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.cp-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.cp-card-area,
+.cp-card-words,
+.cp-relation-effect {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-card-statement {
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.cp-card-effects {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-card-effects dt { font-weight: 600; }
+.cp-card-effects dd { margin: 0; }
+
+.cp-relation-body {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.cp-relation-question {
+  font-size: var(--font-sm);
+  font-weight: 600;
 }
 
 .cp-target-body {
@@ -1853,6 +1909,29 @@ a.tracker-link {
 .cp-refusal-hint {
   margin-top: var(--space-1);
   color: var(--text);
+}
+
+/* The wide card's dry run of an amendment (WF5) */
+.cp-dry-run {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.cp-dry-run[data-check="ok"] { color: var(--green, var(--text)); }
+.cp-dry-run.is-refused { color: var(--red); }
+
+/* Apply… for a change awaiting apply (change-apply.ts) */
+.ca-effects {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-4);
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+.ca-effects-empty {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
 }
 
 .cp-search-input,
@@ -1911,6 +1990,11 @@ a.tracker-link {
   align-items: center;
   gap: var(--space-2);
 }
+
+.cp-homes { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cp-home { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); font-size: var(--font-sm); }
+.cp-home-text { overflow-wrap: anywhere; }
+.cp-model-mark { font-size: var(--font-xs); font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 var(--space-1); }
 
 .cp-placed-line {
   font-size: var(--font-sm);

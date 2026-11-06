@@ -27,6 +27,9 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
 
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "plan",
+  // Borrowed from hench for the PRD Graph and Execution Log, which have no
+  // other stage here. It shows only Rex's own views (see `stageShowsView`).
+  "tune",
   "rex-dashboard",
   "prd",
   "product",
@@ -41,6 +44,7 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
 
 export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
   "work",
+  "tune",
   "hench-runs",
   "hench-audit",
   "hench-optimization",
@@ -96,6 +100,8 @@ export function isKnownViewPath(segment: string): boolean {
 const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   overview: "analyze",
   "rex-dashboard": "work",
+  // The All Commands page became the Reference tab of Settings › Commands.
+  "command-reference": "commands",
   // 0.8.0 renamed the LLM Provider page to Robot Wrangler.
   "llm-provider": "robot-wrangler",
   // 0.8.0 merged work settings, CLI timeouts and templates into Workflow (#457).
@@ -118,6 +124,23 @@ const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
  * which has no `work` stage, so `rex-dashboard` keeps being its own page
  * there rather than redirecting nowhere.
  */
+/** Aliases that land on a tab of their target rather than on its first one. */
+const VIEW_ALIAS_SUBPATH: Readonly<Record<string, string>> = {
+  "command-reference": "reference",
+};
+
+/**
+ * `resolveViewAlias` plus the sub-path the alias lands on: `/command-reference`
+ * opens `/commands/reference`. `sub` is null when the alias has no tab of its own.
+ */
+export function resolveViewAliasRoute(
+  segment: string,
+  validViews: ReadonlySet<ViewId>,
+): { view: ViewId; sub: string | null } | null {
+  const view = resolveViewAlias(segment, validViews);
+  return view ? { view, sub: VIEW_ALIAS_SUBPATH[segment] ?? null } : null;
+}
+
 export function resolveViewAlias(segment: string, validViews: ReadonlySet<ViewId>): ViewId | null {
   const target = VIEW_ALIASES[segment];
   return target && validViews.has(target) ? target : null;

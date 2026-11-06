@@ -9,11 +9,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render, type FunctionComponent } from "preact";
 import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
-import { STAGES } from "../../../src/viewer/views/index.js";
+import { STAGES, stageViews } from "../../../src/viewer/views/index.js";
+import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
 import {
+  AREA_DETAIL_FIXTURE,
   CAPABILITY_DETAIL_FIXTURE,
   CHANGES_FIXTURE,
   PRODUCT_MAP_FIXTURE,
@@ -79,13 +81,21 @@ afterEach(() => {
 
 describe("routing", () => {
   it("places Product and Changes on the Plan stage as server-backed rex views", () => {
-    const plan = STAGES.plan.sections.filter((s) => s.view === "product" || s.view === "changes");
+    const plan = STAGES.plan.tiles!.filter((t) => !t.band && (t.view === "product" || t.view === "changes"));
     expect(plan).toEqual([
-      { view: "product", requiresServer: true },
-      { view: "changes", requiresServer: true },
+      { view: "product", panel: "product-map", title: "Product", embedsView: true, cols: 12, rows: 2, v2Only: true, requiresServer: true },
+      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+      { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 6, v2Only: true, requiresServer: true },
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);
     expect(buildValidViews("rex").has("changes")).toBe(true);
+  });
+
+  it("Plan no longer lists Requirements, yet still owns its route and keeps it valid", () => {
+    expect(STAGES.plan.tiles!.map((t) => t.view)).not.toContain("requirements");
+    expect(stageViews("plan")).toContain("requirements");
+    expect(buildValidViews(null).has("requirements")).toBe(true);
+    expect(buildValidViews("rex").has("requirements")).toBe(true);
   });
 });
 
@@ -117,6 +127,28 @@ describe("on a v2 project", () => {
 
     act(() => { root.querySelector<HTMLButtonElement>(".cap-back")!.click(); });
     expect(root.querySelector(".pm-container")).not.toBeNull();
+  });
+
+  it("a capability's Inbox draft opens the change through navigateTo", async () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+    const capability = {
+      ...CAPABILITY_DETAIL_FIXTURE,
+      inboxChanges: [{ id: "change-spec-draft", title: "Build the revised spec", delta: "modified" }],
+    };
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+      [capabilityUrl]: { layout: "v2", capability },
+    });
+    const navigateTo = vi.fn();
+    await mount(h(ProductPage, { navigateTo }));
+
+    const row = [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+      .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!;
+    act(() => { row.click(); });
+    await settle();
+
+    act(() => { root.querySelector<HTMLButtonElement>(".cap-inbox-changes button.ch-change-link")!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "change-spec-draft" });
   });
 
   it("a capability that fails to load still offers the way back to the map", async () => {
@@ -365,5 +397,88 @@ describe("on a v1 project", () => {
     const empty = root.querySelector(".pm-no-product-layer");
     expect(empty?.textContent).toContain("ndx migrate");
     expect(root.querySelector(".pm-area, [data-change-id]")).toBeNull();
+  });
+
+  const v1Tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Product views"] [role="tab"]')];
+
+  it("the /requirements route shows the requirements view under the Product tabs", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v1" } });
+    await mount(h(ProductPage, { initialTab: "requirements" }));
+    // The requirements view mounts once the product read lands, and reads on mount.
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
+    expect(v1Tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(v1Tabs()[1].getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector(".pm-no-product-layer")).toBeNull();
+  });
+
+  it("the Product page opens on Map with the migrate notice, and Requirements is one click away", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v1" } });
+    await mount(h(ProductPage, null));
+    expect(v1Tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(root.querySelector(".pm-no-product-layer")).not.toBeNull();
+    act(() => { v1Tabs()[1].click(); });
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
+    expect(root.querySelector(".pm-no-product-layer")).toBeNull();
+  });
+});
+
+describe("the Requirements tab", () => {
+  const tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Product views"] [role="tab"]')];
+
+  it("sits beside Map and renders the coverage and traceability reads", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    await mount(h(ProductPage, null));
+    expect(tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(tabs()[0].getAttribute("aria-selected")).toBe("true");
+
+    act(() => { tabs()[1].click(); });
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/traceability"));
+    await settle();
+    expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
+    expect(fetched).toContain("/api/rex/requirements/coverage");
+    expect(root.querySelector(".pm-area")).toBeNull();
+  });
+
+  it("moving from /requirements to /product opens the map, not the previous route's tab", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    // The shell renders the active view in one slot, unkeyed, so the registry must key the two routes apart.
+    await mount(h("div", null, renderActiveView("requirements", {} as never)));
+    await vi.waitFor(() => expect(tabs()[1]?.getAttribute("aria-selected")).toBe("true"));
+    await mount(h("div", null, renderActiveView("product", {} as never)));
+    await vi.waitFor(() => expect(tabs()[0]?.getAttribute("aria-selected")).toBe("true"));
+    expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
+  });
+
+  it("/product/area/<slug> shows that area's view as the page, with the way back to the map", async () => {
+    const area = AREA_DETAIL_FIXTURE;
+    stubRoutes({ [`/api/rex/product/area/${area.slug}`]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    const navigateTo = vi.fn();
+    await mount(h("div", null, renderActiveView("product", { selectedTab: `area/${area.slug}`, navigateTo } as never)));
+    await vi.waitFor(() => expect(root.querySelector(".area-head")).not.toBeNull());
+    expect(fetched).toEqual([`/api/rex/product/area/${area.slug}`]);
+    expect(root.querySelector("h2")?.textContent).toContain(AREA_DETAIL_FIXTURE.title);
+    // On its own page the area offers no "Open on Product page": it is that page.
+    // It still offers "+ Change in this area". The spec map's capability blocks and
+    // the cards' change links are buttons too; only the header's buttons carry this claim.
+    const header = [...root.querySelectorAll("button")].filter((b) => !b.closest(".asm") && !b.closest(".area-cards"));
+    expect(header.map((b) => b.textContent)).toEqual(["Product", "+ Change in this area"]);
+    expect(root.querySelectorAll(".asm .pam-block")).toHaveLength(AREA_DETAIL_FIXTURE.capabilities.length);
+    // The page passes navigateTo down, so a Moving now row opens the change's panel.
+    const changeLink = root.querySelector<HTMLButtonElement>('[data-card="moving"] .ch-change-link')!;
+    const changeId = changeLink.closest<HTMLElement>("[data-change-id]")!.dataset.changeId;
+    act(() => changeLink.click());
+    expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: changeId });
+    act(() => root.querySelector<HTMLButtonElement>(".cap-back")!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product");
+  });
+
+  it("the /requirements route opens on that tab on a v2 project", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    await mount(h(ProductPage, { initialTab: "requirements" }));
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
+    expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
   });
 });

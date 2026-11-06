@@ -26,8 +26,10 @@ import { PERMISSION_MODES } from "../../schema/index.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { resolveHenchPaths } from "../../store/paths.js";
-import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
+import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
+import { missingPrdFolderError } from "./prd-folder.js";
+import { excludeHenchRuntimeArtifacts, formatPorcelainPath, splitPlanningPaths } from "../../store/artifacts.js";
+import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/shared.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
 import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";
@@ -78,7 +80,7 @@ export type RunRefusalCode =
  * dashboard has no stderr anyone reads.
  */
 export interface RunWarning {
-  code: "untrusted-repository" | SettingWarningCode;
+  code: "untrusted-repository" | "planning-commit" | SettingWarningCode;
   message: string;
 }
 
@@ -147,7 +149,18 @@ export interface RunResolution {
     blockedBy: string[];
     claimedBy: { worktree: string; pid: number; expiresAt: string } | null;
   } | null;
-  workspace: { root: string; branch: string | null; isAnchor?: boolean; dirty: boolean };
+  workspace: {
+    root: string;
+    branch: string | null;
+    isAnchor?: boolean;
+    dirty: boolean;
+    /**
+     * Repository-relative n-dx planning files the run would commit on their
+     * own before starting; empty when there are none, when other files are
+     * dirty too (then `dirty-tree` refuses) or under `--allow-dirty`.
+     */
+    planningCommit: string[];
+  };
   /**
    * The task's `run` block as stored, once rex's validator has accepted it;
    * `null` when the task carries none or when the block was ignored (a
@@ -260,7 +273,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   const henchDir = resolveHenchPaths(dir).henchDir;
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
   const configured = await loadConfiguredHenchKeys(henchDir);
-  const rexDir = join(dir, config.rexDir);
+  const rexDir = resolveHenchRexDir(dir, config.rexDir);
   const baseLlmConfig = await loadLLMConfig(henchDir);
   const baseVendor = resolveLLMVendor(baseLlmConfig);
   const refusals: RunRefusal[] = [];
@@ -275,7 +288,10 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // (findV2Entry); the report and the claim check use the real id it names.
   let prdItems: PRDItem[] | null = null;
   let v2Tree: V2Tree | undefined;
-  try {
+  // A missing folder keeps its own hint: where the layout expects the PRD.
+  const missingFolder = missingPrdFolderError(dir, rexDir);
+  if (missingFolder) refuse("prd-unreadable", missingFolder);
+  else try {
     const store = await resolveStore(rexDir);
     prdItems = (await store.loadDocument()).items;
     v2Tree = await loadV2Tree(store);
@@ -453,13 +469,19 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   const origin = captureRunGitOrigin(dir);
   const root = origin.worktreeRoot ?? dir;
   const commonDir = getGitCommonDir(dir);
-  const dirty = (await excludeHenchRuntimeArtifacts(await listDirtyPaths(dir), dir)).length > 0;
+  // The run's pre-run gate, previewed: n-dx's own planning files alone are
+  // committed and the run starts; anything else refuses, naming only those.
+  const dirtyLines = await excludeHenchRuntimeArtifacts(await listDirtyPaths(dir), dir);
+  const dirty = dirtyLines.length > 0;
   const allowDirty = flags["allow-dirty"] === "true";
-  if (dirty && !allowDirty) {
+  const split = await splitPlanningPaths(dirtyLines, dir);
+  const planningCommit = !allowDirty && split.other.length === 0 ? split.planning : [];
+  if (dirty && !allowDirty && split.other.length > 0) {
+    const others = split.other.map(formatPorcelainPath);
     refuse(
       "dirty-tree",
       new CLIError(
-        "Refusing to start an autonomous run with uncommitted changes in the working tree.",
+        `Refusing to start an autonomous run with uncommitted changes in the working tree: ${others.join(", ")}.`,
         "Commit or stash them, or pass --allow-dirty to proceed anyway.",
       ),
     );
@@ -474,6 +496,14 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       ? [{
           code: "untrusted-repository" as const,
           message: formatTrustWarningForRun(trustEvaluation, provider.value).join("\n"),
+        }]
+      : []),
+    ...(planningCommit.length > 0
+      ? [{
+          code: "planning-commit" as const,
+          message:
+            `The run first commits ${planningCommit.length} n-dx planning file(s) on their own ` +
+            `(${PLANNING_COMMIT_SUBJECT}): ${planningCommit.join(", ")}`,
         }]
       : []),
     ...settings.warnings,
@@ -512,6 +542,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       branch: origin.branch ?? null,
       ...(commonDir ? { isAnchor: dirname(commonDir) === root } : {}),
       dirty,
+      planningCommit,
     },
     saved: settings.saved ?? null,
     resolved,

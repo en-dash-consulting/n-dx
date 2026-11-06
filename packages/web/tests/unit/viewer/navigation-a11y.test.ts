@@ -108,6 +108,18 @@ function stubFetch() {
         json: async () => ({ name: "demo", description: null, version: null, git: null, nameSource: "directory" }),
       };
     }
+    // A valid v2 status: Plan mounts its v2-only tiles only once a layout is known.
+    if (u.includes("/api/status")) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          initialized: true,
+          sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 0, modulesComplete: 0, modulesTotal: 0 },
+          rex: { exists: true, layout: "v2", percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
+          hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
+        }),
+      };
+    }
     return { ok: true, status: 200, json: async () => ({}) };
   }));
 }
@@ -245,12 +257,13 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
             stage, validViews: VALID, navigateTo: () => {}, renderView: () => null,
           }));
           for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
-            openTile(tile.view);
+            openTile(tile.panel ?? tile.view);
             const tabs = [...root.querySelectorAll(".stage-tile-fullscreen [role=\"tab\"]")];
             expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1);
             for (const tab of tabs) {
               const view = tab.getAttribute("data-tab")!;
-              expect(accessibleName(tab, hidden)).toBe(viewLabel(view as never));
+              const named = [{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].find((t) => t.view === view);
+              expect(accessibleName(tab, hidden)).toBe(named?.label ?? viewLabel(view as never));
             }
           }
         });
@@ -270,16 +283,23 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
   });
 
   it("a bounded scroll region is reachable by keyboard", async () => {
-    await mount(h(StagePage, {
-      stage: "plan", validViews: VALID, navigateTo: () => {}, renderView: () => null,
-    }));
-    // `hench-runs` is the Plan stage's scroll section; open it.
-    const section = root.querySelector("[data-view='hench-runs']")!;
-    act(() => { (section.querySelector(".stage-section-toggle") as HTMLButtonElement).click(); });
-    await act(async () => {});
+    // No stage section sets `scroll` now that the run history and log are Tune
+    // tabs, so give one the option for this test.
+    const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
+    Object.assign(audit, { scroll: true });
+    try {
+      await mount(h(StagePage, {
+        stage: "work", validViews: VALID, navigateTo: () => {}, renderView: () => null,
+      }));
+      const section = root.querySelector("[data-view='hench-audit']")!;
+      act(() => { (section.querySelector(".stage-section-toggle") as HTMLButtonElement).click(); });
+      await act(async () => {});
 
-    const body = section.querySelector(".stage-section-body--scroll");
-    expect(body, "the scroll section did not open").not.toBeNull();
-    expect(body!.getAttribute("tabindex")).toBe("0");
+      const body = section.querySelector(".stage-section-body--scroll");
+      expect(body, "the scroll section did not open").not.toBeNull();
+      expect(body!.getAttribute("tabindex")).toBe("0");
+    } finally {
+      Object.assign(audit, { scroll: undefined });
+    }
   });
 });

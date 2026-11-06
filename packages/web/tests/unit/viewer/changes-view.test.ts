@@ -9,11 +9,13 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { h } from "preact";
 import { act } from "preact/test-utils";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
-import { ChangesView } from "../../../src/viewer/views/changes.js";
+import { ChangesView, changesInArea } from "../../../src/viewer/views/changes.js";
+import { areaBlocks } from "../../../src/viewer/views/product-area-map.js";
 import {
   CHANGE_STAGE_ORDER,
   UNSCHEDULED_RELEASE_LABEL,
   groupChangesByRelease,
+  type AreaSection,
   type ChangeRow,
 } from "../../../src/viewer/views/product-model.js";
 import { CHANGES_FIXTURE } from "../../fixtures/v2-product-map.js";
@@ -174,6 +176,7 @@ describe("ChangesView", () => {
   it("labels an awaiting-apply change as waiting for a steward, between in-progress and applied", () => {
     const row = (id: string, stage: ChangeRow["stage"]): ChangeRow => ({
       id, title: id, stage, plannedRelease: "2.0.0", amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+      criteriaGap: false, openBlockers: 0,
     });
     const el = mount(h(ChangesView, {
       changes: [row("a", "applied"), row("b", "awaiting-apply"), row("c", "in-progress")],
@@ -254,6 +257,7 @@ describe("ChangesView", () => {
 describe("ChangesView filters", () => {
   const row = (id: string, stage: ChangeRow["stage"], plannedRelease?: string): ChangeRow => ({
     id, title: id, stage, plannedRelease, amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+    criteriaGap: false, openBlockers: 0,
   });
   const MIXED = [
     row("o1", "ready", "1.0.0"), row("a1", "applied", "1.0.0"), row("a2", "shipped", "1.0.0"),
@@ -301,6 +305,29 @@ describe("ChangesView filters", () => {
     expect(el.querySelector(".ch-applied-toggle")!.textContent).toBe("2 applied ▸");
   });
 
+  it("a gap filter, as Specs to tighten stores it, shows only the placed open changes with that gap", () => {
+    const gaps = [
+      { ...row("bare", "proposed"), criteriaGap: true },
+      { ...row("tasks", "in-progress"), criteriaGap: true, taskCount: 2 },
+      { ...row("blocked", "ready"), openBlockers: 1 },
+      { ...row("held", "proposed"), criteriaGap: true, awaitsPlacement: true },
+      { ...row("done", "applied"), criteriaGap: true },
+      row("clean", "proposed"),
+    ];
+    const cases: Array<[string, string[]]> = [
+      ["gap:no-criteria", ["bare"]],
+      ["gap:task-criteria", ["tasks"]],
+      ["gap:blocked", ["blocked"]],
+    ];
+    for (const [filter, expected] of cases) {
+      localStorage.setItem("ndx.changes.filter", filter);
+      const el = mount(h(ChangesView, { changes: gaps }));
+      expect(chip(el, filter).getAttribute("aria-pressed"), filter).toBe("true");
+      expect(ids(el), filter).toEqual(expected);
+      cleanupRenderedDiv(el);
+    }
+  });
+
   it("remembers the choice per viewer in localStorage", () => {
     const first = mount(h(ChangesView, { changes: MIXED }));
     pick(first, "release:1.0.0");
@@ -331,6 +358,80 @@ describe("ChangesView filters", () => {
     }
   });
 
+  describe("area filter (?area=<slug>)", () => {
+    const CHECKOUT = { id: "area-1", slug: "checkout", title: "Checkout" };
+    const SEARCH = { id: "area-2", slug: "search", title: "Search" };
+    const AREA_ROWS: ChangeRow[] = [
+      { ...row("c1", "ready", "1.0.0"), areas: [CHECKOUT] },
+      { ...row("c2", "proposed"), areas: [CHECKOUT, SEARCH] },
+      // Held for placement still counts on the badge, so the filter keeps it.
+      { ...row("c3", "proposed"), areas: [CHECKOUT], awaitsPlacement: true },
+      { ...row("s1", "in-progress"), areas: [SEARCH] },
+      row("loose", "proposed"),
+      row("done", "applied"),
+    ];
+    const SECTION: AreaSection = { id: CHECKOUT.id, slug: CHECKOUT.slug, title: CHECKOUT.title, capabilities: [], openChangeIds: ["c1", "c2", "c3"] };
+
+    it("lists only the area's open changes, as many as its map badge counts", () => {
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "checkout" }));
+      expect(ids(el).sort()).toEqual(["c1", "c2", "c3"]);
+      const badge = areaBlocks([SECTION])[0]!.openChanges;
+      expect(changesInArea(AREA_ROWS, "checkout")).toHaveLength(badge);
+      expect(ids(el)).toHaveLength(badge);
+      expect(chip(el, "area").querySelector(".ch-filter-count")!.textContent).toBe(String(badge));
+    });
+
+    it("names the area on an active chip and outranks the remembered filter", () => {
+      localStorage.setItem("ndx.changes.filter", "applied");
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "checkout" }));
+      expect(chip(el, "area").textContent).toContain("Area: Checkout");
+      expect(chip(el, "applied").getAttribute("aria-pressed")).toBe("false");
+      expect(chip(el, "open").getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("clears the filter from the chip's remove button", () => {
+      const onClearArea = vi.fn();
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "checkout", onClearArea }));
+      const remove = chip(el, "area").querySelector<HTMLButtonElement>("button.ch-filter-remove")!;
+      expect(remove.getAttribute("aria-label")).toBe("Remove the Checkout area filter");
+      act(() => { remove.click(); });
+      expect(onClearArea).toHaveBeenCalledOnce();
+    });
+
+    it("lands on Open, not the remembered filter, once the area is removed", () => {
+      localStorage.setItem("ndx.changes.filter", "stage:ready");
+      let area: string | null = "checkout";
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area, onClearArea: () => { area = null; } }));
+      act(() => { chip(el, "area").querySelector<HTMLButtonElement>("button.ch-filter-remove")!.click(); });
+      expect(area).toBeNull();
+      expect(localStorage.getItem("ndx.changes.filter")).toBe("open");
+      cleanupRenderedDiv(el);
+      const after = mount(h(ChangesView, { changes: AREA_ROWS, area }));
+      expect(chip(after, "open").getAttribute("aria-pressed")).toBe("true");
+      expect(ids(after).sort()).toEqual(["c1", "c2", "c3", "loose", "s1"]);
+    });
+
+    it("clears the filter when another chip is picked", () => {
+      const onClearArea = vi.fn();
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "checkout", onClearArea }));
+      pick(el, "open");
+      expect(onClearArea).toHaveBeenCalledOnce();
+    });
+
+    it("shows every change once the area is gone", () => {
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area: null }));
+      expect(el.querySelector('[data-filter="area"]')).toBeNull();
+      expect(ids(el).sort()).toEqual(["c1", "c2", "c3", "loose", "s1"]);
+    });
+
+    it("names an area with nothing open by its slug, and lists nothing", () => {
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "returns" }));
+      expect(chip(el, "area").textContent).toContain("Area: returns");
+      expect(ids(el)).toEqual([]);
+      expect(el.textContent).toContain("Nothing matches this filter.");
+    });
+  });
+
   it("mounts no rows for a large collapsed applied group", () => {
     const many = Array.from({ length: 1241 }, (_, i) => row(`a${i}`, "applied"));
     const el = mount(h(ChangesView, { changes: [...many, row("open", "proposed")] }));
@@ -349,6 +450,8 @@ describe("groupChangesByRelease", () => {
     touches: [],
     taskCount: 0,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
     ...over,
   });
 

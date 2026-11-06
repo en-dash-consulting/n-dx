@@ -88,6 +88,7 @@ const VALUE_KEYS = new Set([
   "model",
   "format",
   "parent",
+  "area",
   "title",
   "description",
   "status",

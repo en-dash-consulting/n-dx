@@ -1,12 +1,12 @@
 import type { ViewId } from "./types.js";
-import { stripBasePath, resolveViewAlias } from "./external.js";
+import { stripBasePath, resolveViewAliasRoute } from "./external.js";
 
 export interface ParsedRoute {
   view: ViewId;
   subId: string | null;
 }
 
-const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs"]);
+const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs", "commands"]);
 
 /**
  * Views whose `subId` is a task id (the rest of `/<view>/<subId>` is a run id or unused).
@@ -14,6 +14,77 @@ const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs"]);
  */
 export function isTaskRouteView(view: ViewId): boolean {
   return view === "prd" || view === "live-task" || view === "work";
+}
+
+/** Tabs Settings › Commands names in its sub-path; the Run tab is the bare `/commands`. */
+const COMMANDS_PATH_TABS: ReadonlySet<string> = new Set(["reference"]);
+
+/**
+ * The tab a route opens on a view that keeps its tab in the path (`/commands/reference`).
+ * Null for every other view, and for an unrecognised sub-path, so the address
+ * bar settles on the page the viewer actually shows.
+ */
+export function routeTab(view: ViewId, subId: string | null): string | null {
+  if (view === "product" && subId && isProductSubPath(subId)) return subId;
+  return view === "commands" && subId && COMMANDS_PATH_TABS.has(subId) ? subId : null;
+}
+
+/**
+ * An area's page, `/product/area/<slug>`, or with a capability selected,
+ * `/product/area/<slug>/capability/<id>`; its sub-path rides in the route's tab.
+ */
+const AREA_PATH = /^area\/([^/]+)(?:\/capability\/([^/]+))?$/;
+
+/** Placement mode for one Inbox change, `/product/place/<changeId>`. */
+const PLACE_PATH = /^place\/([^/]+)$/;
+
+/** A Product sub-path the route keeps: an area's, or placement mode's. */
+function isProductSubPath(sub: string): boolean {
+  return AREA_PATH.test(sub) || PLACE_PATH.test(sub);
+}
+
+/** The Product tab that opens placement mode for `changeId`. */
+export function placementTab(changeId: string): string {
+  return `place/${encodeURIComponent(changeId)}`;
+}
+
+/** The change a `place/<id>` tab places, or null when the tab is not placement mode's. */
+export function placeChangeOfTab(tab: string | null): string | null {
+  const id = tab && PLACE_PATH.exec(tab)?.[1];
+  if (!id) return null;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    // A hand-edited address with a malformed escape names no change.
+    return null;
+  }
+}
+
+/**
+ * The slug an `area/<slug>` tab names, decoded (the tab carries it as it sits
+ * in the address), or null when the tab is not an area's or the slug is malformed.
+ */
+export function areaSlugOfTab(tab: string | null): string | null {
+  const slug = tab && AREA_PATH.exec(tab)?.[1];
+  if (!slug) return null;
+  try {
+    return decodeURIComponent(slug);
+  } catch {
+    // A hand-edited address like `/product/area/%E0` names no area.
+    return null;
+  }
+}
+
+/** The capability `area/<slug>/capability/<id>` selects in the area, or null. */
+export function areaCapabilityOfTab(tab: string | null): string | null {
+  const id = tab && AREA_PATH.exec(tab)?.[2];
+  if (!id) return null;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    // A hand-edited address like `/capability/%E0` is no selection: the area shows.
+    return null;
+  }
 }
 
 /**
@@ -112,9 +183,9 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   // viewers that keep them as their own page. Any trailing sub-path rides
   // along unexamined, same as an unrecognised sub-path does today, so it is
   // preserved in the address bar rather than dropped.
-  const movedAlias = resolveViewAlias(base, validViews);
-  if (movedAlias === "work") return parseWorkPath("work", sub);
-  if (movedAlias) return { view: movedAlias, subId: sub || null };
+  const moved = resolveViewAliasRoute(base, validViews);
+  if (moved?.view === "work") return parseWorkPath("work", sub);
+  if (moved) return { view: moved.view, subId: sub || moved.sub };
 
   const work = parseWorkPath(base, sub);
   if (work && validViews.has("work")) return work;
@@ -130,6 +201,8 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   if (slashIdx > 0) {
     const view = base as ViewId;
     if (validViews.has(view) && sub && DEEP_LINK_VIEWS.has(view)) return { view, subId: sub };
+    // An area's page, or placement mode. Until they have their own views they are the Product page.
+    if (view === "product" && validViews.has(view) && isProductSubPath(sub)) return { view, subId: sub };
   }
   return null;
 }

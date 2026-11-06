@@ -192,7 +192,23 @@ export function placementRelationRule(change: PlacementChange): { relation: Plac
     : { relation: "touches", rule: "the title does not open with an amending verb, and the intent has no Relation line" };
 }
 
-function scoreNode(change: PlacementChange, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {
+/**
+ * Each node's keywords, kept against the text they came from. Ranking many
+ * changes against one node list (an Inbox) extracts a node's keywords once,
+ * not once per change; a node whose text changed is extracted again.
+ */
+const nodeKeywordCache = new WeakMap<PlacementNode, { text: string; words: string[] }>();
+
+function nodeKeywords(node: PlacementNode): string[] {
+  const text = `${node.title} ${node.statement ?? ""}`;
+  const cached = nodeKeywordCache.get(node);
+  if (cached?.text === text) return cached.words;
+  const words = extractKeywords(text);
+  nodeKeywordCache.set(node, { text, words });
+  return words;
+}
+
+function scoreNode(change: PlacementChange, changeWords: ReadonlySet<string>, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {
   const text = `${change.title}\n${change.intent ?? ""}`;
   let score = 0;
   const reasons: string[] = [];
@@ -224,8 +240,7 @@ function scoreNode(change: PlacementChange, node: PlacementNode, relation: Place
     }
   }
 
-  const changeWords = new Set(extractKeywords(text));
-  const shared = extractKeywords(`${node.title} ${node.statement ?? ""}`).filter((w) => changeWords.has(w));
+  const shared = nodeKeywords(node).filter((w) => changeWords.has(w));
   if (shared.length > 0) {
     score += WEIGHT_TOKEN * shared.length;
     reasons.push(`words: ${shared.join(", ")}`);
@@ -241,8 +256,9 @@ export function rankPlacementCandidates(
   size: number = PLACEMENT_SHORTLIST_SIZE,
 ): PlacementCandidate[] {
   const relation = placementRelation(change);
+  const changeWords = new Set(extractKeywords(`${change.title}\n${change.intent ?? ""}`));
   return nodes
-    .map((node) => scoreNode(change, node, relation))
+    .map((node) => scoreNode(change, changeWords, node, relation))
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score || a.target.localeCompare(b.target))
     .slice(0, size);

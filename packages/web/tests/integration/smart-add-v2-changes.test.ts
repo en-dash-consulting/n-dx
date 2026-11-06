@@ -293,6 +293,14 @@ describe("Quick Add on a v2 PRD", () => {
     expect(args[args.indexOf("--parent") + 1]).toBe("epic-1");
   });
 
+  it("refuses an area filter on a v1 PRD, which has no product areas", async () => {
+    const res = await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card", area: "checkout" });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/v2 PRD/);
+    expect(execCalls).toHaveLength(0);
+  });
+
   it("refuses an empty accept without spawning rex", async () => {
     const res = await post(port, "/api/rex/smart-add-accept", { text: "   " });
 
@@ -466,6 +474,56 @@ describe("Quick Add placement on a v2 tree", () => {
     const { changes } = await res.json();
     expect(changes).toHaveLength(1);
     expect(changes[0].placement.shortlist[0]).toMatchObject({ target: CAPABILITY_ID, strength: "strong", area: "" });
+  });
+
+  describe("limited to an area", () => {
+    const AREA_ID = "a0000000-0000-4000-8000-000000000001";
+
+    it("ranks within the area through rex add --area and offers only the area's capabilities and constraints", async () => {
+      mockExecResult = {
+        stdout: JSON.stringify(previewWith([
+          { target: CAPABILITY_ID, relation: "touches", score: 11, reasons: ["words: card"] },
+          // Not one of the area's targets: the area itself, and a node outside the tree.
+          { target: AREA_ID, relation: "touches", score: 11, reasons: [] },
+          { target: "elsewhere", relation: "touches", score: 9, reasons: [] },
+        ])),
+        stderr: "", exitCode: 0, error: null,
+      };
+
+      // By frozen slug, as the area view addresses it; rex is handed the id.
+      const res = await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card", area: "checkout" });
+
+      expect(res.status).toBe(200);
+      const { args } = execCalls[0];
+      expect(args[args.indexOf("--area") + 1]).toBe(AREA_ID);
+      const { placement } = (await res.json()).changes[0];
+      expect(placement.shortlist.map((c: { target: string }) => c.target)).toEqual([CAPABILITY_ID]);
+      // The tie is read from what is offered: the dropped row tied with the kept one.
+      expect(placement.tied).toBe(false);
+    });
+
+    it("previews unfiltered without an area", async () => {
+      mockExecResult = {
+        stdout: JSON.stringify(previewWith([
+          { target: CAPABILITY_ID, relation: "touches", score: 11, reasons: [] },
+          { target: "elsewhere", relation: "touches", score: 9, reasons: [] },
+        ])),
+        stderr: "", exitCode: 0, error: null,
+      };
+
+      const { changes } = await (await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card" })).json();
+
+      expect(execCalls[0].args).not.toContain("--area");
+      expect(changes[0].placement.shortlist).toHaveLength(2);
+    });
+
+    it("refuses an area the PRD does not contain, so request text never reaches argv", async () => {
+      for (const area of ["--area", "nowhere", CAPABILITY_ID, "", 7]) {
+        const res = await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card", area });
+        expect(res.status, `area ${JSON.stringify(area)}`).toBe(400);
+      }
+      expect(execCalls).toHaveLength(0);
+    });
   });
 
   it("Add & place creates a change outside the Inbox that touches the chosen node", async () => {

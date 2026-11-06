@@ -15,7 +15,9 @@ import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
+import { AskInSidecarButton } from "../ask-in-sidecar.js";
 import { TrackerLinksEditor } from "../tracker-links.js";
+import { ChangeTrackerChip } from "../tracker-chip.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
@@ -24,6 +26,8 @@ import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-ve
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
+import { ChangeApplySection } from "./change-apply.js";
+import { placementTab } from "../../route-state.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1225,6 +1229,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       h("span", { class: `prd-level-badge prd-level-${itemType}` }, itemLabel),
       h("span", { class: "task-id" }, item.id.slice(0, 8)),
       h(CopyLinkButton, { path: `/prd/${item.id}`, compact: true }),
+      // Drawn only while web.sidecar is on. A task's lens is Describe, or Diagnose run after a failed run.
+      isWorkItemType(itemType) ? h(AskInSidecarButton, { kind: "task", itemId: item.id }) : null,
     ),
 
     // Editable title
@@ -1248,8 +1254,12 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           onOpenChange: (id: string) => onNavigateToItem?.(id),
           onWritten: onPrdChanged,
           onInboxState: setInInbox,
+          onPlaceOnMap: navigateTo ? (id: string) => navigateTo("product", { tab: placementTab(id) }) : undefined,
         })
       : null,
+
+    // Apply…: a change awaiting apply, previewed before it writes
+    isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, item, onWritten: onPrdChanged }) : null,
 
     // Status selector
     h(
@@ -1414,6 +1424,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           { class: "task-section", "data-section": "tracker-links" },
           h("div", { class: "task-section-label" }, "Tracker"),
           h(TrackerLinksEditor, { itemId: item.id, refreshKey: item, onChanged: onPrdChanged }),
+          itemType === "change" ? h(ChangeTrackerChip, { changeId: item.id, refreshKey: item }) : null,
         )
       : null,
 

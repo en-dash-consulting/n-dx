@@ -39,7 +39,12 @@ export interface AskSeed {
   labels?: Record<string, string>;
 }
 
-export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; askSeed?: AskSeed }) => void;
+/**
+ * `section` rides in the URL as `?section=<key>`; the target view scrolls to it.
+ * `area` rides as `?area=<slug>` on Open changes (`changes`), which it filters
+ * to that area's open changes; other views drop it.
+ */
+export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; tab?: string; askSeed?: AskSeed; section?: string; area?: string }) => void;
 
 export interface FileDetail {
   type: "file";

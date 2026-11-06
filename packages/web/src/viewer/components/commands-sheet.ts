@@ -2,7 +2,8 @@
  * The commands sheet: lifts from the bottom bar over the current page with
  * every command — run the ones the dashboard can run, read what the rest do.
  * Opening it is UI state, not a route: the page underneath does not change,
- * and the full reference still has its own page at `/command-reference`.
+ * and the full reference has its own page: `/command-reference` redirects to
+ * `/commands/reference` (Settings › Commands › Reference).
  */
 
 import { h } from "preact";

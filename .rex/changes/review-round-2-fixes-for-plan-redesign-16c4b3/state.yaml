@@ -1,0 +1,52 @@
+schema: "rex/v2"
+items:
+  "0cde8782-b5f0-4202-93ae-044d427184a5":
+    status: "completed"
+    startedAt: "2026-11-06T16:09:58.766Z"
+    completedAt: "2026-11-06T16:13:31.350Z"
+    endedAt: "2026-11-06T16:13:31.350Z"
+    activeIntervals: [{"end":"2026-11-06T16:13:31.350Z","start":"2026-11-06T16:09:58.766Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "requirementCoverage counts automated/metric requirements on open changes and their non-terminal tasks (what rex ready evaluates on v2); uncovered = open changes with none. Row label, doc comments and docs/packages/web.md updated; tests cover product-layer ignored, task/change counted, manual ignored, completed task and applied change excluded."
+    lastModified: "2026-11-06T16:13:31.350Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "16c4b3b7-deb4-4bfc-97fb-27651c5dfab0":
+    status: "completed"
+    startedAt: "2026-11-06T16:21:05.070Z"
+    completedAt: "2026-11-06T16:21:05.070Z"
+    endedAt: "2026-11-06T16:21:05.070Z"
+    activeIntervals: [{"end":"2026-11-06T16:21:05.070Z","start":"2026-11-06T16:21:05.070Z"}]
+    appliedAt: "2026-11-06T16:21:05.070Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T16:21:05.070Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "27b86abd-678f-4f5c-86ae-8618b47ca7c2":
+    status: "completed"
+    startedAt: "2026-11-06T16:15:47.527Z"
+    completedAt: "2026-11-06T16:18:50.609Z"
+    endedAt: "2026-11-06T16:18:50.609Z"
+    activeIntervals: [{"end":"2026-11-06T16:18:50.609Z","start":"2026-11-06T16:15:47.527Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ChangeApplySection derives awaiting-apply from the detail item; no /api/rex/changes fetch per panel."
+    lastModified: "2026-11-06T16:18:50.609Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2fb8468b-d432-4948-9372-a0093fafdf40":
+    status: "completed"
+    startedAt: "2026-11-06T16:13:40.975Z"
+    completedAt: "2026-11-06T16:15:38.966Z"
+    endedAt: "2026-11-06T16:15:38.966Z"
+    activeIntervals: [{"end":"2026-11-06T16:15:38.966Z","start":"2026-11-06T16:13:40.975Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "SpecGapsPanel reads useChangesSummary(); test mounts under ChangesSummaryProvider and asserts one summary read."
+    lastModified: "2026-11-06T16:15:38.966Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd231b6b-4b32-4d7b-aa77-b569bb0f3cb4":
+    status: "completed"
+    startedAt: "2026-11-06T16:19:36.671Z"
+    completedAt: "2026-11-06T16:21:05.070Z"
+    endedAt: "2026-11-06T16:21:05.070Z"
+    activeIntervals: [{"end":"2026-11-06T16:21:05.070Z","start":"2026-11-06T16:19:36.671Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Shipped fixture has shippedIn without appliedAt; added isAwaitingApply unit case. Dropping the guard fails 2 tests."
+    lastModified: "2026-11-06T16:21:05.070Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -255,8 +255,9 @@ export function runPlanCommands(plan: QueuePlan): string {
  * Where a chosen lane stands, read from the lane's first task's work card in
  * the same session, raised after the plan card was decided: `raised` while the
  * card waits (or before the agent has raised one), `started` once it is
- * approved and its run began, `open` when it was denied, withdrawn or its
- * start was refused — the lane has started nothing.
+ * approved and its run began, `open` when it was denied, withdrawn, its
+ * start was refused or its run failed afterwards (the server revises the
+ * card's `carriedOut` to failed) — the lane has nothing running.
  */
 export function runPlanLaneState(plan: SidecarCard, lane: number, cards: readonly SidecarCard[]): "open" | "raised" | "started" {
   if (plan.status !== "approved" || plan.lane !== lane) return "open";
@@ -473,6 +474,16 @@ function settledNote(card: SidecarCard, state: SidecarCardState): string {
   }
 }
 
+/**
+ * A decided card folds to one line. A decided run plan does not: its lanes
+ * stay live after the decision (Started, Work card raised, Start lane again).
+ * Nor does an approval whose action failed: "Approved" alone would hide that
+ * nothing was written, and its problems are what the operator needs to read.
+ */
+function foldable(card: SidecarCard): boolean {
+  return sidecarCardState(card) !== "pending" && !card.runPlan && card.carriedOut?.ok !== false;
+}
+
 /** Focus is somewhere ⌘↵ and ⌘⌫ edit text. */
 export function isTextField(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -517,6 +528,9 @@ interface CardProps {
 
 function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
+  // A decided card is one line (head + note) until the operator opens its body.
+  const [open, setOpen] = useState(false);
+  const folded = foldable(card) && !open;
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
   const editable = first && state === "pending";
   // A change-set card's body is its items; the raw input stays behind a disclosure.
@@ -564,13 +578,23 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
       h("span", { class: "sidecar-card-kind" }, SIDECAR_CARD_KIND_LABELS[card.kind] ?? card.kind),
       h("span", { class: "sidecar-card-title" }, sidecarCardTitle(card, cliName)),
     ),
-    card.kind === "command" ? h("div", { class: "sidecar-card-effects" }, sidecarCommandEffectsLine(card, manifest)) : null,
-    card.preview !== undefined
+    state !== "pending"
+      ? h("div", { class: "sidecar-card-settled" },
+          h("p", { class: "sidecar-card-note" }, settledNote(card, state)),
+          !foldable(card) ? null : h("button", {
+            type: "button", class: "sidecar-card-toggle", "aria-expanded": open,
+            "aria-label": `${open ? "Hide" : "Show"} details of ${sidecarCardTitle(card, cliName)}`,
+            onClick: () => setOpen(!open),
+          }, open ? "Hide" : "Details"),
+        )
+      : null,
+    !folded && card.kind === "command" ? h("div", { class: "sidecar-card-effects" }, sidecarCommandEffectsLine(card, manifest)) : null,
+    !folded && card.preview !== undefined
       ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
       : null,
-    body,
+    folded ? null : body,
     state !== "pending"
-      ? h("p", { class: "sidecar-card-note" }, settledNote(card, state))
+      ? null
       : first
         ? h("div", { class: "sidecar-card-decide" },
             h("input", {
@@ -651,6 +675,7 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [deciding, setDeciding] = useState(false);
   const [path, setPath] = useState("");
   const [externalEdit, setExternalEdit] = useState<ExternalCallEdit | undefined>(undefined);
+  const [decidedOpen, setDecidedOpen] = useState(false);
   const firstId = first?.id ?? null;
   const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
 
@@ -716,8 +741,7 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   }, [firstId]);
 
   if (cards.length === 0) return null;
-  return h("ol", { class: "sidecar-cards", "aria-label": "Permission cards" },
-    cards.map((card) => h(SidecarCardView, {
+  const view = (card: SidecarCard) => h(SidecarCardView, {
       key: card.id,
       card,
       cards,
@@ -737,6 +761,20 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       path,
       onPath: setPath,
       onRestartLane: send ? (lane: number) => { void send(runPlanRestartPrompt(card, lane)); } : undefined,
-    })),
+  });
+  // Pending cards (and run plans) stay first and open; several decided ones sit behind one toggle.
+  const open = cards.filter((c) => !foldable(c));
+  const decided = cards.filter(foldable);
+  return h("ol", { class: "sidecar-cards", "aria-label": "Permission cards" },
+    open.map(view),
+    decided.length > 1
+      ? h("li", { class: "sidecar-cards-decided" },
+          h("button", {
+            type: "button", class: "sidecar-cards-decided-toggle", "aria-expanded": decidedOpen,
+            onClick: () => setDecidedOpen(!decidedOpen),
+          }, `${decided.length} decided`),
+          decidedOpen ? h("ol", { class: "sidecar-cards-decided-list" }, decided.map(view)) : null,
+        )
+      : decided.map(view),
   );
 }

@@ -379,8 +379,17 @@ export class SidecarSessionRegistry {
   /**
    * Run one turn: open (or resume) the vendor session, append the prompt and
    * every event to the transcript, and store the id the turn reported.
+   *
+   * @param notes What happened since the last turn that no tool result
+   *   reported. The vendor prompt carries them before the operator's message;
+   *   the transcript keeps the operator's message alone.
    */
-  async sendTurn(id: string, prompt: string, onFrame?: (frame: SidecarFrame) => void): Promise<SessionTurnResult> {
+  async sendTurn(
+    id: string,
+    prompt: string,
+    onFrame?: (frame: SidecarFrame) => void,
+    notes: readonly string[] = [],
+  ): Promise<SessionTurnResult> {
     this.sweep();
     const record = this.records.get(id);
     if (!record) throw new Error(`No Sidecar session ${id}`);
@@ -390,7 +399,7 @@ export class SidecarSessionRegistry {
     const abort = new AbortController();
     this.turnAborts.set(id, abort);
     try {
-      return await this.runTurn(record, prompt, abort.signal, onFrame);
+      return await this.runTurn(record, prompt, notes, abort.signal, onFrame);
     } finally {
       this.turnOpen.delete(id);
       this.turnAborts.delete(id);
@@ -404,6 +413,7 @@ export class SidecarSessionRegistry {
   private async runTurn(
     record: SidecarSessionRecord,
     prompt: string,
+    notes: readonly string[],
     signal: AbortSignal,
     onFrame?: (frame: SidecarFrame) => void,
   ): Promise<SessionTurnResult> {
@@ -439,7 +449,7 @@ export class SidecarSessionRegistry {
     this.persist();
 
     try {
-      let vendorPrompt = prompt;
+      let vendorPrompt = notes.length > 0 ? composeOpeningPrompt({ notes, prompt }) : prompt;
       if (cold && context && record.refresh) {
         const packet = await context.packet?.(record, signal);
         const ledger = renderLedger(context.ledger(record));
@@ -450,7 +460,7 @@ export class SidecarSessionRegistry {
           notes: ledger.carried,
           contextTokens: record.refresh.contextTokens,
         });
-        vendorPrompt = composeColdPrompt({ packet, ledger: ledger.text, exchanges, prompt });
+        vendorPrompt = composeColdPrompt({ packet, ledger: ledger.text, exchanges, notes, prompt });
         // Stopped while the packet was built: settle without spawning. The
         // session stays marked, so its next turn starts cold again.
         if (this.stopRequested.has(record.id)) {
@@ -461,7 +471,7 @@ export class SidecarSessionRegistry {
       if (opening && context) {
         const packet = await context.packet?.(record, signal);
         const ledger = renderLedger(context.ledger(record)).text;
-        if (packet || ledger) vendorPrompt = composeOpeningPrompt({ packet, ledger, prompt });
+        if (packet || ledger) vendorPrompt = composeOpeningPrompt({ packet, ledger, notes, prompt });
         if (this.stopRequested.has(record.id)) {
           return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
         }

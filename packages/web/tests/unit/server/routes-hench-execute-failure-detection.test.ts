@@ -133,6 +133,86 @@ describe("POST /api/hench/execute — failure detection beyond exit code", () =>
     expect(failureEntry.detail).toContain("Stopping after 1 iteration(s) due to failed status.");
   });
 
+  // #989 review: hench warns on stderr but refuses on stdout; the log keeps both.
+  it("logs stderr's warning and stdout's refusal when the run printed both", async () => {
+    stubManagedRun({
+      exitCode: 1,
+      stdout: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n",
+      stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+    });
+
+    await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: "task-1" }),
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    const log = await readFile(join(rexDir, "execution-log.jsonl"), "utf-8");
+    const failureEntry = log.trim().split("\n").map((l) => JSON.parse(l)).find((e) => e.event === "task_execution_failed");
+    expect(failureEntry.detail).toMatch(
+      /: Warning: hench config field "maxTurn" is unknown and ignored\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts$/,
+    );
+  });
+
+  describe("broadcast error", () => {
+    async function runAndGetBroadcastError(result: { exitCode: number; stdout: string; stderr: string }): Promise<string> {
+      await closeRouteTestServer(server);
+      const messages: unknown[] = [];
+      const started = await startRouteTestServer((req, res) =>
+        Promise.resolve(handleHenchRoute(req, res, ctx, (data) => messages.push(data))),
+      );
+      server = started.server;
+      stubManagedRun(result);
+      await fetch(`http://127.0.0.1:${started.port}/api/hench/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-1" }),
+      });
+      await vi.waitFor(() => {
+        const last = messages.at(-1) as { state?: { status?: string } } | undefined;
+        expect(last?.state?.status).toBe("failed");
+      });
+      return ((messages.at(-1) as { state: { error: string } }).state).error;
+    }
+
+    it("carries stdout's refusal when stderr holds only a warning", async () => {
+      const error = await runAndGetBroadcastError({
+        exitCode: 1,
+        stdout: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n",
+        stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+      });
+      expect(error).toContain("Refusing to start");
+      expect(error).toContain("src/app.ts");
+    });
+
+    it("keeps the refusal header when the dirty-file list is long", async () => {
+      const files = Array.from({ length: 20 }, (_, i) => `  packages/web/src/server/some/long/path/file-${i}.ts`);
+      const error = await runAndGetBroadcastError({
+        exitCode: 1,
+        // hench's real output: header, indented list, then the closing line run.ts prints.
+        stdout: [
+          "Starting task...",
+          "⚠ Refusing to start an autonomous run with 21 uncommitted files in the working tree.",
+          ...files,
+          "  … and 1 more",
+          "Stopped before running. Commit or discard your changes, then re-run.",
+        ].join("\n") + "\n",
+        stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+      });
+      expect(error).toContain("Refusing to start");
+      expect(error).toContain("file-19.ts");
+      expect(error).toContain("Stopped before running");
+      expect(error).not.toContain("Starting task...");
+      expect(error).toContain("maxTurn");
+    });
+
+    it("still carries stderr when stdout is empty", async () => {
+      const error = await runAndGetBroadcastError({ exitCode: 1, stdout: "", stderr: "boom: spawn failed\n" });
+      expect(error).toContain("boom: spawn failed");
+    });
+  });
+
   it("still reports completed when exitCode is 0", async () => {
     stubManagedRun({ exitCode: 0, stdout: "Task completed successfully.", stderr: "" });
 

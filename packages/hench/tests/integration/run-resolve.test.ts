@@ -157,6 +157,7 @@ describe("the resolution report", () => {
       branch: git(projectDir, "branch", "--show-current"),
       isAnchor: true,
       dirty: false,
+      planningCommit: [],
     });
     expect(r.resolved).toEqual({
       vendor: { value: "claude", source: "llm.vendor" },
@@ -556,6 +557,47 @@ describe("refusals are reported, not thrown", () => {
     expect(codes(r)).toEqual(["dirty-tree"]);
     expect(r.workspace.dirty).toBe(true);
     expect(codes(await resolve({ task: "t-pending", "allow-dirty": "true" }))).toEqual([]);
+  });
+
+  it("reports the planning files a run would commit, instead of refusing on them", async () => {
+    await writeFile(join(rexDir, "pending-proposals.json"), "[]\n", "utf-8");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(codes(r)).toEqual([]);
+    expect(r.workspace.planningCommit).toEqual([".rex/pending-proposals.json"]);
+    const warning = r.warnings.find((w) => w.code === "planning-commit");
+    expect(warning?.message).toContain(".rex/pending-proposals.json");
+
+    // --allow-dirty leaves the tree alone, so nothing would be committed.
+    const allowed = await resolve({ task: "t-pending", "allow-dirty": "true" });
+    expect(allowed.workspace.planningCommit).toEqual([]);
+    expect(allowed.warnings.map((w) => w.code)).not.toContain("planning-commit");
+  });
+
+  it("dirty-tree names a rename's source as well as its target", async () => {
+    await mkdir(join(projectDir, "src"), { recursive: true });
+    await writeFile(join(projectDir, "src", "app.ts"), "export {};\n", "utf-8");
+    git(projectDir, "add", "src/app.ts");
+    git(projectDir, "commit", "-q", "-m", "add app");
+    await mkdir(join(rexDir, "changes", "ch"), { recursive: true });
+    git(projectDir, "mv", "src/app.ts", ".rex/changes/ch/app.ts");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(codes(r)).toEqual(["dirty-tree"]);
+    const refusal = r.refusals.find((x) => x.code === "dirty-tree");
+    expect(refusal?.message).toContain("src/app.ts -> .rex/changes/ch/app.ts");
+  });
+
+  it("dirty-tree names only the non-planning files when both are dirty", async () => {
+    await writeFile(join(rexDir, "pending-proposals.json"), "[]\n", "utf-8");
+    await writeFile(join(projectDir, "scratch.txt"), "work in progress", "utf-8");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(codes(r)).toEqual(["dirty-tree"]);
+    const refusal = r.refusals.find((x) => x.code === "dirty-tree");
+    expect(refusal?.message).toContain("scratch.txt");
+    expect(refusal?.message).not.toContain("pending-proposals.json");
+    expect(r.workspace.planningCommit).toEqual([]);
   });
 });
 

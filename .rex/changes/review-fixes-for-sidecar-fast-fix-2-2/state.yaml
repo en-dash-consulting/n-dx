@@ -1,0 +1,26 @@
+schema: "rex/v2"
+items:
+  "1a54e882-1fb1-4c72-b63b-0eee7f6cfb94":
+    lastModified: "2026-11-06T17:36:46.945Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2e5ceff9-f00b-412d-a42b-b6a31326a9c4":
+    status: "completed"
+    startedAt: "2026-11-06T17:33:19.166Z"
+    completedAt: "2026-11-06T17:37:07.826Z"
+    endedAt: "2026-11-06T17:37:07.826Z"
+    activeIntervals: [{"end":"2026-11-06T17:37:07.826Z","start":"2026-11-06T17:33:19.166Z"}]
+    lastModified: "2026-11-06T17:37:07.826Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4df7a49b-1b9a-47f5-be5a-3ed4493a3974":
+    status: "completed"
+    startedAt: "2026-11-06T17:30:46.547Z"
+    completedAt: "2026-11-06T17:33:08.213Z"
+    endedAt: "2026-11-06T17:33:08.213Z"
+    activeIntervals: [{"end":"2026-11-06T17:33:08.213Z","start":"2026-11-06T17:30:46.547Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "markdown.ts: ol gets start from first item's number when not 1; list/paragraph-break patterns accept leading whitespace. Two viewer tests added."
+    lastModified: "2026-11-06T17:33:08.213Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9cd5af28-170d-4a2c-8779-61f655f6f080":
+    lastModified: "2026-11-06T17:36:46.945Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

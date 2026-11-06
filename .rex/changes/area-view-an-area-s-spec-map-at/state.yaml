@@ -1,0 +1,132 @@
+schema: "rex/v2"
+items:
+  "019399a6-ea02-4193-be85-9a411a30dc55":
+    status: "completed"
+    startedAt: "2026-11-05T19:13:55.578Z"
+    completedAt: "2026-11-05T20:00:19.559Z"
+    endedAt: "2026-11-05T20:00:19.559Z"
+    activeIntervals: [{"end":"2026-11-05T19:47:51.783Z","start":"2026-11-05T19:13:55.578Z"},{"end":"2026-11-05T20:00:19.559Z","start":"2026-11-05T20:00:19.559Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (39):\n- overwrites README.proposed.md on rerun but never touches the original README\n- primary README.md contains Overview, Quick Start, Testing, and License sections in order\n- proposed README.proposed.md mirrors all four sections in order\n- emits a non-empty ## License stub when package.json lacks a license field\n- emits a non-empty ## Testing stub when no test command is detected\n- mentions both CLAUDE.md and AGENTS.md artifacts\n- shows status summary\n- shows completion percentage\n… and 31 more"
+    lastModified: "2026-11-05T20:00:19.559Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "056a30fd-25f2-428d-a193-308a7c6fcc8b":
+    status: "completed"
+    startedAt: "2026-11-05T13:28:28.027Z"
+    completedAt: "2026-11-05T13:49:21.418Z"
+    endedAt: "2026-11-05T13:49:21.418Z"
+    activeIntervals: [{"end":"2026-11-05T13:47:40.042Z","start":"2026-11-05T13:28:28.027Z"},{"end":"2026-11-05T13:49:21.418Z","start":"2026-11-05T13:49:21.418Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- removes the directory it made when the write fails\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T13:49:21.418Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0987fa69-e981-4318-b940-cadc8540fc25":
+    status: "completed"
+    startedAt: "2026-11-05T14:53:35.583Z"
+    completedAt: "2026-11-05T15:17:49.542Z"
+    endedAt: "2026-11-05T15:17:49.542Z"
+    activeIntervals: [{"end":"2026-11-05T15:17:49.542Z","start":"2026-11-05T14:53:35.583Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex suggestPlacement takes { area } and rex add takes --area; POST /api/rex/smart-add-preview takes area (id/slug, 400 otherwise), forwards --area and drops non-area rows; SmartAddInput area prop limits shortlist legend and search to the area; area view header \"+ Change in this area\" opens it (Esc closes only the capture). Tests: rex change-place + product-change-v2, web smart-add-v2-changes route tests, smart-add-input, area-view."
+    lastModified: "2026-11-05T15:17:49.542Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0a8a9c7c-6e0a-4717-a428-0dbd836584a6":
+    status: "completed"
+    startedAt: "2026-11-05T16:54:31.848Z"
+    completedAt: "2026-11-05T17:13:01.517Z"
+    endedAt: "2026-11-05T17:13:01.517Z"
+    activeIntervals: [{"end":"2026-11-05T17:10:53.148Z","start":"2026-11-05T16:54:31.848Z"},{"end":"2026-11-05T17:13:01.517Z","start":"2026-11-05T17:13:01.517Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T17:13:01.517Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "18fc7905-b4e4-4e8a-8dbe-b541ea9a671f":
+    status: "completed"
+    startedAt: "2026-11-05T13:49:27.119Z"
+    completedAt: "2026-11-05T14:19:29.675Z"
+    endedAt: "2026-11-05T14:19:29.675Z"
+    activeIntervals: [{"end":"2026-11-05T14:03:16.048Z","start":"2026-11-05T13:49:27.119Z"},{"end":"2026-11-05T14:19:29.675Z","start":"2026-11-05T14:06:19.192Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "views/area-spec-map.ts: SpecMap (one AreaBlock per capability sized by criteriaCount, tinted by status, open-change count marker, ConstraintBands above, order changing/defective then size). AreaBlock gains optional selected/aria-pressed. Tests: area-spec-map (7)."
+    lastModified: "2026-11-05T14:19:40.585Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1eec7ffe-4ce7-46fc-abcd-4d1ec573bb15":
+    status: "completed"
+    startedAt: "2026-11-05T18:32:38.072Z"
+    completedAt: "2026-11-05T18:48:28.421Z"
+    endedAt: "2026-11-05T18:48:28.421Z"
+    activeIntervals: [{"end":"2026-11-05T18:48:28.421Z","start":"2026-11-05T18:32:38.072Z"}]
+    lastModified: "2026-11-05T18:48:28.421Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "50c98ea3-d30c-4eea-8df7-fece3958d327":
+    status: "completed"
+    startedAt: "2026-11-05T13:10:16.427Z"
+    completedAt: "2026-11-05T13:28:07.789Z"
+    endedAt: "2026-11-05T13:28:07.789Z"
+    activeIntervals: [{"end":"2026-11-05T13:28:07.789Z","start":"2026-11-05T13:10:16.427Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "GET /api/rex/product/area/<slug-or-id> (buildAreaDetail in routes-rex/product.ts): capabilities and constraint rows from the product map, binding constraints from rex computeEdges.boundBy, open changes, Inbox guesses from suggestPlacement's top candidate, five most recent applied, realizedBy code links. 404 unknown, { layout: \"v1\" } on v1. AreaDetail viewer mirror type. 5 route tests."
+    lastModified: "2026-11-05T13:28:07.789Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "79842c6f-d3e5-4b7f-961a-5521d5bdd0cc":
+    status: "completed"
+    startedAt: "2026-11-05T14:21:16.878Z"
+    completedAt: "2026-11-05T14:53:12.751Z"
+    endedAt: "2026-11-05T14:53:12.751Z"
+    activeIntervals: [{"end":"2026-11-05T14:38:52.300Z","start":"2026-11-05T14:21:16.878Z"},{"end":"2026-11-05T14:53:12.751Z","start":"2026-11-05T14:44:03.812Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "views/area-cards.ts: Moving now, Waiting in the Inbox (Place), Recently applied, Where it lives in code; each with an empty state; wired into AreaView with navigateTo. Tests: area-cards (7)."
+    lastModified: "2026-11-05T14:53:15.277Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9b5e6519-b13e-4ca2-a70a-40988f4dcea8":
+    status: "completed"
+    startedAt: "2026-11-05T20:00:19.559Z"
+    completedAt: "2026-11-05T20:00:19.559Z"
+    endedAt: "2026-11-05T20:00:19.559Z"
+    activeIntervals: [{"end":"2026-11-05T20:00:19.559Z","start":"2026-11-05T20:00:19.559Z"}]
+    appliedAt: "2026-11-05T20:00:19.559Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-05T20:00:19.559Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9c72e349-bf76-42ba-8274-2d40b7c3127e":
+    status: "completed"
+    startedAt: "2026-11-05T18:12:07.567Z"
+    completedAt: "2026-11-05T18:31:17.913Z"
+    endedAt: "2026-11-05T18:31:17.913Z"
+    activeIntervals: [{"end":"2026-11-05T18:26:52.724Z","start":"2026-11-05T18:12:07.567Z"},{"end":"2026-11-05T18:31:17.913Z","start":"2026-11-05T18:31:17.913Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (18):\n- renders tree after loading data\n- marks prunable items with strikethrough class\n- marks affected parent with modified indicator\n- renders epic impact badge for affected epics\n- renders legend with remove and affected indicators\n- renders filter controls and overall completion impact\n- filters to only show affected branches by default\n- shows remove indicator for prunable items\n… and 10 more"
+    lastModified: "2026-11-05T18:31:17.913Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "aafbcb58-7768-4992-9361-1d7804243c96":
+    status: "completed"
+    startedAt: "2026-11-05T17:13:09.431Z"
+    completedAt: "2026-11-05T17:44:29.786Z"
+    endedAt: "2026-11-05T17:44:29.786Z"
+    activeIntervals: [{"end":"2026-11-05T17:32:22.187Z","start":"2026-11-05T17:13:09.431Z"},{"end":"2026-11-05T17:44:29.786Z","start":"2026-11-05T17:44:29.786Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (22):\n- every test file that asserts straight after a real sleep is in the inventory\n- opened at the capability's address, selects it, and Esc goes back to the area's address\n- tests/e2e/wall-clock-inventory-policy.test.js > wall-clock assertion inventory completeness > every test file that asserts straight after a real sleep is in the inventory\n  AssertionError: Test file(s) assert immediately after a real-timer sleep but have no entry in tests/wall-clock-assertion-inventory.md:\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n… and 14 more"
+    lastModified: "2026-11-05T17:44:29.786Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d4ea348e-a405-4ea3-8aa7-fbff41d82cc5":
+    status: "completed"
+    startedAt: "2026-11-05T15:18:10.789Z"
+    completedAt: "2026-11-05T15:37:01.117Z"
+    endedAt: "2026-11-05T15:37:01.117Z"
+    activeIntervals: [{"end":"2026-11-05T15:32:12.582Z","start":"2026-11-05T15:18:10.789Z"},{"end":"2026-11-05T15:37:01.117Z","start":"2026-11-05T15:37:01.117Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- does not reintroduce retired token names, with or without a fallback\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T15:37:01.117Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d62e3a3f-ee58-4d87-bcef-a5e9779a88de":
+    status: "completed"
+    startedAt: "2026-11-05T15:37:07.782Z"
+    completedAt: "2026-11-05T16:54:05.631Z"
+    endedAt: "2026-11-05T16:54:05.631Z"
+    activeIntervals: [{"end":"2026-11-05T16:43:29.532Z","start":"2026-11-05T15:37:07.782Z"},{"end":"2026-11-05T16:54:05.631Z","start":"2026-11-05T16:54:05.631Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
+    lastModified: "2026-11-05T16:54:05.631Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dd36321e-8552-4124-9ad9-5c3a78c14bfb":
+    status: "completed"
+    startedAt: "2026-11-05T18:50:50.803Z"
+    completedAt: "2026-11-05T19:13:34.859Z"
+    endedAt: "2026-11-05T19:13:34.859Z"
+    activeIntervals: [{"end":"2026-11-05T19:10:00.816Z","start":"2026-11-05T18:50:50.803Z"},{"end":"2026-11-05T19:13:34.859Z","start":"2026-11-05T19:13:34.859Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T19:13:34.859Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

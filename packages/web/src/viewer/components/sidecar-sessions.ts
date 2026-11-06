@@ -73,12 +73,28 @@ function SessionRow({ row, sidecar, onOpened }: { row: SidecarSessionRow; sideca
   );
 }
 
+/**
+ * Starts a fresh session on the current agent with the page attached; the
+ * session it leaves stays in the list. `onDone` runs whether or not the server
+ * created it: a refusal is reported on the conversation panel, so the list must
+ * give way for it to be seen.
+ */
+export function NewSessionButton({ sidecar, onDone, className }: { sidecar: SidecarState; onDone?: () => void; className?: string }) {
+  return h("button", {
+    type: "button",
+    class: `sidecar-new-session${className ? ` ${className}` : ""}`,
+    disabled: sidecar.sending,
+    onClick: () => { void sidecar.newSession().then(() => onDone?.()); },
+  }, "New session");
+}
+
 export function SidecarSessions({ sidecar, onOpened }: { sidecar: SidecarState; onOpened: () => void }) {
   const { sessions } = sidecar;
   const { reload } = sessions;
   useEffect(() => { void reload(); }, [reload]);
 
   return h("section", { class: "sidecar-sessions", "aria-label": "Sessions" },
+    h(NewSessionButton, { sidecar, onDone: onOpened, className: "sidecar-sessions-new" }),
     h("div", { class: "sidecar-sessions-filter", role: "group", "aria-label": "Show sessions from" },
       (["this", "all"] as const).map((value) =>
         h("button", {

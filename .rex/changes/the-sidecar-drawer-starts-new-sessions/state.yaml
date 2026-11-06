@@ -1,0 +1,54 @@
+schema: "rex/v2"
+items:
+  "36144c3a-06d2-4516-a4d0-1a8339c3071f":
+    status: "completed"
+    startedAt: "2026-11-06T04:15:47.859Z"
+    completedAt: "2026-11-06T04:20:45.085Z"
+    endedAt: "2026-11-06T04:20:45.085Z"
+    activeIntervals: [{"end":"2026-11-06T04:20:45.085Z","start":"2026-11-06T04:15:47.859Z"}]
+    lastModified: "2026-11-06T04:20:45.085Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3711844c-d4a8-4369-85b0-d28453fe699f":
+    status: "completed"
+    startedAt: "2026-11-06T04:11:40.783Z"
+    completedAt: "2026-11-06T04:15:39.580Z"
+    endedAt: "2026-11-06T04:15:39.580Z"
+    activeIntervals: [{"end":"2026-11-06T04:15:39.580Z","start":"2026-11-06T04:11:40.783Z"}]
+    lastModified: "2026-11-06T04:15:39.580Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3b2115b8-a329-4a63-b69b-b4b71a126048":
+    status: "completed"
+    startedAt: "2026-11-06T04:23:13.434Z"
+    completedAt: "2026-11-06T04:23:13.434Z"
+    endedAt: "2026-11-06T04:23:13.434Z"
+    activeIntervals: [{"end":"2026-11-06T04:23:13.434Z","start":"2026-11-06T04:23:13.434Z"}]
+    appliedAt: "2026-11-06T04:23:13.434Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T04:23:13.434Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5e3017b6-7598-4ea5-9ab6-da30ef90cede":
+    status: "completed"
+    startedAt: "2026-11-06T04:07:38.042Z"
+    completedAt: "2026-11-06T04:11:32.855Z"
+    endedAt: "2026-11-06T04:11:32.855Z"
+    activeIntervals: [{"end":"2026-11-06T04:11:32.855Z","start":"2026-11-06T04:07:38.042Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Shared vnode Markdown renderer in viewer/utils/markdown.ts; PR preview and Sidecar replies use it."
+    lastModified: "2026-11-06T04:11:32.855Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b092ce9b-d725-4872-8db2-e2a0ba7d117f":
+    status: "completed"
+    startedAt: "2026-11-06T04:21:19.415Z"
+    completedAt: "2026-11-06T04:23:13.434Z"
+    endedAt: "2026-11-06T04:23:13.434Z"
+    activeIntervals: [{"end":"2026-11-06T04:23:13.434Z","start":"2026-11-06T04:21:19.415Z"}]
+    lastModified: "2026-11-06T04:23:13.434Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ca3fe259-00ec-4b7f-a08c-c1d0b103d543":
+    status: "completed"
+    startedAt: "2026-11-06T04:03:55.805Z"
+    completedAt: "2026-11-06T04:07:28.875Z"
+    endedAt: "2026-11-06T04:07:28.875Z"
+    activeIntervals: [{"end":"2026-11-06T04:07:28.875Z","start":"2026-11-06T04:03:55.805Z"}]
+    lastModified: "2026-11-06T04:07:28.875Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

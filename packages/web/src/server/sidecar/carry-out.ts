@@ -34,6 +34,8 @@ export interface CarryOutResult {
   text: string;
   /** The PRD items the effect wrote, in order. */
   ids?: string[];
+  /** A started run's end, for an effect that outlives its tool result: a failed end revises the card. */
+  ended?: Promise<CarryOutResult>;
 }
 
 /** The effects an approved call can have, wired to the server's job model and execute route. */
@@ -42,6 +44,7 @@ export interface SidecarActions {
   previewWork(taskId: string, options: Record<string, unknown> | undefined): Promise<string>;
   /** Runs the command and waits for it (see {@link awaitSidecarCommand}); `signal` aborts the wait, never the command. */
   runCommand(argv: string[], signal?: AbortSignal, project?: string): Promise<CarryOutResult> | CarryOutResult;
+  /** Starts the run and waits out its starting phase: a run hench refuses there is a failed result naming hench's reason. */
   startWork(taskId: string, options: Record<string, unknown> | undefined): Promise<CarryOutResult>;
   /** A proposal read against the PRD for its change-set card, or why it cannot be written. */
   reviewChangeSet(input: Record<string, unknown>): Promise<SidecarChangeSet | string>;
@@ -366,6 +369,16 @@ function commandEndResult(job: SidecarCommandJob, end: SidecarCommandEnd): Carry
     ? `\n${tail.cutBytes > 0 ? `Output, cut to its end (${tail.cutLines} lines, ${tail.cutBytes} bytes cut before it):` : "Output:"}\n${tail.text}`
     : "\nIt printed nothing.";
   return { ok: end.exitCode === 0 && !end.stopped, text: `\`${job.command}\` (job ${job.jobId}) ${ended}.${body}` };
+}
+
+/**
+ * A run that ended in failure, as the tool result and the card state it:
+ * `what` and how it exited, then the end of what it printed (hench's refusal).
+ */
+export function runFailedResult(what: string, end: { exitCode: number | null; output: string }): CarryOutResult {
+  const exited = end.exitCode === null ? "ended without an exit code" : `exited with code ${end.exitCode}`;
+  const tail = outputTail(end.output);
+  return { ok: false, text: `${what}: it ${exited}.${tail.text ? `\n${tail.text}` : " It printed nothing."}` };
 }
 
 /**

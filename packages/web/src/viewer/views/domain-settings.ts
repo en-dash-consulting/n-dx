@@ -15,3 +15,4 @@ export { CommandsView } from "./commands.js";
 export { CommandReferenceView } from "./command-reference.js";
 export { RobotWranglerView } from "./robot-wrangler.js";
 export { ProjectView } from "./project.js";
+export { ToolingPanel } from "./tooling-panel.js";

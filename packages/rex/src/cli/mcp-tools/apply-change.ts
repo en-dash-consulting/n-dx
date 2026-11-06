@@ -1,14 +1,14 @@
 /**
  * `apply_change`: a steward applies an open v2 change's amendments to the
- * product layer, whatever `rex.applyOn` says (`core/apply-amendments.ts`).
+ * product layer, whatever `rex.applyOn` says, through `core/apply-change.ts`,
+ * the entry the dashboard's Apply shares.
  * Operator-only: not on hench's agent allowlist.
  */
 
 import { z } from "zod";
-import { applyAmendments, ApplyAmendmentsError, NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
-import { indexTree } from "../../schema/v2-rules.js";
+import { NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
+import { applyChange } from "../../core/apply-change.js";
 import { prdLayout } from "../../store/prd-model-reader.js";
-import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
 import type { PRDStore } from "../../store/index.js";
 import { NO_PRODUCT_LAYER } from "./get-product.js";
 import { textResult, type McpResult } from "./result.js";
@@ -23,16 +23,16 @@ export async function handleApplyChange(
 ): Promise<McpResult> {
   try {
     if ((await prdLayout(rexDir)) !== "v2") return textResult(`${NO_PRODUCT_LAYER} Changes are applied on a v2 PRD only.`, true);
-    let appliedAt!: string;
-    const { result } = await withPrdModelTransaction(rexDir, (model) => {
-      const now = clock();
-      appliedAt = now.toISOString();
-      const out = applyAmendments(model.tree, args.id, { appliedAt, now, force: args.force });
-      // Logged and returned by id: args.id may be a display id, which can later name another change.
-      const change = indexTree(out.tree).resolve(args.id)!.id;
-      return { tree: out.tree, result: { change, applied: out.applied } };
-    });
-    const { change, applied } = result;
+    const outcome = await applyChange(rexDir, args.id, { force: args.force, clock });
+    if (!outcome.ok) {
+      const hint = outcome.problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))
+        ? " No tool edits a stored amendment: add proposed text or a criteria delta to it by hand, or cancel the change and place it again with place_change's proposed or criteria."
+        : "";
+      return textResult(outcome.message + hint, true);
+    }
+    // Logged and returned by id: args.id may be a display id, which can later name another change.
+    const { change, appliedAt } = outcome;
+    const applied = outcome.applied.map(({ delta, nodeId, summary }) => ({ delta, nodeId, summary }));
     await store.appendLog({
       timestamp: appliedAt,
       event: "change_applied",
@@ -41,12 +41,6 @@ export async function handleApplyChange(
     });
     return textResult(JSON.stringify({ change, appliedAt, applied }));
   } catch (err) {
-    if (err instanceof ApplyAmendmentsError) {
-      const hint = err.problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))
-        ? " No tool edits a stored amendment: add proposed text or a criteria delta to it by hand, or cancel the change and place it again with place_change's proposed or criteria."
-        : "";
-      return textResult(err.message + hint, true);
-    }
     return textResult(`Error: ${(err as Error).message}`, true);
   }
 }

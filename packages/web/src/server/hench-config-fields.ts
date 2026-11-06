@@ -13,7 +13,7 @@
  * cannot drift, and `validateConfigKeyValue` gives them one gate.
  */
 
-import { PROJECT_DIRS } from "@n-dx/llm-client";
+import { PROJECT_DIRS, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 
 /**
  * Config field metadata for the UI and for write validation.
@@ -359,6 +359,19 @@ export function validateConfigKeyValue(key: string, value: unknown, vendor?: str
     return validateProviderForVendor(value, vendor ?? null);
   }
   return null;
+}
+
+/**
+ * A field's default as it applies to one project.
+ *
+ * `rexDir`'s recorded default is hench's schema default, the legacy `.rex`.
+ * hench reads that value as "wherever the layout keeps rex", so on the `.ndx/`
+ * layout the default the operator should see is `.ndx/rex`.
+ */
+export function fieldDefaultForProject(field: ConfigFieldInfo, projectDir: string): unknown {
+  if (field.path !== "rexDir") return field.defaultValue;
+  const layout = resolveLayout(projectDir);
+  return relativeToRoot(layout, layout.rexDir);
 }
 
 /**

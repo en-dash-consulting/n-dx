@@ -1,0 +1,56 @@
+schema: "rex/v2"
+items:
+  "1149dd16-b801-4784-86b6-4d2f78d161a4":
+    status: "completed"
+    startedAt: "2026-11-06T05:38:48.951Z"
+    completedAt: "2026-11-06T05:40:12.571Z"
+    endedAt: "2026-11-06T05:40:12.571Z"
+    activeIntervals: [{"end":"2026-11-06T05:40:12.571Z","start":"2026-11-06T05:38:48.951Z"}]
+    lastModified: "2026-11-06T05:40:12.571Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3214b5d0-61f8-4c8a-b990-8405d643b6e4":
+    status: "completed"
+    startedAt: "2026-11-06T05:32:23.037Z"
+    completedAt: "2026-11-06T05:34:04.483Z"
+    endedAt: "2026-11-06T05:34:04.483Z"
+    activeIntervals: [{"end":"2026-11-06T05:34:04.483Z","start":"2026-11-06T05:32:23.037Z"}]
+    lastModified: "2026-11-06T05:34:04.483Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8207eded-8d98-42f6-b050-6f5202574aac":
+    status: "completed"
+    startedAt: "2026-11-06T05:29:59.333Z"
+    completedAt: "2026-11-06T05:32:13.975Z"
+    endedAt: "2026-11-06T05:32:13.975Z"
+    activeIntervals: [{"end":"2026-11-06T05:32:13.975Z","start":"2026-11-06T05:29:59.333Z"}]
+    lastModified: "2026-11-06T05:32:13.975Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8f95c80b-66c2-4d54-b914-6c75b2d5a12d":
+    status: "completed"
+    startedAt: "2026-11-06T05:14:33.412Z"
+    completedAt: "2026-11-06T05:17:50.557Z"
+    endedAt: "2026-11-06T05:17:50.557Z"
+    activeIntervals: [{"end":"2026-11-06T05:17:50.557Z","start":"2026-11-06T05:14:33.412Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Map block badge reads 'N open' and is its own button (sibling of the block button) that stores an area filter and opens Open changes. Commit c988a98f2."
+    lastModified: "2026-11-06T05:17:50.557Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bc311c6d-feb0-4707-824d-ab998cb6d6ff":
+    status: "completed"
+    startedAt: "2026-11-06T05:18:20.797Z"
+    completedAt: "2026-11-06T05:29:02.872Z"
+    endedAt: "2026-11-06T05:29:02.872Z"
+    activeIntervals: [{"end":"2026-11-06T05:29:02.872Z","start":"2026-11-06T05:18:20.797Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "/api/rex/changes rows carry `areas` inverted from openChangesByArea; route carries ?area=<slug> on changes; ChangesView filters with removable chip; map badge and Moving now navigate with the area."
+    lastModified: "2026-11-06T05:29:02.872Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c21b26e5-e952-4ffa-bafb-d9090eec965a":
+    status: "completed"
+    startedAt: "2026-11-06T05:40:12.571Z"
+    completedAt: "2026-11-06T05:40:12.571Z"
+    endedAt: "2026-11-06T05:40:12.571Z"
+    activeIntervals: [{"end":"2026-11-06T05:40:12.571Z","start":"2026-11-06T05:40:12.571Z"}]
+    appliedAt: "2026-11-06T05:40:12.571Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T05:40:12.571Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

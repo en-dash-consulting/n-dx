@@ -6,7 +6,9 @@
  * positioned inside the page body, stays on the page's own right edge, and
  * the status dock moves left by the drawer's width (`--sidecar-w`, UX10).
  * Default 440 px, resizable 360–640 px by dragging or arrowing its left edge;
- * the width is remembered.
+ * the width is remembered. A wide-mode toggle in the head widens it to most of
+ * the viewport (at 960 px and up) and lifts the tool-result cap; that choice is
+ * remembered too. Under 960 px the drawer takes at most 85% of the viewport.
  *
  * Inside: the head, the transcript, the session's permission cards
  * (sidecar-cards.ts), an orange paused bar above the composer while the turn
@@ -22,13 +24,14 @@ import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/sidecar.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
-import { SidecarSessions } from "./sidecar-sessions.js";
+import { SidecarSessions, NewSessionButton } from "./sidecar-sessions.js";
 import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
 import {
   TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultIsError,
 } from "./sidecar-tool-names.js";
 import type { ToolLineCard } from "./sidecar-tool-names.js";
 import { useHubProjects } from "./project-switcher.js";
+import { renderMarkdown } from "../utils/markdown.js";
 import {
   ExtensionTabPanel, ExtensionTabStrip, SIDECAR_TAB, extensionFramePath, useExtensionTabs,
 } from "./sidecar-extension-tabs.js";
@@ -39,6 +42,28 @@ export const SIDECAR_WIDTH_MIN = 360;
 export const SIDECAR_WIDTH_MAX = 640;
 const WIDTH_KEY = "ndx-sidecar-width";
 const WIDTH_STEP = 20;
+const WIDE_KEY = "ndx-sidecar-wide";
+/** Below this viewport width the page needs the room: no wide mode. */
+export const SIDECAR_WIDE_MIN_VIEWPORT = 960;
+/** Wide mode leaves the page at least this much. */
+const WIDE_PAGE_MIN = 480;
+const WIDE_SHARE = 0.7;
+/** On a narrow viewport the drawer never takes more than this share of it. */
+const NARROW_SHARE = 0.85;
+
+/** The drawer's width in px for the chosen width and mode at this viewport. */
+export function effectiveSidecarWidth(width: number, wide: boolean, viewport: number): number {
+  if (viewport < SIDECAR_WIDE_MIN_VIEWPORT) return Math.min(width, Math.round(viewport * NARROW_SHARE));
+  return wide ? Math.max(width, Math.min(Math.round(viewport * WIDE_SHARE), viewport - WIDE_PAGE_MIN)) : width;
+}
+
+function storedWide(): boolean {
+  try {
+    return localStorage.getItem(WIDE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function clampSidecarWidth(width: number): number {
   if (!Number.isFinite(width)) return SIDECAR_WIDTH_DEFAULT;
@@ -209,7 +234,7 @@ export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
       if (frame.checkpoint) return null;
       const event = frame.event;
       if (event.type === "assistant" && event.text) {
-        return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, event.text);
+        return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, renderMarkdown(event.text, { classPrefix: "sidecar-md", breaks: true }));
       }
       if (event.type === "tool_use" && event.toolCall) {
         return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result, card, connectionLabels });
@@ -249,7 +274,7 @@ function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
   return h("div", { class: "sidecar-attachment" },
     item
       ? h("span", { class: "sidecar-chip sidecar-chip-item", "data-kind": item.kind },
-          h("span", { class: "sidecar-chip-label" }, `${item.kind === "plan" || item.kind === "live" ? "" : `${item.kind} `}${item.label}`),
+          h("span", { class: "sidecar-chip-label" }, `${item.kind === "plan" || item.kind === "live" || item.kind === "inbox" ? "" : `${item.kind} `}${item.label}`),
           h("button", {
             type: "button",
             class: "sidecar-chip-remove",
@@ -300,6 +325,10 @@ export interface SidecarDrawerProps {
 
 export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [width, setWidth] = useState(storedWidth);
+  const [wide, setWide] = useState(storedWide);
+  // Width of a wide drawer the edge has narrowed but not yet out of wide mode.
+  const [wideWidth, setWideWidth] = useState<number | null>(null);
+  const [viewport, setViewport] = useState(() => window.innerWidth);
   const [draft, setDraft] = useState("");
   const [listing, setListing] = useState(false);
   const [lensMenu, setLensMenu] = useState(false);
@@ -318,15 +347,38 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const applyWidth = useCallback((next: number) => {
     const w = clampSidecarWidth(next);
     setWidth(w);
-    try { localStorage.setItem(WIDTH_KEY, String(w)); } catch { /* storage full or blocked: the width still applies */ }
+    // Dragging or arrowing the edge is a choice of width, so it leaves wide mode.
+    setWide(false);
+    try {
+      localStorage.setItem(WIDTH_KEY, String(w));
+      localStorage.setItem(WIDE_KEY, "0");
+    } catch { /* storage full or blocked: the width still applies */ }
   }, []);
+
+  const toggleWide = () => {
+    const next = !wide;
+    setWide(next);
+    setWideWidth(null);
+    try { localStorage.setItem(WIDE_KEY, next ? "1" : "0"); } catch { /* blocked: the mode still applies */ }
+  };
+
+  useEffect(() => {
+    const onResize = () => setViewport(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const canWiden = viewport >= SIDECAR_WIDE_MIN_VIEWPORT;
+  const isWide = wide && canWiden;
+  const fullWidth = effectiveSidecarWidth(width, wide, viewport);
+  const shownWidth = isWide && wideWidth !== null ? Math.min(wideWidth, fullWidth) : fullWidth;
 
   // The status dock is fixed to the viewport; it reads the drawer's width.
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--sidecar-w", `${width}px`);
+    root.style.setProperty("--sidecar-w", `${shownWidth}px`);
     return () => { root.style.removeProperty("--sidecar-w"); };
-  }, [width]);
+  }, [shownWidth]);
 
   // Follow the newest frame.
   useEffect(() => {
@@ -337,8 +389,10 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const onResizeStart = (e: PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = width;
-    const move = (ev: PointerEvent) => applyWidth(startWidth + (startX - ev.clientX));
+    const startWidth = shownWidth;
+    // The listener outlives this render, so the drag tracks wide mode itself.
+    let stillWide = isWide;
+    const move = (ev: PointerEvent) => { stillWide = resizeTo(startWidth + (startX - ev.clientX), stillWide); };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -347,11 +401,25 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     window.addEventListener("pointerup", up);
   };
 
+  // A wide drawer is past the resize range. The edge follows the pointer
+  // between the range and the full wide width, never shrinking on a widening
+  // move; wide mode ends only once the width is back inside the range.
+  // Returns whether the drawer is still wide.
+  const resizeTo = (next: number, wideNow = isWide): boolean => {
+    if (wideNow && next > SIDECAR_WIDTH_MAX) {
+      setWideWidth(next >= fullWidth ? null : next);
+      return true;
+    }
+    setWideWidth(null);
+    applyWidth(next);
+    return false;
+  };
+
   const onResizeKey = (e: KeyboardEvent) => {
-    if (e.key === "ArrowLeft") applyWidth(width + WIDTH_STEP);
-    else if (e.key === "ArrowRight") applyWidth(width - WIDTH_STEP);
-    else if (e.key === "Home") applyWidth(SIDECAR_WIDTH_MIN);
-    else if (e.key === "End") applyWidth(SIDECAR_WIDTH_MAX);
+    if (e.key === "ArrowLeft") resizeTo(shownWidth + WIDTH_STEP);
+    else if (e.key === "ArrowRight") resizeTo(shownWidth - WIDTH_STEP);
+    else if (e.key === "Home") resizeTo(SIDECAR_WIDTH_MIN);
+    else if (e.key === "End") resizeTo(Math.max(SIDECAR_WIDTH_MAX, shownWidth));
     else return;
     e.preventDefault();
   };
@@ -381,8 +449,8 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
 
   return h("aside", {
     id: "sidecar-drawer",
-    class: "sidecar-drawer",
-    style: { width: `${width}px` },
+    class: `sidecar-drawer${isWide ? " sidecar-drawer--wide" : ""}`,
+    style: { width: `${shownWidth}px` },
     "aria-label": "Sidecar",
   },
     h("div", {
@@ -391,21 +459,32 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       tabIndex: 0,
       "aria-orientation": "vertical",
       "aria-label": "Resize Sidecar",
-      "aria-valuenow": width,
+      "aria-valuenow": shownWidth,
       "aria-valuemin": SIDECAR_WIDTH_MIN,
-      "aria-valuemax": SIDECAR_WIDTH_MAX,
+      "aria-valuemax": Math.max(SIDECAR_WIDTH_MAX, shownWidth),
       onPointerDown: onResizeStart,
       onKeyDown: onResizeKey,
     }),
     h("header", { class: "sidecar-head" },
       h("span", { class: "sidecar-title" }, "Sidecar"),
       sidecar.session ? h("span", { class: "sidecar-session-name" }, sidecar.session.name) : null,
+      h(NewSessionButton, { sidecar, onDone: () => setListing(false) }),
       h("button", {
         type: "button",
         class: `sidecar-sessions-toggle${listing ? " active" : ""}`,
         "aria-pressed": listing ? "true" : "false",
         onClick: () => setListing((v) => !v),
       }, "Sessions"),
+      canWiden
+        ? h("button", {
+            type: "button",
+            class: `sidecar-wide-toggle${isWide ? " active" : ""}`,
+            "aria-pressed": isWide ? "true" : "false",
+            "aria-label": "Wide mode",
+            title: isWide ? "Narrow the drawer" : "Widen the drawer",
+            onClick: toggleWide,
+          }, "↔")
+        : null,
       h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Sidecar", title: "Close (⌘J)" }, "×"),
     ),
     h(ExtensionTabStrip, { tabs, active, onSelect: selectTab }),
@@ -468,7 +547,9 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
           `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
       : null,
     sidecar.readOnly
-      ? h("p", { class: "sidecar-readonly", role: "status" }, "This session has ended. Its transcript is read-only.")
+      ? h("div", { class: "sidecar-readonly", role: "status" },
+          h("span", null, "This session has ended. Its transcript is read-only."),
+          h(NewSessionButton, { sidecar }))
       : h("form", {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },

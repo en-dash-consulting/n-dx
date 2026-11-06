@@ -46,8 +46,8 @@ describe("Live routes", () => {
 });
 
 describe("Live is outside the stage loop", () => {
-  it("is in no stage, and the loop is still Analysis → Plan → Work", () => {
-    expect(STAGE_ORDER).toEqual(["analyze", "plan", "work"]);
+  it("is in no stage, and the loop is Analysis → Plan → Work → Tune", () => {
+    expect(STAGE_ORDER).toEqual(["analyze", "plan", "work", "tune"]);
     for (const view of LIVE_VIEWS) {
       expect(isLiveView(view)).toBe(true);
       expect(isStageId(view)).toBe(false);

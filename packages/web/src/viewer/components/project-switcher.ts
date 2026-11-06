@@ -210,7 +210,9 @@ export function ProjectSwitcher({ label, title, view, hub, navigate }: ProjectSw
       "aria-label": `Project: ${title ?? label}. Switch project`,
       onClick: () => { if (open) setOpen(false); else openMenu(); },
     },
-      label,
+      // In a span, not a bare text node, so it can ellipsize when the top
+      // nav squeezes the project context (UX2').
+      h("span", { class: "breadcrumb-project-label" }, label),
       h("span", { class: "breadcrumb-workspace-caret", "aria-hidden": "true" }, "▾"),
     ),
     open

@@ -109,6 +109,7 @@ export {
   buildValidViews,
   isKnownViewPath,
   resolveViewAlias,
+  resolveViewAliasRoute,
 } from "./view-routing.js";
 export { OWN_WORKTREE_NOTE, laneSteps, stepRunOptions } from "./queue-plan.js";
 export type { PlannedLane, PlannedTask, QueuePlan, StepRunOptions } from "./queue-plan.js";

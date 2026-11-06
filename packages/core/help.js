@@ -887,6 +887,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
       { flag: "--git", description: "Create a git repository when the target directory is not in one (answers the preflight prompt; required for non-interactive runs)" },
       { flag: "--no-git", description: "Never create a git repository — skip the preflight prompt and leave auto-commit features off" },
+      { flag: "--no-commit", description: "Leave the files init writes uncommitted (by default init commits exactly the paths it created or changed)" },
       { flag: "--no-claude", description: "Skip Claude Code integration (no CLAUDE.md, .claude/ modifications)" },
       { flag: "--no-codex", description: "Skip Codex integration (no AGENTS.md, .agents/, .codex/ modifications)" },
       { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex)" },

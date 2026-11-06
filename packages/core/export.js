@@ -323,6 +323,9 @@ export function summarizeRunForExport(run, opts = {}) {
     vendor: run.vendor ?? diagnostics.vendor,
     tokenDiagnosticStatus: diagnostics.tokenDiagnosticStatus,
     invocationContext: run.invocationContext,
+    // Tune's Outcomes by tier reads both; the detail file already carries them.
+    weight: typeof run.weight === "string" ? run.weight : undefined,
+    gate: gateVerdict(run.testGate),
     tokenUsage: {
       input: usage.input || 0,
       output: usage.output || 0,
@@ -334,6 +337,19 @@ export function summarizeRunForExport(run, opts = {}) {
   if (opts.includeTranscripts) entry.error = run.error;
   else entry.transcriptOmitted = true;
   return entry;
+}
+
+/**
+ * The test gate's verdict, as the live server's `toRunSummary` reports it:
+ * only when the gate ran — `ran: false` is a skip or an inconclusive gate.
+ *
+ * @param {unknown} gate
+ * @returns {"passed" | "failed" | undefined}
+ */
+function gateVerdict(gate) {
+  if (!gate || typeof gate !== "object") return undefined;
+  if (gate.ran !== true || typeof gate.passed !== "boolean") return undefined;
+  return gate.passed ? "passed" : "failed";
 }
 
 /** Count files matching `pred` anywhere under `root`. Missing root → 0. */

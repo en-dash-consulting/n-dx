@@ -24,7 +24,7 @@
  *     `completedAt` whenever an item leaves `completed`, so the status is
  *     `completed`. Otherwise it conflicts. The same holds when only
  *     `completedAt` diverged and the later side's completion was kept.
- *   - `startedAt` and `revisedAt` take the earlier stamp; `lastModified`
+ *   - `startedAt`, `createdAt` and `revisedAt` take the earlier stamp; `lastModified`
  *     the later.
  *   - Every other field, `lastModifiedBy` included, takes the side with the
  *     later `lastModified`. With no usable stamps it conflicts.
@@ -155,6 +155,7 @@ function mergeRow(
         else conflict(key);
         break;
       case "startedAt":
+      case "createdAt":
       case "revisedAt":
         setOrDelete(row, key, earlier(o, t));
         break;

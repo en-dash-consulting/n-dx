@@ -17,6 +17,11 @@ export interface PlaceWithSidecar {
   place: (changeId: string) => void;
   /** The change attached now, if any. */
   attached: string | null;
+  /**
+   * The change selected in the Inbox triage queue, or null. The drawer
+   * attaches it on the Inbox page without opening.
+   */
+  select?: (changeId: string | null) => void;
 }
 
 /** Null while `web.sidecar` is off. */

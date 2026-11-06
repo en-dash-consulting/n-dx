@@ -15,6 +15,7 @@
  */
 
 import type {
+  AreaDetail,
   CapabilityDetail,
   ChangeRow,
   ProductMap,
@@ -25,6 +26,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
   areas: [
     {
       id: "area-define",
+      slug: "define-the-product",
       displayId: "A1",
       title: "Define the product",
       summary: "Capturing intent as a map people can read without reading history.",
@@ -79,9 +81,11 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
           ],
         },
       ],
+      openChangeIds: ["change-placement-engine", "change-stewards"],
     },
     {
       id: "area-execute",
+      slug: "execute-the-work",
       displayId: "A2",
       title: "Execute the work",
       summary: "Running tasks autonomously and recording what they cost.",
@@ -154,6 +158,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
           openChanges: [],
         },
       ],
+      openChangeIds: ["change-run-field", "change-forked-sessions", "change-usage-cursors"],
     },
   ],
   constraints: [
@@ -191,6 +196,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 4,
     completedTaskCount: 1,
+    criteriaGap: true,
+    openBlockers: 0,
   },
   {
     id: "change-stewards",
@@ -205,6 +212,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 0,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-run-field",
@@ -219,6 +228,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 3,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 1,
   },
   {
     id: "change-usage-cursors",
@@ -232,6 +243,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 2,
     completedTaskCount: 1,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-jev-client",
@@ -246,6 +259,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [{ id: "constraint-architecture-integrity", title: "Architecture integrity" }],
     taskCount: 2,
     completedTaskCount: 2,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-windows-ports",
@@ -259,6 +274,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 1,
     completedTaskCount: 1,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-forked-sessions",
@@ -277,6 +294,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     ],
     taskCount: 1,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
   },
   {
     id: "change-timeline",
@@ -290,6 +309,8 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     touches: [],
     taskCount: 0,
     completedTaskCount: 0,
+    criteriaGap: false,
+    openBlockers: 0,
   },
 ];
 
@@ -365,6 +386,42 @@ export const CAPABILITY_DETAIL_FIXTURE: CapabilityDetail = {
     { path: "packages/hench/src/agent/loop.ts", role: "agent loop" },
     { path: "packages/hench/tests/integration/run-loop.test.ts", role: "tests" },
   ],
+  pendingAmendments: [
+    {
+      changeId: "change-run-field",
+      changeDisplayId: "CH-160",
+      changeTitle: "A run field on PRD items",
+      stage: "ready",
+      delta: "modified",
+      summary: "Runs honour a per-item run block.",
+      proposed: "An agent picks the next actionable task and implements it unattended, using the task's saved run settings.",
+      criteria: {
+        add: [{ id: "c5", text: "A saved run block overrides the project defaults." }],
+        replace: [{ id: "c3", text: "The run is recorded with its token spend and the settings it used." }],
+        remove: ["c2", "c4"],
+      },
+    },
+  ],
+  inboxChanges: [],
+};
+
+const DEFINE_AREA = PRODUCT_MAP_FIXTURE.areas[0]!;
+
+/** The area read for "Define the product", built from the map's own rows. */
+export const AREA_DETAIL_FIXTURE: AreaDetail = {
+  id: DEFINE_AREA.id,
+  slug: DEFINE_AREA.slug,
+  displayId: DEFINE_AREA.displayId,
+  title: DEFINE_AREA.title,
+  summary: DEFINE_AREA.summary,
+  stewards: DEFINE_AREA.stewards ?? [],
+  counts: { capabilities: 3, constraints: 1, met: 1, changing: 1, defective: 0, openChanges: 2 },
+  capabilities: DEFINE_AREA.capabilities,
+  constraints: PRODUCT_MAP_FIXTURE.constraints.slice(0, 1),
+  openChanges: DEFINE_AREA.capabilities.flatMap((c) => c.openChanges),
+  inbox: [],
+  recentlyApplied: [],
+  code: [],
 };
 
 /** A map with nothing in it, for the Product page's empty state. */

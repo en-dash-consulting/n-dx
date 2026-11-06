@@ -674,7 +674,14 @@ function pollJob(
  * `rex reshape` with `--dry-run`, so nothing is written until the operator
  * sees what would change and confirms. `ndx ci` is read-only.
  */
-export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
+export type ValidationActionKind = "fix" | "ci" | "reshape";
+
+export function ValidationActions({ onChanged, show }: {
+  onChanged?: () => void;
+  /** Draw only these actions (Plan health opens Fix and Reshape one at a time); default all. */
+  show?: readonly ValidationActionKind[];
+}) {
+  const shows = (kind: ValidationActionKind) => !show || show.includes(kind);
   const cliName = useCliName();
   const [fixState, setFixState] = useState<ActionState>("idle");
   const [fixReport, setFixReport] = useState<unknown>(null);
@@ -778,7 +785,7 @@ export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
 
     h("div", { class: "validation-action-row" },
       // ── rex fix ──
-      h("div", { class: "cmd-panel validation-action" },
+      !shows("fix") ? null : h("div", { class: "cmd-panel validation-action" },
         h("h4", { class: "cmd-panel-title" }, "Fix issues"),
         h("p", { class: "cmd-panel-desc" },
           "Repair common validation problems (timestamps, stale references, statuses). Equivalent to ",
@@ -807,7 +814,7 @@ export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
       ),
 
       // ── ndx ci ──
-      h("div", { class: "cmd-panel validation-action" },
+      !shows("ci") ? null : h("div", { class: "cmd-panel validation-action" },
         h("h4", { class: "cmd-panel-title" }, "CI check"),
         h("p", { class: "cmd-panel-desc" },
           "Run the analysis pipeline and validate PRD health. Equivalent to ",
@@ -836,7 +843,7 @@ export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
       ),
 
       // ── rex reshape ──
-      h("div", { class: "cmd-panel validation-action" },
+      !shows("reshape") ? null : h("div", { class: "cmd-panel validation-action" },
         h("h4", { class: "cmd-panel-title" }, "Reshape PRD"),
         h("p", { class: "cmd-panel-desc" },
           "LLM-driven restructuring: merge duplicates, re-level items, split oversized ones. Equivalent to ",

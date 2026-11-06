@@ -10,9 +10,13 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
+import type { RuleNode } from "../../../src/server/rex-gateway.js";
+import { buildChangeSummary } from "../../../src/server/routes-rex/product.js";
 import type {
+  AreaDetailWire,
   CapabilityDetailWire,
   ChangeRowWire,
+  ChangeSummaryWire,
   ProductMapWire,
 } from "../../../src/server/routes-rex/product.js";
 import type {
@@ -26,10 +30,12 @@ import type {
 } from "../../../src/server/routes-rex/placement.js";
 import type { ChangePlacementErrorKind } from "../../../src/server/rex-gateway.js";
 import type {
+  AreaDetail,
   CapabilityDetail,
   ChangePlacement,
   ChangePlacements,
   ChangeRow,
+  ChangeSummary,
   PlaceChangeRequest,
   PlaceChangeResult,
   PlacementDraft,
@@ -47,6 +53,8 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const sameMap: Same<ProductMapWire, ProductMap> = true;
 const sameChange: Same<ChangeRowWire, ChangeRow> = true;
 const sameCapability: Same<CapabilityDetailWire, CapabilityDetail> = true;
+const sameSummary: Same<ChangeSummaryWire, ChangeSummary> = true;
+const sameArea: Same<AreaDetailWire, AreaDetail> = true;
 const samePlacement: Same<ChangePlacementWire, ChangePlacement> = true;
 const samePlacements: Same<ChangePlacementsWire, ChangePlacements> = true;
 const samePlace:Same<PlaceChangeRequestWire, PlaceChangeRequest> = true;
@@ -56,12 +64,13 @@ const sameProposed: Same<ProposeChangeResultWire, ProposeChangeResult> = true;
 const sameDraft: Same<PlacementDraftWire, PlacementDraft> = true;
 // The refusal kinds the viewer words a hint for are rex's, which the 422 answer carries.
 const sameRefusalKind: Same<ChangePlacementErrorKind, PlacementRefusalKind> = true;
-void [sameMap, sameChange, sameCapability, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
+void [sameMap, sameChange, sameCapability, sameSummary, sameArea, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const AREA_ID = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY_ID = "a0000000-0000-4000-8000-000000000002";
 const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+const TASK_ID = "c0000000-0000-4000-8000-000000000002";
 
 async function serve(ctx: ServerContext): Promise<{ server: Server; base: string }> {
   const server = createServer(async (req, res) => {
@@ -109,6 +118,15 @@ describe("v2 product reads", () => {
     ));
   }
 
+  /** Mark the fixture's change done and shipped but not applied, as a release stamp before a steward's apply leaves it. */
+  function shipChange(): void {
+    const statePath = join(rexDir, "changes", "add-apple-pay", "state.yaml");
+    writeFileSync(statePath, readFileSync(statePath, "utf-8").replace(
+      '    status: "in_progress"\n',
+      '    status: "completed"\n    shippedIn: "1.2.0"\n',
+    ));
+  }
+
   it("GET /product lists areas and capabilities with rex's status, health and open changes", async () => {
     const { status, body } = await get("product");
     expect(status).toBe(200);
@@ -118,6 +136,7 @@ describe("v2 product reads", () => {
     expect(map.constraints).toEqual([]);
     expect(map.areas).toEqual([{
       id: AREA_ID,
+      slug: "checkout",
       displayId: "A1",
       title: "Checkout",
       summary: "Taking payment for a basket.",
@@ -133,13 +152,101 @@ describe("v2 product reads", () => {
         criteriaCount: 2,
         openChanges: [{ id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", stage: "in-progress", delta: "modified" }],
       }],
+      openChangeIds: [CHANGE_ID],
     }]);
   });
 
   it("GET /product drops an applied change from the overlays", async () => {
     applyChange();
     const { body } = await get("product");
-    expect((body.map as ProductMap).areas[0].capabilities[0].openChanges).toEqual([]);
+    const area = (body.map as ProductMap).areas[0];
+    expect(area.capabilities[0].openChanges).toEqual([]);
+    expect(area.openChangeIds).toEqual([]);
+  });
+
+  // Open changes' Open filter and the lifecycle strip leave a shipped change out; so do the badge and the Product total.
+  it("GET /product drops a shipped but unapplied change from the overlays and the area's open count", async () => {
+    shipChange();
+    const rows = (await get("changes")).body.changes as ChangeRow[];
+    expect(rows.find((r) => r.id === CHANGE_ID)?.stage).toBe("shipped");
+    const area = ((await get("product")).body.map as ProductMap).areas[0];
+    expect(area.capabilities[0].openChanges).toEqual([]);
+    expect(area.openChangeIds).toEqual([]);
+  });
+
+  describe("GET /product per-area open changes", () => {
+    const OTHER_ID = "c0000000-0000-4000-8000-0000000000a1";
+    /** A second open change with the given amendments and touches. */
+    const addChange = (amends: unknown[], touches: string[] = []): void => {
+      const dir = join(rexDir, "changes", "other");
+      mkdirSync(dir);
+      writeFileSync(join(dir, "index.md"), [
+        "---", `id: "${OTHER_ID}"`, 'type: "change"', 'title: "Other"', 'slug: "other"',
+        `amends: ${JSON.stringify(amends)}`, `touches: ${JSON.stringify(touches)}`, "---", "",
+      ].join("\n"));
+      writeFileSync(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${OTHER_ID}":`, '    status: "pending"', ""].join("\n"));
+    };
+    const area = async () => ((await get("product")).body.map as ProductMap).areas[0];
+    const added = (target: string, under: string, type = "capability") =>
+      ({ target, delta: "added", type, under, title: target, summary: `Adds ${target}` });
+
+    it("counts a change that adds a capability under the area", async () => {
+      addChange([added("refunds", AREA_ID)]);
+      expect((await area()).openChangeIds.sort()).toEqual([CHANGE_ID, OTHER_ID].sort());
+    });
+
+    it("counts a change whose overlay is keyed by the area id", async () => {
+      addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }]);
+      const a = await area();
+      expect(a.openChangeIds).toContain(OTHER_ID);
+      // No capability carries it: only the area's count does.
+      expect(a.capabilities[0].openChanges.map((c) => c.id)).not.toContain(OTHER_ID);
+    });
+
+    it("counts one change once however many of the area's nodes it reaches", async () => {
+      addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }], [CAPABILITY_ID]);
+      expect((await area()).openChangeIds.filter((id) => id === OTHER_ID)).toHaveLength(1);
+    });
+
+    // Open changes' ?area=<slug> keeps the rows naming that slug; its count must be the badge's.
+    const cases: Array<[string, () => void]> = [
+      ["an amendment to a capability", () => {}],
+      ["an addition under the area", () => addChange([added("refunds", AREA_ID)])],
+      ["a removal of the area itself", () => addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }])],
+      ["a touch on the area and its capability", () => addChange([], [AREA_ID, CAPABILITY_ID])],
+      ["a shipped but unapplied change", () => {
+        shipChange();
+        addChange([added("refunds", AREA_ID)]);
+      }],
+    ];
+    for (const [label, seed] of cases) {
+      it(`filters /changes by area to the badge's open changes: ${label}`, async () => {
+        seed();
+        const a = await area();
+        const rows = (await get("changes")).body.changes as ChangeRow[];
+        const filtered = rows.filter((r) => r.areas?.some((ref) => ref.slug === a.slug));
+        expect(filtered.map((r) => r.id).sort()).toEqual([...a.openChangeIds].sort());
+        expect(filtered).toHaveLength(a.openChangeIds.length);
+        // The filtered list renders open rows only, so an applied or shipped row would be counted and not shown.
+        expect(filtered.filter((r) => r.stage === "applied" || r.stage === "shipped")).toEqual([]);
+      });
+
+      it(`lists the badge's open changes in the area view's Moving now: ${label}`, async () => {
+        seed();
+        const a = await area();
+        const detail = (await get(`product/area/${a.slug}`)).body.area as AreaDetail;
+        expect(detail.openChanges.map((c) => c.id).sort()).toEqual([...a.openChangeIds].sort());
+        expect(detail.counts.openChanges).toBe(a.openChangeIds.length);
+      });
+    }
+
+    it("lists a change that only adds a capability under the area in Moving now, as added", async () => {
+      applyChange();
+      addChange([added("refunds", AREA_ID)]);
+      const detail = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(detail.openChanges).toEqual([{ id: OTHER_ID, title: "Other", stage: expect.any(String), delta: "added" }]);
+      expect(detail.counts.openChanges).toBe(1);
+    });
   });
 
   it("GET /changes lists each change with its stage, map links and task progress", async () => {
@@ -159,7 +266,92 @@ describe("v2 product reads", () => {
         touches: [],
         taskCount: 1,
         completedTaskCount: 0,
+        // The change carries no criteria of its own, as after rex's split, but its
+        // one open task does: no gap.
+        criteriaGap: false,
+        openBlockers: 0,
+        // The area whose openChangeIds lists it: Open changes' ?area= filter matches this.
+        areas: [{ id: AREA_ID, slug: "checkout", title: "Checkout" }],
       }],
+    });
+  });
+
+  it("GET /changes names no area on applied history", async () => {
+    applyChange();
+    const rows = (await get("changes")).body.changes as ChangeRow[];
+    expect(rows[0]!.areas).toBeUndefined();
+  });
+
+  describe("GET /changes gap fields", () => {
+    const changeDir = () => join(rexDir, "changes", "add-apple-pay");
+    const taskPath = () => join(changeDir(), "wire-the-button.md");
+    const indexPath = () => join(changeDir(), "index.md");
+    const row = async () => (await get("changes")).body.changes[0] as ChangeRowWire;
+    const withChangeCriteria = (): void => {
+      writeFileSync(indexPath(), readFileSync(indexPath(), "utf-8").replace(
+        'priority: "high"\n', 'priority: "high"\nacceptanceCriteria:\n  - "Apple Pay completes a purchase"\n',
+      ));
+    };
+    const blockerId = "c0000000-0000-4000-8000-0000000000b1";
+    /** A sibling change that blocks the fixture's task, with the given status. */
+    const addBlocker = (status: "pending" | "completed"): void => {
+      writeFileSync(taskPath(), readFileSync(taskPath(), "utf-8").replace(
+        'type: "task"\n', `type: "task"\nblockedBy: ["${blockerId}"]\n`,
+      ));
+      const dir = join(rexDir, "changes", "blocker");
+      mkdirSync(dir);
+      writeFileSync(join(dir, "index.md"), [
+        "---", `id: "${blockerId}"`, 'type: "change"', 'title: "Blocker"', 'slug: "blocker"', "---", "",
+      ].join("\n"));
+      writeFileSync(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${blockerId}":`, `    status: "${status}"`, ""].join("\n"));
+    };
+
+    it("reports no gap when the change and its open task both carry criteria", async () => {
+      withChangeCriteria();
+      expect(await row()).toMatchObject({ criteriaGap: false, openBlockers: 0 });
+    });
+
+    it("reports no gap for a task-less change that has its own criteria", async () => {
+      withChangeCriteria();
+      rmSync(taskPath());
+      expect(await row()).toMatchObject({ taskCount: 0, criteriaGap: false });
+    });
+
+    it("reports a gap for a task-less change without criteria", async () => {
+      rmSync(taskPath());
+      expect(await row()).toMatchObject({ taskCount: 0, criteriaGap: true });
+    });
+
+    const dropTaskCriteria = (): void => {
+      writeFileSync(taskPath(), readFileSync(taskPath(), "utf-8").replace(/acceptanceCriteria:\n {2}- .*\n/, ""));
+    };
+    /** The fixture's task has no state row; add one. */
+    const setTaskStatus = (status: string): void => {
+      const statePath = join(changeDir(), "state.yaml");
+      writeFileSync(statePath, `${readFileSync(statePath, "utf-8")}  "${TASK_ID}":\n    status: "${status}"\n`);
+    };
+
+    it("reports a gap when an open task has no criteria", async () => {
+      withChangeCriteria();
+      dropTaskCriteria();
+      expect((await row()).criteriaGap).toBe(true);
+    });
+
+    it("ignores a cancelled task without criteria, and its blockers", async () => {
+      dropTaskCriteria();
+      addBlocker("pending");
+      setTaskStatus("cancelled");
+      expect(await row()).toMatchObject({ criteriaGap: false, openBlockers: 0 });
+    });
+
+    it("counts an open blocker on a task", async () => {
+      addBlocker("pending");
+      expect((await row()).openBlockers).toBe(1);
+    });
+
+    it("does not count a completed blocker", async () => {
+      addBlocker("completed");
+      expect((await row()).openBlockers).toBe(0);
     });
   });
 
@@ -172,10 +364,177 @@ describe("v2 product reads", () => {
     expect(map.areas[0].capabilities[0].openChanges[0].stage).toBe("awaiting-apply");
   });
 
+  describe("stage of an open change whose own state is empty", () => {
+    it("reads in-progress while one of its tasks is in_progress", async () => {
+      writeTaskStartedState();
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("in-progress");
+    });
+
+    it("reads proposed when no task has started and the change is not ready", async () => {
+      writeEmptyChangeState();
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("proposed");
+    });
+
+    // Rex never clears startedAt: a failed `ndx work` run resets the task to pending and keeps it.
+    it("reads proposed when its task was reset to pending after starting", async () => {
+      writeEmptyChangeState(`  "${TASK_ID}":\n    status: "pending"\n    startedAt: "2026-11-05T12:00:00.000Z"\n`);
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("proposed");
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).stages["in-progress"]).toBe(0);
+    });
+
+    it("reads in-progress while one task is completed and another is still pending", async () => {
+      const secondTaskId = "c0000000-0000-4000-8000-000000000003";
+      writeFileSync(
+        join(rexDir, "changes", "add-apple-pay", "show-the-total.md"),
+        `---\nid: "${secondTaskId}"\ntype: "task"\ntitle: "Show the total"\nslug: "show-the-total"\n---\n`,
+      );
+      writeEmptyChangeState(
+        `  "${TASK_ID}":\n    status: "completed"\n    startedAt: "2026-11-05T12:00:00.000Z"\n    completedAt: "2026-11-05T13:00:00.000Z"\n` +
+        `  "${secondTaskId}":\n    status: "pending"\n`,
+      );
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("in-progress");
+    });
+  });
+
+  /** The change's own state row cleared, as before `ndx work` starts anything. */
+  function writeEmptyChangeState(extra = ""): void {
+    writeFileSync(join(rexDir, "changes", "add-apple-pay", "state.yaml"), `schema: "rex/v2"\nitems:\n${extra}`);
+  }
+
+  /** The change's own state empty and its task started, as `ndx work` leaves them. */
+  function writeTaskStartedState(): void {
+    writeEmptyChangeState(`  "${TASK_ID}":\n    status: "in_progress"\n    startedAt: "2026-11-05T12:00:00.000Z"\n`);
+  }
+
   it("GET /changes reads a shipped change as shipped", async () => {
     applyChange();
     const { body } = await get("changes");
     expect((body.changes as ChangeRow[])[0]).toMatchObject({ stage: "shipped", shippedIn: "1.2.0" });
+  });
+
+  describe("GET /changes/summary", () => {
+    /** An unplaced change, as `rex add` files one into the Inbox. */
+    function addInboxChange(): void {
+      const id = "c0000000-0000-4000-8000-000000000009";
+      const dir = join(rexDir, "changes", "gift-cards");
+      mkdirSync(dir);
+      writeFileSync(join(dir, "index.md"), [
+        "---", `id: "${id}"`, 'type: "change"', 'title: "Gift cards"', 'slug: "gift-cards"', "---", "",
+      ].join("\n"));
+      writeFileSync(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${id}":`, "    needsPlacement: true", ""].join("\n"));
+    }
+
+    it("counts stages and Inbox, lists placed open changes and names rex's next pick", async () => {
+      const { status, body } = await get("changes/summary");
+      expect(status).toBe(200);
+      expect(body).toEqual({
+        layout: "v2",
+        summary: {
+          inbox: 0,
+          inboxInStage: 0,
+          stages: { proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 },
+          open: [{
+            id: CHANGE_ID,
+            displayId: "CH-1",
+            title: "Add Apple Pay",
+            stage: "in-progress",
+            priority: "high",
+            plannedRelease: "1.2.0",
+            taskCount: 1,
+            completedTaskCount: 0,
+            criteriaGap: false,
+            openBlockers: 0,
+          }],
+          next: {
+            id: TASK_ID,
+            title: "Wire the button",
+            type: "task",
+            changeId: CHANGE_ID,
+            changeDisplayId: "CH-1",
+            changeTitle: "Add Apple Pay",
+            reason: expect.any(String),
+            summary: expect.any(String),
+          },
+          // The fixture's one open change and its task hold no requirement.
+          requirements: { total: 0, uncovered: 1 },
+        },
+      });
+      const summary = (body as { summary: ChangeSummary }).summary;
+      expect(["in_progress", "ready_to_finalize", "priority"]).toContain(summary.next!.reason);
+    });
+
+    it("counts an Inbox change apart from the stages and leaves it out of the open list", async () => {
+      addInboxChange();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.inbox).toBe(1);
+      expect(summary.stages).toEqual({ proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 });
+      expect(summary.open.map((c) => c.id)).toEqual([CHANGE_ID]);
+    });
+
+    describe("requirement coverage reads the change layer, as rex ready does on v2", () => {
+      const req = (id: string, validationType: string) =>
+        `{"id":"${id}","title":"${id}","category":"technical","validationType":"${validationType}","acceptanceCriteria":["x"]}`;
+      /** Put a requirements line just before a node file's closing frontmatter fence. */
+      const withReqs = (file: string, reqs: string[]): void => {
+        const original = readFileSync(file, "utf8");
+        writeFileSync(file, original.replace(/\n---\n/, `\nrequirements: [${reqs.join(",")}]\n---\n`));
+      };
+      const coverage = async () => ((await get("changes/summary")).body.summary as ChangeSummary).requirements;
+      const changeDir = () => join(rexDir, "changes", "add-apple-pay");
+
+      it("ignores product-layer requirements, which rex ready never reads", async () => {
+        withReqs(join(rexDir, "product", "checkout", "pay-by-card.md"), [req("r1", "automated")]);
+        expect(await coverage()).toEqual({ total: 0, uncovered: 1 });
+      });
+
+      it("counts automated and metric requirements on a task, not manual ones", async () => {
+        withReqs(join(changeDir(), "wire-the-button.md"), [req("r1", "manual"), req("r2", "automated"), req("r3", "metric")]);
+        expect(await coverage()).toEqual({ total: 2, uncovered: 0 });
+      });
+
+      it("counts a requirement on the change itself", async () => {
+        withReqs(join(changeDir(), "index.md"), [req("r1", "automated")]);
+        expect(await coverage()).toEqual({ total: 1, uncovered: 0 });
+      });
+
+      it("leaves out a completed task and an applied change", async () => {
+        withReqs(join(changeDir(), "wire-the-button.md"), [req("r1", "automated")]);
+        const statePath = join(changeDir(), "state.yaml");
+        writeFileSync(statePath, `${readFileSync(statePath, "utf8")}  "${TASK_ID}":\n    status: "completed"\n`);
+        expect(await coverage()).toEqual({ total: 0, uncovered: 1 });
+        applyChange();
+        expect(await coverage()).toEqual({ total: 0, uncovered: 0 });
+      });
+
+      it("leaves out a completed change awaiting apply, which ready treats as terminal", async () => {
+        withReqs(join(changeDir(), "index.md"), [req("r1", "automated")]);
+        const statePath = join(changeDir(), "state.yaml");
+        writeFileSync(statePath, readFileSync(statePath, "utf8").replace('    status: "in_progress"\n', '    status: "completed"\n'));
+        expect(await coverage()).toEqual({ total: 0, uncovered: 0 });
+      });
+    });
+
+    it("counts a change whose task is in_progress under in-progress, not proposed", async () => {
+      writeTaskStartedState();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.stages).toEqual({ proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 });
+      expect(summary.open[0].stage).toBe("in-progress");
+    });
+
+    it("counts an unstarted, unready change as proposed", async () => {
+      writeEmptyChangeState();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.stages).toEqual({ proposed: 1, ready: 0, "in-progress": 0, "awaiting-apply": 0 });
+    });
+
+    it("reads the tree on every request, so a write shows on the next read", async () => {
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).stages["in-progress"]).toBe(1);
+      applyChange();
+      const summary = (await get("changes/summary")).body.summary as ChangeSummary;
+      expect(summary.stages["in-progress"]).toBe(0);
+      expect(summary.open).toEqual([]);
+      expect(summary.next).toBeNull();
+    });
   });
 
   it("GET /product/capability/<display id> returns the capability page", async () => {
@@ -199,6 +558,10 @@ describe("v2 product reads", () => {
       { id: "c2", text: "A declined card shows why" },
     ]);
     expect(capability.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
+    // The open change amends it, so what it would change rides along for the area view's diff.
+    expect(capability.pendingAmendments).toEqual([
+      expect.objectContaining({ changeId: CHANGE_ID, changeDisplayId: "CH-1", stage: "in-progress", delta: "modified", summary: expect.any(String) }),
+    ]);
   });
 
   describe("met and specChangedSinceMet", () => {
@@ -313,6 +676,17 @@ describe("v2 product reads", () => {
       expect(drafted).toMatchObject({ needsPlacement: true, amends: [{ id: CAPABILITY_ID, delta: "modified" }] });
     });
 
+    it("the capability lists its held draft as waiting in the Inbox, never as an open change", async () => {
+      meetCapability();
+      const draftId = (await post(edit(false))).body.drafts[0].id as string;
+      const capability = (await get(`product/capability/${CAPABILITY_ID}`)).body.capability as CapabilityDetailWire;
+      expect(capability.inboxChanges).toEqual([expect.objectContaining({ id: draftId, delta: "modified" })]);
+      expect(capability.openChanges.map((c) => c.id)).not.toContain(draftId);
+      const map = (await get("product")).body.map as ProductMapWire;
+      const row = map.areas.flatMap((a) => a.capabilities).find((c) => c.id === CAPABILITY_ID);
+      expect(row?.openChanges.map((c) => c.id)).not.toContain(draftId);
+    });
+
     it("edits a criterion's text and refuses an id the capability does not own", async () => {
       meetCapability();
       const changed = await post(edit(false, { criteria: [{ id: "c2", text: "A declined card shows the reason" }] }));
@@ -352,6 +726,153 @@ describe("v2 product reads", () => {
         .toBe("A valid card is charged once");
     });
   });
+
+  describe("GET /product/area/<slug-or-id>", () => {
+    const CONSTRAINT_ID = "a0000000-0000-4000-8000-000000000010";
+    const OTHER_CONSTRAINT_ID = "a0000000-0000-4000-8000-000000000011";
+    const OTHER_AREA_ID = "a0000000-0000-4000-8000-000000000020";
+    const INBOX_ID = "c0000000-0000-4000-8000-000000000030";
+
+    const write = (path: string, lines: string[]): void => {
+      mkdirSync(join(rexDir, path, ".."), { recursive: true });
+      writeFileSync(join(rexDir, path), [...lines, ""].join("\n"));
+    };
+
+    /**
+     * Adds to the fixture: a constraint binding Checkout, a second area with a
+     * constraint of its own, code on the capability and an Inbox change whose
+     * best guess is "Pay by card".
+     */
+    beforeEach(() => {
+      const card = join(rexDir, "product", "checkout", "pay-by-card.md");
+      writeFileSync(card, readFileSync(card, "utf-8").replace('criteria: [', 'realizedBy: ["src/pay/card.ts"]\ncriteria: ['));
+      write("product/no-card-storage.md", [
+        "---", `id: "${CONSTRAINT_ID}"`, 'type: "constraint"', 'title: "No card storage"', 'slug: "no-card-storage"',
+        'statement: "Card numbers never touch our disk."', `appliesTo: ["${AREA_ID}"]`, "---",
+      ]);
+      write("product/catalogue/index.md", [
+        "---", `id: "${OTHER_AREA_ID}"`, 'type: "area"', 'title: "Catalogue"', 'slug: "catalogue"', "---",
+      ]);
+      write("product/catalogue/images-load-fast.md", [
+        "---", `id: "${OTHER_CONSTRAINT_ID}"`, 'type: "constraint"', 'title: "Images load fast"', 'slug: "images-load-fast"',
+        `appliesTo: ["${OTHER_AREA_ID}"]`, "---",
+      ]);
+      write("changes/save-a-card/index.md", [
+        "---", `id: "${INBOX_ID}"`, 'type: "change"', 'title: "Pay by card with a saved card"', 'slug: "save-a-card"',
+        'intent: "A shopper can pay by card without typing the card again."', "---",
+      ]);
+      write("changes/save-a-card/state.yaml", ['schema: "rex/v2"', "items:", `  "${INBOX_ID}":`, "    needsPlacement: true"]);
+    });
+
+    it("answers the area's capabilities, constraints, open changes, Inbox guesses and code", async () => {
+      const { status, body } = await get("product/area/checkout");
+      expect(status).toBe(200);
+      expect(body.layout).toBe("v2");
+      const area = body.area as AreaDetail;
+      expect(area).toMatchObject({
+        id: AREA_ID,
+        slug: "checkout",
+        title: "Checkout",
+        summary: "Taking payment for a basket.",
+        stewards: [],
+        counts: { capabilities: 1, constraints: 1, met: 0, changing: 1, defective: 0, openChanges: 1 },
+        recentlyApplied: [],
+        code: [{ capabilityId: CAPABILITY_ID, path: "src/pay/card.ts" }],
+      });
+      expect(area.capabilities).toEqual([expect.objectContaining({
+        id: CAPABILITY_ID,
+        statement: "A shopper can pay for a basket with a card.",
+        status: "changing",
+        health: "ok",
+        criteriaCount: 2,
+        openChanges: [{ id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", stage: "in-progress", delta: "modified" }],
+      })]);
+      // The Catalogue constraint binds another area only.
+      expect(area.constraints.map((c) => c.id)).toEqual([CONSTRAINT_ID]);
+      expect(area.openChanges).toEqual([{ id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", stage: "in-progress", delta: "modified" }]);
+      expect(area.inbox).toEqual([expect.objectContaining({
+        id: INBOX_ID,
+        title: "Pay by card with a saved card",
+        target: { id: CAPABILITY_ID, title: "Pay by card", type: "capability" },
+      })]);
+    });
+
+    it("counts a held change that amends a capability here only in the Inbox", async () => {
+      // A Product-page edit drafts this shape: held for placement, amending the capability it edited.
+      write("changes/save-a-card/index.md", [
+        "---", `id: "${INBOX_ID}"`, 'type: "change"', 'title: "Pay by card with a saved card"', 'slug: "save-a-card"',
+        'intent: "A shopper can pay by card without typing the card again."',
+        `amends: [{"target":"${CAPABILITY_ID}","delta":"modified","summary":"Saved cards"}]`, "---",
+      ]);
+      const area = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(area.inbox.map((c) => c.id)).toEqual([INBOX_ID]);
+      expect(area.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
+      expect(area.counts.openChanges).toBe(1);
+      const section = ((await get("product")).body.map as ProductMap).areas.find((a) => a.id === AREA_ID)!;
+      expect(section.openChangeIds).toEqual([CHANGE_ID]);
+      expect(section.capabilities[0]!.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
+    });
+
+    it("leaves a retired capability out of the capability count", async () => {
+      const RETIRED_ID = "a0000000-0000-4000-8000-000000000004";
+      const REMOVER_ID = "c0000000-0000-4000-8000-000000000040";
+      write("product/checkout/pay-by-cheque.md", [
+        "---", `id: "${RETIRED_ID}"`, 'type: "capability"', 'title: "Pay by cheque"', 'slug: "pay-by-cheque"',
+        'statement: "A shopper can pay by cheque."', "---",
+      ]);
+      const checkoutState = join(rexDir, "product", "checkout", "state.yaml");
+      writeFileSync(checkoutState, `${readFileSync(checkoutState, "utf-8")}  "${RETIRED_ID}":\n    status: "deleted"\n`);
+      write("changes/drop-cheques/index.md", [
+        "---", `id: "${REMOVER_ID}"`, 'type: "change"', 'title: "Drop cheques"', 'slug: "drop-cheques"',
+        `amends: [{"target":"${RETIRED_ID}","delta":"removed","summary":"Nobody pays by cheque"}]`, "---",
+      ]);
+      write("changes/drop-cheques/state.yaml", [
+        'schema: "rex/v2"', "items:", `  "${REMOVER_ID}":`, '    status: "completed"', '    appliedAt: "2026-10-05T12:00:00.000Z"',
+      ]);
+      const area = (await get("product/area/checkout")).body.area as AreaDetail;
+      // rex's report omits a tombstone today, so the row never arrives; if it
+      // ever does, `counts.capabilities` still counts only the live ones.
+      expect(area.capabilities.map((c) => c.id)).toEqual([CAPABILITY_ID]);
+      expect(area.counts.capabilities).toBe(1);
+    });
+
+    it("marks an Inbox guess tied when the top two candidates share a score", async () => {
+      const untied = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(untied.inbox[0]!.strength).not.toBe("tied");
+      // A twin of "Pay by card" scores the same against the Inbox change.
+      write("product/checkout/pay-by-card-twin.md", [
+        "---", 'id: "a0000000-0000-4000-8000-000000000003"', 'type: "capability"', 'title: "Pay by card"',
+        'slug: "pay-by-card-twin"', 'statement: "A shopper can pay for a basket with a card."',
+        'criteria: [{"id":"c1","text":"A valid card is charged once"},{"id":"c2","text":"A declined card shows why"}]', "---",
+      ]);
+      const area = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(area.inbox).toEqual([expect.objectContaining({ id: INBOX_ID, strength: "tied" })]);
+    });
+
+    it("resolves the area by id and display id, and lists an applied change as recently applied", async () => {
+      applyChange();
+      for (const ref of [AREA_ID, "A1"]) {
+        const area = (await get(`product/area/${ref}`)).body.area as AreaDetail;
+        expect(area.id).toBe(AREA_ID);
+        expect(area.openChanges).toEqual([]);
+        expect(area.recentlyApplied).toEqual([{
+          id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", appliedAt: "2026-10-05T12:00:00.000Z", shippedIn: "1.2.0",
+        }]);
+      }
+    });
+
+    it("keeps another area's guesses and constraints out", async () => {
+      const area = (await get("product/area/catalogue")).body.area as AreaDetail;
+      expect(area).toMatchObject({ id: OTHER_AREA_ID, capabilities: [], openChanges: [], inbox: [], code: [] });
+      expect(area.constraints.map((c) => c.id)).toEqual([OTHER_CONSTRAINT_ID]);
+    });
+
+    it.each(["no-such-area", CAPABILITY_ID])("answers 404 for %s", async (ref) => {
+      const { status, body } = await get(`product/area/${ref}`);
+      expect(status).toBe(404);
+      expect(body.error).toContain(ref);
+    });
+  });
 });
 
 describe("product reads on a v1 project", () => {
@@ -373,7 +894,7 @@ describe("product reads on a v1 project", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it.each(["product", "changes", "product/capability/A1.1"])("GET /%s answers layout v1 and nothing else", async (path) => {
+  it.each(["product", "changes", "changes/summary", "product/capability/A1.1", "product/area/checkout"])("GET /%s answers layout v1 and nothing else", async (path) => {
     const res = await fetch(`${base}/${path}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ layout: "v1" });
@@ -388,5 +909,27 @@ describe("product reads on a v1 project", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error).toContain("v1");
     expect(existsSync(join(tmpDir, ".rex", "product"))).toBe(false);
+  });
+});
+
+describe("buildChangeSummary: Inbox changes also counted in a stage", () => {
+  const capability: RuleNode = { id: "cap-1", type: "capability", title: "Pay", slug: "pay" };
+  const change = (id: string, held: boolean): RuleNode => ({
+    id, type: "change", title: id, slug: id, ...(held ? { needsPlacement: true } : {}),
+  });
+  const staged = (s: ChangeSummaryWire): number => Object.values(s.stages).reduce((n, c) => n + c, 0);
+
+  it("counts an Inbox change in a stage too when no capability can hold it", () => {
+    const summary = buildChangeSummary({ product: [], changes: [change("a", true), change("b", false)] });
+    expect(summary.inbox).toBe(1);
+    expect(summary.inboxInStage).toBe(1);
+    expect(staged(summary)).toBe(2);
+  });
+
+  it("counts a held Inbox change once, in the Inbox only", () => {
+    const summary = buildChangeSummary({ product: [capability], changes: [change("a", true)] });
+    expect(summary.inbox).toBe(1);
+    expect(summary.inboxInStage).toBe(0);
+    expect(staged(summary)).toBe(0);
   });
 });

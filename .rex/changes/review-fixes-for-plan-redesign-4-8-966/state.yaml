@@ -1,0 +1,30 @@
+schema: "rex/v2"
+items:
+  "47220535-f736-4de6-863f-f13016f3c34e":
+    status: "completed"
+    startedAt: "2026-11-06T03:51:31.080Z"
+    completedAt: "2026-11-06T03:56:40.861Z"
+    endedAt: "2026-11-06T03:56:40.861Z"
+    activeIntervals: [{"end":"2026-11-06T03:56:40.861Z","start":"2026-11-06T03:51:31.080Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Tooling tile renders from config+catalog immediately; auth line reads new GET /api/commands/auth/cached (never spawns). Tests in tooling-panel.test.ts and routes-commands.test.ts."
+    lastModified: "2026-11-06T03:56:40.861Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "61314ed5-2912-4595-9fb2-f373268fcced":
+    status: "completed"
+    startedAt: "2026-11-06T03:57:07.991Z"
+    completedAt: "2026-11-06T03:59:38.582Z"
+    endedAt: "2026-11-06T03:59:38.582Z"
+    activeIntervals: [{"end":"2026-11-06T03:59:38.582Z","start":"2026-11-06T03:57:07.991Z"}]
+    lastModified: "2026-11-06T03:59:38.582Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dd752175-30d5-4377-9565-5dc9d868e9f1":
+    status: "completed"
+    startedAt: "2026-11-06T03:59:38.582Z"
+    completedAt: "2026-11-06T03:59:38.582Z"
+    endedAt: "2026-11-06T03:59:38.582Z"
+    activeIntervals: [{"end":"2026-11-06T03:59:38.582Z","start":"2026-11-06T03:59:38.582Z"}]
+    appliedAt: "2026-11-06T03:59:38.582Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T03:59:38.582Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

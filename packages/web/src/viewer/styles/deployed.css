@@ -75,8 +75,7 @@
 
 /* ── Hench execution controls ──────────────────────────────────────── */
 .ndx-deployed .hench-execute-btn,
-.ndx-deployed .hench-terminate-btn,
-.ndx-deployed .hench-throttle-controls {
+.ndx-deployed .hench-terminate-btn {
   display: none !important;
 }
 

@@ -32,7 +32,7 @@
  * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
  * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
  * |                                                  | links*                                       |
- * | change: intent, acceptanceCriteria, amends,      | assignee, ready, needsPlacement              |
+ * | change: intent, acceptanceCriteria, amends,      | assignee, ready, needsPlacement, createdAt   |
  * |   touches, plannedRelease, spike, fix, priority, | lastModified, lastModifiedBy                 |
  * |   requirements, loe, loeRationale,               |                                              |
  * |   loeConfidence, effort*,                        |                                              |
@@ -569,6 +569,12 @@ export interface ItemState {
    * (`change-placed-at-close`).
    */
   needsPlacement?: boolean;
+  /**
+   * Changes: ISO timestamp of the change's first write, stamped once by the
+   * model transaction and never moved. A change recorded before this field
+   * existed has none; its age reads from `lastModified`.
+   */
+  createdAt?: string;
   lastModified?: string;
   lastModifiedBy?: string;
   [key: string]: unknown;
@@ -597,6 +603,7 @@ export const ItemStateSchema = z
     assignee: z.string().optional(),
     ready: z.boolean().optional(),
     needsPlacement: z.boolean().optional(),
+    createdAt: z.string().optional(),
     lastModified: z.string().optional(),
     lastModifiedBy: z.string().optional(),
   })

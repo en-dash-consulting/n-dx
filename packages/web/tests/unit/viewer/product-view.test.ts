@@ -10,6 +10,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { h } from "preact";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 import { ProductView } from "../../../src/viewer/views/product.js";
+import { areaBlock } from "../../../src/viewer/views/product-area-map.js";
 import {
   needsAttention,
   productTotals,
@@ -195,10 +196,11 @@ describe("capability ordering", () => {
     };
     const totals = productTotals({
       areas: [{
-        id: "a", title: "A", capabilities: [
+        id: "a", slug: "a", title: "A", capabilities: [
           row({ id: "one", title: "One", openChanges: [shared] }),
           row({ id: "two", title: "Two", openChanges: [shared, { ...shared, id: "ch-2" }] }),
         ],
+        openChangeIds: ["ch-1", "ch-2"],
       }],
       constraints: [],
     });
@@ -207,9 +209,64 @@ describe("capability ordering", () => {
     expect(totals.capabilities).toBe(2);
   });
 
+  it("counts an open change that only adds a capability under an area", () => {
+    // The change names no existing capability, so no capability overlay holds it.
+    const totals = productTotals({
+      areas: [{
+        id: "a", slug: "a", title: "A", capabilities: [row({ id: "one", title: "One" })],
+        openChangeIds: ["ch-add"],
+      }],
+      constraints: [],
+    });
+
+    expect(totals.openChanges).toBe(1);
+  });
+
+  it("counts an open change whose only amendment removes an area", () => {
+    const totals = productTotals({
+      areas: [
+        { id: "a", slug: "a", title: "A", capabilities: [], openChangeIds: ["ch-remove-a"] },
+        { id: "b", slug: "b", title: "B", capabilities: [], openChangeIds: [] },
+      ],
+      constraints: [],
+    });
+
+    expect(totals.openChanges).toBe(1);
+  });
+
+  it("counts a change listed on an area and on its capability once", () => {
+    const shared = { id: "ch-1", title: "Shared", stage: "ready" as const };
+    const totals = productTotals({
+      areas: [{
+        id: "a", slug: "a", title: "A",
+        capabilities: [row({ id: "one", title: "One", openChanges: [shared] })],
+        openChangeIds: ["ch-1", "ch-add"],
+      }],
+      constraints: [],
+    });
+
+    expect(totals.openChanges).toBe(2);
+  });
+
+  it("matches the distinct open changes across Plan's area-map badges", () => {
+    const badges = PRODUCT_MAP_FIXTURE.areas.map((area) => areaBlock(area).openChanges);
+    expect(badges).toEqual(PRODUCT_MAP_FIXTURE.areas.map((a) => a.openChangeIds.length));
+
+    // One change spans two areas and counts once; another only adds a
+    // capability under the first area, so no capability overlay carries it.
+    const areas = PRODUCT_MAP_FIXTURE.areas.map((area, i) => (
+      i === 0 ? { ...area, openChangeIds: [...area.openChangeIds, "change-run-field", "change-add-only"] } : area
+    ));
+    const distinct = new Set(areas.flatMap((a) => a.openChangeIds)).size;
+
+    expect(distinct).toBe(6);
+    expect(productTotals({ ...PRODUCT_MAP_FIXTURE, areas }).openChanges).toBe(distinct);
+    expect(productTotals(PRODUCT_MAP_FIXTURE).openChanges).toBe(5);
+  });
+
   it("counts defective constraints alongside defective capabilities", () => {
     const totals = productTotals({
-      areas: [{ id: "a", title: "A", capabilities: [row({ health: "defective" })] }],
+      areas: [{ id: "a", slug: "a", title: "A", capabilities: [row({ health: "defective" })], openChangeIds: [] }],
       constraints: [
         { id: "c1", title: "C1", health: "defective", appliesTo: "all" },
         { id: "c2", title: "C2", health: "ok", appliesTo: "all" },

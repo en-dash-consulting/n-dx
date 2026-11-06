@@ -50,6 +50,10 @@
 .topnav-guide { display: flex; align-items: center; margin-left: auto; padding-right: var(--space-2); }
 .topnav-guide + .topnav-search { margin-left: 0; }
 
+/* The project context gives way first (breadcrumb.css) and the width tiers
+   (sidecar.css) shed text, so the tabs keep their width. They still shrink and
+   scroll as a last resort — when badges or a long run status outgrow the tier —
+   rather than pushing the Sidecar button off the page. */
 .topnav-tabs { display: flex; align-self: stretch; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
 .topnav-tabs::-webkit-scrollbar { display: none; }
 .topnav-tab { flex: none; }
@@ -626,6 +630,8 @@
 .home-preflight-slot:empty { display: none; }
 .home-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 .home-stages-2 { grid-template-columns: repeat(2, 1fr); }
+.home-stages-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1199px) { .home-stages-4 { grid-template-columns: repeat(2, 1fr); } }
 .home-stages-1 { grid-template-columns: minmax(0, 420px); }
 .stage-card {
   display: flex;
@@ -675,7 +681,7 @@
   .topnav-brand-text { display: none; }
   .topnav-tab { padding: 0 var(--space-2); }
   .main--staged { padding-left: calc(16px + var(--stage-link-w)); padding-right: calc(16px + var(--stage-link-w)); }
-  .home-stages, .home-stages-2 { grid-template-columns: 1fr; }
+  .home-stages, .home-stages-2, .home-stages-4 { grid-template-columns: 1fr; }
   .stage-card { min-height: 0; }
   .stage-card-mark { max-width: 110px; }
   .bottombar-status { display: none; }

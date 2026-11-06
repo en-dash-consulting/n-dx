@@ -62,7 +62,7 @@ export const VIEW_META = {
     label: "Home",
     glyph: "⌂",
     product: "global",
-    blurb: "The three stages of the loop, side by side, each with its headline numbers.",
+    blurb: "The four stages of the loop, side by side, each with its headline numbers.",
   },
 
   // ── Live ─────────────────────────────────────────────────────
@@ -98,13 +98,19 @@ export const VIEW_META = {
     label: "Plan",
     glyph: "☑",
     product: "rex",
-    blurb: "What to build next: the PRD, proposals from analysis, and the planning commands.",
+    blurb: "What to build next: the PRD, proposals from analysis, and the changes in flight.",
   },
   work: {
     label: "Work",
     glyph: "▶",
     product: "hench",
-    blurb: "Get it done: hand the next task to the agent, pick a run mode, watch what it costs.",
+    blurb: "Get it done: hand the next task to the agent, pick a run mode, see what each worktree is running.",
+  },
+  tune: {
+    label: "Tune",
+    glyph: "◑",
+    product: "hench",
+    blurb: "Fit the {cli} workflow to this project and the tools you have.",
   },
 
   // ── SourceVision ─────────────────────────────────────────────

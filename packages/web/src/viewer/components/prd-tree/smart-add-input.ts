@@ -25,8 +25,9 @@ import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from "./change-placement.js";
+import { PlanWithSidecarButton } from "../plan-with-sidecar.js";
 import { useProductRead } from "../../hooks/index.js";
-import type { PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
+import type { AreaDetail, PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -41,6 +42,24 @@ export interface SmartAddInputProps {
   layout?: "v1" | "v2";
   /** Open a change's detail panel; "Amends…" lands there after Add. */
   onOpenChange?: (id: string) => void;
+  /**
+   * v2: capture a change in this area. The suggested placement and the search
+   * offer only its capabilities and the constraints binding it; nothing
+   * chosen still lands the change in the Inbox.
+   */
+  area?: CaptureArea;
+}
+
+/** The area a capture is limited to, as the area read gives it. */
+export type CaptureArea = Pick<AreaDetail, "id" | "slug" | "title" | "capabilities" | "constraints">;
+
+/** The product map a capture in `area` searches: that area and the constraints binding it. */
+export function areaSearchMap(area: CaptureArea): ProductMap {
+  return {
+    // A search map: nothing reads its open-change counts.
+    areas: [{ id: area.id, slug: area.slug, title: area.title, capabilities: area.capabilities, openChangeIds: [] }],
+    constraints: area.constraints,
+  };
 }
 
 interface QualityIssue {
@@ -240,10 +259,19 @@ const V2_COPY: PanelCopy = {
   loadingText: "Preparing the change...",
 };
 
+/** A capture in one area: v2's words, naming the area it is placed in. */
+function areaCopy(area: CaptureArea): PanelCopy {
+  return {
+    ...V2_COPY,
+    title: `Change in ${area.title}`,
+    subtitle: `Your text becomes one change: the first line is its title and the full text its description. Place it on one of ${area.title}'s capabilities or constraints, or leave it in the Inbox.`,
+  };
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange }: SmartAddInputProps) {
-  const copy = layout === "v2" ? V2_COPY : V1_COPY;
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area }: SmartAddInputProps) {
+  const copy = area ? areaCopy(area) : layout === "v2" ? V2_COPY : V1_COPY;
   const [input, setInput] = useState("");
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
@@ -321,7 +349,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   // ── Debounced preview ────────────────────────────────────────────
 
-  const triggerPreview = useCallback(async (text: string, reqId: number, parentId?: string) => {
+  const triggerPreview = useCallback(async (text: string, reqId: number, parentId?: string, areaId?: string) => {
     // Abort any in-flight request
     if (abortRef.current) {
       abortRef.current.abort();
@@ -336,6 +364,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     try {
       const body: Record<string, string> = { text };
       if (parentId) body.parentId = parentId;
+      if (areaId) body.area = areaId;
 
       const res = await fetch("/api/rex/smart-add-preview", {
         method: "POST",
@@ -385,12 +414,12 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     if (text.length < MIN_INPUT_LENGTH) return;
 
     const reqId = ++requestIdRef.current;
-    // The bar layout hides the scope selector, so a scope picked before
-    // switching to it must not silently apply.
-    const parentId = (!bar && selectedScope) || undefined;
+    // The bar layout and an area capture hide the scope selector, so a scope
+    // picked before switching must not silently apply.
+    const parentId = (!bar && !area && selectedScope) || undefined;
     previewedRef.current = { text, ...(parentId ? { parentId } : {}) };
-    triggerPreview(text, reqId, parentId);
-  }, [input, triggerPreview, selectedScope, bar]);
+    triggerPreview(text, reqId, parentId, area?.id);
+  }, [input, triggerPreview, selectedScope, bar, area]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -572,8 +601,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
           h("p", { class: "smart-add-subtitle" }, copy.subtitle),
         ),
 
-    // Context selection dropdown
-    !bar && scopeOptions.length > 0
+    // Context selection dropdown. An area capture adds a change, never a task under one.
+    !bar && !area && scopeOptions.length > 0
       ? h("div", { class: "smart-add-scope" },
           h("label", { class: "smart-add-scope-label" }, "Scope"),
           h("select", {
@@ -657,6 +686,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
         onClick: handleSubmit,
         "aria-label": copy.actionLabel,
       }, state === "loading" ? copy.busy : copy.action),
+      // v2 only: the Plan lens proposes a change set, which a v1 tree has no place for.
+      layout === "v2" ? h(PlanWithSidecarButton, { text: input, areaId: area?.id, disabled: state === "loading" }) : null,
       bar ? barAction : null,
     ),
 
@@ -691,9 +722,10 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
             ),
           ),
 
-          h(ChangePreviewList, {
+          h(area ? AreaChangePreviewList : ChangePreviewList, {
             changes,
             choices,
+            area,
             onChoose: (index: number, choice: PlacementChoice) =>
               setChoices((prev) => prev.map((c, i) => (i === index ? choice : c))),
           }),
@@ -831,13 +863,25 @@ interface ChangePreviewListProps {
   changes: PreviewChange[];
   choices: PlacementChoice[];
   onChoose: (index: number, choice: PlacementChoice) => void;
+  /** Set for an area capture; see {@link AreaChangePreviewList}. */
+  area?: CaptureArea;
 }
 
 /** The previewed changes, with the product map their "Search all" fields share. */
-function ChangePreviewList({ changes, choices, onChoose }: ChangePreviewListProps) {
+function ChangePreviewList(props: ChangePreviewListProps) {
   const product = useProductRead<ProductMap>("/api/rex/product", (body) => body.map as ProductMap);
   const map = product.state === "ready" ? product.data ?? null : null;
   const mapError = product.state === "error" ? product.message : undefined;
+  return h(ChangePreviewCards, { ...props, map, mapError });
+}
+
+/** The previewed changes of an area capture: the search covers only that area, so there is no map to read. */
+function AreaChangePreviewList(props: ChangePreviewListProps) {
+  const map = useMemo(() => (props.area ? areaSearchMap(props.area) : null), [props.area]);
+  return h(ChangePreviewCards, { ...props, map });
+}
+
+function ChangePreviewCards({ changes, choices, onChoose, area, map, mapError }: ChangePreviewListProps & { map: ProductMap | null; mapError?: string }) {
   return h("div", { class: "smart-add-preview" },
     changes.map((change, ci) =>
       h(ChangePreviewCard, {
@@ -848,6 +892,7 @@ function ChangePreviewList({ changes, choices, onChoose }: ChangePreviewListProp
         onChoose: (choice: PlacementChoice) => onChoose(ci, choice),
         map,
         mapError,
+        areaTitle: area?.title,
       }),
     ),
   );
@@ -861,9 +906,11 @@ interface ChangePreviewCardProps {
   onChoose: (choice: PlacementChoice) => void;
   map: ProductMap | null;
   mapError?: string;
+  /** The area an area capture is limited to; names it in the placement legend. */
+  areaTitle?: string;
 }
 
-function ChangePreviewCard({ change, name, choice, onChoose, map, mapError }: ChangePreviewCardProps) {
+function ChangePreviewCard({ change, name, choice, onChoose, map, mapError, areaTitle }: ChangePreviewCardProps) {
   const shortlist = change.placement?.shortlist ?? [];
   const targets = shortlist.map(candidateTarget);
   const chosen = choice.target;
@@ -888,9 +935,12 @@ function ChangePreviewCard({ change, name, choice, onChoose, map, mapError }: Ch
       change.needsPlacement
         ? h("div", { class: "cp-form smart-add-place" },
             h("fieldset", { class: "cp-shortlist" },
-              h("legend", { class: "smart-add-preview-desc" }, "Suggested placement"),
+              h("legend", { class: "smart-add-preview-desc" }, areaTitle ? `Suggested placement in ${areaTitle}` : "Suggested placement"),
               !shortlist.length
-                ? h("div", { class: "cp-shortlist-empty" }, "No placement suggested. Search, or leave it in the Inbox.")
+                ? h("div", { class: "cp-shortlist-empty" },
+                    areaTitle
+                      ? `No placement suggested in ${areaTitle}. Search it, or leave it in the Inbox.`
+                      : "No placement suggested. Search, or leave it in the Inbox.")
                 : null,
               change.placement?.tied
                 ? h("div", { class: "cp-shortlist-warning", role: "note", "data-warning": "tied" },

@@ -13,6 +13,7 @@ import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
 
 import {
   isInsideGitRepo,
@@ -20,6 +21,10 @@ import {
   runGitPreflight,
   commitInitBaseline,
   formatGitInitCommitLines,
+  snapshotDirtyPaths,
+  parsePorcelainZ,
+  finishInitCommit,
+  machineLocalIgnoreEntries,
 } from "../../packages/core/git-preflight.js";
 
 function gitAvailable() {
@@ -173,13 +178,42 @@ describe("git-preflight: formatGitInitCommitLines", () => {
     expect(lines.some((l) => l.includes("index locked"))).toBe(true);
   });
 
+  it("returns no lines when a re-init changed nothing", () => {
+    expect(formatGitInitCommitLines({ status: "unchanged" })).toEqual([]);
+  });
+
+  it("counts the files committed in an existing repository", () => {
+    const lines = formatGitInitCommitLines({ status: "committed", kind: "files", paths: ["a", "b"] });
+    expect(lines).toEqual(["  Committed 2 init files (chore: n-dx init)."]);
+  });
+
+  it("says the files were left uncommitted under --no-commit", () => {
+    const lines = formatGitInitCommitLines({ status: "skipped" });
+    expect(lines.some((l) => l.includes("left uncommitted"))).toBe(true);
+  });
+
   it("surfaces the commit error when `git commit` failed", () => {
     const lines = formatGitInitCommitLines({
       status: "commit-failed",
       error: "Please tell me who you are",
     });
-    expect(lines.some((l) => l.includes("initial n-dx commit failed"))).toBe(true);
+    expect(lines.some((l) => l.includes("n-dx init commit failed"))).toBe(true);
+    expect(lines.some((l) => l.includes("uncommitted"))).toBe(true);
     expect(lines.some((l) => l.includes("Please tell me who you are"))).toBe(true);
+  });
+
+  it("says the baseline commit's files are staged, but an existing repo's are left uncommitted", () => {
+    const baseline = formatGitInitCommitLines({ status: "commit-failed", error: "x" }).join("\n");
+    const files = formatGitInitCommitLines({ status: "commit-failed", kind: "files", error: "x" }).join("\n");
+    expect(baseline).toContain("staged but uncommitted");
+    expect(files).toContain("left uncommitted");
+    expect(files).not.toContain("staged");
+  });
+
+  it("names at most five already-changed init files and counts the rest", () => {
+    const leftDirty = ["a", "b", "c", "d", "e", "f", "g"];
+    const lines = formatGitInitCommitLines({ status: "unchanged", kind: "files", leftDirty }).join("\n");
+    expect(lines).toContain("Left 7 init files you had already changed uncommitted: a, b, c, d, e and 2 more.");
   });
 });
 
@@ -230,6 +264,11 @@ describe.skipIf(!GIT_OK)("git-preflight: commitInitBaseline", () => {
     expect(status).toBe("");
   });
 
+  it("leaves the commit to the caller: finishInitCommit does nothing outside a repository", () => {
+    expect(finishInitCommit(tmpDir, { gitResult: { status: "declined" }, before: null })).toBeNull();
+    expect(finishInitCommit(tmpDir, { gitResult: { status: "non-interactive" }, before: null })).toBeNull();
+  });
+
   it("returns add-failed when git is not a valid repository (`.git` is a bogus file)", async () => {
     // Without an initialized repo, `git add` fails with a fatal error —
     // surfaces as add-failed rather than throwing out of the helper.
@@ -240,6 +279,268 @@ describe.skipIf(!GIT_OK)("git-preflight: commitInitBaseline", () => {
     expect(["add-failed", "commit-failed", "committed", "nothing-to-commit"]).toContain(result.status);
     if (result.status === "add-failed" || result.status === "commit-failed") {
       expect(typeof result.error).toBe("string");
+    }
+  });
+});
+
+describe("git-preflight: parsePorcelainZ", () => {
+  it("collects every path, including both sides of a rename", () => {
+    const out = " M a.txt\0?? dir/b.txt\0R  new.txt\0old.txt\0A  c.txt\0";
+    expect([...parsePorcelainZ(out)].sort()).toEqual(["a.txt", "c.txt", "dir/b.txt", "new.txt", "old.txt"]);
+  });
+
+  it("returns an empty set for a clean tree", () => {
+    expect(parsePorcelainZ("").size).toBe(0);
+  });
+});
+
+// The commit at the end of `ndx init` in a repository that already existed.
+describe.skipIf(!GIT_OK)("git-preflight: committing init's paths in an existing repo", () => {
+  let tmpDir;
+
+  const git = (...args) => execFileSync("git", args, { cwd: tmpDir, encoding: "utf-8", stdio: "pipe" });
+  const status = () => git("status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean).sort();
+  const commitCount = () => Number(git("rev-list", "--count", "HEAD").trim());
+  const inside = { status: "inside" };
+
+  /** Stand-in for init's writes: a tool directory, config, and a .gitignore edit. */
+  async function simulateInitWrites() {
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    await writeFile(join(tmpDir, ".rex", "config.json"), "{}\n");
+    await writeFile(join(tmpDir, ".n-dx.json"), "{}\n");
+    await writeFile(join(tmpDir, ".gitignore"), "node_modules\n.n-dx.local.json\n");
+  }
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "git-preflight-inside-"));
+    initRepo(tmpDir);
+    await writeFile(join(tmpDir, ".gitignore"), "node_modules\n");
+    await writeFile(join(tmpDir, "app.js"), "one\n");
+    await writeFile(join(tmpDir, "lib.js"), "one\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "user baseline");
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("commits the paths init wrote with the n-dx trailers and leaves a clean tree", async () => {
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+    expect(result).toMatchObject({ status: "committed", kind: "files" });
+    expect(result.paths).toEqual([".gitignore", ".n-dx.json", ".rex/config.json"]);
+    expect(status()).toEqual([]);
+
+    const message = git("log", "-1", "--pretty=%B");
+    expect(message.startsWith("chore: n-dx init\n")).toBe(true);
+    expect(message).toContain("N-DX: init/files");
+    expect(message).toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
+  });
+
+  it("stages and commits only init's paths, leaving the user's changes as they were", async () => {
+    await writeFile(join(tmpDir, "app.js"), "staged edit\n");
+    git("add", "app.js");
+    await writeFile(join(tmpDir, "lib.js"), "unstaged edit\n");
+    await writeFile(join(tmpDir, "notes.txt"), "untracked\n");
+    const userStatus = status();
+
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.status).toBe("committed");
+    const committed = git("show", "--name-only", "--pretty=format:", "HEAD").split("\n").filter(Boolean).sort();
+    expect(committed).toEqual([".gitignore", ".n-dx.json", ".rex/config.json"]);
+    // The user's staged, unstaged and untracked changes are untouched.
+    expect(status()).toEqual(userStatus);
+  });
+
+  it("creates no commit when a re-init changed nothing", () => {
+    const before = snapshotDirtyPaths(tmpDir);
+    const count = commitCount();
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+    expect(result.status).toBe("unchanged");
+    expect(formatGitInitCommitLines(result)).toEqual([]);
+    expect(commitCount()).toBe(count);
+  });
+
+  it("leaves everything uncommitted under --no-commit", async () => {
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    const count = commitCount();
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before, commit: false });
+    expect(result.status).toBe("skipped");
+    expect(commitCount()).toBe(count);
+    expect(status().length).toBeGreaterThan(0);
+  });
+
+  it("drops machine-local files an earlier commit tracked, keeping them on disk and the user's staging intact", async () => {
+    // The ndx-demo shape: a hand `git add .` took in the dashboard pid and the
+    // analysis cache, and the running server has since rewritten the pid.
+    await writeFile(join(tmpDir, ".n-dx-web.pid"), "111\n");
+    await mkdir(join(tmpDir, ".sourcevision", ".cache"), { recursive: true });
+    await writeFile(join(tmpDir, ".sourcevision", ".cache", "analyses.jsonl"), "{}\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "user add-all");
+    await writeFile(join(tmpDir, ".n-dx-web.pid"), "222\n");
+    await writeFile(join(tmpDir, "app.js"), "staged edit\n");
+    git("add", "app.js");
+
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    const ignore = machineLocalIgnoreEntries(tmpDir);
+    await writeFile(join(tmpDir, ".gitignore"), `node_modules\n${ignore.join("\n")}\n`);
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result).toMatchObject({ status: "committed", kind: "files" });
+    expect(result.untracked.sort()).toEqual([".n-dx-web.pid", ".sourcevision/.cache/analyses.jsonl"]);
+    expect(git("ls-files", ".n-dx-web.pid", ".sourcevision/.cache").trim()).toBe("");
+    expect(existsSync(join(tmpDir, ".n-dx-web.pid"))).toBe(true);
+    // Only the user's staged edit is left; the pid no longer shows as modified.
+    expect(status()).toEqual(["M  app.js"]);
+    expect(formatGitInitCommitLines(result).join("\n")).toContain("Stopped tracking 2 machine-local files");
+  });
+
+  it("commits sourcevision output that was already dirty, but not the user's own PRD edits", async () => {
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    await writeFile(join(tmpDir, ".sourcevision", "CONTEXT.md"), "v1\n");
+    await writeFile(join(tmpDir, ".rex", "item.md"), "v1\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "first init");
+    // A hub-started analysis, and an uncommitted PRD edit, before re-init.
+    await writeFile(join(tmpDir, ".sourcevision", "CONTEXT.md"), "v2\n");
+    await writeFile(join(tmpDir, ".rex", "item.md"), "user edit\n");
+
+    const before = snapshotDirtyPaths(tmpDir);
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.paths).toEqual([".sourcevision/CONTEXT.md"]);
+    expect(result.leftDirty).toEqual([".rex/item.md"]);
+    expect(status()).toEqual([" M .rex/item.md"]);
+  });
+
+  it("commits nothing that appeared outside init's paths while init ran", async () => {
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    // Saved in another terminal while a prompt waited.
+    await writeFile(join(tmpDir, "notes.txt"), "mine\n");
+    await writeFile(join(tmpDir, ".env"), "SECRET=1\n");
+    await writeFile(join(tmpDir, "app.js"), "edited elsewhere\n");
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.paths).toEqual([".gitignore", ".n-dx.json", ".rex/config.json"]);
+    expect(status()).toEqual(["?? .env", "?? notes.txt", " M app.js"].sort());
+  });
+
+  it("commits only under the project directory when it is below the repository root", async () => {
+    const pkg = join(tmpDir, "packages", "foo");
+    await mkdir(join(pkg, ".rex"), { recursive: true });
+    await mkdir(join(tmpDir, "packages", "bar"), { recursive: true });
+    const before = snapshotDirtyPaths(pkg);
+    await writeFile(join(pkg, ".rex", "config.json"), "{}\n");
+    await writeFile(join(pkg, "CLAUDE.md"), "# foo\n");
+    await writeFile(join(tmpDir, "packages", "bar", "index.js"), "bar\n");
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# root\n");
+
+    const result = finishInitCommit(pkg, { gitResult: inside, before });
+
+    expect(result.paths).toEqual(["packages/foo/.rex/config.json", "packages/foo/CLAUDE.md"]);
+    expect(status()).toEqual(["?? CLAUDE.md", "?? packages/bar/index.js"]);
+  });
+
+  it("reports init paths the user had already changed and leaves them as they were", async () => {
+    await writeFile(join(tmpDir, ".gitignore"), "node_modules\ndist\n");
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# from an earlier init\n");
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# regenerated\n");
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.paths).toEqual([".n-dx.json", ".rex/config.json"]);
+    expect(result.leftDirty).toEqual([".gitignore", "CLAUDE.md"]);
+    expect(status()).toEqual([" M .gitignore", "?? CLAUDE.md"]);
+    const lines = formatGitInitCommitLines(result).join("\n");
+    expect(lines).toContain("Left 2 init files you had already changed uncommitted: .gitignore, CLAUDE.md.");
+    expect(lines).toContain("Commit them before `ndx work`.");
+  });
+
+  it("reports already-changed init paths even when there is nothing to commit", async () => {
+    await writeFile(join(tmpDir, "AGENTS.md"), "# pending\n");
+    const before = snapshotDirtyPaths(tmpDir);
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+    expect(result).toMatchObject({ status: "unchanged", leftDirty: ["AGENTS.md"] });
+    expect(formatGitInitCommitLines(result).join("\n")).toContain("Left 1 init file you had already changed");
+  });
+
+  it("does not run the project's commit hooks", async () => {
+    // tests/setup-session-env.js points the global core.hooksPath at an empty
+    // directory; a repository-local value overrides it.
+    const hooks = join(tmpDir, ".git", "hooks-under-test");
+    await mkdir(hooks, { recursive: true });
+    git("config", "core.hooksPath", hooks.split("\\").join("/"));
+    await writeFile(join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    await writeFile(join(hooks, "commit-msg"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.status).toBe("committed");
+    expect(status()).toEqual([]);
+  });
+
+  it("leaves the real index untouched and says nothing is staged when the commit fails", async () => {
+    await writeFile(join(tmpDir, "app.js"), "staged edit\n");
+    git("add", "app.js");
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    const userStatus = status();
+
+    // No identity anywhere git looks, and no guessing one from the host.
+    const saved = { ...process.env };
+    const emptyGlobal = join(tmpDir, ".git", "empty-global-config");
+    await writeFile(emptyGlobal, "");
+    git("config", "--unset", "user.name");
+    git("config", "--unset", "user.email");
+    git("config", "user.useConfigOnly", "true");
+    for (const k of ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"]) {
+      delete process.env[k];
+    }
+    process.env.GIT_CONFIG_GLOBAL = emptyGlobal;
+    process.env.GIT_CONFIG_NOSYSTEM = "1";
+    let result;
+    try {
+      result = finishInitCommit(tmpDir, { gitResult: inside, before });
+    } finally {
+      for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+      Object.assign(process.env, saved);
+    }
+
+    expect(result).toMatchObject({ status: "commit-failed", kind: "files" });
+    expect(status()).toEqual(userStatus);
+    const lines = formatGitInitCommitLines(result).join("\n");
+    expect(lines).toContain("left uncommitted");
+    expect(lines).not.toContain("staged");
+  });
+
+  it("ignores the dashboard runtime files and both caches", () => {
+    expect(machineLocalIgnoreEntries(tmpDir)).toEqual(expect.arrayContaining([
+      ".n-dx-web.pid", ".n-dx-web.port", ".n-dx-web-usage.jsonl", ".sourcevision/.cache/", ".rex/.cache/",
+    ]));
+  });
+
+  it("returns null from snapshotDirtyPaths outside a repository", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "git-preflight-outside-"));
+    try {
+      expect(snapshotDirtyPaths(outside)).toBeNull();
+    } finally {
+      await rm(outside, { recursive: true, force: true });
     }
   });
 });

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
-import { PROJECT_DIRS, repoCommandEnv } from "../prd/llm-gateway.js";
+import { repoCommandEnv, resolveLayout } from "../prd/llm-gateway.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
@@ -158,7 +158,7 @@ export async function toolRexUpdateStatus(
     const findingTags = existing.tags.filter((t: string) => t.startsWith("finding:"));
     if (findingTags.length > 0) {
       try {
-        const rexDir = join(options.projectDir, PROJECT_DIRS.REX);
+        const rexDir = resolveLayout(options.projectDir).rexDir;
         let ackStore = await loadAcknowledged(rexDir);
         for (const tag of findingTags) {
           const hash = tag.slice("finding:".length);

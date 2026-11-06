@@ -48,7 +48,7 @@ rex remove <id> .                    # remove item and descendants
 rex reshape .                        # LLM-powered PRD restructuring
 rex prune .                          # remove completed subtrees
 rex restore .                        # list tree snapshots; --latest or --id=<snapshot> rolls back (v1)
-rex validate .                       # check PRD integrity
+rex validate .                       # check PRD integrity (v2: also warns on stale release plans)
 rex fix .                            # auto-fix common PRD issues
 rex usage .                          # token usage analytics
 rex report .                         # JSON health report for CI
@@ -60,6 +60,10 @@ rex reorganize .                     # detect and fix structural issues
 rex health .                         # PRD structure health score
 rex mcp .                            # start MCP server (stdio)
 ```
+
+## Stale release plans (v2)
+
+`rex validate`, `rex health` and the MCP `health` tool share one rule: an open change whose `plannedRelease` has shipped (some change carries `shippedIn` for it) or is older than the newest shipped release is stale. Validate reports it as a warning named `release plans`, which never fails CI, and each finding names the change and says to plan it for a coming release or clear `plannedRelease`. A change with no planned release is never flagged. The dashboard's Plan health panel reads the same check.
 
 ## Smart Add (v1)
 
@@ -88,6 +92,7 @@ rex product show .                                   # areas, capabilities, cons
 rex product show A1.1 .                              # one capability: statement, capability criteria, changes
 rex product edit A1.1 --capability-criterion="c3: A refund reaches the card" .     # revise it; drafts a change
 rex product edit A1.1 --statement="..." --editorial .                              # reword it; stays met
+rex change inbox .                                  # every change awaiting placement, with age and shortlist
 rex change place CH-2 .                              # the placement shortlist
 rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3: ..." .
 rex change place CH-2 --propose --type=capability --under=A1 --title="Refund by card" .   # nothing fits: propose a new node

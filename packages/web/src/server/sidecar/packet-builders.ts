@@ -437,6 +437,37 @@ function previewDigest(brief: string): string {
   return [`${brief.length} characters, ${lines.length} lines.`, "Headings:", bullets(headings, "(no headings)")].join("\n");
 }
 
+const DESCRIBE_CHILDREN_MAX = 15;
+export const MISSING_DONE_WHEN_NOTE =
+  "A task whose done-when reads (none stated) has no checks: propose done-when for it as text in your reply, as for a vague check.";
+
+/** `node`'s done-when as unchecked boxes, each line prefixed by `indent`. */
+function doneWhenChecks(node: RuleNode, indent: string): string {
+  const checks = strings(node.acceptanceCriteria).map((c) => `${indent}- [ ] ${c}`);
+  return checks.length > 0 ? checks.join("\n") : `${indent}(none stated)`;
+}
+
+/**
+ * A change's tasks (a task's subtasks), each with its status and done-when, so
+ * Describe on a change can tighten the tasks that lack criteria. Bounded: past
+ * the first few the section names how many it left out.
+ */
+function childrenSections(node: RuleNode, now: string): PacketSection[] {
+  const children = node.children ?? [];
+  if (children.length === 0) return [];
+  const shown = children.slice(0, DESCRIBE_CHILDREN_MAX).map((c) =>
+    [`- ${kindOf(c)} ${oneLine(label(c), 120)}: ${nodeStatus(c)}`, "  Done when:", doneWhenChecks(c, "  ")].join("\n"),
+  );
+  const rest = children.length - shown.length;
+  const more = rest > 0 ? [`… ${rest} more not shown`] : [];
+  // The lens instructions cover vague checks; a task with none needs its own ask.
+  const unchecked = children.some((c) => strings(c.acceptanceCriteria).length === 0)
+    ? [MISSING_DONE_WHEN_NOTE]
+    : [];
+  const [id, title] = node.type === "change" ? ["tasks", "Tasks"] : ["subtasks", "Subtasks"];
+  return [prdSection(id, title, [...shown, ...more, ...unchecked].join("\n"), now)];
+}
+
 /** Describe: the task as it will run: text, done-when, settings, what blocks it and how it has gone. */
 export async function buildDescribePacket(
   sources: PacketSources,
@@ -453,20 +484,22 @@ export async function buildDescribePacket(
   const found = target.ref ? findNode(prd.tree.changes, target.ref) : null;
   if (!found) return refused(target.ref ? `"${target.ref}" names no task` : "Describe needs a task");
   const { node, chain } = found;
+  const isChange = node.type === "change";
 
   const sections: PacketSection[] = [
     prdSection(
-      "task",
-      "Task",
+      isChange ? "change" : "task",
+      isChange ? "Change" : "Task",
       [
         label(node),
         `Status: ${nodeStatus(node)}${text(node.priority) ? ` · priority ${text(node.priority)}` : ""}`,
         `Description: ${text(node.description) ?? text(node.intent) ?? "(none)"}`,
         "Done when (checks):",
-        strings(node.acceptanceCriteria).map((c) => `- [ ] ${c}`).join("\n") || "(none stated)",
+        doneWhenChecks(node, ""),
       ].join("\n"),
       now,
     ),
+    ...childrenSections(node, now),
     await likelyFilesSection(sources, node, now),
     prdSection("parents", "Parent chain", bullets(chain.map((p) => `${kindOf(p)} ${label(p)} (${nodeStatus(p)})`), "(top level)"), now),
     prdSection("blockers", "Blockers and dependencies", blockersBody(prd, node), now),

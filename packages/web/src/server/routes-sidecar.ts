@@ -87,12 +87,12 @@ import type { BrokerScope } from "./sidecar/broker-policy.js";
 import { createHubActions } from "./sidecar/hub-actions.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
-import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
+import { awaitSidecarCommand, renderWorkPreview, runFailedResult, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { readLinkCall, writeLinkCard } from "./tracker/link-card.js";
 import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
-import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution } from "./routes-hench.js";
+import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -405,7 +405,8 @@ export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = 
  * The effects of an approved broker call in `ctx`'s workspace: a command
  * runs as the workspace's Sidecar command job (job tray, Live) and the agent
  * waits up to `commandWaitMs` for its output, work starts through the hench
- * execute route under `guard.maxConcurrentProcesses`, and a work card's
+ * execute route under `guard.maxConcurrentProcesses` and is reported once it
+ * passes its `startingPhaseMs` (or failed, if hench refused it), and a work card's
  * preview is the Prepare route's `ndx work --resolve`. A change-set card is
  * read against the workspace's PRD before it is raised and written there,
  * under the PRD lock, on approval (`sidecar/change-set.ts`). A placement card
@@ -417,9 +418,10 @@ export function sidecarActions(
   broadcast: WebSocketBroadcaster,
   {
     commandWaitMs = SIDECAR_COMMAND_WAIT_MS,
+    startingPhaseMs = STARTING_PHASE_MS,
     workspaces,
     exec = llmExec,
-  }: { commandWaitMs?: number; workspaces?: SidecarWorkspaces; exec?: BranchHealthExec } = {},
+  }: { commandWaitMs?: number; startingPhaseMs?: number; workspaces?: SidecarWorkspaces; exec?: BranchHealthExec } = {},
 ): SidecarActions {
   return {
     githubReadsAllowed: () => readSidecarSettings(ctx.projectDir).githubReads,
@@ -491,9 +493,16 @@ export function sidecarActions(
       const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);
       if (here.length > 0) return { ok: false, text: `Nothing started: ${RUN_HERE_REASON(here)}.` };
       if (inUse >= max) return { ok: false, text: `Nothing started: ${CONCURRENT_LIMIT_REASON(inUse, max, holders)}.` };
-      const answer = await startTaskExecution(ctx, { taskId, ...(options && { options }) }, broadcast);
+      const answer = await startTaskExecution(ctx, { taskId, ...(options && { options }) }, broadcast, { awaitStart: true, startingPhaseMs });
       if (answer.status !== 202) return { ok: false, text: `Nothing started: ${String(answer.body.error ?? `the execute route answered ${answer.status}`)}.` };
-      return { ok: true, text: `Started run ${String(answer.body.runId)} on task ${taskId} (${String(answer.body.taskTitle)}); follow it on Live.` };
+      const run = `Run ${String(answer.body.runId)} on task ${taskId} (${String(answer.body.taskTitle)})`;
+      if (answer.exited && !answer.exited.ok) return runFailedResult(`${run} did not start`, answer.exited);
+      if (answer.exited) return { ok: true, text: `${run} started and exited with code 0; see it on Live.` };
+      return {
+        ok: true,
+        text: `Started run ${String(answer.body.runId)} on task ${taskId} (${String(answer.body.taskTitle)}); follow it on Live.`,
+        ...(answer.ended && { ended: answer.ended.then((end) => (end.ok ? { ok: true, text: `${run} completed.` } : runFailedResult(`${run} failed`, end))) }),
+      };
     },
   };
 }
@@ -687,13 +696,18 @@ function startTurn(
       console.error(`[sidecar] could not save how the turn in session ${id} ended: ${errorMessage(err)}`);
     }
   };
+  // What failed since the last turn after its tool result returned; dropped only once a turn carried it.
+  const notes = broker.notesForNextTurn(id);
   // The user frame is appended synchronously inside sendTurn, before it
   // first awaits, so it is on disk by the time the POST answers.
-  registry.sendTurn(id, prompt, (frame) => announce({ cursor: frame.seq, running: true })).finally(() => {
+  registry.sendTurn(id, prompt, (frame) => announce({ cursor: frame.seq, running: true }), notes).finally(() => {
     // Nothing waits on a card once its turn is over.
     broker.withdraw(id, "The turn ended");
   }).then(
-    (result) => close(result.status, result.error),
+    (result) => {
+      if (result.status === "completed") broker.notesDelivered(id, notes.length);
+      close(result.status, result.error);
+    },
     (err: unknown) => {
       const error = errorMessage(err);
       console.error(`[sidecar] turn in session ${id} failed: ${error}`);

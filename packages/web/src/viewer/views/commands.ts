@@ -17,6 +17,8 @@ import { useState, useCallback, useEffect } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { useCliName, findOperation } from "../hooks/index.js";
 import type { ActiveOperation, JobTray } from "../hooks/index.js";
+import type { NavigateTo } from "../types.js";
+import { CommandReferenceView } from "./command-reference.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -726,21 +728,53 @@ export function RefreshPanel({ jobs }: { jobs: JobTray }) {
 
 // ── Main view ────────────────────────────────────────────────────────
 
-export function CommandsView({ jobs }: { jobs: JobTray }) {
+type CommandsTab = "run" | "reference";
+
+const COMMANDS_TABS: readonly { id: CommandsTab; label: string }[] = [
+  { id: "run", label: "Run" },
+  { id: "reference", label: "Reference" },
+];
+
+/**
+ * The tab lives in the route (`/commands/reference`, where `/command-reference`
+ * lands), so a reload, a shared link and Back/Forward all reopen it.
+ */
+export function CommandsView({ jobs, navigateTo, tab }: { jobs: JobTray; navigateTo: NavigateTo; tab: CommandsTab }) {
+  const setTab = (next: CommandsTab) => navigateTo("commands", next === "run" ? undefined : { tab: next });
+
   return h("div", { class: "commands-container" },
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
       h("h2", { class: "view-title" }, "Commands"),
     ),
-    h("p", { class: "section-sub" },
-      "Trigger CLI operations directly from the dashboard.",
+    h("div", { class: "stage-section-tablist", role: "tablist", "aria-label": "Commands views" },
+      COMMANDS_TABS.map((t) =>
+        h("button", {
+          key: t.id,
+          type: "button",
+          role: "tab",
+          id: `commands-tab-${t.id}`,
+          "aria-selected": String(tab === t.id),
+          "aria-controls": "commands-tabpanel",
+          class: `stage-section-tab${tab === t.id ? " active" : ""}`,
+          onClick: () => setTab(t.id),
+        }, t.label)),
     ),
 
-    h("div", { class: "cmd-panels" },
-      h(RefreshPanel, { jobs }),
-      h(InstallSamplePanel, null),
-      h(ExportPanel, null),
-      h(SelfHealPanel, { jobs }),
+    h("div", { id: "commands-tabpanel", role: "tabpanel", "aria-labelledby": `commands-tab-${tab}` },
+      tab === "reference"
+        ? h(CommandReferenceView, null)
+        : h(Fragment, null,
+            h("p", { class: "section-sub" },
+              "Trigger CLI operations directly from the dashboard.",
+            ),
+            h("div", { class: "cmd-panels" },
+              h(RefreshPanel, { jobs }),
+              h(InstallSamplePanel, null),
+              h(ExportPanel, null),
+              h(SelfHealPanel, { jobs }),
+            ),
+          ),
     ),
   );
 }

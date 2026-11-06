@@ -280,6 +280,8 @@ describe("external-call card after the call", () => {
       status: "approved",
       carriedOut: { ok: false, problems: [{ field: "estimate", message: "must be positive" }, { message: "title too long" }] },
     }));
+    // A failed call stays open: folding it would leave only "Approved".
+    expect(el.querySelector(".sidecar-card-toggle")).toBeNull();
     const problems = el.querySelector(".sidecar-external-problems")!;
     expect(problems.getAttribute("role")).toBe("alert");
     expect(problems.textContent).toContain("2 problems");

@@ -22,6 +22,7 @@ import {
   DIAGNOSE_RUN_CAP,
   EXPLAIN_CAP,
   GUIDE_CAP,
+  MISSING_DONE_WHEN_NOTE,
   PLAN_CAP,
 } from "../../../src/server/sidecar/packet-builders.js";
 import type { PacketSources, RunGateRead, TaskRunRead } from "../../../src/server/sidecar/packet-sources.js";
@@ -30,7 +31,8 @@ import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "../../../src/server/sid
 const FIXTURES = resolve(__dirname, "../../../../rex/tests/fixtures");
 const NOW = "2026-10-28T12:00:00.000Z";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
-const CHANGE_TASK = "c0000000-0000-4000-8000-000000000002";
+const CHANGE = "c0000000-0000-4000-8000-000000000001";
+const CHANGE_TASK ="c0000000-0000-4000-8000-000000000002";
 const V1_EPIC = "11111111-1111-1111-1111-111111111111";
 const V1_TASK = "33333333-3333-3333-3333-333333333333";
 
@@ -443,6 +445,31 @@ describe("Describe", () => {
     expect(DESCRIBE_INSTRUCTIONS).toContain("`rex update` or the item editor");
     expect(DESCRIBE_INSTRUCTIONS).toContain("Do not call `propose_prd_change` for an existing task");
     expect(DESCRIBE_INSTRUCTIONS).not.toContain("change-set card");
+  });
+
+  it("on a change: titles the head Change and lists each task with status and done-when, criteria-less ones included", async () => {
+    const sources = await sourcesFor("v2");
+    const prd = (await sources.prd())!;
+    const change = prd.tree.changes.find((c) => c.id === CHANGE)!;
+    change.children = [...(change.children ?? []), { id: "c0000000-0000-4000-8000-0000000000ff", type: "task", title: "Add the receipt line", slug: "add-the-receipt-line", status: "pending" }];
+    const packet = await buildDescribePacket({ ...sources, prd: async () => prd }, { ref: CHANGE }, NOW);
+    expect(packet.chars).toBeLessThanOrEqual(DESCRIBE_CAP);
+    expect(packet.text).toMatch(/## Change\n_source: [^\n]*\n\nCH-1 Add Apple Pay\n/);
+    expect(packet.text).not.toContain("## Task\n");
+    expect(packet.text).toMatch(/## Tasks\n_source: [^\n]*\n\n- task Wire the button: pending\n {2}Done when:\n {2}- \[ \] The button appears on Safari only\n/);
+    expect(packet.text).toContain("- task Add the receipt line: pending\n  Done when:\n  (none stated)");
+    expect(packet.text).toContain(MISSING_DONE_WHEN_NOTE);
+  });
+
+  it("on a change whose tasks all have done-when: lists them without the missing-checks note", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE }, NOW)).text;
+    expect(text).toContain("## Tasks");
+    expect(text).not.toContain(MISSING_DONE_WHEN_NOTE);
+  });
+
+  it("on a task: carries no Tasks section", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).not.toContain("## Tasks");
   });
 
   it("names each refusal and marks an unanswered resolve as unavailable", async () => {

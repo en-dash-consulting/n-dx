@@ -36,7 +36,8 @@ import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { safeParseInt } from "./constants.js";
-import { resolveHenchPaths } from "../../store/paths.js";
+import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
+import { assertPrdFolderExists } from "./prd-folder.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
@@ -995,6 +996,25 @@ export function createExecutionQueue(maxConcurrent: number): ExecutionQueue {
 // ---------------------------------------------------------------------------
 
 /**
+ * The canonical id of the item `--task <ref>` runs, or `undefined` when the
+ * ref names nothing. On v2 the ref may be a display id, an alias or a change,
+ * which resolves to that change's task no other worktree holds — the selection
+ * the brief makes (`findV2Entry`). On v1 it is the item id itself.
+ */
+export async function resolveTaskRefId(
+  rexDir: string,
+  ref: string,
+  claims?: TaskClaims,
+): Promise<string | undefined> {
+  const store = await resolveStore(rexDir);
+  const items = (await store.loadDocument()).items;
+  const tree = await loadV2Tree(store);
+  if (!tree) return findItem(items, ref)?.item.id;
+  const foreign = claims ? await claims.foreignClaims() : undefined;
+  return findV2Entry(tree, items, ref, foreign)?.item.id;
+}
+
+/**
  * Peek at the next task's scheduling priority without consuming it.
  *
  * Looks up the task (by explicit ID or auto-selection) and resolves
@@ -1889,6 +1909,21 @@ export async function cmdRun(
 ): Promise<void> {
   // `--resolve` never reaches here: the CLI dispatches it to cmdResolve
   // (run-resolve.ts), which reports this function's decisions without acting.
+
+  // --epic-by-epic walks every epic's tasks in order, and its selection path
+  // carries no assignee filter. Accepting --mine there would run — and commit
+  // under — tasks belonging to other people while the operator believes the
+  // run was scoped to their own, so refuse instead of no-opping. Same reason
+  // --review refuses on the api provider rather than reporting unreviewed runs
+  // as reviewed. Checked first: a contradictory invocation fails on its
+  // arguments before any environment check (config, PRD folder, git config).
+  if (flags["mine"] === "true" && flags["epic-by-epic"] === "true") {
+    throw new CLIError(
+      "Cannot use --mine with --epic-by-epic.",
+      "--epic-by-epic processes every epic in order and cannot filter by assignee. " +
+        "Drop --mine, or run without --epic-by-epic.",
+    );
+  }
   const henchDir = resolveHenchPaths(dir).henchDir;
   // An invalid field in hench's config.json must not refuse the whole run —
   // fall back to that field's default and say so, so a bad edit (often made
@@ -1897,7 +1932,8 @@ export async function cmdRun(
     onInvalid: "use-defaults",
     onWarning: (message) => warn(message),
   });
-  const rexDir = join(dir, config.rexDir);
+  const rexDir = resolveHenchRexDir(dir, config.rexDir);
+  assertPrdFolderExists(dir, rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
@@ -1985,20 +2021,6 @@ export async function cmdRun(
   // matches only when it was set to that same identity string. Like --tags,
   // this only constrains autoselection: an explicit --task bypasses it.
   const mine = flags["mine"] === "true";
-  // --epic-by-epic walks every epic's tasks in order, and its selection path
-  // carries no assignee filter. Accepting --mine there would run — and commit
-  // under — tasks belonging to other people while the operator believes the
-  // run was scoped to their own, so refuse instead of no-opping. Same reason
-  // --review refuses on the api provider rather than reporting unreviewed runs
-  // as reviewed. Checked before resolveActor so a contradictory invocation
-  // fails on its arguments rather than after reading git config.
-  if (mine && flags["epic-by-epic"] === "true") {
-    throw new CLIError(
-      "Cannot use --mine with --epic-by-epic.",
-      "--epic-by-epic processes every epic in order and cannot filter by assignee. " +
-        "Drop --mine, or run without --epic-by-epic.",
-    );
-  }
   const epicRefusal = await refuseEpicFlagsOnV2(rexDir, flags);
   if (epicRefusal) throw epicRefusal;
   const assignee = mine ? await resolveActor(dir) : undefined;
@@ -2374,6 +2396,13 @@ export async function cmdRun(
     // record, for the commits that happen later in the loop.
     const invocationGitOrigin = captureRunGitOrigin(dir);
 
+    // The gate's planning commit names the unit --task runs, by canonical id:
+    // restacks and landing key on it, and on v2 the flag may be a display id,
+    // an alias or a change. No trailer when the ref resolves to nothing.
+    const planningItemId = flags.task && flags.task !== "true"
+      ? await resolveTaskRefId(rexDir, flags.task, TaskClaims.forProject(dir, { readOnly: true }))
+      : undefined;
+
     // One-time pre-run commit gate: before the work loop begins, offer to
     // commit any pre-existing uncommitted changes so the user's in-progress
     // edits are not folded into hench's own commits. Runs once per invocation
@@ -2387,6 +2416,7 @@ export async function cmdRun(
       allowDirty,
       dryRun,
       origin: invocationGitOrigin,
+      ...(planningItemId ? { itemId: planningItemId } : {}),
       // Size-aware escalation config (hench.git.*); --allow-dirty above
       // takes precedence over both settings.
       checkpointThreshold: config.git?.checkpointThreshold,

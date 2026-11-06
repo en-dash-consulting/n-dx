@@ -119,7 +119,7 @@ test("settings opened over a task page close back to it", async ({ page }) => {
 test("a bare URL lands on home; a stage tab and a section link update the active view", async ({ page }) => {
   const tracker = trackConsoleErrors(page);
   await page.goto(`${dashboard.baseUrl}/`, { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".stage-card")).toHaveCount(3, { timeout: 10_000 });
+  await expect(page.locator(".stage-card")).toHaveCount(4, { timeout: 10_000 });
   await expect(page).toHaveURL(/\/home$/);
 
   // The Plan column goes to the Plan stage and lights its tab.

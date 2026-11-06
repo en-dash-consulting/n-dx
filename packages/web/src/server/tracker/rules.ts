@@ -19,7 +19,7 @@
  * here and are never overridden by a value.
  */
 
-import type { FactSource, TrackerEvent, TrackerFact, TrackerMapping } from "./server-profiles.js";
+import { trackerItemIdOfRef, type FactSource, type TrackerEvent, type TrackerFact, type TrackerMapping } from "./server-profiles.js";
 import type { TrackerRuleMode, TrackerSyncConfig } from "./sync-config.js";
 
 export type TrackerRuleKind = "create" | "move" | "blocked";
@@ -183,7 +183,7 @@ export function planTrackerEvent(
     if (mapping.createStatusProperty) args[mapping.createStatusProperty] = status;
   } else {
     tool = mapping.moveTool;
-    args[mapping.itemIdProperty] = record.ref;
+    args[mapping.itemIdProperty] = trackerItemIdOfRef(mapping, record.ref!);
     args[mapping.moveStatusProperty] = status;
   }
 

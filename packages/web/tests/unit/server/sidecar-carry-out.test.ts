@@ -4,13 +4,16 @@
  * The real route, broker and production actions: an MCP client stands in for
  * the session's vendor CLI, and the only fakes are the two spawn seams
  * (`spawnManaged` for the command job and the run, `exec` for
- * `ndx work --resolve`) and a registry that reports the session's turn running.
+ * `ndx work --resolve`) and a registry that reports the session's turn running
+ * (a real one with a scripted vendor CLI where a test reads the next turn's prompt).
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, type ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { execMock, spawnManagedMock } = vi.hoisted(() => ({ execMock: vi.fn(), spawnManagedMock: vi.fn() }));
@@ -21,6 +24,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 });
 
 import { recordRepoTrust } from "@n-dx/llm-client";
+import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { commandJobsOf, handleCommandsRoute } from "../../../src/server/routes-commands.js";
@@ -28,7 +32,7 @@ import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.j
 import { createAnnouncingBroker, handleSidecarRoute, sidecarActions, type SidecarCardMessage } from "../../../src/server/routes-sidecar.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
 import { SIDECAR_OUTPUT_MAX_BYTES, outputTail } from "../../../src/server/sidecar/carry-out.js";
-import type { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
+import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { workspaceKeyOf } from "../../../src/server/workspace-scoped.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -80,14 +84,14 @@ const runningRegistry = (): SidecarSessionRegistry => ({
   isRunning: () => true,
 }) as unknown as SidecarSessionRegistry;
 
-async function brokerClient(): Promise<Client> {
+async function brokerClient(session = SESSION): Promise<Client> {
   const client = new Client({ name: "test-cli", version: "0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL(`${server.baseUrl}/api/sidecar/sessions/${SESSION}/mcp`)));
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${server.baseUrl}/api/sidecar/sessions/${session}/mcp`)));
   return client;
 }
 
-async function decide(cardId: string, body: Record<string, unknown>): Promise<Response> {
-  return fetch(`${server.baseUrl}/api/sidecar/sessions/${SESSION}/cards/${cardId}`, {
+async function decide(cardId: string, body: Record<string, unknown>, session = SESSION): Promise<Response> {
+  return fetch(`${server.baseUrl}/api/sidecar/sessions/${session}/cards/${cardId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -142,13 +146,19 @@ afterEach(async () => {
 /** How long a command's tool result waits on the job; a test that reaches the bound shortens it. */
 let commandWaitMs: number;
 
-async function serve(): Promise<void> {
+/** Serve the route over {@link runningRegistry}; takes no argument, so `beforeEach(serve)` passes it none. */
+function serve(): Promise<void> {
+  return serveWith(runningRegistry);
+}
+
+async function serveWith(registryFor: () => SidecarSessionRegistry): Promise<void> {
   commandWaitMs = 10_000;
   server = await startRouteTestServer(async (req, res) =>
     (await handleSidecarRoute(req, res, ctx, broadcast, {
-      registryFor: runningRegistry,
+      registryFor,
       brokerFor: () => broker,
-      actionsFor: (c) => sidecarActions(c, broadcast, { commandWaitMs }),
+      // A run's starting phase cut short: a start_work result waits it out.
+      actionsFor: (c) => sidecarActions(c, broadcast, { commandWaitMs, startingPhaseMs: 20 }),
     }))
     || handleCommandsRoute(req, res, ctx, broadcast));
 }
@@ -383,6 +393,158 @@ describe("start_work", () => {
     expect(resultText(result)).toMatch(/Nothing started: Task "missing" not found in PRD\.$/);
     expect(spawnManagedMock).not.toHaveBeenCalled();
     await client.close();
+  });
+
+  it("reports a start hench refuses in its starting phase as failed, with hench's message, on the result and the card", async () => {
+    spawnManagedMock.mockImplementationOnce(() => ({
+      done: Promise.resolve({
+        exitCode: 1,
+        stdout: "Checking the working tree…\n",
+        stderr: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n",
+      }),
+      kill: vi.fn(() => true),
+      pid: 4242,
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(
+      /Run exec-\w+ on task task-1 \(Carry it out\) did not start: it exited with code 1\.\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts\nChecking the working tree…$/,
+    );
+    expect(resultText(result)).not.toContain("Started run");
+    expect(broker.cards(SESSION).find((c) => c.id === cardId)?.carriedOut).toEqual({ ok: false });
+    await client.close();
+  });
+
+  // #989 review: hench refuses on stdout (info) and warns on stderr (warn).
+  it("carries hench's stdout refusal, with its file list, when stderr holds only a warning", async () => {
+    spawnManagedMock.mockImplementationOnce(() => ({
+      done: Promise.resolve({
+        exitCode: 1,
+        stdout: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n  src/lib.ts\n",
+        stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+      }),
+      kill: vi.fn(() => true),
+      pid: 4243,
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(
+      /did not start: it exited with code 1\.\nWarning: hench config field "maxTurn" is unknown and ignored\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts\n {2}src\/lib\.ts$/,
+    );
+    // The card's line shows this result text beside its failed state.
+    expect(broker.cards(SESSION).find((c) => c.id === cardId)?.carriedOut).toEqual({ ok: false });
+    await client.close();
+  });
+
+  it("revises a started run's card to failed when the run fails later", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" });
+    expect(resultText(await call)).toMatch(/Started run exec-\w+ on task task-1/);
+    const card = () => broker.cards(SESSION).find((c) => c.id === cardId);
+    expect(card()?.carriedOut).toEqual({ ok: true });
+
+    cardMessages = [];
+    finishSpawn[0]({ exitCode: 1, stdout: "Stopping after 1 iteration(s) due to failed status.\n", stderr: "" });
+    await cardAnnounced("approved");
+    expect(card()?.carriedOut).toEqual({ ok: false });
+    await client.close();
+  });
+});
+
+describe("a run that fails after start_work said it started", () => {
+  /** Each prompt the session's vendor CLI read on stdin, in order. */
+  let prompts: string[];
+  let registry: SidecarSessionRegistry;
+  let sessionId: string;
+  /** The agent's start_work call runs inside a turn: the broker is served while this holds. */
+  let turnHeld: boolean;
+
+  /** A Claude stand-in that records its prompt and replies "ok". */
+  const scriptedClaude: NonNullable<VendorSessionOptions["spawn"]> = () => {
+    const id = `vendor-${prompts.length + 1}`;
+    const index = prompts.push("") - 1;
+    const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    Object.assign(child, { stdin, stdout, stderr: new PassThrough(), pid: undefined });
+    stdin.on("data", (chunk: Buffer) => { prompts[index] += chunk.toString(); });
+    stdin.on("end", () => {
+      stdout.write(JSON.stringify({ type: "system", subtype: "init", session_id: id }) + "\n");
+      stdout.write(JSON.stringify({ type: "result", session_id: id, result: "ok" }) + "\n");
+      stdout.end();
+      setImmediate(() => child.emit("close", 0));
+    });
+    return child as unknown as ChildProcess;
+  };
+
+  beforeEach(async () => {
+    execMock.mockImplementation(async (_bin: string, args: string[]) =>
+      args.includes("--resolve")
+        ? { exitCode: 0, stdout: JSON.stringify(RESOLUTION), stderr: "" }
+        : { exitCode: 1, stdout: "", stderr: "unexpected exec in test" });
+    prompts = [];
+    turnHeld = true;
+    registry = new SidecarSessionRegistry({ dir: join(root, ".hench", "sidecar"), connect: () => ({ spawn: scriptedClaude }) });
+    sessionId = registry.create({ scope: "worktree", worktree: root, vendor: "claude" }).id;
+    const isRunning = registry.isRunning.bind(registry);
+    vi.spyOn(registry, "isRunning").mockImplementation((id) => turnHeld || isRunning(id));
+    await serveWith(() => registry);
+  });
+
+  async function turn(prompt: string): Promise<void> {
+    const sent = prompts.length;
+    const res = await fetch(`${server.baseUrl}/api/sidecar/sessions/${sessionId}/turns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    expect(res.status).toBe(202);
+    await vi.waitFor(() => {
+      expect(prompts).toHaveLength(sent + 1);
+      expect(registry.isRunning(sessionId)).toBe(false);
+    });
+  }
+
+  it("tells the agent on the session's next turn which run failed, with the end of hench's output", async () => {
+    const client = await brokerClient(sessionId);
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" }, sessionId);
+    const started = resultText(await call);
+    expect(started).toMatch(/Started run exec-\w+ on task task-1/);
+    const runId = /Started run (exec-\w+)/.exec(started)![1];
+    await client.close();
+
+    // Past its starting phase, hench refuses the run.
+    cardMessages = [];
+    finishSpawn[0]({ exitCode: 1, stdout: "", stderr: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n" });
+    await cardAnnounced("approved");
+    turnHeld = false;
+
+    await turn("what next?");
+    expect(prompts[0]).toBe([
+      "## Since your last turn",
+      `Run ${runId} on task task-1 (Carry it out) failed: it exited with code 1.`,
+      "Refusing to start: the working tree has uncommitted changes:",
+      "  src/app.ts",
+      "",
+      "## Operator's message",
+      "what next?",
+    ].join("\n"));
+
+    // Carried once: the turn after it reads the operator's message alone.
+    await turn("and then?");
+    expect(prompts[1]).toBe("and then?");
   });
 });
 

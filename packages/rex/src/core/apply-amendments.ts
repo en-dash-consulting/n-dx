@@ -309,6 +309,24 @@ export function amendsHash(amends: readonly Amendment[]): string {
   return createHash("sha256").update(canonicalJson(amends)).digest("hex");
 }
 
+/**
+ * What an apply preview was judged on: SHA-256 hex of the change's amends and,
+ * for each node an amendment names (its target, and an added one's `under`),
+ * the live node it resolves to and that node's spec hash. An edit to an
+ * amendment or to a targeted node's statement or criteria changes it; a
+ * retitle does not. Undefined when `changeRef` names no live change.
+ */
+export function applyPreviewHash(tree: V2Tree, changeRef: string): string | undefined {
+  const change = resolve(tree.changes, changeRef);
+  if (!change || change.type !== "change") return undefined;
+  const amends = change.amends ?? [];
+  const targets = amends.flatMap((a) => [a.target, ...(a.delta === "added" && a.under !== undefined ? [a.under] : [])]).map((ref) => {
+    const node = resolve(tree.product, ref);
+    return node ? [ref, node.id, nodeSpecHash(node)] : [ref, null, null];
+  });
+  return createHash("sha256").update(canonicalJson({ change: change.id, amends, targets })).digest("hex");
+}
+
 export interface AmendsEditedAfterApply {
   /** Id of the applied change. */
   changeId: string;

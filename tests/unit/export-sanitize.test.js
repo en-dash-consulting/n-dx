@@ -240,6 +240,7 @@ const PUBLISHED_INDEX_PATHS = [
   "taskId",
   "taskTitle",
   "vendor",
+  "weight",
 ].sort();
 
 /** What `runExport` writes to `api/hench/runs.json`. */
@@ -347,6 +348,14 @@ describe("exported run records", () => {
       counts: { filesRead: 2, filesChanged: 1, commandsExecuted: 1, testsRun: 1, toolCallsTotal: 3 },
     });
     expect(entry.error).toBeUndefined();
+  });
+
+  it("carry the tier and a gate verdict only when the gate ran, as the live server does", () => {
+    const run = fixtureRun();
+    expect(summarizeRunForExport(run)).toMatchObject({ weight: run.weight, gate: "failed" });
+    expect(summarizeRunForExport({ ...run, testGate: { ran: true, passed: true } }).gate).toBe("passed");
+    expect(summarizeRunForExport({ ...run, testGate: { ran: false, passed: false, skipReason: "x" } }).gate).toBeUndefined();
+    expect(summarizeRunForExport({ ...run, testGate: undefined, weight: undefined })).toMatchObject({ gate: undefined, weight: undefined });
   });
 
   it("survive a sparse record without inventing fields", () => {

@@ -15,6 +15,7 @@ import {
   mapNameStatus,
   parseNameStatusOutput,
   parseMergeLogOutput,
+  listMergeCommits,
   parseCoAuthorTrailers,
   resolveItemOrigin,
   summarizeFiles,
@@ -70,6 +71,41 @@ function prdFixture(): PRDDocument {
       },
     ],
   };
+}
+
+/**
+ * A v2 change layer as the store loads it: changes at the root carrying
+ * `type: "change"` (and the v1 `level` compatibility field), with tasks and
+ * subtasks beneath.
+ */
+function v2Fixture(): PRDDocument {
+  return {
+    schema: "rex/v1",
+    title: "v2",
+    items: [
+      {
+        id: "11111111-aaaa-bbbb-cccc-000000000000",
+        title: "Change one",
+        type: "change",
+        level: "epic",
+        status: "in_progress",
+        children: [
+          { id: "22222222-aaaa-bbbb-cccc-000000000000", title: "Leaf task", type: "task", level: "task", status: "completed" },
+          {
+            id: "33333333-aaaa-bbbb-cccc-000000000000",
+            title: "Task with subtask",
+            type: "task",
+            level: "task",
+            status: "pending",
+            children: [
+              { id: "44444444-aaaa-bbbb-cccc-000000000000", title: "Subtask", type: "subtask", level: "subtask", status: "pending" },
+            ],
+          },
+        ],
+      },
+      { id: "55555555-aaaa-bbbb-cccc-000000000000", title: "Change two", type: "change", level: "epic", status: "pending" },
+    ],
+  } as PRDDocument;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +256,27 @@ describe("parseMergeLogOutput", () => {
   it("returns an empty list for empty input", () => {
     expect(parseMergeLogOutput("")).toEqual([]);
   });
+
+  it("reads N-DX-Item trailer values from the seventh field", () => {
+    const rec = `abc${FS}p1 p2${FS}2024-01-01T00:00:00Z${FS}alice${FS}Merge (#1)${FS}Body${FS}id-one,id-two${RS}`;
+    expect(parseMergeLogOutput(rec)[0].itemTrailers).toEqual(["id-one", "id-two"]);
+  });
+
+  it("reads no trailers when the field is absent or empty", () => {
+    const bare = `abc${FS}p1${FS}2024-01-01T00:00:00Z${FS}alice${FS}Merge${FS}Body${RS}`;
+    const empty = `def${FS}p1${FS}2024-01-01T00:00:00Z${FS}alice${FS}Merge${FS}Body${FS}${RS}`;
+    expect(parseMergeLogOutput(bare)[0].itemTrailers).toEqual([]);
+    expect(parseMergeLogOutput(empty)[0].itemTrailers).toEqual([]);
+  });
+});
+
+describe("listMergeCommits", () => {
+  it("asks git to parse the N-DX-Item trailers", () => {
+    let seen: string[] = [];
+    listMergeCommits((args) => { seen = args; return ""; }, 10);
+    const format = seen.find((a) => a.startsWith("--pretty=format:"));
+    expect(format).toContain("%(trailers:key=N-DX-Item,valueonly,separator=%x2c)");
+  });
 });
 
 describe("parseCoAuthorTrailers", () => {
@@ -367,6 +424,18 @@ describe("flattenPrdItems", () => {
     const epicD = nodes.find((n) => n.id.startsWith("dddddddd"));
     expect(epicD?.parentId).toBeUndefined();
     expect(epicD?.priority).toBe("high");
+  });
+
+  it("draws a v2 document as changes and their tasks, shaped from its structure", () => {
+    const { nodes } = flattenPrdItems(v2Fixture(), "/nonexistent/.rex");
+    expect(nodes.map((n) => [n.id.slice(0, 8), n.itemType, n.parentId?.slice(0, 8), n.shape])).toEqual([
+      ["11111111", "change", undefined, "diamond"],
+      ["22222222", "task", "11111111", "triangle"],
+      ["33333333", "task", "11111111", "diamond"],
+      ["44444444", "subtask", "33333333", "triangle"],
+      ["55555555", "change", undefined, "triangle"],
+    ]);
+    expect(nodes.some((n) => n.itemType === "epic" || n.itemType === "feature")).toBe(false);
   });
 });
 
@@ -543,6 +612,35 @@ describe("buildMergeGraph (injected runners)", () => {
       (e) => e.from === "sha_two" && e.to === bbb && e.attribution === "commit-message",
     );
     expect(msgEdge).toBeDefined();
+  });
+
+  it("links a merge on a v2 tree to the items its N-DX-Item trailers name", () => {
+    const change = "11111111-aaaa-bbbb-cccc-000000000000";
+    const task = "22222222-aaaa-bbbb-cccc-000000000000";
+    const unknown = "99999999-aaaa-bbbb-cccc-000000000000";
+    const body = `Ships the change.\n\nN-DX-Item: ${change}\nN-DX-Item: ${task}`;
+    const merges =
+      `sha_v2${FS}p1 p2${FS}2024-03-01T10:00:00Z${FS}alice${FS}Ship change one (#7)${FS}${body}${FS}${change},${task},${unknown}${RS}`;
+    const runner = makeRunner(merges, "__NDXSHA__ sha_v2\nM\tsrc/a.ts");
+
+    const graph = buildMergeGraph({
+      projectDir: tmpDir,
+      rexDir: join(tmpDir, ".rex"),
+      henchRunsDir: join(tmpDir, ".hench", "runs"),
+      gitRunner: runner,
+      listHenchRuns: () => [],
+      loadPRD: () => v2Fixture(),
+    });
+
+    const prdTypes = new Set(graph.nodes.filter((n) => n.kind === "prd").map((n) => (n as { itemType: string }).itemType));
+    expect(prdTypes).toEqual(new Set(["change", "task", "subtask"]));
+    // Trailers alone link the merge; the same ids in the body are not drawn twice.
+    expect(graph.edges).toEqual([
+      { from: "sha_v2", to: change, attribution: "trailer" },
+      { from: "sha_v2", to: task, attribution: "trailer" },
+    ]);
+    expect(graph.stats.mergesWithPrdLinkage).toBe(1);
+    expect(graph.stats.prdItemsLinked).toBe(2);
   });
 
   it("reports merges with no PRD linkage in stats", () => {

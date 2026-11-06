@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * A stage section's header count (`StageSection.badge`) and its
+ * A stage tile's header count (`StageTile.badge`), a stage section's
+ * (`StageSection.badge`) and its
  * open-while-non-empty default (`openWhenNonEmpty`).
  *
  * The count is read from `/api/status` through `useProjectStatus`; the
@@ -12,7 +13,8 @@ import { h, render } from "preact";
 import type { VNode } from "preact";
 import { act } from "preact/test-utils";
 import { BadgedSection } from "../../../src/viewer/views/stage-pages.js";
-import type { StageSection } from "../../../src/viewer/views/stages.js";
+import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
+import type { StageSection, StageTile } from "../../../src/viewer/views/stages.js";
 
 const flushes: Array<(batch: { types: Set<string> }) => void> = [];
 vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
@@ -152,5 +154,52 @@ describe("openWhenNonEmpty", () => {
     await mount(section({ view: "changes", badge: "inbox" }));
     expect(badge()?.dataset.count).toBe("19");
     expect(toggle().getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("stage tile badge", () => {
+  const tileGrid = (tile: StageTile) => h(TileGrid, {
+    stage: "plan", tiles: [tile], tabsOf: () => [],
+    renderView: (view) => h("div", { "data-rendered": view }),
+    renderPanel: () => null, renderSummary: () => null,
+  });
+  const tileBadge = () => root.querySelector<HTMLElement>(".stage-tile-head .stage-section-badge");
+
+  it("shows the open Inbox count in the tile header, labelled, after the title", async () => {
+    await mount(tileGrid({ view: "changes", badge: "inbox" }));
+    expect(tileBadge()?.dataset.count).toBe("19");
+    expect(tileBadge()?.querySelector(".sr-only")?.textContent).toBe("19 changes in the Inbox");
+    expect(tileBadge()?.previousElementSibling?.className).toBe("stage-tile-title");
+    // The head's aria-label hides its content, so the count must be its description.
+    const head = root.querySelector<HTMLButtonElement>(".stage-tile-head")!;
+    const described = document.getElementById(head.getAttribute("aria-describedby") ?? "");
+    expect(described?.textContent).toContain("19 changes in the Inbox");
+  });
+
+  it("follows rex:prd-changed without a reload", async () => {
+    await mount(tileGrid({ view: "changes", badge: "inbox" }));
+    current = status({ open: 1, appliedUnplaced: 156 });
+    act(() => { for (const onFlush of [...flushes]) onFlush({ types: new Set(["rex:prd-changed"]) }); });
+    await settle();
+    expect(tileBadge()?.dataset.count).toBe("1");
+    expect(tileBadge()?.querySelector(".sr-only")?.textContent).toBe("1 change in the Inbox");
+  });
+
+  it("shows a zero count, and no pill on v1 or without a badge", async () => {
+    current = status({ open: 0, appliedUnplaced: 3 });
+    await mount(tileGrid({ view: "changes", badge: "inbox" }));
+    expect(tileBadge()?.dataset.count).toBe("0");
+    render(null, root);
+    root.remove();
+
+    current = status();
+    await mount(tileGrid({ view: "changes", badge: "inbox" }));
+    expect(tileBadge()).toBeNull();
+    render(null, root);
+    root.remove();
+
+    current = status({ open: 19, appliedUnplaced: 0 });
+    await mount(tileGrid({ view: "changes" }));
+    expect(tileBadge()).toBeNull();
   });
 });

@@ -1,17 +1,20 @@
 /**
  * Top navigation: the logo (which is also the way home), the project context
- * — hub link, project switcher, worktree · branch chip — the three stage tabs
- * — Analysis, Plan, Work — then, after a divider, the Live tab, the page's
+ * — hub link, project switcher, worktree · branch chip — the four stage tabs
+ * — Analysis, Plan, Work, Tune — then, after a divider, the Live tab, the page's
  * guide, the run-project control and search, and — after another divider,
  * while `web.sidecar` is on — the Sidecar button. Settings and commands are
  * on the bottom bar.
  *
- * Width tiers (UX2', shell.css): at 1440 px and up everything shows; below
- * 1440 the stage hints drop; below 1200 the search label drops to its ⌘K; at
- * 960 and below the Sidecar button is its glyph and badge.
+ * Width tiers (UX2', sidecar.css), with the Sidecar on: at 1600 px and up
+ * everything shows; below 1600 the stage hints drop; below 1440 the search
+ * label drops to its ⌘K and the run control to its ▶ glyph; below 1200 the
+ * tab padding tightens; at 960 and below the tab glyphs drop and the Sidecar
+ * button is its glyph and badge. At every width the project context shrinks
+ * (name ellipsized) before the tabs would scroll.
  *
  * A tab is active on its own stage page and on any view that stage lists,
- * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Plan lit.
+ * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Tune lit.
  * Live is lit on every Live route and is not part of the stage loop.
  */
 

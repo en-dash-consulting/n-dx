@@ -7,7 +7,7 @@ import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
-import { isKnownViewPath, resolveViewAlias, buildValidViews } from "../shared/view-routing.js";
+import { isKnownViewPath, buildValidViews, resolveViewAliasRoute } from "../shared/view-routing.js";
 import { OAUTH_CALLBACK_PATH, injectSessionScript } from "../shared/index.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
@@ -205,14 +205,17 @@ export function handleStaticRoute(
   // its own page (resolveViewAlias returns null there, and the request falls
   // through unchanged). Any sub-path and query string survive the redirect.
   const aliasSegment = pathOnly.slice(1).split("/")[0];
-  const aliasTarget = resolveViewAlias(aliasSegment, buildValidViews(ctx.scope ?? null));
-  if (aliasTarget) {
-    const rest = pathOnly.slice(1 + aliasSegment.length);
+  const alias = resolveViewAliasRoute(aliasSegment, buildValidViews(ctx.scope ?? null));
+  if (alias) {
+    const aliasTarget = alias.view;
+    const typed = pathOnly.slice(1 + aliasSegment.length);
+    const rest = typed || (alias.sub ? `/${alias.sub}` : "");
     // Relative, not root-relative: start.ts strips a /w/<key>/ workspace slot
     // from req.url before this runs, and the hub proxy re-prefixes only
     // /p/<id>/, so "/analyze" would drop the slot and land on the anchor.
     // One "../" per sub-path segment climbs back to the alias's directory.
-    const up = "../".repeat((rest.match(/\//g) ?? []).length);
+    // Only the sub-path the caller typed counts; one the alias adds is below the target.
+    const up = "../".repeat((typed.match(/\//g) ?? []).length);
     const location = `${up}${aliasTarget}${rest}${queryString ? `?${queryString}` : ""}`;
     // 302, not 301: a browser caches a 301 per URL indefinitely, and the same
     // localhost URL may later be a rex-scoped viewer or a build without the alias.

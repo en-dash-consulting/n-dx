@@ -104,6 +104,7 @@ const REX_COMMANDS = [
   "fix",
   "report",
   "verify",
+  "ready",
   "recommend",
   "analyze",
   "import",

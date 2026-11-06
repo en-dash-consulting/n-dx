@@ -8,6 +8,8 @@ import {
   loadServerProfile,
   resolveServerProfile,
   TRACKER_EVENTS,
+  trackerItemIdOfRef,
+  trackerItemUrl,
   USER_PROFILES_DIR,
   type ProfileTool,
   type ServerProfile,
@@ -66,6 +68,16 @@ describe("built-in profiles", () => {
     expect(caos.label).toBe("CAOS");
     expect(Object.keys(caos.tracker!.statusMap).sort()).toEqual([...TRACKER_EVENTS].sort());
     expect(caos.fieldHints.create_work_item.epicId).toEqual({ optionsFrom: { tool: "list_epics", path: "items", arguments: { pageSize: 100 } } });
+    expect(caos.tracker!.readStatusProperty).toBe("status");
+  });
+});
+
+describe("readStatusProperty", () => {
+  it("is optional, and refused when it is not a non-empty string", () => {
+    userProfile("desk", deskProfile);
+    expect((loadServerProfile("desk", { ndxHome }) as ServerProfile).tracker!.readStatusProperty).toBeUndefined();
+    userProfile("desk", { ...deskProfile, tracker: { ...deskProfile.tracker, readStatusProperty: 3 } });
+    expect(loadServerProfile("desk", { ndxHome })).toEqual({ problems: ["tracker.readStatusProperty must be a non-empty string when set"] });
   });
 });
 
@@ -149,5 +161,45 @@ describe("a profile that does not fit", () => {
     const resolution = resolveServerProfile("desk", desk, { ndxHome });
     expect(resolution).toMatchObject({ state: "invalid" });
     expect(resolution.state === "invalid" && resolution.problem).toMatch(/fieldHints\.new_ticket: .*"title".*tracker\.facts names pr-landed/);
+  });
+
+  it("is refused for an item URL template that is no http(s) URL or holds no single placeholder", () => {
+    for (const [template, problem] of [
+      ["notion://{id}", /must be an http\(s\) URL/],
+      ["https://desk.example/items/", /exactly one \{id\} or \{compactId\}/],
+      ["https://desk.example/{id}/{compactId}", /exactly one/],
+      ["https://desk.example/{id}/{id}", /exactly one/],
+      [42, /non-empty string/],
+    ] as const) {
+      userProfile("desk", { ...deskProfile, tracker: { ...deskProfile.tracker, itemUrlTemplate: template } });
+      const resolution = resolveServerProfile("desk", desk, { ndxHome });
+      expect(resolution.state === "invalid" && resolution.problem).toMatch(problem);
+    }
+  });
+});
+
+describe("item URL template", () => {
+  const uuid = "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0";
+
+  it("builds the CAOS item's Notion page URL from its id, and reads the id back from it", () => {
+    const caos = (loadServerProfile("caos", { ndxHome }) as ServerProfile).tracker!;
+    const url = trackerItemUrl(caos, uuid);
+    expect(url).toBe("https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0");
+    expect(trackerItemIdOfRef(caos, url!)).toBe(uuid);
+  });
+
+  it("puts {id} in as given, and returns any ref the template did not build unchanged", () => {
+    const mapping = { itemUrlTemplate: "https://desk.example/t/{id}/view" };
+    expect(trackerItemUrl(mapping, "a b")).toBe("https://desk.example/t/a%20b/view");
+    expect(trackerItemIdOfRef(mapping, "https://desk.example/t/a%20b/view")).toBe("a b");
+    expect(trackerItemIdOfRef(mapping, "WM-7")).toBe("WM-7");
+    expect(trackerItemIdOfRef(mapping, "https://other.example/t/x/view")).toBe("https://other.example/t/x/view");
+    // A hand-linked URL with a malformed escape is read as itself, never thrown on.
+    expect(trackerItemIdOfRef(mapping, "https://desk.example/t/a%zz/view")).toBe("https://desk.example/t/a%zz/view");
+  });
+
+  it("builds nothing and reads every ref as itself without a template", () => {
+    expect(trackerItemUrl({}, uuid)).toBeUndefined();
+    expect(trackerItemIdOfRef({}, "https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0")).toBe("https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0");
   });
 });

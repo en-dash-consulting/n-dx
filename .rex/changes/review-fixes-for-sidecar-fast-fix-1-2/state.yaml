@@ -1,0 +1,52 @@
+schema: "rex/v2"
+items:
+  "13ce5c45-49ae-496f-8665-88d75ed1c545":
+    status: "completed"
+    startedAt: "2026-11-06T17:19:49.761Z"
+    completedAt: "2026-11-06T17:19:49.761Z"
+    endedAt: "2026-11-06T17:19:49.761Z"
+    activeIntervals: [{"end":"2026-11-06T17:19:49.761Z","start":"2026-11-06T17:19:49.761Z"}]
+    appliedAt: "2026-11-06T17:19:49.761Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T17:19:49.761Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3dbce690-339a-44f9-8154-0db093b49be2":
+    status: "completed"
+    startedAt: "2026-11-06T17:03:45.783Z"
+    completedAt: "2026-11-06T17:08:12.552Z"
+    endedAt: "2026-11-06T17:08:12.552Z"
+    activeIntervals: [{"end":"2026-11-06T17:08:12.552Z","start":"2026-11-06T17:03:45.783Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-hench runEndOutput: stderr tail then stdout tail, each bounded; used for RunEnd.output and the task_execution_failed log detail. Web test with stderr warning + stdout refusal."
+    lastModified: "2026-11-06T17:08:12.552Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6d750811-4a02-4569-9b52-b55d0d0ea6a4":
+    status: "completed"
+    startedAt: "2026-11-06T17:11:42.095Z"
+    completedAt: "2026-11-06T17:15:10.994Z"
+    endedAt: "2026-11-06T17:15:10.994Z"
+    activeIntervals: [{"end":"2026-11-06T17:15:10.994Z","start":"2026-11-06T17:11:42.095Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "splitPlanningPaths adds both sides of a planning rename; commitPlanningChanges stages only paths present in the worktree, so git rm'd paths and rename sources reach the path-limited commit through HEAD. Three hench tests added."
+    lastModified: "2026-11-06T17:15:10.994Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6ea32693-0356-466a-9a3e-696a101f2819":
+    status: "completed"
+    startedAt: "2026-11-06T17:08:20.491Z"
+    completedAt: "2026-11-06T17:11:33.949Z"
+    endedAt: "2026-11-06T17:11:33.949Z"
+    activeIntervals: [{"end":"2026-11-06T17:11:33.949Z","start":"2026-11-06T17:08:20.491Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "cmdRun resolves --task via new resolveTaskRefId (findV2Entry on v2, findItem on v1, foreign claims excluded) before the pre-run gate; trailer omitted when unresolved."
+    lastModified: "2026-11-06T17:11:33.949Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a5b0d661-af3a-4632-bdd4-d4466ebac054":
+    status: "completed"
+    startedAt: "2026-11-06T17:18:29.398Z"
+    completedAt: "2026-11-06T17:19:49.761Z"
+    endedAt: "2026-11-06T17:19:49.761Z"
+    activeIntervals: [{"end":"2026-11-06T17:19:49.761Z","start":"2026-11-06T17:18:29.398Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added run-planning-commit-item-id.test.ts: drives cmdRun --task=CH-1 on the v2 fixture with a dirty planning file and asserts the planning commit's N-DX-Item is the resolved task id."
+    lastModified: "2026-11-06T17:19:49.761Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

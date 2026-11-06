@@ -75,7 +75,8 @@ export type V2RuleId =
   | "unreviewed-spec"
   | "run-settings"
   | "retired-state-field"
-  | "check-requirement";
+  | "check-requirement"
+  | "stale-release-plan";
 
 export interface RuleFinding {
   rule: V2RuleId;
@@ -181,6 +182,17 @@ const ABANDONED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>([
  */
 export function isOpenChange(node: RuleNode): boolean {
   return node.type === "change" && !isAppliedChange(node) && !ABANDONED_CHANGE_STATUSES.has(node.status ?? "pending");
+}
+
+/**
+ * An open change in the Inbox: `needsPlacement`, whether or not the product
+ * layer has anything to place it on. The one rule behind every Inbox count
+ * (`get_prd_status`, the dashboard's status route and the Inbox list). A
+ * change that is also held ({@link awaitsPlacement}) is the subset `ndx work`
+ * skips.
+ */
+export function isInboxChange(node: RuleNode): boolean {
+  return isOpenChange(node) && node.needsPlacement === true;
 }
 
 /**
@@ -311,6 +323,8 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "run-settings": "warning",
   "retired-state-field": "warning",
   "check-requirement": "warning",
+  // A plan to re-date, not a broken tree: reported, never fails validate or CI.
+  "stale-release-plan": "warning",
 };
 
 function finding(rule: V2RuleId, node: RuleNode, message: string, severity: RuleSeverity = RULE_SEVERITY[rule]): RuleFinding {
@@ -890,6 +904,63 @@ const retiredStateField: Rule = ({ entries }) =>
       ),
   );
 
+type Release = [major: number, minor: number, patch: number, prerelease: string | undefined];
+
+/** A release name as semver, or undefined for a name that is not (`next`). */
+function parseRelease(release: string): Release | undefined {
+  const m = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?$/.exec(normalizeVersion(release));
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4]] : undefined;
+}
+
+/**
+ * Semver order of two parsed releases. A prerelease sorts before its release;
+ * prereleases compare identifier by identifier, digits numerically
+ * (`beta.2` < `beta.10`), and a shorter list of equal identifiers first.
+ */
+function compareReleases(a: Release, b: Release): number {
+  for (const i of [0, 1, 2] as const) if (a[i] !== b[i]) return a[i] - b[i];
+  if (a[3] === b[3]) return 0;
+  if (a[3] === undefined) return 1;
+  if (b[3] === undefined) return -1;
+  const pa = a[3].split(".");
+  const pb = b[3].split(".");
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    const diff = pa[i].localeCompare(pb[i], "en", { numeric: true });
+    if (diff !== 0) return diff;
+  }
+  return pa.length - pb.length;
+}
+
+/**
+ * An open change planned for a release that has gone: one some change carries
+ * as `shippedIn`, or one older by semver than the newest shipped release. A
+ * change with no `plannedRelease`, or one that is not semver, is never flagged;
+ * nor is one with `shippedIn`, which `applyOn: review` stamps before applying.
+ */
+const staleReleasePlan: Rule = ({ entries }) => {
+  const changes = entries.map(({ node }) => node).filter((node) => node.type === "change");
+  const shipped = new Map<string, string>();
+  for (const node of changes) if (node.shippedIn) shipped.set(normalizeVersion(node.shippedIn), node.shippedIn);
+  let newest: { name: string; version: Release } | undefined;
+  for (const name of shipped.values()) {
+    const version = parseRelease(name);
+    if (version && (!newest || compareReleases(version, newest.version) > 0)) newest = { name, version };
+  }
+  return changes.flatMap((node) => {
+    const planned = node.plannedRelease;
+    if (!planned || node.shippedIn || !isOpenChange(node)) return [];
+    const where = `Open change "${node.title}" (${node.id}) is planned for ${planned}`;
+    if (shipped.has(normalizeVersion(planned))) {
+      return [finding("stale-release-plan", node, `${where}, which has shipped; plan it for a coming release or clear plannedRelease`)];
+    }
+    const version = parseRelease(planned);
+    if (newest && version && compareReleases(version, newest.version) < 0) {
+      return [finding("stale-release-plan", node, `${where}, older than ${newest.name}, the newest shipped release; plan it for a coming release or clear plannedRelease`)];
+    }
+    return [];
+  });
+};
+
 /** Every rule, errors first, in the order findings are reported. */
 const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
@@ -914,6 +985,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "run-settings": runSettings,
   "retired-state-field": retiredStateField,
   "check-requirement": checkRequirement,
+  "stale-release-plan": staleReleasePlan,
 };
 
 export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];

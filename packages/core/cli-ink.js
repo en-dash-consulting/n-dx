@@ -27,7 +27,7 @@ import {
 } from "./cli-brand.js";
 import {
   formatGitWarningLines,
-  commitInitBaseline,
+  finishInitCommit,
   formatGitInitCommitLines,
 } from "./git-preflight.js";
 
@@ -216,6 +216,9 @@ function InitApp({
   tools,
   runInitCapture,
   gitResult,
+  gitBefore,
+  commitInit = true,
+  recordIdentity,
   onComplete,
 }) {
   const [phases, setPhases] = useState([]);
@@ -394,12 +397,11 @@ function InitApp({
       }
       setPhase("assistants", "done");
 
-      // Stage and commit the n-dx baseline when the preflight just
-      // initialized git in this run.  Runs after every tool directory and
-      // assistant surface has been written so the snapshot is complete.
-      const gitCommitResult = gitResult?.status === "initialized"
-        ? commitInitBaseline(dir)
-        : null;
+      // Commit what init wrote (see finishInitCommit). Runs after every
+      // tool directory, assistant surface and config write so the commit
+      // leaves no init path dirty.
+      recordIdentity?.();
+      const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit });
 
       setRecap({
         dirLabel,

@@ -64,6 +64,28 @@ describe("CapabilityPage", () => {
     expect(items[0].querySelector(".cap-inherited")).toBeNull();
   });
 
+  it("lists a held Inbox draft under Waiting in the Inbox with a link, not under Open changes", () => {
+    const opened: string[] = [];
+    const capability: CapabilityDetail = {
+      ...CAPABILITY_DETAIL_FIXTURE,
+      inboxChanges: [{ id: "change-spec-draft", displayId: "CH-170", title: "Build the revised spec", delta: "modified" }],
+    };
+    const el = mount(h(CapabilityPage, { capability, onOpenChange: (id: string) => opened.push(id) }));
+
+    const inbox = el.querySelector("[aria-label='Waiting in the Inbox']");
+    expect(inbox?.querySelector(".section-header")?.textContent).toBe("Waiting in the Inbox (1)");
+    expect(inbox?.textContent).toContain("CH-170");
+    expect(el.querySelector(".cap-open-changes")?.textContent).not.toContain("Build the revised spec");
+
+    act(() => (inbox?.querySelector("button.ch-change-link") as HTMLButtonElement).click());
+    expect(opened).toEqual(["change-spec-draft"]);
+  });
+
+  it("renders no Inbox section when nothing is held", () => {
+    const el = mount(h(CapabilityPage, { capability: CAPABILITY_DETAIL_FIXTURE }));
+    expect(el.querySelector(".cap-inbox-changes")).toBeNull();
+  });
+
   it("renders the history of changes that moved the capability", () => {
     const el = mount(h(CapabilityPage, { capability: CAPABILITY_DETAIL_FIXTURE }));
 

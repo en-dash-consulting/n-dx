@@ -4,7 +4,8 @@
  * on the product map, so this is where a person gives it one.
  *
  * Top to bottom: a note with the change's position in the Inbox ("N of M ·
- * Next ›"); rex's shortlist as radio rows; a search over every capability and
+ * Next ›") and, where the caller can open it, "Place on the map ↗" for
+ * placement mode on the area view (WF1); rex's shortlist as radio rows; a search over every capability and
  * constraint; the relation (Touches, or Amends with its summary, the target's
  * criteria to edit and an optional replacement statement); and the actions —
  * Place, Place & next, Place & add another (an extra touches, IB3) and
@@ -19,21 +20,40 @@
  * `/placement/draft`: a pick selects its shortlist row, a proposal fills the
  * proposal form, and a note says the model chose. The draft writes nothing.
  *
+ * Placement mode renders it wide (`layout: "wide"`) beside the spec map:
+ * each candidate is a card with its area, strength, matched words, statement
+ * and what Touches and Amends would do, the chosen card holds the relation,
+ * and rex's relation is pre-selected only for a strong, untied pick. With
+ * Amends chosen the card is the editor (WF5): every edit re-checks through
+ * `POST /api/rex/changes/:id/placement/check`, the card shows the Sidecar
+ * placement card's dry-run line, and Place waits until rex accepts the check.
+ * The section follows a target chosen on the map (`selection`), reports its
+ * own choices (`onChoose`) and the pending criteria count (`onPendingCriteria`).
+ *
+ * In the wide panel, Place & add another keeps an umbrella change open: each
+ * extra home is a touches (`/place`), the panel lists the homes with Remove
+ * (`/unplace`) until Done, and `onHomes` reports them so the map marks each.
+ * "Draft with the model" there adds its pick as a card marked "model", never
+ * checked for the person, and only while Sidecar (whose Place lens drafts) is off.
+ *
  * Once the change leaves the Inbox the section shrinks to one line naming
  * where it was placed.
  *
  * @module viewer/components/prd-tree/change-placement
  */
 
-import { h, type ComponentChildren } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { Fragment, h, type ComponentChildren } from "preact";
+import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useCliName, useFeatureToggle, useProductRead } from "../../hooks/index.js";
+import type { SidecarPlacementCheck } from "../../hooks/sidecar.js";
+import { CHECK_DEBOUNCE_MS, checkPlacementRequest, dryRunLine } from "../sidecar-placement.js";
 import { isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
 import { Pending } from "../../views/product-pages.js";
 import { StrengthChip } from "../strength-chip.js";
-import { PlaceWithSidecarButton } from "../place-with-sidecar.js";
+import { PlaceWithSidecarButton, PlaceWithSidecarContext } from "../place-with-sidecar.js";
 import type {
   CapabilityDetail,
+  ChangePlacement,
   ChangeRow,
   PlaceChangeRequest,
   PlaceChangeResult,
@@ -47,6 +67,13 @@ import type {
   ProposeChangeResult,
 } from "../../views/product-model.js";
 import { CriteriaEditor } from "./criteria-editor.js";
+import {
+  dropPlacementDraft,
+  loadPlacementDraft,
+  savePlacementDraft,
+  type PlaceStepDraft,
+  type ProposeStepDraft,
+} from "./placement-draft.js";
 
 // ── Title focus after Place & next ───────────────────────────────────
 
@@ -126,6 +153,16 @@ export function criteriaDelta(drafts: readonly CriterionDraft[]): PlacementCrite
   return { ...(add.length ? { add } : {}), ...(replace.length ? { replace } : {}), ...(remove.length ? { remove } : {}) };
 }
 
+/** How many criteria the amendment adds less how many it removes. */
+export function criteriaCountDelta(drafts: readonly CriterionDraft[]): number {
+  return drafts.reduce((n, d) => (d.original === undefined ? n + 1 : d.removed ? n - 1 : n), 0);
+}
+
+/** The criteria an amendment would leave its capability with, as the selected block shows it: "12 → 13". */
+export function pendingCriteriaNote(count: number, delta: number): string {
+  return `${count} → ${count + delta}`;
+}
+
 /** The next free `cN` id after every id in `taken`. */
 export function nextCriterionId(taken: readonly string[]): string {
   const max = taken.reduce((n, id) => {
@@ -133,6 +170,29 @@ export function nextCriterionId(taken: readonly string[]): string {
     return m ? Math.max(n, Number(m[1])) : n;
   }, 0);
   return `c${max + 1}`;
+}
+
+/**
+ * rex's top pick is strong and nothing ties it. Only then does placement mode
+ * open zoomed into its area and pre-select rex's relation (WF2, WF4).
+ */
+export function strongUntiedPick(placement: Pick<ChangePlacement, "tied" | "shortlist">): boolean {
+  return !placement.tied && placement.shortlist[0]?.strength === "strong";
+}
+
+/** What placing with Touches does to the target. */
+export function touchesEffect(title: string): string {
+  return `Links this change to ${title}. What it promises stays as it is.`;
+}
+
+/** What placing with Amends does to the target. */
+export function amendsEffect(title: string): string {
+  return `Changes what ${title} promises: its statement or criteria change when this change is applied.`;
+}
+
+/** The question a wide card asks while no relation is chosen. */
+export function relationQuestion(title: string): string {
+  return `Does this change alter what ${title} promises?`;
 }
 
 /** Where `changeId` sits in the Inbox, and which change follows it. */
@@ -156,6 +216,7 @@ export function placedLine(change: Pick<ChangeRow, "amends" | "touches">): strin
 /** What a refusal asks of the person, by rex's `kind`. */
 export const REFUSAL_HINTS: Record<PlacementRefusalKind, string> = {
   "not-a-target": "Choose a capability or constraint from the list or the search.",
+  "not-touched": "It is no longer a home of this change. Reload the tree.",
   "content-needs-amends": "A replacement statement or criteria edits need Amends.",
   "already-amends": "This change already amends it. Choose another place.",
   "already-proposed": "This change already proposes that. Change the title or the area.",
@@ -212,6 +273,42 @@ function RefusalNote({ refusal }: { refusal: Refusal }) {
   return h("div", { class: "cp-refusal", role: "alert" },
     h("div", { class: "cp-refusal-message" }, refusal.message),
     hint ? h("div", { class: "cp-refusal-hint", "data-kind": refusal.kind }, hint) : null,
+  );
+}
+
+/**
+ * Rex's dry run of `body`, re-run each time it changes and settles: undefined
+ * with no body, null while the check for this body is in flight. An answer for
+ * an earlier body never stands for the current one.
+ */
+function useDryRun(changeId: string, body: PlaceChangeRequest | null): SidecarPlacementCheck | null | undefined {
+  const key = body ? JSON.stringify(body) : "";
+  const [answer, setAnswer] = useState<{ key: string; check: SidecarPlacementCheck } | null>(null);
+  useEffect(() => {
+    if (!body) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      void checkPlacementRequest(changeId, { ...body }).then((check) => { if (live) setAnswer({ key, check }); });
+    }, CHECK_DEBOUNCE_MS);
+    return () => { live = false; clearTimeout(timer); };
+  }, [changeId, key]);
+  if (!body) return undefined;
+  return answer?.key === key ? answer.check : null;
+}
+
+/** The Sidecar placement card's dry-run line, with a refusal's hint by kind. */
+function DryRunLine({ check }: { check: SidecarPlacementCheck | null }) {
+  const refused = check && !check.ok ? check : null;
+  const hint = refused ? (REFUSAL_HINTS as Record<string, string | undefined>)[refused.kind] : undefined;
+  return h("div", {
+    class: `cp-dry-run${refused ? " is-refused" : ""}`,
+    role: "status",
+    "aria-live": "polite",
+    "data-check": check === null ? "checking" : refused ? "refused" : "ok",
+    ...(refused ? { "data-kind": refused.kind } : {}),
+  },
+    h("div", { class: "cp-dry-run-line" }, check ? dryRunLine(check) : "Checking the amendment…"),
+    hint ? h("div", { class: "cp-refusal-hint" }, hint) : null,
   );
 }
 
@@ -299,6 +396,75 @@ export function TargetRow({ name, target, checked, onChoose }: {
   );
 }
 
+/**
+ * Touches or Amends. The compact form shows two plain options; a wide card
+ * names each one's effect on `target`, and asks the question while neither
+ * is chosen.
+ */
+function RelationChoice({ name, relation, onChange, target }: {
+  name: string;
+  relation: PlacementRelation | null;
+  onChange: (r: PlacementRelation) => void;
+  /** The card's target; absent in the compact form. */
+  target?: PlacementTarget;
+}) {
+  const legend = target && relation === null ? relationQuestion(target.title) : "Relation";
+  return h("fieldset", { class: "cp-relation", "data-relation": relation ?? "unset" },
+    h("legend", { class: target && relation === null ? "cp-relation-question" : "task-section-label" }, legend),
+    (["touches", "amends"] as const).map((r) =>
+      h("label", { key: r, class: "cp-relation-option" },
+        h("input", { type: "radio", name, value: r, checked: relation === r, onChange: () => onChange(r) }),
+        h("span", { class: "cp-relation-body" },
+          h("span", null, r === "touches" ? "Touches" : "Amends"),
+          target
+            ? h("span", { class: "cp-relation-effect" }, r === "touches" ? touchesEffect(target.title) : amendsEffect(target.title))
+            : null,
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * One candidate as a card in the wide panel: its title and strength, area,
+ * matched words, statement and what Touches and Amends would do. The checked
+ * card holds the relation choice in place of the two effect lines.
+ */
+export function CandidateCard({ name, target, checked, onChoose, relationChoice, touchesOnly, model = false }: {
+  name: string;
+  target: PlacementTarget;
+  checked: boolean;
+  onChoose: (t: PlacementTarget) => void;
+  /** The relation choice, and with Amends the editor and its dry run, shown in the checked card. */
+  relationChoice: ComponentChildren;
+  /** Only Touches applies, so the card names no Amends effect. */
+  touchesOnly: boolean;
+  /** The model's one-shot pick: the card says so, and it is never checked until a person checks it. */
+  model?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  // A block chosen on the map brings its card into view.
+  useEffect(() => { if (checked) ref.current?.scrollIntoView?.({ block: "nearest" }); }, [checked]);
+  const area = target.area || (target.type === "constraint" ? "Constraint" : "");
+  return h("div", { ref, class: `cp-card${checked ? " is-checked" : ""}${model ? " is-model" : ""}`, "data-target": target.target },
+    h("label", { class: "cp-card-head" },
+      h("input", { type: "radio", name, value: target.target, checked, onChange: () => onChoose(target) }),
+      h("span", { class: "cp-target-title" }, target.title),
+      target.strength ? h(StrengthChip, { strength: target.strength }) : h("span", { class: "cp-target-kind" }, target.type),
+      model ? h("span", { class: "cp-model-mark", title: "Picked by the model" }, "model") : null,
+    ),
+    area ? h("div", { class: "cp-card-area" }, area) : null,
+    target.reasons?.length ? h("div", { class: "cp-card-words" }, matched(target.reasons)) : null,
+    target.statement ? h("p", { class: "cp-card-statement" }, target.statement) : null,
+    checked && relationChoice
+      ? relationChoice
+      : h("dl", { class: "cp-card-effects" },
+          h("dt", null, "Touches"), h("dd", null, touchesEffect(target.title)),
+          touchesOnly ? null : [h("dt", { key: "a" }, "Amends"), h("dd", { key: "b" }, amendsEffect(target.title))],
+        ),
+  );
+}
+
 /** Search over every capability and constraint, grouped by area. */
 export function TargetSearch({ map, mapError, onChoose }: {
   map: ProductMap | null;
@@ -379,54 +545,138 @@ interface PlaceFormProps {
   draftEnabled: boolean;
   /** The model drafted a new node: open the proposal form filled with it. */
   onDraftProposal: (draft: PlacementDraft) => void;
+  /** Placement mode's wide panel: candidates as cards (WF3). */
+  wide?: boolean;
+  /** A target chosen outside the form (a block or chip on the map); the form follows it. */
+  selection?: PlacementTarget | null;
+  /** Reports each target the form chooses, so the map can light it. */
+  onChoose?: (t: PlacementTarget) => void;
+  /** Reports how an Amends edit moves the target's criteria count; null when nothing is amended. */
+  onPendingCriteria?: (pending: PendingCriteria | null) => void;
+  /** Homes placed so far in an add-another session, listed above the cards with Remove. */
+  homes?: readonly PlacedHome[];
+  onRemoveHome?: (home: PlacedHome) => void;
 }
 
-function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone, draftEnabled, onDraftProposal }: PlaceFormProps) {
+/** One home the change was placed on in this visit. */
+export interface PlacedHome {
+  target: string;
+  title: string;
+  relation: PlacementRelation;
+}
+
+/** The capability the proposal form would add, as the spec map draws it: a dashed ghost block in `under`'s area. */
+export interface ProposalGhost {
+  /** What the form's title says; the change's own title while it is empty. */
+  title: string;
+  /** The area id chosen in the form; empty until one is chosen. */
+  under: string;
+}
+
+/** An amendment's effect on its target's criteria count, for the selected block. */
+export interface PendingCriteria {
+  target: string;
+  /** Criteria added less criteria removed. */
+  delta: number;
+}
+
+/** The relation the form opens on: rex's, except that the wide panel takes it only from a strong, untied pick (WF4). */
+function initialRelation(placement: ChangePlacement | null, wide: boolean): PlacementRelation | null {
+  if (!wide) return placement?.relation ?? "touches";
+  return placement && strongUntiedPick(placement) ? placement.relation : null;
+}
+
+function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone, draftEnabled, onDraftProposal, wide = false, selection, onChoose, onPendingCriteria, homes = [], onRemoveHome }: PlaceFormProps) {
   const placement = read && "placement" in read ? read.placement : null;
   const shortlist = placement?.shortlist ?? [];
   // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
   const [requested] = useState(() => (another ? null : takePlacementRequest(changeId)));
-  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? null);
-  const [relation, setRelation] = useState<PlacementRelation>(requested?.relation ?? placement?.relation ?? "touches");
-  const [summary, setSummary] = useState("");
-  const [proposed, setProposed] = useState("");
+  // The pick and edits this form was left with (WF10); a caller's request outranks them.
+  const [saved] = useState<PlaceStepDraft | null>(() => {
+    if (another || requested) return null;
+    const draft = loadPlacementDraft(changeId);
+    return draft?.step === "place" ? draft : null;
+  });
+  // The saved amendment edits wait here until the target's criteria seed would otherwise replace them.
+  const savedCriteria = useRef(saved?.criteria.length ? saved.criteria : null);
+  const justRestored = useRef(false);
+  // An extra place starts empty: the map's selection is the place just made.
+  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? saved?.target ?? (another ? null : selection) ?? null);
+  const seenSelection = useRef(selection?.target);
+  const [relation, setRelation] = useState<PlacementRelation | null>(requested?.relation ?? (saved ? saved.relation : initialRelation(placement, wide)));
+  const [summary, setSummary] = useState(saved?.summary ?? "");
+  const [proposed, setProposed] = useState(saved?.proposed ?? "");
   const [drafts, setDrafts] = useState<CriterionDraft[]>([]);
+  // The target the drafts belong to; until it matches the choice, the criteria are still being read.
+  const [draftsFor, setDraftsFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [draftNote, setDraftNote] = useState<DraftNote | null>(null);
   const draft = useDraft(changeId);
   const criteriaRef = useRef<HTMLDivElement>(null);
+  // The model's pick in the wide panel: a card marked "model", never checked for the person.
+  const [modelPick, setModelPick] = useState<PlacementTarget | null>(null);
   // Drafting is for open changes: rex refuses an applied one, and an extra place only touches.
   const canDraft = draftEnabled && !touchesOnly && !another;
 
   const askModel = async () => {
     setDraftNote(null);
+    // Each draft stands alone: an earlier pick's "model" card does not outlive it.
+    setModelPick(null);
     const answer = await draft.run();
     if (!answer) return;
     if (answer.proposal) { onDraftProposal(answer); return; }
     const row = answer.pick !== undefined
       ? answer.shortlist.find((c) => c.target === answer.pick) ?? shortlist.find((c) => c.target === answer.pick)
       : undefined;
-    if (row) setChosen(row);
+    if (row && wide) setModelPick(row);
+    else if (row) setChosen(row);
     setDraftNote({ text: draftNoteText(answer, row?.title), warnings: answer.warnings });
   };
 
   // The rules' relation arrives with the shortlist; an extra place only touches.
-  useEffect(() => { if (placement && !requested) setRelation(placement.relation); }, [placement?.relation]);
+  useEffect(() => { if (placement && !requested && !saved) setRelation(initialRelation(placement, wide)); }, [placement?.relation]);
   // A requested target becomes its shortlist row once read: that row carries type and criteria.
   useEffect(() => {
     const row = requested?.target && shortlist.find((c) => c.target === requested.target!.target);
     if (row && chosen?.target === row.target) setChosen(row);
   }, [shortlist.length]);
-  const effectiveRelation: PlacementRelation = another || touchesOnly ? "touches" : relation;
+  // The map chose: follow it, preferring the shortlist row, which carries strength and criteria.
+  // Only a new choice counts; the selection the form mounted with is not one.
+  useEffect(() => {
+    if (selection?.target === seenSelection.current) return;
+    seenSelection.current = selection?.target;
+    if (selection && selection.target !== chosen?.target) {
+      setChosen(shortlist.find((c) => c.target === selection.target) ?? selection);
+    }
+  }, [selection?.target]);
+  // Every choice, wherever it came from, reaches the map.
+  useEffect(() => { if (chosen) onChoose?.(chosen); }, [chosen?.target]);
+  const effectiveRelation: PlacementRelation | null = another || touchesOnly ? "touches" : relation;
 
   // The target's criteria seed the Amends form; a search pick reads them.
   useEffect(() => {
     setRefusal(null);
-    if (!chosen) { setDrafts([]); return; }
-    const seed = (list: Array<{ id: string; text: string }>) =>
+    if (!chosen) { setDrafts([]); setDraftsFor(null); return; }
+    // Resuming a draft: its edited criteria stand in for the seed, once.
+    if (savedCriteria.current && chosen.target === saved?.target.target) {
+      setDrafts(savedCriteria.current);
+      setDraftsFor(chosen.target);
+      savedCriteria.current = null;
+      // This commit still holds the empty list: saving it would overwrite the edits being restored.
+      justRestored.current = true;
+      return;
+    }
+    savedCriteria.current = null;
+    const target = chosen.target;
+    const seed = (list: Array<{ id: string; text: string }>) => {
       setDrafts(list.map((c) => ({ id: c.id, text: c.text, original: c.text })));
+      setDraftsFor(target);
+    };
     if (chosen.criteria) { seed(chosen.criteria); return; }
+    // The previous target's edits must not outlive the choice while the read is open.
+    setDrafts([]);
+    setDraftsFor(null);
     let live = true;
     readCriteria(chosen.target).then((list) => { if (live) seed(list); });
     return () => { live = false; };
@@ -435,6 +685,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const name = `cp-target-${changeId}`;
   const searchPick = chosen && !shortlist.some((c) => c.target === chosen.target) ? chosen : null;
   const visible = drafts.filter((d) => !d.removed);
+  const criteriaLoading = !!chosen && draftsFor !== chosen.target;
 
   const editDraft = (i: number, text: string) => {
     const id = visible[i].id;
@@ -447,15 +698,39 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const addDraft = (text: string) =>
     setDrafts((prev) => [...prev, { id: nextCriterionId(prev.map((d) => d.id)), text }]);
 
+  // The placement as Place would send it.
+  const body: PlaceChangeRequest | null = chosen && effectiveRelation
+    ? { target: chosen.target, relation: effectiveRelation }
+    : null;
+  if (body?.relation === "amends") {
+    if (summary.trim()) body.summary = summary.trim();
+    if (proposed.trim()) body.proposed = proposed.trim();
+    const delta = criteriaLoading ? undefined : criteriaDelta(drafts);
+    if (delta) body.criteria = delta;
+  }
+  // The wide card re-checks an amendment on every edit (WF5); the server decides, the viewer recomputes nothing.
+  const amending = wide && body?.relation === "amends";
+  const dryRun = useDryRun(changeId, amending ? body : null);
+
+  // The selected block shows the criteria count the amendment would leave.
+  const pending: PendingCriteria | null = amending && chosen?.type === "capability"
+    ? { target: chosen.target, delta: criteriaCountDelta(drafts) }
+    : null;
+  // Whatever the form holds is kept as a draft, so leaving by any route loses nothing (WF10).
+  // A pick is the least that counts; no pick, no draft. An extra place after a write keeps none.
+  useEffect(() => {
+    if (another) return;
+    if (justRestored.current) { justRestored.current = false; return; }
+    savePlacementDraft(changeId, chosen
+      ? { step: "place", target: chosen, relation, summary, proposed, criteria: drafts }
+      : null);
+  }, [chosen?.target, relation, summary, proposed, drafts]);
+  const pendingKey = pending ? `${pending.target}:${pending.delta}` : "";
+  useEffect(() => { onPendingCriteria?.(pending); }, [pendingKey]);
+  useEffect(() => () => onPendingCriteria?.(null), []);
+
   const submit = async (mode: PlaceMode) => {
-    if (!chosen) return;
-    const body: PlaceChangeRequest = { target: chosen.target, relation: effectiveRelation };
-    if (effectiveRelation === "amends") {
-      if (summary.trim()) body.summary = summary.trim();
-      if (proposed.trim()) body.proposed = proposed.trim();
-      const delta = criteriaDelta(drafts);
-      if (delta) body.criteria = delta;
-    }
+    if (!body || !chosen) return;
     setBusy(true);
     setRefusal(null);
     const answer = await post<PlaceChangeResult>(changeUrl(changeId, "place"), body);
@@ -473,8 +748,58 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
 
   const invalidCriteria = refusal?.kind === "nothing-to-modify";
   const criteriaId = `cp-criteria-${changeId}`;
+  // An amendment in the wide card waits for rex to accept its dry run.
+  const cannotPlace = !body || busy || (effectiveRelation === "amends" && criteriaLoading) || (amending && !dryRun?.ok);
+  const relationName = `cp-relation-${changeId}`;
+  const relationChoice = (target?: PlacementTarget) => another || touchesOnly
+    ? null
+    : h(RelationChoice, { name: relationName, relation, onChange: setRelation, target });
 
-  return h("div", { class: "cp-form" },
+  const amendsEditor = effectiveRelation === "amends"
+    ? h("div", { class: "cp-amends" },
+        h("label", { class: "cp-field" },
+          h("span", { class: "task-section-label" }, "Amendment summary"),
+          h("input", {
+            type: "text", class: "cp-input", value: summary, placeholder: changeTitle,
+            onInput: (e: Event) => setSummary((e.target as HTMLInputElement).value),
+          }),
+        ),
+        chosen && chosen.type === "capability"
+          ? h("div", { ref: criteriaRef },
+              h(CriteriaEditor, {
+                id: criteriaId,
+                label: `Criteria of ${chosen.title}`,
+                criteria: visible.map((d) => d.text),
+                onEdit: editDraft,
+                onRemove: removeDraft,
+                onAdd: addDraft,
+                placeholder: "New capability criterion...",
+                invalid: invalidCriteria,
+              }),
+            )
+          : null,
+        h("label", { class: "cp-field" },
+          h("span", { class: "task-section-label" }, "Replacement statement (optional)"),
+          h("textarea", {
+            class: "cp-input", rows: 2, value: proposed, placeholder: chosen?.statement ?? "",
+            "aria-invalid": invalidCriteria ? "true" : undefined,
+            onInput: (e: Event) => setProposed((e.target as HTMLTextAreaElement).value),
+          }),
+        ),
+      )
+    : null;
+
+  // With Amends chosen, the checked card is the editor (WF5).
+  const cardChoice = (t: PlacementTarget) => {
+    const choice = relationChoice(t);
+    const editing = amending && chosen?.target === t.target;
+    return h(Fragment, null, choice, editing ? amendsEditor : null, editing ? h(DryRunLine, { check: dryRun ?? null }) : null);
+  };
+  const targetRow = (t: PlacementTarget, checked: boolean) => wide
+    ? h(CandidateCard, { key: t.target, name, target: t, checked, onChoose: setChosen, relationChoice: another || touchesOnly ? null : cardChoice(t), touchesOnly: touchesOnly || another, model: t.target === modelPick?.target })
+    : h(TargetRow, { key: t.target, name, target: t, checked, onChoose: setChosen });
+
+  return h("div", { class: `cp-form${wide ? " cp-wide" : ""}` },
     h("fieldset", { class: "cp-shortlist" },
       h("legend", { class: "task-section-label" }, another ? "Add another place" : "Where it goes"),
       !read ? h("div", { class: "cp-shortlist-pending", role: "status" }, "Finding a place…") : null,
@@ -488,8 +813,22 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
         ? h("div", { class: "cp-shortlist-warning", role: "note", "data-warning": "weak" },
             "Weak matches only. Check them, or search.")
         : null,
-      shortlist.map((c) => h(TargetRow, { key: c.target, name, target: c, checked: chosen?.target === c.target, onChoose: setChosen })),
-      searchPick ? h(TargetRow, { key: searchPick.target, name, target: searchPick, checked: true, onChoose: setChosen }) : null,
+      homes.length
+        ? h("ul", { class: "cp-homes", "aria-label": "Placed so far" },
+            homes.map((home) =>
+              h("li", { key: home.target, class: "cp-home", "data-target": home.target },
+                h("span", { class: "cp-home-text" }, `${home.relation === "amends" ? "Amends" : "Touches"} ${home.title}`),
+                // Only a touches can be taken back here; an amendment is edited in the change.
+                home.relation === "touches" && onRemoveHome
+                  ? h("button", { type: "button", class: "ch-change-link cp-home-remove", "aria-label": `Remove ${home.title}`, onClick: () => onRemoveHome(home) }, "Remove")
+                  : null)))
+        : null,
+      shortlist.map((c) => targetRow(c, chosen?.target === c.target)),
+      // The model's pick off the shortlist joins the cards, unchecked; once chosen it shows as the search pick below.
+      modelPick && !shortlist.some((c) => c.target === modelPick.target) && chosen?.target !== modelPick.target
+        ? targetRow(modelPick, false)
+        : null,
+      searchPick ? targetRow(searchPick, true) : null,
       canDraft ? h(DraftButton, { busy: draft.busy, onClick: askModel }) : null,
       canDraft && draftNote ? h(DraftNoteView, { note: draftNote }) : null,
       canDraft && draft.refusal ? h(RefusalNote, { refusal: draft.refusal }) : null,
@@ -497,63 +836,21 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
 
     h(TargetSearch, { map, mapError, onChoose: setChosen }),
 
-    another || touchesOnly
-      ? null
-      : h("fieldset", { class: "cp-relation" },
-          h("legend", { class: "task-section-label" }, "Relation"),
-          (["touches", "amends"] as const).map((r) =>
-            h("label", { key: r, class: "cp-relation-option" },
-              h("input", { type: "radio", name: `cp-relation-${changeId}`, value: r, checked: relation === r, onChange: () => setRelation(r) }),
-              r === "touches" ? "Touches" : "Amends",
-            ),
-          ),
-        ),
-
-    effectiveRelation === "amends"
-      ? h("div", { class: "cp-amends" },
-          h("label", { class: "cp-field" },
-            h("span", { class: "task-section-label" }, "Amendment summary"),
-            h("input", {
-              type: "text", class: "cp-input", value: summary, placeholder: changeTitle,
-              onInput: (e: Event) => setSummary((e.target as HTMLInputElement).value),
-            }),
-          ),
-          chosen && chosen.type === "capability"
-            ? h("div", { ref: criteriaRef },
-                h(CriteriaEditor, {
-                  id: criteriaId,
-                  label: `Criteria of ${chosen.title}`,
-                  criteria: visible.map((d) => d.text),
-                  onEdit: editDraft,
-                  onRemove: removeDraft,
-                  onAdd: addDraft,
-                  placeholder: "New capability criterion...",
-                  invalid: invalidCriteria,
-                }),
-              )
-            : null,
-          h("label", { class: "cp-field" },
-            h("span", { class: "task-section-label" }, "Replacement statement (optional)"),
-            h("textarea", {
-              class: "cp-input", rows: 2, value: proposed, placeholder: chosen?.statement ?? "",
-              "aria-invalid": invalidCriteria ? "true" : undefined,
-              onInput: (e: Event) => setProposed((e.target as HTMLTextAreaElement).value),
-            }),
-          ),
-        )
-      : null,
+    // The wide panel holds the relation and the amendment in the chosen card.
+    wide ? null : relationChoice(),
+    wide ? null : amendsEditor,
 
     refusal ? h(RefusalNote, { refusal }) : null,
 
     h("div", { class: "cp-actions" },
-      h("button", { type: "button", class: "btn btn-sm cp-place", disabled: !chosen || busy, onClick: () => submit("place") }, "Place"),
+      h("button", { type: "button", class: "btn btn-sm cp-place", disabled: cannotPlace, onClick: () => submit("place") }, "Place"),
       another
         ? h("button", { type: "button", class: "btn btn-sm cp-done", onClick: onDone }, "Done")
         : [
             hasNext
-              ? h("button", { key: "next", type: "button", class: "btn btn-sm cp-place-next", disabled: !chosen || busy, onClick: () => submit("next") }, "Place & next")
+              ? h("button", { key: "next", type: "button", class: "btn btn-sm cp-place-next", disabled: cannotPlace, onClick: () => submit("next") }, "Place & next")
               : null,
-            h("button", { key: "another", type: "button", class: "btn btn-sm cp-place-another", disabled: !chosen || busy, onClick: () => submit("another") }, "Place & add another"),
+            h("button", { key: "another", type: "button", class: "btn btn-sm cp-place-another", disabled: cannotPlace, onClick: () => submit("another") }, "Place & add another"),
             // An applied change's amendments have already reached the map: nothing new to propose.
             touchesOnly
               ? null
@@ -577,15 +874,23 @@ interface ProposeFormProps {
   draftEnabled: boolean;
   /** A draft the shortlist's "Draft with the model" brought here: the form opens filled with it. */
   drafted?: PlacementDraft | null;
+  /** Reports the capability being proposed as the form changes; null for a constraint and once the form closes. */
+  onGhost?: (ghost: ProposalGhost | null) => void;
+  /** The area the form opens under when no draft names one: placement mode's zoomed area. */
+  defaultUnder?: string;
+  /** A map pick of an area made while the form is open moves the form's area to it. */
+  followPick?: AreaPick | null;
+  /** The form as a leaving left it (WF10); it opens on this. */
+  saved?: ProposeStepDraft | null;
 }
 
-function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted }: ProposeFormProps) {
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost, defaultUnder, followPick, saved }: ProposeFormProps) {
   const initial = drafted?.proposal;
-  const [type, setType] = useState<"capability" | "constraint">(initial?.type ?? "capability");
-  const [under, setUnder] = useState(initial?.under ?? "");
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [statement, setStatement] = useState(initial?.proposed ?? "");
-  const [criteria, setCriteria] = useState(criteriaLines(initial));
+  const [type, setType] = useState<"capability" | "constraint">(saved?.type ?? initial?.type ?? "capability");
+  const [under, setUnder] = useState(saved?.under ?? initial?.under ?? defaultUnder ?? "");
+  const [title, setTitle] = useState(saved?.title ?? initial?.title ?? "");
+  const [statement, setStatement] = useState(saved?.statement ?? initial?.proposed ?? "");
+  const [criteria, setCriteria] = useState(saved?.criteria ?? criteriaLines(initial));
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [draftNote, setDraftNote] = useState<DraftNote | null>(
@@ -593,6 +898,23 @@ function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed
   );
   const draft = useDraft(changeId);
   const areas = map?.areas ?? [];
+
+  // A map pick of an area while the form is open takes the form with it, so both name one area (WF6).
+  // Only picks made after the form opened count: the map's opening zoom never overrides a resumed draft's area.
+  const followed = useRef(followPick?.n);
+  useEffect(() => {
+    if (!followPick || followPick.n === followed.current) return;
+    followed.current = followPick.n;
+    setUnder(followPick.under);
+  }, [followPick?.n]);
+  // The form closing, by Back or by a write, clears the ghost.
+  useEffect(() => { onGhost?.(type === "capability" ? { title: title.trim() || changeTitle, under } : null); }, [type, title, under]);
+  useEffect(() => () => onGhost?.(null), []);
+  // Typed text or a chosen type is an edit worth keeping (WF10); the area alone the map supplied is not.
+  useEffect(() => {
+    const edited = !!(title.trim() || statement.trim() || criteria.trim()) || type !== "capability" || under !== (defaultUnder ?? "");
+    savePlacementDraft(changeId, edited ? { step: "propose", type, under, title, statement, criteria } : null);
+  }, [type, under, title, statement, criteria]);
 
   const askModel = async () => {
     setDraftNote(null);
@@ -681,6 +1003,34 @@ export interface ChangePlacementSectionProps {
   onWritten?: () => void;
   /** Reports whether the change is in the Inbox, for the panel's other notes. */
   onInboxState?: (inInbox: boolean) => void;
+  /** Opens placement mode on the area view; absent, the section offers no switch. */
+  onPlaceOnMap?: (id: string) => void;
+  /**
+   * "wide" is placement mode's panel beside the spec map: candidates as cards
+   * and rex's relation pre-selected only for a strong, untied pick. The
+   * compact default is the detail panel's.
+   */
+  layout?: "compact" | "wide";
+  /** A target chosen on the map; the place form follows it. */
+  selection?: PlacementTarget | null;
+  /** Reports each target the place form chooses. */
+  onChoose?: (t: PlacementTarget) => void;
+  /** Reports how the wide card's amendment moves its target's criteria count; null when nothing is amended. */
+  onPendingCriteria?: (pending: PendingCriteria | null) => void;
+  /** Reports the capability the proposal form would add, so the map can draw it as a ghost block. */
+  onGhost?: (ghost: ProposalGhost | null) => void;
+  /** Reports the ids of the homes this change was placed on in this visit, so the map can mark each. */
+  onHomes?: (targets: string[]) => void;
+  /** The area id "Nothing fits" proposes under until the form says otherwise: the map's zoomed area. */
+  proposeUnder?: string;
+  /** The area the map's last pick zoomed into, numbered so a pick of the same area again still counts; an open proposal form follows it. */
+  followPick?: AreaPick | null;
+}
+
+/** A map pick of an area: its id and a count that grows with every pick. */
+export interface AreaPick {
+  under: string;
+  n: number;
 }
 
 /** What the section shows after a write, until the change's next read. */
@@ -693,14 +1043,23 @@ interface Written {
  * The placement section of a change's detail panel. Key it by change id:
  * its state belongs to one change.
  */
-export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState }: ChangePlacementSectionProps) {
+export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, onHomes, proposeUnder, followPick }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
-  const [proposing, setProposing] = useState(false);
+  // A draft left on the proposal step resumes there (WF10).
+  const [savedPropose, setSavedPropose] = useState<ProposeStepDraft | null>(() => {
+    const draft = loadPlacementDraft(changeId);
+    return draft?.step === "propose" ? draft : null;
+  });
+  const [proposing, setProposing] = useState(savedPropose !== null);
   const [another, setAnother] = useState(false);
   const [written, setWritten] = useState<Written | null>(null);
   const [drafted, setDrafted] = useState<PlacementDraft | null>(null);
-  const draftEnabled = useFeatureToggle(PLACEMENT_DRAFT_FEATURE, false);
+  const [homes, setHomes] = useState<PlacedHome[]>([]);
+  const [removeRefusal, setRemoveRefusal] = useState<Refusal | null>(null);
+  // With Sidecar on, "Place with Sidecar" replaces the one-shot draft in both layouts (SP3).
+  const sidecarOn = useContext(PlaceWithSidecarContext) !== null;
+  const draftEnabled = useFeatureToggle(PLACEMENT_DRAFT_FEATURE, false) && !sidecarOn;
 
   const row = inbox.load.state === "ready" ? inbox.load.data.find((c) => c.id === changeId) : undefined;
   const inInbox = !!row?.awaitsPlacement && !written;
@@ -718,6 +1077,9 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
   useEffect(() => { if (live) setRead(live); }, [live]);
 
   useEffect(() => { onInboxState?.(!!row?.awaitsPlacement); }, [row?.awaitsPlacement]);
+  const homeKey = homes.map((home) => home.target).join(",");
+  useEffect(() => { onHomes?.(homes.map((home) => home.target)); }, [homeKey]);
+  useEffect(() => () => onHomes?.([]), []);
 
   const showForm = inInbox || appliedUnplaced || another;
   const touchesOnly = !!row?.appliedAt;
@@ -747,11 +1109,25 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
 
   const onPlaced = (result: PlaceChangeResult, target: PlacementTarget, mode: PlaceMode) => {
     const note: Written = { line: `Placed: ${result.relation} ${target.title}`, ...(result.warnings ? { warnings: result.warnings } : {}) };
+    dropPlacementDraft(changeId);
     afterWrite();
+    // Every home placed while adding more is listed, with Remove, until Done.
+    if (mode === "another" || another) {
+      setHomes((prev) => [...prev.filter((home) => home.target !== target.target), { target: target.target, title: target.title, relation: result.relation }]);
+    }
     if (mode === "next") { setWritten(note); openNext(position.next); return; }
-    if (mode === "another") { setAnother(true); setWritten(note); return; }
+    // The wide panel's session stays open on every extra home until Done; the compact one closes on Place.
+    if (mode === "another" || (another && layout === "wide")) { setAnother(true); setWritten(note); return; }
     setAnother(false);
     setWritten(note);
+  };
+
+  const removeHome = async (home: PlacedHome) => {
+    const answer = await post<{ change: string; target: string }>(`/api/rex/changes/${encodeURIComponent(changeId)}/unplace`, { target: home.target });
+    if (!answer.ok) { setRemoveRefusal(answer.refusal); return; }
+    setRemoveRefusal(null);
+    setHomes((prev) => prev.filter((kept) => kept.target !== home.target));
+    afterWrite();
   };
 
   const onProposed = (result: ProposeChangeResult, next: boolean) => {
@@ -760,11 +1136,12 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       ...(result.warnings ? { warnings: result.warnings } : {}),
     });
     setProposing(false);
+    dropPlacementDraft(changeId);
     afterWrite();
     if (next) openNext(position.next);
   };
 
-  return h("section", { class: "task-section cp-section", "aria-label": "Placement", "data-change-placement": another ? "another" : appliedUnplaced ? "applied" : "inbox" },
+  return h("section", { class: "task-section cp-section", "aria-label": "Placement", "data-layout": layout, "data-change-placement": another ? "another" : appliedUnplaced ? "applied" : "inbox" },
     // Only a change still in the Inbox is the Place lens's to draft.
     inInbox && !another ? h(PlaceWithSidecarButton, { changeId }) : null,
     another
@@ -787,21 +1164,30 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
                   : null,
               )
             : null,
+          onPlaceOnMap
+            ? h("button", {
+                type: "button", class: "ch-change-link cp-place-on-map", onClick: () => onPlaceOnMap(changeId),
+              }, "Place on the map ↗")
+            : null,
         ),
+    removeRefusal ? h(RefusalNote, { refusal: removeRefusal }) : null,
     h(PlacementForms, {
       proposing: proposing && !another,
       place: {
         changeId, changeTitle, read, another, touchesOnly, hasNext: position.next !== null,
         onPlaced,
-        onNothingFits: () => { setDrafted(null); setProposing(true); },
-        onDone: () => setAnother(false),
+        onNothingFits: () => { setDrafted(null); setSavedPropose(null); setProposing(true); },
+        // Done with no home left (all removed) puts the change back in the Inbox.
+        onDone: () => { setAnother(false); if (!homes.length) setWritten(null); },
+        homes: another ? homes : [], onRemoveHome: removeHome,
         draftEnabled,
-        onDraftProposal: (draft) => { setDrafted(draft); setProposing(true); },
+        onDraftProposal: (draft) => { setDrafted(draft); setSavedPropose(null); setProposing(true); },
+        wide: layout === "wide", selection, onChoose, onPendingCriteria,
       },
       propose: {
         changeId, changeTitle, hasNext: position.next !== null,
-        onProposed, onBack: () => setProposing(false),
-        draftEnabled, drafted,
+        onProposed, onBack: () => { setSavedPropose(null); setProposing(false); },
+        draftEnabled, drafted, onGhost, defaultUnder: proposeUnder, followPick, saved: savedPropose,
       },
     }),
   );

@@ -4,7 +4,8 @@
  *
  * Covers:
  *   - default full-tree rendering (every PRD item visible without expansion)
- *   - the "Epics only" view-mode toggle in the header
+ *   - the "Epics only" view-mode toggle in the header ("Changes only" on v2)
+ *   - a v2 tree: changes and tasks, tree-depth indent, trailer links
  *   - selection-driven highlighting (root + transitive descendants)
  *   - viewport recenter when a node is clicked
  *   - lazy origin fetch on PRD click and the resulting detail-panel section
@@ -109,6 +110,38 @@ function makeGraph(): MinimalGraph {
     ],
     stats: { merges: 1, mergesWithPrdLinkage: 1, mergesWithoutPrdLinkage: 0, prdItemsLinked: 1 },
   };
+}
+
+/**
+ * A v2 graph as the server builds it: change C1 with tasks CT1 and CT2,
+ * change C2 alone, and merge M1 linked to C1 by its N-DX-Item trailer.
+ */
+function makeV2Graph(): MinimalGraph {
+  return {
+    generatedAt: "2026-11-05T00:00:00Z",
+    nodes: [
+      { kind: "prd", id: "C1", title: "Change One", itemType: "change", status: "in_progress", shape: "diamond" },
+      { kind: "prd", id: "CT1", title: "Change Task One", itemType: "task", status: "completed", parentId: "C1", shape: "triangle" },
+      { kind: "prd", id: "CT2", title: "Change Task Two", itemType: "task", status: "pending", parentId: "C1", shape: "triangle" },
+      { kind: "prd", id: "C2", title: "Change Two", itemType: "change", status: "pending", shape: "triangle" },
+      {
+        kind: "merge", id: "M1", sha: "abcdef1", shortSha: "abcdef1",
+        subject: "Ship change one (#7)", body: "", mergedAt: "2026-11-01T00:00:00Z",
+        author: "alice", parents: ["p1", "p2"],
+        filesSummary: emptyFilesSummary(), files: [],
+      },
+    ],
+    edges: [{ from: "M1", to: "C1", attribution: "trailer" }],
+    stats: { merges: 1, mergesWithPrdLinkage: 1, mergesWithoutPrdLinkage: 0, prdItemsLinked: 1 },
+  };
+}
+
+/** The x a rendered PRD node is translated to. */
+function nodeX(root: HTMLElement, id: string): number {
+  const transform = root.querySelector(`.mg-prd-node[data-prd-id="${id}"]`)?.getAttribute("transform") ?? "";
+  const match = transform.match(/translate\(([-\d.]+),/);
+  if (!match) throw new Error(`PRD node ${id} is not rendered`);
+  return Number(match[1]);
 }
 
 async function flush() {
@@ -269,11 +302,12 @@ describe("MergeGraphView", () => {
     items: Array<Record<string, unknown>>,
     options: {
       originHandler?: (url: string) => Promise<Response>;
+      graph?: MinimalGraph;
     } = {},
   ) {
     fetchSpy.mockImplementation((url: string) => {
       if (url.startsWith("/api/merge-graph")) {
-        return Promise.resolve(new Response(JSON.stringify(makeGraph()), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify(options.graph ?? makeGraph()), { status: 200 }));
       }
       if (url.startsWith("/data/prd.json")) {
         return Promise.resolve(new Response(JSON.stringify({ items }), { status: 200 }));
@@ -391,6 +425,53 @@ describe("MergeGraphView", () => {
     await waitFor(() => {
       expect(root.querySelectorAll(".mg-prd-node").length).toBe(5);
     });
+  });
+
+  it("indents a v1 task two levels under its epic, as before", async () => {
+    mountWithPrd([]);
+    await waitFor(() => {
+      expect(root.querySelectorAll(".mg-prd-node").length).toBe(5);
+    });
+    expect(nodeX(root, "E1")).toBe(0);
+    expect(nodeX(root, "F1")).toBe(22);
+    expect(nodeX(root, "T1")).toBe(44);
+  });
+
+  // ── v2 tree ────────────────────────────────────────────────────────────────
+
+  it("draws a v2 tree as changes and their tasks, with changes as the root rows", async () => {
+    mountWithPrd([], { graph: makeV2Graph() });
+    await waitFor(() => {
+      expect(root.querySelectorAll(".mg-prd-node").length).toBe(4);
+    });
+
+    const labels = [...root.querySelectorAll<SVGGElement>(".mg-prd-node")]
+      .map((n) => n.getAttribute("aria-label") ?? "");
+    expect(labels.filter((l) => l.startsWith("PRD change:"))).toHaveLength(2);
+    expect(labels.filter((l) => l.startsWith("PRD task:"))).toHaveLength(2);
+    expect(labels.some((l) => /PRD (epic|feature):/.test(l))).toBe(false);
+
+    // No feature level on v2: a change's tasks sit one indent in.
+    expect(nodeX(root, "C1")).toBe(0);
+    expect(nodeX(root, "CT1")).toBe(22);
+
+    const chips = [...root.querySelectorAll<HTMLButtonElement>(".mg-view-toggle .mg-chip")];
+    expect(chips.map((c) => c.textContent)).toEqual(["Full tree", "Changes only"]);
+    await act(async () => {
+      chips[1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush();
+    });
+    await waitFor(() => {
+      expect(root.querySelectorAll(".mg-prd-node").length).toBe(2);
+    });
+  });
+
+  it("draws a merge's N-DX-Item trailer link to the item it names", async () => {
+    mountWithPrd([], { graph: makeV2Graph() });
+    await waitFor(() => {
+      expect(root.querySelectorAll(".mg-edge-link").length).toBe(1);
+    });
+    expect(root.querySelector(".mg-edge-link")?.getAttribute("stroke")).toBe("var(--brand-teal)");
   });
 
   // ── Selection / highlight behavior ─────────────────────────────────────────

@@ -37,6 +37,7 @@ import { resetDeferredTasks, resetDeferredAndCommit } from "../../src/cli/comman
 import {
   commitResetDeferredChanges,
   performPreRunCommitGateIfNeeded,
+  PLANNING_COMMIT_SUBJECT,
 } from "../../src/agent/lifecycle/shared.js";
 import { listUncommittedPrdPaths } from "../../src/agent/lifecycle/uncommitted-work-gate.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
@@ -207,7 +208,7 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
   describe("the commit covers only the reset's own write", () => {
     const operatorEdit = "# Epic X\nstatus: pending\n\nhalf-finished operator edit\n";
 
-    it("does not commit when the PRD tree was already dirty, and the gate then refuses", async () => {
+    it("does not commit when the PRD tree was already dirty; the gate then commits it as planning files", async () => {
       await writeFile(epicIndexPath, operatorEdit, "utf-8");
       expect(await listUncommittedPrdPaths(projectDir)).toContain(
         `.rex/${PRD_TREE_DIRNAME}/epic-x/index.md`,
@@ -224,15 +225,18 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
       expect(await commitCount()).toBe(1);
       expect(await readFile(epicIndexPath, "utf-8")).toBe(operatorEdit);
 
-      // The gate is what reports it — the pre-#370 behaviour. cmdRun maps this
-      // "stop" to exit 1.
+      // The gate then handles it: PRD files are n-dx's planning files, so
+      // they get a commit of their own and the run starts (decision UT1).
       const result = await performPreRunCommitGateIfNeeded({
         projectDir,
         henchDir,
         autonomous: true,
         deps: { isTTY: false },
       });
-      expect(result).toBe("stop");
+      expect(result).toBe("proceed");
+      expect(await commitCount()).toBe(2);
+      const { stdout: subject } = await execFile("git", ["log", "-1", "--format=%s"], { cwd: projectDir });
+      expect(subject.trim()).toBe(PLANNING_COMMIT_SUBJECT);
     });
 
     it("still commits when the dirt is outside the PRD tree", async () => {

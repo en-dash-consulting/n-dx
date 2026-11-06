@@ -29,7 +29,8 @@ describe("viewer history writes", () => {
       const src = readFileSync(file, "utf-8");
       for (const m of src.matchAll(CALL)) {
         const args = argsAt(src, m.index! + m[0].length);
-        if (!/appUrl\(|location|url\.toString\(\)/.test(args)) {
+        // `\b`: a variable named `locationBefore` is not a URL derived from `location`.
+        if (!/appUrl\(|\blocation\b|\burl\.toString\(\)/.test(args)) {
           offenders.push(`${file.slice(VIEWER_DIR.length + 1)}: ${m[0]}${args.slice(0, 60).replace(/\s+/g, " ")}`);
         }
       }

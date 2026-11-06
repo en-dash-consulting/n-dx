@@ -15,7 +15,7 @@
 
 import { readFile } from "node:fs/promises";
 import type { AddChangeNodeInput } from "../../core/change-add.js";
-import { suggestPlacement, type PlacementSuggestion } from "../../core/change-place.js";
+import { ChangePlacementError, suggestPlacement, type PlacementSuggestion } from "../../core/change-place.js";
 import type { Priority } from "../../schema/index.js";
 import type { ChangeNodeType } from "../../schema/v2.js";
 import { indexTree, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
@@ -75,7 +75,7 @@ export async function cmdAddChange(
     ...(flags.priority ? { priority: flags.priority as Priority } : {}),
     ...(flags.blockedBy ? { blockedBy: parseCsvList(flags.blockedBy) } : {}),
   };
-  const [added] = await addChanges(dir, [input]);
+  const [added] = await addChanges(dir, [input], flags.area?.trim() || undefined);
   report([added], flags.format === "json");
 }
 
@@ -92,6 +92,8 @@ export async function cmdAddChangesFromDescriptions(
     .map((t) => t.trim())
     .filter(Boolean);
   if (!texts.length) throw new CLIError("Missing description or --file flag.", 'Usage: rex add "<description>" or rex add --file=<path>');
+  // Ranks each new change's placement among one area's capabilities and constraints.
+  const area = flags.area?.trim() || undefined;
   const inputs = texts.map((text): AddChangeNodeInput => {
     const title = titleFrom(text);
     return {
@@ -106,26 +108,41 @@ export async function cmdAddChangesFromDescriptions(
   // dashboard's Quick Add relies on it): report what would be created, write nothing.
   if (flags.format === "json" && flags.accept !== "true") {
     const { tree } = await loadPrdModel(resolveRexPaths(dir).rexDir);
-    const rows = jsonRows(planChanges(tree, inputs, new Date()).added);
+    const rows = jsonRows(planChanges(tree, inputs, new Date(), area).added);
     // `proposals` and `qualityIssues` keep smart-add's preview keys, so a v1-shaped reader sees an empty preview, not a parse error.
     return result(JSON.stringify({ preview: true, changes: rows, proposals: [], qualityIssues: [] }, null, 2));
   }
-  report(await addChanges(dir, inputs), flags.format === "json");
+  report(await addChanges(dir, inputs, area), flags.format === "json");
 }
 
-/** `inputs` added to `tree` in memory, with the placement shortlist for each new change still in the Inbox. */
-function planChanges(start: V2Tree, inputs: ProposedChangeInput[], now: Date): { tree: V2Tree; added: Added[] } {
+/**
+ * `inputs` added to `tree` in memory, with the placement shortlist for each
+ * new change still in the Inbox; with `area`, ranked among that area's targets only.
+ */
+function planChanges(start: V2Tree, inputs: ProposedChangeInput[], now: Date, area?: string): { tree: V2Tree; added: Added[] } {
   const { tree, nodes } = addProposedChanges(start, inputs, { now });
   const ids = nodes.map((node) => node.id);
   const index = indexTree(tree);
   const added = ids.map((id): Added => {
     const node = index.resolve(id)!;
     if (node.type !== "change" || !node.needsPlacement) return { node };
-    const suggestion = suggestPlacement(tree, id);
+    const suggestion = suggestInArea(tree, id, area);
     const targets = suggestion.shortlist.map((c) => index.resolve(c.target)!);
     return { node, suggestion, targets: Object.fromEntries(targets.map((t) => [t.id, { id: t.id, displayId: t.displayId, title: t.title }])) };
   });
   return { tree, added };
+}
+
+/** The rules' shortlist for `id`; an `--area` naming no live area is a usage error. */
+function suggestInArea(tree: V2Tree, id: string, area: string | undefined): PlacementSuggestion {
+  try {
+    return suggestPlacement(tree, id, undefined, area === undefined ? {} : { area });
+  } catch (err) {
+    if (err instanceof ChangePlacementError && err.kind === "not-an-area") {
+      throw new CLIError(`--area: ${err.plain}.`, "Pass an area's id, display id or slug (see 'rex product').");
+    }
+    throw err;
+  }
 }
 
 /**
@@ -137,12 +154,12 @@ function planChanges(start: V2Tree, inputs: ProposedChangeInput[], now: Date): {
  * door rather than a second creation pipeline that could place changes
  * differently. See `recommend/changes-from-proposals.ts`.
  */
-export async function addChanges(dir: string, inputs: ProposedChangeInput[]): Promise<Added[]> {
+export async function addChanges(dir: string, inputs: ProposedChangeInput[], area?: string): Promise<Added[]> {
   const rexDir = resolveRexPaths(dir).rexDir;
   let now!: Date;
   const { result: added } = await withPrdModelTransaction(rexDir, (model) => {
     now = new Date();
-    const planned = planChanges(model.tree, inputs, now);
+    const planned = planChanges(model.tree, inputs, now, area);
     return { tree: planned.tree, result: planned.added };
   });
   const store = await resolveStore(rexDir);

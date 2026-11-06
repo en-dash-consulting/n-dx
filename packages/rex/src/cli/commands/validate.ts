@@ -21,6 +21,7 @@ import {
   SLUG_RULE_MARKER_MISSING,
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
+import { checkStaleReleasePlans } from "../../core/health.js";
 
 import { info, result } from "../output.js";
 import { green, yellow, red } from "@n-dx/llm-client";
@@ -254,6 +255,18 @@ export async function cmdValidate(
       });
     }
 
+  }
+
+  // The same rule rex health and the MCP health tool run, so every surface
+  // names the same stale plans. A warning: re-dating a plan never fails CI.
+  if (doc && store && isChangeLayerStore(store)) {
+    const stale = checkStaleReleasePlans(await store.loadTree());
+    checks.push({
+      name: "release plans",
+      pass: stale.length === 0,
+      severity: "warn",
+      errors: stale.map((f) => f.message),
+    });
   }
 
   // prd_tree/ is a v1 backend. On the change layer a stray one is not the PRD,

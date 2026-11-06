@@ -161,9 +161,9 @@ the MCP server descriptors.
 only Claude Code's own behaviour belongs in `claude-addendum.md`, which never
 reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` enforces this.
 
-Re-run `ndx init` after editing `packages/core/assistant-assets/`.
-`tests/e2e/agents-md-size-budget.test.js` limits root + nested instructions:
-Codex drops their tail past `project_doc_max_bytes`. Put detail in `docs/`.
+Re-run `ndx init --no-commit .` after editing `packages/core/assistant-assets/`.
+`tests/e2e/agents-md-size-budget.test.js` caps root + nested instructions:
+Codex truncates past `project_doc_max_bytes`. Put detail in `docs/`.
 
 ## n-dx Orchestration Commands
 

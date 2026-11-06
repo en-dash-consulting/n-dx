@@ -42,7 +42,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(22);
+    expect(V2_RULE_IDS).toHaveLength(23);
   });
 
   it("a healthy tree has no findings", () => {
@@ -1079,5 +1079,65 @@ describe("retired-state-field", () => {
 
   it("is silent on a tree with no retired keys", () => {
     expect(check("retired-state-field", { product: [cap()], changes: [node("change", { appliedAt: "2026-10-05T00:00:00.000Z" })] })).toEqual([]);
+  });
+});
+
+describe("stale-release-plan", () => {
+  const APPLIED = "2026-10-05T00:00:00.000Z";
+  const shipped = (release: string) => node("change", { status: "completed", appliedAt: APPLIED, shippedIn: release });
+
+  it("is a warning", () => {
+    expect(RULE_SEVERITY["stale-release-plan"]).toBe("warning");
+  });
+
+  it("reports an open change planned for a release another change shipped in", () => {
+    const open = node("change", { plannedRelease: "0.10.0" });
+    const findings = check("stale-release-plan", { changes: [shipped("0.10.0"), open] });
+    expect(ids(findings)).toEqual([open.id]);
+    expect(findings[0].severity).toBe("warning");
+    expect(findings[0].message).toContain(open.id);
+    expect(findings[0].message).toContain("0.10.0");
+    expect(findings[0].message).toContain("has shipped");
+  });
+
+  it("reports an open change planned for a release older than the newest shipped one, by semver", () => {
+    const old = node("change", { plannedRelease: "0.8.0" });
+    const prerelease = node("change", { plannedRelease: "v0.10.0-beta.1" });
+    const findings = check("stale-release-plan", { changes: [shipped("0.9.0"), shipped("0.10.0"), old, prerelease] });
+    expect(ids(findings)).toEqual([old.id, prerelease.id]);
+    expect(findings[0].message).toContain("older than 0.10.0");
+  });
+
+  it("orders prerelease identifiers numerically", () => {
+    const later = node("change", { plannedRelease: "1.0.0-beta.10" });
+    const earlier = node("change", { plannedRelease: "1.0.0-beta.1" });
+    expect(ids(check("stale-release-plan", { changes: [shipped("1.0.0-beta.2"), later, earlier] }))).toEqual([earlier.id]);
+  });
+
+  it("counts a completed but unapplied change as open", () => {
+    const awaiting = node("change", { status: "completed", plannedRelease: "0.9.0" });
+    expect(ids(check("stale-release-plan", { changes: [shipped("0.10.0"), awaiting] }))).toEqual([awaiting.id]);
+  });
+
+  it("skips a change that shipped in its planned release but is not applied yet", () => {
+    const shippedAsPlanned = node("change", { status: "completed", plannedRelease: "0.10.0", shippedIn: "0.10.0" });
+    expect(check("stale-release-plan", { changes: [shippedAsPlanned] })).toEqual([]);
+  });
+
+  it("skips unscheduled, applied, cancelled and future-planned changes", () => {
+    const changes = [
+      shipped("0.10.0"),
+      node("change", {}),
+      node("change", { plannedRelease: "0.9.0", appliedAt: APPLIED }),
+      node("change", { plannedRelease: "0.9.0", status: "cancelled" }),
+      node("change", { plannedRelease: "0.11.0" }),
+      node("change", { plannedRelease: "1.0.0" }),
+      node("change", { plannedRelease: "next" }),
+    ];
+    expect(check("stale-release-plan", { changes })).toEqual([]);
+  });
+
+  it("is silent when nothing has shipped", () => {
+    expect(check("stale-release-plan", { changes: [node("change", { plannedRelease: "0.1.0" })] })).toEqual([]);
   });
 });

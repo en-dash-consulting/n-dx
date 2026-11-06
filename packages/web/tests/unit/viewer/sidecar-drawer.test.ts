@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
-import { SidecarDock, SidecarFrameRow, clampSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
+import { SidecarDock, SidecarFrameRow, clampSidecarWidth, effectiveSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
 import {
   isSidecarShortcut,
   mergeFrames,
@@ -80,6 +80,10 @@ interface Server {
   hubTabs?: Array<{ name: string; label: string }>;
   /** The keyed page's answer; unset is a 200. A pending promise is a sidecar still starting. */
   pageAnswer?: () => Response | Promise<Response>;
+  /** While set, PATCH /api/sidecar/sessions/:id answers 500 with this error. */
+  patchError?: string;
+  /** While set, POST /api/sidecar/sessions answers 500 with this error. */
+  createError?: string;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -150,6 +154,7 @@ function stubServer(): void {
     if (other) return json(other[2] ? { cards: [] } : { sessions: server.otherSessions[other[1]] ?? [] });
     const own = /^\/api\/sidecar\/sessions\/([\w-]+)(\/end)?$/.exec(url);
     if (own && (method === "PATCH" || own[2])) {
+      if (method === "PATCH" && server.patchError) return json({ error: server.patchError }, 500);
       const entry = server.sessions.find((e) => e.session.id === own[1])!;
       if (own[2]) entry.session.endedAt = "2026-10-28T12:00:00.000Z";
       else Object.assign(entry.session, body);
@@ -157,6 +162,7 @@ function stubServer(): void {
     }
     if (url === "/api/sidecar/sessions" && method === "GET") return json({ sessions: server.sessions });
     if (url === "/api/sidecar/sessions" && method === "POST") {
+      if (server.createError) return json({ error: server.createError }, 500);
       const created = { session: session({ id: "new", vendor: body.vendor, model: body.model }), running: false };
       server.sessions.push(created);
       return json(created, 201);
@@ -236,8 +242,12 @@ async function settle(): Promise<void> {
 
 // ── Harness: what main.ts renders for Sidecar ─────────────────────────────
 
+/** The hook state the last render of Shell saw, for tests that call its methods as main.ts does. */
+let lastSidecar: ReturnType<typeof useSidecarShell>["sidecar"] | null = null;
+
 function Shell({ view, page }: { view: ViewId; page?: Partial<SidecarPageSelection> }) {
   const shell = useSidecarShell(useFeatureToggle("web.sidecar", false), { view, zone: null, taskId: null, ...page });
+  lastSidecar = shell.sidecar;
   return h("div", null,
     h(TopNav, { view, validViews: VALID, onNavigate: vi.fn(), onOpenSearch: vi.fn(), sidecar: shell.button }),
     h(SidecarDock, { open: shell.drawer.open, sidecar: shell.sidecar, onClose: shell.drawer.close },
@@ -402,6 +412,121 @@ describe("the top-nav button", () => {
     await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
     expect((drawer() as HTMLElement).style.width).toBe("360px");
     expect(localStorage.getItem("ndx-sidecar-width")).toBe("360");
+  });
+});
+
+describe("wide mode", () => {
+  const original = window.innerWidth;
+  const setViewport = (w: number) => { (window as { innerWidth: number }).innerWidth = w; };
+  const toggle = () => root.querySelector<HTMLButtonElement>(".sidecar-wide-toggle");
+  afterEach(() => { setViewport(original); vi.restoreAllMocks(); });
+
+  it("computes the width: wide takes most of the viewport and leaves the page 480 px", () => {
+    expect(effectiveSidecarWidth(440, false, 1440)).toBe(440);
+    expect(effectiveSidecarWidth(440, true, 1440)).toBe(960);
+    expect(effectiveSidecarWidth(440, true, 1920)).toBe(1344);
+    expect(effectiveSidecarWidth(440, true, 960)).toBe(480);
+    expect(effectiveSidecarWidth(640, true, 960)).toBe(640);
+  });
+
+  it("widens the drawer, lifts the result cap and is remembered across a reopen", async () => {
+    setViewport(1440);
+    await mount();
+    await pressCmdJ();
+    expect(toggle()!.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => { toggle()!.click(); });
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    expect(document.documentElement.style.getPropertyValue("--sidecar-w")).toBe("960px");
+    expect(localStorage.getItem("ndx-sidecar-wide")).toBe("1");
+    await pressCmdJ();
+    await pressCmdJ();
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    await act(async () => { toggle()!.click(); });
+    expect((drawer() as HTMLElement).style.width).toBe("440px");
+    expect(localStorage.getItem("ndx-sidecar-wide")).toBe("0");
+  });
+
+  it("leaves wide mode when the edge is resized", async () => {
+    setViewport(1440);
+    localStorage.setItem("ndx-sidecar-wide", "1");
+    await mount();
+    await pressCmdJ();
+    const edge = root.querySelector<HTMLElement>(".sidecar-resize")!;
+    expect(edge.getAttribute("aria-valuemax")).toBe("960");
+    // Widening a wide drawer is a no-op, not a snap back to the stored width.
+    for (const key of ["ArrowLeft", "End"]) {
+      await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
+      expect((drawer() as HTMLElement).style.width).toBe("960px");
+    }
+    // Arrow-Right narrows by one step from the shown width and stays wide.
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("940px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    for (let i = 0; i < 15; i++) {
+      await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    }
+    expect((drawer() as HTMLElement).style.width).toBe("660px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    // Back inside 360–640: wide mode ends.
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("640px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("360px");
+  });
+
+  it("follows the pointer when dragging inward from wide mode, with no jump", async () => {
+    setViewport(1440);
+    localStorage.setItem("ndx-sidecar-wide", "1");
+    await mount();
+    await pressCmdJ();
+    const edge = root.querySelector<HTMLElement>(".sidecar-resize")!;
+    const move = async (x: number) => act(async () => { window.dispatchEvent(new MouseEvent("pointermove", { clientX: x })); });
+    await act(async () => { edge.dispatchEvent(new MouseEvent("pointerdown", { clientX: 500, bubbles: true, cancelable: true })); });
+    await move(505);
+    expect((drawer() as HTMLElement).style.width).toBe("955px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    await move(700);
+    expect((drawer() as HTMLElement).style.width).toBe("760px");
+    await move(400);
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    await move(900);
+    expect((drawer() as HTMLElement).style.width).toBe("560px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
+    // Out of wide mode, the same drag resizes within 360–640.
+    await move(800);
+    expect((drawer() as HTMLElement).style.width).toBe("640px");
+    window.dispatchEvent(new MouseEvent("pointerup"));
+  });
+
+  it("works with storage blocked", async () => {
+    setViewport(1440);
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    await mount();
+    await pressCmdJ();
+    await act(async () => { toggle()!.click(); });
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+  });
+
+  it("keeps the drawer usable on a narrow viewport: no toggle, no wide, at most 85%", async () => {
+    setViewport(800);
+    localStorage.setItem("ndx-sidecar-wide", "1");
+    await mount();
+    await pressCmdJ();
+    expect(toggle()).toBeNull();
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
+    expect((drawer() as HTMLElement).style.width).toBe("440px");
+    expect(effectiveSidecarWidth(640, false, 500)).toBe(425);
+  });
+
+  it("styles the toggle and lifts the cap with tokens only", () => {
+    const css = readFileSync(join(__dirname, "../../../src/viewer/styles/sidecar.css"), "utf8");
+    expect(css).toMatch(/\.sidecar-drawer--wide \.sidecar-tool-output \{ max-height: none; \}/);
+    expect(css).toMatch(/\.sidecar-wide-toggle\.active \{[^}]*var\(--bg-active\)/);
   });
 });
 
@@ -1360,10 +1485,59 @@ describe("permission cards", () => {
       expect(el.classList.contains(`sidecar-card--${state}`), `${kind} ${state}`).toBe(true);
       expect(el.querySelector(".sidecar-card-title")?.textContent).toBe(title);
       expect(el.querySelector(".sidecar-card-kind")?.textContent).not.toBe("");
+      // A decided card is folded: open it to read its input.
+      if (state !== "pending") await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-card-toggle")!.click(); });
       expect(JSON.parse(el.querySelector(".sidecar-card-input")!.textContent!)).toEqual(input);
       if (note) expect(el.querySelector(".sidecar-card-note")?.textContent).toMatch(note);
       await act(async () => { render(null, host); });
     }
+  });
+
+  describe("decided cards fold", () => {
+    const draw = async (cards: SidecarCard[]): Promise<HTMLElement> => {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      await act(async () => {
+        render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => true) }), host);
+      });
+      return host;
+    };
+    const click = (el: Element | null) => act(async () => { (el as HTMLElement).click(); });
+
+    it("shows a decided card as its head and note, and expands on demand", async () => {
+      const host = await draw([card("d1", 1, { status: "approved" })]);
+      const toggle = host.querySelector<HTMLButtonElement>(".sidecar-card-toggle")!;
+      expect(host.querySelector(".sidecar-card-title")).not.toBeNull();
+      expect(host.querySelector(".sidecar-card-note")?.textContent).toBe("Approved");
+      expect(host.querySelector(".sidecar-card-input")).toBeNull();
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      await click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(host.querySelector(".sidecar-card-input")).not.toBeNull();
+      await click(toggle);
+      expect(host.querySelector(".sidecar-card-input")).toBeNull();
+      host.remove();
+    });
+
+    it("collapses several decided cards behind an N decided toggle and keeps pending cards open", async () => {
+      const host = await draw([
+        card("d1", 1, { status: "approved" }),
+        card("d2", 2, { status: "denied" }),
+        card("p1", 3),
+      ]);
+      expect(host.querySelectorAll(".sidecar-card")).toHaveLength(1);
+      expect(host.querySelector(".sidecar-card--pending .sidecar-card-input")).not.toBeNull();
+      const toggle = host.querySelector<HTMLButtonElement>(".sidecar-cards-decided-toggle")!;
+      expect(toggle.textContent).toBe("2 decided");
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      await click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(host.querySelectorAll(".sidecar-card")).toHaveLength(3);
+      expect(host.querySelectorAll(".sidecar-card--approved .sidecar-card-input, .sidecar-card--denied .sidecar-card-input")).toHaveLength(0);
+      // Pending first, decided after.
+      expect(host.querySelector(".sidecar-cards > li:first-child")?.classList.contains("sidecar-card--pending")).toBe(true);
+      host.remove();
+    });
   });
 
   describe("effects line layout tokens", () => {
@@ -1567,6 +1741,100 @@ describe("attachment and lens", () => {
     expect(patches()).toEqual([expect.objectContaining({
       url: "/api/sidecar/sessions/s1", body: { lens: "describe", target: { ref: "t1" } },
     })]);
+  });
+
+  it("reports why the open session refused to follow, and not an unrelated earlier error", async () => {
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("prd");
+    // An unrelated drawer error is no reason for the follow to have failed.
+    await act(async () => { lastSidecar!.reportError("Card decision refused"); });
+    expect(lastSidecar!.followError).toBeNull();
+    server.patchError = "Session is busy";
+    await act(async () => { render(h(Shell, { view: "prd", page: { taskId: "t1" } }), root); });
+    await settle();
+    expect(lastSidecar!.followError).toBe("Session is busy");
+    expect(root.querySelector(".sidecar-error")?.textContent).toBe("Session is busy");
+  });
+
+  it("newSession starts a session on the attachment's lens and target in place of an ended one", async () => {
+    server.sessions = [{ session: session({ id: "s1", endedAt: "2026-10-28T11:00:00.000Z" }), running: false }];
+    await mount("prd", { taskId: "t1" });
+    await pressCmdJ();
+    await act(async () => { await lastSidecar!.openSession("s1"); });
+    await settle();
+    expect(lastSidecar!.session?.id).toBe("s1");
+    let ok = false;
+    await act(async () => { ok = await lastSidecar!.newSession(); });
+    await settle();
+    expect(ok).toBe(true);
+    expect(server.requests.find((r) => r.method === "POST" && r.url === "/api/sidecar/sessions")?.body)
+      .toMatchObject({ lens: "describe", target: { ref: "t1" } });
+    expect(lastSidecar!.session?.id).toBe("new");
+  });
+
+  describe("New session control", () => {
+    const newButtons = () => [...root.querySelectorAll<HTMLButtonElement>(".sidecar-new-session")];
+    const posts = () => server.requests.filter((r) => r.method === "POST" && r.url === "/api/sidecar/sessions");
+    const openListed = async () => {
+      await mount("prd", { taskId: "t1" });
+      await pressCmdJ();
+      await click(root.querySelector(".sidecar-sessions-toggle"));
+    };
+
+    it("the drawer head starts a session with the page attached", async () => {
+      server.sessions = [{ session: session({ id: "s1" }), running: false }];
+      await open("prd", { taskId: "t1" });
+      expect(root.querySelector(".sidecar-head .sidecar-new-session")?.textContent).toBe("New session");
+      await click(root.querySelector(".sidecar-head .sidecar-new-session"));
+      expect(posts()).toHaveLength(1);
+      expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
+      expect(lastSidecar!.session?.id).toBe("new");
+    });
+
+    it("the sessions list starts one, closes the list and attaches the page", async () => {
+      server.sessions = [{ session: session({ id: "s1" }), running: false }];
+      await openListed();
+      await click(root.querySelector(".sidecar-sessions .sidecar-new-session"));
+      expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
+      expect(root.querySelector(".sidecar-sessions")).toBeNull();
+      expect(lastSidecar!.session?.id).toBe("new");
+    });
+
+    it("the ended-session bar starts one with the page attached", async () => {
+      server.sessions = [{ session: session({ id: "s1", endedAt: "2026-10-28T11:00:00.000Z" }), running: false }];
+      await open("prd", { taskId: "t1" });
+      await act(async () => { await lastSidecar!.openSession("s1"); });
+      await settle();
+      expect(root.querySelector(".sidecar-composer")).toBeNull();
+      await click(root.querySelector(".sidecar-readonly .sidecar-new-session"));
+      expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
+      expect(lastSidecar!.session?.id).toBe("new");
+      expect(root.querySelector(".sidecar-composer")).not.toBeNull();
+    });
+
+    it("a refused New session from the list leaves the list and shows why", async () => {
+      server.sessions = [{ session: session({ id: "s1" }), running: false }];
+      server.createError = "Sidecar is off";
+      await openListed();
+      await click(root.querySelector(".sidecar-sessions .sidecar-new-session"));
+      expect(root.querySelector(".sidecar-sessions")).toBeNull();
+      expect(root.querySelector(".sidecar-error")?.textContent).toBe("Sidecar is off");
+      expect(lastSidecar!.session?.id).toBe("s1");
+    });
+
+    it("the live session it leaves stays in the list and resumes", async () => {
+      server.sessions = [{ session: session({ id: "s1", name: "First" }), running: false }];
+      await open("prd", { taskId: "t1" });
+      await click(newButtons()[0]);
+      expect(lastSidecar!.session?.id).toBe("new");
+      await click(root.querySelector(".sidecar-sessions-toggle"));
+      const first = root.querySelector<HTMLElement>('.sidecar-session[data-session="s1"]')!;
+      expect(first).not.toBeNull();
+      expect(first.textContent).not.toContain("ended");
+      const resume = [...first.querySelectorAll("button")].find((b) => b.textContent === "Resume")!;
+      await click(resume);
+      expect(lastSidecar!.session?.id).toBe("s1");
+    });
   });
 
   it("a task picked in the tree after the page opened attaches, and re-targets the open session on each pick", async () => {

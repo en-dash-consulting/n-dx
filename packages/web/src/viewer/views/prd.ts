@@ -18,8 +18,8 @@ import { FloatingNotice } from "../components/index.js";
 
 import {h} from "preact";
 import type { VNode } from "preact";
-import { ActionIcon } from "../components/index.js";
-import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
+import { ActionIcon, GhostCardsContext } from "../components/index.js";
+import { useState, useEffect, useCallback, useMemo, useRef, useContext } from "preact/hooks";
 import { PRDTree, ALL_STATUSES } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
@@ -40,10 +40,8 @@ import {
   useFeatureToggle,
   useFacetState,
   useClaims,
-  useSidecarProposals,
   useProductRead,
 } from "../hooks/index.js";
-import { isDeployedMode } from "../deployed-mode.js";
 import { ghostRowsByParent } from "../components/prd-tree/ghost-rows.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
@@ -65,9 +63,9 @@ export interface PRDViewProps {
 }
 
 /** The ids of changes rex holds for placement, out of `GET /api/rex/changes`. */
-function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
-  const rows = body.changes as Array<{ id: string; awaitsPlacement?: boolean }>;
-  return new Set(rows.filter((c) => c.awaitsPlacement).map((c) => c.id));
+export function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
+  const rows = body.changes as Array<{ id: string; inbox?: boolean }>;
+  return new Set(rows.filter((c) => c.inbox).map((c) => c.id));
 }
 
 const NO_INBOX: ReadonlySet<string> = new Set();
@@ -87,7 +85,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
 
   // ── Sidecar's proposed items as ghost rows (UX5), behind web.sidecar ──
-  const proposals = useSidecarProposals(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
+  const proposals = useContext(GhostCardsContext);
   const ghostRows = useMemo(() => ghostRowsByParent(proposals), [proposals]);
 
   // ── Cross-worktree claims (read-only chips on claimed rows) ─────

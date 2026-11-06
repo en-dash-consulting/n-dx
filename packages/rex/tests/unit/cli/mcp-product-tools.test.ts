@@ -20,6 +20,7 @@ import {
   handlePlaceChange,
   handleUpdateTaskStatus,
 } from "../../../src/cli/mcp-tools/index.js";
+import { applyChange } from "../../../src/core/apply-change.js";
 import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture, markChangeApplied } from "../../helpers/v2-fixture.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
@@ -372,6 +373,15 @@ describe("apply_change", () => {
     expect(capability.status.status).toBe("met");
     expect(capability.changes[0]).toMatchObject({ id: CHANGE, open: false, applied: true });
     expect((await log()).at(-1)).toMatchObject({ event: "change_applied", itemId: CHANGE, detail: `modified ${CAPABILITY}` });
+  });
+
+  it("takes no preview hash: an amendment edited after a dashboard preview still applies as it now reads", async () => {
+    await completeFixtureTask(rexDir);
+    const preview = await applyChange(rexDir, "CH-1", { preview: true });
+    expect(preview.ok).toBe(true);
+    const file = join(rexDir, "changes", "add-apple-pay", "index.md");
+    await writeFile(file, (await readFile(file, "utf-8")).replace(`"summary":"Wallets count as cards"`, `"summary":"Wallets and cards"`));
+    expect(json(await handleApplyChange(store(), rexDir, { id: "CH-1" })).applied).toMatchObject([{ summary: "Wallets and cards" }]);
   });
 
   it("refuses a change already applied, and an unknown one", async () => {

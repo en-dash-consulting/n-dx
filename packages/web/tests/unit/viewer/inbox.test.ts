@@ -9,10 +9,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import type { VNode } from "preact";
 import { act } from "preact/test-utils";
-import { InboxPage, sortInbox, type InboxRow } from "../../../src/viewer/views/inbox.js";
+import { InboxPage, InboxView, sortInbox, type InboxRow } from "../../../src/viewer/views/inbox.js";
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
 import { STAGES, viewBlurb, viewLabel } from "../../../src/viewer/views/index.js";
 import { buildValidViews } from "../../../src/shared/index.js";
+import { PlaceWithSidecarContext } from "../../../src/viewer/components/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import type { ChangePlacement, ChangeRow, PlacementStrength } from "../../../src/viewer/views/product-model.js";
 
@@ -25,16 +26,16 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
-    amends: [], touches: [], taskCount: 1, completedTaskCount: 0, ...extra,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
+    amends: [], touches: [], taskCount: 1, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
 
 /** A shortlist whose best candidate has `strength`; `tied` marks a shared top score. */
-function placement(id: string, strength: PlacementStrength | null, opts: { tied?: boolean; score?: number; tags?: string[] } = {}): ChangePlacement {
+function placement(id: string, strength: PlacementStrength | null, opts: { tied?: boolean; score?: number; tags?: string[]; ageDays?: number } = {}): ChangePlacement {
   return {
     layout: "v2",
-    change: { id, title: `Change ${id}`, status: "pending", taskCount: 1, tags: opts.tags },
+    change: { id, title: `Change ${id}`, status: "pending", taskCount: 1, tags: opts.tags, ageDays: opts.ageDays },
     relation: "touches",
     relationRule: "a rule",
     tied: opts.tied ?? false,
@@ -99,7 +100,8 @@ beforeEach(() => {
   // `/api/project` is cached per module; each case reads its own.
   clearProjectMetadataCache();
   localStorage.clear();
-  root = document.createElement("div");
+  sessionStorage.clear();
+  root =document.createElement("div");
   document.body.appendChild(root);
 });
 
@@ -111,30 +113,30 @@ afterEach(() => {
 
 // ── Placement on Plan ────────────────────────────────────────────────
 
-describe("the Plan section", () => {
-  it("sits after the capture bar and before Tasks, server-backed, with the Inbox badge", () => {
-    const views = STAGES.plan.sections.map((s) => s.view);
-    expect(views.slice(0, 3)).toEqual(["analysis", "inbox", "prd"]);
-    expect(STAGES.plan.sections[1]).toEqual({ view: "inbox", requiresServer: true, badge: "inbox", openWhenNonEmpty: true });
+describe("the Plan tile", () => {
+  it("sits after the product map, server-backed, with the Inbox badge", () => {
+    // The lifecycle strip leads, above the grid; it is a band, not a view tile.
+    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["product", "inbox", "changes", "validation", "changes"]);
+    expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true });
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
     expect(viewBlurb("inbox")).toBe("Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.");
   });
 
-  it("shows the open Inbox count and its blurb, with the CLI name, in its header while collapsed", async () => {
+  it("shows the open Inbox count and its blurb, with the CLI name, in the tile header", async () => {
     serveInbox([], [], { open: 19, appliedUnplaced: 156 });
     routes["/api/project"] = { cliName: "ndx" };
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "plan:inbox": false }));
     await mount(h(StagePage, {
       stage: "plan", validViews: buildValidViews(null), navigateTo: vi.fn(),
       renderView: (view) => h("div", { "data-rendered": view }),
     }));
-    const section = root.querySelector<HTMLElement>('.stage-section[data-view="inbox"]')!;
-    expect(section.querySelector(".stage-section-toggle")?.getAttribute("aria-expanded")).toBe("false");
-    expect(section.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
-    expect(section.querySelector(".stage-section-blurb")?.textContent).toContain("ndx work skips their tasks");
-    expect(section.previousElementSibling?.getAttribute("data-view")).toBe("analysis");
-    expect(section.nextElementSibling?.getAttribute("data-view")).toBe("prd");
+    const tile = root.querySelector<HTMLElement>('.stage-tile[data-tile="inbox"]')!;
+    expect(tile.classList.contains("stage-tile--c4")).toBe(true);
+    expect(tile.classList.contains("stage-tile--r2")).toBe(true);
+    expect(tile.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
+    expect(tile.querySelector(".stage-tile-blurb")?.textContent).toBe("Changes with no place on the product map yet. ndx work skips their tasks until each is placed.");
+    expect(tile.previousElementSibling?.getAttribute("data-tile")).toBe("product-map");
+    expect(tile.nextElementSibling?.getAttribute("data-tile")).toBe("changes-glance");
   });
 });
 
@@ -171,7 +173,7 @@ describe("sortInbox", () => {
 describe("InboxPage on a v2 project", () => {
   it("lists only changes awaiting placement, strongest guess first, with guess and strength", async () => {
     serveInbox(
-      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined }), change("s")],
+      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined, inbox: undefined }), change("s")],
       [placement("w", "weak", { tags: ["web"] }), placement("s", "strong")],
     );
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
@@ -207,13 +209,39 @@ describe("InboxPage on a v2 project", () => {
     expect(root.querySelector(".inbox-more")).toBeNull();
   });
 
-  it("a row, or its Place button, opens the change's detail panel in Tasks", async () => {
-    serveInbox([change("x")], [placement("x", "strong")]);
+  it("a row opens the change's detail panel in Tasks; its Place opens placement mode for it", async () => {
+    serveInbox([change("x"), change("y")], [placement("x", "strong"), placement("y", "weak")]);
     const navigateTo = vi.fn();
     await mount(h(InboxPage, { navigateTo }));
     act(() => { root.querySelector<HTMLElement>(".inbox-row")!.click(); });
+    act(() => { root.querySelectorAll<HTMLButtonElement>(".inbox-place")[1]!.click(); });
+    // Place does not also bubble to the row.
+    expect(navigateTo.mock.calls).toEqual([["prd", { taskId: "x" }], ["product", { tab: "place/y" }]]);
+  });
+
+  it("Place opens the row like a click when nothing can open placement mode", async () => {
+    const onOpenChange = vi.fn();
+    await mount(h(InboxView, { rows: [{ change: change("x") }], appliedUnplaced: 0, onOpenChange }));
     act(() => { root.querySelector<HTMLButtonElement>(".inbox-place")!.click(); });
-    expect(navigateTo.mock.calls).toEqual([["prd", { taskId: "x" }], ["prd", { taskId: "x" }]]);
+    expect(onOpenChange).toHaveBeenCalledWith("x");
+  });
+
+  it("shows an unsaved placement as 'draft · <relation> <target>' on the row, and a proposal as 'draft · proposes <title>' (WF10)", async () => {
+    const target = { target: "cap-gift", title: "Gift cards", area: "Payments" };
+    sessionStorage.setItem("ndx.placement-draft.x", JSON.stringify({ step: "place", target, relation: "amends", summary: "", proposed: "", criteria: [] }));
+    sessionStorage.setItem("ndx.placement-draft.y", JSON.stringify({ step: "propose", type: "capability", under: "", title: "Gift receipts", statement: "", criteria: "" }));
+    await mount(h(InboxView, { rows: [{ change: change("x") }, { change: change("y") }, { change: change("z") }], appliedUnplaced: 0, onOpenChange: vi.fn() }));
+    const notes = [...root.querySelectorAll<HTMLElement>(".inbox-row")].map((r) => r.querySelector(".inbox-draft")?.textContent ?? null);
+    expect(notes).toEqual(["draft · amends Gift cards", "draft · proposes Gift receipts", null]);
+  });
+
+  it("drops the draft of a change the Inbox no longer lists", async () => {
+    sessionStorage.setItem("ndx.placement-draft.gone", JSON.stringify({ step: "propose", type: "capability", under: "", title: "t", statement: "", criteria: "" }));
+    sessionStorage.setItem("ndx.placement-draft.x", JSON.stringify({ step: "propose", type: "capability", under: "", title: "t", statement: "", criteria: "" }));
+    serveInbox([change("x")], []);
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(sessionStorage.getItem("ndx.placement-draft.gone")).toBeNull();
+    expect(sessionStorage.getItem("ndx.placement-draft.x")).not.toBeNull();
   });
 
   it("names a shortlist that failed to load instead of a guess", async () => {
@@ -231,11 +259,45 @@ describe("InboxPage on a v2 project", () => {
     expect(rowIds()).toHaveLength(12);
   });
 
-  it("says 'Inbox is empty' at zero", async () => {
-    serveInbox([change("placed", { awaitsPlacement: undefined })], []);
+  it("says 'Inbox is empty' at zero, and that a held change cannot close and its tasks are skipped until placed", async () => {
+    serveInbox([change("placed", { awaitsPlacement: undefined, inbox: undefined })], []);
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
-    expect(root.querySelector(".inbox-empty")?.textContent).toBe("Inbox is empty");
+    const text = root.querySelector(".inbox-empty")?.textContent ?? "";
+    expect(text).toContain("Inbox is empty");
+    expect(text).toContain("A change held in the Inbox cannot close");
+    expect(text).toContain("n-dx work skips its tasks until it is placed");
     expect(rowIds()).toEqual([]);
+  });
+
+  it("lists an Inbox change that is not held, as on a tree with no capability to place it on", async () => {
+    serveInbox([change("free", { awaitsPlacement: undefined })], []);
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(rowIds()).toEqual(["free"]);
+  });
+
+  it("shows each row's age, its top suggestion's score beside the strength chip, and Place with Sidecar while web.sidecar is on", async () => {
+    const place = vi.fn();
+    serveInbox([change("x"), change("y")], [placement("x", "strong", { score: 7, ageDays: 3 }), placement("y", "weak", { ageDays: 0 })]);
+    const navigateTo = vi.fn();
+    await mount(h(PlaceWithSidecarContext.Provider, { value: { place, attached: null } }, h(InboxPage, { navigateTo })));
+    const [first, second] = [...root.querySelectorAll<HTMLElement>(".inbox-row")];
+    expect(first!.querySelector(".inbox-age")?.textContent).toBe("3 days");
+    expect(second!.querySelector(".inbox-age")?.textContent).toBe("today");
+    expect(first!.querySelector(".inbox-guess-score")?.textContent).toBe("7");
+    expect(first!.querySelector(".inbox-guess-score")?.previousElementSibling?.classList.contains("inbox-strength")).toBe(true);
+    const sidecar = first!.querySelector<HTMLButtonElement>(".cp-place-with-sidecar")!;
+    expect(sidecar.textContent).toBe("Place with Sidecar");
+    expect(first!.querySelector(".inbox-place")).not.toBeNull();
+    act(() => { sidecar.click(); });
+    expect(place).toHaveBeenCalledWith("x");
+    // It does not also open the row.
+    expect(navigateTo).not.toHaveBeenCalled();
+  });
+
+  it("draws no Place with Sidecar while web.sidecar is off", async () => {
+    serveInbox([change("x")], [placement("x", "strong")]);
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(root.querySelector(".cp-place-with-sidecar")).toBeNull();
   });
 
   it("shows applied-but-unplaced history as a collapsed count until its list is read", async () => {

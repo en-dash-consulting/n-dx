@@ -101,7 +101,7 @@ export type {
 
 // ---- Schema: v2 tree index ---------------------------------------------------
 
-export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
+export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, isInboxChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
 export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
 
 // ---- Core: change placement --------------------------------------------------
@@ -109,14 +109,15 @@ export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOption
 // CLI (`rex change place`) and MCP (`place_change`) call. `placementStrength`
 // holds the strength bands, so no surface keeps its own thresholds.
 // `recordProposal` records a new capability or constraint when nothing fits.
+// `recordUnplacement` takes back one touches.
 
 // `draftChangePlacement` asks the configured `prd.place` text model for a pick
 // or a proposal and writes nothing; a drafted proposal has no target, so
 // accepting it through `recordProposal` mints the new node's id.
 
-export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
+export { suggestPlacement, suggestPlacements, recordPlacement, recordProposal, recordUnplacement, ChangePlacementError } from "./core/change-place.js";
 export type {
-  ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, SuggestedPlacementRow, RecordPlacementInput, RecordPlacementResult,
+  ChangePlacementErrorKind, PlacementSuggestion, PlacementSuggestionResult, SuggestedPlacementCandidate, SuggestedPlacementRow, RecordPlacementInput, RecordPlacementResult,
   RecordProposalInput, RecordProposalOptions, RecordProposalResult, PlacementDraft, DraftedProposal,
 } from "./core/change-place.js";
 export { draftChangePlacement } from "./analyze/place-draft.js";
@@ -490,6 +491,7 @@ export type { ReshapeReasonOptions, ReshapeReasonResult } from "./analyze/reshap
 export {
   computeHealthScore,
   formatHealthScore,
+  checkStaleReleasePlans,
 } from "./core/health.js";
 export type {
   StructureHealthScore, HealthDimensions, HealthOptions,
@@ -704,6 +706,10 @@ export type {
 // Reader and transaction
 export { withPrdModelTransaction, PrdLayoutError } from "./store/prd-model-transaction.js";
 export type { PrdModelEdit, PrdModelTransactionOptions, PrdModelTransactionResult } from "./store/prd-model-transaction.js";
+
+// Steward apply of an open change, or its preview (MCP apply_change, the dashboard's Apply)
+export { applyChange } from "./core/apply-change.js";
+export type { ApplyChangeOptions, ApplyChangeOutcome, AppliedAmendmentEffect } from "./core/apply-change.js";
 
 // Direct edit of a product node's spec (`rex product edit`, the dashboard's capability form)
 export { handleProductEdit, ProductEditError } from "./core/product-edit.js";

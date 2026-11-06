@@ -152,3 +152,41 @@ export function buildTierTable(
   }
   return rows;
 }
+
+/** Vendors the Your tooling tile summarises: the ones with a CLI or a local server. */
+export const TOOLING_VENDORS = ["claude", "codex", "local"] as const satisfies readonly LLMVendor[];
+
+/** The three tiers the tile shows; `free` and the agent pin stay on the Settings page. */
+const TOOLING_TIERS = ["light", "standard", "heavy"] as const satisfies readonly TaskTier[];
+
+export interface VendorTierSummary {
+  tier: (typeof TOOLING_TIERS)[number];
+  model: string;
+}
+
+/** The model each of light, standard and heavy resolves to, per tooling vendor — whether or not it is the active one. */
+export function buildVendorTiers(config: LLMConfig): Record<(typeof TOOLING_VENDORS)[number], VendorTierSummary[]> {
+  const out = {} as Record<(typeof TOOLING_VENDORS)[number], VendorTierSummary[]>;
+  for (const vendor of TOOLING_VENDORS) {
+    out[vendor] = TOOLING_TIERS.map((tier) => ({ tier, model: resolveTier(tier, vendor, config).model }));
+  }
+  return out;
+}
+
+export interface RouteOverride {
+  taskClass: string;
+  label: string;
+  tier: string;
+}
+
+/**
+ * Commands whose saved `llm.routes` entry names a different tier than the
+ * default route. An entry equal to the default is not an override; a glob or
+ * prefix key that is not a registered class is listed under its own name.
+ */
+export function buildRouteOverrides(config: LLMConfig): RouteOverride[] {
+  return Object.entries(config.routes ?? {})
+    .filter(([taskClass, tier]) => DEFAULT_ROUTES[taskClass] !== tier)
+    .map(([taskClass, tier]) => ({ taskClass, label: TASK_CLASS_LABELS[taskClass] ?? taskClass, tier }))
+    .sort((a, b) => a.taskClass.localeCompare(b.taskClass));
+}

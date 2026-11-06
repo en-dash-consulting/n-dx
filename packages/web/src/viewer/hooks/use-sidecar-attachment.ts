@@ -23,13 +23,26 @@ export interface SidecarLensInfo {
   target?: { kind: string; needs: string };
 }
 
-export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change";
+export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change" | "area" | "inbox";
 
 /** The thing the current page is about. `ref` is what the lens packet is pointed at; Plan and Live have none. */
 export interface SidecarPageItem {
   kind: SidecarPageItemKind;
   ref?: string;
   label: string;
+  /** A lens the operator asked for by name ("Diagnose in Sidecar"), ahead of the kind's default. */
+  lens?: string;
+  /**
+   * What a lens choice and a removal are held against, when not `kind:ref`.
+   * An explicit request gives each click its own, so a choice made on the
+   * page (General on Plan) cannot outlive the operator asking again.
+   */
+  key?: string;
+}
+
+/** The key a lens choice or a removal is held against. */
+export function pageItemKey(item: SidecarPageItem | null): string {
+  return item ? item.key ?? `${item.kind}:${item.ref ?? ""}` : "";
 }
 
 export const GENERAL_LENS = "general";
@@ -45,12 +58,66 @@ export interface SidecarPageSelection {
   worktree?: string | null;
   /** The change awaiting placement attached by "Place with Sidecar", by id. */
   changeId?: string | null;
+  /** The task whose failed run "Diagnose in Sidecar" attached, by id; asks with Diagnose run on any page. */
+  diagnoseTaskId?: string | null;
+  /** The change "Describe in Sidecar" / "Tighten with Sidecar" attached, by id; asks with Describe. */
+  describeChangeId?: string | null;
+  /** The change selected in the Inbox triage queue; asks with Place on the Inbox page. */
+  inboxChangeId?: string | null;
+  /**
+   * "Ask Sidecar" / "Explain in Sidecar" on a task, capability or zone page:
+   * attaches that item with its kind's default lens, until the page shows another item. `seq` counts the clicks,
+   * so each one re-attaches an item the operator had removed.
+   */
+  ask?: { kind: "task" | "capability" | "zone"; ref: string; seq: number } | null;
+  /**
+   * "Plan with Sidecar" on a capture bar: asks with the Plan lens, aimed at
+   * `area` when the capture was area-scoped. `seq` counts the clicks, so each
+   * one starts again from the Plan lens.
+   */
+  plan?: { area: string | null; seq: number } | null;
+  /**
+   * The area view that is open, on Plan's tile or the Product page: its area
+   * id and title, and the capability selected inside it. Asks with Explain on
+   * the area, or on the capability while one is selected.
+   */
+  areaView?: { id: string; label: string; capabilityId: string | null } | null;
+}
+
+/** An ask holds only while the page still shows the item it was made on. */
+function askStillApplies(page: SidecarPageSelection, ask: { kind: "task" | "capability" | "zone"; ref: string }): boolean {
+  switch (ask.kind) {
+    case "task": return page.taskId === ask.ref;
+    case "zone": return page.zone === ask.ref;
+    case "capability": return page.capabilityId === ask.ref || page.areaView?.capabilityId === ask.ref;
+  }
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
 export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null {
   // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
   if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
+  if (page.diagnoseTaskId) return { kind: "task", ref: page.diagnoseTaskId, label: page.diagnoseTaskId, lens: "diagnose-run" };
+  if (page.describeChangeId) {
+    return { kind: "change", ref: page.describeChangeId, label: page.describeChangeId, lens: "describe", key: `describe:${page.describeChangeId}` };
+  }
+  if (page.ask && askStillApplies(page, page.ask)) {
+    const { kind, ref, seq } = page.ask;
+    return { kind, ref, label: ref, key: `ask:${kind}:${ref}:${seq}` };
+  }
+  if (page.plan) {
+    const key = `plan-with:${page.plan.area ?? ""}:${page.plan.seq}`;
+    return page.plan.area
+      ? { kind: "area", ref: page.plan.area, label: page.plan.area, lens: "plan", key }
+      : { kind: "plan", label: "Plan", lens: "plan", key };
+  }
+  // The area view is open on Plan or Product: its selected capability, else the area itself.
+  if (page.areaView) {
+    const { id, label, capabilityId } = page.areaView;
+    return capabilityId
+      ? { kind: "capability", ref: capabilityId, label: capabilityId }
+      : { kind: "area", ref: id, label };
+  }
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };
   }
@@ -59,6 +126,12 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
     return { kind: "capability", ref: page.capabilityId, label: page.capabilityId };
   }
   if (page.view === "workspaces" && page.worktree) return { kind: "worktree", ref: page.worktree, label: page.worktree };
+  // The Inbox is about changes awaiting placement: the selected one, else the queue.
+  if (page.view === "inbox") {
+    return page.inboxChangeId
+      ? { kind: "change", ref: page.inboxChangeId, label: page.inboxChangeId }
+      : { kind: "inbox", label: "Inbox" };
+  }
   if (page.view === "plan") return { kind: "plan", label: "Plan" };
   if (page.view === "live" || page.view === "live-analyze") return { kind: "live", label: "Live" };
   return null;
@@ -66,14 +139,17 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
 
 /** The lens id a page item asks for, before the registry is consulted. */
 export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boolean): string {
+  if (item?.lens) return item.lens;
   switch (item?.kind) {
     case "task": return lastRunFailed ? "diagnose-run" : "describe";
     case "capability":
+    case "area":
     case "zone": return "explain";
     case "plan": return "plan";
     case "live": return "guide";
     case "worktree": return "diagnose-branch";
-    case "change": return "place";
+    case "change":
+    case "inbox": return "place";
     default: return GENERAL_LENS;
   }
 }
@@ -164,7 +240,7 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   const [removedKey, setRemovedKey] = useState<string | null>(null);
 
   const pageItem = pageItemFor(page);
-  const key = pageItem ? `${pageItem.kind}:${pageItem.ref ?? ""}` : "";
+  const key = pageItemKey(pageItem);
   const taskRef = pageItem?.kind === "task" ? pageItem.ref ?? null : null;
 
   useEffect(() => {

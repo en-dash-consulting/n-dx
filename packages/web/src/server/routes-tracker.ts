@@ -10,6 +10,12 @@
  *   GET  /api/tracker/cards/form?requestId=   -> { externalCall } the form a waiting card's call is drawn from
  *   POST /api/tracker/cards/decide { requestId, action: "dismiss" | "approve", args? }
  *                                 -> { entry } approve makes the call once with the operator's args
+ *   GET  /api/tracker/changes     -> { tracker, changes } each change's chip: its refs and the state ndx
+ *                                 last set, from the activity log; makes no tracker call
+ *   GET  /api/tracker/changes/:id/state  -> { ref, state, readAt } | { ref, state: null, problem } the
+ *                                 linked work item's current state, one readTool call kept a minute
+ *                                 (tracker/item-state.ts); the change detail asks when it opens
+ *   POST /api/tracker/changes/:id/create  raise the change's create card
  *
  * The tick is the hub's clock: it is answered only on the per-user token
  * itself. A browser session is refused here, and a Sidecar broker credential
@@ -31,7 +37,12 @@ import { collectTrackerEvents, type TrackerEventExec } from "./tracker/event-sou
 import { readSourceProblems, type SourceProblem } from "./tracker/source-problems.js";
 import { TRACKER_EVENTS } from "./tracker/server-profiles.js";
 import { loadTrackerSync } from "./tracker/sync-config.js";
-import { decideTrackerCard, enqueueTrackerEvent, runTrackerSyncTick, type CardDecision, type TrackerSyncService } from "./tracker/sync-engine.js";
+import { decideTrackerCard, enqueueTrackerEvent, prepareTrackerSync, raiseCreateCard, runTrackerSyncTick, type CardDecision, type TrackerSyncService } from "./tracker/sync-engine.js";
+import { changeChips } from "./tracker/change-chips.js";
+import { findItemByRef } from "./tracker/item-links.js";
+import { readTrackerItemState } from "./tracker/item-state.js";
+import { itemLinkRefs, type LinkFields } from "./tracker/link-refs.js";
+import { resolveStore, type PRDItem } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 
 export const TRACKER_PREFIX = "/api/tracker";
@@ -39,6 +50,9 @@ const TICK_PATH = `${TRACKER_PREFIX}/sync/tick`;
 const ACTIVITY_PATH = `${TRACKER_PREFIX}/activity`;
 const FORM_PATH = `${TRACKER_PREFIX}/cards/form`;
 const DECIDE_PATH = `${TRACKER_PREFIX}/cards/decide`;
+const CHANGES_PATH = `${TRACKER_PREFIX}/changes`;
+const CREATE_PATH = new RegExp(`^${TRACKER_PREFIX}/changes/([^/]+)/create$`);
+const STATE_PATH = new RegExp(`^${TRACKER_PREFIX}/changes/([^/]+)/state$`);
 
 /** The most entries the activity route answers, newest kept. */
 export const MAX_ACTIVITY_ENTRIES = 200;
@@ -125,9 +139,64 @@ export async function handleTrackerRoute(
     else if (action === "approve" && args && typeof args === "object" && !Array.isArray(args)) decision = { action, args: args as Record<string, unknown> };
     else return refuse(res, 400, 'action is "dismiss", or "approve" with args');
     const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
-    const decided = await decideTrackerCard({ projectDir: ctx.projectDir, service }, requestId, decision);
+    const decided = await decideTrackerCard({ projectDir: ctx.projectDir, rexDir: ctx.rexDir, service }, requestId, decision);
     if (!decided.ok) return refuse(res, decided.status, decided.error);
     jsonResponse(res, 200, { entry: decided.entry });
+    return true;
+  }
+
+  if (pathname === CHANGES_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
+    const ready = prepareTrackerSync({ projectDir: ctx.projectDir, service });
+    // No usable tracker connection: nothing to chip and nothing to create in.
+    if ("state" in ready) {
+      jsonResponse(res, 200, { tracker: null, changes: {} });
+      return true;
+    }
+    const store = await resolveStore(ctx.rexDir);
+    const { items } = await store.loadDocument();
+    jsonResponse(res, 200, {
+      tracker: { label: ready.profile.label },
+      changes: changeChips(items, readTrackerActivity(ctx.projectDir), ready.mapping),
+    });
+    return true;
+  }
+
+  const live = STATE_PATH.exec(pathname);
+  if (live) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
+    const ready = prepareTrackerSync({ projectDir: ctx.projectDir, service });
+    if ("state" in ready) return refuse(res, 422, "tracker sync is not configured");
+    const store = await resolveStore(ctx.rexDir);
+    const { items } = await store.loadDocument();
+    const found = findItemByRef(items, decodeURIComponent(live[1]));
+    if (!found || found.type !== "change") return refuse(res, 404, `Change "${live[1]}" not found`);
+    const [ref] = itemLinkRefs(found as PRDItem & LinkFields);
+    if (!ref) return refuse(res, 409, `Change "${found.id}" links to no work item`);
+    const options = { projectDir: ctx.projectDir, service, connection: ready.config.connection, mapping: ready.mapping };
+    jsonResponse(res, 200, await readTrackerItemState(options, ref));
+    return true;
+  }
+
+  const create = CREATE_PATH.exec(pathname);
+  if (create) {
+    if (method !== "POST") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    const changeId = decodeURIComponent(create[1]);
+    const store = await resolveStore(ctx.rexDir);
+    const { items } = await store.loadDocument();
+    const found = findItemByRef(items, changeId);
+    if (!found || found.type !== "change") return refuse(res, 404, `Change "${changeId}" not found`);
+    const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
+    // A linked change plans nothing (rules.ts), so it is refused rather than created twice.
+    const [ref] = itemLinkRefs(found as PRDItem & LinkFields);
+    const raised = raiseCreateCard(
+      { projectDir: ctx.projectDir, service },
+      { event: "change-captured", rexId: found.id, ...(ref && { ref }), values: { title: found.title } },
+    );
+    if (!raised.ok) return refuse(res, raised.status, raised.error);
+    jsonResponse(res, 200, { requestId: raised.requestId, entry: raised.entry });
     return true;
   }
 

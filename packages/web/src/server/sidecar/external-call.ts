@@ -56,7 +56,7 @@ export function resultData(result: CallToolResult): unknown {
 }
 
 /** `path` (dotted keys; empty for the root) into `data`. */
-function at(data: unknown, path: string): unknown {
+export function dataAt(data: unknown, path: string): unknown {
   let current = data;
   for (const key of path.split(".").filter(Boolean)) {
     if (!isRecord(current)) return undefined;
@@ -131,7 +131,7 @@ async function readOptions(
     const result = await Promise.race([read, expired]);
     if (result === "expired" || result.isError) return [];
     const data = resultData(result);
-    return optionsOf("auto" in hint ? autoList(data) : at(data, hint.optionsFrom.path));
+    return optionsOf("auto" in hint ? autoList(data) : dataAt(data, hint.optionsFrom.path));
   } catch {
     // A hint is an aid: an unreachable server or a malformed result leaves a plain field.
     return [];

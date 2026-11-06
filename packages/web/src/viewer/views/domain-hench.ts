@@ -12,6 +12,7 @@
 
 export { HenchRunsView } from "./hench-runs.js";
 export { AdaptiveOptimizationView } from "./adaptive-optimization.js";
+export { OutcomesPanel } from "./outcomes-panel.js";
 
 // TODO(ask-panel): a Hench-scoped Ask panel gets exported here once the
 // SourceVision one (PRD feature d339458a) is generalised. Its domain context is

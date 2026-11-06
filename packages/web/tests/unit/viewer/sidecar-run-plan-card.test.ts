@@ -189,6 +189,20 @@ describe("the run-plan card", () => {
     expect(el.querySelectorAll(".sidecar-run-plan-lane")[1].querySelector(".sidecar-run-plan-started")).toBeNull();
   });
 
+  it("reads open again, offering Start lane, once a started run's card is revised to failed", async () => {
+    const send = vi.fn(async (_prompt: string) => true);
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    const draw = (carriedOut: { ok: boolean }) => act(async () => {
+      render(h(SidecarCards, { cards: [decided(), workCard({ status: "approved", carriedOut })], manifest: null, decide: vi.fn(async () => true), send }), host!);
+    });
+    await draw({ ok: true });
+    expect(badges(host)).toEqual({ started: "Started", raised: null });
+    await draw({ ok: false });
+    expect(badges(host)).toEqual({ started: null, raised: null });
+    expect(host.querySelectorAll(".sidecar-run-plan-lane")[0].querySelector(".sidecar-run-plan-restart")).not.toBeNull();
+  });
+
   it.each([
     ["denied", { status: "denied" }],
     ["withdrawn", { status: "withdrawn", reason: "the turn stopped" }],

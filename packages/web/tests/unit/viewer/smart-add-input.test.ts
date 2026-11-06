@@ -4,7 +4,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SmartAddInput } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
+import { SmartAddInput, type CaptureArea } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
 import { takePlacementRequest } from "../../../src/viewer/components/prd-tree/change-placement.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
@@ -1078,6 +1078,79 @@ describe("SmartAddInput placement choice on a v2 PRD", () => {
     click(accept(root));
     await settle();
     expect(bodyOf("/api/rex/items")[0].touches).toEqual([SEARCHED]);
+  });
+
+  describe("in an area (AD6)", () => {
+    const AREA_CAP = "01J9CAP0000000000000000000A";
+    const AREA_RULE = "01J9CON0000000000000000000A";
+    const area = {
+      id: "area-pay",
+      slug: "payments",
+      title: "Payments",
+      capabilities: [{ id: AREA_CAP, title: "Refund an order", status: "met", health: "ok", criteriaCount: 1, openChanges: [] }],
+      constraints: [{ id: AREA_RULE, title: "Card data stays encrypted", health: "ok", appliesTo: ["Payments"] }],
+    } as unknown as CaptureArea;
+
+    async function search(root: HTMLElement, text: string) {
+      const input = root.querySelector<HTMLInputElement>(".smart-add-place .cp-search-input")!;
+      input.value = text;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await settle();
+      return [...root.querySelectorAll(".cp-search-result")].map((r) => r.textContent ?? "");
+    }
+
+    it("asks for the area's shortlist, names the area and hides the scope selector", async () => {
+      route(previewOf(strongUntied));
+      const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2", area }));
+      await preview(root);
+
+      expect(bodyOf("/api/rex/smart-add-preview")).toEqual([{ text: "Hide the console window when spawning", area: "area-pay" }]);
+      expect(root.querySelector(".smart-add-title")!.textContent).toBe("Change in Payments");
+      expect(root.querySelector(".smart-add-place legend")!.textContent).toBe("Suggested placement in Payments");
+      expect(root.querySelector(".smart-add-scope")).toBeNull();
+    });
+
+    it("searches only the area's capabilities and constraints, never the whole map", async () => {
+      route(previewOf({ relation: "touches", tied: false, shortlist: [] }));
+      const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2", area }));
+      await preview(root);
+
+      expect(root.querySelector(".cp-shortlist-empty")!.textContent).toBe("No placement suggested in Payments. Search it, or leave it in the Inbox.");
+      expect(fetchSpy.mock.calls.some((c) => c[0] === "/api/rex/product")).toBe(false);
+      // "Process windows" is on the product map, outside the area.
+      expect(await search(root, "window")).toEqual([]);
+      expect((await search(root, "refund")).join()).toContain("Refund an order");
+      expect((await search(root, "encrypted")).join()).toContain("Card data stays encrypted");
+    });
+
+    it("Add & place writes the change placed on the chosen area target, not in the Inbox", async () => {
+      route(previewOf({ relation: "touches", tied: false, shortlist: [] }));
+      const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2", area }));
+      await preview(root);
+
+      await search(root, "refund");
+      click(root.querySelector(".cp-search-result"));
+      await settle();
+      expect(accept(root).textContent).toBe("Add 1 change & place it");
+      click(accept(root));
+      await settle();
+
+      expect(bodyOf("/api/rex/items")[0].touches).toEqual([AREA_CAP]);
+      expect(bodyOf("/api/rex/smart-add-accept")).toEqual([]);
+    });
+
+    it("lands the change in the Inbox when nothing is chosen", async () => {
+      route(previewOf({ relation: "touches", tied: false, shortlist: [] }));
+      const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2", area }));
+      await preview(root);
+
+      expect(accept(root).textContent).toBe("Add to Inbox");
+      click(accept(root));
+      await settle();
+
+      expect(bodyOf("/api/rex/smart-add-accept")).toEqual([{ text: "Hide the console window when spawning" }]);
+      expect(bodyOf("/api/rex/items")).toEqual([]);
+    });
   });
 
   it("Amends… adds the change to the Inbox and opens its detail panel on Amends", async () => {

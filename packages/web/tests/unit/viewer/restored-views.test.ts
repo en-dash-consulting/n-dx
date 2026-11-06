@@ -20,7 +20,8 @@ import {
   REX_SCOPE_VIEWS,
   buildValidViews,
 } from "../../../src/shared/index.js";
-import { STAGES, viewLabel } from "../../../src/viewer/views/index.js";
+import { STAGES, viewLabel, stageForView } from "../../../src/viewer/views/index.js";
+import { tileTitle } from "../../../src/viewer/views/stage-tiles.js";
 
 const emptyData: LoadedData = {
   manifest: null,
@@ -98,5 +99,34 @@ describe("restored views: navigation entries", () => {
 
   it("analysis is a section of the Plan stage", () => {
     expect(STAGES.plan.sections.map((s) => s.view)).toContain("analysis");
+  });
+});
+
+describe("views moved into Tune", () => {
+  const MOVED: ViewId[] = ["hench-runs", "activity", "token-usage", "hench-optimization", "hench-adaptive", "merge-graph"];
+
+  it.each(MOVED)("%s still resolves, renders, and sits under Tune", (view) => {
+    expect(buildValidViews(null).has(view)).toBe(true);
+    expect(renderActiveView(view, makeCtx())).toBeTruthy();
+    expect(stageForView(view)).toBe("tune");
+    expect(viewLabel("tune")).toBe("Tune");
+  });
+
+  it("Plan and Work no longer list them", () => {
+    const listed = [...STAGES.plan.sections, ...STAGES.work.sections].map((s) => s.view);
+    for (const view of MOVED) expect(listed).not.toContain(view);
+  });
+
+  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped, Outcomes by tier and Your tooling", () => {
+    const tiles = STAGES.tune.tiles!;
+    expect(tiles.map(tileTitle)).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
+    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], [], []]);
+    expect(tiles[0]).toMatchObject({ cols: 8, rows: 2 });
+    // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.
+    expect(tiles[4]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
+    expect(tiles[4].cols ?? 4).toBe(4);
+    // Your tooling is a 4×2 read-only panel; its lines link to Settings, which cannot be a stage view.
+    expect(tiles[5]).toMatchObject({ view: "hench-optimization", panel: "tooling", rows: 2 });
+    expect(tiles[5].cols ?? 4).toBe(4);
   });
 });

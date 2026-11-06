@@ -254,3 +254,130 @@ describe("GET /api/tracker/activity", () => {
     expect(await sources()).toEqual([]);
   });
 });
+
+describe("change chips and Create in tracker (SP8)", () => {
+  const CHANGE = "c0000000-0000-4000-8000-000000000001";
+  const createdId = `ndx:ndx:${CHANGE}:change-captured`;
+  const chips = async () => (await fetch(`${server.baseUrl}/api/tracker/changes`, { headers: auth })).json();
+  const create = (id: string, headers: Record<string, string> = auth) =>
+    fetch(`${server.baseUrl}/api/tracker/changes/${encodeURIComponent(id)}/create`, { method: "POST", headers });
+  const activityLog = async () => (await fetch(`${server.baseUrl}/api/tracker/activity`, { headers: auth })).json();
+  const rexDir = () => join(root, ".rex");
+
+  beforeEach(() => {
+    cpSync(resolve(__dirname, "../../../rex/tests/fixtures/v2-tree"), rexDir(), { recursive: true });
+  });
+
+  it("answers no tracker, and refuses Create, while no trackerSync settings name a connection", async () => {
+    writeFileSync(join(root, ".n-dx.local.json"), "{}");
+    expect(await chips()).toEqual({ tracker: null, changes: {} });
+    expect((await create(CHANGE)).status).toBe(422);
+    expect((await activityLog()).cards).toEqual([]);
+  });
+
+  it("chips a linked change with its refs, and the state sync last set", async () => {
+    expect(await chips()).toEqual({ tracker: { label: "CAOS" }, changes: {} });
+    expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: null } });
+    appendTrackerActivity(root, {
+      at: "2026-11-05T12:00:00.000Z", event: "pr-opened", rexId: CHANGE, rule: "move", mode: "on",
+      requestId: `ndx:ndx:${CHANGE}:pr-opened`, call: { tool: "move_work_item", args: {} }, result: "ok",
+    });
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: "readyForReview" } });
+  });
+
+  it("raises one waiting card for an unlinked change, writing nothing to the PRD or the tracker", async () => {
+    const res = await create(CHANGE);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      requestId: createdId,
+      entry: { result: "card", rule: "create", call: { tool: "create_work_item", args: { requestId: createdId, initialStatus: "backlog" } } },
+    });
+    expect((await activityLog()).cards).toEqual([createdId]);
+    // The change is not linked: still offered Create, never chipped.
+    expect((await chips()).changes).toEqual({});
+    // Asked again while it waits: the same card, not a second one.
+    expect((await (await create(CHANGE)).json()).requestId).toBe(createdId);
+    const log = await activityLog();
+    expect(log.entries.filter((e: TrackerActivityEntry) => e.requestId === createdId)).toHaveLength(1);
+  });
+
+  it("refuses a task, an unknown id, a change sync already created, and a linked change", async () => {
+    expect((await create("c0000000-0000-4000-8000-000000000002")).status).toBe(404);
+    expect((await create("no-such-change")).status).toBe(404);
+    appendTrackerActivity(root, {
+      at: "2026-11-05T12:00:00.000Z", event: "change-captured", rexId: CHANGE, rule: "create", mode: "on",
+      requestId: createdId, call: { tool: "create_work_item", args: {} }, result: "ok",
+    });
+    expect((await create(CHANGE)).status).toBe(409);
+    // Created but not linked yet: chipped as created, so Create is not offered again.
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: [], state: "backlog" } });
+    expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+    expect((await create(CHANGE)).status).toBe(409);
+  });
+
+  describe("the linked item's state against the fake CAOS server", () => {
+    let fake: FakeMcpHttpServer;
+    let status: string;
+    const liveState = async (id = CHANGE) => fetch(`${server.baseUrl}/api/tracker/changes/${encodeURIComponent(id)}/state`, { headers: auth });
+    const reads = () => fake.calls.filter((c) => c.name === "get_work_item");
+
+    beforeEach(async () => {
+      status = "inReview";
+      fake = await startFakeMcpHttpServer({
+        extraTools: (s) => addCaosTools(s, {
+          get_work_item: ({ workItemId }: { workItemId: string }) => ({ content: [{ type: "text", text: JSON.stringify({ id: workItemId, status }) }] }),
+        }),
+      });
+      await service.close();
+      const caos = { id: "caos", label: "CAOS", auth: "none", transport: "http", url: fake.url, profile: "caos" } as ConnectionConfig;
+      service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {}, connections: [caos] });
+    });
+
+    afterEach(async () => {
+      await fake.close();
+    });
+
+    it("chips a hand-linked change sync never moved with no state, making no tracker call", async () => {
+      expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+      expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: null } });
+      expect(fake.calls).toEqual([]);
+    });
+
+    it("reads the current state once with the profile's readTool, and keeps it for the next open", async () => {
+      // A URL the profile's template built reads back as the tracker's id.
+      const url = "https://www.notion.so/0123456789abcdef0123456789abcdef";
+      expect(await changeItemLink(rexDir(), CHANGE, url, "link")).toMatchObject({ ok: true });
+      const first = await liveState();
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({ ref: url, state: "inReview" });
+      expect(reads()).toEqual([{ name: "get_work_item", arguments: { workItemId: "01234567-89ab-cdef-0123-456789abcdef" } }]);
+      status = "done";
+      expect(await (await liveState()).json()).toMatchObject({ state: "inReview" });
+      expect(reads()).toHaveLength(1);
+    });
+
+    it("refuses a change with no link, and one that is not a change", async () => {
+      expect((await liveState()).status).toBe(409);
+      expect((await liveState(TASK)).status).toBe(404);
+      expect(fake.calls).toEqual([]);
+    });
+  });
+
+  it("answers the state unknown, keeping the ref, while the connection is unreachable", async () => {
+    expect(await changeItemLink(rexDir(), CHANGE, "WM-9", "link")).toMatchObject({ ok: true });
+    const res = await fetch(`${server.baseUrl}/api/tracker/changes/${CHANGE}/state`, { headers: auth });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ref: "WM-9", state: null });
+    expect(body.problem).toMatch(/caos/);
+    expect((await chips()).changes).toEqual({ [CHANGE]: { refs: ["WM-9"], state: null } });
+  });
+
+  it("needs a credential, and is off with web.sidecar", async () => {
+    expect((await create(CHANGE, {})).status).toBe(401);
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { web: { sidecar: false } } }));
+    expect((await create(CHANGE)).status).toBe(403);
+    expect((await fetch(`${server.baseUrl}/api/tracker/changes`, { headers: auth })).status).toBe(403);
+  });
+});

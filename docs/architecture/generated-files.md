@@ -15,7 +15,8 @@ an assistant reads them at most to diagnose something, never to edit.
 | `.sourcevision/.cache/inventory-fingerprint.json` | Hash of the sourcevision version and the merged language config the last inventory was made under. An incremental `sv analyze` reuses inventory.json's entries only when it matches, so a rule change or upgrade reclassifies unchanged files. Machine-local; safe to delete — the next run rebuilds the inventory in full |
 | `.sourcevision/.cache/analyses.jsonl` | One line per `sv analyze` run — mode, wall-clock per phase, calls/tokens/time per LLM task class (the same record as `manifest.lastAnalysis`, kept for the last 200 runs). Machine-local; safe to delete |
 | `.sourcevision/.cache/analyze-progress.json` | Live progress of the current or last `sv analyze` — phase, enrichment pass, batch k of n, LLM use so far — rewritten as the run moves and marked complete/failed at the end; served as `progress` on `GET /api/commands/sv-analyze/status`. Read it through `readAnalyzeProgress`, which reports a `running` file as `interrupted` when its pid is dead or, where `ps` can tell, now belongs to another program. Machine-local; safe to delete |
-| `.n-dx-web-usage.jsonl` | Dashboard LLM spend ledger — one line per Ask call (vendor, model, token classes, outcome). Read by the LLM Utilization view as the `web` package bucket; not attributed to any PRD item. Machine-local; safe to delete |
+| `.n-dx-web.pid`, `.n-dx-web.port` (`.ndx/web.pid`, `.ndx/web.port`) | Dashboard process and port markers written by `ndx start`. `ndx init` and `ndx migrate-layout` gitignore them with the ledger. Machine-local; safe to delete when no dashboard runs |
+| `.n-dx-web-usage.jsonl` (`.ndx/web-usage.jsonl`) | Dashboard LLM spend ledger — one line per Ask call (vendor, model, token classes, outcome). Read by the LLM Utilization view as the `web` package bucket; not attributed to any PRD item. Machine-local; safe to delete |
 
 ## See also
 

@@ -21,6 +21,14 @@ Done when (checks):
 - [ ] Valid passwords authenticate users
 - [ ] Invalid passwords show a generic error
 
+## Subtasks
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- subtask Add password form: completed
+  Done when:
+  - [ ] Fields are labelled
+  - [ ] Submit is disabled while pending
+
 ## Likely files
 _source: task text, .rex/ (live read); git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
 

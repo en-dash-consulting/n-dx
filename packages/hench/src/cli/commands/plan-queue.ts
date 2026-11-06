@@ -16,7 +16,7 @@ import type { V2Tree } from "../../prd/rex-gateway.js";
 import { listWorktrees, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { loadConfig } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
-import { resolveHenchPaths } from "../../store/paths.js";
+import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { loadV2Tree } from "../../agent/planning/work-selection.js";
 import { resolveProjectCliName } from "../../agent/planning/cli-identity.js";
 import { TaskClaims } from "../../process/task-claims.js";
@@ -24,6 +24,7 @@ import { countActiveLocksReadOnly } from "../../process/limiter.js";
 import { OWN_WORKTREE_NOTE, planQueue } from "../../queue/plan-queue.js";
 import type { ActiveRunCount, QueueChange, QueuePlan, QueueTask } from "../../queue/plan-queue.js";
 import { CLIError } from "../errors.js";
+import { assertPrdFolderExists } from "./prd-folder.js";
 import { result as output, warn } from "../output.js";
 
 type TreeNode = V2Tree["changes"][number];
@@ -177,7 +178,9 @@ export async function countRepositoryActiveRuns(dir: string): Promise<ActiveRunC
 export async function cmdPlanQueue(dir: string, flags: Record<string, string>): Promise<void> {
   const henchDir = resolveHenchPaths(dir).henchDir;
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
-  const store = await resolveStore(join(dir, config.rexDir));
+  const rexDir = resolveHenchRexDir(dir, config.rexDir);
+  assertPrdFolderExists(dir, rexDir);
+  const store = await resolveStore(rexDir);
   const tree = await loadV2Tree(store);
   if (!tree) {
     throw new CLIError(

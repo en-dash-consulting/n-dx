@@ -1,6 +1,9 @@
 /**
- * `rex change place <change>` and `rex change apply <change>`: the change
- * layer of a v2 PRD.
+ * `rex change place <change>`, `rex change apply <change>` and
+ * `rex change inbox`: the change layer of a v2 PRD.
+ *
+ * `inbox` lists every open change awaiting placement with its age and top-5
+ * shortlist (`core/change-inbox.ts`); on a v1 PRD it says so and exits 0.
  *
  * `place` without `--target` prints the placement rules' shortlist; with it,
  * records the placement (`core/change-place.ts`); with `--propose`, records a
@@ -11,11 +14,12 @@
  */
 
 import { applyAmendments, ApplyAmendmentsError, NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
+import { listInbox, type InboxRow } from "../../core/change-inbox.js";
 import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../core/change-place.js";
 import { indexTree, type RuleNode } from "../../schema/v2-rules.js";
 import { ADDED_NODE_TYPES, type AddedNodeType, type Criterion } from "../../schema/v2.js";
 import { resolveRexPaths, resolveStore } from "../../store/index.js";
-import { loadPrdModel } from "../../store/prd-model-reader.js";
+import { loadPrdModel, prdLayout } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
 import { CLIError } from "../errors.js";
 import { result, warn } from "../output.js";
@@ -31,7 +35,7 @@ import {
   requireV2,
 } from "./v2-cli.js";
 
-export const CHANGE_SUBCOMMANDS = ["place", "apply"] as const;
+export const CHANGE_SUBCOMMANDS = ["place", "apply", "inbox"] as const;
 
 const RELATIONS = new Set(["touches", "amends"]);
 
@@ -42,16 +46,54 @@ export async function cmdChange(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
-  if (sub !== "place" && sub !== "apply") {
+  if (sub !== "place" && sub !== "apply" && sub !== "inbox") {
     throw new CLIError(
       sub ? `Unknown change subcommand: ${sub}` : "Missing change subcommand.",
       `Usage: rex change <${CHANGE_SUBCOMMANDS.join("|")}> <change> … (see 'rex change --help')`,
     );
   }
   const rexDir = resolveRexPaths(dir).rexDir;
+  if (sub === "inbox") return inboxChanges(rexDir, ref, flags);
   await requireV2(rexDir, `change ${sub}`);
   if (!ref) throw new CLIError("Missing the change id.", `Usage: rex change ${sub} <change> [options] [dir]`);
   return sub === "place" ? placeChange(rexDir, ref, flags, multiFlags) : applyChange(rexDir, ref, flags);
+}
+
+const INBOX_NOT_APPLICABLE =
+  "Not applicable: this PRD uses the v1 layout (.rex/prd_tree/), which has no Inbox of changes awaiting placement.";
+
+/** `rex change inbox`: every open change held for placement, oldest first. A v1 tree answers plainly, exit 0. */
+async function inboxChanges(rexDir: string, ref: string | undefined, flags: Record<string, string>): Promise<void> {
+  if (ref) throw new CLIError(`rex change inbox takes no change id (got ${ref}).`, "Usage: rex change inbox [--format=json] [dir]");
+  const json = flags.format === "json";
+  if ((await prdLayout(rexDir)) !== "v2") {
+    return result(json ? JSON.stringify({ applicable: false, layout: "v1", message: INBOX_NOT_APPLICABLE }, null, 2) : INBOX_NOT_APPLICABLE);
+  }
+  const { tree } = await loadPrdModel(rexDir);
+  const { rows } = listInbox(tree, new Date());
+  if (json) return result(JSON.stringify({ applicable: true, layout: "v2", count: rows.length, changes: rows }, null, 2));
+  if (!rows.length) return result("The Inbox is empty: no open change is awaiting placement.");
+  const index = indexTree(tree);
+  const label = (id: string) => {
+    const node = index.resolve(id);
+    return node ? `${nodeLabel(node)} ${node.title}` : id;
+  };
+  result([`${rows.length} change${rows.length === 1 ? "" : "s"} awaiting placement:`, ...rows.flatMap((r) => inboxLines(r, label))].join("\n"));
+}
+
+function inboxLines(row: InboxRow, label: (id: string) => string): string[] {
+  const age = row.ageDays === undefined ? "age unknown" : `${row.ageDays}d old`;
+  return [
+    "",
+    `${row.displayId ?? row.id}  ${row.title}  (${age})`,
+    ...(row.intent ? [`  Intent: ${row.intent}`] : []),
+    ...(row.shortlist.length
+      ? [
+          `  Shortlist (${row.relation}${row.tied ? ", top two tied" : ""}):`,
+          ...row.shortlist.map((c, i) => `    ${i + 1}. ${label(c.target)}  score ${c.score} (${c.strength})${c.reasons.length ? `: ${c.reasons.join("; ")}` : ""}`),
+        ]
+      : ["  Shortlist: no capability or constraint matched."]),
+  ];
 }
 
 async function placeChange(rexDir: string, ref: string, flags: Record<string, string>, multiFlags: Record<string, string[]>): Promise<void> {
@@ -226,6 +268,7 @@ function placementRefusal(err: ChangePlacementError): CLIError {
       );
     case "applied-change-amends":
       return new CLIError(err.plain, "Pass --relation=touches with --target, and no --proposed or capability criteria.");
+    case "not-touched":
     case "already-amends":
     case "already-proposed":
     case "rule-errors":

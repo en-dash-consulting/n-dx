@@ -11,6 +11,7 @@ import { act } from "preact/test-utils";
 import { InboxTriagePage, isTypingTarget, shortcutFor } from "../../../src/viewer/views/inbox-triage.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { takeTitleFocus } from "../../../src/viewer/components/prd-tree/change-placement.js";
+import { PlaceWithSidecarContext } from "../../../src/viewer/components/place-with-sidecar.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import type { ChangePlacement, ChangeRow, PlacementCandidate, ProductMap } from "../../../src/viewer/views/product-model.js";
 
@@ -23,8 +24,8 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
-    amends: [], touches: [], taskCount: 2, completedTaskCount: 0, ...extra,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
+    amends: [], touches: [], taskCount: 2, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
 
@@ -47,9 +48,9 @@ function placement(id: string, shortlist: PlacementCandidate[], tags?: string[])
 }
 
 const MAP: ProductMap = {
-  areas: [{ id: "area-pay", title: "Payments", capabilities: [
+  areas: [{ id: "area-pay", slug: "payments", title: "Payments", capabilities: [
     { id: "cap-refund", title: "Refunds", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
-  ] }],
+  ], openChangeIds: [] }],
   constraints: [],
 };
 
@@ -72,7 +73,7 @@ function serve(next: ChangeRow[], lists: ChangePlacement[]): void {
       const body = JSON.parse(String(init.body)) as Record<string, unknown>;
       posts.push({ url, body });
       const id = decodeURIComponent(url.split("/")[4]);
-      changes = changes.map((c) => (c.id === id ? { ...c, awaitsPlacement: undefined, needsPlacement: false } : c));
+      changes = changes.map((c) => (c.id === id ? { ...c, awaitsPlacement: undefined, inbox: undefined, needsPlacement: false } : c));
       return json({ change: id, target: body.target, relation: body.relation });
     }
     if (url === "/api/project") return json({ cliName: "ndx" });
@@ -129,6 +130,7 @@ function serveThree(): void {
 
 beforeEach(() => {
   for (const id of ["a", "b", "c"]) takeTitleFocus(id);
+  sessionStorage.clear();
   clearProjectMetadataCache();
   root = document.createElement("div");
   document.body.appendChild(root);
@@ -227,6 +229,13 @@ describe("the Inbox page", () => {
     expect(document.activeElement).toBe($(".inbox-queue-list"));
   });
 
+  it("Place on the map ↗ opens placement mode for the selected change", async () => {
+    serveThree();
+    const navigateTo = await mountPage();
+    await click($(".inbox-detail .cp-place-on-map"));
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: "place/c" });
+  });
+
   it("Skip leaves the change in the Inbox and moves on, wrapping at the end", async () => {
     serveThree();
     await mountPage();
@@ -242,7 +251,7 @@ describe("the Inbox page", () => {
   });
 
   it("shows the empty state when nothing waits", async () => {
-    serve([change("x", { awaitsPlacement: undefined })], []);
+    serve([change("x", { awaitsPlacement: undefined, inbox: undefined })], []);
     await mountPage();
     expect($(".inbox-empty")?.textContent).toBe("Inbox is empty");
     expect(counts()).toBe(" · 0 to place · 0 placed this visit");
@@ -355,5 +364,27 @@ describe("the page's keyboard", () => {
     } finally {
       dialog.remove();
     }
+  });
+});
+
+// ── Sidecar ──────────────────────────────────────────────────────────
+
+describe("the Sidecar drawer on the Inbox page", () => {
+  it("is told the selected change, follows the selection, and lets go on leaving", async () => {
+    serveThree();
+    const select = vi.fn();
+    await act(async () => {
+      render(h(PlaceWithSidecarContext.Provider, { value: { place: vi.fn(), attached: null, select } },
+        h(InboxTriagePage, { navigateTo: vi.fn() })), root);
+    });
+    await settle();
+    expect(selectedId()).toBe("c");
+    expect(select).toHaveBeenLastCalledWith("c");
+
+    await click($('.inbox-qitem[data-change-id="b"]'));
+    expect(select).toHaveBeenLastCalledWith("b");
+
+    act(() => { render(null, root); });
+    expect(select).toHaveBeenLastCalledWith(null);
   });
 });

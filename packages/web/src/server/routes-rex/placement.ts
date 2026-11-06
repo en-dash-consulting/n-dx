@@ -7,6 +7,8 @@
  *                                         every open change awaiting placement, from one model load
  *   POST /api/rex/changes/:id/place     → { change, target, relation, warnings? }
  *   POST /api/rex/changes/:id/propose   → { change, proposed: { target, under, title, type }, warnings? }
+ *   POST /api/rex/changes/:id/unplace   → { change, target }
+ *                                         takes back one touches ("Place & add another"'s Remove)
  *   POST /api/rex/changes/:id/placement/draft
  *                                       → { layout: "v2", change, relation, tied, shortlist, pick?, proposal?, model?, warnings }
  *                                         the `prd.place` model's draft; writes nothing. Spends tokens, so it
@@ -16,8 +18,8 @@
  *                                         rex's dry run of `{ target, relation?, … }` or `{ propose: { type, under, title, … } }`
  *                                         on the loaded tree: what it would record, or the refusal kind. Writes nothing.
  *
- * Rex decides everything (`suggestPlacement`, `recordPlacement`,
- * `recordProposal`); this module enriches the shortlist with what the viewer
+ * Rex decides everything (`suggestPlacements`, `recordPlacement`,
+ * `recordProposal`, `recordUnplacement`); this module enriches the shortlist with what the viewer
  * shows and writes through rex's v2 transaction, as `place_change` does.
  * {@link writePlacement} is the one write: the two POST routes and an
  * approved Sidecar placement card (`sidecar/carry-out.ts`) all go through it.
@@ -40,18 +42,24 @@ import {
   prdLayout,
   loadPrdModel,
   indexTree,
-  isOpenChange,
+  isInboxChange,
   isAppliedChange,
-  awaitsPlacement,
   resolveStore,
-  suggestPlacement,
+  suggestPlacements,
   recordPlacement,
   recordProposal,
+  recordUnplacement,
   ChangePlacementError,
   placementStrength,
   withPrdModelTransaction,
 } from "../rex-gateway.js";
-import type { RuleNode, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
+import type { RuleNode, TreeIndex, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
+
+/** One change's rex suggestion, read off `suggestPlacements` so the gateway carries no extra type for it. */
+type PlacementSuggestion = Extract<
+  ReturnType<typeof suggestPlacements> extends Map<string, infer R> ? R : never,
+  { suggestion: unknown }
+>["suggestion"];
 import type { SidecarPlacementCheck, SidecarPlacementRequest } from "../../shared/index.js";
 
 // ── Wire types (mirror viewer/views/product-model.ts) ────────────────
@@ -75,7 +83,18 @@ export interface PlacementCandidateWire {
 
 export interface ChangePlacementWire {
   layout: "v2";
-  change: { id: string; title: string; intent?: string; status: string; taskCount: number; tags?: string[] };
+  change: {
+    id: string;
+    title: string;
+    intent?: string;
+    status: string;
+    taskCount: number;
+    tags?: string[];
+    /** When the change was first recorded (`createdAt`, else `lastModified` for a change older than that field); absent when neither is set. */
+    createdAt?: string;
+    /** Whole days from `createdAt` to the read, as `rex change inbox` reports it. */
+    ageDays?: number;
+  };
   relation: PlacementRelationWire;
   /** The rule that set `relation`, in rex's words. */
   relationRule: string;
@@ -158,9 +177,9 @@ function areaTitles(index: ReturnType<typeof indexTree>): (id: string) => string
 /** Rex's shortlist rows, each with the target's title, area, statement and criteria. */
 function enrichShortlist(
   index: ReturnType<typeof indexTree>,
+  areaOf: (id: string) => string,
   candidates: ReadonlyArray<{ target: string; score: number; strength: PlacementStrengthWire; reasons: string[]; amendedBy?: string[] }>,
 ): PlacementCandidateWire[] {
-  const areaOf = areaTitles(index);
   return candidates.flatMap((candidate): PlacementCandidateWire[] => {
     const node = index.resolve(candidate.target);
     if (!node || (node.type !== "capability" && node.type !== "constraint")) return [];
@@ -182,11 +201,17 @@ function enrichShortlist(
 
 /** The shortlist for `changeRef`, with each candidate's title, area, statement and criteria. */
 export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePlacementWire {
-  const suggestion = suggestPlacement(tree, changeRef);
+  const result = suggestPlacements(tree, [changeRef]).get(changeRef)!;
+  if ("error" in result) throw result.error;
   const index = indexTree(tree);
+  return placementWire(index, areaTitles(index), result.suggestion);
+}
+
+/** The wire shape of rex's `suggestion`, with each candidate's title, area, statement and criteria. Age is rex's. */
+function placementWire(index: TreeIndex, areaOf: (id: string) => string, suggestion: PlacementSuggestion): ChangePlacementWire {
   const change = index.resolve(suggestion.change)!;
   const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
-  const shortlist = enrichShortlist(index, suggestion.shortlist);
+  const shortlist = enrichShortlist(index, areaOf, suggestion.shortlist);
 
   return {
     layout: "v2",
@@ -198,6 +223,7 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
       status: change.status ?? "pending",
       taskCount: tasks.length,
       ...(change.tags?.length ? { tags: change.tags } : {}),
+      ...(suggestion.createdAt !== undefined ? { createdAt: suggestion.createdAt, ageDays: suggestion.ageDays } : {}),
     },
     relation: suggestion.relation,
     relationRule: suggestion.relationRule,
@@ -236,14 +262,18 @@ export interface PreviewPlacementWire {
  * score and reasons, and strength when rex is current; strength comes from
  * rex's own band when it is absent, the area from `tree` (the project's tree:
  * the shortlisted targets exist there even though the change does not yet).
+ * With `only`, rows whose target is not in it are dropped first (an area's
+ * targets), so the tie is read from what the person is offered.
  * Anything that is not a placement passes through untouched.
  */
-export function completePreviewPlacement(placement: unknown, tree: V2Tree | null): unknown {
+export function completePreviewPlacement(placement: unknown, tree: V2Tree | null, only?: ReadonlySet<string>): unknown {
   const p = placement as { relation?: unknown; shortlist?: unknown } | null;
   if (!p || typeof p !== "object" || !Array.isArray(p.shortlist)) return placement;
   const index = tree ? indexTree(tree) : null;
   const areaOf = index ? areaTitles(index) : () => "";
-  const shortlist = (p.shortlist as Array<Record<string, unknown>>).map((c): PreviewPlacementCandidateWire => {
+  const rows = (p.shortlist as Array<Record<string, unknown>>)
+    .filter((c) => !only || (typeof c.target === "string" && only.has(index?.resolve(c.target)?.id ?? c.target)));
+  const shortlist = rows.map((c): PreviewPlacementCandidateWire => {
     const score = typeof c.score === "number" ? c.score : 0;
     const type = typeof c.target === "string" ? index?.resolve(c.target)?.type : undefined;
     return {
@@ -272,16 +302,14 @@ export interface ChangePlacementsWire {
 /** The shortlist of every open change awaiting placement and every applied change never placed, keyed by change id. */
 export function buildAwaitingPlacements(tree: V2Tree): ChangePlacementsWire["placements"] {
   const index = indexTree(tree);
+  const waiting = index.entries.flatMap(({ node }) =>
+    node.type === "change" && (isInboxChange(node) || (isAppliedChange(node) && !!node.needsPlacement)) ? [node.id] : [],
+  );
+  // One batch: rex builds its placement inputs once, not once per change.
+  const areaOf = areaTitles(index);
   const out: ChangePlacementsWire["placements"] = {};
-  for (const { node } of index.entries) {
-    if (node.type !== "change") continue;
-    const waiting = isOpenChange(node) ? awaitsPlacement(index, node) : isAppliedChange(node) && !!node.needsPlacement;
-    if (!waiting) continue;
-    try {
-      out[node.id] = buildChangePlacement(tree, node.id);
-    } catch (err) {
-      out[node.id] = { error: errorMessage(err) };
-    }
+  for (const [id, result] of suggestPlacements(tree, waiting)) {
+    out[id] = "error" in result ? { error: errorMessage(result.error) } : placementWire(index, areaOf, result.suggestion);
   }
   return out;
 }
@@ -627,6 +655,39 @@ async function handlePlacementCheck(changeRef: string, req: IncomingMessage, res
   return true;
 }
 
+/**
+ * `POST /api/rex/changes/:id/unplace` `{ target }`: take back one touches a
+ * "Place & add another" session added. Only a touches goes: an amendment is
+ * edited, not removed here. A change left with no home returns to the Inbox.
+ * Rex's `recordUnplacement` decides: it refuses a cancelled change
+ * (`change-not-open`), a target the change does not touch (`not-touched`) and
+ * a result its rules reject, as it does for a placement.
+ */
+async function handleUnplace(changeRef: string, req: IncomingMessage, res: ServerResponse, ctx: ServerContext, broadcast?: WebSocketBroadcaster): Promise<boolean> {
+  const json = parseJson(await readBody(req, res));
+  const target = typeof json === "string" ? undefined : json.target;
+  if (typeof json === "string" || typeof target !== "string" || !target.trim()) {
+    errorResponse(res, 400, typeof json === "string" ? json : "target must be a capability or constraint id");
+    return true;
+  }
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  try {
+    const now = new Date();
+    const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
+      const { tree, change, target: removed } = recordUnplacement(model.tree, changeRef, target, now);
+      return { tree, result: { change, target: removed } };
+    }, { now: () => now });
+    await publish(ctx, { timestamp: now.toISOString(), itemId: result.change, event: "change_unplaced", detail: `touches ${result.target} (via web)` }, broadcast);
+    jsonResponse(res, 200, result);
+  } catch (err) {
+    refuse(res, err);
+  }
+  return true;
+}
+
 /** The toggle "Draft with the model" sits behind, here and in the detail panel. */
 export const PLACEMENT_DRAFT_FEATURE = "rex.placementDraft";
 
@@ -643,12 +704,13 @@ async function handlePlacementDraft(changeRef: string, res: ServerResponse, ctx:
   try {
     const { tree } = await loadPrdModel(ctx.rexDir);
     const draft = await draftChangePlacement(tree, changeRef, { rexDir: ctx.rexDir, projectDir: ctx.projectDir });
+    const index = indexTree(tree);
     const body: PlacementDraftWire = {
       layout: "v2",
       change: draft.change,
       relation: draft.relation,
       tied: draft.tied,
-      shortlist: enrichShortlist(indexTree(tree), draft.shortlist),
+      shortlist: enrichShortlist(index, areaTitles(index), draft.shortlist),
       ...(draft.pick !== undefined ? { pick: draft.pick } : {}),
       ...(draft.proposal ? { proposal: draft.proposal } : {}),
       ...(draft.model ? { model: draft.model } : {}),
@@ -663,7 +725,7 @@ async function handlePlacementDraft(changeRef: string, res: ServerResponse, ctx:
 
 // ── Router ───────────────────────────────────────────────────────────
 
-const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|placement\/draft|placement\/check)$/;
+const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|unplace|placement\/draft|placement\/check)$/;
 
 /** Handle the placement routes. Returns false when the path is not one of them. */
 export function routePlacement(
@@ -683,5 +745,6 @@ export function routePlacement(
   if (method !== "POST") return false;
   if (action === "placement/draft") return handlePlacementDraft(changeRef, res, ctx);
   if (action === "placement/check") return handlePlacementCheck(changeRef, req, res, ctx);
+  if (action === "unplace") return handleUnplace(changeRef, req, res, ctx, broadcast);
   return handlePlacementWrite(action as "place" | "propose", changeRef, req, res, ctx, broadcast);
 }

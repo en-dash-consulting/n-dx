@@ -19,7 +19,7 @@
 
 import { h } from "preact";
 import { useCallback, useMemo, useState } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { AskInSidecarButton, BrandedHeader } from "../components/index.js";
 import { CRITERIA_LABEL } from "../external.js";
 import {
   CAPABILITY_HEALTH_LABELS,
@@ -30,10 +30,119 @@ import {
   needsAttention,
   type CapabilityDetail,
   type CapabilityHistoryEntry,
+  type PendingAmendment,
   type ProductEdit,
 } from "./product-model.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/** One criterion an amendment would add, replace or remove, against the capability's own criteria. */
+export interface CriterionDiffRow {
+  id: string;
+  kind: "added" | "replaced" | "removed";
+  /** The current text; absent for an added criterion. */
+  before?: string;
+  /** The amended text; absent for a removed criterion. */
+  after?: string;
+}
+
+/**
+ * What an amendment does to the capability's own criteria, changed rows only.
+ * Inherited criteria are another node's and never appear. A replace or remove
+ * naming no current criterion reads as an add or is dropped: the diff shows
+ * what would be on the page, not the amendment's bookkeeping.
+ */
+export function criteriaDiff(
+  current: readonly CapabilityDetail["criteria"][number][],
+  criteria: NonNullable<PendingAmendment["criteria"]> | undefined,
+): CriterionDiffRow[] {
+  if (!criteria) return [];
+  const own = new Map(current.filter((c) => !c.inheritedFrom).map((c) => [c.id, c.text]));
+  const rows: CriterionDiffRow[] = [];
+  for (const c of criteria.replace) {
+    const before = own.get(c.id);
+    rows.push(before === undefined
+      ? { id: c.id, kind: "added", after: c.text }
+      : { id: c.id, kind: "replaced", before, after: c.text });
+  }
+  for (const c of criteria.add) rows.push({ id: c.id, kind: "added", after: c.text });
+  for (const id of criteria.remove) {
+    const before = own.get(id);
+    if (before !== undefined) rows.push({ id, kind: "removed", before });
+  }
+  return rows;
+}
+
+const DIFF_KIND_LABELS: Record<CriterionDiffRow["kind"], string> = {
+  added: "added",
+  replaced: "reworded",
+  removed: "removed",
+};
+
+/** Each pending amendment as a before/after of the statement and the criteria. */
+export function PendingAmendments({ capability }: { capability: CapabilityDetail }) {
+  const pending = capability.pendingAmendments;
+  if (pending.length === 0) return null;
+  return h("section", { class: "cap-pending", "aria-label": "Pending amendments" },
+    h("h3", { class: "section-header" }, `Pending amendments (${pending.length})`),
+    pending.map((amendment) => {
+      const rows = criteriaDiff(capability.criteria, amendment.criteria);
+      return h("article", { key: amendment.changeId, class: "cap-amendment", "data-change-id": amendment.changeId },
+        h("header", { class: "cap-amendment-head" },
+          amendment.changeDisplayId ? h("span", { class: "cap-display-id" }, amendment.changeDisplayId) : null,
+          h("span", { class: "cap-amendment-title" }, amendment.changeTitle),
+          h("span", { class: "tag" }, CHANGE_STAGE_LABELS[amendment.stage]),
+        ),
+        amendment.summary ? h("p", { class: "cap-amendment-summary" }, amendment.summary) : null,
+        amendment.delta === "removed"
+          ? h("p", { class: "cap-amendment-retire" }, "This change retires the capability.")
+          : null,
+        amendment.proposed !== undefined && amendment.proposed !== (capability.statement ?? "")
+          ? h("div", { class: "cap-diff cap-diff-statement", "aria-label": "Statement before and after" },
+              h("div", { class: "cap-diff-before" },
+                h("span", { class: "cap-diff-label" }, "Before"),
+                h("p", null, capability.statement ?? "(no statement)")),
+              h("div", { class: "cap-diff-after" },
+                h("span", { class: "cap-diff-label" }, "After"),
+                h("p", null, amendment.proposed)))
+          : null,
+        rows.length > 0
+          ? h("ul", { class: "cap-diff-criteria", "aria-label": "Criteria before and after" },
+              rows.map((row) =>
+                h("li", { key: `${row.kind}:${row.id}`, class: `cap-diff-row cap-diff-${row.kind}`, "data-criterion-id": row.id },
+                  h("span", { class: "tag" }, DIFF_KIND_LABELS[row.kind]),
+                  row.before !== undefined ? h("del", { class: "cap-diff-before" }, row.before) : null,
+                  row.after !== undefined ? h("ins", { class: "cap-diff-after" }, row.after) : null)))
+          : null,
+      );
+    }),
+  );
+}
+
+/**
+ * A capability's content without the page chrome: status, statement, pending
+ * amendments, criteria, history and code. The area view shows it in its column.
+ */
+export function CapabilityBody({ capability }: { capability: CapabilityDetail }) {
+  return h("div", { class: "cap-body", "data-capability-id": capability.id },
+    h("div", { class: "cap-badges" },
+      capability.displayId ? h("span", { class: "cap-display-id" }, capability.displayId) : null,
+      h("span", { class: `tag pm-status pm-status-${capability.status}`, "data-status": capability.status },
+        CAPABILITY_STATUS_LABELS[capability.status]),
+      h("span", { class: `tag pm-health pm-health-${capability.health}`, "data-health": capability.health },
+        CAPABILITY_HEALTH_LABELS[capability.health]),
+    ),
+    h("section", { class: "cap-statement", "aria-label": "Statement" },
+      h("h3", { class: "section-header" }, "Statement"),
+      capability.statement
+        ? h("p", { class: "cap-statement-text" }, capability.statement)
+        : h("div", { class: "empty-state" }, "No statement yet.")),
+    h(PendingAmendments, { capability }),
+    h(Criteria, { capability }),
+    h(History, { entries: capability.history }),
+    h(WhereItLives, { capability }),
+  );
+}
 
 function Criteria({ capability }: { capability: CapabilityDetail }) {
   return h("section", { class: "cap-criteria", "aria-label": CRITERIA_LABEL.capability },
@@ -220,12 +329,40 @@ function EditForm({ capability, onEdit }: {
   );
 }
 
+/**
+ * Inbox changes held for placement against this capability, such as the draft
+ * a spec edit here makes. Kept apart from Open changes: a held change has not
+ * entered a stage, and counts only in the Inbox.
+ */
+function WaitingInInbox({ changes, onOpenChange }: {
+  changes: CapabilityDetail["inboxChanges"];
+  onOpenChange?: (id: string) => void;
+}) {
+  if (changes.length === 0) return null;
+  return h("section", { class: "cap-inbox-changes", "aria-label": "Waiting in the Inbox" },
+    h("h3", { class: "section-header" }, `Waiting in the Inbox (${changes.length})`),
+    h("ul", { class: "pm-overlays" },
+      changes.map((change) =>
+        h("li", { key: change.id, class: "pm-overlay" },
+          h("span", { class: "pm-overlay-id" }, change.displayId ?? change.id),
+          " ",
+          onOpenChange
+            ? h("button", { type: "button", class: "ch-change-link", onClick: () => onOpenChange(change.id) }, change.title)
+            : h("span", { class: "pm-overlay-title" }, change.title),
+        ),
+      ),
+    ),
+  );
+}
+
 // ── View ─────────────────────────────────────────────────────────────
 
-export function CapabilityPage({ capability, onBack, onEdit }: {
+export function CapabilityPage({ capability, onBack, onEdit, onOpenChange }: {
   capability: CapabilityDetail;
   /** Returns to the Product page. Omitted, no back control renders. */
   onBack?: () => void;
+  /** Opens a change's panel. Omitted, Inbox changes render as plain titles. */
+  onOpenChange?: (id: string) => void;
   /**
    * Submits a direct edit to the spec. Omitted, the page is read-only and no
    * form renders — the Product page's own rows have nowhere to send one.
@@ -241,6 +378,7 @@ export function CapabilityPage({ capability, onBack, onEdit }: {
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
       h("h2", { class: "view-title" }, capability.title),
+      h(AskInSidecarButton, { kind: "capability", itemId: capability.id }),
     ),
 
     h("nav", { class: "cap-breadcrumb", "aria-label": "Breadcrumb" },
@@ -273,6 +411,8 @@ export function CapabilityPage({ capability, onBack, onEdit }: {
         : h("div", { class: "empty-state" }, "No statement yet."),
     ),
 
+    h(PendingAmendments, { capability }),
+
     h(Criteria, { capability }),
 
     onEdit && isEditable(capability)
@@ -295,6 +435,8 @@ export function CapabilityPage({ capability, onBack, onEdit }: {
           ),
         )
       : null,
+
+    h(WaitingInInbox, { changes: capability.inboxChanges, onOpenChange }),
 
     capability.dependsOn.length > 0
       ? h("section", { class: "cap-depends-on", "aria-label": "Depends on" },

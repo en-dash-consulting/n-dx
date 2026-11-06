@@ -124,6 +124,8 @@ describe("the change-set card", () => {
   it("draws a written card read-only with the ids it wrote", async () => {
     const card = changeSetCard(V1, { status: "approved", edited: true, carriedOut: { ok: true, ids: ["n1", "n2", "n3"] } });
     const { el } = await draw(card);
+    expect(el.querySelector(".sidecar-change-set-item")).toBeNull();
+    await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-card-toggle")!.click(); });
     expect(el.querySelector("input.sidecar-change-set-title")).toBeNull();
     expect(el.querySelector(".sidecar-change-set-title code")?.textContent).toBe(" n1");
     expect(el.querySelector(".sidecar-change-set-written")?.textContent).toBe("Written with your edits: 3 items");

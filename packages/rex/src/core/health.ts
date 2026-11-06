@@ -606,6 +606,14 @@ export function checkV2TreeHealth(
   });
 }
 
+/**
+ * The `stale-release-plan` findings for a v2 tree: the one tree rule
+ * `rex validate` runs, so it names the same plans `rex health` does.
+ */
+export function checkStaleReleasePlans(tree: V2Tree, now: Date = new Date()): RuleFinding[] {
+  return checkV2Rules(tree, { now }, ["stale-release-plan"]);
+}
+
 /** A finished change with no commit reachable from main. */
 export interface UnlandedChange {
   id: string;

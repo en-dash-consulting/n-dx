@@ -15,8 +15,8 @@
  * then {@link PlacementBody}.
  */
 
-import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { createContext, h } from "preact";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import type {
   PlacementCriterion,
   PlacementEditBody,
@@ -47,6 +47,8 @@ export interface PlacementDraft {
   type: "capability" | "constraint";
   under: string;
   title: string;
+  /** The title of a target chosen on the spec map that is not on rex's shortlist. */
+  label?: string;
 }
 
 /**
@@ -161,10 +163,87 @@ export function placementDecidable(card: SidecarCard, edit: PlacementEdit | null
   return !!check?.ok && !cardSpecMoved(card, edit);
 }
 
+/** A draft moved to `target` and `title`, as a row or a spec-map block chooses it: the previous target's edits go. */
+export function draftOnTarget(draft: PlacementDraft, target: string, label?: string): PlacementDraft {
+  return { ...draft, mode: "place", target, statement: null, replace: {}, remove: [], add: [], ...(label !== undefined ? { label } : {}) };
+}
+
+/** An off-shortlist target's title: the map's label for it, else rex's dry-run title when it is the card's own target, else its id. */
+export function offShortlistTitle(draft: PlacementDraft, check: SidecarPlacementCheck): string {
+  if (draft.label) return draft.label;
+  return check.ok && check.action === "place" && check.target === draft.target ? check.title : draft.target;
+}
+
 /** The nearest unused `cN` id for a new criterion. */
 export function nextCriterionId(used: readonly string[]): string {
   const numbers = used.map((id) => /^c(\d+)$/.exec(id)).filter((m): m is RegExpExecArray => !!m).map((m) => Number(m[1]));
   return `c${Math.max(0, ...numbers) + 1}`;
+}
+
+// ── Shared placement state (SP2) ─────────────────────────────────────
+
+/**
+ * Each placement card's working copy, by card id: one copy the card and the
+ * spec map both read and write, so a row chosen on the card lights its block
+ * and a block chosen on the map selects the card's row. Viewer state only;
+ * it outlives the drawer closing, so the map keeps following the card.
+ */
+export interface CardDrafts {
+  /** The card's working copy: as edited, else as the card opened. */
+  get(card: SidecarCard): PlacementDraft;
+  /** Set a card's working copy; every reader re-renders. */
+  set(card: SidecarCard, next: PlacementDraft | ((prev: PlacementDraft) => PlacementDraft)): void;
+  /** Forget a card's working copy once nothing reads it any more. */
+  drop(cardId: string): void;
+  subscribe(listener: () => void): () => void;
+}
+
+export function createCardDrafts(): CardDrafts {
+  const drafts = new Map<string, PlacementDraft>();
+  const listeners = new Set<() => void>();
+  const notify = () => { for (const listener of listeners) listener(); };
+  const get = (card: SidecarCard) => drafts.get(card.id) ?? draftFromRequest(card.placement!.request, card.placement!.check);
+  return {
+    get,
+    set(card, next) {
+      const value = typeof next === "function" ? next(get(card)) : next;
+      if (value === drafts.get(card.id)) return;
+      drafts.set(card.id, value);
+      notify();
+    },
+    drop(cardId) { if (drafts.delete(cardId)) notify(); },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+  };
+}
+
+/**
+ * The open session's placement cards and their shared working copies, for
+ * placement mode: while one waits for the change being placed, the panel
+ * yields to it (SP2). main.ts provides it only while `web.sidecar` is on;
+ * without it (Sidecar off, the hub's drawer) a card keeps its copy to itself.
+ */
+export interface SidecarPlacementShare {
+  cards: readonly SidecarCard[];
+  drafts: CardDrafts;
+}
+
+export const SidecarPlacementContext = createContext<SidecarPlacementShare | null>(null);
+
+/** The shared working copies, or a store of this component's own when nothing shares them. */
+export function useCardDrafts(): CardDrafts {
+  const shared = useContext(SidecarPlacementContext);
+  const [own] = useState(createCardDrafts);
+  return shared?.drafts ?? own;
+}
+
+/** A placement card's working copy in `store`, re-read whenever a copy changes; null for no card. */
+export function useCardDraft(store: CardDrafts, card: SidecarCard | null): PlacementDraft | null {
+  const [, rerender] = useState(0);
+  useEffect(() => store.subscribe(() => rerender((n) => n + 1)), [store]);
+  return card?.placement ? store.get(card) : null;
 }
 
 // ── Reads ────────────────────────────────────────────────────────────
@@ -215,7 +294,8 @@ export async function checkPlacementRequest(change: string, body: PlacementEditB
   }
 }
 
-const CHECK_DEBOUNCE_MS = 250;
+/** How long an edit settles before it is re-checked; placement mode's Amends card waits the same. */
+export const CHECK_DEBOUNCE_MS = 250;
 
 // ── Body ─────────────────────────────────────────────────────────────
 
@@ -234,9 +314,10 @@ export function PlacementBody({ card, editable, onEdit, edit }: PlacementBodyPro
   const original = placement.request;
   // Unedited is the draft the card opened as, not the agent's raw call: a
   // relation rex filled in or a display id rex resolved is no operator edit.
-  const [opened] = useState<PlacementDraft>(() => draftFromRequest(original, placement.check));
-  const originalKey = JSON.stringify(placementBody(requestFromDraft(opened, original)));
-  const [draft, setDraft] = useState<PlacementDraft>(opened);
+  const originalKey = JSON.stringify(placementBody(requestFromDraft(draftFromRequest(original, placement.check), original)));
+  // The working copy is shared with placement mode's spec map (SP2).
+  const drafts = useCardDrafts();
+  const draft = useCardDraft(drafts, card)!;
   const shortlist = useShortlist(placement.change, editable);
   const product = useProductRead<ProductMap>("/api/rex/product", (body) => body.map as ProductMap);
   const areas = product.state === "ready" ? product.data.areas : [];
@@ -270,10 +351,10 @@ export function PlacementBody({ card, editable, onEdit, edit }: PlacementBodyPro
   const candidates: PlacementCandidate[] = shortlist.state === "ready" ? shortlist.read.shortlist : [];
   const known = candidates.find((c) => c.target === draft.target);
   const rows: PlacementCandidate[] = !known && draft.mode === "place" && draft.target
-    ? [{ target: draft.target, type: "capability", title: placement.check.ok && placement.check.action === "place" ? placement.check.title : draft.target, area: "", criteria: [], score: 0, strength: "weak", reasons: [] }, ...candidates]
+    ? [{ target: draft.target, type: "capability", title: offShortlistTitle(draft, placement.check), area: "", criteria: [], score: 0, strength: "weak", reasons: [] }, ...candidates]
     : candidates;
   const chosen = rows.find((c) => c.target === draft.target);
-  const set = (patch: Partial<PlacementDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
+  const set = (patch: Partial<PlacementDraft>) => drafts.set(card, (prev) => ({ ...prev, ...patch }));
   const group = `place-${card.id}`;
 
   const shown = edit ? edit.check : placement.check;
@@ -296,7 +377,7 @@ export function PlacementBody({ card, editable, onEdit, edit }: PlacementBodyPro
             h("input", {
               type: "radio", name: group, value: c.target,
               checked: draft.mode === "place" && draft.target === c.target,
-              onChange: () => set({ mode: "place", target: c.target, statement: null, replace: {}, remove: [], add: [] }),
+              onChange: () => drafts.set(card, (prev) => draftOnTarget(prev, c.target)),
             }),
             h("span", { class: "sidecar-place-row-title" }, c.title),
             h("span", { class: "sidecar-place-row-meta" },

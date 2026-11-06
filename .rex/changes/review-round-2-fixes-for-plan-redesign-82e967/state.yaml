@@ -1,0 +1,32 @@
+schema: "rex/v2"
+items:
+  "2bbebad7-f4c6-4cde-abd3-700d834cc27b":
+    status: "completed"
+    startedAt: "2026-11-06T15:59:01.990Z"
+    completedAt: "2026-11-06T16:01:53.140Z"
+    endedAt: "2026-11-06T16:01:53.140Z"
+    activeIntervals: [{"end":"2026-11-06T16:01:53.140Z","start":"2026-11-06T15:59:01.990Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added a Product tile to Plan's v1Tiles; its tablist reaches Requirements. Test mounts Plan on v1 and clicks the Requirements tab."
+    lastModified: "2026-11-06T16:01:53.140Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "82e9677c-14b3-4b7d-8380-0e6531eba663":
+    status: "completed"
+    startedAt: "2026-11-06T16:04:58.043Z"
+    completedAt: "2026-11-06T16:04:58.043Z"
+    endedAt: "2026-11-06T16:04:58.043Z"
+    activeIntervals: [{"end":"2026-11-06T16:04:58.043Z","start":"2026-11-06T16:04:58.043Z"}]
+    appliedAt: "2026-11-06T16:04:58.043Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T16:04:58.043Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e916a9c8-a829-4b94-99f0-622c35071682":
+    status: "completed"
+    startedAt: "2026-11-06T16:02:02.796Z"
+    completedAt: "2026-11-06T16:04:58.043Z"
+    endedAt: "2026-11-06T16:04:58.043Z"
+    activeIntervals: [{"end":"2026-11-06T16:04:58.043Z","start":"2026-11-06T16:02:02.796Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "LayoutTileGrid treats rex.exists === false as \"none\" and draws v1Tiles minus requiresPrd tiles (Tasks empty state; no Product tile saying to migrate). Test updated."
+    lastModified: "2026-11-06T16:04:58.043Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

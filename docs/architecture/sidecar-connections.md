@@ -58,8 +58,12 @@ no code path knows any server. It carries:
   `itemIdProperty`, the status properties, a `statusMap` from every ndx event
   (`change-captured`, `run-started`, `pr-opened`, `pr-merged`,
   `release-published`, `run-failed-twice`) to a tracker status, the `facts` each
-  event needs (input property and sources) and `defaults` (`reviewer`,
-  `estimateScale`).
+  event needs (input property and sources), `defaults` (`reviewer`,
+  `estimateScale`) and an optional `itemUrlTemplate`: an http(s) URL holding
+  one `{id}` (the id as given) or `{compactId}` (the id without dashes). CAOS
+  items are Notion pages, so its template is `https://www.notion.so/{compactId}`.
+  An optional `readStatusProperty` (dotted for nested) names where the
+  `readTool` reply holds the item's status; CAOS's is `status`.
 - `oauth` (optional): `readScopes`, `writeScopes` and the `writeTools` that
   need the write scopes. See [Scopes](#scopes).
 
@@ -120,20 +124,40 @@ untracked `.n-dx.local.json` only, as connections do:
   `run-failed-twice` is **blocked**, the rest are **move** on a linked item.
 - Every rule is `off` unless set. `dry-run` logs the would-be call and makes
   none. `on` makes a move through the connection service; create and blocked
-  are logged as a card instead, so a person decides.
+  are logged as a card instead, so a person decides. The one exception to
+  `off` is an explicit **Create in tracker** (`POST
+  /api/tracker/changes/:id/create`): it plans the create as if the rule were
+  `on`, so it raises the card whatever the create rule's mode. It makes no
+  tracker call until the card is approved.
 - Every call carries the profile's `requestIdProperty` set to
   `ndx:<project>:<rexId>:<event>`. A create reply, and any duplicate reply
   (`duplicate: true` or an `error` starting `duplicate`), is confirmed with the
   profile's `readTool` before it is logged.
+- An approved create card links the change to the confirmed work item (its
+  `issues`, under the PRD lock), so the move rules that follow find it. An id
+  that is no work ref (CAOS replies with an opaque UUID) is linked as the URL
+  the profile's `itemUrlTemplate` builds, and a move on that link sends the id
+  read back out of the URL. The entry records `workItemId`; a link that cannot
+  be written, including an opaque id under a profile with no template, leaves
+  the entry `ok` with a problem naming the failure.
+- A change's tracker chip (Plan's Open changes rows, `GET /api/tracker/changes`)
+  never calls the tracker. Its state is the one ndx last set, from the activity
+  log, and reads "set by ndx" because someone may have moved the item since; a
+  linked change sync never moved reads "linked · state unknown". The change
+  detail reads the item's current state once when it opens
+  (`GET /api/tracker/changes/:id/state`): one `readTool` call on the change's
+  first ref, its `readStatusProperty` taken from the reply and kept for a
+  minute. A failed read, an unreachable connection included, answers the state
+  unknown with the reason and is not kept.
 - A refusal logs its problems list and settles the event: it is never planned
   again, with the same arguments or other ones. So do `ok`, `duplicate` and
   `card`. An unreachable connection, or one that needs sign-in, logs that once
   (again only when the result changes) and keeps the event queued, unchanged.
   One tick runs per project at a time; a second waits for the first.
 - The log is append-only JSONL, `<henchDir>/sidecar/tracker-activity.jsonl`:
-  `{ at, event, rexId, rule, mode, requestId, call, result, problems? }`, with
-  `result` one of `would`, `ok`, `duplicate`, `refused`, `card`, `unavailable`,
-  `needs-sign-in`.
+  `{ at, event, rexId, rule, mode, requestId, call, result, problems?, workItemId? }`,
+  with `result` one of `would`, `ok`, `duplicate`, `refused`, `card`,
+  `dismissed`, `unavailable`, `needs-sign-in`.
 
 ### Events and the clock
 
@@ -196,6 +220,13 @@ Routes, governed by `web.sidecar`:
   event sources the last tick could not read, and the sync connection's state
   (`null` with no `trackerSync` connection). Live's Tracker activity section
   reads it while `web.sidecar` is on.
+- `POST /api/tracker/changes/:id/create` raises the create card for a change
+  on request, whatever the create rule's mode, and answers
+  `{ requestId, entry }`. It makes no tracker call and writes no PRD. A card
+  already waiting is returned as is; a dismissed one is raised again; a linked
+  change, or one already created, is refused with 409.
+- `GET /api/tracker/changes/:id/state` reads the change's work item state once
+  (see the tracker chip above): 409 when the change links to no work item.
 - `GET /api/tracker/cards/form?requestId=` answers `{ externalCall }`, the
   waiting card's call drawn as the C1 form (schema and picker choices).
 - `POST /api/tracker/cards/decide { requestId, action, args? }` decides a

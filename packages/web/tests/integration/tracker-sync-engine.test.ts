@@ -8,15 +8,20 @@
  * the event queued.
  */
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { resolveStore } from "@n-dx/rex";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ConnectionConfig } from "../../src/server/connections/connection-config.js";
 import { ConnectionService } from "../../src/server/connections/connection-service.js";
 import { pendingCards, readTrackerActivity, trackerActivityPath } from "../../src/server/tracker/activity-log.js";
 import { decideTrackerCard, enqueueTrackerEvent, queuedTrackerEvents, runTrackerSyncTick } from "../../src/server/tracker/sync-engine.js";
 import type { TrackerEventRecord } from "../../src/server/tracker/rules.js";
+import { collectTrackerEvents } from "../../src/server/tracker/event-sources.js";
+import { findItemByRef } from "../../src/server/tracker/item-links.js";
+import { itemLinkRefs, type LinkFields } from "../../src/server/tracker/link-refs.js";
+import { USER_PROFILES_DIR } from "../../src/server/tracker/server-profiles.js";
 import { addCaosTools, type CaosReply } from "../fixtures/connections/fake-mcp-tools.mjs";
 import { startFakeMcpHttpServer, type FakeMcpHttpServer } from "../helpers/fake-mcp-http-server.js";
 import { removeTestDir } from "../helpers/server-route-test-support.js";
@@ -28,6 +33,7 @@ let service: ConnectionService | undefined;
 let replies: Record<string, CaosReply>;
 
 const AT = new Date("2026-11-05T12:00:00.000Z");
+const V2_FIXTURE = resolve(__dirname, "../../../rex/tests/fixtures/v2-tree");
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "tracker-sync-"));
@@ -117,6 +123,13 @@ describe("rule modes", () => {
     expect(toolCalls()).toHaveLength(2);
   });
 
+  it("moves a hand-linked URL with a malformed escape as it reads, and the events behind it still run", async () => {
+    settings({ "run-started": "dry-run", "pr-merged": "dry-run" });
+    const bad = "https://www.notion.so/abc%zz";
+    const { entries } = await tick({ event: "run-started", rexId: "rex-1", ref: bad }, { event: "pr-merged", rexId: "rex-1", ref: "WM-1" });
+    expect(entries.map((e) => [e.event, e.call.args.workItemId])).toEqual([["run-started", bad], ["pr-merged", "WM-1"]]);
+  });
+
   it("names the project after its directory when trackerSync.project is unset", async () => {
     writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ trackerSync: { connection: "caos", rules: { "run-started": "dry-run" } } }));
     const { entries } = await tick(runStarted);
@@ -169,7 +182,7 @@ describe("deciding a card", () => {
   const created: TrackerEventRecord = { event: "change-captured", rexId: "rex-2", values: { title: "Sidecar tracker sync" } };
   const requestId = "ndx:ndx:rex-2:change-captured";
   const decide = (decision: Parameters<typeof decideTrackerCard>[2], id = requestId) =>
-    decideTrackerCard({ projectDir: root, service: connect(), now: () => AT, profiles: { ndxHome } }, id, decision);
+    decideTrackerCard({ projectDir: root, rexDir: join(root, ".rex"), service: connect(), now: () => AT, profiles: { ndxHome } }, id, decision);
 
   it("approves a card once: makes the call with the operator's edits, keeps the request id, and records the result", async () => {
     settings({ "change-captured": "on" });
@@ -233,6 +246,108 @@ describe("deciding a card", () => {
     const decided = await decide({ action: "approve", args: { title: "T", epicId: "e-1" } });
     expect(decided).toMatchObject({ ok: true, entry: { result: expect.stringMatching(/^(unavailable|needs-sign-in)$/) } });
     expect(pendingCards(readTrackerActivity(root)).map((e) => e.requestId)).toEqual([requestId]);
+  });
+});
+
+describe("an approved create links the change", () => {
+  const CHANGE = "c0000000-0000-4000-8000-000000000001";
+  const captured: TrackerEventRecord = { event: "change-captured", rexId: CHANGE, values: { title: "Sidecar tracker sync" } };
+  const rexDir = () => join(root, ".rex");
+  const approve = (requestId = `ndx:ndx:${CHANGE}:change-captured`) =>
+    decideTrackerCard({ projectDir: root, rexDir: rexDir(), service: connect(), now: () => AT, profiles: { ndxHome } }, requestId, {
+      action: "approve",
+      args: { title: "T", epicId: "e-1" },
+    });
+  const issuesOf = async (id: string) => {
+    const doc = await (await resolveStore(rexDir())).loadDocument();
+    return itemLinkRefs(findItemByRef(doc.items, id) as LinkFields);
+  };
+
+  beforeEach(() => {
+    cpSync(V2_FIXTURE, rexDir(), { recursive: true });
+  });
+
+  it("writes the created work item onto the change, so a later run start plans a move", async () => {
+    settings({ "change-captured": "on", "run-started": "on" });
+    replies.create_work_item = json({ id: "WM-7" });
+    const runs = join(root, ".hench", "runs");
+    mkdirSync(runs, { recursive: true });
+    const collect = () => collectTrackerEvents({ projectDir: root, rexDir: rexDir(), events: ["run-started"], githubReads: false });
+    // The first read takes the baseline.
+    expect((await collect()).records).toEqual([]);
+
+    await tick(captured);
+    const decided = await approve();
+    expect(decided).toMatchObject({ ok: true, entry: { result: "ok", workItemId: "WM-7" } });
+    expect(decided.ok && decided.entry.problems).toBeFalsy();
+    expect(await issuesOf(CHANGE)).toEqual(["WM-7"]);
+
+    writeFileSync(join(runs, "r-1.json"), JSON.stringify({ id: "r-1", taskId: CHANGE, status: "running", startedAt: new Date().toISOString() }));
+    const { records } = await collect();
+    expect(records).toEqual([{ event: "run-started", rexId: CHANGE, ref: "WM-7" }]);
+    const { entries } = await tick(...records);
+    expect(entries).toEqual([expect.objectContaining({ rule: "move", result: "ok" })]);
+    expect(toolCalls().at(-1)).toEqual({
+      name: "move_work_item",
+      arguments: { requestId: `ndx:ndx:${CHANGE}:run-started`, workItemId: "WM-7", toStatus: "inProgress" },
+    });
+  });
+
+  it("links an opaque id through the URL the profile builds, so a later run start moves that item", async () => {
+    const id = "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0";
+    const url = "https://www.notion.so/3b3a80b7192480f7b5fce8093ba5f7f0";
+    settings({ "change-captured": "on", "run-started": "on" });
+    replies.create_work_item = json({ id });
+    const runs = join(root, ".hench", "runs");
+    mkdirSync(runs, { recursive: true });
+    const collect = () => collectTrackerEvents({ projectDir: root, rexDir: rexDir(), events: ["run-started"], githubReads: false });
+    expect((await collect()).records).toEqual([]);
+
+    await tick(captured);
+    const decided = await approve();
+    expect(decided).toMatchObject({ ok: true, entry: { result: "ok", workItemId: id } });
+    expect(decided.ok && decided.entry.problems).toBeFalsy();
+    expect(await issuesOf(CHANGE)).toEqual([url]);
+
+    writeFileSync(join(runs, "r-1.json"), JSON.stringify({ id: "r-1", taskId: CHANGE, status: "running", startedAt: new Date().toISOString() }));
+    const { records } = await collect();
+    expect(records).toEqual([{ event: "run-started", rexId: CHANGE, ref: url }]);
+    const { entries } = await tick(...records);
+    expect(entries).toEqual([expect.objectContaining({ rule: "move", result: "ok" })]);
+    expect(toolCalls().at(-1)).toEqual({
+      name: "move_work_item",
+      arguments: { requestId: `ndx:ndx:${CHANGE}:run-started`, workItemId: id, toStatus: "inProgress" },
+    });
+  });
+
+  it("keeps an opaque id unlinked, naming the problem, under a profile with no item URL template", async () => {
+    const caos = JSON.parse(readFileSync(resolve(__dirname, "../../src/server/tracker/profiles/caos.json"), "utf8"));
+    delete caos.tracker.itemUrlTemplate;
+    mkdirSync(join(ndxHome, USER_PROFILES_DIR), { recursive: true });
+    writeFileSync(join(ndxHome, USER_PROFILES_DIR, "plain.json"), JSON.stringify(caos));
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ trackerSync: { connection: "caos", profile: "user:plain", project: "ndx", rules: { "change-captured": "on" } } }));
+    const id = "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0";
+    replies.create_work_item = json({ id });
+    await tick(captured);
+    const decided = await approve();
+    expect(decided).toMatchObject({
+      ok: true,
+      entry: { result: "ok", workItemId: id, problems: [{ message: expect.stringMatching(new RegExp(`^created ${id}, but could not link ${CHANGE} to it: .*tracker key`)) }] },
+    });
+    expect(await issuesOf(CHANGE)).toEqual([]);
+  });
+
+  it("records the created item and names the link failure when the link cannot be written", async () => {
+    settings({ "change-captured": "on" });
+    replies.create_work_item = json({ id: "WM-8" });
+    await tick({ ...captured, rexId: "no-such-change" });
+    const decided = await approve("ndx:ndx:no-such-change:change-captured");
+    expect(decided).toMatchObject({
+      ok: true,
+      entry: { result: "ok", workItemId: "WM-8", problems: [{ message: expect.stringMatching(/^created WM-8, but could not link no-such-change to it: .*not found/) }] },
+    });
+    expect(readTrackerActivity(root).at(-1)).toEqual(decided.ok && decided.entry);
+    expect(pendingCards(readTrackerActivity(root))).toEqual([]);
   });
 });
 

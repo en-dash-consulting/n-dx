@@ -509,12 +509,18 @@ export interface SidecarState {
    */
   chooseAgent: (vendor: string, model?: string) => Promise<void>;
   send: (prompt: string) => Promise<boolean>;
+  /** Start a new session on the current agent and attachment and follow it; false, with the error set, when the server refuses. */
+  newSession: () => Promise<boolean>;
+  /** Put a message on the drawer's error line. */
+  reportError: (message: string) => void;
   stop: () => Promise<void>;
   /**
    * The page item attached as the session's target, and the lens it asks
    * with. The open session follows it through PATCH /api/sidecar/sessions/:id.
    */
   attachment: SidecarAttachment;
+  /** Why the PATCH making the open session follow the attachment failed; null while it follows or the PATCH is pending. */
+  followError: string | null;
 }
 
 interface Tail {
@@ -811,6 +817,19 @@ export function useSidecar(
     }
   }, [createSession, fetchFrames]);
 
+  const newSession = useCallback(async (): Promise<boolean> => {
+    setSending(true);
+    setError(null);
+    try {
+      const vendor = endpointRef.current.fixed?.vendor ?? await defaultVendor();
+      return (await createSession(pickedRef.current ?? { vendor, model: "" })) !== null;
+    } finally {
+      if (mountedRef.current) setSending(false);
+    }
+  }, [createSession]);
+
+  const reportError = useCallback((message: string) => setError(message), []);
+
   const stop = useCallback(async () => {
     const id = tailRef.current.sessionId;
     if (!id) return;
@@ -832,16 +851,23 @@ export function useSidecar(
   const openId = session && !session.endedAt ? session.id : null;
   const syncKey = `${openId}|${wantLens}|${wantRef}`;
   const syncedRef = useRef("");
+  // Why the open session last refused to follow the attachment; cleared when the attachment or session moves on.
+  const [followError, setFollowError] = useState<string | null>(null);
   useEffect(() => {
     if (!enabled || !open || !openId || !asks || syncedRef.current === syncKey) return;
     syncedRef.current = syncKey;
     const fields: { lens?: string; target?: { ref?: string } } = {};
     if (wantLens !== heldLens) fields.lens = wantLens;
     if (wantRef !== heldRef) fields.target = wantRef ? { ref: wantRef } : {};
+    setFollowError(null);
     if (Object.keys(fields).length === 0) return;
     void patchJson<SidecarSessionEntry>(`${sessionsPath()}/${encodeURIComponent(openId)}`, fields).then((res) => {
       if (!mountedRef.current) return;
-      if (!res.ok) { setError(res.error); return; }
+      if (!res.ok) {
+        setError(res.error);
+        if (syncedRef.current === syncKey) setFollowError(res.error);
+        return;
+      }
       if (res.data.session.id === tailRef.current.sessionId) setSession(res.data.session);
     });
   }, [enabled, open, asks, syncKey, openId, wantLens, wantRef, heldLens, heldRef]);
@@ -918,7 +944,7 @@ export function useSidecar(
   return {
     session, frames, running, sending, waiting, sessionWaiting, cards, commandManifest, decide,
     readOnly: session?.endedAt !== undefined, sessions, openSession,
-    lastTurn, error, agent, catalog, chooseAgent, send, stop, attachment,
+    lastTurn, error, agent, catalog, chooseAgent, send, newSession, reportError, stop, attachment, followError,
   };
 }
 

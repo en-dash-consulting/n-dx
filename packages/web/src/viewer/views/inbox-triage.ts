@@ -1,7 +1,8 @@
 /**
  * The Inbox's own page, for clearing a backlog: the queue on the left in the
  * Plan section's order (IB7), and the selected change's "Where it goes"
- * section inline on the right. Place & next is the default action.
+ * section inline on the right. Place & next is the default action; "Place on
+ * the map ↗" in the section opens placement mode on the area view (WF1).
  *
  * Keyboard, inactive while typing in a field: J/K move, 1–5 pick a
  * candidate, T/A set touches/amends, Enter places and moves on, S skips
@@ -15,10 +16,11 @@
  */
 
 import { h } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { StrengthChip, useProjectStatus } from "../components/index.js";
+import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { PlaceWithSidecarContext, StrengthChip, useProjectStatus } from "../components/index.js";
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
+import { placementTab } from "../route-state.js";
 import { AppliedHistory, bestGuess, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 
@@ -103,6 +105,52 @@ function press(scope: HTMLElement, selectors: readonly string[]): void {
   }
 }
 
+/**
+ * The shortcuts that press a control of the placement section: pick, relation,
+ * place, nothing fits and search. True when `shortcut` was one of them. The
+ * Inbox page and placement mode share this, so a key does what its button does
+ * in both. A pick takes a shortlist row in the compact form and a card in the wide.
+ */
+export function pressPanelShortcut(scope: HTMLElement | null, shortcut: Shortcut): boolean {
+  switch (shortcut.kind) {
+    case "pick":
+      scope?.querySelectorAll<HTMLInputElement>(".cp-shortlist .cp-target input, .cp-shortlist .cp-card-head input")[shortcut.n - 1]?.click();
+      return true;
+    case "relation":
+      if (scope) press(scope, [`.cp-relation input[value="${shortcut.relation}"]`]);
+      return true;
+    case "place":
+      if (scope) press(scope, [".cp-place-next", ".cp-propose-next", ".cp-place", ".cp-propose-btn"]);
+      return true;
+    case "nothing-fits":
+      if (scope) press(scope, [".cp-nothing-fits"]);
+      return true;
+    case "search":
+      scope?.querySelector<HTMLInputElement>(".cp-search-input:not([disabled])")?.focus();
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Listen for the shortcuts while mounted; a dialog over the page owns the keyboard. */
+export function useShortcuts(run: (shortcut: Shortcut) => void): void {
+  // Bound once; the ref sees this render's state.
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      const shortcut = shortcutFor(e);
+      if (!shortcut) return;
+      e.preventDefault();
+      runRef.current(shortcut);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+}
+
 // ── Queue ────────────────────────────────────────────────────────────
 
 const optionId = (id: string) => `inbox-q-${id}`;
@@ -152,6 +200,14 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
     if (selected === null && ordered && order.length) setSelected(order[0]);
   }, [order, ordered, selected]);
 
+  // The Sidecar drawer attaches the selected change (Place lens); null while Sidecar is off.
+  const reportSelection = useContext(PlaceWithSidecarContext)?.select;
+  useEffect(() => {
+    if (!reportSelection) return;
+    reportSelection(selected);
+    return () => reportSelection(null);
+  }, [reportSelection, selected]);
+
   const select = (id: string) => {
     // The section asks the detail panel to focus the next title; here the
     // queue keeps focus, so the next key press still reaches the page.
@@ -166,44 +222,13 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
     setSelected(order[(from + order.length) % order.length]);
   };
 
-  const run = (shortcut: Shortcut) => {
-    const scope = detailRef.current;
+  useShortcuts((shortcut) => {
     switch (shortcut.kind) {
       case "move": step(shortcut.delta); return;
       case "skip": step(1); return;
-      case "pick":
-        scope?.querySelectorAll<HTMLInputElement>(".cp-shortlist .cp-target input")[shortcut.n - 1]?.click();
-        return;
-      case "relation":
-        if (scope) press(scope, [`.cp-relation input[value="${shortcut.relation}"]`]);
-        return;
-      case "place":
-        if (scope) press(scope, [".cp-place-next", ".cp-propose-next", ".cp-place", ".cp-propose-btn"]);
-        return;
-      case "nothing-fits":
-        if (scope) press(scope, [".cp-nothing-fits"]);
-        return;
-      case "search":
-        scope?.querySelector<HTMLInputElement>(".cp-search-input:not([disabled])")?.focus();
-        return;
+      default: pressPanelShortcut(detailRef.current, shortcut);
     }
-  };
-
-  // Bound once; the ref sees this render's state.
-  const runRef = useRef(run);
-  runRef.current = run;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // A dialog over the page owns the keyboard.
-      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
-      const shortcut = shortcutFor(e);
-      if (!shortcut) return;
-      e.preventDefault();
-      runRef.current(shortcut);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  });
 
   if (load.state === "v1") return null;
   if (load.state !== "ready") return h(Pending, { load });
@@ -262,6 +287,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
                 changeTitle: current.title,
                 onOpenChange: select,
                 onWritten: onWritten(current.id),
+                onPlaceOnMap: navigateTo ? (id: string) => navigateTo("product", { tab: placementTab(id) }) : undefined,
               }),
               h("div", { key: "bar", class: "inbox-detail-bar" },
                 h("button", {

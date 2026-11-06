@@ -62,6 +62,7 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+.sidecar-wide-toggle,
 .sidecar-close {
   display: inline-flex;
   align-items: center;
@@ -76,7 +77,9 @@
   line-height: 1;
   cursor: pointer;
 }
+.sidecar-wide-toggle:hover,
 .sidecar-close:hover { color: var(--text); background: var(--bg-hover); }
+.sidecar-wide-toggle.active { color: var(--text); background: var(--bg-active); }
 .sidecar-sessions-toggle { margin-left: auto; }
 
 .sidecar-paused {
@@ -108,6 +111,24 @@
   white-space: pre-wrap;
   font-size: 13px;
 }
+.sidecar-msg-assistant { white-space: normal; line-height: 1.5; overflow-wrap: anywhere; }
+.sidecar-md-heading { margin: 0 0 var(--space-2); font-size: 14px; }
+.sidecar-md-paragraph, .sidecar-md-list { margin: 0 0 var(--space-2); }
+.sidecar-md-list { padding-left: var(--space-4); }
+.sidecar-md-code {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-x: auto;
+}
+.sidecar-msg-assistant code { font-family: var(--font-mono); font-size: 12px; }
+.sidecar-msg-assistant :not(pre) > code { padding: 0 var(--space-1); border-radius: var(--radius-sm, 3px); background: var(--bg-surface); }
+.sidecar-msg-assistant a { color: var(--accent, var(--text)); text-decoration: underline; }
+.sidecar-msg-assistant > :last-child { margin-bottom: 0; }
 .sidecar-msg-user { align-self: flex-end; max-width: 85%; background: var(--bg-active, var(--bg-hover)); }
 .sidecar-msg-assistant { background: var(--bg); border: 1px solid var(--border); }
 .sidecar-msg-failure { color: var(--red, var(--text)); border: 1px solid var(--red, var(--border)); }
@@ -160,6 +181,9 @@
   border-radius: 4px;
   color: var(--text);
 }
+/* Wide mode has the room: tool results show whole. */
+.sidecar-drawer--wide .sidecar-tool-input,
+.sidecar-drawer--wide .sidecar-tool-output { max-height: none; }
 .sidecar-tool-pending { margin: 0; font-style: italic; }
 
 .sidecar-agent {
@@ -444,6 +468,23 @@
 .sidecar-run-plan-command { font-size: 11px; overflow-wrap: anywhere; }
 .sidecar-run-plan-actions { display: flex; align-items: center; gap: var(--space-2); }
 .sidecar-card-note, .sidecar-card-queued { margin: 0; color: var(--text-muted); }
+.sidecar-card-settled { display: flex; gap: var(--space-2); align-items: baseline; justify-content: space-between; min-width: 0; }
+.sidecar-card-settled .sidecar-card-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidecar-card-toggle, .sidecar-cards-decided-toggle {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.sidecar-card-toggle:hover, .sidecar-cards-decided-toggle:hover { color: var(--text); }
+.sidecar-card-toggle:focus-visible, .sidecar-cards-decided-toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.sidecar-cards-decided { display: flex; flex-direction: column; gap: var(--space-2); }
+.sidecar-cards-decided-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
 .sidecar-card-decide { display: flex; flex-direction: column; gap: var(--space-1); }
 .sidecar-card-reason { font: inherit; font-size: 12px; }
 .sidecar-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
@@ -556,16 +597,37 @@
   text-align: center;
 }
 
-/* ── Width tiers (UX2'): ≥1440 full · 1200–1439 · 961–1199 · ≤960 ───── */
+/* ── Width tiers (UX2') ──────────────────────────────────────────────────
+ * Four stage tabs, Live and the Sidecar button share the bar, so it sheds
+ * optional text as it narrows, so the tabs need not scroll (they still do as
+ * a last resort, when badges outgrow a tier, rather than push the page wide):
+ *   ≥1600      everything shows
+ *   <1600      stage hints drop (with the Sidecar on; off, shell.css drops
+ *              them at a 1400 px bar)
+ *   <1440      search label drops to its ⌘K; run control to its ▶ glyph. The
+ *              run status stays visible as a coloured border/glyph
+ *              (runcmd-btn--error, --finished, --running) and in the title.
+ *              Decision: the rule applies with web.sidecar off too, so the
+ *              bar's width tiers stay one set; those users see the same
+ *              colour and title at 1200–1439 px, not the label.
+ *   <1200      tab padding tightens
+ *   ≤960       tab glyphs drop; the Sidecar button is its glyph and badge
+ * At every width the project context gives way before the tabs, down to
+ * 100 px with its name ellipsized (breadcrumb.css). */
 
-@media (max-width: 1439px) {
-  .topnav-tab-hint { display: none; }
+@media (max-width: 1599px) {
+  .topnav:has(.topnav-sidecar) .topnav-tab-hint { display: none; }
 }
-@media (max-width: 1199px) {
+@media (max-width: 1439px) {
   .topnav-search-label { display: none; }
   .topnav-search { min-width: 0; }
+  .topnav-run .runcmd-label { display: none; }
+}
+@media (max-width: 1199px) {
+  .topnav-tab { padding: 0 var(--space-2); gap: 6px; }
 }
 @media (max-width: 960px) {
+  .topnav-tab-glyph { display: none; }
   .topnav-sidecar { padding: 5px var(--space-2); }
   .topnav-sidecar-label { display: none; }
   /* The badge rides the glyph's corner. */
@@ -573,7 +635,8 @@
 }
 
 /* Sessions list (drawer state C) */
-.sidecar-sessions-toggle {
+.sidecar-sessions-toggle,
+.sidecar-new-session {
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -583,7 +646,12 @@
   font-size: 12px;
   cursor: pointer;
 }
-.sidecar-sessions-toggle:hover { background: var(--bg-hover); color: var(--text); }
+.sidecar-sessions-toggle:hover,
+.sidecar-new-session:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.sidecar-new-session:disabled { opacity: 0.5; cursor: default; }
+.sidecar-new-session { margin-left: auto; }
+.sidecar-new-session + .sidecar-sessions-toggle { margin-left: 0; }
+.sidecar-sessions-new { margin: 0 0 var(--space-2); }
 .sidecar-sessions-toggle.active { background: var(--bg-active); color: var(--text); font-weight: 600; }
 .sidecar-sessions { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-2) var(--space-3); }
 .sidecar-sessions-filter { display: flex; gap: var(--space-1); margin-bottom: var(--space-2); }
@@ -598,7 +666,7 @@
 .sidecar-session-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--text-muted); margin-top: var(--space-1); }
 .sidecar-session-actions, .sidecar-session-confirm, .sidecar-session-rename { display: flex; gap: var(--space-2); margin-top: var(--space-2); align-items: center; }
 .sidecar-session-name-input { flex: 1; min-width: 0; }
-.sidecar-readonly { flex: none; margin: 0; padding: var(--space-2) var(--space-3); color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); }
+.sidecar-readonly { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); }
 
 /* Workflow > Sidecar: the allow-list editor's rows (views/sidecar-settings.ts). */
 .sidecar-allow-rules {
