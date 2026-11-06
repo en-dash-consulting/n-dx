@@ -34,6 +34,10 @@ function freePort(host: string): Promise<number> {
   });
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Resolves with the port serve.js prints in its URL on `host`, which it does
  * only after Vite's listen() resolved; rejects if it exits first. No deadline
@@ -41,7 +45,7 @@ function freePort(host: string): Promise<number> {
  */
 function listening(child: ChildProcess, host: string): Promise<number> {
   let output = "";
-  const url = new RegExp(`${host.replace(/\./g, "\\.")}:(\\d+)`);
+  const url = new RegExp(`${escapeRegExp(host)}:(\\d+)`);
   return new Promise((done, fail) => {
     const onData = (chunk: Buffer) => {
       // Vite bolds the port, so drop the colour codes before matching.
