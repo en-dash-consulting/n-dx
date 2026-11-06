@@ -477,9 +477,11 @@ function settledNote(card: SidecarCard, state: SidecarCardState): string {
 /**
  * A decided card folds to one line. A decided run plan does not: its lanes
  * stay live after the decision (Started, Work card raised, Start lane again).
+ * Nor does an approval whose action failed: "Approved" alone would hide that
+ * nothing was written, and its problems are what the operator needs to read.
  */
 function foldable(card: SidecarCard): boolean {
-  return sidecarCardState(card) !== "pending" && !card.runPlan;
+  return sidecarCardState(card) !== "pending" && !card.runPlan && card.carriedOut?.ok !== false;
 }
 
 /** Focus is somewhere ⌘↵ and ⌘⌫ edit text. */
