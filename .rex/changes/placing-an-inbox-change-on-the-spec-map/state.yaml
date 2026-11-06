@@ -25,10 +25,13 @@ items:
     lastModified: "2026-11-05T23:12:04.536Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "42ae74c1-1803-4dc0-b9fa-40fbd8c8ad97":
+    status: "completed"
     startedAt: "2026-11-06T00:23:18.528Z"
-    activeIntervals: [{"end":"2026-11-06T00:44:53.141Z","start":"2026-11-06T00:23:18.528Z"}]
+    completedAt: "2026-11-06T00:46:40.388Z"
+    endedAt: "2026-11-06T00:46:40.388Z"
+    activeIntervals: [{"end":"2026-11-06T00:44:53.141Z","start":"2026-11-06T00:23:18.528Z"},{"end":"2026-11-06T00:46:40.388Z","start":"2026-11-06T00:46:40.388Z"}]
     failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (31):\n- shows field-level error styling after blur on empty title\n- getAggregator is called when the scheduler interval fires\n- broadcast is called when orphaned entries are pruned\n- options without broadcast do not throw when scheduler fires\n- overrideIntervalMs is respected over config file defaults\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n… and 23 more"
-    lastModified: "2026-11-06T00:44:53.742Z"
+    lastModified: "2026-11-06T00:46:40.388Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "464a9480-8e07-49cd-9889-21d2ae55f316":
     lastModified: "2026-11-06T00:31:36.678Z"
