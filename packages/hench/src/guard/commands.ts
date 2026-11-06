@@ -191,45 +191,99 @@ function containsRun(words: readonly string[], run: readonly string[]): boolean 
 const DOUBLE_QUOTE_ESCAPABLE = new Set(["$", "`", '"', "\\", "\n"]);
 
 /**
+ * A word as sh passes it, plus what it may expand to. `pattern` is set when an
+ * unquoted `{ * ? [` appeared: sh brace-expands and globs after removing
+ * quotes, so the program may receive other words than `text`.
+ */
+interface CommandWord {
+  text: string;
+  /**
+   * Over-approximates every string the word could expand to: `*` and a brace
+   * group match anything, `?` and a bracket expression one character. Too
+   * wide on purpose — it only ever refuses a denied program's arguments.
+   */
+  pattern: RegExp | null;
+}
+
+/** Characters that start brace expansion or a glob when unquoted. */
+const EXPANSION_STARTS = new Set(["{", "*", "?", "["]);
+
+/**
  * Whitespace-separated words as POSIX `sh` would pass them: quotes removed, an
  * unquoted backslash dropped before the character it escapes, and inside
  * double quotes a backslash dropped only before a character sh lets it escape
  * there. So `find\-generic-password` reads as the word sh hands the program.
- * Under cmd.exe a backslash is a path separator, not an escape, so it is kept.
+ * Under cmd.exe a backslash is a path separator, not an escape, so it is kept,
+ * and nothing expands.
  */
-function commandWords(command: string, shellKind: ShellKind): string[] {
-  const words: string[] = [];
+function commandWords(command: string, shellKind: ShellKind): CommandWord[] {
+  const words: CommandWord[] = [];
   let word: string | null = null;
+  // Regex source for the word; `expands` says whether it differs from a literal.
+  let source = "";
+  let expands = false;
+  // Inside an unquoted brace group (depth) or bracket expression: already `.*` / `.`.
+  let braceDepth = 0;
+  let inBracket = false;
   let quote: string | null = null;
   let escaped = false;
-  const backslashEscapes = shellKind !== "cmd";
+  const posix = shellKind !== "cmd";
+
+  const literal = (ch: string): void => {
+    word = (word ?? "") + ch;
+    if (braceDepth === 0 && !inBracket) source += ch.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  };
+  const flush = (): void => {
+    if (word !== null) {
+      words.push({ text: word, pattern: expands ? new RegExp(`^${source}$`, "is") : null });
+    }
+    word = null;
+    source = "";
+    expands = false;
+    braceDepth = 0;
+    inBracket = false;
+  };
+
   for (const ch of command) {
     if (escaped) {
       escaped = false;
       // Inside double quotes sh keeps the backslash unless it escapes one of these.
-      if (quote === '"' && !DOUBLE_QUOTE_ESCAPABLE.has(ch)) word += "\\";
-      word = (word ?? "") + ch;
+      if (quote === '"' && !DOUBLE_QUOTE_ESCAPABLE.has(ch)) literal("\\");
+      literal(ch);
     } else if (quote === "'") {
       if (ch === quote) quote = null;
-      else word += ch;
+      else literal(ch);
     } else if (quote === '"') {
       if (ch === '"') quote = null;
-      else if (ch === "\\" && backslashEscapes) escaped = true;
-      else word += ch;
-    } else if (ch === "\\" && backslashEscapes) {
+      else if (ch === "\\" && posix) escaped = true;
+      else literal(ch);
+    } else if (ch === "\\" && posix) {
       word ??= "";
       escaped = true;
     } else if (/\s/.test(ch)) {
-      if (word !== null) words.push(word);
-      word = null;
+      flush();
     } else if (ch === "'" || ch === '"') {
       word ??= "";
       quote = ch;
-    } else {
+    } else if (posix && inBracket) {
+      word += ch;
+      if (ch === "]") inBracket = false;
+    } else if (posix && braceDepth > 0) {
+      word += ch;
+      if (ch === "{") braceDepth++;
+      else if (ch === "}") braceDepth--;
+    } else if (posix && EXPANSION_STARTS.has(ch)) {
       word = (word ?? "") + ch;
+      expands = true;
+      if (ch === "{") { source += ".*"; braceDepth = 1; }
+      else if (ch === "*") source += ".*";
+      else if (ch === "?") source += ".";
+      else { source += "."; inBracket = true; }
+    } else {
+      literal(ch);
     }
   }
-  if (word !== null) words.push(word);
+  flush();
   return words;
 }
 
@@ -290,13 +344,36 @@ function securitySubcommand(args: readonly string[]): string | null {
  * the subcommand it would actually run (an abbreviation resolved) is matched
  * too.
  */
-function runsDeniedPrefix(words: readonly string[], prefix: readonly string[]): boolean {
-  if (prefix.length === 0 || words.length < prefix.length) return false;
+function runsDeniedPrefix(words: readonly CommandWord[], prefix: readonly string[]): boolean {
+  if (prefix.length === 0 || words.length === 0) return false;
   const program = programName(prefix[0]!);
-  if (programName(words[0]!) !== program) return false;
+  if (programName(words[0]!.text) !== program) return false;
   const args = words.slice(1);
-  if (containsRun(args, prefix.slice(1))) return true;
-  return program === "security" && prefix.length > 1 && securitySubcommand(args) === prefix[1];
+  if (args.some((arg) => arg.pattern && mayExpandToDenied(arg.pattern, program, prefix.slice(1)))) {
+    return true;
+  }
+  if (words.length < prefix.length) return false;
+  const texts = args.map((arg) => arg.text);
+  if (containsRun(texts, prefix.slice(1))) return true;
+  return program === "security" && prefix.length > 1 && securitySubcommand(texts) === prefix[1];
+}
+
+/**
+ * Whether a word sh expands could become one of a denied prefix's later
+ * tokens — or, for `security`, an abbreviation that runs one. Which words the
+ * expansion yields depends on the filesystem at run time, so any possible
+ * match is refused.
+ */
+function mayExpandToDenied(pattern: RegExp, program: string, rest: readonly string[]): boolean {
+  return rest.some((token) => {
+    if (pattern.test(token)) return true;
+    if (program !== "security") return false;
+    for (let end = 1; end < token.length; end++) {
+      const abbreviation = token.slice(0, end);
+      if (pattern.test(abbreviation) && securitySubcommand([abbreviation]) === token) return true;
+    }
+    return false;
+  });
 }
 
 /**
@@ -308,7 +385,9 @@ function runsDeniedPrefix(words: readonly string[], prefix: readonly string[]): 
  * A `security` subcommand is also resolved as `security` resolves it, so an
  * abbreviation (`security find-generic`) is refused too; see
  * {@link SECURITY_COMMANDS}.
- * Words are unescaped as sh would (`find\-generic-password`). Checked before
+ * Words are unescaped as sh would (`find\-generic-password`). A later word
+ * with an unquoted brace or glob (`{find-generic-password,-s}`, `fin[d]-…`) is
+ * refused when its expansion could name the denied token. Checked before
  * the allowlist, so it holds even when a user widens `guard.allowedCommands`
  * to include `op` or `security`.
  *

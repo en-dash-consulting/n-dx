@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { GuardRails, credentialStorePattern } from "../../../src/guard/index.js";
+import { GuardRails, assertNotCredentialCommand, credentialStorePattern } from "../../../src/guard/index.js";
 import { GuardError, validatePath } from "../../../src/guard/paths.js";
 import {
   DEFAULT_EXECUTION_POLICY,
@@ -248,6 +248,13 @@ describe("the agent may not run a command that reads a stored credential", () =>
     "security -qvp prompt fin -w",
     "security -R find-gen -w",
     "security -- find-generic -w",
+    // sh brace-expands and globs after quote removal; the result depends on the
+    // filesystem, so any expansion that could name the subcommand is refused.
+    "security {find-generic-password,-s} ndx -w",
+    "security fin[d]-generic-password -w",
+    "security find-generic-passwor? -w",
+    "security 'find'* -w",
+    "security f? -w",
     "op read op://vault/item/field",
     "/opt/homebrew/bin/op read x",
     "'/opt/homebrew/bin/op' item list",
@@ -287,6 +294,19 @@ describe("the agent may not run a command that reads a stored credential", () =>
     // Inside double quotes sh keeps a backslash before `-`, so this is not the subcommand.
     expect(() => guard.checkCommand("security \"find\\-generic-password\"")).not.toThrow();
     expect(() => guard.checkCommand("npm test")).not.toThrow();
+    // Quoted or escaped, these characters do not expand.
+    expect(() => guard.checkCommand("security '{find-generic-password,-s}' -w")).not.toThrow();
+    expect(() => guard.checkCommand("security \"fin[d]-generic-password\" -w")).not.toThrow();
+    expect(() => guard.checkCommand("security find-generic-passwor\\? -w")).not.toThrow();
+    // An expansion that cannot name the subcommand, and commands that are not denied.
+    expect(() => guard.checkCommand("security list-keychain? -d user")).not.toThrow();
+    expect(() => guard.checkCommand("node scripts/build-*.mjs")).not.toThrow();
+    expect(() => guard.checkCommand("git log -- 'fin[d]*' src/{a,b}.ts")).not.toThrow();
+    // Outside the allowlist, so the credential check alone is under test here.
+    const { commandPrefixes } = agentCredentialDenials({ ndxHome });
+    for (const command of ["ls *.ts", "echo {a,b}", "cat fin[d]-generic-password"]) {
+      expect(() => assertNotCredentialCommand(command, commandPrefixes, "posix"), command).not.toThrow();
+    }
     // The documented gap: an allowed interpreter is not a command this list can see.
     expect(() => guard.checkCommand("node -e 'process.exit(0)'")).not.toThrow();
   });
@@ -322,6 +342,15 @@ describe("the agent may not run a command that reads a stored credential", () =>
       expect(() => guard.checkCommand("/usr/local/bin/node /x/get-key.mjs --vault v")).toThrow(/reads a stored credential/);
       expect(() => guard.checkCommand("node -e 1")).not.toThrow();
       expect(() => guard.checkCommand("node scripts/build.mjs")).not.toThrow();
+    });
+
+    it.each([
+      "node /x/get-key.m?s",
+      "node /x/get-key.{mjs,x}",
+      "node /x/[g]et-key.mjs",
+      "node /x/*.mjs --vault v",
+    ])("refuses its script spelled with a brace or glob: %j", (command) => {
+      expect(() => widenedGuard().checkCommand(command)).toThrow(/reads a stored credential/);
     });
 
     it.each(["darwin", "linux", "win32"] as const)("the Claude CLI denies the script, not bare node (%s)", (platform) => {
