@@ -454,8 +454,10 @@ describe("PlacementMode", () => {
       expect(ghost()).toHaveLength(0);
       await nothingFits();
       expect($(".placing-panel .cp-propose")).not.toBeNull();
-      // No area chosen yet: nowhere to draw it.
-      expect(ghost()).toHaveLength(0);
+      // The form opens under the zoomed area, so the ghost is there at once.
+      expect(crumb()).toEqual(["Plan", "Product map", "Shipping"]);
+      expect($<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!.value).toBe("area-ship");
+      expect(ghost().map((el) => el.querySelector(".pam-label")?.textContent)).toEqual(["Print gift receipts"]);
 
       const under = $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
       await act(async () => { under.value = "area-pay"; under.dispatchEvent(new Event("change", { bubbles: true })); });
@@ -474,6 +476,20 @@ describe("PlacementMode", () => {
       expect(crumb()).toEqual(["Plan", "Product map", "Tax"]);
       expect(ghost()).toHaveLength(1);
       expect($('.pam-block[data-block="cap-vat"]')).not.toBeNull();
+    });
+
+    it("at the area level, opens with no area and draws no ghost until one is chosen", async () => {
+      serve([change("a")], [placement("a", [candidate("cap-label", { strength: "possible", score: 2 })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect($(".placing-container")?.dataset.level).toBe("map");
+      await nothingFits();
+      expect($<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!.value).toBe("");
+      expect(ghost()).toHaveLength(0);
+      const under = $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
+      await act(async () => { under.value = "area-tax"; under.dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      expect($(".placing-container")?.dataset.level).toBe("area");
+      expect(ghost()).toHaveLength(1);
     });
 
     it("keeps blocks sharing words with the title lit as it is typed", async () => {

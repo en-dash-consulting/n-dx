@@ -793,12 +793,14 @@ interface ProposeFormProps {
   drafted?: PlacementDraft | null;
   /** Reports the capability being proposed as the form changes; null for a constraint and once the form closes. */
   onGhost?: (ghost: ProposalGhost | null) => void;
+  /** The area the form opens under when no draft names one: placement mode's zoomed area. */
+  defaultUnder?: string;
 }
 
-function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost }: ProposeFormProps) {
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost, defaultUnder }: ProposeFormProps) {
   const initial = drafted?.proposal;
   const [type, setType] = useState<"capability" | "constraint">(initial?.type ?? "capability");
-  const [under, setUnder] = useState(initial?.under ?? "");
+  const [under, setUnder] = useState(initial?.under ?? defaultUnder ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [statement, setStatement] = useState(initial?.proposed ?? "");
   const [criteria, setCriteria] = useState(criteriaLines(initial));
@@ -917,6 +919,8 @@ export interface ChangePlacementSectionProps {
   onPendingCriteria?: (pending: PendingCriteria | null) => void;
   /** Reports the capability the proposal form would add, so the map can draw it as a ghost block. */
   onGhost?: (ghost: ProposalGhost | null) => void;
+  /** The area id "Nothing fits" proposes under until the form says otherwise: the map's zoomed area. */
+  proposeUnder?: string;
 }
 
 /** What the section shows after a write, until the change's next read. */
@@ -929,7 +933,7 @@ interface Written {
  * The placement section of a change's detail panel. Key it by change id:
  * its state belongs to one change.
  */
-export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost }: ChangePlacementSectionProps) {
+export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, proposeUnder }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
   const [proposing, setProposing] = useState(false);
@@ -1043,7 +1047,7 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       propose: {
         changeId, changeTitle, hasNext: position.next !== null,
         onProposed, onBack: () => setProposing(false),
-        draftEnabled, drafted, onGhost,
+        draftEnabled, drafted, onGhost, defaultUnder: proposeUnder,
       },
     }),
   );

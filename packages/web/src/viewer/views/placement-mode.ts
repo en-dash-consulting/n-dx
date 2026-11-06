@@ -374,6 +374,8 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           onChoose: choose,
           onPendingCriteria: setPending,
           onGhost: setGhost,
+          // Nothing fits proposes under the zoomed area, so the ghost lands where the map is.
+          proposeUnder: zoomedArea?.id,
         })),
     ),
   );
