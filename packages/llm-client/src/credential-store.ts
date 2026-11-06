@@ -144,7 +144,7 @@ export interface CredentialWriteOptions extends CredentialStoreOptions {
   lockTimeoutMs?: number;
   /** Whether a lock holder's PID is running (`kill(pid, 0)`); injectable for tests. */
   pidAlive?: (pid: number) => boolean;
-  /** The lock's stat, read and link calls; injectable for tests. */
+  /** The lock's stat, read, link and remove calls; injectable for tests. */
   lockFs?: LockFs;
   /** Runs `icacls` on win32; injectable so the ACL path is testable anywhere. */
   execFileSyncImpl?: typeof execFileSyncCli;
