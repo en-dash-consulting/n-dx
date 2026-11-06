@@ -191,6 +191,9 @@ const FULL_STATUS = {
   sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 12, modulesComplete: 3, modulesTotal: 4 },
   rex: { exists: true, percentComplete: 40, stats: { total: 10, completed: 4, inProgress: 1, pending: 5, deferred: 0, blocked: 0 }, hasInProgress: true, hasPending: true, nextTaskTitle: "t" },
   hench: { configured: true, totalRuns: 7, activeRuns: 1, staleRuns: 0 },
+  // /api/status always sends it, and useProjectStatus drops a body without it,
+  // which leaves Plan's v2-only tiles unmounted (no layout is known yet).
+  initialized: true,
 };
 
 function stubProject(status: unknown = FULL_STATUS) {

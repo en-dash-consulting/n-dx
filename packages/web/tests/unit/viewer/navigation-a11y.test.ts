@@ -108,6 +108,18 @@ function stubFetch() {
         json: async () => ({ name: "demo", description: null, version: null, git: null, nameSource: "directory" }),
       };
     }
+    // A valid v2 status: Plan mounts its v2-only tiles only once a layout is known.
+    if (u.includes("/api/status")) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          initialized: true,
+          sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 0, modulesComplete: 0, modulesTotal: 0 },
+          rex: { exists: true, layout: "v2", percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
+          hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
+        }),
+      };
+    }
     return { ok: true, status: 200, json: async () => ({}) };
   }));
 }
