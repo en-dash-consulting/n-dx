@@ -312,7 +312,11 @@ export async function excludeHenchRuntimeArtifacts(
 
 /** A dirty tree split into n-dx's own planning files and everything else. */
 export interface PlanningSplit {
-  /** Repository-relative paths of dirty planning files, as git reported them. */
+  /**
+   * Repository-relative paths of dirty planning files, as git reported them.
+   * A rename or copy contributes both its paths, so committing the list
+   * records the source's deletion too.
+   */
   planning: string[];
   /**
    * The remaining porcelain lines, less rex's machine-local files
@@ -344,8 +348,14 @@ export async function splitPlanningPaths(
     const source = renameSource(line);
     // Rex's locks, backups and derived cache: neither committed nor refused on.
     if (source === undefined && matchesProjectPath(path, REX_MACHINE_LOCAL_PATHS, prefix)) continue;
-    if (isPlanning(path) && (source === undefined || isPlanning(source))) split.planning.push(path);
-    else split.other.push(line);
+    if (source === undefined) {
+      if (isPlanning(path)) split.planning.push(path);
+      else split.other.push(line);
+    } else if (isPlanning(path) && isPlanning(source)) {
+      split.planning.push(source, path);
+    } else {
+      split.other.push(line);
+    }
   }
   return split;
 }

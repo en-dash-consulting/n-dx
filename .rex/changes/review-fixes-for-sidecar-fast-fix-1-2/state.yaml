@@ -14,7 +14,14 @@ items:
     lastModified: "2026-11-06T17:08:12.552Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6d750811-4a02-4569-9b52-b55d0d0ea6a4":
-    lastModified: "2026-11-06T17:03:24.865Z"
+    status: "completed"
+    startedAt: "2026-11-06T17:11:42.095Z"
+    completedAt: "2026-11-06T17:15:10.994Z"
+    endedAt: "2026-11-06T17:15:10.994Z"
+    activeIntervals: [{"end":"2026-11-06T17:15:10.994Z","start":"2026-11-06T17:11:42.095Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "splitPlanningPaths adds both sides of a planning rename; commitPlanningChanges stages only paths present in the worktree, so git rm'd paths and rename sources reach the path-limited commit through HEAD. Three hench tests added."
+    lastModified: "2026-11-06T17:15:10.994Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6ea32693-0356-466a-9a3e-696a101f2819":
     status: "completed"

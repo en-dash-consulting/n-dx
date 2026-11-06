@@ -2105,6 +2105,11 @@ export const PLANNING_COMMIT_SUBJECT = "chore(prd): commit planning changes befo
  * `:(top,literal)` pathspec: right from a project in a subdirectory, and no
  * glob in a slug can widen it. The same pathspecs go to `git commit`, which
  * then records only those paths even if something else was already staged.
+ * A path-limited commit takes each path's worktree state, deletions included,
+ * but only for paths git already knows; `add` is there for untracked files.
+ * Paths missing from the worktree are kept out of `add`: one removed with
+ * `git rm` (or a rename's source) is in neither the worktree nor the index,
+ * so `add` refuses it, while `commit` still finds it in HEAD.
  *
  * @param itemId The task about to run, for the `N-DX-Item` trailer; omitted
  *   when selection has not picked one yet.
@@ -2112,8 +2117,11 @@ export const PLANNING_COMMIT_SUBJECT = "chore(prd): commit planning changes befo
 async function commitPlanningChanges(projectDir: string, paths: string[], itemId?: string): Promise<void> {
   // No paths would mean a bare `git commit`, which takes the whole index.
   if (paths.length === 0) throw new Error("no planning files to commit");
-  const pathspecs = paths.map((path) => `:(top,literal)${path}`);
-  await execGitMutation(projectDir, ["add", "--", ...pathspecs], 30_000);
+  const spec = (path: string) => `:(top,literal)${path}`;
+  const pathspecs = paths.map(spec);
+  const top = (await execStdout("git", ["rev-parse", "--show-toplevel"], { cwd: projectDir, timeout: 15_000 })).trim();
+  const present = paths.filter((path) => existsSync(join(top || projectDir, path)));
+  if (present.length > 0) await execGitMutation(projectDir, ["add", "--", ...present.map(spec)], 30_000);
   const trailers = [
     "N-DX: pre-run commit gate",
     ...(itemId ? [`N-DX-Item: ${itemId}`] : []),

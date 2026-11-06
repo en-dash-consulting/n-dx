@@ -144,6 +144,35 @@ describe("pre-run commit gate: n-dx planning files", () => {
     expect(await git("status", "--porcelain")).toContain(".rex/changes/ch/state.yaml");
   });
 
+  it("commits a staged planning rename whole, leaving the index clean", async () => {
+    await git("mv", ".rex/changes/ch", ".rex/changes/renamed");
+
+    expect(await gate()).toBe("proceed");
+
+    const files = (await git("show", "--name-status", "--no-renames", "--format=", "HEAD")).split("\n").sort();
+    expect(files).toEqual(["A\t.rex/changes/renamed/state.yaml", "D\t.rex/changes/ch/state.yaml"]);
+    expect(await git("status", "--porcelain")).toBe("");
+  });
+
+  it("commits a staged planning deletion instead of refusing", async () => {
+    await git("rm", "-q", ".rex/changes/ch/state.yaml");
+
+    expect(await gate()).toBe("proceed");
+
+    expect(await git("show", "--name-status", "--format=", "HEAD")).toBe("D\t.rex/changes/ch/state.yaml");
+    expect(await git("status", "--porcelain")).toBe("");
+  });
+
+  it("refuses a rename between a planning and a non-planning path", async () => {
+    await git("mv", "src/app.ts", ".rex/changes/ch/app.ts");
+    const before = await git("rev-parse", "HEAD");
+
+    expect(await gate()).toBe("stop");
+
+    expect(await git("rev-parse", "HEAD")).toBe(before);
+    expect(logged.find((line) => line.includes("Refusing to start"))).toContain(".rex/changes/ch/app.ts");
+  });
+
   it("addresses a nested project's planning files from the repository root", async () => {
     // A project in a subdirectory: porcelain paths are repo-relative, so the
     // commit has to address them from the top of the repository.
