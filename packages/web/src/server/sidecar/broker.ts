@@ -53,6 +53,8 @@ export interface SidecarCard {
   preview?: string;
   /** A work card's run options as start uses them (`workOptions`), defaults applied; the viewer titles the card from these. */
   runOptions?: Record<string, unknown>;
+  /** A work card's row: the task and the change it sits in, as the PRD read when the card was raised. */
+  rowText?: string;
   /** A change-set card's items as approval writes them, read against the PRD before the card was raised. */
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan as the planner printed it when the card was raised; its commands are never the model's. */
@@ -92,6 +94,7 @@ export interface SidecarCard {
 export interface CardAnnex {
   preview?: string;
   runOptions?: Record<string, unknown>;
+  rowText?: string;
   changeSet?: SidecarChangeSet;
   runPlan?: QueuePlan;
   placement?: SidecarPlacement;
@@ -238,6 +241,7 @@ export class SidecarBroker {
       allowListKey: key,
       ...(annex.preview !== undefined && { preview: annex.preview }),
       ...(annex.runOptions !== undefined && { runOptions: annex.runOptions }),
+      ...(annex.rowText !== undefined && { rowText: annex.rowText }),
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
       ...(annex.placement !== undefined && { placement: annex.placement }),

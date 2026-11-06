@@ -27,7 +27,7 @@ function TaskLine({ task, navigateTo }: { task: PlanTask; navigateTo: NavigateTo
       class: "live-queue-item",
       href: "#",
       onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo("prd", { taskId: task.id }); },
-    }, h("span", { class: "live-card-title" }, task.title)),
+    }, h("span", { class: "live-card-title" }, task.rowText ?? task.title)),
     h("span", { class: "live-card-chain" }, task.reason));
 }
 

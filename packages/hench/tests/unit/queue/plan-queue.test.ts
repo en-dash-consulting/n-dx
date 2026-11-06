@@ -202,7 +202,8 @@ describe("lanes after the first need their own worktree", () => {
   it("marks every lane after the first in the JSON, leaving the existing fields as they were", () => {
     const p = twoLanes();
     expect(p.lanes.map((l) => l.ownWorktree)).toEqual([false, true]);
-    expect(Object.keys(p.lanes[0]).sort()).toEqual(["changeId", "command", "ownWorktree", "tasks"]);
+    expect(Object.keys(p.lanes[0]).sort()).toEqual(["changeId", "changeTitle", "command", "ownWorktree", "tasks"]);
+    expect(typeof p.lanes[0].changeTitle).toBe("string");
     expect(Object.keys(p).sort()).toEqual(["activeRuns", "activeRunsByWorktree", "excluded", "lanes", "runLimit", "summary"]);
     expect(p.lanes[1].command).toBe("ndx work --task=t-b1 --auto .");
   });

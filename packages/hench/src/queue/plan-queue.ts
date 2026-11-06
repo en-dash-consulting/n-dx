@@ -92,6 +92,8 @@ export interface PlannedTask {
 export interface PlannedLane {
   command: string;
   changeId: string;
+  /** The change's title; its id when the PRD does not name it. */
+  changeTitle: string;
   /**
    * The lane must run in a worktree of its own: true for every lane after the
    * first, and for lane 1 too while a run is live in this worktree. Each
@@ -222,6 +224,7 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
   const lanes: PlannedLane[] = chosen.map((lane, i) => ({
     command: input.command(lane.tasks.map((t) => t.id)),
     changeId: lane.change.id,
+    changeTitle: lane.change.title,
     ownWorktree: i > 0 || hereBusy,
     tasks: lane.tasks.map((t, j) => ({
       id: t.id,

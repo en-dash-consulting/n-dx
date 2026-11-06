@@ -133,6 +133,20 @@ export function chainLabel(chain: readonly LiveChainLink[]): string | null {
   return chain.length > 0 ? chain.map((c) => c.title).join(" › ") : null;
 }
 
+/**
+ * A runnable row's title line and its ancestors line. On a v2 tree the title
+ * names the change ("<task> · in <change>"), which already says where the task
+ * sits, so the chain line is dropped; on a v1 tree the bare title and the
+ * ancestors stay as they were.
+ */
+export function runnableRowParts(
+  item: { epicChain: readonly LiveChainLink[]; rowText?: string },
+  title: string,
+): { text: string; chain: string | null } {
+  const text = item.rowText ?? title;
+  return { text, chain: text === title ? chainLabel(item.epicChain) : null };
+}
+
 /** Human names for the long jobs the dashboard can run. */
 const JOB_LABELS: Record<string, string> = {
   "sv-analyze": "Sourcevision analysis",
