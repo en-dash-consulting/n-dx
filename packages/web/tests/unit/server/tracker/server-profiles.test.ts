@@ -188,6 +188,14 @@ describe("item URL template", () => {
     expect(trackerItemIdOfRef(caos, url!)).toBe(uuid);
   });
 
+  it("reads the page id from a board peek URL's p= parameter, not the database id in the path", () => {
+    const caos = (loadServerProfile("caos", { ndxHome }) as ServerProfile).tracker!;
+    const peek = "https://www.notion.so/ws/0123456789abcdef0123456789abcdef?v=fedcba9876543210fedcba9876543210&p=3b3a80b7192480f7b5fce8093ba5f7f0&pm=s";
+    expect(trackerItemIdOfRef(caos, peek)).toBe(uuid);
+    // A p= that is not 32 hex is ignored: the path tail still decides.
+    expect(trackerItemIdOfRef(caos, "https://www.notion.so/ws/3b3a80b7192480f7b5fce8093ba5f7f0?p=short")).toBe(uuid);
+  });
+
   it("reads the id from a URL copied from the browser, ignoring workspace, title slug and query", () => {
     const caos = (loadServerProfile("caos", { ndxHome }) as ServerProfile).tracker!;
     const browser = "https://www.notion.so/ws/Some-Title-3b3a80b7192480f7b5fce8093ba5f7f0?pvs=4";
