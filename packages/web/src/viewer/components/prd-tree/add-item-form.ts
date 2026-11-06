@@ -341,7 +341,8 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
           placeholder: "One criterion, then Add...",
           onInput: (e: Event) => setCriterionDraft((e.target as HTMLInputElement).value),
           onKeyDown: (e: KeyboardEvent) => {
-            if (e.key === "Enter") {
+            // Enter that confirms an IME composition is not "add this line".
+            if (e.key === "Enter" && !e.isComposing) {
               e.preventDefault();
               addCriterion();
             }

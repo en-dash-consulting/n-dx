@@ -248,6 +248,22 @@ describe("AddItemForm", () => {
       expect(onSubmit.mock.calls[0][0].acceptanceCriteria).toEqual(["keep"]);
     });
 
+    it("Enter adds a criterion, but not while an IME composition is open", () => {
+      const { root, input } = setup();
+      const field = input("add-form-criterion");
+      const press = (isComposing: boolean) => act(() => {
+        field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing, bubbles: true }));
+      });
+
+      type(field, "日本");
+      press(true);
+      expect(root.querySelectorAll(".rex-add-form-criterion")).toHaveLength(0);
+
+      press(false);
+      const items = root.querySelectorAll(".rex-add-form-criterion-text");
+      expect(Array.from(items).map((el) => el.textContent)).toEqual(["日本"]);
+    });
+
     it("omits criteria and tags when none are given", async () => {
       const { onSubmit, input, submit } = setup();
       type(input("add-form-title"), "Bare");
