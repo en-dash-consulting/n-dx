@@ -22,7 +22,7 @@ import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/sidecar.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
-import { SidecarSessions } from "./sidecar-sessions.js";
+import { SidecarSessions, NewSessionButton } from "./sidecar-sessions.js";
 import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
 import {
   TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultIsError,
@@ -400,6 +400,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     h("header", { class: "sidecar-head" },
       h("span", { class: "sidecar-title" }, "Sidecar"),
       sidecar.session ? h("span", { class: "sidecar-session-name" }, sidecar.session.name) : null,
+      h(NewSessionButton, { sidecar, onStarted: () => setListing(false) }),
       h("button", {
         type: "button",
         class: `sidecar-sessions-toggle${listing ? " active" : ""}`,
@@ -468,7 +469,9 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
           `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
       : null,
     sidecar.readOnly
-      ? h("p", { class: "sidecar-readonly", role: "status" }, "This session has ended. Its transcript is read-only.")
+      ? h("div", { class: "sidecar-readonly", role: "status" },
+          h("span", null, "This session has ended. Its transcript is read-only."),
+          h(NewSessionButton, { sidecar }))
       : h("form", {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },

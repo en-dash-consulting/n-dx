@@ -1605,6 +1605,61 @@ describe("attachment and lens", () => {
     expect(lastSidecar!.session?.id).toBe("new");
   });
 
+  describe("New session control", () => {
+    const newButtons = () => [...root.querySelectorAll<HTMLButtonElement>(".sidecar-new-session")];
+    const posts = () => server.requests.filter((r) => r.method === "POST" && r.url === "/api/sidecar/sessions");
+    const openListed = async () => {
+      await mount("prd", { taskId: "t1" });
+      await pressCmdJ();
+      await click(root.querySelector(".sidecar-sessions-toggle"));
+    };
+
+    it("the drawer head starts a session with the page attached", async () => {
+      server.sessions = [{ session: session({ id: "s1" }), running: false }];
+      await open("prd", { taskId: "t1" });
+      expect(root.querySelector(".sidecar-head .sidecar-new-session")?.textContent).toBe("New session");
+      await click(root.querySelector(".sidecar-head .sidecar-new-session"));
+      expect(posts()).toHaveLength(1);
+      expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
+      expect(lastSidecar!.session?.id).toBe("new");
+    });
+
+    it("the sessions list starts one, closes the list and attaches the page", async () => {
+      server.sessions = [{ session: session({ id: "s1" }), running: false }];
+      await openListed();
+      await click(root.querySelector(".sidecar-sessions .sidecar-new-session"));
+      expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
+      expect(root.querySelector(".sidecar-sessions")).toBeNull();
+      expect(lastSidecar!.session?.id).toBe("new");
+    });
+
+    it("the ended-session bar starts one with the page attached", async () => {
+      server.sessions = [{ session: session({ id: "s1", endedAt: "2026-10-28T11:00:00.000Z" }), running: false }];
+      await open("prd", { taskId: "t1" });
+      await act(async () => { await lastSidecar!.openSession("s1"); });
+      await settle();
+      expect(root.querySelector(".sidecar-composer")).toBeNull();
+      await click(root.querySelector(".sidecar-readonly .sidecar-new-session"));
+      expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
+      expect(lastSidecar!.session?.id).toBe("new");
+      expect(root.querySelector(".sidecar-composer")).not.toBeNull();
+    });
+
+    it("the live session it leaves stays in the list and resumes", async () => {
+      server.sessions = [{ session: session({ id: "s1", name: "First" }), running: false }];
+      await open("prd", { taskId: "t1" });
+      await click(newButtons()[0]);
+      expect(lastSidecar!.session?.id).toBe("new");
+      await click(root.querySelector(".sidecar-sessions-toggle"));
+      const first = root.querySelector<HTMLElement>('.sidecar-session[data-session="s1"]')!;
+      expect(first).not.toBeNull();
+      expect(first.textContent).not.toContain("ended");
+      const resume = [...first.querySelectorAll("button")].find((b) => b.textContent === "Resume")!;
+      await click(resume);
+      expect(lastSidecar!.session?.id).toBe("s1");
+    });
+  });
+
   it("a task picked in the tree after the page opened attaches, and re-targets the open session on each pick", async () => {
     server.sessions = [{ session: session({ id: "s1" }), running: false }];
     await open("prd");

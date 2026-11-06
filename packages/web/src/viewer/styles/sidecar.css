@@ -594,7 +594,8 @@
 }
 
 /* Sessions list (drawer state C) */
-.sidecar-sessions-toggle {
+.sidecar-sessions-toggle,
+.sidecar-new-session {
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -604,7 +605,12 @@
   font-size: 12px;
   cursor: pointer;
 }
-.sidecar-sessions-toggle:hover { background: var(--bg-hover); color: var(--text); }
+.sidecar-sessions-toggle:hover,
+.sidecar-new-session:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.sidecar-new-session:disabled { opacity: 0.5; cursor: default; }
+.sidecar-new-session { margin-left: auto; }
+.sidecar-new-session + .sidecar-sessions-toggle { margin-left: 0; }
+.sidecar-sessions-new { margin: 0 0 var(--space-2); }
 .sidecar-sessions-toggle.active { background: var(--bg-active); color: var(--text); font-weight: 600; }
 .sidecar-sessions { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-2) var(--space-3); }
 .sidecar-sessions-filter { display: flex; gap: var(--space-1); margin-bottom: var(--space-2); }
@@ -619,7 +625,7 @@
 .sidecar-session-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--text-muted); margin-top: var(--space-1); }
 .sidecar-session-actions, .sidecar-session-confirm, .sidecar-session-rename { display: flex; gap: var(--space-2); margin-top: var(--space-2); align-items: center; }
 .sidecar-session-name-input { flex: 1; min-width: 0; }
-.sidecar-readonly { flex: none; margin: 0; padding: var(--space-2) var(--space-3); color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); }
+.sidecar-readonly { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); }
 
 /* Workflow > Sidecar: the allow-list editor's rows (views/sidecar-settings.ts). */
 .sidecar-allow-rules {
