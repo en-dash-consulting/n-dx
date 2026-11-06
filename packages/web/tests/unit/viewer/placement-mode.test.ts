@@ -146,6 +146,7 @@ describe("labels", () => {
 
   it("says why the map opened at the area level", () => {
     expect(mapLevelNote(null)).toBe("rex found no candidate. Pick an area, or search in the panel.");
+    expect(mapLevelNote(null, "HTTP 500")).toBe("Could not read rex's shortlist: HTTP 500. Pick an area, or search in the panel.");
     expect(mapLevelNote(placement("a", [candidate("x"), candidate("y")], true))).toContain("tie");
     expect(mapLevelNote(placement("a", [candidate("x", { strength: "possible" })]))).toBe("None strong: the best is possible. Pick an area to compare its candidates in place.");
   });
@@ -278,6 +279,18 @@ describe("PlacementMode", () => {
     await act(async () => { $<HTMLButtonElement>(".placing-crumb-map")!.click(); });
     await settle();
     expect($(".placing-container")?.dataset.level).toBe("map");
+  });
+
+  it("names the failure in the area-level note when the shortlist read fails, not 'no candidate'", async () => {
+    serve([change("a")], []);
+    const served = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) =>
+      url === "/api/rex/changes/placements"
+        ? new Response(JSON.stringify({ error: "rex is down" }), { status: 500, headers: { "Content-Type": "application/json" } })
+        : served(url, init)));
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    expect($(".placing-container")?.dataset.level).toBe("map");
+    expect($(".placing-note")?.textContent).toBe("Could not read rex's shortlist: rex is down. Pick an area, or search in the panel.");
   });
 
   it("opens a tied shortlist at the area level, even when its top pick is strong", async () => {

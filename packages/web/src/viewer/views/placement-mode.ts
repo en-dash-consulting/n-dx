@@ -120,7 +120,8 @@ export function candidateNote(rank: number, candidate: Pick<PlacementCandidate, 
 }
 
 /** What the area level says about the shortlist that sent it there. */
-export function mapLevelNote(placement: ChangePlacement | null): string {
+export function mapLevelNote(placement: ChangePlacement | null, failure?: string): string {
+  if (failure !== undefined) return `Could not read rex's shortlist: ${failure}. Pick an area, or search in the panel.`;
   const top = placement?.shortlist[0];
   if (!placement || !top) return "rex found no candidate. Pick an area, or search in the panel.";
   if (placement.tied) return "The top candidates tie. Pick an area to compare its candidates in place.";
@@ -312,6 +313,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const shown = row ?? lastRow.current;
   const read = shown?.shortlist;
   const placement = read && "placement" in read ? read.placement : null;
+  const failure = read && "error" in read ? read.error : undefined;
 
   // undefined: not decided yet; null: the area level; a slug: zoomed into it.
   const [zoom, setZoom] = useState<string | null | undefined>(undefined);
@@ -397,7 +399,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           : null,
         zoom === null && map
           ? [
-              h("p", { key: "note", class: "placing-note", role: "note" }, mapLevelNote(placement)),
+              h("p", { key: "note", class: "placing-note", role: "note" }, mapLevelNote(placement, failure)),
               h(AreaLevel, { key: "areas", map, groups, onZoom: setZoom }),
             ]
           : null,
