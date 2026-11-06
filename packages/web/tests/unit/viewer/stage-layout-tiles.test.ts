@@ -57,7 +57,8 @@ describe("Plan tiles before the first status", () => {
   it("mounts no v2-only tile with null status, then a v1 status", () => {
     status = null;
     mount();
-    expect(tiles()).toContain("validation");
+    // Validation sits on Plan as the Plan health panel tile.
+    expect(tiles()).toContain("plan-health");
     for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
 
     status = withLayout("v1");
