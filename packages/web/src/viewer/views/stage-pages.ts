@@ -12,7 +12,7 @@
 
 import { h } from "preact";
 import type { ComponentChild } from "preact";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import {
   STAGES,
@@ -250,12 +250,16 @@ type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; depl
 /**
  * A grid whose tiles follow the project's PRD layout, read from project status
  * so only a stage with `v1Tiles` subscribes. A static export has no status and
- * no server-backed v2 tiles, so it takes the v1 set; while status is loading,
- * v2 stands, as the sections it replaces did.
+ * no server-backed v2 tiles, so it takes the v1 set; before the first status
+ * arrives, v2 stands, as the sections it replaces did. A later null (a failed
+ * poll, a server restart) keeps the last known layout: swapping tile sets would
+ * unmount the open tile and lose its state.
  */
 function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridProps) {
+  const known = useRef<"v1" | "v2" | undefined>(undefined);
   const layout = useProjectStatus()?.rex.layout;
-  return h(TileGrid, { ...grid, tiles: deployed || layout === "v1" ? v1Tiles : tiles });
+  if (layout) known.current = layout;
+  return h(TileGrid, { ...grid, tiles: deployed || known.current === "v1" ? v1Tiles : tiles });
 }
 
 // ── Landing ────────────────────────────────────────────────────
