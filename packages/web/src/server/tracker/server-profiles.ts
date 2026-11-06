@@ -121,6 +121,8 @@ export function trackerItemUrl(mapping: Pick<TrackerMapping, "itemUrlTemplate">,
 
 const COMPACT_UUID = /^([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})$/i;
 
+const COMPACT_ID_TAIL = /(?:^|-)([0-9a-f]{32})$/i;
+
 /**
  * The work item id a linked `ref` names for the tracker's tools: the id inside
  * a URL the profile's template built, else `ref` itself (a key, or a URL the
@@ -134,6 +136,13 @@ export function trackerItemIdOfRef(mapping: Pick<TrackerMapping, "itemUrlTemplat
   if (typeof placeholder !== "string") return ref;
   const [prefix, suffix] = template.split(placeholder);
   if (!ref.startsWith(prefix) || !ref.endsWith(suffix) || ref.length <= prefix.length + suffix.length) return ref;
+  if (placeholder === "{compactId}") {
+    // A URL copied from the browser: `<workspace>/<Title>-<id>?pvs=4`. The id is
+    // the last path segment's trailing 32 hex, not the whole remainder.
+    const path = ref.slice(prefix.length, ref.length - suffix.length).split(/[?#]/, 1)[0];
+    const tail = COMPACT_ID_TAIL.exec(path.slice(path.lastIndexOf("/") + 1));
+    if (tail) return tail[1].replace(COMPACT_UUID, "$1-$2-$3-$4-$5");
+  }
   let id: string;
   try {
     id = decodeURIComponent(ref.slice(prefix.length, ref.length - suffix.length));
