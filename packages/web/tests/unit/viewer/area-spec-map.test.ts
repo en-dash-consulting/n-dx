@@ -124,7 +124,7 @@ describe("ghost markers from waiting cards", () => {
     const band = AREA_DETAIL_FIXTURE.constraints[0];
     const el = mountWithCards([card([{ parentId: band.id }, { parentId: band.id }])]);
     const chip = el.querySelector(`.asm-band [data-ghost="${band.id}"]`)!;
-    expect(chip.classList.contains("pam-ghost")).toBe(false);
+    expect(chip.classList.contains("pam-ghost-mark")).toBe(false);
     expect(chip.querySelector("[aria-hidden='true']")?.textContent).toBe("+2");
     expect(chip.querySelector(".sr-only")?.textContent).toBe("2 waiting on a card");
   });
