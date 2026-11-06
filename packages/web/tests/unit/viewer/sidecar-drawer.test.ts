@@ -1497,6 +1497,8 @@ describe("permission cards", () => {
     "item-edit": { tool: "propose_item_edit", input: { id: "t1", tags: ["ui"] }, title: "t1" },
     // Without its change (a card from before the status was read) the title is the item's id.
     status: { tool: "propose_status", input: { id: "t1", status: "deferred" }, title: "t1" },
+    // Without its choice (a card from before the question was read) the title is the call's question.
+    choice: { tool: "ask_choice", input: { question: "Which store?", options: [] }, title: "Which store?" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },

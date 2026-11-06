@@ -48,6 +48,7 @@ import {
   workOptions,
   type SidecarActions,
 } from "./carry-out.js";
+import { readChoiceCall } from "./choice-card.js";
 import { buildExternalCall, callProblems } from "./external-call.js";
 import { BRANCH_HEALTH_OFF_READ, CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 import { LEDGER_ENTRY_MAX_CHARS, type LedgerEntryType } from "./ledger.js";
@@ -168,6 +169,18 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
       id: z.string().min(1).describe("The change, task or subtask (id or display id)"),
       status: z.enum(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled", "deleted"]).describe("The proposed status"),
       reason: z.string().optional().describe("Why the status changes; shown on the card, and the failure reason when status is failing"),
+    },
+  },
+  ask_choice: {
+    description: [
+      "Ask the operator to decide between options you name; use it instead of writing \"A, B or C\" in your reply. Waits for the operator's choice card and returns their answer as the result.",
+      "Give two to twelve options, each a short `label` and an optional `description`. The card always offers an Other row for free text, so do not add one. Set `multiSelect` only when more than one answer can stand.",
+      "It writes nothing; a denied card means the operator declined to answer.",
+    ].join(" "),
+    input: {
+      question: z.string().min(1).describe("The decision, as one question"),
+      options: z.array(z.object({ label: z.string().min(1), description: z.string().optional() })).min(2).max(12),
+      multiSelect: z.boolean().optional().describe("Let the operator pick several options"),
     },
   },
   github_read: {
@@ -423,6 +436,12 @@ export function createBrokerMcpServer(
         const statusChange = await actions.checkStatus(input);
         if (typeof statusChange === "string") return text(`No card was raised: ${statusChange}. Nothing was written.`, true);
         annex.statusChange = statusChange;
+      }
+      // A choice card shows the question as read; a call with no real choice raises none.
+      if (name === "ask_choice") {
+        const choice = readChoiceCall(input);
+        if (typeof choice === "string") return text(`No card was raised: ${choice}. Nothing was asked.`, true);
+        annex.choice = choice;
       }
       // A run-plan card lists the planner's own lanes; with no plan, or no lane, no card is raised.
       if (name === "propose_run_plan") {

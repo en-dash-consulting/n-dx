@@ -45,6 +45,7 @@ import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitl
 import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "./sidecar-external-call.js";
 import { ItemEditBody, itemEditDraftOf, itemEditEdits, type ItemEditDraft } from "./sidecar-item-edit.js";
 import { StatusBody, statusLabel } from "./sidecar-status.js";
+import { ChoiceBody, choiceAnswerLine, choiceAnswerOf, EMPTY_CHOICE_DRAFT, type ChoiceDraft } from "./sidecar-choice.js";
 
 /** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
 export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
@@ -59,6 +60,7 @@ export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>>
   link: "Link",
   "item-edit": "Item edit",
   status: "Status",
+  choice: "Question",
   "network-read": "Network read",
   "draft-post": "Draft post",
   "draft-file": "Draft file",
@@ -118,6 +120,7 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       // The item and its move, as the card read it.
       case "status":
         return card.statusChange ? `${card.statusChange.itemId}: ${statusLabel(card.statusChange.from)} → ${statusLabel(card.statusChange.to)}` : str(input.id);
+      case "choice": return card.choice?.question ?? str(input.question);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
       case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
       case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
@@ -484,10 +487,11 @@ async function allowGithubReads(): Promise<void> {
 
 function settledNote(card: SidecarCard, state: SidecarCardState): string {
   switch (state) {
-    case "approved": return "Approved";
+    case "approved": return card.choice?.answer ? `Answered · ${choiceAnswerLine(card.choice.answer)}` : "Approved";
     case "allow-listed": return "Approved · allow-listed, runs without asking from now on";
     case "denied":
       if (card.status === "withdrawn") return `Denied · ${SIDECAR_SESSION_ENDED_REASON}`;
+      if (card.choice) return card.reason ? `Skipped · note sent to the agent: "${card.reason}"` : "Skipped · no answer given";
       return card.reason ? `Denied · note sent to the agent: "${card.reason}"` : "Denied";
     case "withdrawn": return `Withdrawn · ${card.reason ?? "the turn stopped"}`;
     case "pending": return "";
@@ -546,10 +550,13 @@ interface CardProps {
   /** The first waiting item-edit card's fields as the operator is editing them. */
   itemEditDraft: ItemEditDraft;
   onItemEditDraft: (draft: ItemEditDraft) => void;
+  /** The first waiting choice card's picks. */
+  choiceDraft: ChoiceDraft;
+  onChoiceDraft: (draft: ChoiceDraft) => void;
   onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, itemEditDraft, onItemEditDraft, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, itemEditDraft, onItemEditDraft, choiceDraft, onChoiceDraft, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   // A decided card is one line (head + note) until the operator opens its body.
   const [open, setOpen] = useState(false);
@@ -581,6 +588,11 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
           h(ItemEditBody, { card, editable, draft: editable ? itemEditDraft : {}, onDraft: onItemEditDraft }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
+    : card.choice
+      ? h(ChoiceBody, {
+          card, editable, draft: editable ? choiceDraft : EMPTY_CHOICE_DRAFT, onDraft: onChoiceDraft,
+          onSend: () => { const answer = choiceAnswerOf(choiceDraft); if (answer) onDecide({ approve: true, answer }); },
+        })
     : card.statusChange
       ? [
           h(StatusBody, { card }),
@@ -645,10 +657,16 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                 : h("button", {
                     type: "button", class: "sidecar-card-approve",
                     // Place waits for the dry-run line of the placement as edited; a call waits for every field to hold a value.
-                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)) || externalEdit === null,
-                    onClick: () => onDecide({ approve: true }),
+                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)) || externalEdit === null
+                      || (!!card.choice && !choiceAnswerOf(choiceDraft)),
+                    // A question is answered by sending the picks: its approval is the answer.
+                    onClick: () => {
+                      const choiceAnswer = card.choice ? choiceAnswerOf(choiceDraft) : null;
+                      onDecide(choiceAnswer ? { approve: true, answer: choiceAnswer } : { approve: true });
+                    },
                   },
-                    card.changeSet
+                    card.choice ? "Send"
+                    : card.changeSet
                       ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
                       : card.placement ? "Place"
                       : card.itemEdit ? "Approve and write"
@@ -660,7 +678,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
               // Copy hands the draft to the operator and posts nothing: it settles the card as denied.
               draft ? h(DraftCopyButton, { text: str(card.input.body), deciding, onCopied: () => onDecide({ approve: false, reason: DRAFT_COPIED_REASON }) }) : null,
               h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) },
-                card.runPlan ? "Not now" : draft ? "Discard" : "Deny"),
+                card.runPlan ? "Not now" : draft ? "Discard" : card.choice ? "Skip" : "Deny"),
               card.kind === "network-read"
                 ? h("button", {
                     type: "button",
@@ -677,7 +695,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                     onClick: () => onDecide({ approve: true, remember: true }),
                   }, "Always allow")
                 : null,
-              h("span", { class: "sidecar-card-keys", "aria-hidden": "true" }, card.runPlan ? "⌘⌫ not now" : "⌘↵ approve · ⌘⌫ deny"),
+              h("span", { class: "sidecar-card-keys", "aria-hidden": "true" }, card.runPlan ? "⌘⌫ not now" : card.choice ? "⌘↵ send · ⌘⌫ skip" : "⌘↵ approve · ⌘⌫ deny"),
             ),
           )
         : h("p", { class: "sidecar-card-queued" }, "Decided after the card above"),
@@ -710,6 +728,7 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [path, setPath] = useState("");
   const [externalEdit, setExternalEdit] = useState<ExternalCallEdit | undefined>(undefined);
   const [itemEditDraft, setItemEditDraft] = useState<ItemEditDraft>({});
+  const [choiceDraft, setChoiceDraft] = useState<ChoiceDraft>(EMPTY_CHOICE_DRAFT);
   const [decidedOpen, setDecidedOpen] = useState(false);
   const firstId = first?.id ?? null;
   const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
@@ -719,6 +738,7 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   useEffect(() => {
     setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined);
     setItemEditDraft(firstItemEdit ? itemEditDraftOf(firstItemEdit) : {});
+    setChoiceDraft(EMPTY_CHOICE_DRAFT);
   }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
@@ -729,6 +749,14 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     if (first.placement && decision.approve && !placementDecidable(first, placementEdit)) return;
     // Nor of a call while a field's text is not a value of its type.
     if (first.kind === "external-call" && decision.approve && externalEdit === null) return;
+    // Nor of a question until a row is picked (or Other holds text): ⌘↵ sends what the card shows.
+    if (first.choice && decision.approve) {
+      const picked = decision.answer ?? choiceAnswerOf(choiceDraft);
+      if (!picked) return;
+      setDeciding(true);
+      try { await decide(first.id, { ...decision, answer: picked }); } finally { setDeciding(false); }
+      return;
+    }
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
@@ -804,6 +832,8 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       onExternalEdit: setExternalEdit,
       itemEditDraft: card.id === firstId ? itemEditDraft : {},
       onItemEditDraft: setItemEditDraft,
+      choiceDraft: card.id === firstId ? choiceDraft : EMPTY_CHOICE_DRAFT,
+      onChoiceDraft: setChoiceDraft,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
       path,
       onPath: setPath,
