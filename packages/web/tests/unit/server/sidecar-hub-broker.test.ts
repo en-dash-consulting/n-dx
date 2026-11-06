@@ -113,7 +113,8 @@ describe("what the hub session is offered", () => {
     const names = tools.map((t) => t.name);
     expect(names).toContain("start_work");
     expect(names).not.toContain("save_draft");
-    expect(names).toHaveLength(13);
+    expect(names).toContain("ask_choice");
+    expect(names).toHaveLength(14);
   });
 
   it("refuses a withheld tool called by name", async () => {

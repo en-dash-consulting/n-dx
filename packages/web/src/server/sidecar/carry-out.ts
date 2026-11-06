@@ -28,6 +28,7 @@
 import { laneSteps, stepRunOptions } from "../../shared/index.js";
 import type { QueuePlan, SidecarChangeSet, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
+import { choiceResultText } from "./choice-card.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
 
 /** One effect's result, as the tool result states it. */
@@ -136,7 +137,7 @@ export async function carryOutDecision(
   if (outcome.decidedBy === "operator" || outcome.decidedBy === "withdrawn") {
     const { card } = outcome;
     const note = card.reason ? ` Operator's note: ${card.reason}` : "";
-    const nothing = tool === "draft_github_post" ? "Nothing was posted." : tool === "save_draft" ? "Nothing was saved." : "Nothing ran.";
+    const nothing = tool === "draft_github_post" ? "Nothing was posted." : tool === "save_draft" ? "Nothing was saved." : tool === "ask_choice" ? "No answer was given." : "Nothing ran.";
     if (outcome.decidedBy === "withdrawn") {
       return { ok: false, text: `Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}. ${nothing}` };
     }
@@ -165,8 +166,12 @@ async function carryOut(
 ): Promise<CarryOutResult> {
   const later = CARRIED_OUT_LATER[tool];
   if (later !== undefined) return { ok: true, text: `Recorded, not carried out yet: ${later} carries out ${tool} calls.` };
-  if (!actions) return { ok: false, text: `This server cannot carry out ${tool} calls; nothing ran.` };
   const card = cardOf(outcome);
+  // A question needs no server action: the operator's answer, on its card, is the result.
+  if (tool === "ask_choice") {
+    return card?.choice ? { ok: true, text: choiceResultText(card.choice) } : { ok: false, text: "The card carried no question; nothing was asked." };
+  }
+  if (!actions) return { ok: false, text: `This server cannot carry out ${tool} calls; nothing ran.` };
   switch (tool) {
     case "run_command":
       return actions.runCommand((input.argv as unknown[]).map(String), signal, typeof input.project === "string" ? input.project : undefined);

@@ -396,6 +396,22 @@
 .sidecar-status-to { color: var(--green); text-decoration: none; font-weight: 600; }
 .sidecar-status-refused { color: var(--red); }
 .sidecar-status-reason, .sidecar-status-note { color: var(--text-muted); }
+/* Choice card: the question, one row per option, an Other row. */
+.sidecar-choice { display: flex; flex-direction: column; gap: var(--space-2); font-size: 12px; }
+.sidecar-choice-question { margin: 0; color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.sidecar-choice-rows { display: flex; flex-direction: column; gap: var(--space-1); }
+.sidecar-choice-row {
+  display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); cursor: pointer;
+}
+.sidecar-choice-row:hover { background: var(--bg-hover); }
+.sidecar-choice-row.is-selected { border-color: var(--accent); background: var(--bg-active); }
+.sidecar-choice-row:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sidecar-choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sidecar-choice-label { color: var(--text); overflow-wrap: anywhere; }
+.sidecar-choice-description, .sidecar-choice-note { color: var(--text-muted); overflow-wrap: anywhere; }
+.sidecar-choice-note { margin: 0; }
+.sidecar-choice-other-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; }
 .sidecar-card-details summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
 
 /* Change-set card (story 11) */

@@ -26,6 +26,7 @@ export const BROKER_TOOL_NAMES = [
   "propose_link",
   "propose_item_edit",
   "propose_status",
+  "ask_choice",
   "github_read",
   "draft_github_post",
   "migration_decision",
@@ -56,6 +57,7 @@ export type SidecarCardKind =
   | "link"
   | "item-edit"
   | "status"
+  | "choice"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -94,6 +96,8 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerCardTool, BrokerToolPolic
   propose_item_edit: { card: "item-edit", allowList: "never" },
   // A status change moves work through rex's lifecycle (completion runs rex's checks): decided card by card.
   propose_status: { card: "status", allowList: "never" },
+  // A question writes nothing: answering it is the whole decision, so there is nothing to allow-list.
+  ask_choice: { card: "choice", allowList: "never" },
   github_read: { card: "network-read", allowList: "per-project" },
   draft_github_post: { card: "draft-post", allowList: "never" },
   migration_decision: { card: "migration-decision", allowList: "never" },

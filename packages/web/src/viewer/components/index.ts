@@ -135,6 +135,8 @@ export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external
 export { ItemEditBody, itemEditDraftOf, itemEditEdits, listDiff } from "./sidecar-item-edit.js";
 export type { ItemEditBodyProps, ItemEditDraft } from "./sidecar-item-edit.js";
 export { StatusBody, statusLabel } from "./sidecar-status.js";
+export { ChoiceBody, choiceAnswerOf, toggleChoice, toggleOther, EMPTY_CHOICE_DRAFT } from "./sidecar-choice.js";
+export type { ChoiceBodyProps, ChoiceDraft } from "./sidecar-choice.js";
 export { PlanWithSidecarContext, PlanWithSidecarButton, PlanInAreaButton, planFirstTurn, planSurvivesAreaReport } from "./plan-with-sidecar.js";
 export type { PlanWithSidecar } from "./plan-with-sidecar.js";
 export { DescribeInSidecarContext, DescribeInSidecarButton } from "./describe-in-sidecar.js";
