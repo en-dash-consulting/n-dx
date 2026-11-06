@@ -155,6 +155,43 @@ describe("POST /api/hench/execute — failure detection beyond exit code", () =>
     );
   });
 
+  describe("broadcast error", () => {
+    async function runAndGetBroadcastError(result: { exitCode: number; stdout: string; stderr: string }): Promise<string> {
+      await closeRouteTestServer(server);
+      const messages: unknown[] = [];
+      const started = await startRouteTestServer((req, res) =>
+        Promise.resolve(handleHenchRoute(req, res, ctx, (data) => messages.push(data))),
+      );
+      server = started.server;
+      stubManagedRun(result);
+      await fetch(`http://127.0.0.1:${started.port}/api/hench/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-1" }),
+      });
+      await vi.waitFor(() => {
+        const last = messages.at(-1) as { state?: { status?: string } } | undefined;
+        expect(last?.state?.status).toBe("failed");
+      });
+      return ((messages.at(-1) as { state: { error: string } }).state).error;
+    }
+
+    it("carries stdout's refusal when stderr holds only a warning", async () => {
+      const error = await runAndGetBroadcastError({
+        exitCode: 1,
+        stdout: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n",
+        stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+      });
+      expect(error).toContain("Refusing to start");
+      expect(error).toContain("src/app.ts");
+    });
+
+    it("still carries stderr when stdout is empty", async () => {
+      const error = await runAndGetBroadcastError({ exitCode: 1, stdout: "", stderr: "boom: spawn failed\n" });
+      expect(error).toContain("boom: spawn failed");
+    });
+  });
+
   it("still reports completed when exitCode is 0", async () => {
     stubManagedRun({ exitCode: 0, stdout: "Task completed successfully.", stderr: "" });
 

@@ -2302,6 +2302,9 @@ export const STARTING_PHASE_MS = 2000;
 /** Characters of each stream {@link runEndOutput} keeps by default. */
 export const RUN_END_STREAM_MAX_CHARS = 4000;
 
+/** Characters of each stream a failed dashboard run's broadcast `error` keeps. */
+const EXEC_STATE_ERROR_STREAM_CHARS = 300;
+
 /**
  * What a finished run printed: the end of stderr, then the end of stdout, each
  * cut to `maxChars`. hench warns on stderr but prints its pre-run refusals on
@@ -2563,12 +2566,13 @@ async function startExecution(
           ? result.stdout.split("\n").filter((l) => l.trim()).at(-1)
           : undefined;
         if (!isSuccess) {
-          // stderr is empty for this failure mode (hench logs the reason via
-          // its normal stdout info() logging, not console.error), so fall
-          // back to the last meaningful stdout line rather than leaving the
-          // dashboard with no explanation at all.
-          entry.state.error = (result.stderr ? result.stderr.slice(-200) : undefined)
-            || lastOutLine
+          // hench logs most failure reasons on stdout (info()), but warns on
+          // stderr and refuses on stdout, so when stderr has text keep the end
+          // of each stream: a warning must not hide the refusal. With stderr
+          // empty, the last meaningful stdout line is the reason.
+          entry.state.error = (result.stderr?.trim()
+            ? runEndOutput(result.stderr, result.stdout, EXEC_STATE_ERROR_STREAM_CHARS)
+            : lastOutLine)
             || "Task run failed";
           appendLog(ctx, {
             timestamp: entry.state.finishedAt,
