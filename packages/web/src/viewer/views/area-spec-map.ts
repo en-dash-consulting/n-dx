@@ -74,10 +74,16 @@ export function ConstraintBands({ constraints, ghostCounts = new Map() }: { cons
         h("span", { class: "asm-band-title" }, c.title),
         h("span", { class: "tag" }, appliesToLabel(c.appliesTo)),
         c.health === "defective" ? h("span", { class: "tag asm-band-health" }, "defective") : null,
-        ghostCounts.get(c.id)
-          ? h("span", { class: "pam-ghost", "data-ghost": c.id, title: `${ghostCounts.get(c.id)} waiting on a card` },
-              `+${ghostCounts.get(c.id)}`)
-          : null)));
+        bandGhost(c.id, ghostCounts.get(c.id) ?? 0))));
+}
+
+/** A band's waiting-on-a-card chip: "+N" on screen, the count in words for a screen reader. */
+function bandGhost(id: string, count: number) {
+  if (count === 0) return null;
+  const words = `${count} waiting on a card`;
+  return h("span", { class: "tag asm-band-ghost", "data-ghost": id, title: words },
+    h("span", { "aria-hidden": "true" }, `+${count}`),
+    h("span", { class: "sr-only" }, words));
 }
 
 export interface SpecMapProps {

@@ -43,7 +43,14 @@ items:
     lastModified: "2026-11-05T17:35:28.302Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8722270b-60ea-428e-904e-deb8ded883d8":
-    lastModified: "2026-11-06T02:22:01.719Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:22:41.239Z"
+    completedAt: "2026-11-06T02:26:07.325Z"
+    endedAt: "2026-11-06T02:26:07.325Z"
+    activeIntervals: [{"end":"2026-11-06T02:26:07.325Z","start":"2026-11-06T02:22:41.239Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "SpecMap reads GhostCardsContext, counts waiting items per capability via ghostCountsByTarget, passes ghosts to each capability block (and a +N chip on targeted constraint bands). blockName already says \"N waiting on a card\". Deny/approval follow from the cards leaving the context. Unit tests added."
+    lastModified: "2026-11-06T02:26:07.325Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a7bb7079-fcc5-4b3d-83c1-784fa7ab1f5f":
     lastModified: "2026-11-05T01:08:18.734Z"

@@ -82,7 +82,7 @@ describe("ghost markers from waiting cards", () => {
     act(() => {
       render(
         h(GhostCardsContext.Provider, { value: cards as never },
-          h(SpecMap, { capabilities: CAPS, constraints: [], onSelect: vi.fn() })),
+          h(SpecMap, { capabilities: CAPS, constraints: AREA_DETAIL_FIXTURE.constraints, onSelect: vi.fn() })),
         root!,
       );
     });
@@ -97,7 +97,17 @@ describe("ghost markers from waiting cards", () => {
     expect(marker(b.id)?.textContent).toBe("+1");
     expect(el.querySelector(`button[aria-label*="2 waiting on a card"]`)).not.toBeNull();
     act(() => { render(null, root!); });
-    expect(mountWithCards([]).querySelector(".pam-ghost")).toBeNull();
+    root?.remove();
+    expect(mountWithCards([]).querySelector("[data-ghost]")).toBeNull();
+  });
+
+  it("marks a targeted constraint band in its flow, with the count in words", () => {
+    const band = AREA_DETAIL_FIXTURE.constraints[0];
+    const el = mountWithCards([card([{ parentId: band.id }, { parentId: band.id }])]);
+    const chip = el.querySelector(`.asm-band [data-ghost="${band.id}"]`)!;
+    expect(chip.classList.contains("pam-ghost")).toBe(false);
+    expect(chip.querySelector("[aria-hidden='true']")?.textContent).toBe("+2");
+    expect(chip.querySelector(".sr-only")?.textContent).toBe("2 waiting on a card");
   });
 });
 

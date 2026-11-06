@@ -870,6 +870,8 @@
 }
 .asm-band-defective { border-left-color: var(--red); }
 .asm-band-title { font-weight: 600; overflow-wrap: anywhere; }
+/* Items a waiting Sidecar card proposes for the constraint: dashed, in the band's flow. */
+.asm-band-ghost { border: 1px dashed var(--text-muted); background: transparent; color: var(--text-muted); font-weight: 600; }
 
 /* ── Placement mode (views/placement-mode.ts) ──────────────────── */
 
