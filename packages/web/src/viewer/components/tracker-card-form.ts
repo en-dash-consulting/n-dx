@@ -40,6 +40,9 @@ function problemOf(entry: DecidedEntry | undefined): string | null {
   return `The tracker did not run the call (${result})${detail ? `: ${detail}` : ""}`;
 }
 
+/** Results that leave the card waiting (sync-engine's `isUnreachable`). */
+const RETRYABLE: ReadonlySet<string> = new Set(["unavailable", "needs-sign-in"]);
+
 export interface TrackerCardFormProps {
   /** The card: its request id and the call the rules planned. */
   entry: { requestId: string; call: { tool: string; args: Record<string, unknown> } };
@@ -52,6 +55,7 @@ export function TrackerCardForm({ entry, onDone, onCancel }: TrackerCardFormProp
   const [edit, setEdit] = useState<ExternalCallEdit>(entry.call.args);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [closed, setClosed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,8 +82,10 @@ export function TrackerCardForm({ entry, onDone, onCancel }: TrackerCardFormProp
       if (!res.ok) { setError(await errorOf(res, "Could not run the call")); return; }
       const { entry: decided } = (await res.json()) as { entry?: DecidedEntry };
       const problem = problemOf(decided);
-      if (problem) setError(problem);
-      else onDone();
+      if (!problem) { onDone(); return; }
+      setError(problem);
+      // An unreachable call leaves the card waiting, so Run may retry; any other result closed it.
+      if (!RETRYABLE.has(decided?.result ?? "")) setClosed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not run the call");
     } finally {
@@ -93,7 +99,7 @@ export function TrackerCardForm({ entry, onDone, onCancel }: TrackerCardFormProp
       : error ? null : h("p", { class: "live-muted", role: "status" }, "Reading the call's form…"),
     error ? h("p", { class: "live-error", role: "alert" }, error) : null,
     h("div", { class: "live-tracker-actions" },
-      h("button", { type: "button", class: "cmd-btn cmd-btn-primary", "data-action": "send", disabled: busy || !call || !edit, onClick: () => { void send(); } },
+      h("button", { type: "button", class: "cmd-btn cmd-btn-primary", "data-action": "send", disabled: busy || closed || !call || !edit, onClick: () => { void send(); } },
         busy ? "Running…" : `Run ${entry.call.tool}`),
       h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", disabled: busy, onClick: onCancel }, "Cancel"),
     ),

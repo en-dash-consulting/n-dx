@@ -166,6 +166,15 @@ describe("ChangeTrackerChip", () => {
     await run();
     expect(root.querySelector('[data-action="send"]')).not.toBeNull();
     expect(root.querySelector(".live-error")?.textContent).toContain("title is required");
+    // The refusal closed the card: a second Run would only answer 409 over the real problem.
+    expect((root.querySelector('[data-action="send"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps Run enabled when the tracker cannot be reached, since the card still waits", async () => {
+    decided = { result: "unavailable", problems: [{ message: "connection unavailable" }] };
+    await run();
+    expect(root.querySelector(".live-error")?.textContent).toContain("connection unavailable");
+    expect((root.querySelector('[data-action="send"]') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("says to link by hand when an ok create's link failed", async () => {

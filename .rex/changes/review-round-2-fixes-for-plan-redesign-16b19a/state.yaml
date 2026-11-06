@@ -1,8 +1,18 @@
 schema: "rex/v2"
 items:
   "16b19afa-8a71-44ab-80c3-16ada838d66f":
-    lastModified: "2026-11-06T16:27:59.254Z"
+    lastModified: "2026-11-06T16:30:28.826Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "213a850b-fd30-4556-8709-f1051742c195":
+    lastModified: "2026-11-06T16:30:28.826Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "499952e1-ad0c-467e-ab12-ac9c12851464":
-    lastModified: "2026-11-06T16:27:59.254Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:28:05.526Z"
+    completedAt: "2026-11-06T16:30:56.751Z"
+    endedAt: "2026-11-06T16:30:56.751Z"
+    activeIntervals: [{"end":"2026-11-06T16:30:56.751Z","start":"2026-11-06T16:28:05.526Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tracker-card-form send reads entry.result/problems; form stays open unless ok/duplicate with none; link-failed ok says to link by hand. Commit c9248b84e."
+    lastModified: "2026-11-06T16:30:56.751Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
