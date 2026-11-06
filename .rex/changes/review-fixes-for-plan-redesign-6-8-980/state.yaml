@@ -14,7 +14,14 @@ items:
     lastModified: "2026-11-06T04:04:05.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "61981436-d7f0-4d4b-b4b3-bc00ecc887a1":
-    lastModified: "2026-11-06T04:04:03.408Z"
+    status: "completed"
+    startedAt: "2026-11-06T04:06:32.750Z"
+    completedAt: "2026-11-06T04:08:40.808Z"
+    endedAt: "2026-11-06T04:08:40.808Z"
+    activeIntervals: [{"end":"2026-11-06T04:08:40.808Z","start":"2026-11-06T04:06:32.750Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "areaCapabilityOfTab guards decodeURIComponent and returns null on a malformed id; tests added."
+    lastModified: "2026-11-06T04:08:40.808Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1a3d73b-606b-4a74-af66-5bdb948adee0":
     lastModified: "2026-11-06T04:04:05.649Z"

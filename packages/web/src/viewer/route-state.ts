@@ -43,7 +43,13 @@ export function areaSlugOfTab(tab: string | null): string | null {
 /** The capability `area/<slug>/capability/<id>` selects in the area, or null. */
 export function areaCapabilityOfTab(tab: string | null): string | null {
   const id = tab && AREA_PATH.exec(tab)?.[2];
-  return id ? decodeURIComponent(id) : null;
+  if (!id) return null;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    // A hand-edited address like `/capability/%E0` is no selection: the area shows.
+    return null;
+  }
 }
 
 /**

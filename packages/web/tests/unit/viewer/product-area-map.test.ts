@@ -88,6 +88,10 @@ describe("area routes", () => {
     expect(areaCapabilityOfTab(route!.subId)).toBe("cap-placement");
     expect(areaCapabilityOfTab("area/define-the-product")).toBeNull();
   });
+  it("reads a malformed capability id as no selection", () => {
+    expect(areaCapabilityOfTab("area/define-the-product/capability/%E0")).toBeNull();
+    expect(areaCapabilityOfTab("area/define-the-product/capability/cap%20x")).toBe("cap x");
+  });
   it("leaves other product sub-paths alone", () => {
     expect(parsePathnameRoute("/product/other", valid)).toBeNull();
     expect(routeTab("product", "other")).toBeNull();

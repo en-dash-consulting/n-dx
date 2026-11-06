@@ -319,6 +319,22 @@ describe("a selected capability", () => {
     });
   });
 
+  it("opened at an address with a malformed capability id, renders the area instead of throwing", async () => {
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
+    });
+    await mount(h("div", null, renderActiveView("product", {
+      navigateTo: vi.fn(),
+      validViews: buildValidViews(null),
+      data: {},
+      isFeatureDisabled: () => false,
+      selectedTab: `area/${AREA_DETAIL_FIXTURE.slug}/capability/%E0`,
+    } as never)));
+    await vi.waitFor(() => expect(root.querySelector(".area-cards:not(.area-capability)")).not.toBeNull());
+    expect(root.querySelector(".area-capability")).toBeNull();
+  });
+
   it("clears the selection and the address when a refresh stops listing the capability", async () => {
     await open();
     act(() => block().click());
