@@ -2389,6 +2389,7 @@ export async function cmdRun(
       allowDirty,
       dryRun,
       origin: invocationGitOrigin,
+      ...(flags.task && flags.task !== "true" ? { itemId: flags.task } : {}),
       // Size-aware escalation config (hench.git.*); --allow-dirty above
       // takes precedence over both settings.
       checkpointThreshold: config.git?.checkpointThreshold,

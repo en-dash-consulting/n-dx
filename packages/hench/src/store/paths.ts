@@ -174,6 +174,29 @@ export const BOOKKEEPING_PATHS: readonly string[] = [
   ...bookkeepingPathsUnder("ndx"),
 ];
 
+/**
+ * n-dx's own planning files, in **both** layouts: rex's bookkeeping (the PRD
+ * roots, `state.yaml`, the logs and records in {@link REX_BOOKKEEPING_ENTRIES})
+ * and the project config (`.n-dx.json`, `.ndx/config.json`).
+ *
+ * The pre-run gate commits these on their own before a run (decision UT1):
+ * planning a change dirties them, and refusing to start over files n-dx wrote
+ * itself left a run unstartable on a tree that held nothing else.
+ *
+ * Unlike {@link BOOKKEEPING_PATHS} this leaves hench's state directory out.
+ * `.hench/config.json` is operator configuration that must still stop an
+ * autonomous run, and hench's runtime artifacts are dropped before this list
+ * is consulted.
+ */
+export const PLANNING_PATHS: readonly string[] = (["legacy", "ndx"] as const).flatMap((mode) => {
+  const layout = resolveLayout(".", { mode });
+  const rexDir = stateDirNameUnder("rex", mode);
+  return [
+    ...REX_BOOKKEEPING_ENTRIES.map((entry) => `${rexDir}/${entry}`),
+    relativeToRoot(layout, layout.configFile),
+  ];
+});
+
 /** Hench's config file inside its state directory. */
 export const HENCH_CONFIG_FILENAME = "config.json";
 

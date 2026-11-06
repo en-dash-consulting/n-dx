@@ -47,6 +47,7 @@ import { CLI_LOG_FILENAME } from "../prd/llm-gateway.js";
 import {
   AGENT_MCP_DIRNAME,
   LOCKS_DIRNAME,
+  PLANNING_PATHS,
   RECOVERY_DIRNAME,
   REVIEWS_DIRNAME,
   RUNS_DIRNAME,
@@ -306,4 +307,50 @@ export async function excludeHenchRuntimeArtifacts(
 ): Promise<string[]> {
   const prefix = await repoRelativePrefix(projectDir);
   return porcelainLines.filter((line) => !isHenchRuntimeArtifact(parsePorcelainPath(line), prefix));
+}
+
+/** A dirty tree split into n-dx's own planning files and everything else. */
+export interface PlanningSplit {
+  /** Repository-relative paths of dirty planning files, as git reported them. */
+  planning: string[];
+  /** The remaining porcelain lines: work the pre-run gate still refuses on. */
+  other: string[];
+}
+
+/**
+ * Split porcelain lines (hench's runtime artifacts already dropped) into
+ * n-dx's planning files, {@link PLANNING_PATHS}, and the rest.
+ *
+ * A rename or copy counts as planning only when both of its paths are: the
+ * pre-run commit stages by path, and a rename out of `src/` into `.rex/`
+ * would otherwise land half of an operator's change in n-dx's commit.
+ *
+ * @param porcelainLines - porcelain lines, as produced for `projectDir`
+ * @param projectDir - the directory those lines were collected for
+ */
+export async function splitPlanningPaths(
+  porcelainLines: string[],
+  projectDir: string,
+): Promise<PlanningSplit> {
+  const prefix = await repoRelativePrefix(projectDir);
+  const isPlanning = (path: string): boolean => matchesProjectPath(path, PLANNING_PATHS, prefix);
+  const split: PlanningSplit = { planning: [], other: [] };
+  for (const line of porcelainLines) {
+    const path = parsePorcelainPath(line);
+    const source = renameSource(line);
+    if (isPlanning(path) && (source === undefined || isPlanning(source))) split.planning.push(path);
+    else split.other.push(line);
+  }
+  return split;
+}
+
+/** The `old` half of a rename or copy line (`R  old -> new`), unquoted; else undefined. */
+function renameSource(line: string): string | undefined {
+  const status = line.slice(0, 2);
+  if (!status.includes("R") && !status.includes("C")) return undefined;
+  const body = line.slice(3);
+  const arrow = body.lastIndexOf(" -> ");
+  if (arrow === -1) return undefined;
+  const old = body.slice(0, arrow).trim();
+  return old.length >= 2 && old.startsWith('"') && old.endsWith('"') ? old.slice(1, -1) : old;
 }

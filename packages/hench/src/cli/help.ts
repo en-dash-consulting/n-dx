@@ -107,6 +107,12 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       {
         title: "Pre-run commit gate",
         content:
+          "When the only uncommitted files are n-dx's planning files (the PRD\n" +
+          "folders under .rex/ or .ndx/rex/, and .n-dx.json or .ndx/config.json),\n" +
+          "the gate commits exactly those as \"chore(prd): commit planning changes\n" +
+          "before run\" and starts. Any other uncommitted file is handled as below,\n" +
+          "and a refusal lists only those files. --allow-dirty skips the commit.\n" +
+          "\n" +
           "The gate is size-aware: when uncommitted changes reach\n" +
           "hench.git.checkpointThreshold lines changed (default: 200, 0 disables),\n" +
           "the interactive prompt defaults to committing a checkpoint first. With\n" +
