@@ -68,9 +68,13 @@ describe("ToolingPanel", () => {
     vi.unstubAllGlobals();
   });
 
-  function stub(config: unknown, catalog: unknown, auth: unknown = { ok: true }) {
+  /** `auth` is the cached-verdict body, or a promise standing in for a slow response. */
+  function stub(config: unknown, catalog: unknown, auth: unknown = { cached: true, ok: true }) {
     fetchSpy.mockImplementation((url: string) => {
-      const body = url.includes("/catalog") ? catalog : url.includes("/commands/auth") ? auth : config;
+      if (url.includes("/commands/auth")) {
+        return Promise.resolve(auth).then((body) => ({ ok: true, json: () => Promise.resolve(body) }));
+      }
+      const body = url.includes("/catalog") ? catalog : config;
       return Promise.resolve({ ok: body !== null, json: () => Promise.resolve(body) });
     });
   }
@@ -122,10 +126,35 @@ describe("ToolingPanel", () => {
   });
 
   it("shows a signed-out active vendor without breaking the tile", async () => {
-    stub(CONFIG, CATALOG, { ok: false, error: "Not logged in" });
+    stub(CONFIG, CATALOG, { cached: true, ok: false, error: "Not logged in" });
     mount();
     await waitFor(() => expect(text('[data-vendor="claude"] .tooling-state')).toBe("Signed out"));
     expect(root.querySelectorAll(".tooling-vendor")).toHaveLength(3);
+  });
+
+  it("renders from config and catalog without waiting on, or starting, a credential check", async () => {
+    let answer!: (body: unknown) => void;
+    stub(CONFIG, CATALOG, new Promise((resolve) => { answer = resolve; }));
+    mount();
+    // The cached-verdict read is still pending, yet the tile is up.
+    await waitFor(() => expect(root.querySelectorAll(".tooling-vendor")).toHaveLength(3));
+    expect(text('[data-vendor="claude"] .tooling-state')).toBe("Connected");
+
+    answer({ cached: true, ok: false, error: "Not logged in" });
+    await waitFor(() => expect(text('[data-vendor="claude"] .tooling-state')).toBe("Signed out"));
+
+    // Only the cache is read: no POST, which would spawn `ndx auth` and the vendor CLI.
+    const authCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("/commands/auth"));
+    expect(authCalls.map(([url, init]) => [url, (init as RequestInit | undefined)?.method ?? "GET"]))
+      .toEqual([["/api/commands/auth/cached", "GET"]]);
+  });
+
+  it("keeps the catalog state when no credential check has run yet", async () => {
+    stub(CONFIG, CATALOG, { cached: false });
+    mount();
+    await waitFor(() => expect(root.querySelectorAll(".tooling-vendor")).toHaveLength(3));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(text('[data-vendor="claude"] .tooling-state')).toBe("Connected");
   });
 
   it("keeps the models when the catalog cannot be read", async () => {

@@ -28,6 +28,7 @@
  * GET  /api/commands/reshape/status  — reshape status and proposal report
  * POST /api/commands/reshape/stop    — interrupt the running reshape pass
  * POST /api/commands/auth            — verify LLM provider credentials (spawns `ndx auth`)
+ * GET  /api/commands/auth/cached     — the last credential-check result, if any; never spawns
  * POST /api/commands/validate-tokens — hench vendor token-accuracy check
  * POST /api/commands/export-pdf      — sourcevision PDF report (returns the written path)
  * GET  /api/commands/sidecar-command/status — the command a Sidecar session last ran (see startSidecarCommand)
@@ -1817,6 +1818,18 @@ async function handleAuth(
   return true;
 }
 
+/**
+ * GET /api/commands/auth/cached — the cached credential-check result, or
+ * `{ cached: false }` when there is none. Never spawns: read-only surfaces
+ * (Tune's Your tooling tile) show a verdict only when one already exists and
+ * leave the live check, which runs the vendor CLI on a real prompt, to Robot
+ * Wrangler's Re-check.
+ */
+function handleAuthCached(res: ServerResponse): boolean {
+  jsonResponse(res, 200, authCheckCache ? { ...authCheckCache, cached: true } : { cached: false });
+  return true;
+}
+
 /** POST /api/commands/validate-tokens — hench vendor token-accuracy check. */
 async function handleValidateTokens(
   _req: IncomingMessage,
@@ -2299,6 +2312,9 @@ export function handleCommandsRoute(
   }
   if (path === "auth" && method === "POST") {
     return handleAuth(req, res, ctx);
+  }
+  if (path === "auth/cached" && method === "GET") {
+    return handleAuthCached(res);
   }
   if (path === "validate-tokens" && method === "POST") {
     return handleValidateTokens(req, res, ctx);

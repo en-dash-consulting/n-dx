@@ -2007,6 +2007,18 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(second.ok).toBe(true);
   });
 
+  it("auth/cached reads the last verdict and never spawns a check", async () => {
+    const cachedUrl = `http://127.0.0.1:${port}/api/commands/auth/cached`;
+    expect(await (await fetch(cachedUrl)).json()).toEqual({ cached: false });
+    expect(execMock).not.toHaveBeenCalled();
+
+    execMock.mockResolvedValue({ stdout: "claude: credentials OK", stderr: "", error: null });
+    await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" });
+    const body = await (await fetch(cachedUrl)).json();
+    expect(body).toMatchObject({ cached: true, ok: true });
+    expect(execMock).toHaveBeenCalledTimes(1);
+  });
+
   it("auth?refresh=true forces a fresh check", async () => {
     execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
     execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });

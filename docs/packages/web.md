@@ -148,7 +148,7 @@ Two read-only tiles on the Tune page. Neither writes anything.
 - **Keyed on vendor and tier.** Never on model name, since models are renamed and retired. A row's tooltip lists the resolved models for audit.
 - **No gate result.** A run with no gate result stays out of the rate and is counted separately ("N runs without a gate result, not in the rate"). A row with no gated run shows `–`, not 0%.
 
-**Your tooling.** A summary of what this project can run on: connected vendor CLIs, the model for each tier, review pairing and per-command route overrides. Editing stays in Settings. Vendor, tier and review lines link to the matching section of Settings › Robot Wrangler. No Settings field edits `llm.routes`, so the route line names `ndx config` instead of linking.
+**Your tooling.** A summary of what this project can run on: connected vendor CLIs, the model for each tier, review pairing and per-command route overrides. Editing stays in Settings. Vendor, tier and review lines link to the matching section of Settings › Robot Wrangler. No Settings field edits `llm.routes`, so the route line names `ndx config` instead of linking. The tile never runs a credential check, because the check sends a real prompt to the vendor CLI. It shows the result of the last check from Robot Wrangler when one exists. Otherwise it shows the vendor's catalog state.
 
 ## Prepare task
 

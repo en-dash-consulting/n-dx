@@ -44,14 +44,18 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T | null> {
   }
 }
 
-/** The cached credential check Robot Wrangler runs; only the active CLI vendor has one. */
-async function readAuth(config: ToolingConfig): Promise<ToolingAuth> {
+/**
+ * The verdict of the last credential check Robot Wrangler ran; only the active
+ * CLI vendor has one. Reads the server's cache and never starts a check — the
+ * live check runs the vendor CLI on a real prompt, so it stays on Robot
+ * Wrangler's Re-check. No cached verdict reads as null (catalog state only).
+ */
+async function readCachedAuth(config: ToolingConfig): Promise<ToolingAuth> {
   if (config.effective?.provider !== "cli") return null;
-  const body = await getJson<{ ok?: boolean; error?: string | null; output?: string }>(
-    "/api/commands/auth",
-    { method: "POST" },
+  const body = await getJson<{ cached?: boolean; ok?: boolean; error?: string | null }>(
+    "/api/commands/auth/cached",
   );
-  if (!body) return null;
+  if (!body?.cached) return null;
   return body.ok
     ? { ok: true, detail: null }
     : { ok: false, detail: body.error ?? "Credential check failed" };
@@ -92,8 +96,10 @@ export function ToolingPanel({ navigateTo, extra }: {
       ]);
       if (cancelled) return;
       if (!config) { setLoad({ state: "error" }); return; }
-      const auth = await readAuth(config);
-      if (!cancelled) setLoad({ state: "ready", config, catalog, auth });
+      // Render from config and catalog now; the auth line fills in after.
+      setLoad({ state: "ready", config, catalog, auth: null });
+      const auth = await readCachedAuth(config);
+      if (!cancelled && auth) setLoad({ state: "ready", config, catalog, auth });
     })();
     return () => { cancelled = true; };
   }, []);
