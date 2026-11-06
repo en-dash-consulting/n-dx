@@ -2087,6 +2087,22 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(second).toMatchObject({ ok: false, cached: false });
   });
 
+  it("an auth-mode change in .n-dx.local.json for the same vendor drops the cached verdict", async () => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+    execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
+    execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
+    const authUrl = `http://127.0.0.1:${port}/api/commands/auth`;
+
+    expect((await (await fetch(authUrl, { method: "POST" })).json()).ok).toBe(true);
+
+    // What `ndx config llm.claude.auth api .` writes: the vendor is unchanged.
+    await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { auth: "api" } } }));
+
+    expect(await (await fetch(`${authUrl}/cached`)).json()).toEqual({ cached: false });
+    expect((await (await fetch(authUrl, { method: "POST" })).json()).ok).toBe(false);
+    expect(execMock).toHaveBeenCalledTimes(2);
+  });
+
   it("validate-tokens runs the hench check and returns its output", async () => {
     execMock.mockResolvedValue({ stdout: "token reporting accurate", stderr: "", error: null });
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/validate-tokens`, { method: "POST" });
