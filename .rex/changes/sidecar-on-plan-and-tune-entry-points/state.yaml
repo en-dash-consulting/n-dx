@@ -53,10 +53,14 @@ items:
     lastModified: "2026-11-06T02:26:07.325Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a7bb7079-fcc5-4b3d-83c1-784fa7ab1f5f":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T02:26:15.166Z"
-    activeIntervals: [{"start":"2026-11-06T02:26:15.166Z"}]
-    lastModified: "2026-11-06T02:26:15.808Z"
+    completedAt: "2026-11-06T02:38:52.701Z"
+    endedAt: "2026-11-06T02:38:52.701Z"
+    activeIntervals: [{"end":"2026-11-06T02:38:52.701Z","start":"2026-11-06T02:26:15.166Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement mode yields its panel to a pending Sidecar placement card for the change (one line + Place by hand); card and spec map share one per-card working copy (CardDrafts via SidecarPlacementContext from main.ts); Place by hand or an unapproved card end seeds the panel's WF10 draft from the card. Tests in placement-mode.test.ts."
+    lastModified: "2026-11-06T02:38:52.701Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ab8a86e9-1a64-41b3-8617-fa5e1265f390":
     status: "completed"

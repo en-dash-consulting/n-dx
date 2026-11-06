@@ -1186,4 +1186,17 @@ describe("PlacementMode with a Sidecar placement card (SP2)", () => {
     expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
     expect(pressed()).toEqual(["cap-gift"]);
   });
+
+  it("a card missing from one cards read (a failed read) keeps its edits and takes the panel again when it returns", async () => {
+    await show([sidecarCard()]);
+    await act(async () => { $<HTMLInputElement>('.drawer .sidecar-place-row input[value="cap-gift"]')!.click(); });
+    await settle();
+    await show([]);
+    expect($(".placing-yield")).toBeNull();
+    expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
+    await show([sidecarCard()]);
+    expect($(".placing-yield")).not.toBeNull();
+    expect(cardRow()).toBe("cap-gift");
+    expect(pressed()).toEqual(["cap-gift"]);
+  });
 });

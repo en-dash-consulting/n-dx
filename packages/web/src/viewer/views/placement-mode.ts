@@ -420,7 +420,8 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const [panelRun, setPanelRun] = useState(0);
   const yielding = waiting !== null && handed !== waiting.id;
   const cardCopy = useCardDraft(drafts, yielding ? waiting : null);
-  const handOver = (from: SidecarCard) => {
+  /** Open the panel on the card's copy; `final` marks the card handed, so it never takes the panel again. */
+  const handOver = (from: SidecarCard, final = true) => {
     const copy = drafts.get(from);
     const shortlistNow = placement?.shortlist ?? [];
     const row = copy.mode === "place"
@@ -428,7 +429,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
       : null;
     savePlacementDraft(changeId, panelDraftOfCard(copy, from.placement!.request, row));
     if (row) setSelection(row);
-    setHanded(from.id);
+    if (final) setHanded(from.id);
     setPanelRun((n) => n + 1);
   };
   // A card that ends while the panel yields to it, withdrawn after M1's 60 s or denied, leaves the
@@ -442,7 +443,11 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
     const now = (share?.cards ?? []).find((c) => c.id === ended.id);
     // Handed over by Place by hand: the card still waits in the drawer, with its copy.
     if (now?.status === "pending") return;
-    if (now?.status !== "approved") handOver(ended);
+    // Missing from the list is not settled: a failed cards read lists none, and the card can come
+    // back waiting. The panel takes the card's copy meanwhile, but the copy stays, and the card
+    // takes the panel again if it returns.
+    if (!now) { handOver(ended, false); return; }
+    if (now.status !== "approved") handOver(ended);
     drafts.drop(ended.id);
   }, [yielding, waiting?.id]);
   const cardTarget = cardCopy?.mode === "place" && cardCopy.target ? cardCopy.target : null;
