@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "8cdee1e7-fc40-4655-9038-9566eb62f673":
-    lastModified: "2026-11-06T03:27:55.121Z"
+    status: "completed"
+    startedAt: "2026-11-06T03:28:03.677Z"
+    completedAt: "2026-11-06T03:30:55.957Z"
+    endedAt: "2026-11-06T03:30:55.957Z"
+    activeIntervals: [{"end":"2026-11-06T03:30:55.957Z","start":"2026-11-06T03:28:03.677Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Open ↗ added to the full-screen tile header, calling navigateTo(tile.view); test added; guide says Inbox tile."
+    lastModified: "2026-11-06T03:30:55.957Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bbf67764-309c-428a-b7f9-0a421dbe3a66":
     lastModified: "2026-11-06T03:27:57.353Z"

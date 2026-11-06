@@ -368,6 +368,26 @@ describe("rendered surfaces take their labels from the model", () => {
     expect(wrong).toEqual([]);
   });
 
+  it("each Plan tile opens its own page from Open ↗", async () => {
+    const opened: ViewId[] = [];
+    act(() => {
+      render(h(StagePage, {
+        stage: "plan", validViews: buildValidViews(null), navigateTo: (view: ViewId) => { opened.push(view); }, renderView: () => null,
+      }), root);
+    });
+    await settle();
+    const views = (STAGES.plan.tiles ?? []).map((t) => t.view);
+    for (const view of views) {
+      act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${view}"] .stage-tile-head`)?.click(); });
+      await settle();
+      const open = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen button")].find((b) => b.textContent === "Open ↗");
+      act(() => { open?.click(); });
+      act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
+    }
+    expect(opened).toEqual(views);
+    expect(opened).toEqual(expect.arrayContaining(["changes", "product", "validation"]));
+  });
+
   it("the settings overlay names each entry with the model's label", async () => {
     act(() => {
       render(h(SettingsOverlay, {
