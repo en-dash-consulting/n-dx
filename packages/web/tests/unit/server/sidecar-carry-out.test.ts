@@ -148,7 +148,8 @@ async function serve(): Promise<void> {
     (await handleSidecarRoute(req, res, ctx, broadcast, {
       registryFor: runningRegistry,
       brokerFor: () => broker,
-      actionsFor: (c) => sidecarActions(c, broadcast, { commandWaitMs }),
+      // A run's starting phase cut short: a start_work result waits it out.
+      actionsFor: (c) => sidecarActions(c, broadcast, { commandWaitMs, startingPhaseMs: 20 }),
     }))
     || handleCommandsRoute(req, res, ctx, broadcast));
 }
@@ -382,6 +383,46 @@ describe("start_work", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/Nothing started: Task "missing" not found in PRD\.$/);
     expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("reports a start hench refuses in its starting phase as failed, with hench's message, on the result and the card", async () => {
+    spawnManagedMock.mockImplementationOnce(() => ({
+      done: Promise.resolve({
+        exitCode: 1,
+        stdout: "Checking the working tree…\n",
+        stderr: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n",
+      }),
+      kill: vi.fn(() => true),
+      pid: 4242,
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(
+      /Run exec-\w+ on task task-1 \(Carry it out\) did not start: it exited with code 1\.\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts$/,
+    );
+    expect(resultText(result)).not.toContain("Started run");
+    expect(broker.cards(SESSION).find((c) => c.id === cardId)?.carriedOut).toEqual({ ok: false });
+    await client.close();
+  });
+
+  it("revises a started run's card to failed when the run fails later", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" });
+    expect(resultText(await call)).toMatch(/Started run exec-\w+ on task task-1/);
+    const card = () => broker.cards(SESSION).find((c) => c.id === cardId);
+    expect(card()?.carriedOut).toEqual({ ok: true });
+
+    cardMessages = [];
+    finishSpawn[0]({ exitCode: 1, stdout: "Stopping after 1 iteration(s) due to failed status.\n", stderr: "" });
+    await cardAnnounced("approved");
+    expect(card()?.carriedOut).toEqual({ ok: false });
     await client.close();
   });
 });

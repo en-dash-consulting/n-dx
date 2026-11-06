@@ -2292,23 +2292,62 @@ async function handleExecute(
 }
 
 /** What an execute request came to: an answer for the client, or the consented slug migration. */
-type ExecuteOutcome = { kind: "migrate" } | { kind: "answer"; status: number; body: Record<string, unknown> };
+type ExecuteOutcome =
+  | { kind: "migrate" }
+  | { kind: "answer"; status: number; body: Record<string, unknown>; run?: SpawnedRun };
+
+/** How long a dashboard run reads `starting` before it reads `running`: hench's preflight runs in that window. */
+export const STARTING_PHASE_MS = 2000;
+
+/** How a dashboard-started `ndx work` process ended. `output` is its stderr, or its stdout when stderr was empty. */
+export interface RunEnd {
+  ok: boolean;
+  exitCode: number | null;
+  output: string;
+}
+
+/** A spawned run's two moments: `started` settles with null once it passes its starting phase, or with its end if it exits first. */
+interface SpawnedRun {
+  started: Promise<RunEnd | null>;
+  ended: Promise<RunEnd>;
+}
+
+/** {@link startTaskExecution}'s answer; with `awaitStart`, `exited` is the end of a run that exited inside its starting phase. */
+export interface ExecutionStart {
+  status: number;
+  body: Record<string, unknown>;
+  exited?: RunEnd;
+  /** Settles when the spawned run ends; absent when nothing spawned. */
+  ended?: Promise<RunEnd>;
+}
 
 /**
  * Start a run on `taskId` exactly as `POST /api/hench/execute` would, for a
  * caller inside this server: an approved Sidecar `start_work` card. Answers
  * what the route would have answered — 202 with the run, or the refusal.
  * Never migrates the tree: that consent belongs to the operator's button.
+ *
+ * `awaitStart` opts in to waiting out the run's starting phase, where hench's
+ * preflight refuses a dirty tree or a missing task: a run that exits inside it
+ * comes back as `exited`. The route itself still answers 202 at once.
  */
 export async function startTaskExecution(
   ctx: ServerContext,
   request: { taskId: string; options?: unknown },
   broadcast?: WebSocketBroadcaster,
-): Promise<{ status: number; body: Record<string, unknown> }> {
-  const outcome = await reserveAndStart(ctx, { taskId: request.taskId, options: request.options }, broadcast);
+  { awaitStart = false, startingPhaseMs = STARTING_PHASE_MS }: { awaitStart?: boolean; startingPhaseMs?: number } = {},
+): Promise<ExecutionStart> {
+  const outcome = await reserveAndStart(ctx, { taskId: request.taskId, options: request.options }, broadcast, startingPhaseMs);
   // Unreachable without `migrateSlugs` in the body, which this request never carries.
   if (outcome.kind === "migrate") throw new Error("startTaskExecution never migrates the PRD tree");
-  return { status: outcome.status, body: outcome.body };
+  const answer: ExecutionStart = { status: outcome.status, body: outcome.body };
+  if (!outcome.run) return answer;
+  answer.ended = outcome.run.ended;
+  if (awaitStart) {
+    const exited = await outcome.run.started;
+    if (exited) answer.exited = exited;
+  }
+  return answer;
 }
 
 /**
@@ -2321,6 +2360,7 @@ async function reserveAndStart(
   ctx: ServerContext,
   body: Record<string, unknown>,
   broadcast?: WebSocketBroadcaster,
+  startingPhaseMs = STARTING_PHASE_MS,
 ): Promise<ExecuteOutcome> {
   const { startingTasks } = stateForCtx(ctx);
   const taskId = typeof body.taskId === "string" && body.taskId ? body.taskId : null;
@@ -2329,7 +2369,7 @@ async function reserveAndStart(
     startingTasks.add(taskId);
   }
   try {
-    return await startExecution(ctx, body, broadcast);
+    return await startExecution(ctx, body, broadcast, startingPhaseMs);
   } finally {
     if (taskId) startingTasks.delete(taskId);
   }
@@ -2339,7 +2379,8 @@ async function reserveAndStart(
 async function startExecution(
   ctx: ServerContext,
   body: Record<string, unknown>,
-  broadcast?: WebSocketBroadcaster,
+  broadcast: WebSocketBroadcaster | undefined,
+  startingPhaseMs: number,
 ): Promise<ExecuteOutcome> {
   const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
   const verdict = await judgeExecuteRequest(ctx, body, { holdsReservation: true });
@@ -2462,6 +2503,18 @@ async function startExecution(
   // Broadcast initial state
   broadcastExecState(broadcast, execState);
 
+  // Each settles once: whichever of the timer and the exit comes first decides `started`.
+  let settleStarted!: (end: RunEnd | null) => void;
+  let settleEnded!: (end: RunEnd) => void;
+  const run: SpawnedRun = {
+    started: new Promise((resolve) => { settleStarted = resolve; }),
+    ended: new Promise((resolve) => { settleEnded = resolve; }),
+  };
+  const finish = (end: RunEnd): void => {
+    settleStarted(end);
+    settleEnded(end);
+  };
+
   // Transition to "running" after a short delay (hench takes a moment to initialize)
   setTimeout(() => {
     const entry = activeExecutions.get(taskId);
@@ -2469,7 +2522,8 @@ async function startExecution(
       entry.state.status = "running";
       broadcastExecState(broadcast, { ...entry.state });
     }
-  }, 2000);
+    settleStarted(null);
+  }, startingPhaseMs);
 
   // Handle process completion
   handle.done
@@ -2518,6 +2572,7 @@ async function startExecution(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
+      finish({ ok: result.exitCode === 0, exitCode: result.exitCode, output: result.stderr?.trim() ? result.stderr : (result.stdout ?? "") });
     })
     .catch((err) => {
       const entry = activeExecutions.get(taskId);
@@ -2536,6 +2591,7 @@ async function startExecution(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
+      finish({ ok: false, exitCode: null, output: errorMessage(err) });
     })
     .finally(() => {
       contextFile?.remove().catch((err: unknown) => {
@@ -2546,6 +2602,7 @@ async function startExecution(
   // Return immediately with tracking info, echoing the options the run got.
   return {
     kind: "answer",
+    run,
     status: 202,
     body: {
       runId,

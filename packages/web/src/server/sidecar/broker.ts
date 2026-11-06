@@ -270,6 +270,21 @@ export class SidecarBroker {
   recordCarriedOut(sessionId: string, cardId: string, carriedOut: NonNullable<SidecarCard["carriedOut"]>): void {
     const card = this.sessionCards.get(sessionId)?.find((c) => c.id === cardId);
     if (!card || card.status !== "approved" || card.carriedOut) return;
+    this.writeCarriedOut(card, carriedOut);
+  }
+
+  /**
+   * A started effect that failed afterwards: a run hench ended in failure
+   * after its tool result said it started. Only revises a success to a
+   * failure, so a card never goes back to reading carried out.
+   */
+  reviseCarriedOutFailed(sessionId: string, cardId: string): void {
+    const card = this.sessionCards.get(sessionId)?.find((c) => c.id === cardId);
+    if (!card?.carriedOut?.ok) return;
+    this.writeCarriedOut(card, { ...card.carriedOut, ok: false });
+  }
+
+  private writeCarriedOut(card: SidecarCard, carriedOut: NonNullable<SidecarCard["carriedOut"]>): void {
     card.carriedOut = carriedOut;
     ensureSidecarDir(this.dir);
     appendFileSync(join(this.dir, `${card.sessionId}.cards.jsonl`), JSON.stringify(card) + "\n", "utf-8");

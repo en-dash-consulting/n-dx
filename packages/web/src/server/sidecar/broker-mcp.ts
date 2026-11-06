@@ -409,7 +409,10 @@ export function createBrokerMcpServer(
       try {
         const result = await carryOutDecision(name, input, outcome, actions, carrying.signal);
         if (outcome.decidedBy !== "allow-list" && outcome.approved) {
-          broker.recordCarriedOut(sessionId, outcome.card.id, { ok: result.ok, ...(result.ids && { ids: result.ids }) });
+          const { card } = outcome;
+          broker.recordCarriedOut(sessionId, card.id, { ok: result.ok, ...(result.ids && { ids: result.ids }) });
+          // A run that started can still fail; its card then reads failed, and a run-plan lane open again.
+          void result.ended?.then((end) => { if (!end.ok) broker.reviseCarriedOutFailed(sessionId, card.id); });
         }
         return text(result.text, !result.ok);
       } finally {

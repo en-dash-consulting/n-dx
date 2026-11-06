@@ -255,8 +255,9 @@ export function runPlanCommands(plan: QueuePlan): string {
  * Where a chosen lane stands, read from the lane's first task's work card in
  * the same session, raised after the plan card was decided: `raised` while the
  * card waits (or before the agent has raised one), `started` once it is
- * approved and its run began, `open` when it was denied, withdrawn or its
- * start was refused — the lane has started nothing.
+ * approved and its run began, `open` when it was denied, withdrawn, its
+ * start was refused or its run failed afterwards (the server revises the
+ * card's `carriedOut` to failed) — the lane has nothing running.
  */
 export function runPlanLaneState(plan: SidecarCard, lane: number, cards: readonly SidecarCard[]): "open" | "raised" | "started" {
   if (plan.status !== "approved" || plan.lane !== lane) return "open";
