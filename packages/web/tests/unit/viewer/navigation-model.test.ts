@@ -393,6 +393,31 @@ describe("rendered surfaces take their labels from the model", () => {
     expect(opened).toEqual(expect.arrayContaining(["changes", "product", "validation"]));
   });
 
+  it("Tune shows the Your tooling tile on a server and omits it from a static export", async () => {
+    // The tile reads /api/llm/* and /api/commands/auth, none of which an export
+    // writes, so deployed it would only ever report a read error.
+    const tooling = () => root.querySelector('.stage-tile[data-tile="tooling"]');
+    const mountTune = async () => {
+      act(() => {
+        render(h(StagePage, {
+          stage: "tune", validViews: buildValidViews(null), navigateTo: () => {}, renderView: () => null,
+        }), root);
+      });
+      await settle();
+    };
+    try {
+      delete window.__NDX_DEPLOYED__;
+      await mountTune();
+      expect(tooling()).not.toBeNull();
+
+      window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-01-01T00:00:00.000Z" };
+      await mountTune();
+      expect(tooling()).toBeNull();
+    } finally {
+      delete window.__NDX_DEPLOYED__;
+    }
+  });
+
   it("the settings overlay names each entry with the model's label", async () => {
     act(() => {
       render(h(SettingsOverlay, {

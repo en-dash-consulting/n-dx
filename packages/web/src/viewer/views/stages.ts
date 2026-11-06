@@ -270,7 +270,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       // Read-only. A settings page cannot be a stage view, so the tile borrows
       // Suggestions' view for its glyph and "Open"; each line links to the
       // Settings page that edits it.
-      { view: "hench-optimization", panel: "tooling", title: "Your tooling", rows: 2 },
+      { view: "hench-optimization", panel: "tooling", title: "Your tooling", rows: 2, requiresServer: true },
     ],
   },
 };
