@@ -716,6 +716,29 @@ describe("v2 product reads", () => {
       })]);
     });
 
+    it("leaves a retired capability out of the capability count", async () => {
+      const RETIRED_ID = "a0000000-0000-4000-8000-000000000004";
+      const REMOVER_ID = "c0000000-0000-4000-8000-000000000040";
+      write("product/checkout/pay-by-cheque.md", [
+        "---", `id: "${RETIRED_ID}"`, 'type: "capability"', 'title: "Pay by cheque"', 'slug: "pay-by-cheque"',
+        'statement: "A shopper can pay by cheque."', "---",
+      ]);
+      const checkoutState = join(rexDir, "product", "checkout", "state.yaml");
+      writeFileSync(checkoutState, `${readFileSync(checkoutState, "utf-8")}  "${RETIRED_ID}":\n    status: "deleted"\n`);
+      write("changes/drop-cheques/index.md", [
+        "---", `id: "${REMOVER_ID}"`, 'type: "change"', 'title: "Drop cheques"', 'slug: "drop-cheques"',
+        `amends: [{"target":"${RETIRED_ID}","delta":"removed","summary":"Nobody pays by cheque"}]`, "---",
+      ]);
+      write("changes/drop-cheques/state.yaml", [
+        'schema: "rex/v2"', "items:", `  "${REMOVER_ID}":`, '    status: "completed"', '    appliedAt: "2026-10-05T12:00:00.000Z"',
+      ]);
+      const area = (await get("product/area/checkout")).body.area as AreaDetail;
+      // rex's report omits a tombstone today, so the row never arrives; if it
+      // ever does, `counts.capabilities` still counts only the live ones.
+      expect(area.capabilities.map((c) => c.id)).toEqual([CAPABILITY_ID]);
+      expect(area.counts.capabilities).toBe(1);
+    });
+
     it("marks an Inbox guess tied when the top two candidates share a score", async () => {
       const untied = (await get("product/area/checkout")).body.area as AreaDetail;
       expect(untied.inbox[0]!.strength).not.toBe("tied");

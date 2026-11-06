@@ -19,7 +19,7 @@ import { useProductRead } from "../hooks/index.js";
 import { replaceAppHistory } from "../base-path.js";
 import type { AreaDetail } from "./product-model.js";
 import type { NavigateTo } from "../types.js";
-import { SpecMap } from "./area-spec-map.js";
+import { SpecMap, liveCapabilities } from "./area-spec-map.js";
 import { AreaCards } from "./area-cards.js";
 import { AreaCapability } from "./area-capability.js";
 import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
@@ -155,7 +155,7 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
   // A selection the loaded area does not list (a display id or alias in the
   // address, or a capability retired since) is no selection: clearing it also
   // gives the address back to the area's.
-  const listed = selectedId === null || load.state !== "ready" || load.data.capabilities.some((c) => c.id === selectedId);
+  const listed = selectedId === null || load.state !== "ready" || liveCapabilities(load.data.capabilities).some((c) => c.id === selectedId);
   useEffect(() => {
     if (!listed) setSelectedId(null);
   }, [listed]);
@@ -174,7 +174,7 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
   }
   const area = load.data;
   // A selection the area no longer lists (retired since, or a stale address) is no selection.
-  const selected = area.capabilities.find((c) => c.id === selectedId) ?? null;
+  const selected = liveCapabilities(area.capabilities).find((c) => c.id === selectedId) ?? null;
   return h("div", { class: "area-container", "data-area": area.slug },
     back,
     onBack

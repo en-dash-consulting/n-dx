@@ -774,7 +774,7 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
     ...(section.summary ? { summary: section.summary } : {}),
     stewards: section.stewards ?? [],
     counts: {
-      capabilities: caps.length,
+      capabilities: caps.filter((c) => c.status !== "retired").length,
       constraints: constraints.length,
       met: caps.filter((c) => c.status === "met").length,
       changing: caps.filter((c) => c.status === "changing").length,

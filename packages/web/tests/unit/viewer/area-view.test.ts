@@ -335,6 +335,22 @@ describe("a selected capability", () => {
     expect(root.querySelector(".area-capability")).toBeNull();
   });
 
+  it("treats a capability the area marks retired as no selection, in the address and after a click", async () => {
+    const [first, ...rest] = AREA_DETAIL_FIXTURE.capabilities;
+    const retired = { ...AREA_DETAIL_FIXTURE, capabilities: [{ ...first!, status: "retired" as const }, ...rest] };
+    stubRoutes({
+      [AREA_URL]: { layout: "v2", area: retired },
+      [CAP_URL]: { layout: "v2", capability: DETAIL },
+    });
+    history.replaceState(null, "", areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, CAP_ID));
+    await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug, initialCapabilityId: CAP_ID }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".area-capability")).toBeNull();
+      expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
+    });
+    expect(block()).toBeNull();
+  });
+
   it("clears the selection and the address when a refresh stops listing the capability", async () => {
     await open();
     act(() => block().click());
