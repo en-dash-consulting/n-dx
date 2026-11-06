@@ -15,6 +15,7 @@ import {
   SpecMap, appliesToLabel, capabilityBlock, orderCapabilities,
   specBlockBasis, SPEC_BLOCK_FLOOR_REM, SPEC_BLOCK_REM_PER_CRITERION,
 } from "../../../src/viewer/views/area-spec-map.js";
+import { GhostCardsContext } from "../../../src/viewer/components/index.js";
 import { blockName } from "../../../src/viewer/views/product-area-map.js";
 import { AREA_DETAIL_FIXTURE } from "../../fixtures/v2-product-map.js";
 import type { CapabilityRow } from "../../../src/viewer/views/product-model.js";
@@ -59,6 +60,44 @@ describe("capabilityBlock", () => {
     expect(block).toMatchObject({ size: 4, unit: "criteria", status: "defective", openChanges: 1 });
     expect(blockName(block)).toBe("C: 4 criteria, defective, 1 open change");
     expect(blockName(capabilityBlock(row({ criteriaCount: 1 })))).toBe("C: 1 criterion, met, no open changes");
+  });
+
+  it("counts waiting card items per capability, apart from open changes", () => {
+    const counts = new Map([["c", 2], ["other", 5]]);
+    const block = capabilityBlock(row({ criteriaCount: 1 }), counts);
+    expect(block).toMatchObject({ ghosts: 2, openChanges: 0 });
+    expect(blockName(block)).toBe("C: 1 criterion, met, no open changes, 2 waiting on a card");
+    expect(capabilityBlock(row({ id: "none" }), counts).ghosts).toBe(0);
+  });
+});
+
+describe("ghost markers from waiting cards", () => {
+  const card = (items: Array<{ parentId: string }>) => ({
+    id: "card-1",
+    changeSet: { layout: "v2", items: items.map((i) => ({ type: "change", title: "T", ...i })) },
+  });
+  function mountWithCards(cards: unknown[]): HTMLDivElement {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    act(() => {
+      render(
+        h(GhostCardsContext.Provider, { value: cards as never },
+          h(SpecMap, { capabilities: CAPS, constraints: [], onSelect: vi.fn() })),
+        root!,
+      );
+    });
+    return root;
+  }
+
+  it("draws +N on each targeted block and names the count; no card, no marker", () => {
+    const [a, b] = CAPS;
+    const el = mountWithCards([card([{ parentId: a.id }, { parentId: a.id }, { parentId: b.id }])]);
+    const marker = (id: string) => el.querySelector(`[data-ghost="${id}"]`);
+    expect(marker(a.id)?.textContent).toBe("+2");
+    expect(marker(b.id)?.textContent).toBe("+1");
+    expect(el.querySelector(`button[aria-label*="2 waiting on a card"]`)).not.toBeNull();
+    act(() => { render(null, root!); });
+    expect(mountWithCards([]).querySelector(".pam-ghost")).toBeNull();
   });
 });
 

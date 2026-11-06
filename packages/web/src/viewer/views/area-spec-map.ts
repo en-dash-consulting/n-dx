@@ -11,7 +11,9 @@
  */
 
 import { h } from "preact";
-import { AreaBlock, BlockLegend, blockStatus, type AreaBlockModel } from "./product-area-map.js";
+import { useContext, useMemo } from "preact/hooks";
+import { GhostCardsContext, ghostCountsByTarget } from "../components/index.js";
+import { AreaBlock, BlockLegend, blockStatus, type AreaBlockModel, type GhostCounts } from "./product-area-map.js";
 import type { CapabilityRow, ConstraintRow } from "./product-model.js";
 
 /** Whether the capability is moving or broken, which sorts it to the front. */
@@ -31,8 +33,9 @@ export function orderCapabilities(rows: readonly CapabilityRow[]): CapabilityRow
 }
 
 /** The block for one capability. Open changes count once each, on the capability they touch or amend. */
-export function capabilityBlock(row: CapabilityRow): AreaBlockModel {
+export function capabilityBlock(row: CapabilityRow, ghostCounts: GhostCounts = new Map()): AreaBlockModel {
   return {
+    ghosts: ghostCounts.get(row.id) ?? 0,
     key: row.id,
     label: row.title,
     size: row.criteriaCount,
@@ -63,14 +66,18 @@ export function appliesToLabel(appliesTo: ConstraintRow["appliesTo"]): string {
 }
 
 /** The constraints that bind the area, one band each. Draws nothing when none do. */
-export function ConstraintBands({ constraints }: { constraints: readonly ConstraintRow[] }) {
+export function ConstraintBands({ constraints, ghostCounts = new Map() }: { constraints: readonly ConstraintRow[]; ghostCounts?: GhostCounts }) {
   if (constraints.length === 0) return null;
   return h("ul", { class: "asm-bands", "aria-label": "Constraints that bind this area" },
     constraints.map((c) =>
       h("li", { key: c.id, class: `asm-band${c.health === "defective" ? " asm-band-defective" : ""}` },
         h("span", { class: "asm-band-title" }, c.title),
         h("span", { class: "tag" }, appliesToLabel(c.appliesTo)),
-        c.health === "defective" ? h("span", { class: "tag asm-band-health" }, "defective") : null)));
+        c.health === "defective" ? h("span", { class: "tag asm-band-health" }, "defective") : null,
+        ghostCounts.get(c.id)
+          ? h("span", { class: "pam-ghost", "data-ghost": c.id, title: `${ghostCounts.get(c.id)} waiting on a card` },
+              `+${ghostCounts.get(c.id)}`)
+          : null)));
 }
 
 export interface SpecMapProps {
@@ -114,8 +121,10 @@ export function liveCapabilities(rows: readonly CapabilityRow[]): CapabilityRow[
 
 export function SpecMap({ capabilities: allCapabilities, constraints, selectedId = null, onSelect, lit, near, pending, ghost, placed }: SpecMapProps) {
   const capabilities = liveCapabilities(allCapabilities);
+  const cards = useContext(GhostCardsContext);
+  const ghostCounts = useMemo(() => ghostCountsByTarget(cards), [cards]);
   return h("section", { class: "asm", "aria-label": "Spec map" },
-    h(ConstraintBands, { constraints }),
+    h(ConstraintBands, { constraints, ghostCounts }),
     capabilities.length === 0 && !ghost
       ? h("div", { class: "empty-state", role: "status" },
           allCapabilities.length === 0
@@ -126,7 +135,7 @@ export function SpecMap({ capabilities: allCapabilities, constraints, selectedId
             orderCapabilities(capabilities).map((row) =>
               h(AreaBlock, {
                 key: row.id,
-                block: capabilityBlock(row),
+                block: capabilityBlock(row, ghostCounts),
                 basisRem: specBlockBasis(row.criteriaCount),
                 selected: row.id === selectedId,
                 onOpen: () => onSelect(row.id),
