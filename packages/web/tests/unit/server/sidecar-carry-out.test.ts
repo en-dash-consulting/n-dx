@@ -412,9 +412,34 @@ describe("start_work", () => {
     const result = await call;
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(
-      /Run exec-\w+ on task task-1 \(Carry it out\) did not start: it exited with code 1\.\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts$/,
+      /Run exec-\w+ on task task-1 \(Carry it out\) did not start: it exited with code 1\.\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts\nChecking the working tree…$/,
     );
     expect(resultText(result)).not.toContain("Started run");
+    expect(broker.cards(SESSION).find((c) => c.id === cardId)?.carriedOut).toEqual({ ok: false });
+    await client.close();
+  });
+
+  // #989 review: hench refuses on stdout (info) and warns on stderr (warn).
+  it("carries hench's stdout refusal, with its file list, when stderr holds only a warning", async () => {
+    spawnManagedMock.mockImplementationOnce(() => ({
+      done: Promise.resolve({
+        exitCode: 1,
+        stdout: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n  src/lib.ts\n",
+        stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+      }),
+      kill: vi.fn(() => true),
+      pid: 4243,
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(
+      /did not start: it exited with code 1\.\nWarning: hench config field "maxTurn" is unknown and ignored\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts\n {2}src\/lib\.ts$/,
+    );
+    // The card's line shows this result text beside its failed state.
     expect(broker.cards(SESSION).find((c) => c.id === cardId)?.carriedOut).toEqual({ ok: false });
     await client.close();
   });

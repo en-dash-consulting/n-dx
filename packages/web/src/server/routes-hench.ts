@@ -2299,7 +2299,20 @@ type ExecuteOutcome =
 /** How long a dashboard run reads `starting` before it reads `running`: hench's preflight runs in that window. */
 export const STARTING_PHASE_MS = 2000;
 
-/** How a dashboard-started `ndx work` process ended. `output` is its stderr, or its stdout when stderr was empty. */
+/** Characters of each stream {@link runEndOutput} keeps by default. */
+export const RUN_END_STREAM_MAX_CHARS = 4000;
+
+/**
+ * What a finished run printed: the end of stderr, then the end of stdout, each
+ * cut to `maxChars`. hench warns on stderr but prints its pre-run refusals on
+ * stdout, so a warning must not hide the refusal that follows it.
+ */
+export function runEndOutput(stderr: string | undefined, stdout: string | undefined, maxChars = RUN_END_STREAM_MAX_CHARS): string {
+  const tail = (text: string | undefined): string => (text ?? "").trim().slice(-maxChars);
+  return [tail(stderr), tail(stdout)].filter(Boolean).join("\n");
+}
+
+/** How a dashboard-started `ndx work` process ended. `output` is {@link runEndOutput} of its two streams. */
 export interface RunEnd {
   ok: boolean;
   exitCode: number | null;
@@ -2562,7 +2575,7 @@ async function startExecution(
             event: "task_execution_failed",
             itemId: taskId,
             detail: `"${taskTitle}" failed (exit ${result.exitCode}): ${
-              (result.stderr || result.stdout || "").trim().slice(-2000) || "no output captured"
+              runEndOutput(result.stderr, result.stdout, 1000) || "no output captured"
             }`,
           });
         }
@@ -2572,7 +2585,7 @@ async function startExecution(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
-      finish({ ok: result.exitCode === 0, exitCode: result.exitCode, output: result.stderr?.trim() ? result.stderr : (result.stdout ?? "") });
+      finish({ ok: result.exitCode === 0, exitCode: result.exitCode, output: runEndOutput(result.stderr, result.stdout) });
     })
     .catch((err) => {
       const entry = activeExecutions.get(taskId);
