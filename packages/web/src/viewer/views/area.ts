@@ -26,7 +26,7 @@ import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
 
 /** The area's address. */
 export function areaPath(slug: string): string {
-  return `/product/area/${slug}`;
+  return `/product/area/${encodeURIComponent(slug)}`;
 }
 
 /** The address of a capability selected in the area. */

@@ -10,6 +10,7 @@ import {
   blockName,
   blockStatus,
 } from "../../../src/viewer/views/product-area-map.js";
+import { areaPath } from "../../../src/viewer/views/area.js";
 import { areaCapabilityOfTab, areaSlugOfTab, parsePathnameRoute, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
 import type { AreaSection, CapabilityRow, ProductMap } from "../../../src/viewer/views/product-model.js";
 import type { ViewId } from "../../../src/viewer/types.js";
@@ -91,6 +92,19 @@ describe("area routes", () => {
   it("reads a malformed capability id as no selection", () => {
     expect(areaCapabilityOfTab("area/define-the-product/capability/%E0")).toBeNull();
     expect(areaCapabilityOfTab("area/define-the-product/capability/cap%20x")).toBe("cap x");
+  });
+  it("round-trips a non-ASCII or reserved-character area slug", () => {
+    for (const slug of ["café", "my area", "a#b?c"]) {
+      const path = areaPath(slug);
+      expect(path).toBe(`/product/area/${encodeURIComponent(slug)}`);
+      const route = parsePathnameRoute(path, valid);
+      expect(route).toEqual({ view: "product", subId: `area/${encodeURIComponent(slug)}` });
+      expect(areaSlugOfTab(routeTab("product", route!.subId))).toBe(slug);
+      expect(areaSlugOfTab(`area/${encodeURIComponent(slug)}/capability/cap-x`)).toBe(slug);
+    }
+  });
+  it("reads a malformed area slug as no area", () => {
+    expect(areaSlugOfTab("area/%E0")).toBeNull();
   });
   it("leaves other product sub-paths alone", () => {
     expect(parsePathnameRoute("/product/other", valid)).toBeNull();

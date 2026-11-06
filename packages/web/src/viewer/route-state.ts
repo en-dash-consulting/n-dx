@@ -35,9 +35,19 @@ export function routeTab(view: ViewId, subId: string | null): string | null {
  */
 const AREA_PATH = /^area\/([^/]+)(?:\/capability\/([^/]+))?$/;
 
-/** The slug an `area/<slug>` tab names, or null when the tab is not an area's. */
+/**
+ * The slug an `area/<slug>` tab names, decoded (the tab carries it as it sits
+ * in the address), or null when the tab is not an area's or the slug is malformed.
+ */
 export function areaSlugOfTab(tab: string | null): string | null {
-  return (tab && AREA_PATH.exec(tab)?.[1]) || null;
+  const slug = tab && AREA_PATH.exec(tab)?.[1];
+  if (!slug) return null;
+  try {
+    return decodeURIComponent(slug);
+  } catch {
+    // A hand-edited address like `/product/area/%E0` names no area.
+    return null;
+  }
 }
 
 /** The capability `area/<slug>/capability/<id>` selects in the area, or null. */
