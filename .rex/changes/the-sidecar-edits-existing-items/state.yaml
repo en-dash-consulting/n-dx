@@ -4,10 +4,14 @@ items:
     lastModified: "2026-11-06T00:16:20.569Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5d52fd20-ac23-407f-808a-5cc245065564":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T18:14:38.951Z"
-    activeIntervals: [{"start":"2026-11-06T18:14:38.951Z"}]
-    lastModified: "2026-11-06T18:14:39.623Z"
+    completedAt: "2026-11-06T18:21:33.744Z"
+    endedAt: "2026-11-06T18:21:33.744Z"
+    activeIntervals: [{"end":"2026-11-06T18:21:33.744Z","start":"2026-11-06T18:14:38.951Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "propose_status card wired through broker-policy, broker-mcp, carry-out, routes-sidecar, hub-actions; writes via rex handleUpdateTaskStatus."
+    lastModified: "2026-11-06T18:21:33.744Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8334c419-88f6-4cc6-90d1-b22c88dc06fd":
     status: "completed"
@@ -22,6 +26,9 @@ items:
   "bd3a071a-6ad5-402d-9ae8-b872bd1969ed":
     lastModified: "2026-11-06T00:16:41.857Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d652a3f3-fd0f-4600-8916-9fc69685f0e2":
+    lastModified: "2026-11-06T18:21:09.639Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fc83b4cb-5237-4422-b590-d743d0f11c37":
-    lastModified: "2026-11-06T00:19:06.109Z"
+    lastModified: "2026-11-06T18:21:09.639Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
