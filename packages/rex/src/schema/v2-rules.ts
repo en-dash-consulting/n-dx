@@ -923,7 +923,8 @@ function compareReleases(a: Release, b: Release): number {
 /**
  * An open change planned for a release that has gone: one some change carries
  * as `shippedIn`, or one older by semver than the newest shipped release. A
- * change with no `plannedRelease`, or one that is not semver, is never flagged.
+ * change with no `plannedRelease`, or one that is not semver, is never flagged;
+ * nor is one with `shippedIn`, which `applyOn: review` stamps before applying.
  */
 const staleReleasePlan: Rule = ({ entries }) => {
   const changes = entries.map(({ node }) => node).filter((node) => node.type === "change");
@@ -936,7 +937,7 @@ const staleReleasePlan: Rule = ({ entries }) => {
   }
   return changes.flatMap((node) => {
     const planned = node.plannedRelease;
-    if (!planned || !isOpenChange(node)) return [];
+    if (!planned || node.shippedIn || !isOpenChange(node)) return [];
     const where = `Open change "${node.title}" (${node.id}) is planned for ${planned}`;
     if (shipped.has(normalizeVersion(planned))) {
       return [finding("stale-release-plan", node, `${where}, which has shipped; plan it for a coming release or clear plannedRelease`)];

@@ -1,8 +1,22 @@
 schema: "rex/v2"
 items:
   "56f06d41-001e-4f56-b83f-a88cdb918602":
-    lastModified: "2026-11-06T04:00:42.641Z"
+    status: "completed"
+    startedAt: "2026-11-06T04:00:56.278Z"
+    completedAt: "2026-11-06T04:03:14.552Z"
+    endedAt: "2026-11-06T04:03:14.552Z"
+    activeIntervals: [{"end":"2026-11-06T04:03:14.552Z","start":"2026-11-06T04:00:56.278Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "stale-release rule skips changes with shippedIn; test added"
+    lastModified: "2026-11-06T04:03:14.552Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "babe1c8e-9f19-4a0e-9888-3824f4341299":
-    lastModified: "2026-11-06T04:00:42.641Z"
+    status: "completed"
+    startedAt: "2026-11-06T04:03:14.552Z"
+    completedAt: "2026-11-06T04:03:14.552Z"
+    endedAt: "2026-11-06T04:03:14.552Z"
+    activeIntervals: [{"end":"2026-11-06T04:03:14.552Z","start":"2026-11-06T04:03:14.552Z"}]
+    appliedAt: "2026-11-06T04:03:14.552Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T04:03:14.552Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

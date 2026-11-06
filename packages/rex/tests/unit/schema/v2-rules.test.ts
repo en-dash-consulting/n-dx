@@ -1119,6 +1119,11 @@ describe("stale-release-plan", () => {
     expect(ids(check("stale-release-plan", { changes: [shipped("0.10.0"), awaiting] }))).toEqual([awaiting.id]);
   });
 
+  it("skips a change that shipped in its planned release but is not applied yet", () => {
+    const shippedAsPlanned = node("change", { status: "completed", plannedRelease: "0.10.0", shippedIn: "0.10.0" });
+    expect(check("stale-release-plan", { changes: [shippedAsPlanned] })).toEqual([]);
+  });
+
   it("skips unscheduled, applied, cancelled and future-planned changes", () => {
     const changes = [
       shipped("0.10.0"),
