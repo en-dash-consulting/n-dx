@@ -128,6 +128,10 @@ export interface PlacementSuggestion {
   relation: PlacementRelation;
   /** The rule that set {@link relation}, in words. */
   relationRule: string;
+  /** When the change was first recorded: `createdAt`, else `lastModified` for a change older than that field. Absent when neither is set. */
+  createdAt?: string;
+  /** Whole days from `createdAt` to the read's `now`, never negative. */
+  ageDays?: number;
   /**
    * The top two candidates share a score: their order is the id tiebreak, not
    * the rules, so the first is no better a pick than the second.
@@ -144,6 +148,17 @@ export interface SuggestPlacementOptions {
    * alias or frozen slug; one naming no live area is refused (`not-an-area`).
    */
   area?: string;
+  /** The read's clock for `ageDays`; defaults to the current time. */
+  now?: Date;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** A change's first-recorded time and whole-day age at `now`. */
+export function changeAge(node: Pick<RuleNode, "createdAt" | "lastModified">, now: Date): { createdAt?: string; ageDays?: number } {
+  const stamp = [node.createdAt, node.lastModified].find((v): v is string => typeof v === "string" && !Number.isNaN(Date.parse(v)));
+  if (stamp === undefined) return {};
+  return { createdAt: stamp, ageDays: Math.max(0, Math.floor((now.getTime() - Date.parse(stamp)) / MS_PER_DAY)) };
 }
 
 /**
@@ -157,7 +172,7 @@ export function suggestPlacement(
   shortlistSize = PLACEMENT_SHORTLIST_SIZE,
   options: SuggestPlacementOptions = {},
 ): PlacementSuggestion {
-  return suggestFrom(placementContext(tree, options), changeRef, shortlistSize);
+  return suggestFrom(placementContext(tree, options), changeRef, shortlistSize, options.now ?? new Date());
 }
 
 /** One ref's {@link suggestPlacement} result, or the refusal it threw. */
@@ -176,10 +191,11 @@ export function suggestPlacements(
   options: SuggestPlacementOptions = {},
 ): Map<string, PlacementSuggestionResult> {
   const context = placementContext(tree, options);
+  const now = options.now ?? new Date();
   const out = new Map<string, PlacementSuggestionResult>();
   for (const ref of changeRefs) {
     try {
-      out.set(ref, { suggestion: suggestFrom(context, ref, shortlistSize) });
+      out.set(ref, { suggestion: suggestFrom(context, ref, shortlistSize, now) });
     } catch (err) {
       if (!(err instanceof ChangePlacementError)) throw err;
       out.set(ref, { error: err });
@@ -203,7 +219,7 @@ function placementContext(tree: V2Tree, options: SuggestPlacementOptions): Place
   return { index, nodes: inArea ? all.filter((n) => inArea.has(n.id)) : all, amenders: openAmenders(index) };
 }
 
-function suggestFrom(context: PlacementContext, changeRef: string, shortlistSize: number): PlacementSuggestion {
+function suggestFrom(context: PlacementContext, changeRef: string, shortlistSize: number, now: Date): PlacementSuggestion {
   const change = placeableChange(context.index, changeRef);
   const input = placementInput(change);
   const { relation, rule } = defaultRelationRule(change);
@@ -214,6 +230,7 @@ function suggestFrom(context: PlacementContext, changeRef: string, shortlistSize
     change: change.id,
     relation,
     relationRule: rule,
+    ...changeAge(change, now),
     tied: top !== undefined && next !== undefined && top.score === next.score,
     shortlist: ranked.slice(0, shortlistSize).map((c) => ({
       ...c,

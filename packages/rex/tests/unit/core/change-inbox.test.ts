@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { changeAge, listInbox } from "../../../src/core/change-inbox.js";
+import { changeAge, suggestPlacements } from "../../../src/core/change-place.js";
+import { listInbox } from "../../../src/core/change-inbox.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ slug: fields.id as string, ...fields }) as RuleNode;
@@ -27,6 +28,19 @@ describe("changeAge", () => {
     expect(changeAge({}, NOW)).toEqual({});
     expect(changeAge({ createdAt: "not a date" }, NOW)).toEqual({});
     expect(changeAge({ createdAt: new Date(NOW.getTime() + DAY).toISOString() }, NOW).ageDays).toBe(0);
+  });
+});
+
+describe("suggestPlacements", () => {
+  it("carries each change's createdAt and ageDays at the read's now", () => {
+    const t = tree([
+      node({ id: "old", type: "change", title: "Pay by card old", needsPlacement: true, createdAt: ago(4) }),
+      node({ id: "bare", type: "change", title: "Pay by card bare", needsPlacement: true }),
+    ]);
+    const got = suggestPlacements(t, ["old", "bare"], 5, { now: NOW });
+    expect(got.get("old")).toMatchObject({ suggestion: { createdAt: ago(4), ageDays: 4 } });
+    const bare = (got.get("bare") as { suggestion: Record<string, unknown> }).suggestion;
+    expect(bare).not.toHaveProperty("ageDays");
   });
 });
 

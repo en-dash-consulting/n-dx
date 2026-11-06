@@ -204,24 +204,11 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
   const result = suggestPlacements(tree, [changeRef]).get(changeRef)!;
   if ("error" in result) throw result.error;
   const index = indexTree(tree);
-  return placementWire(index, areaTitles(index), result.suggestion, new Date());
+  return placementWire(index, areaTitles(index), result.suggestion);
 }
 
-const MS_PER_DAY = 86_400_000;
-
-/**
- * A change's first-recorded time and whole-day age: the same rule as rex's
- * `changeAge` (`core/change-inbox.ts`, behind `rex change inbox`), kept as a
- * five-line read here so the rex gateway does not grow for it.
- */
-function ageOf(change: { createdAt?: string; lastModified?: string }, now: Date): { createdAt?: string; ageDays?: number } {
-  const stamp = [change.createdAt, change.lastModified].find((v): v is string => typeof v === "string" && !Number.isNaN(Date.parse(v)));
-  if (stamp === undefined) return {};
-  return { createdAt: stamp, ageDays: Math.max(0, Math.floor((now.getTime() - Date.parse(stamp)) / MS_PER_DAY)) };
-}
-
-/** The wire shape of rex's `suggestion`, with each candidate's title, area, statement and criteria. */
-function placementWire(index: TreeIndex, areaOf: (id: string) => string, suggestion: PlacementSuggestion, now: Date): ChangePlacementWire {
+/** The wire shape of rex's `suggestion`, with each candidate's title, area, statement and criteria. Age is rex's. */
+function placementWire(index: TreeIndex, areaOf: (id: string) => string, suggestion: PlacementSuggestion): ChangePlacementWire {
   const change = index.resolve(suggestion.change)!;
   const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
   const shortlist = enrichShortlist(index, areaOf, suggestion.shortlist);
@@ -236,7 +223,7 @@ function placementWire(index: TreeIndex, areaOf: (id: string) => string, suggest
       status: change.status ?? "pending",
       taskCount: tasks.length,
       ...(change.tags?.length ? { tags: change.tags } : {}),
-      ...ageOf(change, now),
+      ...(suggestion.createdAt !== undefined ? { createdAt: suggestion.createdAt, ageDays: suggestion.ageDays } : {}),
     },
     relation: suggestion.relation,
     relationRule: suggestion.relationRule,
@@ -320,10 +307,9 @@ export function buildAwaitingPlacements(tree: V2Tree): ChangePlacementsWire["pla
   );
   // One batch: rex builds its placement inputs once, not once per change.
   const areaOf = areaTitles(index);
-  const now = new Date();
   const out: ChangePlacementsWire["placements"] = {};
   for (const [id, result] of suggestPlacements(tree, waiting)) {
-    out[id] = "error" in result ? { error: errorMessage(result.error) } : placementWire(index, areaOf, result.suggestion, now);
+    out[id] = "error" in result ? { error: errorMessage(result.error) } : placementWire(index, areaOf, result.suggestion);
   }
   return out;
 }
