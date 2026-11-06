@@ -2306,6 +2306,19 @@ export const RUN_END_STREAM_MAX_CHARS = 4000;
 const EXEC_STATE_ERROR_STREAM_CHARS = 300;
 
 /**
+ * The last block of stdout, from its last unindented line on. hench prints a
+ * refusal as a header followed by indented detail lines (a dirty-file list), so
+ * the header survives however long the list is. A block longer than
+ * {@link RUN_END_STREAM_MAX_CHARS} keeps its head.
+ */
+export function lastStdoutBlock(stdout: string | undefined): string {
+  const lines = (stdout ?? "").trimEnd().split("\n");
+  let start = lines.length - 1;
+  while (start > 0 && (lines[start] === "" || /^\s/.test(lines[start]))) start--;
+  return lines.slice(start).join("\n").trim().slice(0, RUN_END_STREAM_MAX_CHARS);
+}
+
+/**
  * What a finished run printed: the end of stderr, then the end of stdout, each
  * cut to `maxChars`. hench warns on stderr but prints its pre-run refusals on
  * stdout, so a warning must not hide the refusal that follows it.
@@ -2571,7 +2584,9 @@ async function startExecution(
           // of each stream: a warning must not hide the refusal. With stderr
           // empty, the last meaningful stdout line is the reason.
           entry.state.error = (result.stderr?.trim()
-            ? runEndOutput(result.stderr, result.stdout, EXEC_STATE_ERROR_STREAM_CHARS)
+            ? [result.stderr.trim().slice(-EXEC_STATE_ERROR_STREAM_CHARS), lastStdoutBlock(result.stdout)]
+                .filter(Boolean)
+                .join("\n")
             : lastOutLine)
             || "Task run failed";
           appendLog(ctx, {

@@ -186,6 +186,18 @@ describe("POST /api/hench/execute — failure detection beyond exit code", () =>
       expect(error).toContain("src/app.ts");
     });
 
+    it("keeps the refusal header when the dirty-file list is long", async () => {
+      const files = Array.from({ length: 20 }, (_, i) => `  packages/web/src/server/some/long/path/file-${i}.ts`);
+      const error = await runAndGetBroadcastError({
+        exitCode: 1,
+        stdout: ["Starting task...", "⚠ Refusing to start an autonomous run with 21 uncommitted files in the working tree.", ...files, "  … and 1 more"].join("\n") + "\n",
+        stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+      });
+      expect(error).toContain("Refusing to start");
+      expect(error).toContain("file-19.ts");
+      expect(error).toContain("maxTurn");
+    });
+
     it("still carries stderr when stdout is empty", async () => {
       const error = await runAndGetBroadcastError({ exitCode: 1, stdout: "", stderr: "boom: spawn failed\n" });
       expect(error).toContain("boom: spawn failed");
