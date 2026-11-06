@@ -99,6 +99,8 @@ describe("the placement route", () => {
     expect(placeChangeOfTab(placementTab("a b/c"))).toBe("a b/c");
     expect(placeChangeOfTab("area/payments")).toBeNull();
     expect(placeChangeOfTab(null)).toBeNull();
+    // A malformed escape in a hand-edited address names no change instead of throwing.
+    expect(placeChangeOfTab("place/%E0%A4%A")).toBeNull();
     expect(routeTab("product", "place/a/extra")).toBeNull();
   });
 });

@@ -51,7 +51,13 @@ export function placementTab(changeId: string): string {
 /** The change a `place/<id>` tab places, or null when the tab is not placement mode's. */
 export function placeChangeOfTab(tab: string | null): string | null {
   const id = tab && PLACE_PATH.exec(tab)?.[1];
-  return id ? decodeURIComponent(id) : null;
+  if (!id) return null;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    // A hand-edited address with a malformed escape names no change.
+    return null;
+  }
 }
 
 /**
