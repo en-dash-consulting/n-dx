@@ -49,3 +49,20 @@ describe("FacetFilter — In the Inbox", () => {
     expect(props.onClearAll).toHaveBeenCalled();
   });
 });
+
+describe("pickInboxIds — the facet reads the same rows as the Inbox section", () => {
+  it("lists every Inbox change on a tree with no live capability (awaitsPlacement false)", async () => {
+    const { pickInboxIds } = await import("../../../src/viewer/views/prd.js");
+    const body = {
+      changes: [
+        { id: "held", inbox: true, awaitsPlacement: false },
+        { id: "placed", inbox: false, awaitsPlacement: false },
+        { id: "waiting", inbox: true, awaitsPlacement: true },
+      ],
+    };
+    const ids = pickInboxIds(body);
+    expect([...ids].sort()).toEqual(["held", "waiting"]);
+    // useInbox keeps the rows flagged `inbox`; the facet ids are the same set.
+    expect([...ids].sort()).toEqual(body.changes.filter((c) => c.inbox).map((c) => c.id).sort());
+  });
+});

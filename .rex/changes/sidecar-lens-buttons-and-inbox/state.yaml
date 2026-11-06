@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-06T05:19:28.484Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "40e8886f-b154-4533-b6b0-5c77ba1faf9c":
-    lastModified: "2026-11-06T15:32:32.856Z"
+    status: "completed"
+    startedAt: "2026-11-06T15:38:04.082Z"
+    completedAt: "2026-11-06T15:39:56.150Z"
+    endedAt: "2026-11-06T15:39:56.150Z"
+    activeIntervals: [{"end":"2026-11-06T15:39:56.150Z","start":"2026-11-06T15:38:04.082Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "pickInboxIds filters on the rows' inbox flag; exported and tested in facet-filter-inbox.test.ts"
+    lastModified: "2026-11-06T15:39:56.150Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "469f3744-d709-42b0-a2b1-7b382870dd14":
     issues: ["https://www.notion.so/3f7a80b7192481fea2d1d0effbc05cec","https://www.notion.so/3f7a80b7192481d2b9dae4d27953f7a1","https://www.notion.so/3f7a80b7192481e7940ff74b8d2c8445"]

@@ -63,9 +63,9 @@ export interface PRDViewProps {
 }
 
 /** The ids of changes rex holds for placement, out of `GET /api/rex/changes`. */
-function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
-  const rows = body.changes as Array<{ id: string; awaitsPlacement?: boolean }>;
-  return new Set(rows.filter((c) => c.awaitsPlacement).map((c) => c.id));
+export function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
+  const rows = body.changes as Array<{ id: string; inbox?: boolean }>;
+  return new Set(rows.filter((c) => c.inbox).map((c) => c.id));
 }
 
 const NO_INBOX: ReadonlySet<string> = new Set();
