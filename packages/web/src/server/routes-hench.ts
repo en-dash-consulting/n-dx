@@ -79,6 +79,7 @@ import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
+  fieldDefaultForProject,
   validateFieldValue,
   validateConfigKeyValue,
   validateConfigConstraints,
@@ -964,7 +965,7 @@ function routeConfig(rc: RouteContext): boolean | Promise<boolean> | null {
 
     const fields = CONFIG_FIELD_META.map((field) => {
       const value = getNestedValue(config, field.path);
-      const { defaultValue } = field;
+      const defaultValue = fieldDefaultForProject(field, rc.ctx.projectDir);
       // An absent key is the default by definition — hench fills it in on load
       // — so it is never marked as differing, whatever the default happens to be.
       const isDefault =

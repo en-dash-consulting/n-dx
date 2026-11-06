@@ -1,5 +1,4 @@
-import { join } from "node:path";
-import { resolveHenchPaths } from "../../store/paths.js";
+import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { resolveStore, findItem } from "../../prd/rex-gateway.js";
 
 /**
@@ -16,7 +15,7 @@ export async function lookupTaskInRex(
 
     const henchDir = resolveHenchPaths(dir).henchDir;
     const config = await loadConfig(henchDir);
-    const rexDir = join(dir, config.rexDir);
+    const rexDir = resolveHenchRexDir(dir, config.rexDir);
     const store = await resolveStore(rexDir);
     const doc = await store.loadDocument();
     const entry = findItem(doc.items, taskId);
@@ -45,7 +44,7 @@ export async function batchLookupTasksInRex(
 
     const henchDir = resolveHenchPaths(dir).henchDir;
     const config = await loadConfig(henchDir);
-    const rexDir = join(dir, config.rexDir);
+    const rexDir = resolveHenchRexDir(dir, config.rexDir);
     const store = await resolveStore(rexDir);
     const doc = await store.loadDocument();
 

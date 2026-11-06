@@ -26,7 +26,7 @@ import { PERMISSION_MODES } from "../../schema/index.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { resolveHenchPaths } from "../../store/paths.js";
+import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
@@ -260,7 +260,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   const henchDir = resolveHenchPaths(dir).henchDir;
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
   const configured = await loadConfiguredHenchKeys(henchDir);
-  const rexDir = join(dir, config.rexDir);
+  const rexDir = resolveHenchRexDir(dir, config.rexDir);
   const baseLlmConfig = await loadLLMConfig(henchDir);
   const baseVendor = resolveLLMVendor(baseLlmConfig);
   const refusals: RunRefusal[] = [];

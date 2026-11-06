@@ -36,7 +36,7 @@ import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { safeParseInt } from "./constants.js";
-import { resolveHenchPaths } from "../../store/paths.js";
+import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
@@ -1897,7 +1897,7 @@ export async function cmdRun(
     onInvalid: "use-defaults",
     onWarning: (message) => warn(message),
   });
-  const rexDir = join(dir, config.rexDir);
+  const rexDir = resolveHenchRexDir(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 

@@ -24,6 +24,7 @@
 import { join } from "node:path";
 
 import {
+  PROJECT_DIRS,
   relativeToRoot,
   resolveLayout,
   type LayoutMode,
@@ -212,6 +213,23 @@ export interface HenchPaths {
   recoveryDir: string;
   /** Per-run MCP server configs. */
   agentMcpDir: string;
+}
+
+/**
+ * The rex directory hench reads the PRD from, given its configured `rexDir`.
+ *
+ * The configured value defaults to the legacy `.rex` (the schema default, and
+ * what every config written before the `.ndx/` layout holds). On a project
+ * moved to `.ndx/` that folder no longer exists, so a configured value equal
+ * to the legacy default yields to the layout's rex dir. Any other value was
+ * set deliberately and wins.
+ *
+ * @param root        Absolute project root.
+ * @param configured  `config.rexDir` from hench's config, relative to `root`.
+ */
+export function resolveHenchRexDir(root: string, configured: string): string {
+  if (configured === PROJECT_DIRS.REX) return resolveLayout(root).rexDir;
+  return join(root, configured);
 }
 
 /**

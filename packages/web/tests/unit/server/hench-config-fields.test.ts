@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   CONFIG_FIELD_META,
   CONFIG_GROUP_DEFAULTS,
   VENDOR_PROVIDERS,
   completeConfigGroups,
+  fieldDefaultForProject,
   getConfigValue,
   setConfigValue,
   validateConfigKeyValue,
@@ -291,5 +295,33 @@ describe("setConfigValue", () => {
     setConfigValue(target, "guard.commandTimeout", 45000);
     expect(target).toEqual({ retry: { baseDelayMs: 1000, maxRetries: 3 }, guard: { commandTimeout: 45000 } });
     expect(getConfigValue(target, "retry.maxRetries")).toBe(3);
+  });
+});
+
+describe("fieldDefaultForProject", () => {
+  const rexDirField = CONFIG_FIELD_META.find((f) => f.path === "rexDir")!;
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "web-hench-field-default-"));
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("shows .rex as rexDir's default on the legacy layout", () => {
+    expect(fieldDefaultForProject(rexDirField, root)).toBe(".rex");
+  });
+
+  it("shows the layout's rex dir as rexDir's default on the .ndx/ layout", () => {
+    mkdirSync(join(root, ".ndx"));
+    expect(fieldDefaultForProject(rexDirField, root)).toBe(".ndx/rex");
+  });
+
+  it("returns the recorded default for every other field", () => {
+    const model = CONFIG_FIELD_META.find((f) => f.path === "model")!;
+    mkdirSync(join(root, ".ndx"));
+    expect(fieldDefaultForProject(model, root)).toBe(model.defaultValue);
   });
 });

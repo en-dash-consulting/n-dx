@@ -374,6 +374,12 @@ export async function runMigrateLayout(dir, flags = [], deps = {}) {
     ]),
   };
 
+  // Before the renames, so the journal holds the legacy path: restore moves the
+  // directory back first and then rewrites the file where it has landed.
+  const henchConfig = henchConfigPath(resolveLayout(root, { mode: "legacy" }));
+  journal.files.set(henchConfig, readOrNull(henchConfig));
+  rewriteHenchRexDir(root, henchConfig);
+
   mkdirSync(container, { recursive: true });
 
   for (const move of moves) {
@@ -436,6 +442,52 @@ export async function runMigrateLayout(dir, flags = [], deps = {}) {
   }
   console.log(`  Committed: ${MIGRATE_COMMIT_SUBJECT}`);
   return 0;
+}
+
+/** hench's config file under a layout. The name matches `config.js`'s hench entry. */
+function henchConfigPath(layout) {
+  return join(layout.henchDir, "config.json");
+}
+
+/**
+ * A JSON file's top-level object, or `null` when the file is missing, is not
+ * JSON, or holds something other than an object.
+ */
+function readJsonObject(path) {
+  const raw = readOrNull(path);
+  if (raw === null) return null;
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+/** Whether `rexDir` is the legacy layout's rex dir (`.rex`), hench's schema default. */
+function isLegacyDefaultRexDir(root, rexDir) {
+  const legacy = resolveLayout(root, { mode: "legacy" });
+  return rexDir === relativeToRoot(legacy, legacy.rexDir);
+}
+
+/**
+ * Point hench's `rexDir` at the `.ndx/` rex dir when it holds the legacy
+ * default. hench reads the PRD from this value, so a `.rex` left behind names a
+ * folder the migration just emptied. A custom value was set deliberately and is
+ * left alone; a missing or unparseable file is not this command's to repair.
+ *
+ * @param {string} root
+ * @param {string} path  hench's config file (at its legacy location).
+ * @returns {boolean} Whether the file was rewritten.
+ */
+function rewriteHenchRexDir(root, path) {
+  const config = readJsonObject(path);
+  if (!config || !isLegacyDefaultRexDir(root, config.rexDir)) return false;
+  const target = resolveLayout(root, { mode: "ndx" });
+  config.rexDir = relativeToRoot(target, target.rexDir);
+  writeFileSync(path, JSON.stringify(config, null, 2) + "\n", "utf-8");
+  return true;
 }
 
 /**
@@ -550,7 +602,13 @@ async function verifyMigration(root, moves, validateBefore, deps) {
     if (!existsSync(move.to)) return `${move.toPattern} is missing`;
     if (existsSync(move.from)) return `${move.fromPattern} is still there`;
   }
-  if (resolveLayout(root).mode !== "ndx") return "the resolver still reports the legacy layout";
+  const layout = resolveLayout(root);
+  if (layout.mode !== "ndx") return "the resolver still reports the legacy layout";
+
+  const henchConfig = readJsonObject(henchConfigPath(layout));
+  if (henchConfig && isLegacyDefaultRexDir(root, henchConfig.rexDir)) {
+    return `${relativeToRoot(layout, henchConfigPath(layout))} still names rexDir ${henchConfig.rexDir}`;
+  }
 
   if (validateBefore === null) return null;
   const validateAfter = await captureValidate(root, deps);

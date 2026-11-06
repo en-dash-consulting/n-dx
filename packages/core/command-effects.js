@@ -223,6 +223,7 @@ export const COMMAND_EFFECTS = {
     writes: [
       { path: ".ndx/", what: "the moved tool directories and config" },
       { path: ".gitignore, .gitattributes", what: "rewritten path patterns" },
+      { path: "{hench}/config.json", what: "rexDir pointed at the new rex dir", conditional: true, when: "when it holds the legacy default .rex" },
       { path: "git commits", what: "the move", conditional: true, when: "without --no-commit" },
     ],
     llm: [],
