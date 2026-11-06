@@ -91,6 +91,12 @@ describe("buildPairReviewBrief", () => {
     expect(buildPairReviewBrief(ctx())).not.toContain("inbox");
   });
 
+  it("says a capture lands as an Inbox change on a v2 tree", () => {
+    const v2 = buildPairReviewBrief(ctx({ prdTreeDir: ".rex/changes/", inboxDir: ".rex/changes/inbox/" }));
+    expect(v2).toContain("Capture as a change (it lands in the Inbox) with `add_item`");
+    expect(v2).not.toContain("Capture as a PRD task");
+  });
+
   it("shares the report schema with the self brief", () => {
     const pair = buildPairReviewBrief(ctx());
     const self = buildReviewBrief({

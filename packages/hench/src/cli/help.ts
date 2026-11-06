@@ -41,10 +41,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "builds a brief, and runs an autonomous agent loop using Claude. The agent\n" +
       "can read/write files, run commands, and update task status.",
     options: [
-      { flag: "--task=<id>", description: "Target a specific Rex task ID" },
+      { flag: "--task=<id>", description: "Target a specific Rex task or a change that runs as one task, by ID" },
       { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
       { flag: "--epic-by-epic", description: "Process epics sequentially, advancing when done" },
       { flag: "--mine", description: "Only pick tasks whose assignee matches the current user (resolved from git identity, like lastModifiedBy). Filters both autoselection and the interactive menu; an explicit --task bypasses it. Refused with --epic-by-epic, which cannot filter by assignee." },
+      { flag: "--tags=<a,b>", description: "Only pick tasks carrying at least one of these tags" },
       { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially (e.g. --iterations=5)" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },

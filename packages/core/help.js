@@ -1022,9 +1022,11 @@ const ORCHESTRATOR_HELP_DEFS = {
     description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude',\n'ndx config llm.vendor codex', or 'ndx config llm.vendor local' before using this command.",
     usage: "ndx work [options] [dir]",
     options: [
-      { flag: "--task=<id>", description: "Target a specific Rex task ID" },
+      { flag: "--task=<id>", description: "Target a specific Rex task or a change that runs as one task, by ID" },
       { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
       { flag: "--epic-by-epic", description: "Process epics sequentially" },
+      { flag: "--mine", description: "Only pick tasks whose assignee matches the current user (resolved from git identity). An explicit --task bypasses it. Refused with --epic-by-epic" },
+      { flag: "--tags=<a,b>", description: "Only pick tasks carrying at least one of these tags" },
       { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },

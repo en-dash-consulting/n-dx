@@ -62,6 +62,10 @@ async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<st
   const completed = completedWorkIds(tree);
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
   const next = findNextWorkTask(tree, { excludeIds });
+  if (!next && tree.changes.length === 0 && flags.format !== "json") {
+    result("No changes in PRD. Run: rex add --title=\"...\" " + dir);
+    return;
+  }
   if (!next) return printNoneLeft(skippedClaimed, flags);
   printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id }, true);
 }
