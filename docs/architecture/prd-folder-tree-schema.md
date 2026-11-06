@@ -100,7 +100,7 @@ a status-only change does not rewrite the node's Markdown.
 | Execution | `status`, `startedAt`, `completedAt`, `endedAt`, `activeIntervals`, `failureReason`, `resolutionType`, `resolutionDetail` |
 | Product evidence | `metAt`, `revisedAt`, `reviewedHash`, `checks` |
 | Change evidence | `appliedAt`, `appliedAmendsHash`, `shippedIn`, `prs`, `issues` |
-| Bookkeeping | `assignee`, `ready`, `needsPlacement`, `lastModified`, `lastModifiedBy`, reserved `links` |
+| Bookkeeping | `assignee`, `ready`, `needsPlacement`, `createdAt` (changes; stamped once on first write, absent on changes recorded before it), `lastModified`, `lastModifiedBy`, reserved `links` |
 
 The work statuses are `pending`, `in_progress`, `completed`, `failing`,
 `deferred`, `blocked`, `cancelled` and `deleted`. Product status and health

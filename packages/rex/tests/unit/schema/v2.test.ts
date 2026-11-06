@@ -426,10 +426,17 @@ describe("field coverage (design intent/state tables)", () => {
       "failureReason", "resolutionType", "resolutionDetail",
       "metAt", "revisedAt", "reviewedHash", "checks",
       "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "links",
-      "assignee", "ready", "needsPlacement",
+      "assignee", "ready", "needsPlacement", "createdAt",
       "lastModified", "lastModifiedBy",
     ];
     for (const f of STATE) expect(ItemStateSchema.shape, f).toHaveProperty(f);
+  });
+
+  it("the schema doc's state table names every state field", () => {
+    // The PRD schema is a soft-frozen surface: a state field the doc does not name is an undocumented contract change.
+    const doc = readFileSync(join(import.meta.dirname, "../../../../../docs/architecture/prd-folder-tree-schema.md"), "utf8");
+    const table = doc.slice(doc.indexOf("| State | Fields |"), doc.indexOf("The work statuses are"));
+    for (const f of Object.keys(ItemStateSchema.shape)) expect(table, f).toContain(`\`${f}\``);
   });
 });
 
