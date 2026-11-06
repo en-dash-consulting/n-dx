@@ -14,7 +14,14 @@ items:
     lastModified: "2026-11-06T00:14:25.390Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b4233b1-cb6a-4b38-a21b-7d0143d48bd4":
-    lastModified: "2026-11-06T00:14:11.220Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:48:25.389Z"
+    completedAt: "2026-11-06T03:02:09.336Z"
+    endedAt: "2026-11-06T03:02:09.336Z"
+    activeIntervals: [{"end":"2026-11-06T03:02:09.336Z","start":"2026-11-06T02:48:25.389Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Pre-run gate and --resolve split dirty files into n-dx planning files (PLANNING_PATHS: rex bookkeeping in both layouts + .n-dx.json/.ndx/config.json; hench dir excluded) and the rest. Planning-only trees get one pathspec-scoped commit (chore(prd): commit planning changes before run, N-DX-Item from --task) and start; otherwise refusal lists only non-planning files. --resolve reports workspace.planningCommit plus a planning-commit warning."
+    lastModified: "2026-11-06T03:02:09.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b1ae4664-1c13-4283-819c-87ac77e7fbb2":
     status: "completed"

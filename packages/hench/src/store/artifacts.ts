@@ -49,6 +49,7 @@ import {
   LOCKS_DIRNAME,
   PLANNING_PATHS,
   RECOVERY_DIRNAME,
+  REX_MACHINE_LOCAL_PATHS,
   REVIEWS_DIRNAME,
   RUNS_DIRNAME,
   stateDirNameUnder,
@@ -313,7 +314,10 @@ export async function excludeHenchRuntimeArtifacts(
 export interface PlanningSplit {
   /** Repository-relative paths of dirty planning files, as git reported them. */
   planning: string[];
-  /** The remaining porcelain lines: work the pre-run gate still refuses on. */
+  /**
+   * The remaining porcelain lines, less rex's machine-local files
+   * (`REX_MACHINE_LOCAL_PATHS`): work the pre-run gate still refuses on.
+   */
   other: string[];
 }
 
@@ -338,6 +342,8 @@ export async function splitPlanningPaths(
   for (const line of porcelainLines) {
     const path = parsePorcelainPath(line);
     const source = renameSource(line);
+    // Rex's locks, backups and derived cache: neither committed nor refused on.
+    if (source === undefined && matchesProjectPath(path, REX_MACHINE_LOCAL_PATHS, prefix)) continue;
     if (isPlanning(path) && (source === undefined || isPlanning(source))) split.planning.push(path);
     else split.other.push(line);
   }

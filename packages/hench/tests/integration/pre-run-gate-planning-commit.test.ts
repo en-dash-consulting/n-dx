@@ -87,6 +87,31 @@ describe("pre-run commit gate: n-dx planning files", () => {
     expect(await git("status", "--porcelain")).toBe("");
   });
 
+  it("never commits rex's locks, backups or derived cache", async () => {
+    // Untracked on a project that skipped the hand-pasted ndx.gitignore block.
+    await put(".rex/changes/ch/state.yaml", "status: in_progress\n");
+    await put(".rex/prd.lock", "{}\n");
+    await put(".rex/.backups/prd_tree_2026/index.md", "# copy of the PRD\n");
+    await put(".ndx/rex/.cache/prd.json", "{}\n");
+
+    expect(await gate()).toBe("proceed");
+
+    expect(await git("show", "--name-only", "--format=", "HEAD")).toBe(".rex/changes/ch/state.yaml");
+    const left = await git("status", "--porcelain", "--untracked-files=all");
+    expect(left).toContain(".rex/prd.lock");
+    expect(left).toContain(".rex/.backups/");
+    expect(left).toContain(".ndx/rex/.cache/prd.json");
+  });
+
+  it("starts without a commit when only rex's machine-local files are dirty", async () => {
+    await put(".rex/prd.lock", "{}\n");
+    const before = await git("rev-parse", "HEAD");
+
+    expect(await gate()).toBe("proceed");
+
+    expect(await git("rev-parse", "HEAD")).toBe(before);
+  });
+
   it("refuses when an app file is also dirty, naming only the non-planning files", async () => {
     await put(".rex/changes/ch/state.yaml", "status: in_progress\n");
     await put(".ndx/config.json", "{}\n");

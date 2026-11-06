@@ -2110,6 +2110,8 @@ export const PLANNING_COMMIT_SUBJECT = "chore(prd): commit planning changes befo
  *   when selection has not picked one yet.
  */
 async function commitPlanningChanges(projectDir: string, paths: string[], itemId?: string): Promise<void> {
+  // No paths would mean a bare `git commit`, which takes the whole index.
+  if (paths.length === 0) throw new Error("no planning files to commit");
   const pathspecs = paths.map((path) => `:(top,literal)${path}`);
   await execGitMutation(projectDir, ["add", "--", ...pathspecs], 30_000);
   const trailers = [
@@ -3120,6 +3122,9 @@ export async function performPreRunCommitGateIfNeeded(
   if (!allowDirty) {
     const split = await (deps.splitPlanning ?? splitPlanningPaths)(allDirty, projectDir);
     if (split.other.length === 0) {
+      // Only rex's machine-local files: nothing to commit, and an empty
+      // pathspec list would make `git commit` take the whole index.
+      if (split.planning.length === 0) return "proceed";
       return commitPlanningBeforeRun(projectDir, split.planning, opts, deps.commitPlanning ?? commitPlanningChanges, checkOrigin);
     }
     dirty = split.other;
