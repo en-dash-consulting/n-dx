@@ -30,6 +30,8 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function TaskProgress({ change }: { change: ChangeRow }) {
+  // The server flags a task-less change rex selects as one unit; a container is not one.
+  if (change.runsAsOneTask) return h("span", { class: "ch-progress ch-progress-empty" }, "runs as one task");
   if (change.taskCount === 0) return h("span", { class: "ch-progress ch-progress-empty" }, "no tasks");
   return h("span", { class: "ch-progress" },
     `${change.completedTaskCount}/${change.taskCount} tasks`);

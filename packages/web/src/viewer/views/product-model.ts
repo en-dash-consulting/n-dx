@@ -222,6 +222,8 @@ export interface ChangeRow {
   touches: TouchedNode[];
   taskCount: number;
   completedTaskCount: number;
+  /** No live tasks and no nested change: `ndx work` runs the change as one unit. */
+  runsAsOneTask?: boolean;
   /** No acceptance criteria on the change, or on one of its open tasks. */
   criteriaGap: boolean;
   /** Distinct blockers, on the change or its open tasks, that are not completed. */

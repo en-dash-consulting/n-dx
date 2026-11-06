@@ -44,6 +44,7 @@ import {
   ProductEditError,
   withPrdModelTransaction,
   findNextWorkTask,
+  changeWorkShape,
   openClaimsStore,
   resolveClaimHolder,
   computeEdges,
@@ -134,6 +135,8 @@ export interface ChangeRowWire {
   touches: Array<{ id: string; title: string }>;
   taskCount: number;
   completedTaskCount: number;
+  /** No live tasks and no nested change: `ndx work` runs the change as one unit (rex's `changeWorkShape`). */
+  runsAsOneTask?: boolean;
   /** No acceptance criteria on the change, or on one of its open tasks. */
   criteriaGap: boolean;
   /** Distinct blockers, on the change or its open tasks, that are not completed. */
@@ -671,6 +674,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         touches: (change.touches ?? []).map((ref) => titleOf(index, ref)),
         taskCount: tasks.length,
         completedTaskCount: tasks.filter((t) => t.status === "completed").length,
+        ...(changeWorkShape(change) === "unit" ? { runsAsOneTask: true } : {}),
         ...gapOf(index, change, tasks),
         ...(areas ? { areas } : {}),
       };

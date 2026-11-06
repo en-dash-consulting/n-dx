@@ -116,6 +116,11 @@ export interface PRDItemData {
   appliedAt?: string;
   /** v2 change: the release that shipped it. */
   shippedIn?: string;
+  /**
+   * v2 change with no tasks: `ndx work` runs it as one unit. Computed by the
+   * server from rex's selection rule (`runnable-units.ts`); never stored.
+   */
+  runsAsOneTask?: boolean;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.branch */
   branch?: string | null;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.sourceFile */

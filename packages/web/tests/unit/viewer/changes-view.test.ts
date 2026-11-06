@@ -173,6 +173,19 @@ describe("ChangesView", () => {
     expect(change?.textContent).toContain("Placement engine for changes");
   });
 
+  it("reads runs as one task for a change the server flags, and no tasks for one it does not", () => {
+    const row = (id: string, extra: Partial<ChangeRow>): ChangeRow => ({
+      id, title: id, stage: "proposed", plannedRelease: "2.0.0", amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+      criteriaGap: false, openBlockers: 0, ...extra,
+    });
+    const el = mount(h(ChangesView, {
+      changes: [row("solo", { runsAsOneTask: true }), row("container", {})],
+    }));
+    pick(el, "release:2.0.0");
+    expect(el.querySelector('[data-change-id="solo"] .ch-progress')?.textContent).toBe("runs as one task");
+    expect(el.querySelector('[data-change-id="container"] .ch-progress')?.textContent).toBe("no tasks");
+  });
+
   it("labels an awaiting-apply change as waiting for a steward, between in-progress and applied", () => {
     const row = (id: string, stage: ChangeRow["stage"]): ChangeRow => ({
       id, title: id, stage, plannedRelease: "2.0.0", amends: [], touches: [], taskCount: 0, completedTaskCount: 0,

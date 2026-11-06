@@ -59,6 +59,20 @@ describe("Rex item routes on a v2 project", () => {
   const send = (method: string, path: string, body: unknown) =>
     fetch(`${base}/${path}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
+  it("GET /prd marks a task-less change runsAsOneTask, never a change with tasks, and writes nothing back", async () => {
+    const created = await (await send("POST", "items", { title: "Solo change", touches: [CAPABILITY_ID] })).json();
+    refreshPRDCache(rexDir, await (await resolveStore(rexDir)).loadDocument());
+
+    const doc = await (await fetch(`${base}/prd`)).json();
+    const solo = findItem(doc.items, created.id)?.item as PRDItem & { runsAsOneTask?: boolean };
+    const withTasks = findItem(doc.items, CHANGE_ID)?.item as PRDItem & { runsAsOneTask?: boolean };
+    expect(solo.runsAsOneTask).toBe(true);
+    expect(withTasks).not.toHaveProperty("runsAsOneTask");
+    // Derived on the way out: neither the cache nor the store carries it.
+    expect(readFileSync(join(rexDir, ".cache", "prd.json"), "utf-8")).not.toContain("runsAsOneTask");
+    expect(await (await resolveStore(rexDir)).getItem(created.id)).not.toHaveProperty("runsAsOneTask");
+  });
+
   it("POST /items creates an Inbox change without a level", async () => {
     const res = await send("POST", "items", { title: "Support gift cards", description: "Shoppers ask for them." });
     expect(res.status).toBe(201);
