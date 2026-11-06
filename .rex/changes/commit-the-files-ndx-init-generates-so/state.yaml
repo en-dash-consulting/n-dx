@@ -8,5 +8,6 @@ items:
     activeIntervals: [{"end":"2026-11-04T17:46:47.551Z","start":"2026-11-04T17:46:30.656Z"},{"end":"2026-11-06T05:39:03.124Z","start":"2026-11-06T05:38:47.379Z"}]
     appliedAt: "2026-11-06T05:39:03.124Z"
     appliedAmendsHash: "74961cf9f2a5298253724115291670576c6330247cd5ece925daa173f276bb80"
+    shippedIn: "0.10.3"
     lastModified: "2026-11-06T05:39:03.124Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

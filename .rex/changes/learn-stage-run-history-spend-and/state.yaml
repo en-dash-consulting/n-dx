@@ -154,5 +154,6 @@ items:
     activeIntervals: [{"end":"2026-11-05T10:23:51.232Z","start":"2026-11-05T10:23:51.232Z"}]
     appliedAt: "2026-11-05T10:23:51.232Z"
     appliedAmendsHash: "69dfc2a24996d74ab48551b74ab507ef5553bbc1192cdc06420ed05b8490aebb"
+    shippedIn: "0.10.3"
     lastModified: "2026-11-05T10:23:51.232Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

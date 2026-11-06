@@ -8,6 +8,7 @@ items:
     activeIntervals: [{"end":"2026-11-05T09:37:11.545Z","start":"2026-11-05T09:37:11.545Z"}]
     appliedAt: "2026-11-05T09:37:11.545Z"
     appliedAmendsHash: "8308e037dcbcaef27259e258eb9663609a1e7d236f23ff866ad265cb0aec61d7"
+    shippedIn: "0.10.3"
     issues: ["https://www.notion.so/3f7a80b7192481948d5cc046d3a68c0a","https://www.notion.so/3f7a80b71924818487c7f0e1c2d5db03","https://www.notion.so/3f7a80b719248147aad1d64b44332ec6","https://www.notion.so/3f7a80b7192481b18321d6a2f010c472","https://www.notion.so/3f7a80b71924810aa352f54b4bbead6e"]
     lastModified: "2026-11-05T09:37:11.545Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

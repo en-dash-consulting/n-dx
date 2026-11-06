@@ -38,6 +38,7 @@ items:
     activeIntervals: [{"end":"2026-11-02T23:52:22.527Z","start":"2026-11-02T23:52:22.527Z"}]
     appliedAt: "2026-11-02T23:52:22.527Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
     issues: ["https://www.notion.so/3f7a80b7192481a09ce5d406106f8408","https://www.notion.so/3f7a80b71924816794b4d9312cd470ed"]
     lastModified: "2026-11-02T23:52:22.527Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

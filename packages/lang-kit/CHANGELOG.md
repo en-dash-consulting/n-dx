@@ -1,5 +1,13 @@
 # @n-dx/lang-kit
 
+## 0.10.3
+
+### Patch Changes
+
+- [#909](https://github.com/en-dash-consulting/n-dx/pull/909) [`55d304a`](https://github.com/en-dash-consulting/n-dx/commit/55d304a06b9e7547490a64e91888a9c25ac64621) Thanks [@endash-shal](https://github.com/endash-shal)! - Resolve Java inherited member types, method references and visible wildcard imports; recognize interface entry points and additional JDK packages. Match Gradle type-safe project accessors to declared projects. Preserve Go workspace import resolution for oversized generated files and report discovery failures even when no build file was found. Reuse verified extracted grammar toolchains without keeping duplicate archives.
+
+- [#909](https://github.com/en-dash-consulting/n-dx/pull/909) [`c01c1cf`](https://github.com/en-dash-consulting/n-dx/commit/c01c1cfdd02e8140e19816cdc7532a14536b691d) Thanks [@endash-shal](https://github.com/endash-shal)! - Use the shared Go module parser in Rex, and honor workspace replacement precedence against the originally required version.
+
 ## 0.10.2
 
 ### Patch Changes
