@@ -145,6 +145,7 @@ function Constraints({ constraints }: { constraints: ConstraintRow[] }) {
           h("th", null, "Constraint"),
           h("th", null, "Health"),
           h("th", null, "Applies to"),
+          h("th", null, "Open changes"),
         ),
       ),
       h("tbody", null,
@@ -165,6 +166,7 @@ function Constraints({ constraints }: { constraints: ConstraintRow[] }) {
                 ? h("span", { class: "tag" }, "all product nodes")
                 : constraint.appliesTo.map((title) => h("span", { key: title, class: "tag" }, title)),
             ),
+            h("td", { class: "pm-cell-overlays" }, h(OverlayList, { changes: constraint.openChanges })),
           ),
         ),
       ),
