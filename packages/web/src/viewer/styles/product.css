@@ -891,7 +891,9 @@
 .placing-map .pam { padding: 0; }
 
 /* Candidate homes are lit; blocks sharing words are near; every other block steps back. */
-.pam-placing .pam-block:not(.pam-lit):not(.pam-near) { opacity: 0.45; }
+.pam-placing .pam-block:not(.pam-lit):not(.pam-near):not(.pam-ghost) { opacity: 0.45; }
+/* A proposed capability: dashed and unfilled, on the map before it exists. */
+.pam-block.pam-ghost { border: 2px dashed var(--accent); background: transparent; cursor: default; }
 .pam-block.pam-lit { box-shadow: 0 0 0 2px var(--accent); }
 .pam-block.pam-near { outline: 1px dashed var(--accent); outline-offset: -3px; }
 .pam-lit-note { color: var(--accent); font-size: var(--font-sm); font-weight: 600; }

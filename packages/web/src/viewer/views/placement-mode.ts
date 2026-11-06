@@ -22,7 +22,9 @@
  * edits survive the move. Blocks off the shortlist dim, except those sharing
  * words with the change, which are marked near. While the panel's card
  * amends a capability, its block shows the criteria count the amendment
- * would leave ("12 → 13").
+ * would leave ("12 → 13"). "Nothing fits" swaps the card for the proposal
+ * form and draws a dashed ghost block in the area the form names, titled as
+ * the form is; blocks sharing words with that title stay marked near.
  *
  * @module viewer/views/placement-mode
  */
@@ -38,6 +40,7 @@ import {
   pendingCriteriaNote,
   strongUntiedPick,
   type PendingCriteria,
+  type ProposalGhost,
   type PlacementTarget,
 } from "../components/prd-tree/change-placement.js";
 import { StrengthChip } from "../components/index.js";
@@ -193,7 +196,7 @@ function AreaLevel({ map, groups, onZoom }: { map: ProductMap; groups: readonly 
  * The zoomed area's spec map: its candidates lit with their rank, blocks
  * sharing words with the change marked near, and the panel's pick selected.
  */
-function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, onSelect }: {
+function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, ghost, onSelect }: {
   slug: string;
   group: AreaCandidates | undefined;
   tied: boolean;
@@ -202,6 +205,8 @@ function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, onSele
   selectedId: string | null;
   /** The panel's amendment, shown on its block as the criteria count it would leave. */
   pending: PendingCriteria | null;
+  /** The proposal form's capability, drawn as a ghost block when it is proposed under this area. */
+  ghost: { title: string } | null;
   onSelect: (row: CapabilityRow, areaTitle: string) => void;
 }) {
   const load = useProductRead(`/api/rex/product/area/${encodeURIComponent(slug)}`, (body) => body.area as AreaDetail);
@@ -214,6 +219,7 @@ function ZoomedArea({ slug, group, tied, changeText, selectedId, pending, onSele
     capabilities,
     constraints,
     selectedId,
+    ghost,
     pending: amended && pending ? { id: amended.id, note: pendingCriteriaNote(amended.criteriaCount, pending.delta) } : null,
     onSelect: (id: string) => {
       const row = capabilities.find((c) => c.id === id);
@@ -281,6 +287,11 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   const [selection, setSelection] = useState<PlacementTarget | null>(null);
   // The panel's amendment, for the selected block's pending criteria count.
   const [pending, setPending] = useState<PendingCriteria | null>(null);
+  // The capability the proposal form would add, while Nothing fits has it open.
+  const [ghost, setGhost] = useState<ProposalGhost | null>(null);
+  const ghostArea = map && ghost ? map.areas.find((a) => a.id === ghost.under) : undefined;
+  // The ghost lives in the area the form names: choosing another area moves the map, and the ghost, there.
+  useEffect(() => { if (ghostArea) setZoom(ghostArea.slug); }, [ghostArea?.slug]);
   /** A pick from the panel, a chip or a block: select it and move the map to its area. */
   const choose = (target: PlacementTarget) => {
     setSelection(target);
@@ -343,9 +354,11 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
               slug: zoom,
               group: groups.find((g) => g.area.slug === zoom),
               tied: !!placement?.tied,
-              changeText: shown.change.title,
+              // The title the proposal is typing, so near-duplicates stay in view.
+              changeText: ghost?.title ?? shown.change.title,
               selectedId,
               pending,
+              ghost: ghost && ghostArea?.slug === zoom ? { title: ghost.title } : null,
               onSelect: (row: CapabilityRow, areaTitle: string) => choose(targetOfRow(row, areaTitle, shortlist)),
             })
           : null,
@@ -360,6 +373,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
           selection,
           onChoose: choose,
           onPendingCriteria: setPending,
+          onGhost: setGhost,
         })),
     ),
   );

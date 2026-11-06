@@ -190,6 +190,7 @@ function serve(changes: ChangeRow[], shortlists: ChangePlacement[], check?: Chec
     "/api/rex/changes/placements": { layout: "v2", placements: Object.fromEntries(shortlists.map((p) => [p.change.id, p])) },
     ...Object.fromEntries(MAP.areas.map((a) => [`/api/rex/product/area/${a.slug}`, { layout: "v2", area: areaDetail(a.slug) }])),
     ...Object.fromEntries(changes.map((c) => [`/api/rex/changes/${c.id}/place`, { relation: "touches" }])),
+    ...Object.fromEntries(changes.map((c) => [`/api/rex/changes/${c.id}/propose`, { proposed: { type: "capability", title: "Gift receipts" } }])),
   };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (check && url.endsWith("/placement/check")) {
@@ -429,6 +430,93 @@ describe("PlacementMode", () => {
     expect(gift.classList.contains("pam-near")).toBe(true);
     expect(gift.querySelector(".pam-near-note")?.textContent).toBe("near · gift");
     expect(gift.getAttribute("aria-label")).toContain("; near · gift");
+  });
+
+  describe("Nothing fits (WF6)", () => {
+    const ghost = () => $$('.pam-block[data-ghost="true"]');
+    const near = () => $$(".pam-block.pam-near").map((el) => el.dataset.block);
+    async function type(sel: string, value: string, event = "input"): Promise<void> {
+      await act(async () => {
+        const el = $<HTMLInputElement>(sel)!;
+        el.value = value;
+        el.dispatchEvent(new Event(event, { bubbles: true }));
+      });
+      await settle();
+    }
+    async function nothingFits(): Promise<void> {
+      await act(async () => { $<HTMLButtonElement>(".cp-nothing-fits")!.click(); });
+      await settle();
+    }
+
+    it("shows the proposal form and a dashed ghost block, titled as the form is, in the chosen area", async () => {
+      serve([change("a", { title: "Print gift receipts" })], [placement("a", [candidate("cap-label", { score: 9 })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect(ghost()).toHaveLength(0);
+      await nothingFits();
+      expect($(".placing-panel .cp-propose")).not.toBeNull();
+      // No area chosen yet: nowhere to draw it.
+      expect(ghost()).toHaveLength(0);
+
+      const under = $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
+      await act(async () => { under.value = "area-pay"; under.dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      // The map moved to Payments, and the ghost wears the change's title until one is typed.
+      expect(crumb()).toEqual(["Plan", "Product map", "Payments"]);
+      expect(ghost().map((el) => el.querySelector(".pam-label")?.textContent)).toEqual(["Print gift receipts"]);
+      expect(ghost()[0]!.getAttribute("aria-label")).toBe("Proposed capability: Print gift receipts");
+
+      await type('.cp-propose input[type="text"]', "Refund to wallet");
+      expect(ghost().map((el) => el.querySelector(".pam-label")?.textContent)).toEqual(["Refund to wallet"]);
+
+      // Another area moves the ghost.
+      await act(async () => { under.value = "area-tax"; under.dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      expect(crumb()).toEqual(["Plan", "Product map", "Tax"]);
+      expect(ghost()).toHaveLength(1);
+      expect($('.pam-block[data-block="cap-vat"]')).not.toBeNull();
+    });
+
+    it("keeps blocks sharing words with the title lit as it is typed", async () => {
+      serve([change("a", { title: "Handle taxes" })], [placement("a", [candidate("cap-label", { score: 9 })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await nothingFits();
+      const under = $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
+      await act(async () => { under.value = "area-pay"; under.dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      expect(near()).toEqual([]);
+      await type('.cp-propose input[type="text"]', "Gift card refunds");
+      expect(near().sort()).toEqual(["cap-gift", "cap-refund"]);
+    });
+
+    it("proposes through /propose and clears the ghost after the write", async () => {
+      serve([change("a")], [placement("a", [candidate("cap-label", { score: 9 })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await nothingFits();
+      const under = $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
+      await act(async () => { under.value = "area-pay"; under.dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      expect(ghost()).toHaveLength(1);
+      await act(async () => { $<HTMLButtonElement>(".cp-propose-btn")!.click(); });
+      await settle();
+      const fetched = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls as Array<[string, RequestInit?]>;
+      const propose = fetched.find(([url]) => url === "/api/rex/changes/a/propose");
+      expect(propose?.[1]?.method).toBe("POST");
+      expect(JSON.parse(String(propose?.[1]?.body))).toMatchObject({ type: "capability", under: "area-pay" });
+      expect(ghost()).toHaveLength(0);
+    });
+
+    it("clears the ghost when the form goes back to the shortlist", async () => {
+      serve([change("a")], [placement("a", [candidate("cap-label", { score: 9 })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await nothingFits();
+      const under = $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
+      await act(async () => { under.value = "area-ship"; under.dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      expect(ghost()).toHaveLength(1);
+      await act(async () => { $<HTMLButtonElement>(".cp-back")!.click(); });
+      await settle();
+      expect(ghost()).toHaveLength(0);
+    });
   });
 
   describe("an amendment edited in the card (WF5)", () => {

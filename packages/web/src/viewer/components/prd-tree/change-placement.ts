@@ -538,6 +538,14 @@ interface PlaceFormProps {
   onPendingCriteria?: (pending: PendingCriteria | null) => void;
 }
 
+/** The capability the proposal form would add, as the spec map draws it: a dashed ghost block in `under`'s area. */
+export interface ProposalGhost {
+  /** What the form's title says; the change's own title while it is empty. */
+  title: string;
+  /** The area id chosen in the form; empty until one is chosen. */
+  under: string;
+}
+
 /** An amendment's effect on its target's criteria count, for the selected block. */
 export interface PendingCriteria {
   target: string;
@@ -783,9 +791,11 @@ interface ProposeFormProps {
   draftEnabled: boolean;
   /** A draft the shortlist's "Draft with the model" brought here: the form opens filled with it. */
   drafted?: PlacementDraft | null;
+  /** Reports the capability being proposed as the form changes; null for a constraint and once the form closes. */
+  onGhost?: (ghost: ProposalGhost | null) => void;
 }
 
-function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted }: ProposeFormProps) {
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost }: ProposeFormProps) {
   const initial = drafted?.proposal;
   const [type, setType] = useState<"capability" | "constraint">(initial?.type ?? "capability");
   const [under, setUnder] = useState(initial?.under ?? "");
@@ -799,6 +809,10 @@ function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed
   );
   const draft = useDraft(changeId);
   const areas = map?.areas ?? [];
+
+  // The form closing, by Back or by a write, clears the ghost.
+  useEffect(() => { onGhost?.(type === "capability" ? { title: title.trim() || changeTitle, under } : null); }, [type, title, under]);
+  useEffect(() => () => onGhost?.(null), []);
 
   const askModel = async () => {
     setDraftNote(null);
@@ -901,6 +915,8 @@ export interface ChangePlacementSectionProps {
   onChoose?: (t: PlacementTarget) => void;
   /** Reports how the wide card's amendment moves its target's criteria count; null when nothing is amended. */
   onPendingCriteria?: (pending: PendingCriteria | null) => void;
+  /** Reports the capability the proposal form would add, so the map can draw it as a ghost block. */
+  onGhost?: (ghost: ProposalGhost | null) => void;
 }
 
 /** What the section shows after a write, until the change's next read. */
@@ -913,7 +929,7 @@ interface Written {
  * The placement section of a change's detail panel. Key it by change id:
  * its state belongs to one change.
  */
-export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria }: ChangePlacementSectionProps) {
+export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
   const [proposing, setProposing] = useState(false);
@@ -1027,7 +1043,7 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       propose: {
         changeId, changeTitle, hasNext: position.next !== null,
         onProposed, onBack: () => setProposing(false),
-        draftEnabled, drafted,
+        draftEnabled, drafted, onGhost,
       },
     }),
   );
