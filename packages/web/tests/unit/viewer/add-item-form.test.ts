@@ -191,6 +191,74 @@ describe("AddItemForm", () => {
     expect(fieldError?.textContent).toContain("Title is required");
   });
 
+  describe("done when and tags", () => {
+    function type(el: HTMLInputElement, value: string) {
+      act(() => {
+        el.value = value;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+
+    function setup() {
+      const onSubmit = vi.fn().mockResolvedValue(undefined);
+      const root = renderToDiv(h(AddItemForm, { allItems: sampleItems, onSubmit, onCancel: vi.fn() }));
+      const input = (id: string) => root.querySelector(`#${id}`) as HTMLInputElement;
+      const addCriterion = (text: string) => {
+        type(input("add-form-criterion"), text);
+        act(() => {
+          (root.querySelector(".rex-add-form-criterion-add") as HTMLButtonElement).click();
+        });
+      };
+      const submit = async () => {
+        act(() => {
+          (root.querySelector("form") as HTMLFormElement).dispatchEvent(new Event("submit", { bubbles: true }));
+        });
+        await flush();
+      };
+      return { root, onSubmit, input, addCriterion, submit };
+    }
+
+    it("creates the item with its acceptance criteria and tags", async () => {
+      const { onSubmit, input, addCriterion, submit } = setup();
+      type(input("add-form-title"), "Ship it");
+      addCriterion("Form sends criteria");
+      addCriterion("Form sends tags");
+      // Typed but not yet added: still sent.
+      type(input("add-form-criterion"), "Pending line");
+      type(input("add-form-tags"), " ui, sidecar ,ui,, ");
+      await submit();
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][0]).toMatchObject({
+        title: "Ship it",
+        acceptanceCriteria: ["Form sends criteria", "Form sends tags", "Pending line"],
+        tags: ["ui", "sidecar"],
+      });
+    });
+
+    it("removes a criterion from the list before it is sent", async () => {
+      const { root, onSubmit, input, addCriterion, submit } = setup();
+      type(input("add-form-title"), "Ship it");
+      addCriterion("keep");
+      addCriterion("drop");
+      const remove = root.querySelectorAll(".rex-add-form-criterion-remove")[1] as HTMLButtonElement;
+      act(() => { remove.click(); });
+      await submit();
+
+      expect(onSubmit.mock.calls[0][0].acceptanceCriteria).toEqual(["keep"]);
+    });
+
+    it("omits criteria and tags when none are given", async () => {
+      const { onSubmit, input, submit } = setup();
+      type(input("add-form-title"), "Bare");
+      await submit();
+
+      const sent = onSubmit.mock.calls[0][0];
+      expect(sent.acceptanceCriteria).toBeUndefined();
+      expect(sent.tags).toBeUndefined();
+    });
+  });
+
   it("type level buttons have aria-pressed attributes", () => {
     const root = renderToDiv(
       h(AddItemForm, {
