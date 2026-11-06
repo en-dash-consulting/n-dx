@@ -1,7 +1,17 @@
 schema: "rex/v2"
 items:
   "3adf86fa-fa8e-4038-9b0c-b866f1281c4f":
-    lastModified: "2026-11-06T18:49:07.266Z"
+    status: "completed"
+    startedAt: "2026-11-06T18:49:17.105Z"
+    completedAt: "2026-11-06T18:52:24.092Z"
+    endedAt: "2026-11-06T18:52:24.092Z"
+    activeIntervals: [{"end":"2026-11-06T18:52:24.092Z","start":"2026-11-06T18:49:17.105Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "/api/hench/ready?all=1 returns the whole list in one pass; viewer makes one request."
+    lastModified: "2026-11-06T18:52:24.092Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5d477a38-78b5-4e60-8024-b00770b5cb34":
+    lastModified: "2026-11-06T18:51:48.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9f53670-8e31-4f3f-a630-786ca4800d3a":
     status: "completed"
@@ -24,5 +34,5 @@ items:
     lastModified: "2026-11-06T18:45:44.278Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fab17b38-480a-43f4-97d9-be9b8f77d45a":
-    lastModified: "2026-11-06T18:45:20.932Z"
+    lastModified: "2026-11-06T18:51:48.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

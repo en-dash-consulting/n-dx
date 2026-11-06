@@ -692,6 +692,15 @@ function readyLimit(url: string): number {
   return Math.min(READY_MAX_LIMIT, Math.max(1, n));
 }
 
+/**
+ * `all=1` asks for every row in one reply. Each request re-reads the claims
+ * store and every run record and reselects, so a client that wants the whole
+ * list pays for one pass, not one per {@link READY_MAX_LIMIT} rows.
+ */
+function readyAll(url: string): boolean {
+  return new URL(url, "http://localhost").searchParams.get("all") === "1";
+}
+
 /** The `offset` query parameter: a whole number from 0, else 0. */
 function readyOffset(url: string): number {
   const raw = new URL(url, "http://localhost").searchParams.get("offset");
@@ -740,8 +749,9 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     errorResponse(res, 404, "No PRD data found");
     return true;
   }
-  const limit = readyLimit(req.url ?? READY_PATH);
-  const offset = readyOffset(req.url ?? READY_PATH);
+  const all = readyAll(req.url ?? READY_PATH);
+  const limit = all ? Number.POSITIVE_INFINITY : readyLimit(req.url ?? READY_PATH);
+  const offset = all ? 0 : readyOffset(req.url ?? READY_PATH);
   const holder = resolveClaimHolder(ctx.projectDir);
   const foreign = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
   const liveTaskIds = new Set((await collectHeldRuns(ctx)).map((run) => run.taskId));
@@ -775,7 +785,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     };
   });
   // `dir` is what execute passes `ndx work`, so a copied command matches the run.
-  jsonResponse(res, 200, { tasks, limit, offset, total: picked.length, dir: ctx.projectDir });
+  jsonResponse(res, 200, { tasks, limit: all ? picked.length : limit, offset, total: picked.length, dir: ctx.projectDir });
   return true;
 }
 
