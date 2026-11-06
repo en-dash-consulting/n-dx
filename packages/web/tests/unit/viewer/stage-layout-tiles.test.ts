@@ -71,6 +71,12 @@ describe("Plan tiles before the first status", () => {
     mount();
     for (const v of V2_ONLY) expect(tiles()).toContain(v);
   });
+
+  it("shows the v2 tiles when status arrives with no PRD (no layout)", () => {
+    status = { rex: { exists: false } } as unknown as Pick<ProjectStatus, "rex">;
+    mount();
+    for (const v of V2_ONLY) expect(tiles()).toContain(v);
+  });
 });
 
 describe("Plan tiles across a failed status poll", () => {
