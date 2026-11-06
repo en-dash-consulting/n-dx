@@ -21,18 +21,25 @@ function shown(root: string, path: string): string {
 }
 
 /**
+ * The error a command reports when `rexDir` does not exist, else `undefined`.
+ *
  * @param root    Absolute project root.
  * @param rexDir  The resolved rex directory the command is about to read.
- * @throws {CLIError} When `rexDir` does not exist.
  */
-export function assertPrdFolderExists(root: string, rexDir: string): void {
-  if (existsSync(rexDir)) return;
+export function missingPrdFolderError(root: string, rexDir: string): CLIError | undefined {
+  if (existsSync(rexDir)) return undefined;
   const expected = resolveLayout(root).rexDir;
-  throw new CLIError(
+  return new CLIError(
     `No PRD folder at ${shown(root, rexDir)}.`,
     expected === rexDir
       ? `This project's layout keeps the PRD at ${shown(root, expected)}. Run "ndx init ." to create one.`
       : `This project's layout expects the PRD at ${shown(root, expected)}; hench's rexDir setting points elsewhere. ` +
         "Fix rexDir in the hench config, or remove it to follow the layout.",
   );
+}
+
+/** @throws {CLIError} When `rexDir` does not exist. */
+export function assertPrdFolderExists(root: string, rexDir: string): void {
+  const err = missingPrdFolderError(root, rexDir);
+  if (err) throw err;
 }

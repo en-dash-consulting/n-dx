@@ -27,7 +27,7 @@ import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
-import { assertPrdFolderExists } from "./prd-folder.js";
+import { missingPrdFolderError } from "./prd-folder.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
@@ -276,8 +276,10 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // (findV2Entry); the report and the claim check use the real id it names.
   let prdItems: PRDItem[] | null = null;
   let v2Tree: V2Tree | undefined;
-  try {
-    assertPrdFolderExists(dir, rexDir);
+  // A missing folder keeps its own hint: where the layout expects the PRD.
+  const missingFolder = missingPrdFolderError(dir, rexDir);
+  if (missingFolder) refuse("prd-unreadable", missingFolder);
+  else try {
     const store = await resolveStore(rexDir);
     prdItems = (await store.loadDocument()).items;
     v2Tree = await loadV2Tree(store);

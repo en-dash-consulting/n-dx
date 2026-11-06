@@ -10,6 +10,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cmdPlanQueue } from "../../src/cli/commands/plan-queue.js";
+import { resolveRun } from "../../src/cli/commands/run-resolve.js";
 import { DEFAULT_HENCH_CONFIG } from "../../src/schema/v1.js";
 import { cleanupProjectDir } from "../helpers/index.js";
 
@@ -40,6 +41,15 @@ describe("--plan-queue with no PRD folder", () => {
     expect(err?.message).toContain("No PRD folder at planning");
     expect(err?.message).not.toContain("v1");
     expect(err?.suggestion).toContain("expects the PRD at");
+  });
+});
+
+describe("--resolve with no PRD folder", () => {
+  it("refuses naming the folder and where the layout expects the PRD", async () => {
+    await setupHenchConfig("planning");
+    const refusal = (await resolveRun(root, { task: "anything" })).refusals.find((r) => r.code === "prd-unreadable");
+    expect(refusal?.message).toContain("No PRD folder at planning");
+    expect(refusal?.hint).toContain("expects the PRD at");
   });
 });
 
