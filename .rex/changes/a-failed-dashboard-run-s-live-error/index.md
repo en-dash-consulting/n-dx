@@ -10,6 +10,7 @@ acceptanceCriteria:
 touches:
   - "a6a5ac6a-ca47-435e-8749-91505acad43f"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"

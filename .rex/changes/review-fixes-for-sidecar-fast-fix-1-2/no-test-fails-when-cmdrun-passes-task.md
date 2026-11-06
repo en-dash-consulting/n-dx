@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "A hench test runs cmdRun with --task=CH-1 on a v2 repo with a dirty planning file and asserts the planning commit's N-DX-Item is the resolved task id"
   - "That test fails if cmdRun passes flags.task to the gate as typed"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
