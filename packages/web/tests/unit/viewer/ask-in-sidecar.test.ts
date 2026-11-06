@@ -92,22 +92,48 @@ describe("the lens an ask attaches", () => {
   const page = { view: "prd" as const, zone: null, taskId: null };
 
   it("asks about a task with Describe, or Diagnose run after a failed run", () => {
-    const item = pageItemFor({ ...page, ask: { kind: "task", ref: "T1", seq: 1 } });
+    const item = pageItemFor({ ...page, taskId: "T1", ask: { kind: "task", ref: "T1", seq: 1 } });
     expect(item).toMatchObject({ kind: "task", ref: "T1" });
     expect(wantedLensFor(item, false)).toBe("describe");
     expect(wantedLensFor(item, true)).toBe("diagnose-run");
   });
 
   it.each(["capability", "zone"] as const)("explains a %s", (kind) => {
-    const item = pageItemFor({ ...page, ask: { kind, ref: "X", seq: 1 } });
+    const item = pageItemFor({
+      ...page,
+      view: kind === "zone" ? "zones" : "product",
+      zone: kind === "zone" ? "X" : null,
+      capabilityId: kind === "capability" ? "X" : null,
+      ask: { kind, ref: "X", seq: 1 },
+    });
     expect(item).toMatchObject({ kind, ref: "X" });
     expect(resolveLens(wantedLensFor(item, false), REGISTRY, item).running).toBe("explain");
   });
 
   it("gives each click its own key, so a removed item is attached again", () => {
-    const first = pageItemFor({ ...page, ask: { kind: "zone", ref: "z1", seq: 1 } });
-    const second = pageItemFor({ ...page, ask: { kind: "zone", ref: "z1", seq: 2 } });
+    const zones = { ...page, view: "zones" as const, zone: "z1" };
+    const first = pageItemFor({ ...zones, ask: { kind: "zone", ref: "z1", seq: 1 } });
+    const second = pageItemFor({ ...zones, ask: { kind: "zone", ref: "z1", seq: 2 } });
     expect(first?.key).not.toBe(second?.key);
+  });
+});
+
+describe("an ask when the page moves to another item in the same view", () => {
+  it("attaches the newly opened task with its default lens, not the asked one", () => {
+    const ask = { kind: "task" as const, ref: "T1", seq: 1 };
+    const item = pageItemFor({ view: "prd", zone: null, taskId: "T2", ask });
+    expect(item).toMatchObject({ kind: "task", ref: "T2" });
+    expect(wantedLensFor(item, false)).toBe("describe");
+  });
+
+  it.each([
+    ["capability", { view: "product" as const, zone: null, taskId: null, capabilityId: "B" }],
+    ["zone", { view: "zones" as const, zone: "B", taskId: null }],
+  ] as const)("attaches the newly opened %s B, not the asked A", (kind, page) => {
+    const item = pageItemFor({ ...page, ask: { kind, ref: "A", seq: 1 } });
+    expect(item).toMatchObject({ kind, ref: "B" });
+    expect(wantedLensFor(item, false)).toBe("explain");
+    expect(item?.key).toBeUndefined();
   });
 });
 

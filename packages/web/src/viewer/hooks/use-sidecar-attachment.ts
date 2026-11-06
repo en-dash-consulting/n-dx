@@ -66,7 +66,7 @@ export interface SidecarPageSelection {
   inboxChangeId?: string | null;
   /**
    * "Ask Sidecar" / "Explain in Sidecar" on a task, capability or zone page:
-   * attaches that item with its kind's default lens. `seq` counts the clicks,
+   * attaches that item with its kind's default lens, until the page shows another item. `seq` counts the clicks,
    * so each one re-attaches an item the operator had removed.
    */
   ask?: { kind: "task" | "capability" | "zone"; ref: string; seq: number } | null;
@@ -84,6 +84,15 @@ export interface SidecarPageSelection {
   areaView?: { id: string; label: string; capabilityId: string | null } | null;
 }
 
+/** An ask holds only while the page still shows the item it was made on. */
+function askStillApplies(page: SidecarPageSelection, ask: { kind: "task" | "capability" | "zone"; ref: string }): boolean {
+  switch (ask.kind) {
+    case "task": return page.taskId === ask.ref;
+    case "zone": return page.zone === ask.ref;
+    case "capability": return page.capabilityId === ask.ref || page.areaView?.capabilityId === ask.ref;
+  }
+}
+
 /** The item the page is about; null when it is about none (Home, Files, …). */
 export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null {
   // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
@@ -92,7 +101,7 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   if (page.describeChangeId) {
     return { kind: "change", ref: page.describeChangeId, label: page.describeChangeId, lens: "describe", key: `describe:${page.describeChangeId}` };
   }
-  if (page.ask) {
+  if (page.ask && askStillApplies(page, page.ask)) {
     const { kind, ref, seq } = page.ask;
     return { kind, ref, label: ref, key: `ask:${kind}:${ref}:${seq}` };
   }
