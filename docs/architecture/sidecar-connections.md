@@ -124,7 +124,11 @@ untracked `.n-dx.local.json` only, as connections do:
   `run-failed-twice` is **blocked**, the rest are **move** on a linked item.
 - Every rule is `off` unless set. `dry-run` logs the would-be call and makes
   none. `on` makes a move through the connection service; create and blocked
-  are logged as a card instead, so a person decides.
+  are logged as a card instead, so a person decides. The one exception to
+  `off` is an explicit **Create in tracker** (`POST
+  /api/tracker/changes/:id/create`): it plans the create as if the rule were
+  `on`, so it raises the card whatever the create rule's mode. It makes no
+  tracker call until the card is approved.
 - Every call carries the profile's `requestIdProperty` set to
   `ndx:<project>:<rexId>:<event>`. A create reply, and any duplicate reply
   (`duplicate: true` or an `error` starting `duplicate`), is confirmed with the
@@ -216,6 +220,13 @@ Routes, governed by `web.sidecar`:
   event sources the last tick could not read, and the sync connection's state
   (`null` with no `trackerSync` connection). Live's Tracker activity section
   reads it while `web.sidecar` is on.
+- `POST /api/tracker/changes/:id/create` raises the create card for a change
+  on request, whatever the create rule's mode, and answers
+  `{ requestId, entry }`. It makes no tracker call and writes no PRD. A card
+  already waiting is returned as is; a dismissed one is raised again; a linked
+  change, or one already created, is refused with 409.
+- `GET /api/tracker/changes/:id/state` reads the change's work item state once
+  (see the tracker chip above): 409 when the change links to no work item.
 - `GET /api/tracker/cards/form?requestId=` answers `{ externalCall }`, the
   waiting card's call drawn as the C1 form (schema and picker choices).
 - `POST /api/tracker/cards/decide { requestId, action, args? }` decides a
