@@ -25,6 +25,7 @@ import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
   TaskBriefChangeSection,
+  TaskBriefWorkUnit,
   TaskBriefTask,
   TaskBriefParent,
   TaskBriefSibling,
@@ -430,6 +431,13 @@ function changeBriefSections(
   return sections.map(({ name, text }) => ({ name, text }));
 }
 
+/** What the run is for on a v2 tree: a task inside a change, or a task-less change that runs as one task. */
+function workUnitOf(tree: V2Tree, unitId: string): TaskBriefWorkUnit {
+  const unit = resolveWorkById(tree, unitId);
+  if (!unit) throw new Error(`Cannot brief ${unitId}: it is not a unit of work on this v2 tree.`);
+  return { kind: unit.kind === "change" ? "change" : "task", changeTitle: unit.change.title };
+}
+
 export async function assembleTaskBrief(
   store: PRDStore,
   taskId?: string,
@@ -487,7 +495,12 @@ export async function assembleTaskBrief(
   }));
 
   const brief: TaskBrief = {
-    ...(tree ? { changeBrief: changeBriefSections(tree, entry.item.id, recentLog) } : {}),
+    ...(tree
+      ? {
+          changeBrief: changeBriefSections(tree, entry.item.id, recentLog),
+          workUnit: workUnitOf(tree, entry.item.id),
+        }
+      : {}),
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),

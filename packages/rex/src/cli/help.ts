@@ -72,11 +72,12 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   next: {
     tool: "rex",
     command: "next",
-    summary: "print the next actionable task",
+    summary: "print the next actionable task or change",
     usage: "rex next [options] [dir]",
     description:
       "Finds the highest-priority task that is ready to work on (not blocked,\n" +
-      "not deferred). Shows the task with its parent chain and explains why\n" +
+      "not deferred). On a v2 tree a change with no tasks counts as one task.\n" +
+      "Shows the task or change with its parent chain and explains why\n" +
       "it was selected.",
     options: [
       { flag: "--format=json", description: "Output as JSON" },
