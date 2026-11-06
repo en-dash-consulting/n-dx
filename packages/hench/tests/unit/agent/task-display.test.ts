@@ -52,6 +52,34 @@ describe("displayTaskInfo", () => {
     expect(allOutput).toContain("Implement feature X");
   });
 
+  it("names a task-less change as a change that runs as one task", () => {
+    const brief = makeBrief();
+    brief.workUnit = { kind: "change", changeTitle: "Implement feature X" };
+    displayTaskInfo(brief);
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(allOutput).toContain("Change");
+    expect(allOutput).toContain("Implement feature X (runs as one task)");
+  });
+
+  it("names the change a v2 task belongs to", () => {
+    const brief = makeBrief();
+    brief.workUnit = { kind: "task", changeTitle: "Ship X" };
+    displayTaskInfo(brief);
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(allOutput).toContain("Implement feature X (in change Ship X)");
+    expect(allOutput).not.toContain("runs as one task");
+  });
+
+  it("keeps the v1 words without a work unit", () => {
+    displayTaskInfo(makeBrief());
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(allOutput).not.toContain("(in change");
+    expect(allOutput).not.toContain("runs as one task");
+  });
+
   it("displays task priority", () => {
     const brief = makeBrief({ priority: "critical" });
     displayTaskInfo(brief);

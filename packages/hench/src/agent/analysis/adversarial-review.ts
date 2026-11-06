@@ -319,6 +319,11 @@ export function buildReviewSystemPrompt(): string {
  * v2 only: the dedupe listing of `changes/` does not reach `changes/inbox/`
  * (no `index.md`, no matching slug), yet unplaced captures wait there.
  */
+/** What a capture is called: a PRD task on v1, a change that lands in the Inbox on v2. */
+function captureNoun(ctx: { inboxDir?: string }): string {
+  return ctx.inboxDir ? "a change (it lands in the Inbox)" : "a PRD task";
+}
+
 function inboxClause(ctx: { inboxDir?: string }): string {
   return ctx.inboxDir ? ` and under \`${ctx.inboxDir}\`, where unplaced changes wait,` : "";
 }
@@ -435,7 +440,7 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "|---|---|---|---|",
     "| `must-fix` | Fix it now, in this session. Add or update the test that would have caught it. Re-run the project's checks after the fix. | `fixed` | `fixed` |",
     ctx.autonomous
-      ? "| `should-fix` | Capture as a PRD task with `add_item` (rex MCP). Do not fix it here. | `captured` | `offered` |"
+      ? `| \`should-fix\` | Capture as ${captureNoun(ctx)} with \`add_item\` (rex MCP). Do not fix it here. | \`captured\` | \`offered\` |`
       : "| `should-fix` | Report it. Do not capture it and do not fix it here — the run queues it for the operator. | `dropped` | `offered` |",
     ctx.autonomous
       ? "| `out-of-scope` | Capture under the area it actually belongs to, never under this change. | `captured` | `offered` |"
@@ -740,7 +745,7 @@ export function buildPairReviewBrief(ctx: PairReviewPromptContext): string {
         ]
       : []),
     ctx.autonomous
-      ? `| ${capturedVerdicts} | Capture as a PRD task with \`add_item\` (rex MCP), under the area it belongs to. | \`captured\` | \`offered\` |`
+      ? `| ${capturedVerdicts} | Capture as ${captureNoun(ctx)} with \`add_item\` (rex MCP), under the area it belongs to. | \`captured\` | \`offered\` |`
       : `| ${capturedVerdicts} | Report it. Do not capture it — the run queues it for the operator. | \`dropped\` | \`offered\` |`,
     "| `not-worth-fixing` | Nothing. Report it with the reason. | `dropped` | `dropped` |",
     "",

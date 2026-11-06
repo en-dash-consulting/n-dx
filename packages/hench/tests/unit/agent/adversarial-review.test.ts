@@ -150,6 +150,13 @@ describe("buildReviewBrief", () => {
     expect(brief).toMatch(/place it with `place_change`/);
   });
 
+  it("says a capture lands as an Inbox change on a v2 tree", () => {
+    const brief = buildReviewBrief({ ...BASE_CTX, inboxDir: ".rex/changes/inbox/" });
+
+    expect(brief).toMatch(/Capture as a change \(it lands in the Inbox\) with `add_item`/);
+    expect(brief).not.toMatch(/Capture as a PRD task/);
+  });
+
   it("leaves the capture choice to the operator when the run is attended, without waiting for it", () => {
     // The reviewer is headless even on an attended run, so it can never hear
     // a selection (95b81c0a). It reports; the run queues; the operator picks.
