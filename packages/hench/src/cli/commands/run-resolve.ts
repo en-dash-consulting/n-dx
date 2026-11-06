@@ -27,6 +27,7 @@ import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
+import { assertPrdFolderExists } from "./prd-folder.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
@@ -276,6 +277,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   let prdItems: PRDItem[] | null = null;
   let v2Tree: V2Tree | undefined;
   try {
+    assertPrdFolderExists(dir, rexDir);
     const store = await resolveStore(rexDir);
     prdItems = (await store.loadDocument()).items;
     v2Tree = await loadV2Tree(store);

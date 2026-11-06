@@ -37,6 +37,7 @@ import { decideEscalation, isEscalationPending } from "../../agent/analysis/esca
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { safeParseInt } from "./constants.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
+import { assertPrdFolderExists } from "./prd-folder.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
@@ -1898,6 +1899,7 @@ export async function cmdRun(
     onWarning: (message) => warn(message),
   });
   const rexDir = resolveHenchRexDir(dir, config.rexDir);
+  assertPrdFolderExists(dir, rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
