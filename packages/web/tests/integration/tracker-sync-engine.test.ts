@@ -130,6 +130,13 @@ describe("rule modes", () => {
     expect(entries.map((e) => [e.event, e.call.args.workItemId])).toEqual([["run-started", bad], ["pr-merged", "WM-1"]]);
   });
 
+  it("moves a Notion URL pasted from the browser by its dashed UUID", async () => {
+    settings({ "run-started": "dry-run" });
+    const ref = "https://www.notion.so/ws/Some-Title-3b3a80b7192480f7b5fce8093ba5f7f0?pvs=4";
+    const { entries } = await tick({ event: "run-started", rexId: "rex-1", ref });
+    expect(entries[0].call).toMatchObject({ tool: "move_work_item", args: { workItemId: "3b3a80b7-1924-80f7-b5fc-e8093ba5f7f0" } });
+  });
+
   it("names the project after its directory when trackerSync.project is unset", async () => {
     writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ trackerSync: { connection: "caos", rules: { "run-started": "dry-run" } } }));
     const { entries } = await tick(runStarted);
