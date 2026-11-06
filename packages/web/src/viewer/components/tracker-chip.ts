@@ -130,7 +130,8 @@ export function CreateInTrackerButton({ changeId, read, onCreated }: { changeId:
   const [card, setCard] = useState<Raised | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!read.label || read.changes[changeId]) return null;
+  // A linked change shows no button, but a problem from the create that just linked it stays visible.
+  if (!read.label || (read.changes[changeId] && !error)) return null;
 
   const raise = async (): Promise<void> => {
     setBusy(true);
@@ -149,9 +150,11 @@ export function CreateInTrackerButton({ changeId, read, onCreated }: { changeId:
 
   return h("span", { class: card ? "create-in-tracker create-in-tracker-open" : "create-in-tracker" },
     card
-      ? h(TrackerCardForm, { entry: card, onDone: () => { setCard(null); onCreated?.(); }, onCancel: () => setCard(null) })
-      : h("button", { type: "button", class: "ch-change-link create-in-tracker-button", disabled: busy, onClick: () => { void raise(); } },
-        `Create in ${read.label}`),
+      ? h(TrackerCardForm, { entry: card, onDone: () => { setCard(null); onCreated?.(); }, onSettled: (problem) => { setCard(null); setError(problem); onCreated?.(); }, onCancel: () => setCard(null) })
+      : read.changes[changeId]
+        ? null
+        : h("button", { type: "button", class: "ch-change-link create-in-tracker-button", disabled: busy, onClick: () => { void raise(); } },
+          `Create in ${read.label}`),
     error ? h("span", { class: "live-error", role: "alert" }, error) : null,
   );
 }

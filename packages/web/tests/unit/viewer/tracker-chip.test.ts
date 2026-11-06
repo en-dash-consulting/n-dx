@@ -161,13 +161,19 @@ describe("ChangeTrackerChip", () => {
     await settle();
   };
 
-  it("keeps the form open and shows the problem when the tracker refuses the create", async () => {
+  it("closes the form, shows the problem and reloads when the tracker refuses the create", async () => {
     decided = { result: "refused", problems: [{ message: "title is required" }] };
-    await run();
-    expect(root.querySelector('[data-action="send"]')).not.toBeNull();
+    const reads = () => calls.filter((c) => c.url === "/api/tracker/changes").length;
+    await mount();
+    act(() => { create()!.click(); });
+    await settle();
+    const before = reads();
+    act(() => { (root.querySelector('[data-action="send"]') as HTMLButtonElement).click(); });
+    await settle();
+    // The card is decided: a second Run would only answer 409 over the real problem.
+    expect(root.querySelector('[data-action="send"]')).toBeNull();
     expect(root.querySelector(".live-error")?.textContent).toContain("title is required");
-    // The refusal closed the card: a second Run would only answer 409 over the real problem.
-    expect((root.querySelector('[data-action="send"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(reads()).toBeGreaterThan(before);
   });
 
   it("keeps Run enabled when the tracker cannot be reached, since the card still waits", async () => {
@@ -177,10 +183,17 @@ describe("ChangeTrackerChip", () => {
     expect((root.querySelector('[data-action="send"]') as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("says to link by hand when an ok create's link failed", async () => {
+  it("reloads the chip, no longer offering Create, and says to link by hand when an ok create's link failed", async () => {
     decided = { result: "ok", problems: [{ message: "created WM-9, but could not link ch-1 to it: locked" }] };
-    await run();
-    expect(root.querySelector('[data-action="send"]')).not.toBeNull();
+    await mount();
+    act(() => { create()!.click(); });
+    await settle();
+    // The server made the item, so the reload reads the change as created.
+    chips = { tracker: { label: "CAOS" }, changes: { "ch-1": { refs: [], state: "Created" } } };
+    act(() => { (root.querySelector('[data-action="send"]') as HTMLButtonElement).click(); });
+    await settle();
+    expect(create()).toBeNull();
+    expect(root.querySelector('[data-action="send"]')).toBeNull();
     expect(root.querySelector(".live-error")?.textContent).toContain("Link it by hand");
   });
 

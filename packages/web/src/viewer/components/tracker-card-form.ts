@@ -47,10 +47,16 @@ export interface TrackerCardFormProps {
   /** The card: its request id and the call the rules planned. */
   entry: { requestId: string; call: { tool: string; args: Record<string, unknown> } };
   onDone: () => void;
+  /**
+   * Called with the problem when a result closed the card without a clean finish
+   * (refused, or an ok create whose link failed). The parent refreshes its row and
+   * may unmount the form, so it must show the problem itself.
+   */
+  onSettled?: (problem: string) => void;
   onCancel: () => void;
 }
 
-export function TrackerCardForm({ entry, onDone, onCancel }: TrackerCardFormProps) {
+export function TrackerCardForm({ entry, onDone, onSettled, onCancel }: TrackerCardFormProps) {
   const [call, setCall] = useState<SidecarExternalCall | null>(null);
   const [edit, setEdit] = useState<ExternalCallEdit>(entry.call.args);
   const [busy, setBusy] = useState(false);
@@ -85,7 +91,10 @@ export function TrackerCardForm({ entry, onDone, onCancel }: TrackerCardFormProp
       if (!problem) { onDone(); return; }
       setError(problem);
       // An unreachable call leaves the card waiting, so Run may retry; any other result closed it.
-      if (!RETRYABLE.has(decided?.result ?? "")) setClosed(true);
+      if (!RETRYABLE.has(decided?.result ?? "")) {
+        setClosed(true);
+        onSettled?.(problem);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not run the call");
     } finally {

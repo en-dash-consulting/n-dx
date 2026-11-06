@@ -1,10 +1,24 @@
 schema: "rex/v2"
 items:
   "16b19afa-8a71-44ab-80c3-16ada838d66f":
-    lastModified: "2026-11-06T16:30:28.826Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:34:34.676Z"
+    completedAt: "2026-11-06T16:34:34.676Z"
+    endedAt: "2026-11-06T16:34:34.676Z"
+    activeIntervals: [{"end":"2026-11-06T16:34:34.676Z","start":"2026-11-06T16:34:34.676Z"}]
+    appliedAt: "2026-11-06T16:34:34.676Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T16:34:34.676Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "213a850b-fd30-4556-8709-f1051742c195":
-    lastModified: "2026-11-06T16:30:28.826Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:32:00.569Z"
+    completedAt: "2026-11-06T16:34:34.676Z"
+    endedAt: "2026-11-06T16:34:34.676Z"
+    activeIntervals: [{"end":"2026-11-06T16:34:34.676Z","start":"2026-11-06T16:32:00.569Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "TrackerCardForm takes onSettled(problem); Live and the change chip refresh and show the problem themselves."
+    lastModified: "2026-11-06T16:34:34.676Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "499952e1-ad0c-467e-ab12-ac9c12851464":
     status: "completed"

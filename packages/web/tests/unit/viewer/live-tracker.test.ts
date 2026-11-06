@@ -68,6 +68,7 @@ describe("Live Tracker activity", () => {
   let calls: Array<{ url: string; method: string; body?: Record<string, unknown> }>;
   let activity: { entries: unknown[]; cards: string[]; connection: unknown } | null;
   let navigateTo: ReturnType<typeof vi.fn<NavigateTo>>;
+  let decided: unknown = {};
 
   function stub(sidecar = true): void {
     vi.stubGlobal("WebSocket", class { onmessage = null; onopen = null; onclose = null; close() {} });
@@ -82,7 +83,7 @@ describe("Live Tracker activity", () => {
       else if (path.startsWith("/api/tracker/cards/decide")) {
         // The card closes once decided.
         if (activity) activity = { ...activity, cards: [] };
-        body = { entry: {} };
+        body = { entry: decided };
       }
       return { ok: true, status: 200, json: async () => body };
     }));
@@ -110,6 +111,7 @@ describe("Live Tracker activity", () => {
     root = document.createElement("div");
     document.body.appendChild(root);
     calls = [];
+    decided = {};
     activity = { entries: [WOULD, REFUSED, CARD], cards: [CARD_ID], connection: CONNECTED };
   });
 
@@ -164,6 +166,21 @@ describe("Live Tracker activity", () => {
     // The card is closed and the list read again: no Approve left.
     expect(root.querySelector('[data-action="approve"]')).toBeNull();
     expect(root.querySelector(".live-tracker-form")).toBeNull();
+  });
+
+  it("refreshes the row when a refused approval closed the card: no Approve to answer 409, and the problem stays", async () => {
+    stub();
+    decided = { result: "refused", problems: [{ message: "epicId is not on this board" }] };
+    await mount();
+    const reads = () => calls.filter((c) => c.url.startsWith("/api/tracker/activity")).length;
+    const before = reads();
+    await click(root.querySelector('[data-action="approve"]'));
+    await click(root.querySelector('[data-action="send"]'));
+    expect(decisions()).toHaveLength(1);
+    expect(reads()).toBeGreaterThan(before);
+    expect(root.querySelector('[data-action="approve"]')).toBeNull();
+    expect(root.querySelector(".live-tracker-form")).toBeNull();
+    expect(root.querySelector(".live-error")?.textContent).toContain("epicId is not on this board");
   });
 
   it("keeps an open card form and its edits when a new entry arrives above it", async () => {

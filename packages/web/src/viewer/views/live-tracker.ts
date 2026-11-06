@@ -78,7 +78,7 @@ function ActivityRow({ entry, waiting, onChanged }: { entry: TrackerActivityRow;
       )
       : null,
     waiting && approving
-      ? h(TrackerCardForm, { entry, onDone: () => { setApproving(false); onChanged(); }, onCancel: () => setApproving(false) })
+      ? h(TrackerCardForm, { entry, onDone: () => { setApproving(false); onChanged(); }, onSettled: (problem) => { setApproving(false); setError(problem); onChanged(); }, onCancel: () => setApproving(false) })
       : null,
     error ? h("p", { class: "live-error", role: "alert" }, error) : null,
   );
