@@ -2,7 +2,8 @@
  * Plan's Specs to tighten panel: what the open changes still lack, as counts that
  * each open the Open changes list on that filter. Rows at zero are hidden.
  *
- * Reads `GET /api/rex/changes/summary`, the same fast read as the lifecycle strip.
+ * Reads the summary the Plan grid's `ChangesSummaryProvider` loaded once, shared
+ * with the lifecycle strip.
  * Requirement coverage joins once an open change or its task has an automated or
  * metric requirement, the nodes `rex ready` reads; until then one line says why
  * `rex ready` marks nothing ready.
@@ -11,7 +12,7 @@
  */
 
 import { h } from "preact";
-import { useProductRead } from "../hooks/index.js";
+import { useChangesSummary } from "./changes-summary-context.js";
 import type { NavigateTo } from "../types.js";
 import type { ChangeSummary } from "./product-model.js";
 import { GAP_LABELS, gapFilter, hasGap, stageFilter, storeFilter, type GapKind } from "./changes.js";
@@ -53,7 +54,7 @@ export function specGaps(summary: ChangeSummary): SpecGaps {
 }
 
 export function SpecGapsPanel({ navigateTo }: { navigateTo: NavigateTo }) {
-  const load = useProductRead("/api/rex/changes/summary", (body) => body.summary as ChangeSummary);
+  const load = useChangesSummary();
   if (load.state === "loading") return h("div", { class: "spec-gaps", role: "status" }, "Loading...");
   if (load.state === "v1") return null;
   if (load.state === "error") return h("div", { class: "spec-gaps", role: "alert" }, `Could not load open changes: ${load.message}`);

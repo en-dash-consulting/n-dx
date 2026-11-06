@@ -17,5 +17,12 @@ items:
     lastModified: "2026-11-06T16:09:52.637Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2fb8468b-d432-4948-9372-a0093fafdf40":
-    lastModified: "2026-11-06T16:09:50.308Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:13:40.975Z"
+    completedAt: "2026-11-06T16:15:38.966Z"
+    endedAt: "2026-11-06T16:15:38.966Z"
+    activeIntervals: [{"end":"2026-11-06T16:15:38.966Z","start":"2026-11-06T16:13:40.975Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "SpecGapsPanel reads useChangesSummary(); test mounts under ChangesSummaryProvider and asserts one summary read."
+    lastModified: "2026-11-06T16:15:38.966Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

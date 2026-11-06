@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { SpecGapsPanel, specGaps, NO_GAPS_LINE, NO_REQUIREMENTS_LINE } from "../../../src/viewer/views/spec-gaps.js";
+import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { gapFilter, hasGap } from "../../../src/viewer/views/changes.js";
 import type { ChangeSummary, GlanceChange } from "../../../src/viewer/views/product-model.js";
 
@@ -58,11 +59,21 @@ describe("SpecGapsPanel", () => {
   beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); navigateTo.mockReset(); localStorage.clear(); });
   afterEach(() => { render(null, root); root.remove(); vi.unstubAllGlobals(); });
 
+  const fetchSpy = vi.fn();
   async function mount(s: ChangeSummary) {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ layout: "v2", summary: s }) })));
-    await act(async () => { render(h(SpecGapsPanel, { navigateTo }), root); });
+    fetchSpy.mockReset();
+    fetchSpy.mockImplementation(async () => ({ ok: true, json: async () => ({ layout: "v2", summary: s }) }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await act(async () => { render(h(ChangesSummaryProvider, null, h(SpecGapsPanel, { navigateTo })), root); });
     await act(async () => {});
   }
+
+  it("reads the shared summary once, under the provider", async () => {
+    await mount(summary([change("a", { openBlockers: 1 })]));
+    const reads = fetchSpy.mock.calls.filter(([url]) => url === "/api/rex/changes/summary");
+    expect(reads).toHaveLength(1);
+    expect(root.querySelector('[data-gap="blocked"]')).not.toBeNull();
+  });
 
   it("each count stores its filter and opens Open changes", async () => {
     await mount(summary([change("a", { openBlockers: 2 })]));
