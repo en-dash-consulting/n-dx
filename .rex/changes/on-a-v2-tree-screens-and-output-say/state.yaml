@@ -57,7 +57,14 @@ items:
     lastModified: "2026-11-06T20:20:49.895Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cae4146e-0330-4936-baa3-231ace031c09":
-    lastModified: "2026-11-06T20:33:31.340Z"
+    status: "completed"
+    startedAt: "2026-11-06T20:34:57.953Z"
+    completedAt: "2026-11-06T20:36:51.382Z"
+    endedAt: "2026-11-06T20:36:51.382Z"
+    activeIntervals: [{"end":"2026-11-06T20:36:51.382Z","start":"2026-11-06T20:34:57.953Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added runnable-row-server.test.ts (describeRunnable x3, readQueuePlan rowText) and a start_work card rowText test in sidecar-carry-out.test.ts."
+    lastModified: "2026-11-06T20:36:51.382Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d143adff-01b4-4459-b703-a9c1fccc4141":
     status: "completed"
