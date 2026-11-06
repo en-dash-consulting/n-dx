@@ -49,6 +49,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("Plan tiles before the first status", () => {
+  const V2_ONLY = ["product", "inbox", "changes"];
+
+  it("mounts no v2-only tile with null status, then a v1 status", () => {
+    status = null;
+    mount();
+    expect(tiles()).toContain("validation");
+    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
+
+    status = withLayout("v1");
+    mount();
+    expect(tiles()).toContain("prd");
+    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
+  });
+
+  it("brings the v2 tiles in once status says v2", () => {
+    status = null;
+    mount();
+    status = withLayout("v2");
+    mount();
+    for (const v of V2_ONLY) expect(tiles()).toContain(v);
+  });
+});
+
 describe("Plan tiles across a failed status poll", () => {
   it("keeps the v1 tiles when status drops to null after a v1 load", () => {
     status = withLayout("v1");

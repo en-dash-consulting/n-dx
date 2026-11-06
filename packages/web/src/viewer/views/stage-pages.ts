@@ -250,16 +250,20 @@ type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; depl
 /**
  * A grid whose tiles follow the project's PRD layout, read from project status
  * so only a stage with `v1Tiles` subscribes. A static export has no status and
- * no server-backed v2 tiles, so it takes the v1 set; before the first status
- * arrives, v2 stands, as the sections it replaces did. A later null (a failed
- * poll, a server restart) keeps the last known layout: swapping tile sets would
- * unmount the open tile and lose its state.
+ * no server-backed v2 tiles, so it takes the v1 set. Before the first status
+ * arrives the layout is unknown: only the layout-agnostic tiles mount, because
+ * a v2 tile's preview fires v2-only requests a v1 project cannot answer. A later
+ * null (a failed poll, a server restart) keeps the last known layout: swapping
+ * tile sets would unmount the open tile and lose its state.
  */
 function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridProps) {
   const known = useRef<"v1" | "v2" | undefined>(undefined);
   const layout = useProjectStatus()?.rex.layout;
   if (layout) known.current = layout;
-  return h(TileGrid, { ...grid, tiles: deployed || known.current === "v1" ? v1Tiles : tiles });
+  const shown = deployed || known.current === "v1" ? v1Tiles
+    : known.current === "v2" ? tiles
+    : tiles.filter((t) => !t.v2Only);
+  return h(TileGrid, { ...grid, tiles: shown });
 }
 
 // ── Landing ────────────────────────────────────────────────────
