@@ -102,10 +102,10 @@ describe("the change-set card", () => {
     const tagged: SidecarChangeSet = { ...V1, items: V1.items.map((item, i) => (i === 0 ? { ...item, tags: ["billing", "q4"] } : item)) };
     const { el, decide } = await draw(changeSetCard(tagged));
     const [first, second] = el.querySelectorAll(".sidecar-change-set-item");
-    expect(first.querySelector<HTMLInputElement>(".sidecar-change-set-tags")?.value).toBe("billing, q4");
-    expect(second.querySelector<HTMLInputElement>(".sidecar-change-set-tags")?.value).toBe("");
-    await type(first.querySelector<HTMLInputElement>(".sidecar-change-set-tags")!, "billing, refunds, , refunds");
-    await type(second.querySelector<HTMLInputElement>(".sidecar-change-set-tags")!, "ui");
+    expect(first.querySelector<HTMLTextAreaElement>(".sidecar-change-set-tags")?.value).toBe("billing\nq4");
+    expect(second.querySelector<HTMLTextAreaElement>(".sidecar-change-set-tags")?.value).toBe("");
+    await type(first.querySelector<HTMLTextAreaElement>(".sidecar-change-set-tags")!, "billing\n refunds \n\nrefunds");
+    await type(second.querySelector<HTMLTextAreaElement>(".sidecar-change-set-tags")!, "ui");
     await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
     expect(decide).toHaveBeenCalledWith("c1", {
       approve: true,
@@ -114,6 +114,15 @@ describe("the change-set card", () => {
         { index: 1, tags: ["ui"] },
       ],
     });
+  });
+
+  it("leaves a tag holding a comma as it is when the operator edits another field", async () => {
+    const tagged: SidecarChangeSet = { ...V1, items: V1.items.map((item, i) => (i === 0 ? { ...item, tags: ["billing, refunds"] } : item)) };
+    const { el, decide } = await draw(changeSetCard(tagged));
+    const [first] = el.querySelectorAll(".sidecar-change-set-item");
+    await type(first.querySelector<HTMLInputElement>(".sidecar-change-set-title")!, "Refunds");
+    await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+    expect(decide).toHaveBeenCalledWith("c1", { approve: true, edits: [{ index: 0, title: "Refunds" }] });
   });
 
   it("sends no edits with a denial", async () => {
