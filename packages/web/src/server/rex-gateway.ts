@@ -34,6 +34,9 @@ export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, 
 // `resolveStore` returns, not a parse of `prd_tree/`.
 export { prdLayout } from "@n-dx/rex";
 export { findNextWorkTask, findActionableWork } from "@n-dx/rex";
+// Whether a change runs as one task (a task-less change is the unit `ndx work`
+// runs) is rex's selection rule; the server sends the viewer the computed flag.
+export { changeWorkShape } from "@n-dx/rex";
 // Item writes on a v2 tree: the guard narrows resolveStore's answer to the
 // change-layer store, and completion is rex's own v2 completion (apply-on-complete).
 export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
@@ -74,7 +77,7 @@ export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
 // `recordUnplacement` is "Place & add another"'s Remove: rex refuses a closed change and runs its rules.
 export { suggestPlacements, recordPlacement, recordProposal, recordUnplacement, ChangePlacementError, placementStrength } from "@n-dx/rex";
 export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
-export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
+export type { RecordPlacementInput } from "@n-dx/rex";
 export type { RecordProposalInput, RecordProposalResult } from "@n-dx/rex";
 export type { PlacementCandidate, PlacementStrength } from "@n-dx/rex";
 // "Draft with the model" (behind rex.placementDraft): the `prd.place` text

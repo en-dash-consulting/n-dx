@@ -13,6 +13,7 @@ import { act } from "preact/test-utils";
 import { startOffer } from "../../../src/viewer/components/prepare-task-model.js";
 import { TaskStartControl } from "../../../src/viewer/components/task-start-control.js";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
+import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 
 describe("startOffer", () => {
@@ -111,5 +112,48 @@ describe("TaskDetail start control", () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(root.querySelector(".start-task-primary")).not.toBeNull();
     expect(root.querySelector(".task-execute-btn")).toBeNull();
+  });
+
+  /** Live answers with no runs; execute answers 200. Every call is recorded. */
+  function stubServer(): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => (String(url).includes("/api/hench/execute")
+        ? { ok: true }
+        : { runs: [], jobs: [], counts: { running: 0, stale: 0, jobs: 0 } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("starts a change the server flags as running as one task", async () => {
+    const fetchMock = stubServer();
+    const item = { id: "solo", title: "Solo", status: "pending", type: "change", runsAsOneTask: true } as const;
+    root = renderToDiv(h(TaskDetail, { item: { ...item }, allItems: [{ ...item }] }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(root.querySelector(".start-task-primary")).not.toBeNull();
+    act(() => { root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click(); });
+    await act(async () => {
+      root!.querySelector<HTMLButtonElement>('.ready-menu [role="menuitem"]')!.click();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const execute = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/hench/execute"));
+    expect(execute).toBeDefined();
+    expect(JSON.parse((execute![1] as RequestInit).body as string)).toMatchObject({ taskId: "solo" });
+  });
+
+  it("offers no start for a change with tasks", async () => {
+    stubServer();
+    const item: PRDItemData = {
+      id: "with-tasks", title: "With tasks", status: "pending", type: "change",
+      children: [{ id: "t1", title: "T1", status: "pending", type: "task" }],
+    };
+    root = renderToDiv(h(TaskDetail, { item, allItems: [item] }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(root.querySelector(".task-execute-section")).toBeNull();
+    expect(root.querySelector(".start-task-primary")).toBeNull();
   });
 });

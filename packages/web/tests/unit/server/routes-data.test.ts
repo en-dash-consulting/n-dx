@@ -80,6 +80,39 @@ describe("Data routes", () => {
     expect(data.title).toBe("Test");
   });
 
+  it("GET /data/prd.json marks each change that runs as one task, and nothing else", async () => {
+    // The v2 change projection: a change with no tasks is the unit ndx work runs;
+    // one with tasks, or one holding a change, is not. A v1 epic is never marked.
+    await writeFile(join(rexDir, "prd.json"), JSON.stringify({
+      schema: "rex/v1",
+      title: "Test",
+      items: [
+        { id: "solo", title: "Solo", type: "change", level: "epic", status: "pending" },
+        { id: "with-tasks", title: "With tasks", type: "change", level: "epic", status: "pending", children: [
+          { id: "t1", title: "T1", type: "task", level: "task", status: "pending" },
+        ] },
+        { id: "emptied", title: "Emptied", type: "change", level: "epic", status: "pending", children: [
+          { id: "t2", title: "T2", type: "task", level: "task", status: "deleted" },
+        ] },
+        { id: "container", title: "Container", type: "change", level: "epic", status: "pending", children: [
+          { id: "nested", title: "Nested", type: "change", level: "feature", status: "pending" },
+        ] },
+        { id: "v1-epic", title: "Epic", level: "epic", status: "pending" },
+      ],
+    }));
+
+    const data = await (await fetch(`http://127.0.0.1:${port}/data/prd.json`)).json();
+    const marked: string[] = [];
+    const walk = (items: Array<{ id: string; runsAsOneTask?: boolean; children?: unknown[] }>): void => {
+      for (const item of items) {
+        if (item.runsAsOneTask) marked.push(item.id);
+        walk((item.children ?? []) as typeof items);
+      }
+    };
+    walk(data.items);
+    expect(marked.sort()).toEqual(["emptied", "nested", "solo"]);
+  });
+
   it("GET /data/status returns mtimes for live reload", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/data/status`);
     expect(res.status).toBe(200);
