@@ -164,6 +164,11 @@ export interface AreaSection {
   summary?: string;
   stewards?: string[];
   capabilities: CapabilityRow[];
+  /**
+   * Distinct open changes that touch or amend the area or a node in it, or add
+   * a node under one; the server works it out. The area map counts these.
+   */
+  openChangeIds: string[];
 }
 
 /** Everything the Product page renders. */

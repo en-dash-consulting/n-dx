@@ -18,8 +18,8 @@ const overlay = (id: string) => ({ id, title: id, stage: "proposed" as const });
 const cap = (over: Partial<CapabilityRow> = {}): CapabilityRow => ({
   id: "c", title: "C", status: "met", health: "ok", criteriaCount: 1, openChanges: [], ...over,
 });
-const area = (slug: string, capabilities: CapabilityRow[]): AreaSection => ({
-  id: `id-${slug}`, slug, title: slug.toUpperCase(), capabilities,
+const area = (slug: string, capabilities: CapabilityRow[], openChangeIds: string[] = []): AreaSection => ({
+  id: `id-${slug}`, slug, title: slug.toUpperCase(), capabilities, openChangeIds,
 });
 
 describe("blockStatus", () => {
@@ -40,19 +40,23 @@ describe("blockStatus", () => {
 });
 
 describe("areaBlocks", () => {
-  it("draws one block per area: size is its capability count, open changes are distinct", () => {
-    const [block] = areaBlocks([area("a", [cap({ openChanges: [overlay("x")] }), cap({ openChanges: [overlay("x"), overlay("y")] })])]);
-    expect(block).toMatchObject({ slug: "a", size: 2, openChanges: 2, status: "met" });
+  it("draws one block per area: size is its capability count, open changes are the server's per-area count", () => {
+    // The area's count wins over its capabilities' overlays: an addition under
+    // the area, or an amendment of the area itself, appears in no overlay.
+    const [block] = areaBlocks([area("a", [cap({ openChanges: [overlay("x")] }), cap()], ["x", "y", "z"])]);
+    expect(block).toMatchObject({ slug: "a", size: 2, openChanges: 3, status: "met" });
   });
 
   it("folds the smallest areas past the cap into one block, keeping order", () => {
     const areas = Array.from({ length: MAX_BLOCKS + 3 }, (_, i) =>
       area(`a${i}`, Array.from({ length: i < 3 ? 1 : 2 }, () => cap())));
-    areas[0]!.capabilities[0]!.openChanges = [overlay("x")];
+    // One change open in two folded areas counts once.
+    areas[0]!.openChangeIds = ["x"];
+    areas[1]!.openChangeIds = ["x", "y"];
     const blocks = areaBlocks(areas);
     expect(blocks).toHaveLength(MAX_BLOCKS);
     const folded = blocks.at(-1)!;
-    expect(folded).toMatchObject({ label: "+4 smaller areas", slug: null, size: 5, openChanges: 1 });
+    expect(folded).toMatchObject({ label: "+4 smaller areas", slug: null, size: 5, openChanges: 2 });
     // a0-a2 (one capability each) and the last of the equal-sized rest fold.
     expect(blocks.slice(0, -1).map((b) => b.slug)).toEqual(areas.slice(3, MAX_BLOCKS + 2).map((a) => a.slug));
   });
@@ -90,7 +94,7 @@ describe("AreaBlock", () => {
 
   it("is a button with an accessible name that opens on click", async () => {
     const onOpen = vi.fn();
-    const block = areaBlocks([area("a", [cap({ openChanges: [overlay("x")] })])])[0]!;
+    const block = areaBlocks([area("a", [cap({ openChanges: [overlay("x")] })], ["x"])])[0]!;
     await act(async () => { render(h(AreaBlock, { block, onOpen }), root); });
     const button = root.querySelector("button")!;
     expect(button.getAttribute("aria-label")).toBe("A: 1 capability, met, 1 open change");

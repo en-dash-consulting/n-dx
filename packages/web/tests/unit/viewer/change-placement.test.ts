@@ -72,10 +72,10 @@ const MAP: ProductMap = {
     { id: "area-pay", slug: "payments", title: "Payments", capabilities: [
       { id: "cap-refund", title: "Refunds", statement: "Refund an order", status: "met", health: "ok", criteriaCount: 1, openChanges: [] },
       { id: "cap-gift", title: "Gift cards", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
-    ] },
+    ], openChangeIds: [] },
     { id: "area-ship", slug: "shipping", title: "Shipping", capabilities: [
       { id: "cap-label", title: "Shipping labels", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
-    ] },
+    ], openChangeIds: [] },
   ],
   constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all" }],
 };

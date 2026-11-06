@@ -91,6 +91,11 @@ export interface AreaSectionWire {
   summary?: string;
   stewards?: string[];
   capabilities: CapabilityRowWire[];
+  /**
+   * Distinct open changes that touch or amend the area or a node in it, or add
+   * a node under one. Its length is the area map's open-change count.
+   */
+  openChangeIds: string[];
 }
 
 export interface ProductMapWire {
@@ -270,6 +275,50 @@ function overlaysByNode(index: TreeIndex, changes: ChangeRuleNode[]): Map<string
   return out;
 }
 
+/**
+ * Distinct open changes per area id, each node counting toward its nearest
+ * area: what a change touches or amends, and where an `added` amendment lands.
+ * An unapplied addition's target names nothing yet, so it counts at its
+ * `under`, followed through same-change parents to an existing node.
+ */
+function openChangesByArea(index: TreeIndex, changes: ChangeRuleNode[]): Map<string, Set<string>> {
+  const areaOf = new Map<string, string>();
+  for (const { node, parent, root } of index.entries) {
+    if (root !== "product") continue;
+    const inherited = parent ? areaOf.get(parent.id) : undefined;
+    if (node.type === "area") areaOf.set(node.id, node.id);
+    else if (inherited) areaOf.set(node.id, inherited);
+  }
+  const out = new Map<string, Set<string>>();
+  for (const change of changes) {
+    if (!isOpenChange(change)) continue;
+    const amends = change.amends ?? [];
+    const addedByTarget = new Map(amends.filter((a) => a.delta === "added").map((a) => [a.target, a]));
+    const landing = (ref: string | undefined): RuleNode | undefined => {
+      const seen = new Set<string>();
+      while (ref !== undefined && !seen.has(ref)) {
+        const node = index.resolve(ref);
+        if (node) return node;
+        seen.add(ref);
+        ref = addedByTarget.get(ref)?.under;
+      }
+      return undefined;
+    };
+    const refs = [
+      ...amends.map((a) => (a.delta === "added" ? landing(a.under) : index.resolve(a.target))),
+      ...(change.touches ?? []).map((ref) => index.resolve(ref)),
+    ];
+    for (const node of refs) {
+      const areaId = node ? areaOf.get(node.id) : undefined;
+      if (!areaId) continue;
+      const ids = out.get(areaId) ?? new Set<string>();
+      ids.add(change.id);
+      out.set(areaId, ids);
+    }
+  }
+  return out;
+}
+
 function specReviewed(node: RuleNode): boolean {
   return !!node.reviewedHash && node.reviewedHash === specHash(nodeSpec(node));
 }
@@ -277,7 +326,9 @@ function specReviewed(node: RuleNode): boolean {
 /** The product map: every live area with its capabilities flattened, and every live constraint. */
 export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | undefined): ProductMapWire {
   const index = indexTree(tree);
-  const overlays = overlaysByNode(index, changesOf(index));
+  const changes = changesOf(index);
+  const overlays = overlaysByNode(index, changes);
+  const openByArea = openChangesByArea(index, changes);
   const report = productReport(tree);
   const areas: AreaSectionWire[] = [];
   const constraints: ConstraintRowWire[] = [];
@@ -294,6 +345,7 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
         ...(row.summary ? { summary: row.summary } : {}),
         ...(node?.type === "area" && node.stewards?.length ? { stewards: node.stewards } : {}),
         capabilities: [],
+        openChangeIds: [...(openByArea.get(row.id) ?? [])],
       };
       areas.push(section);
       for (const child of row.children ?? []) visit(child, section);

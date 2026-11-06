@@ -138,13 +138,56 @@ describe("v2 product reads", () => {
         criteriaCount: 2,
         openChanges: [{ id: CHANGE_ID, displayId: "CH-1", title: "Add Apple Pay", stage: "in-progress", delta: "modified" }],
       }],
+      openChangeIds: [CHANGE_ID],
     }]);
   });
 
   it("GET /product drops an applied change from the overlays", async () => {
     applyChange();
     const { body } = await get("product");
-    expect((body.map as ProductMap).areas[0].capabilities[0].openChanges).toEqual([]);
+    const area = (body.map as ProductMap).areas[0];
+    expect(area.capabilities[0].openChanges).toEqual([]);
+    expect(area.openChangeIds).toEqual([]);
+  });
+
+  describe("GET /product per-area open changes", () => {
+    const OTHER_ID = "c0000000-0000-4000-8000-0000000000a1";
+    /** A second open change with the given amendments and touches. */
+    const addChange = (amends: unknown[], touches: string[] = []): void => {
+      const dir = join(rexDir, "changes", "other");
+      mkdirSync(dir);
+      writeFileSync(join(dir, "index.md"), [
+        "---", `id: "${OTHER_ID}"`, 'type: "change"', 'title: "Other"', 'slug: "other"',
+        `amends: ${JSON.stringify(amends)}`, `touches: ${JSON.stringify(touches)}`, "---", "",
+      ].join("\n"));
+      writeFileSync(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${OTHER_ID}":`, '    status: "pending"', ""].join("\n"));
+    };
+    const area = async () => ((await get("product")).body.map as ProductMap).areas[0];
+    const added = (target: string, under: string, type = "capability") =>
+      ({ target, delta: "added", type, under, title: target, summary: `Adds ${target}` });
+
+    it("counts a change that adds a capability under the area", async () => {
+      addChange([added("refunds", AREA_ID)]);
+      expect((await area()).openChangeIds.sort()).toEqual([CHANGE_ID, OTHER_ID].sort());
+    });
+
+    it("counts an addition under a same-change addition that lands in the area", async () => {
+      addChange([added("partial-refunds", "refunds", "constraint"), added("refunds", CAPABILITY_ID)]);
+      expect((await area()).openChangeIds).toContain(OTHER_ID);
+    });
+
+    it("counts a change whose overlay is keyed by the area id", async () => {
+      addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }]);
+      const a = await area();
+      expect(a.openChangeIds).toContain(OTHER_ID);
+      // No capability carries it: only the area's count does.
+      expect(a.capabilities[0].openChanges.map((c) => c.id)).not.toContain(OTHER_ID);
+    });
+
+    it("counts one change once however many of the area's nodes it reaches", async () => {
+      addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }], [CAPABILITY_ID]);
+      expect((await area()).openChangeIds.filter((id) => id === OTHER_ID)).toHaveLength(1);
+    });
   });
 
   it("GET /changes lists each change with its stage, map links and task progress", async () => {

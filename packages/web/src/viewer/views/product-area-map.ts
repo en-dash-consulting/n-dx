@@ -1,7 +1,8 @@
 /**
  * Plan's product area map: one block per area, sized by how many capabilities
  * it holds, tinted by its computed status, with a count of the open changes
- * that touch or amend it. A block opens the area at `/product/area/<slug>`.
+ * that touch, amend or add under it (the server's `openChangeIds`). A block
+ * opens the area at `/product/area/<slug>`.
  *
  * Reads the product map the Product page already fetches. `AreaBlock` is the
  * reusable part — the area view draws an area's capabilities with it.
@@ -29,11 +30,10 @@ export const BLOCK_STATUS_LABELS: Readonly<Record<BlockStatus, string>> = {
 /** Blocks the map draws before the smallest areas fold into one. */
 export const MAX_BLOCKS = 12;
 
-/** The slice of an area or capability a block draws. */
+/** The slice of a capability a block's status reads. */
 interface Counted {
   status: string;
   health: string;
-  openChanges: ReadonlyArray<{ id: string }>;
 }
 
 /**
@@ -42,7 +42,7 @@ interface Counted {
  * any is unbuilt, else met. Retired capabilities do not count; an area with
  * none left reads proposed, as it has nothing built.
  */
-export function blockStatus(rows: readonly Pick<Counted, "status" | "health">[]): BlockStatus {
+export function blockStatus(rows: readonly Counted[]): BlockStatus {
   const live = rows.filter((r) => r.status !== "retired");
   if (live.length === 0) return "proposed";
   if (live.some((r) => r.health === "defective")) return "defective";
@@ -51,9 +51,9 @@ export function blockStatus(rows: readonly Pick<Counted, "status" | "health">[])
   return "met";
 }
 
-/** Distinct open changes across rows: one change touching two capabilities counts once. */
-export function distinctOpenChanges(rows: readonly Pick<Counted, "openChanges">[]): number {
-  return new Set(rows.flatMap((r) => r.openChanges.map((c) => c.id))).size;
+/** Distinct open changes across areas: one change touching two areas counts once. */
+function distinctOpenChanges(areas: readonly Pick<AreaSection, "openChangeIds">[]): number {
+  return new Set(areas.flatMap((a) => a.openChangeIds)).size;
 }
 
 export interface AreaBlockModel {
@@ -76,7 +76,7 @@ function areaBlock(area: AreaSection): AreaBlockModel {
     size: area.capabilities.length,
     unit: "capabilities",
     status: blockStatus(area.capabilities),
-    openChanges: distinctOpenChanges(area.capabilities),
+    openChanges: distinctOpenChanges([area]),
     slug: area.slug,
   };
 }
@@ -104,7 +104,7 @@ export function areaBlocks(areas: readonly AreaSection[]): AreaBlockModel[] {
       size: rows.length,
       unit: "capabilities",
       status: blockStatus(rows),
-      openChanges: distinctOpenChanges(rows),
+      openChanges: distinctOpenChanges(folded),
       slug: null,
     },
   ];

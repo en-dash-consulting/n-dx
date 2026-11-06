@@ -80,6 +80,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
           ],
         },
       ],
+      openChangeIds: ["change-placement-engine", "change-stewards"],
     },
     {
       id: "area-execute",
@@ -156,6 +157,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
           openChanges: [],
         },
       ],
+      openChangeIds: ["change-run-field", "change-forked-sessions", "change-usage-cursors"],
     },
   ],
   constraints: [
