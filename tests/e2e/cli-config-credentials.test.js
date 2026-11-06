@@ -394,6 +394,8 @@ describe("ndx config credentials --import", () => {
       const r = config(args);
       expect(r.code, r.err).toBe(0);
       expect(r.out).toMatch(/holds an API key \(google\), but the file belongs to the repository/);
+      // Config outranks the store, so storing a key alone does not switch keys.
+      expect(r.out).toMatch(/used instead of the credential store's until it is removed from .*\.n-dx\.local\.json/);
       expect(r.out + r.err).not.toContain(KEY);
     }
     expect(await readFile(localPath(), "utf-8")).toBe(before);

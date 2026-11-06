@@ -4552,7 +4552,8 @@ async function offerKeyImport(dir, flags) {
   if (tracked.tracked) {
     console.log(
       `${label} holds an API key (${names}), but the file belongs to the repository (${tracked.reason}), ` +
-        `so its keys are not moved to your credential store. Store your own with: ndx config credentials.<vendor>`,
+        `so its keys are not moved to your credential store. Each one is used instead of the credential store's ` +
+        `until it is removed from ${label}. Store your own with: ndx config credentials.<vendor>`,
     );
     return;
   }

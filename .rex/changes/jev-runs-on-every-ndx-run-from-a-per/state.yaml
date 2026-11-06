@@ -22,7 +22,14 @@ items:
     lastModified: "2026-11-06T00:51:27.204Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "09879815-d6cd-42b4-ab26-a156cdce8e61":
-    lastModified: "2026-11-06T00:08:35.221Z"
+    status: "completed"
+    startedAt: "2026-11-06T01:01:22.620Z"
+    completedAt: "2026-11-06T01:14:19.482Z"
+    endedAt: "2026-11-06T01:14:19.482Z"
+    activeIntervals: [{"end":"2026-11-06T01:14:19.482Z","start":"2026-11-06T01:01:22.620Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Tracked-file message now says the file's key is used instead of the store's until removed from that file; e2e asserts it."
+    lastModified: "2026-11-06T01:14:19.482Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0e7c49f6-104a-4db7-83f1-7c1397cc7ba7":
     status: "completed"
