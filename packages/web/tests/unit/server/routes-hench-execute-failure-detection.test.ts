@@ -133,6 +133,28 @@ describe("POST /api/hench/execute — failure detection beyond exit code", () =>
     expect(failureEntry.detail).toContain("Stopping after 1 iteration(s) due to failed status.");
   });
 
+  // #989 review: hench warns on stderr but refuses on stdout; the log keeps both.
+  it("logs stderr's warning and stdout's refusal when the run printed both", async () => {
+    stubManagedRun({
+      exitCode: 1,
+      stdout: "Refusing to start: the working tree has uncommitted changes:\n  src/app.ts\n",
+      stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
+    });
+
+    await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: "task-1" }),
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    const log = await readFile(join(rexDir, "execution-log.jsonl"), "utf-8");
+    const failureEntry = log.trim().split("\n").map((l) => JSON.parse(l)).find((e) => e.event === "task_execution_failed");
+    expect(failureEntry.detail).toMatch(
+      /: Warning: hench config field "maxTurn" is unknown and ignored\nRefusing to start: the working tree has uncommitted changes:\n {2}src\/app\.ts$/,
+    );
+  });
+
   it("still reports completed when exitCode is 0", async () => {
     stubManagedRun({ exitCode: 0, stdout: "Task completed successfully.", stderr: "" });
 
