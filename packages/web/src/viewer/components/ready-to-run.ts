@@ -1,9 +1,9 @@
 /**
  * Ready to run — the tasks `ndx work --auto` would pick next, at the top of Work.
  *
- * Fed by `GET /api/hench/ready`, a page at a time, shown in the order returned: the
- * top rows, then "Show all N", with a text search and priority, change and tag
- * filters over every task once the rest of the pages are loaded. Each row
+ * Fed by `GET /api/hench/ready`, shown in the order returned: the top rows, then
+ * "Show all N", with a text search and priority, change and tag filters over
+ * every task once the whole list is loaded (one `all=1` request). Each row
  * opens the Prepare task modal (the primary button and the title); the split
  * button's menu starts the task at once with no options, or copies the terminal
  * command. A start shows a toast: started (with a link to Live), queued (with its
@@ -23,7 +23,7 @@ import type { QueuedReply } from "./prepare-task-model.js";
 
 /** Rows shown before "Show all N". */
 export const READY_TOP_ROWS = 10;
-/** The server's page size (its maximum). */
+/** The first request's page size (the server's maximum). */
 const READY_PAGE = 50;
 const TOAST_MS = 8000;
 
@@ -120,29 +120,25 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const needAllRef = useRef(needAll);
   needAllRef.current = needAll;
 
-  /** The first page; every page once the list is expanded or a control is used. */
+  /**
+   * The first page; the whole list in one request once the list is expanded or
+   * a control is used (each request costs a full selection and runs scan, so
+   * paging through it would repeat that per page).
+   */
   const load = useCallback(async () => {
-    const rows: ReadyTask[] = [];
-    let all = 0;
     try {
-      for (;;) {
-        const res = await fetch(`/api/hench/ready?limit=${READY_PAGE}&offset=${rows.length}`);
-        if (!res.ok) {
-          if (rows.length > 0) break;
-          setError(res.status === 404 ? null : `Could not load the ready list (${res.status})`);
-          setTasks([]);
-          setTotal(0);
-          return;
-        }
-        const data = (await res.json()) as ReadyReply;
-        const page = Array.isArray(data.tasks) ? data.tasks : [];
-        rows.push(...page);
-        all = typeof data.total === "number" ? data.total : rows.length;
-        setDir(typeof data.dir === "string" ? data.dir : "");
-        if (!needAllRef.current || page.length === 0 || rows.length >= all) break;
+      const res = await fetch(needAllRef.current ? "/api/hench/ready?all=1" : `/api/hench/ready?limit=${READY_PAGE}&offset=0`);
+      if (!res.ok) {
+        setError(res.status === 404 ? null : `Could not load the ready list (${res.status})`);
+        setTasks([]);
+        setTotal(0);
+        return;
       }
+      const data = (await res.json()) as ReadyReply;
+      const rows = Array.isArray(data.tasks) ? data.tasks : [];
+      setDir(typeof data.dir === "string" ? data.dir : "");
       setTasks(rows);
-      setTotal(all);
+      setTotal(typeof data.total === "number" ? data.total : rows.length);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the ready list");

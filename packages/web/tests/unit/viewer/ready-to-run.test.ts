@@ -31,7 +31,8 @@ const TASKS = [
 /** The server's page of `tasks` that `url` asks for. */
 function readyPage(tasks: unknown[], url: string) {
   const q = new URL(url, "http://x").searchParams;
-  const limit = Number(q.get("limit")), offset = Number(q.get("offset"));
+  const all = q.get("all") === "1";
+  const limit = all ? tasks.length : Number(q.get("limit")), offset = all ? 0 : Number(q.get("offset"));
   return { tasks: tasks.slice(offset, offset + limit), total: tasks.length, limit, offset, dir: "/work/my app" };
 }
 
@@ -263,10 +264,23 @@ describe("Ready to run: every task, search and filters", () => {
     expect(rows()).toHaveLength(120);
     expect(titles()).toContain("Task number 119");
     expect(rows().some((r) => r.textContent!.includes("low"))).toBe(true);
-    // Three pages of the server's 50.
-    expect(calls.filter((c) => c.url.startsWith("/api/hench/ready")).map((c) => c.url)).toContain("/api/hench/ready?limit=50&offset=100");
+    // One request for the whole list, not a page at a time.
+    expect(calls.filter((c) => c.url.startsWith("/api/hench/ready")).map((c) => c.url)).toEqual([
+      "/api/hench/ready?limit=50&offset=0",
+      "/api/hench/ready?all=1",
+    ]);
     await click(byText("Show top 10"));
     expect(rows()).toHaveLength(10);
+  });
+
+  it("a live refresh while expanded issues one ready request", async () => {
+    await mount(MANY);
+    await click(byText("Show all 120"));
+    const before = calls.length;
+    await act(async () => { live.refresh!(); });
+    await flush();
+    expect(calls.slice(before).map((c) => c.url)).toEqual(["/api/hench/ready?all=1"]);
+    expect(rows()).toHaveLength(120);
   });
 
   it("names each row's change", async () => {
