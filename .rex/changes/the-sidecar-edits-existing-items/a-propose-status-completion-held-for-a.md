@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "Approving a propose_status card to completed while a hench run holds the item's completion does not show \"Status written.\" on the card and names the hold (web test)"
   - "The approval's carriedOut result marks the hold distinctly from a written status (web test)"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
