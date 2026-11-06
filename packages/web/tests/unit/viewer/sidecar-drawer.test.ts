@@ -1360,6 +1360,55 @@ describe("permission cards", () => {
     });
   });
 
+  describe("item-edit card", () => {
+    const edit = (): SidecarCard => card("e1", 1, {
+      kind: "item-edit", tool: "propose_item_edit", allowListKey: null,
+      input: { id: "t1", acceptanceCriteria: ["Loads fast", "Loads in under 1 s"], tags: ["ui"] },
+      itemEdit: {
+        itemId: "t1", itemTitle: "Write the cache",
+        before: { acceptanceCriteria: ["Loads fast", "Works"], tags: [] },
+        after: { acceptanceCriteria: ["Loads fast", "Loads in under 1 s"], tags: ["ui"] },
+      },
+    });
+    const field = (name: string) => root.querySelector(`.sidecar-item-edit-field[data-field="${name}"]`)!;
+
+    it("shows each field before and after, offers no always-allow, and Approve sends no edits when none were made", async () => {
+      await openWith([edit()]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("t1: acceptanceCriteria, tags");
+      expect(root.querySelector(".sidecar-item-edit-item")?.textContent).toBe("t1 Write the cache");
+      const marks = [...field("acceptanceCriteria").querySelectorAll("li")].map((li) => [li.className, li.textContent?.trim()]);
+      expect(marks).toEqual([
+        ["sidecar-item-edit-removed", "− Works"],
+        ["sidecar-item-edit-kept", "Loads fast"],
+        ["sidecar-item-edit-added", "+ Loads in under 1 s"],
+      ]);
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      expect(root.querySelector(".sidecar-card-approve")?.textContent).toBe("Approve and write");
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("sends the operator's edited values with the approval, and the diff follows them", async () => {
+      await openWith([edit()]);
+      const tags = field("tags").querySelector<HTMLTextAreaElement>("textarea")!;
+      await act(async () => { tags.value = "ui\ncache"; tags.dispatchEvent(new Event("input", { bubbles: true })); });
+      expect([...field("tags").querySelectorAll("li.sidecar-item-edit-added")].map((li) => li.textContent?.trim())).toEqual(["+ ui", "+ cache"]);
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", edits: { tags: ["ui", "cache"] } }]);
+    });
+
+    it("sends no edits with a denial", async () => {
+      await openWith([edit()]);
+      const tags = field("tags").querySelector<HTMLTextAreaElement>("textarea")!;
+      await act(async () => { tags.value = "other"; tags.dispatchEvent(new Event("input", { bubbles: true })); });
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-deny")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
+  });
+
   describe("draft-file card", () => {
     const file = (): SidecarCard => card("f1", 1, { kind: "draft-file", tool: "save_draft", input: { kind: "restack-plan", path: "/h/hub/drafts/restack.md", content: "1. rebase #12" } });
     const pathInput = () => root.querySelector<HTMLInputElement>(".sidecar-draft-path-input")!;
@@ -1418,6 +1467,8 @@ describe("permission cards", () => {
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
     // Without its link (a card from before the link was read) the title is the call's own.
     link: { tool: "propose_link", input: { itemId: "t1", ref: "WM-2054" }, title: "t1 → WM-2054" },
+    // Without its fields (a card from before the item was read) the title is the item's id.
+    "item-edit": { tool: "propose_item_edit", input: { id: "t1", tags: ["ui"] }, title: "t1" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },

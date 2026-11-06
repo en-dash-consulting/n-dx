@@ -71,6 +71,8 @@ function spyActions(): SidecarActions & { ran: Array<{ argv: string[]; project?:
     writePlacement: async () => refused,
     checkLink: async () => "no",
     writeLink: async () => refused,
+    checkItemEdit: async () => "no",
+    writeItemEdit: async () => refused,
     readRunPlan: async () => "no",
     githubReadsAllowed: () => false,
     branchHealthEnabled: () => false,
@@ -109,7 +111,7 @@ describe("what the hub session is offered", () => {
     const names = tools.map((t) => t.name);
     expect(names).toContain("start_work");
     expect(names).not.toContain("save_draft");
-    expect(names).toHaveLength(11);
+    expect(names).toHaveLength(12);
   });
 
   it("refuses a withheld tool called by name", async () => {
