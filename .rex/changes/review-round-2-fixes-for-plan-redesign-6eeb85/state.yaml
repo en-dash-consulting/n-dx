@@ -1,8 +1,22 @@
 schema: "rex/v2"
 items:
   "6eeb8500-93ef-4837-92c2-908a49f63a93":
-    lastModified: "2026-11-06T16:24:59.128Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:26:49.973Z"
+    completedAt: "2026-11-06T16:26:49.973Z"
+    endedAt: "2026-11-06T16:26:49.973Z"
+    activeIntervals: [{"end":"2026-11-06T16:26:49.973Z","start":"2026-11-06T16:26:49.973Z"}]
+    appliedAt: "2026-11-06T16:26:49.973Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T16:26:49.973Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9aa864df-29bd-4d42-9abd-73e204e922af":
-    lastModified: "2026-11-06T16:24:59.128Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:25:05.457Z"
+    completedAt: "2026-11-06T16:26:49.973Z"
+    endedAt: "2026-11-06T16:26:49.973Z"
+    activeIntervals: [{"end":"2026-11-06T16:26:49.973Z","start":"2026-11-06T16:25:05.457Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Opening zoom in placement-mode.ts starts at ghostArea.slug when a ghost exists; new test delays /api/rex/product past /placements."
+    lastModified: "2026-11-06T16:26:49.973Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

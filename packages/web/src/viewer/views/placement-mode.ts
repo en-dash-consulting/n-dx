@@ -367,9 +367,12 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   }, []);
   useEffect(() => {
     if (zoom !== undefined || !map || !read) return;
+    // A resumed draft's ghost already names its area. The ghost-follow effect has run in this commit and
+    // will not fire again, so the opening zoom must not overwrite it.
+    if (ghostArea) { setZoom(ghostArea.slug); return; }
     const start = placement ? placementStart(placement, map) : { level: "map" as const };
     setZoom(start.level === "area" ? start.slug : null);
-  }, [zoom, map, read, placement]);
+  }, [zoom, map, read, placement, ghostArea]);
 
   if (inbox.load.state === "v1" || product.state === "v1") {
     return h("div", { class: "empty-state", role: "status" }, "This project's PRD uses the v1 layout, which has no Inbox to place.");

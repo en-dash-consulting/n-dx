@@ -186,7 +186,7 @@ let root: HTMLDivElement;
 /** Answers `POST …/placement/check`: rex's dry run of the body the card sent. */
 type CheckRoute = (body: Record<string, unknown>) => Promise<SidecarPlacementCheck> | SidecarPlacementCheck;
 
-function serve(changes: ChangeRow[], shortlists: ChangePlacement[], check?: CheckRoute): void {
+function serve(changes: ChangeRow[], shortlists: ChangePlacement[], check?: CheckRoute, holdProduct?: Promise<void>): void {
   const routes: Record<string, unknown> = {
     "/api/project": { cliName: "ndx" },
     "/api/rex/changes": { layout: "v2", changes },
@@ -201,6 +201,7 @@ function serve(changes: ChangeRow[], shortlists: ChangePlacement[], check?: Chec
       const answer = await check(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return new Response(JSON.stringify({ layout: "v2", change: "a", check: answer }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
+    if (holdProduct && url === "/api/rex/product") await holdProduct;
     const body = routes[url];
     return new Response(JSON.stringify(body ?? { error: "not found" }), {
       status: body === undefined ? 404 : 200,
@@ -1008,6 +1009,19 @@ describe("PlacementMode", () => {
       sessionStorage.setItem(KEY, JSON.stringify({ step: "propose", type: "capability", under: "area-tax", title: "Gift receipts", statement: "", criteria: "" }));
       serve([change("a")], [placement("a", TWO)]);
       await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect($<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!.value).toBe("area-tax");
+      expect(crumb()).toEqual(["Plan", "Product map", "Tax"]);
+    });
+
+    it("keeps a resumed draft's area when the map read lands after the shortlist", async () => {
+      sessionStorage.setItem(KEY, JSON.stringify({ step: "propose", type: "capability", under: "area-tax", title: "Gift receipts", statement: "", criteria: "" }));
+      let release!: () => void;
+      serve([change("a")], [placement("a", TWO)], undefined, new Promise<void>((r) => { release = r; }));
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      // The shortlist is in; the map is not.
+      expect($(".pam")).toBeNull();
+      await act(async () => { release(); });
+      await settle();
       expect($<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!.value).toBe("area-tax");
       expect(crumb()).toEqual(["Plan", "Product map", "Tax"]);
     });
