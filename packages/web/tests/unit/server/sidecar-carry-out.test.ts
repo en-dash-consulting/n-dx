@@ -384,6 +384,27 @@ describe("start_work", () => {
     await client.close();
   });
 
+  it("names the task's change on the work card", async () => {
+    writeFileSync(join(root, ".rex", ".cache", "prd.json"), JSON.stringify({
+      schema: "rex/v1",
+      title: "carry out",
+      items: [{
+        id: "change-1", type: "change", title: "Ship it", status: "pending",
+        children: [{ id: "task-1", type: "task", title: "Carry it out", status: "pending" }],
+      }],
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+
+    const [card] = broker.cards(SESSION) as SidecarCard[];
+    expect(card.rowText).toBe("Carry it out · in Ship it");
+
+    await decide(cardId, { decision: "approve" });
+    await call;
+    await client.close();
+  });
+
   it("reports the execute route's refusal and starts nothing", async () => {
     const client = await brokerClient();
     const call = client.callTool({ name: "start_work", arguments: { taskId: "missing" } });
