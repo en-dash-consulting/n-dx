@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-06T18:45:20.932Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9f53670-8e31-4f3f-a630-786ca4800d3a":
-    lastModified: "2026-11-06T00:17:27.006Z"
+    status: "completed"
+    startedAt: "2026-11-06T18:45:54.036Z"
+    completedAt: "2026-11-06T18:48:43.490Z"
+    endedAt: "2026-11-06T18:48:43.490Z"
+    activeIntervals: [{"end":"2026-11-06T18:48:43.490Z","start":"2026-11-06T18:45:54.036Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Add item form gains a Done when list and a tags field and sends both; viewer tests cover it."
+    lastModified: "2026-11-06T18:48:43.490Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e07a0471-db0d-4301-9485-1dc5462a9b6d":
     status: "completed"
