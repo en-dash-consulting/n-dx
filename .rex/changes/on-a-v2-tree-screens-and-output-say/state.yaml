@@ -6,6 +6,9 @@ items:
   "58e97129-66cf-472a-9371-cb2bf7ce9c14":
     lastModified: "2026-11-06T01:00:43.535Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5d18cc19-98d9-4045-8ff8-0920f44875eb":
+    lastModified: "2026-11-06T19:55:51.518Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "785c4836-0aff-4725-baca-33d10834bf42":
     lastModified: "2026-11-06T01:01:33.448Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -13,11 +16,18 @@ items:
     lastModified: "2026-11-06T01:02:33.011Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1cea4f6-bf60-4e78-a038-49994901772f":
-    lastModified: "2026-11-06T01:02:55.105Z"
+    lastModified: "2026-11-06T19:55:51.518Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c76674c4-296a-4763-98b4-2557bcafcef7":
     lastModified: "2026-11-06T01:01:08.467Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d143adff-01b4-4459-b703-a9c1fccc4141":
-    lastModified: "2026-11-06T01:00:21.166Z"
+    status: "completed"
+    startedAt: "2026-11-06T19:51:15.150Z"
+    completedAt: "2026-11-06T19:56:20.142Z"
+    endedAt: "2026-11-06T19:56:20.142Z"
+    activeIntervals: [{"end":"2026-11-06T19:56:20.142Z","start":"2026-11-06T19:51:15.150Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "v2 tree view meta/header, Up Next count, search type filter read layout; glossary gains 5 entries; commit 70b363ef4"
+    lastModified: "2026-11-06T19:56:20.142Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

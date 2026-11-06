@@ -10,6 +10,8 @@ import { act } from "preact/test-utils";
 import { viewBlurbFor, viewLabelFor } from "../../../src/viewer/views/view-meta.js";
 import { RexDashboard } from "../../../src/viewer/views/rex-dashboard.js";
 import { SearchOverlay } from "../../../src/viewer/components/search-overlay.js";
+import { PRDView } from "../../../src/viewer/views/prd.js";
+import type { PRDDocumentData } from "../../../src/viewer/components/prd-tree/types.js";
 
 const STATS = { total: 4, completed: 1, inProgress: 1, pending: 2, deferred: 0, blocked: 0 };
 
@@ -63,6 +65,44 @@ describe("tree view meta", () => {
   it("keeps the v1 words on a v1 tree", () => {
     expect(viewLabelFor("prd", "v1")).toBe("Tasks");
     expect(viewBlurbFor("prd", "v1")).toMatch(/epics, features, tasks/);
+  });
+});
+
+describe("tree view", () => {
+  const v1Doc: PRDDocumentData = {
+    schema: "rex/v1",
+    title: "Demo",
+    items: [{ id: "e", title: "Auth", status: "pending", level: "epic", children: [{ id: "t", title: "Login", status: "pending", level: "task" }] }],
+  };
+  const v2Doc: PRDDocumentData = {
+    schema: "rex/v1",
+    title: "Demo",
+    items: [{ id: "c", title: "Auth", status: "pending", type: "change", level: "epic", children: [{ id: "t", title: "Login", status: "pending", type: "task", level: "task" }] } as PRDDocumentData["items"][number]],
+  };
+
+  async function header(layout: "v1" | "v2"): Promise<{ title: string; tips: string[]; text: string }> {
+    stub(layout);
+    await mount(h(PRDView, { prdData: layout === "v2" ? v2Doc : v1Doc, onSelectItem: vi.fn(), onDetailContent: vi.fn() }));
+    const tips = [...root.querySelectorAll<HTMLElement>("[aria-label], [title]")]
+      .map((el) => `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("title") ?? ""}`);
+    return {
+      title: root.querySelector(".view-header .section-header")?.textContent ?? "",
+      tips,
+      text: root.textContent ?? "",
+    };
+  }
+
+  it("is the Change tree on v2 and its header and tips name no epic or feature", async () => {
+    const { title, tips } = await header("v2");
+    expect(title).toBe("Change tree");
+    expect(tips.join(" ")).not.toMatch(/epic|feature/i);
+    expect(root.querySelector(".prd-search-input")?.getAttribute("placeholder")).toMatch(/^Search changes/);
+  });
+
+  it("keeps Tasks and the epic / feature / task tip on v1", async () => {
+    const { title, tips } = await header("v1");
+    expect(title).toBe("Tasks");
+    expect(tips.join(" ")).toMatch(/epic \/ feature \/ task/i);
   });
 });
 
