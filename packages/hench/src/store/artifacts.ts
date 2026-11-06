@@ -271,20 +271,42 @@ export function splitPorcelainLines(output: string): string[] {
   return output.split(/\r?\n/).filter((line) => line.trim().length > 0);
 }
 
-export function parsePorcelainPath(line: string): string {
+function unquotePorcelainPath(path: string): string {
+  const trimmed = path.trim();
+  return trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')
+    ? trimmed.slice(1, -1)
+    : trimmed;
+}
+
+/** Split a porcelain line into its path(s); `from` is set only for R/C lines. */
+function splitPorcelainPaths(line: string): { from?: string; to: string } {
   const status = line.slice(0, 2);
-  let path = line.length > 3 ? line.slice(3) : line.trim();
+  const path = line.length > 3 ? line.slice(3) : line.trim();
 
   if (status.includes("R") || status.includes("C")) {
     const arrow = path.lastIndexOf(" -> ");
-    if (arrow !== -1) path = path.slice(arrow + 4);
+    if (arrow !== -1) {
+      return {
+        from: unquotePorcelainPath(path.slice(0, arrow)),
+        to: unquotePorcelainPath(path.slice(arrow + 4)),
+      };
+    }
   }
+  return { to: unquotePorcelainPath(path) };
+}
 
-  path = path.trim();
-  if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) {
-    path = path.slice(1, -1);
-  }
-  return path;
+/** The path a porcelain line leaves behind: the new path of an R/C line. */
+export function parsePorcelainPath(line: string): string {
+  return splitPorcelainPaths(line).to;
+}
+
+/**
+ * A porcelain line's path for display: `old -> new` for an R/C line, so a move
+ * out of a non-planning path names its source, otherwise the plain path.
+ */
+export function formatPorcelainPath(line: string): string {
+  const { from, to } = splitPorcelainPaths(line);
+  return from === undefined ? to : `${from} -> ${to}`;
 }
 
 /**

@@ -4,9 +4,23 @@ import {
   HENCH_RUNTIME_GITIGNORE_ENTRIES,
   excludeHenchRuntimeArtifacts,
   isHenchRuntimeArtifact,
+  formatPorcelainPath,
   parsePorcelainPath,
   splitPorcelainLines,
 } from "../../../src/store/artifacts.js";
+
+describe("formatPorcelainPath", () => {
+  it("renders a rename or copy as old -> new", () => {
+    expect(formatPorcelainPath("R  src/app.ts -> .rex/changes/ch/app.ts")).toBe("src/app.ts -> .rex/changes/ch/app.ts");
+    expect(formatPorcelainPath("C  src/a.ts -> src/b.ts")).toBe("src/a.ts -> src/b.ts");
+    expect(formatPorcelainPath('R  "old one.ts" -> "new one.ts"')).toBe("old one.ts -> new one.ts");
+  });
+
+  it("renders any other line as its plain path", () => {
+    expect(formatPorcelainPath(" M src/app.ts")).toBe("src/app.ts");
+    expect(formatPorcelainPath('?? "a -> b.ts"')).toBe("a -> b.ts");
+  });
+});
 
 /**
  * A directory that is not inside any git repository, so the repo-relative

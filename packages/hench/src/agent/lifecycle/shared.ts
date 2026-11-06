@@ -40,6 +40,7 @@ import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { LLMVendor, PromptEnvelope } from "../../prd/llm-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
+  formatPorcelainPath,
   matchesProjectPath,
   parsePorcelainPath,
   repoRelativePrefix,
@@ -3272,7 +3273,7 @@ const DIRTY_FILE_LIST_LIMIT = 20;
 
 /** Indented path list of porcelain lines, capped at {@link DIRTY_FILE_LIST_LIMIT}. */
 function formatDirtyFileList(porcelainLines: string[]): string {
-  const shown = porcelainLines.slice(0, DIRTY_FILE_LIST_LIMIT).map((line) => `  ${parsePorcelainPath(line)}`);
+  const shown = porcelainLines.slice(0, DIRTY_FILE_LIST_LIMIT).map((line) => `  ${formatPorcelainPath(line)}`);
   const rest = porcelainLines.length - shown.length;
   return [...shown, ...(rest > 0 ? [`  … and ${rest} more`] : [])].join("\n");
 }

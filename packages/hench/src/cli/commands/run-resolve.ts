@@ -28,7 +28,7 @@ import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { missingPrdFolderError } from "./prd-folder.js";
-import { excludeHenchRuntimeArtifacts, parsePorcelainPath, splitPlanningPaths } from "../../store/artifacts.js";
+import { excludeHenchRuntimeArtifacts, formatPorcelainPath, splitPlanningPaths } from "../../store/artifacts.js";
 import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/shared.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
@@ -477,7 +477,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   const split = await splitPlanningPaths(dirtyLines, dir);
   const planningCommit = !allowDirty && split.other.length === 0 ? split.planning : [];
   if (dirty && !allowDirty && split.other.length > 0) {
-    const others = split.other.map(parsePorcelainPath);
+    const others = split.other.map(formatPorcelainPath);
     refuse(
       "dirty-tree",
       new CLIError(
