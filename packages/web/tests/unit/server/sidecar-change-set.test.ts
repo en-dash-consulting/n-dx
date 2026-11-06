@@ -198,6 +198,19 @@ describe("on a v1 PRD", () => {
     await client.close();
   });
 
+  it("writes the proposed tags, and the operator's edited tags, to the new items", async () => {
+    const client = await brokerClient();
+    const { call, card } = await propose(client, {
+      items: [{ title: "Tagged epic", tags: [" billing ", "billing", ""] }, { title: "Untagged", parent: 0 }],
+    });
+    expect(card.changeSet?.items[0].tags).toEqual(["billing"]);
+    await decide(card.id, { decision: "approve", edits: [{ index: 0, tags: ["billing", "q4"] }, { index: 1, tags: ["ui"] }] });
+    const [first, second] = idsIn(resultText(await call));
+    expect(findItem(await v1Items(), first)!.item.tags).toEqual(["billing", "q4"]);
+    expect(findItem(await v1Items(), second)!.item.tags).toEqual(["ui"]);
+    await client.close();
+  });
+
   it("refuses an edit it cannot write, leaving the card waiting", async () => {
     const client = await brokerClient();
     const { call, card } = await propose(client, { items: [{ title: "Refund flow" }] });
@@ -344,7 +357,7 @@ describe("on a v2 PRD", () => {
     const { call, card } = await propose(client, {
       items: [
         { title: "Offer Google Pay", description: "Android shoppers want a wallet." },
-        { title: "Wire the Google Pay button", acceptanceCriteria: ["The button appears on Chrome"] },
+        { title: "Wire the Google Pay button", acceptanceCriteria: ["The button appears on Chrome"], tags: ["wallet"] },
         { title: "Charge through the wallet", type: "task" },
       ],
       target: "A1.1",
@@ -364,7 +377,7 @@ describe("on a v2 PRD", () => {
     expect((node as { needsPlacement?: boolean }).needsPlacement).toBeUndefined();
     // Read back in slug order, not the card's.
     expect(node?.children?.map((c) => c.id).sort()).toEqual(ids.slice(1).sort());
-    expect(node?.children?.find((c) => c.id === ids[1])).toMatchObject({ type: "task", acceptanceCriteria: ["The button appears on Chrome"] });
+    expect(node?.children?.find((c) => c.id === ids[1])).toMatchObject({ type: "task", acceptanceCriteria: ["The button appears on Chrome"], tags: ["wallet"] });
     const log = readFileSync(join(ctx.rexDir, "execution-log.jsonl"), "utf-8");
     expect(log).toContain(`"event":"change_placed","itemId":"${ids[0]}"`);
     const placed = log.trim().split("\n").map((l) => JSON.parse(l)).find((e) => e.event === "change_placed");
