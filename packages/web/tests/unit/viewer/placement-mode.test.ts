@@ -692,6 +692,32 @@ describe("PlacementMode", () => {
       expect($(".cp-propose")).not.toBeNull();
     });
 
+    describe("after a plain Place, the placed change has left the Inbox", () => {
+      const placeThen = async (key: string) => {
+        const all = ["a", "b", "c", "d"];
+        serve(all.map((id) => change(id)), all.map((id) => placement(id, TWO)));
+        const navigateTo = vi.fn();
+        await mount(h(PlacementMode, { changeId: "c", navigateTo }));
+        // The refetch after Place no longer lists c.
+        also({ "/api/rex/changes": { layout: "v2", changes: ["a", "b", "d"].map((id) => change(id)) } });
+        await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
+        await settle();
+        await act(async () => { $<HTMLButtonElement>(".cp-place")!.click(); });
+        await settle();
+        navigateTo.mockClear();
+        await press(key);
+        return navigateTo;
+      };
+
+      it("J opens the change that took its slot", async () => {
+        expect(await placeThen("j")).toHaveBeenLastCalledWith("product", { tab: "place/d" });
+      });
+
+      it("K opens the change before its slot", async () => {
+        expect(await placeThen("k")).toHaveBeenLastCalledWith("product", { tab: "place/b" });
+      });
+    });
+
     it("leaves a key typed into a field to the field", async () => {
       serve([change("a"), change("b")], [placement("a", TWO), placement("b", TWO)]);
       const navigateTo = vi.fn();

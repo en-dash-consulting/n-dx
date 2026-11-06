@@ -177,13 +177,17 @@ export function otherAreaCandidates(shortlist: readonly PlacementCandidate[], ma
     .filter(({ area }) => area?.slug !== slug);
 }
 
-/** The change `delta` places from `changeId` in the Inbox order, wrapping; null when no other change waits. */
-export function neighbourChange(order: readonly string[], changeId: string, delta: 1 | -1): string | null {
+/**
+ * The change `delta` places from `changeId` in the Inbox order, wrapping; null when no other change waits.
+ * A placed change has left the order: `lastIndex` is the slot it held, so J lands on the change that took
+ * it and K on the one before it.
+ */
+export function neighbourChange(order: readonly string[], changeId: string, delta: 1 | -1, lastIndex = 0): string | null {
   const others = order.filter((id) => id !== changeId);
   if (!others.length) return null;
   const index = order.indexOf(changeId);
-  if (index < 0) return delta > 0 ? others[0] : others[others.length - 1];
-  return order[(index + delta + order.length) % order.length];
+  const from = index >= 0 ? index + delta : delta > 0 ? lastIndex : lastIndex - 1;
+  return order[(from + order.length) % order.length];
 }
 
 /** The breadcrumb's placing label: the change's place in the Inbox, then its title. */
@@ -301,6 +305,10 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   // A placed change leaves the Inbox; the panel still shows where it went.
   const lastRow = useRef<InboxRow | undefined>(row);
   if (row) lastRow.current = row;
+  // Where the change last sat in the Inbox order: once placed it leaves, and J/K step from that slot.
+  const lastIndex = useRef(0);
+  const orderIndex = inbox.rows.findIndex((r) => r.change.id === changeId);
+  if (orderIndex >= 0) lastIndex.current = orderIndex;
   const shown = row ?? lastRow.current;
   const read = shown?.shortlist;
   const placement = read && "placement" in read ? read.placement : null;
@@ -328,7 +336,7 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
   // #896's keys, on the panel beside the map: J/K and S open another Inbox change, the rest press its controls.
   useShortcuts((shortcut) => {
     if (shortcut.kind === "move" || shortcut.kind === "skip") {
-      const to = neighbourChange(inbox.rows.map((r) => r.change.id), changeId, shortcut.kind === "skip" ? 1 : shortcut.delta);
+      const to = neighbourChange(inbox.rows.map((r) => r.change.id), changeId, shortcut.kind === "skip" ? 1 : shortcut.delta, lastIndex.current);
       if (to) navigateTo?.("product", { tab: placementTab(to) });
       return;
     }
