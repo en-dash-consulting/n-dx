@@ -30,7 +30,7 @@ import {
   type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarItemEdit, SidecarLink, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
 import { applyItemEditEdits } from "./item-edit-card.js";
 import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
@@ -62,6 +62,8 @@ export interface SidecarCard {
   link?: SidecarLink;
   /** An item-edit card's fields as read when it was raised and as approval writes them. */
   itemEdit?: SidecarItemEdit;
+  /** A status card's item, current and proposed status and rex's verdict on the move. */
+  statusChange?: SidecarStatusChange;
   /** An external-call card's connection, workspace, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator chose to start on a run-plan card. */
@@ -92,6 +94,7 @@ export interface CardAnnex {
   placement?: SidecarPlacement;
   link?: SidecarLink;
   itemEdit?: SidecarItemEdit;
+  statusChange?: SidecarStatusChange;
   externalCall?: SidecarExternalCall;
 }
 
@@ -234,6 +237,7 @@ export class SidecarBroker {
       ...(annex.placement !== undefined && { placement: annex.placement }),
       ...(annex.link !== undefined && { link: annex.link }),
       ...(annex.itemEdit !== undefined && { itemEdit: annex.itemEdit }),
+      ...(annex.statusChange !== undefined && { statusChange: annex.statusChange }),
       ...(annex.externalCall !== undefined && { externalCall: annex.externalCall }),
       status: "pending",
       raisedAt: this.iso(),
