@@ -203,6 +203,28 @@ describe("from Plan's product map", () => {
     act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
     expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${AREA_DETAIL_FIXTURE.slug}` });
   });
+
+  it("'Open on Product page' encodes a hand-authored slug in the tab", async () => {
+    const slug = "café #1";
+    const map = {
+      ...PRODUCT_MAP_FIXTURE,
+      areas: PRODUCT_MAP_FIXTURE.areas.map((a) => (a.id === AREA_DETAIL_FIXTURE.id ? { ...a, slug } : a)),
+    };
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map },
+      [`/api/rex/product/area/${encodeURIComponent(slug)}`]: { layout: "v2", area: { ...AREA_DETAIL_FIXTURE, slug } },
+      "/api/status": V2_STATUS,
+    });
+    const navigateTo = vi.fn();
+    await mount(h("div", null, renderActiveView("plan", {
+      navigateTo, validViews: buildValidViews(null), data: {}, isFeatureDisabled: () => false,
+    } as never)));
+    await vi.waitFor(() => expect(root.querySelector(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)).not.toBeNull());
+    act(() => root.querySelector<HTMLButtonElement>(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)!.click());
+    await settle();
+    act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${encodeURIComponent(slug)}` });
+  });
 });
 
 describe("a selected capability", () => {
