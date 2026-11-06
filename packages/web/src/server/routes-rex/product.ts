@@ -189,6 +189,8 @@ export interface NextPickWire {
  */
 export interface ChangeSummaryWire {
   inbox: number;
+  /** Inbox changes also counted in a stage: with no capability to place them on, rex does not hold them. */
+  inboxInStage: number;
   stages: Record<OpenChangeStageWire, number>;
   /** Placed open changes, in tree order. */
   open: GlanceChangeWire[];
@@ -537,6 +539,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
   const stages: Record<OpenChangeStageWire, number> = { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 };
   const open: GlanceChangeWire[] = [];
   let inbox = 0;
+  let inboxInStage = 0;
   for (const change of changesOf(index)) {
     if (!isOpenChange(change)) continue;
     // The Inbox count is get_prd_status's; only a held change leaves the stages,
@@ -546,6 +549,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
     const stage = stageOf(change);
     if (stage === "applied" || stage === "shipped") continue;
     stages[stage]++;
+    if (isInboxChange(change)) inboxInStage++;
     const tasks = tasksOf(change);
     open.push({
       id: change.id,
@@ -574,7 +578,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       summary: pick.explanation.summary,
     }
     : null;
-  return { inbox, stages, open, next, requirements: requirementCoverage(index) };
+  return { inbox, inboxInStage, stages, open, next, requirements: requirementCoverage(index) };
 }
 
 /**

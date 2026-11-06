@@ -10,6 +10,8 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
+import type { RuleNode } from "../../../src/server/rex-gateway.js";
+import { buildChangeSummary } from "../../../src/server/routes-rex/product.js";
 import type {
   AreaDetailWire,
   CapabilityDetailWire,
@@ -429,6 +431,7 @@ describe("v2 product reads", () => {
         layout: "v2",
         summary: {
           inbox: 0,
+          inboxInStage: 0,
           stages: { proposed: 0, ready: 0, "in-progress": 1, "awaiting-apply": 0 },
           open: [{
             id: CHANGE_ID,
@@ -906,5 +909,27 @@ describe("product reads on a v1 project", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error).toContain("v1");
     expect(existsSync(join(tmpDir, ".rex", "product"))).toBe(false);
+  });
+});
+
+describe("buildChangeSummary: Inbox changes also counted in a stage", () => {
+  const capability: RuleNode = { id: "cap-1", type: "capability", title: "Pay", slug: "pay" };
+  const change = (id: string, held: boolean): RuleNode => ({
+    id, type: "change", title: id, slug: id, ...(held ? { needsPlacement: true } : {}),
+  });
+  const staged = (s: ChangeSummaryWire): number => Object.values(s.stages).reduce((n, c) => n + c, 0);
+
+  it("counts an Inbox change in a stage too when no capability can hold it", () => {
+    const summary = buildChangeSummary({ product: [], changes: [change("a", true), change("b", false)] });
+    expect(summary.inbox).toBe(1);
+    expect(summary.inboxInStage).toBe(1);
+    expect(staged(summary)).toBe(2);
+  });
+
+  it("counts a held Inbox change once, in the Inbox only", () => {
+    const summary = buildChangeSummary({ product: [capability], changes: [change("a", true)] });
+    expect(summary.inbox).toBe(1);
+    expect(summary.inboxInStage).toBe(0);
+    expect(staged(summary)).toBe(0);
   });
 });

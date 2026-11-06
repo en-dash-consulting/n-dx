@@ -16,6 +16,7 @@ import type { ChangeRow, ChangeSummary } from "../../../src/viewer/views/product
 
 const SUMMARY: ChangeSummary = {
   inbox: 3,
+  inboxInStage: 0,
   stages: { proposed: 4, ready: 0, "in-progress": 2, "awaiting-apply": 1 },
   open: [],
   requirements: { total: 0, uncovered: 0 },
@@ -130,6 +131,20 @@ describe("LifecycleStrip on v2", () => {
     answer({ layout: "v2", summary: { ...SUMMARY, stages: { ...SUMMARY.stages, ready: 2 } } });
     await mount();
     expect(root.querySelector(".ls-hint")).toBeNull();
+  });
+
+  it("says an Inbox change is also in a stage when no capability can hold it", async () => {
+    answer({ layout: "v2", summary: { ...SUMMARY, inbox: 1, inboxInStage: 1 } });
+    await mount();
+    const cell = root.querySelector('[data-stage="inbox"]')!;
+    expect(cell.querySelector(".ls-count")?.textContent).toBe("1Inbox");
+    expect(cell.querySelector(".ls-also-in-stage")?.textContent).toBe("1 also in a stage: no capability to place it on yet");
+  });
+
+  it("shows no note when every Inbox change is held", async () => {
+    answer({ layout: "v2", summary: SUMMARY });
+    await mount();
+    expect(root.querySelector(".ls-also-in-stage")).toBeNull();
   });
 
   it("offers no Start or Run control", async () => {

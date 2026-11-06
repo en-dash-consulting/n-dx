@@ -37,6 +37,7 @@ const INBOX: GhostSource = {
 
 const SUMMARY: ChangeSummary = {
   inbox: 3,
+  inboxInStage: 0,
   stages: { proposed: 4, ready: 0, "in-progress": 2, "awaiting-apply": 1 },
   open: [],
   requirements: { total: 0, uncovered: 0 },

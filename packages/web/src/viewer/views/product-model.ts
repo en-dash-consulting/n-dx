@@ -278,6 +278,8 @@ export interface NextPick {
  */
 export interface ChangeSummary {
   inbox: number;
+  /** Inbox changes also counted in a stage: with no capability to place them on, rex does not hold them. */
+  inboxInStage: number;
   stages: Record<OpenChangeStage, number>;
   open: GlanceChange[];
   next: NextPick | null;

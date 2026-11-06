@@ -1262,4 +1262,5 @@
 /* Sidecar ghosts (SP5): changes a waiting card proposes — dashed, dimmed, never counted. */
 .cg-ghost { opacity: 0.6; font-style: italic; border-left: 2px dashed var(--border); padding-left: var(--space-2); }
 .cg-ghost-chip { border: 1px dashed var(--border); background: none; font-style: normal; }
+.ls-also-in-stage { color: var(--text-dim); font-size: 12px; }
 .ls-waiting { color: var(--text-muted); font-size: 12px; font-style: italic; }

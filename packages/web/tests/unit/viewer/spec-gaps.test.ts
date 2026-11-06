@@ -14,6 +14,7 @@ function change(id: string, over: Partial<GlanceChange> = {}): GlanceChange {
 function summary(open: GlanceChange[], over: Partial<ChangeSummary> = {}): ChangeSummary {
   return {
     inbox: 0,
+    inboxInStage: 0,
     stages: { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 },
     open,
     next: null,

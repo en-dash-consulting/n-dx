@@ -24,6 +24,7 @@ import { ChangesGlance } from "../../../src/viewer/views/changes-glance.js";
 
 const SUMMARY = {
   inbox: 1,
+  inboxInStage: 0,
   stages: { proposed: 1, ready: 0, "in-progress": 0, "awaiting-apply": 0 },
   open: [{ id: "c1", title: "Change c1", stage: "proposed", taskCount: 0, completedTaskCount: 0, criteriaGap: false, openBlockers: 0 }],
   next: null,

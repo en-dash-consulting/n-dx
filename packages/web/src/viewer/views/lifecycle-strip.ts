@@ -42,6 +42,8 @@ export interface StripCell {
   pile?: boolean;
   /** Changes a waiting Sidecar card proposes for this stage; noted apart, never in `count`. */
   waiting?: number;
+  /** Said beside the count when part of it is also counted in a stage; nothing when zero. */
+  alsoInStage?: number;
 }
 
 /** The strip's short stage names; Open changes spells "awaiting-apply" out in full. */
@@ -55,10 +57,13 @@ const STAGE_CELLS: ReadonlyArray<{ stage: OpenChangeStage; label: string; hint: 
 /** Said under the Inbox count. */
 export const INBOX_HINT = "waiting for a place on the map";
 
+/** Said beside the Inbox count when some of it is also in a stage. */
+export const inboxAlsoInStageNote = (n: number): string => `${n.toLocaleString()} also in a stage: no capability to place it on yet`;
+
 /** The five v2 counts, in lifecycle order. */
 export function v2Cells(summary: ChangeSummary, waiting: { inbox: number; proposed: number } = { inbox: 0, proposed: 0 }): StripCell[] {
   return [
-    { key: "inbox", label: "Inbox", count: summary.inbox, target: { view: "inbox" }, hint: INBOX_HINT, waiting: waiting.inbox },
+    { key: "inbox", label: "Inbox", count: summary.inbox, target: { view: "inbox" }, hint: INBOX_HINT, waiting: waiting.inbox, alsoInStage: summary.inboxInStage },
     ...STAGE_CELLS.map(({ stage, label, hint }): StripCell => ({
       key: stage,
       label,
@@ -101,6 +106,9 @@ function Count({ cell, navigateTo }: { cell: StripCell; navigateTo: NavigateTo }
     cell.hint ? h("span", { class: "ls-stage-hint", id: hintId }, cell.hint) : null,
     cell.hintWhenZero && cell.count === 0
       ? h("span", { class: "ls-hint" }, "needs an automated requirement · ", h("code", null, "rex ready"))
+      : null,
+    cell.alsoInStage
+      ? h("span", { class: "ls-also-in-stage" }, inboxAlsoInStageNote(cell.alsoInStage))
       : null,
     cell.waiting
       ? h("span", { class: "ls-waiting" }, `+${cell.waiting} waiting on a card`)
