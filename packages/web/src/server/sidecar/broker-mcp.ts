@@ -157,6 +157,18 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
       priority: z.enum(["critical", "high", "medium", "low"]).optional(),
     },
   },
+  propose_status: {
+    description: [
+      "Propose changing an existing PRD item's status (what rex update_task_status does). Always waits for the operator's status card, which shows the current and proposed status and rex's own transition rule; nothing is written before Approve, and never allow-listed.",
+      "Approval runs rex's own path, never forced: a move rex refuses (for example completed to pending) comes back as an error with rex's message, and completing an item runs rex's checks.",
+      "Refused with no card when the item does not exist or already has the status. Fields other than status are edited with propose_item_edit.",
+    ].join(" "),
+    input: {
+      id: z.string().min(1).describe("The change, task or subtask (id or display id)"),
+      status: z.enum(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled", "deleted"]).describe("The proposed status"),
+      reason: z.string().optional().describe("Why the status changes; shown on the card, and the failure reason when status is failing"),
+    },
+  },
   github_read: {
     description: [
       "Read from GitHub with gh. `pr`: the PR of the worktree the workspace key `ref` names, its checks, each failing check's class and log tail; it reads nothing while the git.branchHealth feature is off.",
@@ -403,6 +415,13 @@ export function createBrokerMcpServer(
         const itemEdit = await actions.checkItemEdit(input);
         if (typeof itemEdit === "string") return text(`No card was raised: ${itemEdit}. Nothing was written.`, true);
         annex.itemEdit = itemEdit;
+      }
+      // A status card shows the item's status read against the PRD; an unknown item or an unchanged status raises none.
+      if (name === "propose_status") {
+        if (!actions) return text("No card was raised: this server cannot read the PRD. Nothing was written.", true);
+        const statusChange = await actions.checkStatus(input);
+        if (typeof statusChange === "string") return text(`No card was raised: ${statusChange}. Nothing was written.`, true);
+        annex.statusChange = statusChange;
       }
       // A run-plan card lists the planner's own lanes; with no plan, or no lane, no card is raised.
       if (name === "propose_run_plan") {

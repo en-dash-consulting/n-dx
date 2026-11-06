@@ -649,7 +649,10 @@ export { createRexMcpServer } from "./cli/mcp.js";
 
 // ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
 
-export { handleEditItem } from "./cli/mcp-tools/index.js";
+export { handleEditItem, handleUpdateTaskStatus } from "./cli/mcp-tools/index.js";
+
+// The status rule `update_task_status` applies without `force`.
+export { validateTransition } from "./core/transitions.js";
 
 // ---- Execution log -----------------------------------------------------------
 // Shared writer behind `append_log` (MCP) and `rex log` / `ndx log` (CLI).

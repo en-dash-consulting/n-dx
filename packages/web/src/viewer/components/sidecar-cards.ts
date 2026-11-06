@@ -44,6 +44,7 @@ import { linkHref, linkText } from "./tracker-links.js";
 import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
 import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "./sidecar-external-call.js";
 import { ItemEditBody, itemEditDraftOf, itemEditEdits, type ItemEditDraft } from "./sidecar-item-edit.js";
+import { StatusBody, statusLabel } from "./sidecar-status.js";
 
 /** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
 export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
@@ -57,6 +58,7 @@ export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>>
   edit: "Edit",
   link: "Link",
   "item-edit": "Item edit",
+  status: "Status",
   "network-read": "Network read",
   "draft-post": "Draft post",
   "draft-file": "Draft file",
@@ -113,6 +115,9 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       // The item and the fields approval writes.
       case "item-edit":
         return card.itemEdit ? `${card.itemEdit.itemId}: ${Object.keys(card.itemEdit.after).join(", ")}` : str(input.id);
+      // The item and its move, as the card read it.
+      case "status":
+        return card.statusChange ? `${card.statusChange.itemId}: ${statusLabel(card.statusChange.from)} → ${statusLabel(card.statusChange.to)}` : str(input.id);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
       case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
       case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
@@ -564,6 +569,11 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
     : card.itemEdit
       ? [
           h(ItemEditBody, { card, editable, draft: editable ? itemEditDraft : {}, onDraft: onItemEditDraft }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
+    : card.statusChange
+      ? [
+          h(StatusBody, { card }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
     : card.link

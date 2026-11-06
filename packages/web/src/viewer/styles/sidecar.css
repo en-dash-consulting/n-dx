@@ -388,6 +388,14 @@
 .sidecar-item-edit-kept { color: var(--text-muted); }
 .sidecar-item-edit-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; }
 .sidecar-item-edit-note { color: var(--text-muted); }
+
+/* Status card: the move and rex's verdict on it. */
+.sidecar-status { display: flex; flex-direction: column; gap: var(--space-1); font-size: 12px; }
+.sidecar-status p { margin: 0; overflow-wrap: anywhere; }
+.sidecar-status-from { color: var(--red); }
+.sidecar-status-to { color: var(--green); text-decoration: none; font-weight: 600; }
+.sidecar-status-refused { color: var(--red); }
+.sidecar-status-reason, .sidecar-status-note { color: var(--text-muted); }
 .sidecar-card-details summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
 
 /* Change-set card (story 11) */

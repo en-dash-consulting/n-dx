@@ -60,6 +60,8 @@ function actions(): SidecarActions {
     writeLink: async () => refused,
     checkItemEdit: (input) => readItemEditCall(rexDir, input),
     writeItemEdit: (itemEdit) => writeItemEditCard({ rexDir, projectDir: root }, itemEdit),
+    checkStatus: async () => "no",
+    writeStatus: async () => refused,
     readRunPlan: async () => "no",
     githubReadsAllowed: () => false,
     branchHealthEnabled: () => false,
