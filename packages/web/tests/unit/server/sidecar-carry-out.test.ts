@@ -780,7 +780,7 @@ describe("propose_run_plan", () => {
     const result = await call;
     expect(result.isError).toBeFalsy();
     const text = resultText(result);
-    expect(text).toContain("The operator chose lane 1 (change change-a). Nothing has started. Call start_work for its first task only: task-1 Carry it out (`ndx work --task=task-1 --auto .`).");
+    expect(text).toContain("The operator chose track 1 (change change-a). Nothing has started. Call start_work for its first task only: task-1 Carry it out (`ndx work --task=task-1 --auto .`).");
     expect(text).toContain("Its other tasks wait, in order: task-2 And this: ndx work --task=task-2 --auto .");
     expect(text).toContain("raise the next start_work card in a later turn");
     expect(text).not.toContain("task-3");
@@ -879,7 +879,7 @@ describe("propose_run_plan", () => {
     const client = await brokerClient();
     const result = await client.callTool({ name: "propose_run_plan", arguments: {} });
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toBe("No card was raised: the planner has no lane (Nothing is ready.). Nothing started.");
+    expect(resultText(result)).toBe("No card was raised: the planner has no track (Nothing is ready.). Nothing started.");
     expect(broker.cards(SESSION)).toEqual([]);
     await client.close();
   });

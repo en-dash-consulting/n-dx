@@ -844,26 +844,26 @@ export async function buildGuidePacket(
     section("summary", "Plan summary", `${oneLine(plan.summary, 300)}\nActive runs: ${plan.activeRuns} of ${plan.runLimit}`),
   ];
   if (plan.lanes.length === 0 && plan.excluded.length === 0) {
-    sections.push(section("ready", "Ready list", "The ready list is empty: no task is ready to run, so there is no lane to plan and no run-plan card to raise."));
+    sections.push(section("ready", "Ready list", "The ready list is empty: no task is ready to run, so there is no track to plan and no run-plan card to raise."));
     return done(sections);
   }
   sections.push(
     section(
       "lanes",
-      "Lanes",
+      "Tracks",
       plan.lanes.length === 0
-        ? "No lane: every ready task was left out. There is nothing to start, so raise no run-plan card."
+        ? "No track: every ready task was left out. There is nothing to start, so raise no run-plan card."
         : plan.lanes
             .map((lane, i) =>
               [
-                `Lane ${i + 1} (change ${lane.changeId}): ${lane.command}`,
+                `Track ${i + 1} (change ${lane.changeId}): ${lane.command}`,
                 ...(lane.ownWorktree ? [`  ${OWN_WORKTREE_NOTE}`] : []),
                 ...lane.tasks.map((t) => `  - ${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`),
               ].join("\n"),
             )
             .join("\n"),
     ),
-    section("excluded", "Left out of every lane", bullets(plan.excluded.map((t) => `${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`), "No ready task was left out.")),
+    section("excluded", "Left out of every track", bullets(plan.excluded.map((t) => `${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`), "No ready task was left out.")),
   );
   return done(sections);
 }
