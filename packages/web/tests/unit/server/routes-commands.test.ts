@@ -2068,6 +2068,25 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(after.ok).toBe(true);
   });
 
+  it("a vendor change made on disk, not through the dashboard, drops the cached verdict", async () => {
+    const configFile = join(tmpDir, ".n-dx.json");
+    await writeFile(configFile, JSON.stringify({ llm: { vendor: "claude" } }));
+    execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
+    execMock.mockResolvedValueOnce({ stdout: "", stderr: "codex: not logged in", error: new Error("exit 1") });
+    const authUrl = `http://127.0.0.1:${port}/api/commands/auth`;
+
+    const first = await (await fetch(authUrl, { method: "POST" })).json();
+    expect(first.ok).toBe(true);
+
+    // What `ndx config llm.vendor codex .` does: no PUT /api/llm/config.
+    await writeFile(configFile, JSON.stringify({ llm: { vendor: "codex" } }));
+
+    expect(await (await fetch(`${authUrl}/cached`)).json()).toEqual({ cached: false });
+    const second = await (await fetch(authUrl, { method: "POST" })).json();
+    expect(execMock).toHaveBeenCalledTimes(2);
+    expect(second).toMatchObject({ ok: false, cached: false });
+  });
+
   it("validate-tokens runs the hench check and returns its output", async () => {
     execMock.mockResolvedValue({ stdout: "token reporting accurate", stderr: "", error: null });
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/validate-tokens`, { method: "POST" });
