@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "A Sidecar reply with single newlines inside a paragraph shows each line on its own line (viewer test)"
   - "The PR preview still joins wrapped lines into one paragraph (viewer test)"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
