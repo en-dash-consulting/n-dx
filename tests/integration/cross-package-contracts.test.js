@@ -1001,7 +1001,7 @@ describe("gateway export auto-detection", () => {
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
-        "collectAllIds", "findNextTask", "findNextWorkTask", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
+        "collectAllIds", "findNextTask", "findNextWorkTask", "findActionableWork", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "validateChangesMerge", "mergeChanges",
