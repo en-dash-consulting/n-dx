@@ -54,6 +54,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   chmodSync,
   closeSync,
+  linkSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -130,13 +131,18 @@ export interface CredentialStoreOptions extends ResolveNdxHomeOptions {
   helperExec?: typeof execFileSyncNoShell;
   /** False: a helper entry resolves to nothing instead of running (status without --check). */
   runHelpers?: boolean;
-  /** Milliseconds now, for a failed helper's retry window. Defaults to `Date.now`; injectable for tests. */
+  /**
+   * Milliseconds now, for a failed helper's retry window and an empty lock's
+   * age. Defaults to `Date.now`; injectable for tests.
+   */
   clock?: () => number;
 }
 
 export interface CredentialWriteOptions extends CredentialStoreOptions {
   /** How long to wait for another writer's lock, in ms. Default 10 s. */
   lockTimeoutMs?: number;
+  /** Whether a lock holder's PID is running (`kill(pid, 0)`); injectable for tests. */
+  pidAlive?: (pid: number) => boolean;
   /** Runs `icacls` on win32; injectable so the ACL path is testable anywhere. */
   execFileSyncImpl?: typeof execFileSyncCli;
   /** The current user's name for the ACL grant; injectable for tests. */
@@ -766,7 +772,11 @@ function updateStore(options: CredentialWriteOptions, mutate: (store: StoreFile)
   const platform = options.platform ?? process.platform;
   ensurePrivateDir(dir, platform);
 
-  withStoreLock(path, options.lockTimeoutMs ?? 10_000, () => {
+  const seams: LockSeams = {
+    now: options.clock ?? defaultLockSeams.now,
+    pidAlive: options.pidAlive ?? defaultLockSeams.pidAlive,
+  };
+  withStoreLock(path, options.lockTimeoutMs ?? 10_000, seams, () => {
     const store = readStoreForWrite(path);
     if (!mutate(store)) return;
     const exposedMode = platform === "win32" ? 0 : (statSync(path, { throwIfNoEntry: false })?.mode ?? 0) & 0o777;
@@ -947,28 +957,38 @@ export function restrictToOwnerWindows(
 
 const LOCK_POLL_MS = 25;
 /**
- * A lock with no readable holder this old lost its writer between creating
- * and writing it. A live writer fills it within microseconds.
+ * An empty lock this old was left by an n-dx from before locks were linked
+ * into place filled, whose writer died between creating and writing it. A
+ * lock this version creates is never empty, so the rule never reaches one.
  */
 export const EMPTY_LOCK_STALE_MS = 5_000;
-/** A takeover guard this old lost its holder, which holds it for microseconds. */
-export const TAKEOVER_GUARD_STALE_MS = 5_000;
+
+/** What the lock consults about the outside world; injectable for tests. */
+export interface LockSeams {
+  /** Milliseconds now, for an empty lock's age. */
+  now: () => number;
+  /** Whether a holder's PID is still running. */
+  pidAlive: (pid: number) => boolean;
+}
+
+const defaultLockSeams: LockSeams = { now: () => Date.now(), pidAlive: (pid) => pidAlive(pid) };
 
 /**
- * Run `fn` holding `<store>.lock`. The lock file records the holder's PID; a
- * lock whose PID is dead, or one left empty past {@link EMPTY_LOCK_STALE_MS},
- * is taken over. A live holder is waited for up to `timeoutMs`, then the call
- * fails naming it.
+ * Run `fn` holding `<store>.lock`. The lock file records the holder's PID and
+ * is created already filled, so it is never seen empty. A lock whose PID is
+ * dead, or an empty one an older n-dx left past {@link EMPTY_LOCK_STALE_MS},
+ * is taken over. A live holder is waited for up to `timeoutMs` however old
+ * its lock, then the call fails naming it.
  */
-function withStoreLock<T>(storePath: string, timeoutMs: number, fn: () => T): T {
+function withStoreLock<T>(storePath: string, timeoutMs: number, seams: LockSeams, fn: () => T): T {
   const lockPath = `${storePath}.lock`;
-  const content = JSON.stringify({ pid: process.pid, token: randomUUID(), since: new Date().toISOString() });
+  const content = holderContent();
   const deadline = Date.now() + timeoutMs;
 
   for (;;) {
-    if (tryCreateLock(lockPath, content)) break;
-    const holder = inspectLock(lockPath);
-    if (holder !== undefined && lockIsStale(holder) && takeOverStaleLock(lockPath, holder)) continue;
+    if (createFilled(lockPath, content)) break;
+    const holder = inspectLock(lockPath, seams.now());
+    if (holder !== undefined && lockIsStale(holder, seams) && takeOverStaleLock(lockPath, holder, seams)) continue;
     if (Date.now() >= deadline) {
       throw new Error(
         `Timed out waiting for the credential store lock ${lockPath}` +
@@ -984,40 +1004,58 @@ function withStoreLock<T>(storePath: string, timeoutMs: number, fn: () => T): T 
   } finally {
     // Remove only our own lock. Nobody else removes a live lock, so it is
     // still ours when its content is.
-    if (inspectLock(lockPath)?.raw === content) rmSync(lockPath, { force: true });
+    removeIfOwn(lockPath, content);
   }
 }
 
-function tryCreateLock(lockPath: string, content: string): boolean {
-  let fd: number;
+function holderContent(): string {
+  return JSON.stringify({ pid: process.pid, token: randomUUID(), since: new Date().toISOString() });
+}
+
+/**
+ * Create `path` holding `content`, or return false when it exists. The
+ * content goes to a private temp file first and is hard-linked into place, so
+ * the file appears complete or not at all, and the link's EEXIST is the same
+ * exclusive test `open(..., "wx")` gives.
+ */
+export function createFilled(path: string, content: string): boolean {
+  const tmp = `${path}.${randomUUID()}.tmp`;
+  const fd = openSync(tmp, "wx", 0o600);
   try {
-    fd = openSync(lockPath, "wx", 0o600);
+    try {
+      writeSync(fd, content);
+    } finally {
+      closeSync(fd);
+    }
+    linkSync(tmp, path);
+    return true;
   } catch (err) {
     if (errorCode(err) === "EEXIST") return false;
     throw err;
-  }
-  try {
-    writeSync(fd, content);
   } finally {
-    closeSync(fd);
+    rmSync(tmp, { force: true });
   }
-  return true;
+}
+
+/** Remove a lock or guard only while it still holds our content. */
+function removeIfOwn(path: string, content: string): void {
+  if (inspectLock(path)?.raw === content) rmSync(path, { force: true });
 }
 
 /** One observation of the lock file. */
 export interface LockState {
-  /** The file's content; empty or partial while its writer is writing it. */
+  /** The file's content; empty only for a lock an older n-dx created. */
   raw: string;
   /** Inode, mtime and content: a replaced lock never matches the old one. */
   identity: string;
-  /** The holder's PID, absent while the content is unreadable. */
+  /** The holder's PID, absent when the content is unreadable. */
   pid?: number;
   since?: string;
   ageMs: number;
 }
 
-/** The lock as it is now, or undefined when there is none. */
-export function inspectLock(lockPath: string): LockState | undefined {
+/** The lock (or guard) as it is now, or undefined when there is none. */
+export function inspectLock(lockPath: string, now: number = Date.now()): LockState | undefined {
   let stats: Stats;
   let raw: string;
   try {
@@ -1027,7 +1065,7 @@ export function inspectLock(lockPath: string): LockState | undefined {
     if (errorCode(err) === "ENOENT") return undefined;
     throw err;
   }
-  const state: LockState = { raw, identity: `${stats.ino}:${stats.mtimeMs}:${raw}`, ageMs: Date.now() - stats.mtimeMs };
+  const state: LockState = { raw, identity: `${stats.ino}:${stats.mtimeMs}:${raw}`, ageMs: now - stats.mtimeMs };
   try {
     const parsed: unknown = JSON.parse(raw);
     if (isRecord(parsed) && typeof parsed.pid === "number") {
@@ -1035,18 +1073,19 @@ export function inspectLock(lockPath: string): LockState | undefined {
       state.since = String(parsed.since ?? "unknown");
     }
   } catch (err) {
-    // Mid-write: the holder opened the file and has not written it yet.
+    // An older n-dx's lock, created empty and not yet (or never) written.
     if (!(err instanceof SyntaxError)) throw err;
   }
   return state;
 }
 
 /**
- * A dead holder's lock, or one still unreadable past the threshold. A fresh
- * unreadable lock is waited for: its writer is alive.
+ * A dead holder's lock, or an unreadable one past the threshold. A filled lock
+ * with a live PID is never stale however old: a paused writer (sleep, SIGSTOP,
+ * swap) or a lagging clock on a network home must not cost a live lock.
  */
-function lockIsStale(lock: LockState): boolean {
-  return lock.pid !== undefined ? !pidAlive(lock.pid) : lock.ageMs >= EMPTY_LOCK_STALE_MS;
+export function lockIsStale(lock: LockState, seams: LockSeams = defaultLockSeams): boolean {
+  return lock.pid !== undefined ? !seams.pidAlive(lock.pid) : lock.ageMs >= EMPTY_LOCK_STALE_MS;
 }
 
 /** The guard every writer that judged this lock stale contends for. */
@@ -1056,43 +1095,42 @@ export function takeoverGuardPath(lockPath: string, judged: LockState): string {
 
 /**
  * Remove a stale lock, but only the one judged stale. Writers that judged the
- * same lock contend for one exclusive guard file; the winner re-inspects and
- * removes the lock only when it is unchanged and still stale. Nobody else
- * removes a stale lock and nobody can create one while it exists, so the
- * removal never hits a live lock a faster writer took meanwhile. Returns true
- * when the lock is gone and the caller may retry at once.
+ * same lock contend for one exclusive guard file, created filled with the
+ * holder's PID; the winner re-inspects and removes the lock only when it is
+ * unchanged and still stale. Nobody else removes a stale lock and nobody can
+ * create one while it exists, so the removal never hits a live lock a faster
+ * writer took meanwhile. Returns true when the lock is gone and the caller may
+ * retry at once.
  */
-export function takeOverStaleLock(lockPath: string, judged: LockState): boolean {
+export function takeOverStaleLock(lockPath: string, judged: LockState, seams: LockSeams = defaultLockSeams): boolean {
   const guard = takeoverGuardPath(lockPath, judged);
-  if (!tryCreateLock(guard, "")) {
-    reclaimAbandonedGuard(guard);
+  const content = holderContent();
+  if (!createFilled(guard, content)) {
+    reclaimAbandonedGuard(guard, seams);
     return false;
   }
   try {
-    const current = inspectLock(lockPath);
+    const current = inspectLock(lockPath, seams.now());
     if (current === undefined) return true;
-    if (current.identity !== judged.identity || !lockIsStale(current)) return false;
+    if (current.identity !== judged.identity || !lockIsStale(current, seams)) return false;
     rmSync(lockPath, { force: true });
     return true;
   } finally {
-    rmSync(guard, { force: true });
+    removeIfOwn(guard, content);
   }
 }
 
 /**
- * Drop a guard whose holder died inside its few-microsecond section. Two
- * writers reclaiming the same abandoned guard at once can still both enter;
- * that needs a writer killed inside the guard, and this keeps it recoverable.
+ * Drop a guard whose recorded holder is dead; a live holder's guard stays
+ * however old. A guard with no readable PID (an older n-dx created it empty)
+ * is left too: it blocks takeover of only the lock it names, and deleting
+ * that lock, as the timeout message says, frees it. Two writers reclaiming
+ * the same dead holder's guard at once can still both enter; that needs a
+ * writer killed inside the guard, and this keeps it recoverable.
  */
-function reclaimAbandonedGuard(guard: string): void {
-  let mtimeMs: number;
-  try {
-    mtimeMs = statSync(guard).mtimeMs;
-  } catch (err) {
-    if (errorCode(err) === "ENOENT") return;
-    throw err;
-  }
-  if (Date.now() - mtimeMs >= TAKEOVER_GUARD_STALE_MS) rmSync(guard, { force: true });
+function reclaimAbandonedGuard(guard: string, seams: LockSeams): void {
+  const state = inspectLock(guard, seams.now());
+  if (state?.pid !== undefined && !seams.pidAlive(state.pid)) rmSync(guard, { force: true });
 }
 
 /** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */

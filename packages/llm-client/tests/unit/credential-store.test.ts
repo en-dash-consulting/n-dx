@@ -6,7 +6,7 @@
  * library and lives in tests/e2e/credential-store-writers.test.ts.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
@@ -14,7 +14,7 @@ import { platform, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   EMPTY_LOCK_STALE_MS,
-  TAKEOVER_GUARD_STALE_MS,
+  createFilled,
   credentialStatus,
   credentialStorePath,
   inspectLock,
@@ -27,6 +27,26 @@ import {
   unsetCredential,
   type CredentialWriteOptions,
 } from "../../src/credential-store.js";
+
+/** Pass-through fs spies: which paths were opened, and what each link carried. */
+const fsCalls = vi.hoisted(() => ({
+  opened: [] as string[],
+  linked: [] as { src: string; dst: string; contentAtLink: string }[],
+}));
+vi.mock("node:fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...fs,
+    openSync: (path: string, ...rest: unknown[]) => {
+      fsCalls.opened.push(String(path));
+      return (fs.openSync as (...a: unknown[]) => number)(path, ...rest);
+    },
+    linkSync: (src: string, dst: string) => {
+      fsCalls.linked.push({ src: String(src), dst: String(dst), contentAtLink: fs.readFileSync(src, "utf-8") });
+      return fs.linkSync(src, dst);
+    },
+  };
+});
 
 const isWindows = platform() === "win32";
 const PLACEHOLDER = "placeholder-file-key";
@@ -339,21 +359,93 @@ describe("cross-process lock", () => {
     expect(readdirSync(dirname(lockPath())).filter((f) => f.endsWith(".takeover"))).toEqual([]);
   });
 
-  it("waits while another writer holds the takeover guard, and reclaims an abandoned one", () => {
-    const dead = spawnSync(process.execPath, ["-e", ""]);
-    writeFileSync(lockPath(), JSON.stringify({ pid: dead.pid, token: "dead", since: "2026-01-01T00:00:00.000Z" }));
+  it("waits while a live writer holds the takeover guard however old, and reclaims a dead holder's", () => {
+    const LIVE = 1001;
+    const DEAD = 1002;
+    const seams = { now: () => Date.now() + 365 * 24 * 3_600_000, pidAlive: (pid: number) => pid === LIVE };
+    writeFileSync(lockPath(), holder(DEAD));
     const judged = inspectLock(lockPath())!;
     const guard = takeoverGuardPath(lockPath(), judged);
-    writeFileSync(guard, "");
-    expect(takeOverStaleLock(lockPath(), judged)).toBe(false);
+    writeFileSync(guard, holder(LIVE));
+    expect(takeOverStaleLock(lockPath(), judged, seams)).toBe(false);
+    expect(existsSync(guard)).toBe(true);
     expect(existsSync(lockPath())).toBe(true);
-    const old = (Date.now() - TAKEOVER_GUARD_STALE_MS - 1_000) / 1_000;
-    utimesSync(guard, old, old);
-    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000 });
+
+    writeFileSync(guard, holder(DEAD));
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, clock: seams.now, pidAlive: seams.pidAlive });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
     expect(existsSync(lockPath())).toBe(false);
     expect(existsSync(guard)).toBe(false);
   });
+
+  it("never removes a filled lock with a live PID, however old the clock says it is", () => {
+    const LIVE = 1001;
+    writeFileSync(lockPath(), holder(LIVE));
+    const farFuture = () => Date.now() + 365 * 24 * 3_600_000;
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: farFuture, pidAlive: (pid) => pid === LIVE,
+    })).toThrow(new RegExp(`held by PID ${LIVE}`));
+    expect(readFileSync(lockPath(), "utf-8")).toBe(holder(LIVE));
+  });
+
+  it("reclaims an older version's empty lock only once the injected clock passes the threshold", () => {
+    writeFileSync(lockPath(), "");
+    const created = statSync(lockPath()).mtimeMs;
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: () => created + EMPTY_LOCK_STALE_MS - 1,
+    })).toThrow(/Timed out/);
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, clock: () => created + EMPTY_LOCK_STALE_MS });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(existsSync(lockPath())).toBe(false);
+  });
 });
+
+describe("createFilled", () => {
+  const target = (): string => join(home, "x.lock");
+
+  it("links the file into place already filled and leaves no temp file", () => {
+    const content = holder(process.pid);
+    expect(createFilled(target(), content)).toBe(true);
+    expect(readFileSync(target(), "utf-8")).toBe(content);
+    expect(readdirSync(home)).toEqual(["x.lock"]);
+  });
+
+  it("counts a link that hits EEXIST as held, leaving the existing file untouched", () => {
+    writeFileSync(target(), "theirs");
+    expect(createFilled(target(), holder(process.pid))).toBe(false);
+    expect(readFileSync(target(), "utf-8")).toBe("theirs");
+    expect(readdirSync(home)).toEqual(["x.lock"]);
+  });
+
+  it("never opens the real path: it appears by linking a temp file already filled", () => {
+    fsCalls.opened.length = 0;
+    fsCalls.linked.length = 0;
+    const content = holder(process.pid);
+    createFilled(target(), content);
+    expect(fsCalls.opened).not.toContain(target());
+    expect(fsCalls.linked).toHaveLength(1);
+    expect(fsCalls.linked[0].dst).toBe(target());
+    expect(fsCalls.linked[0].src).toMatch(/^.+\/x\.lock\.[0-9a-f-]{36}\.tmp$|^.+\\x\.lock\.[0-9a-f-]{36}\.tmp$/);
+    expect(fsCalls.linked[0].contentAtLink).toBe(content);
+  });
+
+  it("takes the store lock and the takeover guard through a filled link", () => {
+    const DEAD = 1002;
+    writeFileSync(join(home, "credentials.json.lock"), holder(DEAD));
+    fsCalls.linked.length = 0;
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, pidAlive: () => false });
+    const linked = fsCalls.linked.map((l) => ({ dst: l.dst.slice(home.length + 1), pid: JSON.parse(l.contentAtLink).pid }));
+    // Lock (EEXIST: the dead holder's), guard, then lock again; every link filled.
+    expect(linked.map((l) => l.pid)).toEqual([process.pid, process.pid, process.pid]);
+    expect(linked[0].dst).toBe("credentials.json.lock");
+    expect(linked[1].dst).toMatch(/^credentials\.json\.lock\.[0-9a-f]{16}\.takeover$/);
+    expect(linked[2].dst).toBe("credentials.json.lock");
+  });
+});
+
+function holder(pid: number): string {
+  return JSON.stringify({ pid, token: `t${pid}`, since: "2026-01-01T00:00:00.000Z" });
+}
 
 describe("Windows owner-only ACL", () => {
   type Call = { binary: string; args: string[] };

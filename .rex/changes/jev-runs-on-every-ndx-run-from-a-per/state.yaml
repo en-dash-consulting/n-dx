@@ -179,7 +179,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-06T00:08:37.744Z"
+    lastModified: "2026-11-06T00:17:41.019Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -210,6 +210,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "assertNotCredentialCommand unescapes words as sh does and matches a prefix's tokens after the program anywhere among later words; Claude CLI gap documented"
     lastModified: "2026-11-04T18:32:38.902Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94595998-4f73-4c75-af45-6a7d01e9c8ac":
+    lastModified: "2026-11-06T00:17:41.019Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94a33e07-b483-4b90-9b37-34911b54f084":
     status: "completed"
@@ -357,7 +360,14 @@ items:
     lastModified: "2026-11-03T17:28:25.718Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e687795c-97ff-4bb5-8cd0-820e59b2d555":
-    lastModified: "2026-11-06T00:08:28.380Z"
+    status: "completed"
+    startedAt: "2026-11-06T00:12:12.312Z"
+    completedAt: "2026-11-06T00:25:16.930Z"
+    endedAt: "2026-11-06T00:25:16.930Z"
+    activeIntervals: [{"end":"2026-11-06T00:25:16.930Z","start":"2026-11-06T00:12:12.312Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lock and takeover guard are created filled via temp file + linkSync (EEXIST = held); guard records PID and is reclaimed only when that PID is dead; age rule kept only for a legacy empty lock; clock and pidAlive injectable."
+    lastModified: "2026-11-06T00:25:16.930Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e97d3394-f0a1-4199-935f-7c7ca4636a87":
     status: "completed"
