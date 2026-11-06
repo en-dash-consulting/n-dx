@@ -154,6 +154,30 @@ describe("withPrdModelTransaction", () => {
     expect(find(tree.product, CAPABILITY)?.createdAt).toBeUndefined();
   });
 
+  it("takes createdAt from a new change's own lastModified, as an import brings it", async () => {
+    const stampedAt = new Date("2026-11-06T10:00:00.000Z");
+    const older = "2026-09-01T08:00:00.000Z";
+    const imported = "d0000000-0000-4000-8000-0000000000bb";
+    await withPrdModelTransaction(
+      rexDir,
+      (model) => {
+        const next = structuredClone(model.tree);
+        next.changes.push({
+          id: imported,
+          type: "change",
+          slug: "imported-change",
+          title: "Imported change",
+          needsPlacement: true,
+          lastModified: older,
+        } as RuleNode);
+        return { tree: next, result: undefined };
+      },
+      { now: () => stampedAt },
+    );
+    const { tree } = await loadPrdModel(rexDir, quiet);
+    expect(find(tree.changes, imported)).toMatchObject({ createdAt: older, lastModified: older });
+  });
+
   it("refuses a v1 tree, naming the layout, before running the mutation", async () => {
     const v1Dir = join(tmp, "v1");
     await cp(V1_FIXTURE, join(v1Dir, PRD_TREE_DIRNAME), { recursive: true });

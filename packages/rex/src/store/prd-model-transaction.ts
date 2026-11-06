@@ -140,7 +140,8 @@ function signTree(tree: V2Tree): Map<string, string> {
  * a write that changes nothing stamps nothing. A new node gets the timestamp
  * when it has none, and the author only when it brought none: an import or a
  * caller that set them keeps its provenance. A new change also gets
- * `createdAt`, once, unless it brought one. A changed node named in
+ * `createdAt`, once, unless it brought one; failing that it takes its own
+ * `lastModified`, so an import keeps its age. A changed node named in
  * `preserveAuthorFor` takes the timestamp but keeps the author it has.
  */
 function stampChangedNodes(
@@ -157,7 +158,7 @@ function stampChangedNodes(
       if (!(preserveAuthorFor?.has(node.id) && node.lastModifiedBy)) node.lastModifiedBy = stamp.lastModifiedBy;
       continue;
     }
-    if (node.type === "change") node.createdAt ??= stamp.lastModified;
+    if (node.type === "change") node.createdAt ??= node.lastModified ?? stamp.lastModified;
     if (node.lastModified) continue;
     node.lastModified = stamp.lastModified;
     if (!node.lastModifiedBy) node.lastModifiedBy = stamp.lastModifiedBy;
