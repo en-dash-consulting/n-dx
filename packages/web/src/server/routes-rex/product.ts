@@ -95,8 +95,8 @@ export interface AreaSectionWire {
   stewards?: string[];
   capabilities: CapabilityRowWire[];
   /**
-   * Distinct open changes that touch or amend the area or a node in it, or add
-   * a node under one. Its length is the area map's open-change count.
+   * Distinct open, unshipped changes that touch or amend the area or a node in
+   * it, or add a node under one. Its length is the area map's open-change count.
    */
   openChangeIds: string[];
 }
@@ -314,6 +314,14 @@ function stageOf(change: RuleNode): ChangeStageWire {
   return change.ready ? "ready" : "proposed";
 }
 
+/**
+ * Open and not yet shipped: a change at one of the {@link OpenChangeStageWire}
+ * stages. Rex's `isOpenChange` keeps a shipped but unapplied change open; the
+ * map's badges, Moving now and the Product total count what Open changes'
+ * Open filter and the lifecycle strip count, so they leave it out.
+ */
+const isMovingChange = (change: RuleNode): boolean => isOpenChange(change) && !change.shippedIn;
+
 const isActive = (node: RuleNode): boolean =>
   node.status === "in_progress" || node.status === "failing";
 
@@ -348,7 +356,7 @@ function overlaysByNode(index: TreeIndex, changes: ChangeRuleNode[]): Map<string
     out.set(targetId, list);
   };
   for (const change of changes) {
-    if (!isOpenChange(change)) continue;
+    if (!isMovingChange(change)) continue;
     const base = {
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
@@ -385,7 +393,7 @@ function openChangesByArea(index: TreeIndex, changes: ChangeRuleNode[]): Map<str
   }
   const out = new Map<string, Set<string>>();
   for (const change of changes) {
-    if (!isOpenChange(change)) continue;
+    if (!isMovingChange(change)) continue;
     const refs = [
       ...(change.amends ?? []).map((a) => {
         const ref = a.delta === "added" ? a.under : a.target;

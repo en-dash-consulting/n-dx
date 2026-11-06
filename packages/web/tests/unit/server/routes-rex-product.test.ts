@@ -116,6 +116,15 @@ describe("v2 product reads", () => {
     ));
   }
 
+  /** Mark the fixture's change done and shipped but not applied, as a release stamp before a steward's apply leaves it. */
+  function shipChange(): void {
+    const statePath = join(rexDir, "changes", "add-apple-pay", "state.yaml");
+    writeFileSync(statePath, readFileSync(statePath, "utf-8").replace(
+      '    status: "in_progress"\n',
+      '    status: "completed"\n    shippedIn: "1.2.0"\n',
+    ));
+  }
+
   it("GET /product lists areas and capabilities with rex's status, health and open changes", async () => {
     const { status, body } = await get("product");
     expect(status).toBe(200);
@@ -149,6 +158,16 @@ describe("v2 product reads", () => {
     applyChange();
     const { body } = await get("product");
     const area = (body.map as ProductMap).areas[0];
+    expect(area.capabilities[0].openChanges).toEqual([]);
+    expect(area.openChangeIds).toEqual([]);
+  });
+
+  // Open changes' Open filter and the lifecycle strip leave a shipped change out; so do the badge and the Product total.
+  it("GET /product drops a shipped but unapplied change from the overlays and the area's open count", async () => {
+    shipChange();
+    const rows = (await get("changes")).body.changes as ChangeRow[];
+    expect(rows.find((r) => r.id === CHANGE_ID)?.stage).toBe("shipped");
+    const area = ((await get("product")).body.map as ProductMap).areas[0];
     expect(area.capabilities[0].openChanges).toEqual([]);
     expect(area.openChangeIds).toEqual([]);
   });
@@ -193,6 +212,10 @@ describe("v2 product reads", () => {
       ["an addition under the area", () => addChange([added("refunds", AREA_ID)])],
       ["a removal of the area itself", () => addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }])],
       ["a touch on the area and its capability", () => addChange([], [AREA_ID, CAPABILITY_ID])],
+      ["a shipped but unapplied change", () => {
+        shipChange();
+        addChange([added("refunds", AREA_ID)]);
+      }],
     ];
     for (const [label, seed] of cases) {
       it(`filters /changes by area to the badge's open changes: ${label}`, async () => {
@@ -202,6 +225,8 @@ describe("v2 product reads", () => {
         const filtered = rows.filter((r) => r.areas?.some((ref) => ref.slug === a.slug));
         expect(filtered.map((r) => r.id).sort()).toEqual([...a.openChangeIds].sort());
         expect(filtered).toHaveLength(a.openChangeIds.length);
+        // The filtered list renders open rows only, so an applied or shipped row would be counted and not shown.
+        expect(filtered.filter((r) => r.stage === "applied" || r.stage === "shipped")).toEqual([]);
       });
 
       it(`lists the badge's open changes in the area view's Moving now: ${label}`, async () => {
