@@ -385,13 +385,14 @@ function gitWithPathspecs(cwd, args, paths, env) {
  */
 export function machineLocalPaths(dir) {
   const layout = resolveLayout(dir);
+  const legacy = resolveLayout(dir, { mode: "legacy" });
   const entries = [
     { path: layout.webPidFile, dir: false },
     { path: layout.webPortFile, dir: false },
     { path: layout.webUsageFile, dir: false },
-    { path: join(dir, ".n-dx-web.pid"), dir: false },
-    { path: join(dir, ".n-dx-web.port"), dir: false },
-    { path: join(dir, ".n-dx-web-usage.jsonl"), dir: false },
+    { path: legacy.webPidFile, dir: false },
+    { path: legacy.webPortFile, dir: false },
+    { path: legacy.webUsageFile, dir: false },
     { path: join(layout.sourcevisionDir, ".cache"), dir: true },
     { path: join(layout.rexDir, ".cache"), dir: true },
   ];
