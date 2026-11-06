@@ -10,6 +10,7 @@ vi.mock("../../../src/viewer/hooks/use-project-status.js", async (orig) => ({
 }));
 
 import { LifecycleStrip, v1Cells, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
+import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { ChangesView } from "../../../src/viewer/views/changes.js";
 import type { ChangeRow, ChangeSummary } from "../../../src/viewer/views/product-model.js";
 
@@ -31,7 +32,7 @@ function answer(body: unknown) {
 }
 
 async function mount() {
-  await act(async () => { render(h(LifecycleStrip, { navigateTo }), root); });
+  await act(async () => { render(h(ChangesSummaryProvider, null, h(LifecycleStrip, { navigateTo })), root); });
   await act(async () => {});
 }
 

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ChangesGlance, limitGroups, MAX_GLANCE_ROWS } from "../../../src/viewer/views/changes-glance.js";
+import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { glanceGap, groupGlanceByRelease, type GlanceChange } from "../../../src/viewer/views/product-model.js";
 
 function change(id: string, over: Partial<GlanceChange> = {}): GlanceChange {
@@ -40,7 +41,7 @@ describe("ChangesGlance", () => {
 
   async function mount(open: GlanceChange[]) {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ layout: "v2", summary: { inbox: 5, stages: {}, open, next: null } }) })));
-    await act(async () => { render(h(ChangesGlance, { navigateTo }), root); });
+    await act(async () => { render(h(ChangesSummaryProvider, null, h(ChangesGlance, { navigateTo })), root); });
     await act(async () => {});
   }
 

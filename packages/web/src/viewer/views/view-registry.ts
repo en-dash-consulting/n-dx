@@ -70,6 +70,7 @@ import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { LifecycleStrip } from "./lifecycle-strip.js";
 import { ChangesGlance } from "./changes-glance.js";
+import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { ProductAreaMap } from "./product-area-map.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
@@ -154,7 +155,7 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
 
 /** A stage page, rendering each of its sections and tiles through this registry. */
 function stage(id: StageId): ViewRenderer {
-  return (ctx) => h(StagePage, {
+  const page: ViewRenderer = (ctx) => h(StagePage, {
     stage: id,
     validViews: validViewsOf(ctx),
     navigateTo: ctx.navigateTo,
@@ -171,6 +172,10 @@ function stage(id: StageId): ViewRenderer {
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
+  // Plan's lifecycle strip and open-changes glance share one summary read.
+  return id === "plan"
+    ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
+    : page;
 }
 
 /** The parts of a stage page that are not views of their own. */

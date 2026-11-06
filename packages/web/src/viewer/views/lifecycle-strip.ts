@@ -1,7 +1,8 @@
 /**
  * Plan's lifecycle strip: where the work is, and what rex would pick next.
  *
- * On v2 it reads rex's change stages from `GET /api/rex/changes/summary` —
+ * On v2 it reads rex's change stages from `GET /api/rex/changes/summary`
+ * (read once for the Plan grid by `ChangesSummaryProvider`) —
  * Inbox, Proposed, Ready, In progress, Awaiting apply — each a count that opens
  * the list it counts (Inbox: the Inbox page; the rest: Open changes filtered to
  * the stage). On v1, which has no stages, it reads Pending and In progress from
@@ -14,9 +15,10 @@
 
 import { h } from "preact";
 import type { ComponentChild } from "preact";
-import { useProductRead, useProjectStatus } from "../hooks/index.js";
+import { useProjectStatus } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { stageFilter, storeFilter } from "./changes.js";
+import { useChangesSummary } from "./changes-summary-context.js";
 import type { ChangeSummary, NextPick, OpenChangeStage } from "./product-model.js";
 
 /** Where a count opens. */
@@ -112,7 +114,7 @@ function Strip({ cells, next, navigateTo }: { cells: StripCell[]; next: Componen
 }
 
 export function LifecycleStrip({ navigateTo }: { navigateTo: NavigateTo }) {
-  const load = useProductRead("/api/rex/changes/summary", (body) => body.summary as ChangeSummary);
+  const load = useChangesSummary();
   const status = useProjectStatus();
 
   if (load.state === "ready") {

@@ -5,19 +5,19 @@
  * ends in "N more", which opens the full Open changes list. Inbox changes are
  * not here — the summary counts them apart.
  *
- * Reads `GET /api/rex/changes/summary`, the same fast read as the lifecycle strip.
+ * Reads the summary the Plan grid's `ChangesSummaryProvider` loaded once, shared
+ * with the lifecycle strip.
  *
  * @module viewer/views/changes-glance
  */
 
 import { h } from "preact";
-import { useProductRead } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
+import { useChangesSummary } from "./changes-summary-context.js";
 import {
   CHANGE_STAGE_LABELS,
   glanceGap,
   groupGlanceByRelease,
-  type ChangeSummary,
   type GlanceChange,
   type GlanceGroup,
 } from "./product-model.js";
@@ -61,7 +61,7 @@ function Row({ change, navigateTo }: { change: GlanceChange; navigateTo: Navigat
 }
 
 export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
-  const load = useProductRead("/api/rex/changes/summary", (body) => body.summary as ChangeSummary);
+  const load = useChangesSummary();
   if (load.state === "loading") return h("div", { class: "changes-glance", role: "status" }, "Loading...");
   if (load.state === "v1") return null;
   if (load.state === "error") return h("div", { class: "changes-glance", role: "alert" }, `Could not load open changes: ${load.message}`);
