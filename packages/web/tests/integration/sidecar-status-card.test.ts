@@ -7,6 +7,7 @@
  * client on a temp v2 PRD.
  */
 
+import { execFileSync, spawn } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -19,7 +20,7 @@ import { allowListKey, BROKER_SCOPE_TOOLS, BROKER_TOOL_POLICY } from "../../src/
 import { SidecarBroker, type SidecarCard } from "../../src/server/sidecar/broker.js";
 import type { SidecarActions } from "../../src/server/sidecar/carry-out.js";
 import { readStatusCall, writeStatusCard } from "../../src/server/sidecar/status-card.js";
-import type { PRDItem } from "../../src/server/rex-gateway.js";
+import { openClaimsStore, resolveClaimHolder, type PRDItem } from "../../src/server/rex-gateway.js";
 import { removeTestDir } from "../helpers/server-route-test-support.js";
 
 const V2_FIXTURE = resolve(__dirname, "../../../rex/tests/fixtures/v2-tree");
@@ -148,6 +149,38 @@ describe("propose_status", () => {
     expect(task.status).toBe("completed");
     // rex's completion stamps the time; a plain status write would not have.
     expect(task.completedAt).toBeTruthy();
+  });
+
+  it("marks a completion held for a hench run as held, not written", async () => {
+    // Claims live under the git dir, so the project is a repository.
+    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    const run = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+    try {
+      const claimed = await openClaimsStore(root).claim(TASK, { worktreeRoot: resolveClaimHolder(root).worktreeRoot, pid: run.pid!, holdsCompletion: true });
+      expect(claimed.ok).toBe(true);
+      const client = await connect(actions());
+      const call = client.callTool({ name: "propose_status", arguments: { id: TASK, status: "completed" } });
+      await vi.waitFor(() => expect(raised).toHaveLength(1));
+      broker.decide("s1", raised[0]!.id, { approve: true });
+      const result = await call;
+      expect(result.isError).toBeFalsy();
+      expect(textOf(result)).toContain("not written yet");
+      expect(textOf(result)).toContain("completionHeld");
+      expect((await readTask()).status).toBe("pending");
+      const carriedOut = broker.cards("s1")[0]!.carriedOut!;
+      expect(carriedOut).toMatchObject({ ok: true, held: true, ids: [TASK] });
+    } finally {
+      run.kill();
+    }
+  });
+
+  it("does not mark a written status held", async () => {
+    const client = await connect(actions());
+    const call = client.callTool({ name: "propose_status", arguments: { id: TASK, status: "deferred" } });
+    await vi.waitFor(() => expect(raised).toHaveLength(1));
+    broker.decide("s1", raised[0]!.id, { approve: true });
+    await call;
+    expect(broker.cards("s1")[0]!.carriedOut!.held).toBeUndefined();
   });
 
   it("fails the card with rex's message for a transition rex refuses", async () => {

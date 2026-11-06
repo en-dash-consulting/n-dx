@@ -32,6 +32,7 @@ import {
   type SidecarLensInfo,
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+import { StatusBody } from "../../../src/viewer/components/sidecar-status.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
 import { openExtensionTab } from "../../../src/viewer/components/sidecar-extension-tabs.js";
 import { installBasePathFetch, setBasePathForTests } from "../../../src/viewer/base-path.js";
@@ -1383,6 +1384,20 @@ describe("permission cards", () => {
     it("quotes rex's refusal on a move rex will not make", async () => {
       await openWith([status({ allowed: false, message: 'Cannot move from "completed" to "pending".' }, "pending")]);
       expect(root.querySelector(".sidecar-status-refused")?.textContent).toBe('Rex refuses this move: Cannot move from "completed" to "pending".');
+    });
+
+    const noteOf = (carriedOut: NonNullable<SidecarCard["carriedOut"]>): string | null | undefined => {
+      const decided = { ...status({ allowed: true }, "completed"), status: "approved" as const, carriedOut };
+      act(() => { render(h(StatusBody, { card: decided }), root); });
+      return root.querySelector(".sidecar-status-note")?.textContent;
+    };
+
+    it("says a completion held for a hench run is recorded, not written", () => {
+      expect(noteOf({ ok: true, held: true, ids: ["t1"] })).toBe("Recorded; the hench run applies it after its test gate.");
+    });
+
+    it("says a written status is written", () => {
+      expect(noteOf({ ok: true, ids: ["t1"] })).toBe("Status written.");
     });
   });
 

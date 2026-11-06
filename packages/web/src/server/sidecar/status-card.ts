@@ -50,6 +50,15 @@ export async function readStatusCall(rexDir: string, input: Record<string, unkno
   };
 }
 
+/** Whether rex's `update_task_status` reply says the completion was held for a hench run. */
+function completionHeld(reply: string): boolean {
+  try {
+    return (JSON.parse(reply) as { completionHeld?: unknown } | null)?.completionHeld === true;
+  } catch {
+    return false; // a reply that is not JSON is not the held reply
+  }
+}
+
 /** An approved status card's write through rex's `update_task_status`. Never throws. */
 export async function writeStatusCard(ctx: { rexDir: string; projectDir: string }, change: SidecarStatusChange): Promise<CarryOutResult> {
   try {
@@ -67,6 +76,8 @@ export async function writeStatusCard(ctx: { rexDir: string; projectDir: string 
     );
     const text = result.content.map((part) => ("text" in part ? part.text : "")).join("\n");
     if (result.isError) return { ok: false, text: `Nothing was written: ${text}` };
+    // rex records a completion a hench run holds without writing it; the status has not moved.
+    if (completionHeld(text)) return { ok: true, held: true, text: `Status of ${item.id} (${item.title}) not written yet: ${text}`, ids: [item.id] };
     refreshPRDCache(ctx.rexDir, await store.loadDocument());
     return { ok: true, text: `Status of ${item.id} (${item.title}): ${text}`, ids: [item.id] };
   } catch (err) {
