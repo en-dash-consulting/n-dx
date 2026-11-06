@@ -190,11 +190,20 @@ describe("POST /api/hench/execute — failure detection beyond exit code", () =>
       const files = Array.from({ length: 20 }, (_, i) => `  packages/web/src/server/some/long/path/file-${i}.ts`);
       const error = await runAndGetBroadcastError({
         exitCode: 1,
-        stdout: ["Starting task...", "⚠ Refusing to start an autonomous run with 21 uncommitted files in the working tree.", ...files, "  … and 1 more"].join("\n") + "\n",
+        // hench's real output: header, indented list, then the closing line run.ts prints.
+        stdout: [
+          "Starting task...",
+          "⚠ Refusing to start an autonomous run with 21 uncommitted files in the working tree.",
+          ...files,
+          "  … and 1 more",
+          "Stopped before running. Commit or discard your changes, then re-run.",
+        ].join("\n") + "\n",
         stderr: "Warning: hench config field \"maxTurn\" is unknown and ignored\n",
       });
       expect(error).toContain("Refusing to start");
       expect(error).toContain("file-19.ts");
+      expect(error).toContain("Stopped before running");
+      expect(error).not.toContain("Starting task...");
       expect(error).toContain("maxTurn");
     });
 

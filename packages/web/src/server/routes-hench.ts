@@ -2306,16 +2306,22 @@ export const RUN_END_STREAM_MAX_CHARS = 4000;
 const EXEC_STATE_ERROR_STREAM_CHARS = 300;
 
 /**
- * The last block of stdout, from its last unindented line on. hench prints a
- * refusal as a header followed by indented detail lines (a dirty-file list), so
- * the header survives however long the list is. A block longer than
- * {@link RUN_END_STREAM_MAX_CHARS} keeps its head.
+ * The end of stdout for a failed run's `error`. hench prints a refusal as a
+ * header followed by indented detail lines (a dirty-file list), then a closing
+ * "Stopped before running." line, so keep everything from the header of the
+ * last indented list on: the header survives however long the list is. A block
+ * longer than {@link RUN_END_STREAM_MAX_CHARS} keeps its head. Output with no
+ * indented line keeps its last {@link EXEC_STATE_ERROR_STREAM_CHARS}.
  */
 export function lastStdoutBlock(stdout: string | undefined): string {
-  const lines = (stdout ?? "").trimEnd().split("\n");
-  let start = lines.length - 1;
-  while (start > 0 && (lines[start] === "" || /^\s/.test(lines[start]))) start--;
-  return lines.slice(start).join("\n").trim().slice(0, RUN_END_STREAM_MAX_CHARS);
+  const lines = (stdout ?? "").trimEnd().split(/\r?\n/);
+  const isIndented = (line: string): boolean => /^\s+\S/.test(line);
+  let last = lines.length - 1;
+  while (last >= 0 && !isIndented(lines[last])) last--;
+  if (last < 0) return lines.join("\n").trim().slice(-EXEC_STATE_ERROR_STREAM_CHARS);
+  let header = last;
+  while (header > 0 && (lines[header].trim() === "" || isIndented(lines[header]))) header--;
+  return lines.slice(header).join("\n").trim().slice(0, RUN_END_STREAM_MAX_CHARS);
 }
 
 /**
