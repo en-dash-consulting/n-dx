@@ -576,7 +576,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             h("h3", null, "Up Next"),
             activeEpics > 0
               ? h("span", { class: "rex-dash-section-meta" },
-                  `${activeEpics} epic${activeEpics !== 1 ? "s" : ""} in progress`,
+                  `${activeEpics} ${(activeEpics === 1 ? rootLabel : rootPlural).toLowerCase()} in progress`,
                 )
               : null,
           ),

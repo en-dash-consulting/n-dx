@@ -32,6 +32,7 @@ export * from "./use-prd-data.js";
 export * from "./use-prd-deep-link.js";
 export * from "./use-prd-websocket.js";
 export * from "./use-project-metadata.js";
+export * from "./use-prd-layout.js";
 export * from "./use-project-status.js";
 export * from "./use-refresh-throttle.js";
 export * from "./use-sidecar.js";
