@@ -168,6 +168,8 @@ export class SidecarBroker {
   private readonly now: () => number;
   /** Every card raised since the server started, per session, oldest first. */
   private readonly sessionCards = new Map<string, SidecarCard[]>();
+  /** Per session, what its next turn tells the agent: an effect that failed after its tool result returned. */
+  private readonly turnNotes = new Map<string, string[]>();
   private readonly pending = new Map<string, PendingCard>();
   /** Per session, the decided calls still carrying out their effect; `withdraw` aborts them. */
   private readonly carrying = new Map<string, Set<AbortController>>();
@@ -277,11 +279,27 @@ export class SidecarBroker {
    * A started effect that failed afterwards: a run hench ended in failure
    * after its tool result said it started. Only revises a success to a
    * failure, so a card never goes back to reading carried out.
+   *
+   * @param note What the agent is told on the session's next turn, since its
+   *   tool result has already returned.
    */
-  reviseCarriedOutFailed(sessionId: string, cardId: string): void {
+  reviseCarriedOutFailed(sessionId: string, cardId: string, note?: string): void {
     const card = this.sessionCards.get(sessionId)?.find((c) => c.id === cardId);
     if (!card?.carriedOut?.ok) return;
     this.writeCarriedOut(card, { ...card.carriedOut, ok: false });
+    if (note) this.turnNotes.set(sessionId, [...(this.turnNotes.get(sessionId) ?? []), note]);
+  }
+
+  /** What the session's next turn tells the agent, oldest first; kept until {@link notesDelivered}. */
+  notesForNextTurn(sessionId: string): string[] {
+    return [...(this.turnNotes.get(sessionId) ?? [])];
+  }
+
+  /** Drop the first `count` notes: a completed turn carried them. */
+  notesDelivered(sessionId: string, count: number): void {
+    const left = (this.turnNotes.get(sessionId) ?? []).slice(count);
+    if (left.length > 0) this.turnNotes.set(sessionId, left);
+    else this.turnNotes.delete(sessionId);
   }
 
   private writeCarriedOut(card: SidecarCard, carriedOut: NonNullable<SidecarCard["carriedOut"]>): void {

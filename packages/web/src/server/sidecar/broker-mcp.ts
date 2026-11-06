@@ -411,8 +411,9 @@ export function createBrokerMcpServer(
         if (outcome.decidedBy !== "allow-list" && outcome.approved) {
           const { card } = outcome;
           broker.recordCarriedOut(sessionId, card.id, { ok: result.ok, ...(result.ids && { ids: result.ids }) });
-          // A run that started can still fail; its card then reads failed, and a run-plan lane open again.
-          void result.ended?.then((end) => { if (!end.ok) broker.reviseCarriedOutFailed(sessionId, card.id); });
+          // A run that started can still fail; its card then reads failed, a run-plan lane open again,
+          // and the session's next turn tells the agent, whose tool result said it started.
+          void result.ended?.then((end) => { if (!end.ok) broker.reviseCarriedOutFailed(sessionId, card.id, end.text); });
         }
         return text(result.text, !result.ok);
       } finally {

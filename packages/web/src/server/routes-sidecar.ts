@@ -696,13 +696,18 @@ function startTurn(
       console.error(`[sidecar] could not save how the turn in session ${id} ended: ${errorMessage(err)}`);
     }
   };
+  // What failed since the last turn after its tool result returned; dropped only once a turn carried it.
+  const notes = broker.notesForNextTurn(id);
   // The user frame is appended synchronously inside sendTurn, before it
   // first awaits, so it is on disk by the time the POST answers.
-  registry.sendTurn(id, prompt, (frame) => announce({ cursor: frame.seq, running: true })).finally(() => {
+  registry.sendTurn(id, prompt, (frame) => announce({ cursor: frame.seq, running: true }), notes).finally(() => {
     // Nothing waits on a card once its turn is over.
     broker.withdraw(id, "The turn ended");
   }).then(
-    (result) => close(result.status, result.error),
+    (result) => {
+      if (result.status === "completed") broker.notesDelivered(id, notes.length);
+      close(result.status, result.error);
+    },
     (err: unknown) => {
       const error = errorMessage(err);
       console.error(`[sidecar] turn in session ${id} failed: ${error}`);

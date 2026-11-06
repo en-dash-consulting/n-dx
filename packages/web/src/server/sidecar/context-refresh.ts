@@ -86,6 +86,17 @@ export interface ColdPromptInput {
   exchanges: readonly Exchange[];
   /** The operator's new message. */
   prompt: string;
+  /** What happened since the last turn that no tool result reported; see {@link notesSection}. */
+  notes?: readonly string[];
+}
+
+/**
+ * What the session's effects did after their tool results returned (a run
+ * that failed after start_work said it started), as a section the agent reads
+ * before the operator's message. Undefined with no notes.
+ */
+function notesSection(notes: readonly string[] | undefined): string | undefined {
+  return notes && notes.length > 0 ? `## Since your last turn\n${notes.join("\n\n")}` : undefined;
 }
 
 /**
@@ -105,19 +116,23 @@ export function composeColdPrompt(input: ColdPromptInput): string {
       .join("\n\n---\n\n");
     parts.push(`## Last ${input.exchanges.length === 1 ? "exchange" : `${input.exchanges.length} exchanges`}\n${turns}`);
   }
+  const notes = notesSection(input.notes);
+  if (notes) parts.push(notes);
   parts.push(`## Operator's message\n${input.prompt}`);
   return parts.join("\n\n");
 }
 
 /**
- * A turn that carries the lens packet, the ledger, or both, then the
- * operator's message. The ledger rides with the packet: a session opened
- * fresh, re-lensed or handed off to still has its notes.
+ * A turn that carries the lens packet, the ledger, notes since the last turn,
+ * or any of them, then the operator's message. The ledger rides with the
+ * packet: a session opened fresh, re-lensed or handed off to still has its notes.
  */
-export function composeOpeningPrompt(input: { packet?: string; ledger?: string; prompt: string }): string {
+export function composeOpeningPrompt(input: { packet?: string; ledger?: string; notes?: readonly string[]; prompt: string }): string {
   const parts: string[] = [];
   if (input.packet) parts.push(input.packet);
   if (input.ledger) parts.push(`## Session ledger\n${input.ledger}`);
+  const notes = notesSection(input.notes);
+  if (notes) parts.push(notes);
   parts.push(`## Operator's message\n${input.prompt}`);
   return parts.join("\n\n");
 }
