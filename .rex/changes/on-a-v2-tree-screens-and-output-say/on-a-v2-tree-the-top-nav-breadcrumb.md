@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "On a v1 tree they still read \"Tasks\" (viewer test)"
   - "No caller of viewLabel or viewBlurb for prd or rex-dashboard renders v1 words on a v2 tree"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
