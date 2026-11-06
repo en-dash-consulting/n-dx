@@ -152,22 +152,25 @@ export function sidecarCommandEffectsLine(card: SidecarCard, manifest: SidecarSt
 
 // ── Change-set card (story 11) ───────────────────────────────────────
 
-/** One item's fields as the operator is editing them; criteria one per line. */
+/**
+ * One item's fields as the operator is editing them; criteria and tags one
+ * per line, as the item-edit card takes them, so a tag holding a comma
+ * survives an edit to another field.
+ */
 export interface ChangeSetDraft {
   title: string;
   description: string;
   criteria: string;
-  /** Comma-separated. */
   tags: string;
 }
 
 type ChangeSetItem = NonNullable<SidecarCard["changeSet"]>["items"][number];
 
-const tagList = (text: string): string[] => [...new Set(text.split(",").map((t) => t.trim()).filter(Boolean))];
 const criteriaLines = (text: string): string[] => text.split("\n").map((l) => l.trim()).filter(Boolean);
+const tagList = (text: string): string[] => [...new Set(criteriaLines(text))];
 
 function draftOf(item: ChangeSetItem): ChangeSetDraft {
-  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n"), tags: (item.tags ?? []).join(", ") };
+  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n"), tags: (item.tags ?? []).join("\n") };
 }
 
 /** The edits an approval sends: only the items, and fields, the operator changed. */
@@ -241,7 +244,7 @@ function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) 
                 h("input", { type: "text", class: "sidecar-change-set-title", "aria-label": `Title of ${label}`, value: draft.title, onInput: set("title") }),
                 h("textarea", { class: "sidecar-change-set-description", "aria-label": `Description of ${label}`, rows: 2, value: draft.description, onInput: set("description") }),
                 h("textarea", { class: "sidecar-change-set-criteria", "aria-label": `Done when (one per line) for ${label}`, rows: 2, placeholder: "Done when… (one per line)", value: draft.criteria, onInput: set("criteria") }),
-                h("input", { type: "text", class: "sidecar-change-set-tags", "aria-label": `Tags (comma separated) for ${label}`, placeholder: "Tags, comma separated", value: draft.tags, onInput: set("tags") }),
+                h("textarea", { class: "sidecar-change-set-tags", "aria-label": `Tags (one per line) for ${label}`, rows: 1, placeholder: "Tags… (one per line)", value: draft.tags, onInput: set("tags") }),
               )
             : h("div", { class: "sidecar-change-set-fields" },
                 h("p", { class: "sidecar-change-set-title" }, item.title, written?.ids?.[index] ? h("code", null, ` ${written.ids[index]}`) : null),
