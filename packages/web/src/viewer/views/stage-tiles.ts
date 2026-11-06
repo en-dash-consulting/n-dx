@@ -24,7 +24,7 @@
 import { h } from "preact";
 import type { ComponentChild } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import type { ViewId } from "../types.js";
+import type { NavigateTo, ViewId } from "../types.js";
 import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
@@ -115,9 +115,10 @@ interface FullScreenProps extends TileContentProps {
   stage: StageId;
   onClose: () => void;
   besideDetail: boolean;
+  navigateTo?: NavigateTo;
 }
 
-function FullScreenTile({ stage, tile, onClose, besideDetail, ...content }: FullScreenProps) {
+function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...content }: FullScreenProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -151,6 +152,14 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, ...content }: Full
           h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
           h("h2", { class: "stage-tile-fullscreen-title", "aria-current": "page" }, title),
         ),
+        navigateTo
+          ? h("button", {
+              type: "button",
+              class: "stage-tile-btn stage-tile-open-page",
+              onClick: () => navigateTo(tile.view),
+              title: `Open ${title} on its own page`,
+            }, "Open ↗")
+          : null,
         h("button", {
           ref: closeRef,
           type: "button",
@@ -229,9 +238,11 @@ export interface TileGridProps {
   renderSummary: RenderSummary;
   /** The detail panel is open beside the page; full-screen leaves room for it. */
   besideDetail?: boolean;
+  /** Gives each full-screen tile an Open ↗ to its own page. */
+  navigateTo?: NavigateTo;
 }
 
-export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false }: TileGridProps) {
+export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false, navigateTo }: TileGridProps) {
   const [fullScreen, setFullScreen] = useState<string | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -274,6 +285,7 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
           idBase: `stage-tile-${stage}-${tileKey(full)}-full`,
           onClose: closeFullScreen,
           besideDetail,
+          navigateTo,
         })
       : null,
   );

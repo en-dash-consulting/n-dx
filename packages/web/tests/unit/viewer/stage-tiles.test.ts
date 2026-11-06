@@ -94,10 +94,19 @@ describe("TileGrid", () => {
     expect(document.activeElement).toBe(head("problems"));
   });
 
-  it("has two modes only: an opened tile offers no Open link", () => {
+  it("offers no Open ↗ without a navigateTo", () => {
     mount();
     act(() => head("files").click());
     expect([...dialog()!.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Open ↗");
+  });
+
+  it("opens a tile's own page from Open ↗ in the modal", () => {
+    const calls: unknown[][] = [];
+    mount({ navigateTo: (...a) => { calls.push(a); } });
+    act(() => head("files").click());
+    const open = [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Open ↗")!;
+    act(() => open.click());
+    expect(calls).toEqual([["files"]]);
   });
 
   it("heads an opened tile with a trail back to the stage, which closes it", () => {

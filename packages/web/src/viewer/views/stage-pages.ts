@@ -238,9 +238,9 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
     def.tiles
       ? def.v1Tiles
         ? h(LayoutTileGrid, {
-            stage, tiles: tilesFor("v2"), v1Tiles: tilesFor("v1"), deployed, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen,
+            stage, tiles: tilesFor("v2"), v1Tiles: tilesFor("v1"), deployed, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo,
           })
-        : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
+        : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo })
       : null,
   );
 }
