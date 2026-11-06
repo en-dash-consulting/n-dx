@@ -13,6 +13,7 @@ import { AreaInPlace, AreaView, areaCapabilityPath, areaCountLabels, areaPath, s
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { AREA_DETAIL_FIXTURE, CAPABILITY_DETAIL_FIXTURE, PRODUCT_MAP_FIXTURE } from "../../fixtures/v2-product-map.js";
 
 vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
@@ -245,6 +246,21 @@ describe("a selected capability", () => {
       { id: "c5", kind: "cap-diff-added", before: undefined, after: "A saved run block overrides the project defaults." },
       { id: "c2", kind: "cap-diff-removed", before: "A failing validation run ends the task rather than committing.", after: undefined },
     ]);
+  });
+
+  it("behind the hub, selecting and leaving a capability keeps the /p/<id> prefix", async () => {
+    setBasePathForTests("/p/x");
+    try {
+      await open();
+      history.replaceState(null, "", `/p/x${areaPath(AREA_DETAIL_FIXTURE.slug)}`);
+      act(() => block().click());
+      await settle();
+      expect(location.pathname).toBe(`/p/x${areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, CAP_ID)}`);
+      pressEscape(root.querySelector(".area-capability")!);
+      expect(location.pathname).toBe(`/p/x${areaPath(AREA_DETAIL_FIXTURE.slug)}`);
+    } finally {
+      setBasePathForTests(null);
+    }
   });
 
   it("Esc returns to the area with the column restored, and stops there", async () => {

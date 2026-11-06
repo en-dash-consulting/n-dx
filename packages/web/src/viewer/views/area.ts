@@ -66,8 +66,9 @@ export function useInPlaceAddress(path: string | null, restoreTo?: string): void
   useEffect(() => {
     if (path === null) return undefined;
     // `restoreTo` is for an address the page was opened at (a reload), which
-    // is not the one to go back to.
-    const locationBefore = restoreTo ?? `${location.pathname}${location.search}${location.hash}`;
+    // is not the one to go back to. It is app-relative, so it goes back through
+    // `replaceAppHistory` to keep the hub's `/p/<id>` or a worktree's `/w/<key>`.
+    const url = new URL(location.href);
     const stateBefore: unknown = history.state;
     replaceAppHistory({ ...(stateBefore as object | null), [IN_PLACE]: path }, path);
     return () => {
@@ -76,7 +77,8 @@ export function useInPlaceAddress(path: string | null, restoreTo?: string): void
       // so the nested one has not given this address back yet.
       const current = (history.state as Record<string, unknown> | null)?.[IN_PLACE];
       if (current === path || (typeof current === "string" && current.startsWith(`${path}/`))) {
-        history.replaceState(stateBefore, "", locationBefore);
+        if (restoreTo === undefined) history.replaceState(stateBefore, "", url.toString());
+        else replaceAppHistory(stateBefore, restoreTo);
       }
     };
   }, [path, restoreTo]);
