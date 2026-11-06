@@ -165,6 +165,11 @@ interface InitStatus {
    * because `ndx init` treats a failed `git init` as a warning, not a failure.
    */
   gitInitialized: boolean | null;
+  /**
+   * Set when init succeeded but the wizard's Google key could not be stored:
+   * what failed and how to store it. Never contains the key. Null otherwise.
+   */
+  credentialWarning: string | null;
 }
 
 // Module-level singleton — one init at a time per server process. The
@@ -179,6 +184,7 @@ const initStatuses = new WorkspaceScoped<InitStatus>(() => ({
   error: null,
   gitRequested: false,
   gitInitialized: null,
+  credentialWarning: null,
 }));
 
 // ── Binary resolution helpers ─────────────────────────────────────────
@@ -909,6 +915,7 @@ async function handleInit(
   initStatus.error = null;
   initStatus.gitRequested = git === true;
   initStatus.gitInitialized = null;
+  initStatus.credentialWarning = null;
 
   // Return 202 immediately, run in background — first-time init runs a
   // sourcevision analyze pass and can take a while on a large repo.
@@ -945,15 +952,10 @@ async function handleInit(
     // covers these same fields post-init). Set here via the same `ndx
     // config` CLI path that page documents; failures here are non-fatal —
     // init itself already succeeded, and these can be set from Settings.
-    // The key goes to the credential store on stdin, never on argv: a spawned
-    // argv is visible in the process list and the history warning would land
-    // in the init log.
+    // The store is the only place the Google key goes, so a failed store is
+    // reported rather than dropped.
     if (provider === "google" && googleApiKey) {
-      await foundationExec(bin, [...prefixArgs, "config", "credentials.google", "--stdin", ctx.projectDir], {
-        cwd: ctx.projectDir,
-        timeout: 15_000,
-        input: googleApiKey,
-      }).catch(() => {});
+      initStatus.credentialWarning = await storeInitGoogleKey(bin, prefixArgs, ctx.projectDir, googleApiKey);
     }
     if (provider === "local") {
       if (localHost) {
@@ -986,6 +988,46 @@ async function handleInit(
   });
 
   return true;
+}
+
+/**
+ * Store the wizard's Google key with `ndx config credentials.google --stdin`.
+ * Returns null when stored, otherwise a warning naming the failure and how to
+ * store the key by hand.
+ *
+ * The key goes on stdin, never argv: a spawned argv is visible in the process
+ * list, and the CLI's history warning would land in the init log. The failure
+ * detail comes from the CLI's stderr, so the key is cut out of it before
+ * redaction — a reason that echoed the key would otherwise reach the browser.
+ */
+async function storeInitGoogleKey(
+  bin: string,
+  prefixArgs: string[],
+  projectDir: string,
+  key: string,
+): Promise<string | null> {
+  let detail: string;
+  try {
+    const result = await foundationExec(bin, [...prefixArgs, "config", "credentials.google", "--stdin", projectDir], {
+      cwd: projectDir,
+      timeout: 15_000,
+      input: key,
+    });
+    if (result.exitCode === 0) return null;
+    detail = lastLine(result.stderr)
+      || result.error?.message
+      || (result.exitCode === null ? "timed out" : `exit code ${result.exitCode}`);
+  } catch (err) {
+    detail = errorMessage(err);
+  }
+  const reason = redactSecrets(detail.split(key).join("[key]"));
+  return `Google API key was not stored (${reason}). `
+    + "Store it with: ndx config credentials.google";
+}
+
+function lastLine(text: string): string {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines[lines.length - 1] ?? "";
 }
 
 /**

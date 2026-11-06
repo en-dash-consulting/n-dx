@@ -23,7 +23,7 @@
 
 import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
-import { dirname, join, resolve, relative } from "path";
+import { dirname, join, resolve, relative, sep } from "path";
 import { fileURLToPath } from "url";
 import { findSharedSecrets, loadProjectConfigStrict, loadShellTestEnv, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { localConfigStatus } from "./local-config-status.js";
@@ -282,7 +282,7 @@ async function runBoundaryPhase(dir, info, isJSON) {
     ok: gatewayResult.ok,
     detail: gatewayResult.ok
       ? `${gatewayResult.checked} files checked, all cross-package imports use gateways`
-      : `${gatewayResult.violations.length} file(s) bypass gateway pattern`,
+      : describeStepFailure(gatewayResult, "file(s) bypass gateway pattern"),
     ...(gatewayResult.violations.length > 0 ? { violations: gatewayResult.violations } : {}),
   });
   if (gatewayResult.ok) {
@@ -290,7 +290,7 @@ async function runBoundaryPhase(dir, info, isJSON) {
   } else {
     info(`  ✗ gateway imports`);
     if (!isJSON) {
-      for (const v of gatewayResult.violations) info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
+      for (const v of gatewayResult.violations) info(`    ✗ ${v.line ? `${v.file}:${v.line} — ` : ""}${v.message}`);
     }
   }
 
@@ -307,7 +307,7 @@ async function runBoundaryPhase(dir, info, isJSON) {
       ? `skipped (no ${RESTRICTED_IMPORTS_KEY} configured)`
       : archResult.ok
       ? `${archResult.checked} files checked against ${plural(archResult.rules, "restricted-import rule")}, no unauthorized imports`
-      : `${archResult.violations.length} restricted-import violation(s) found`,
+      : describeStepFailure(archResult, "restricted-import violation(s) found"),
     ...(archResult.violations.length > 0 ? { violations: archResult.violations } : {}),
   });
   if (!archResult.applies) {
@@ -882,20 +882,36 @@ function runtimeImportRegex(pkg) {
 }
 
 /**
+ * Regex to detect a dynamic `import("pkg")` call of a specific package.
+ * Mirrors `hasDynamicImportOf` in tests/e2e/domain-isolation.test.js: the bare
+ * specifier only, so `import("pkg/dist/x.js")` does not match.
+ *
+ * @param {string} pkg  Package name (e.g. "@n-dx/rex")
+ * @returns {RegExp}
+ */
+function dynamicImportRegex(pkg) {
+  return new RegExp(`\\bimport\\s*\\(\\s*["']${pkg}["']\\s*\\)`);
+}
+
+/**
  * Recursively collect all .ts files under a directory.
- * Skips node_modules and dist directories.
+ * Skips node_modules and dist directories, and an entry that no longer exists
+ * (a dangling symlink, or one deleted mid-scan).
  *
  * @param {string} dir  Directory to scan
+ * @param {(path: string, err: Error, isDir: boolean) => void} onUnreadable
+ *   Told about each directory or entry it cannot read, which it never skips silently.
  * @returns {string[]}  Array of relative file paths (from project root)
  */
-function collectTsFiles(dir) {
+function collectTsFiles(dir, onUnreadable) {
   const results = [];
 
   function walk(d) {
     let entries;
     try {
       entries = readdirSync(d);
-    } catch {
+    } catch (err) {
+      onUnreadable(d, err, true);
       return;
     }
     for (const entry of entries) {
@@ -903,10 +919,12 @@ function collectTsFiles(dir) {
       const full = join(d, entry);
       let st;
       try {
-        st = statSync(full);
-      } catch {
+        st = statSync(full, { throwIfNoEntry: false });
+      } catch (err) {
+        onUnreadable(full, err, false);
         continue;
       }
+      if (!st) continue;
       if (st.isDirectory()) {
         walk(full);
       } else if (entry.endsWith(".ts") && !entry.endsWith(".d.ts")) {
@@ -923,12 +941,22 @@ function collectTsFiles(dir) {
  * Check that all cross-package runtime imports pass through designated
  * gateway modules, and that intra-package import boundaries are respected.
  *
+ * A file or directory it cannot read fails the step, as in the
+ * architecture-policy step: it is listed after the violations, with no `line`,
+ * as `cannot read <path>: <error>`, and `unreadable` counts those entries.
+ *
  * @param {string} dir  Project root directory
- * @returns {{ ok: boolean, checked: number, violations: Array<{ file: string, line: number, message: string }> }}
+ * @returns {{ ok: boolean, checked: number, violations: Array<{ file: string, line?: number, message: string }>, unreadable: number }}
  */
 function checkGatewayImports(dir) {
   const violations = [];
   let checked = 0;
+  // Keyed by path: several rules scan the same package, and each lists it once.
+  const unreadable = new Map();
+  const noteUnreadable = (path, err, isDir) => {
+    const file = relative(dir, path) + (isDir ? sep : "");
+    unreadable.set(file, { file, message: describeUnreadable({ file, message: err.message }) });
+  };
 
   // ── Cross-package gateway checks ────────────────────────────────────────
   for (const rule of GATEWAY_RULES) {
@@ -936,21 +964,25 @@ function checkGatewayImports(dir) {
     if (!existsSync(pkgDir)) continue;
 
     const regex = runtimeImportRegex(rule.externalPkg);
-    const files = collectTsFiles(pkgDir);
+    const dynamicRegex = dynamicImportRegex(rule.externalPkg);
+    const files = collectTsFiles(pkgDir, noteUnreadable);
 
     for (const filePath of files) {
       checked++;
       const relPath = relative(dir, filePath);
+      // gateway-rules.json paths use "/"; relative() uses "\" on Windows.
+      const ruleKey = relPath.replace(/\\/g, "/");
 
       // Skip if this file IS a designated gateway
-      if (rule.gatewayFiles.has(relPath)) continue;
+      if (rule.gatewayFiles.has(ruleKey)) continue;
       // Skip explicit per-file allowlist entries (documented in gateway-rules.json)
-      if (rule.allowedNonGatewayFiles.has(relPath)) continue;
+      if (rule.allowedNonGatewayFiles.has(ruleKey)) continue;
 
       let content;
       try {
         content = readFileSync(filePath, "utf-8");
-      } catch {
+      } catch (err) {
+        noteUnreadable(filePath, err, false);
         continue;
       }
 
@@ -960,8 +992,10 @@ function checkGatewayImports(dir) {
         // Quick pre-filter: skip lines that don't mention the package
         if (!line.includes(`"${rule.externalPkg}"`) && !line.includes(`'${rule.externalPkg}'`)) continue;
 
-        // Check for runtime (non-type) import/export
-        if (regex.test(line)) {
+        // Check for a runtime (non-type) static import/export or a dynamic import()
+        const trimmed = line.trim();
+        const isDynamic = !trimmed.startsWith("//") && !trimmed.startsWith("*") && dynamicRegex.test(trimmed);
+        if (regex.test(line) || isDynamic) {
           violations.push({
             file: relPath,
             line: i + 1,
@@ -977,7 +1011,7 @@ function checkGatewayImports(dir) {
     const srcDir = join(dir, rule.sourceDir);
     if (!existsSync(srcDir)) continue;
 
-    const files = collectTsFiles(srcDir);
+    const files = collectTsFiles(srcDir, noteUnreadable);
 
     for (const filePath of files) {
       checked++;
@@ -986,7 +1020,8 @@ function checkGatewayImports(dir) {
       let content;
       try {
         content = readFileSync(filePath, "utf-8");
-      } catch {
+      } catch (err) {
+        noteUnreadable(filePath, err, false);
         continue;
       }
 
@@ -1004,9 +1039,10 @@ function checkGatewayImports(dir) {
   }
 
   return {
-    ok: violations.length === 0,
+    ok: violations.length === 0 && unreadable.size === 0,
     checked,
-    violations,
+    violations: [...violations, ...unreadable.values()],
+    unreadable: unreadable.size,
   };
 }
 
@@ -1192,10 +1228,14 @@ function walkFiles(dir, skipDirs, excludedDirs) {
  * `test/`/`tests/` directories are exempt, as are node_modules, dist, .git,
  * n-dx's state directories and every rule's `excludeDirs`.
  *
- * @returns {{ checked: number, violations: Array<{ file: string, rule: object }> }}
+ * A selected file that cannot be read is reported in `unreadable`, never
+ * skipped: an enforced rule must not pass over a file it did not read.
+ *
+ * @returns {{ checked: number, violations: Array<{ file: string, rule: object }>, unreadable: Array<{ file: string, message: string }> }}
  */
 function scanRestrictedImports(dir, rules) {
   const violations = [];
+  const unreadable = [];
   let checked = 0;
   const skipDirs = sourceScanSkipDirs();
   const excludedDirs = new Set(rules.flatMap((r) => r.excludeDirs));
@@ -1218,16 +1258,41 @@ function scanRestrictedImports(dir, rules) {
     if (applicable.length === 0) continue;
 
     const full = join(dir, rel);
-    // A tracked file deleted from the work tree, or a submodule's gitlink.
-    if (!statSync(full, { throwIfNoEntry: false })?.isFile()) continue;
-    checked++;
-    const content = readFileSync(full, "utf-8");
+    let content;
+    try {
+      // A tracked file deleted from the work tree, or a submodule's gitlink.
+      // The stat is inside the try: a file under an unreadable directory
+      // throws EACCES here, not at the read.
+      if (!statSync(full, { throwIfNoEntry: false })?.isFile()) continue;
+      checked++;
+      content = readFileSync(full, "utf-8");
+    } catch (err) {
+      unreadable.push({ file: rel, message: err.message });
+      continue;
+    }
     for (const [rule, pattern] of applicable) {
       if (pattern.test(content)) violations.push({ file: rel, rule });
     }
   }
 
-  return { checked, violations };
+  return { checked, violations, unreadable };
+}
+
+/**
+ * A failed import step's summary: `found` labels the violation count, and a
+ * file it could not read is counted apart, so an EACCES never reads as an import.
+ */
+function describeStepFailure({ violations, unreadable }, found) {
+  const violated = violations.length - unreadable;
+  return [
+    ...(violated > 0 ? [`${violated} ${found}`] : []),
+    ...(unreadable > 0 ? [`${plural(unreadable, "file")} could not be read`] : []),
+  ].join(", ");
+}
+
+/** What an unreadable file tells the operator: the file and the read error. */
+function describeUnreadable({ file, message }) {
+  return `cannot read ${file}: ${message}`;
 }
 
 /** What a violation tells the operator: the file, the module, the rule, and how to allow it. */
@@ -1241,14 +1306,16 @@ function describeViolation({ file, rule }) {
  * architecture-policy.test.js, so a skipped or broken test file still leaves
  * the rule enforced.
  *
- * Returns the violating paths. Exported for the parity test.
+ * Returns the violating paths, plus a `cannot read <file>: <error>` entry for
+ * each file it could not read, so a read failure never passes for a violation.
+ * Exported for the parity test.
  */
 export function checkArchitecturePolicy(dir) {
-  const { checked, violations } = scanRestrictedImports(dir, [NDX_CHILD_PROCESS_RULE]);
+  const { checked, violations, unreadable } = scanRestrictedImports(dir, [NDX_CHILD_PROCESS_RULE]);
   return {
-    ok: violations.length === 0,
+    ok: violations.length === 0 && unreadable.length === 0,
     checked,
-    violations: violations.map((v) => v.file),
+    violations: [...violations.map((v) => v.file), ...unreadable.map(describeUnreadable)],
   };
 }
 
@@ -1258,32 +1325,36 @@ export function checkArchitecturePolicy(dir) {
  * project's `ci.restrictedImports` rules. `applies` is false when there is no
  * rule, and the step is then reported as skipped.
  *
+ * `violations` lists rule violations, then files it could not read;
+ * `unreadable` counts the second kind, so the step's summary can tell them apart.
+ *
  * Exported for tests.
  *
- * @returns {Promise<{ applies: boolean, ok: boolean, rules: number, checked: number, violations: string[] }>}
+ * @returns {Promise<{ applies: boolean, ok: boolean, rules: number, checked: number, violations: string[], unreadable: number }>}
  */
 export async function checkRestrictedImports(dir) {
   // Strict: an unparseable config would otherwise read as "no rules" and skip.
   const { config, errors: configErrors } = await loadProjectConfigStrict(dir);
   if (configErrors.length > 0) {
-    return { applies: true, ok: false, rules: 0, checked: 0, violations: configErrors };
+    return { applies: true, ok: false, rules: 0, checked: 0, violations: configErrors, unreadable: 0 };
   }
   const configLabel = projectConfigLabel(dir, PROJECT_CONFIG_FILE);
   const { rules: configured, errors } = parseRestrictedImports(config?.ci?.restrictedImports, configLabel);
   if (errors.length > 0) {
-    return { applies: true, ok: false, rules: 0, checked: 0, violations: errors };
+    return { applies: true, ok: false, rules: 0, checked: 0, violations: errors, unreadable: 0 };
   }
   const rules = [...(isNdxMonorepo(dir) ? [NDX_CHILD_PROCESS_RULE] : []), ...configured];
   if (rules.length === 0) {
-    return { applies: false, ok: true, rules: 0, checked: 0, violations: [] };
+    return { applies: false, ok: true, rules: 0, checked: 0, violations: [], unreadable: 0 };
   }
-  const { checked, violations } = scanRestrictedImports(dir, rules);
+  const { checked, violations, unreadable } = scanRestrictedImports(dir, rules);
   return {
     applies: true,
-    ok: violations.length === 0,
+    ok: violations.length === 0 && unreadable.length === 0,
     rules: rules.length,
     checked,
-    violations: violations.map(describeViolation),
+    violations: [...violations.map(describeViolation), ...unreadable.map(describeUnreadable)],
+    unreadable: unreadable.length,
   };
 }
 

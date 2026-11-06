@@ -52,6 +52,9 @@ import {
 /** Names this entry accepts. */
 export const CLI_CREDENTIAL_NAMES: readonly string[] = ["typesafe", ...KEYED_VENDORS];
 
+/** Starts `status`'s line naming why the store was not read; `ndx config` finds it by this. */
+const STORE_PROBLEM_PREFIX = "Store not read: ";
+
 const USAGE = [
   "Usage: credentials <command>",
   "",
@@ -222,16 +225,22 @@ export async function runCredentialsCli(argv: readonly string[], io: Credentials
         const project = projectArg?.slice("--project=".length);
         if (projectArg !== undefined && !project) return usage("--project needs a directory.");
         const config = project ? await loadLLMConfig(resolve(project)) : undefined;
+        // The output reports a store that was not read (storeProblem), so that
+        // warning is held back; any other (a failed helper) still goes out.
+        const warnings: string[] = [];
+        const held = { ...store, warn: (m: string) => warnings.push(m) };
         const statuses = CLI_CREDENTIAL_NAMES.map((name) =>
           credentialStatus(name, {
-            ...store,
+            ...held,
             check,
             // google's variable is the project's llm.google.apiKeyEnv when set.
             ...(config && name === "google" ? { envVar: vendorKeyEnv("google", config) } : {}),
           }),
         );
         // Without --check no helper runs, for the vendor lines either.
-        const vendors = config ? vendorAuthStatuses(config, { ...store, runHelpers: check }) : undefined;
+        const vendors = config ? vendorAuthStatuses(config, { ...held, runHelpers: check }) : undefined;
+        const storeProblem = statuses[0]?.storeProblem;
+        for (const warning of warnings) if (warning !== storeProblem) store.warn!(warning);
         if (json) {
           io.stdout(`${JSON.stringify(vendors ? { credentials: statuses, vendors } : statuses, null, 2)}\n`);
         } else {
@@ -259,7 +268,7 @@ function formatStatus(statuses: CredentialStatus[]): string {
   const lines = statuses.map((s) => {
     const helper = `credential store, helper (${s.helperCommand})`;
     if (s.helperResult === "failed") return `${s.name}: ${helper}: failed, so not set`;
-    if (s.source === null) return `${s.name}: not set`;
+    if (s.source === null) return s.storeProblem ? `${s.name}: unknown, the store was not read` : `${s.name}: not set`;
     if (s.helperResult === "not-run") return `${s.name}: ${helper}, not run (--check runs it)`;
     const where =
       s.source === "env"
@@ -270,7 +279,11 @@ function formatStatus(statuses: CredentialStatus[]): string {
     return `${s.name}: ${where}, fingerprint ${s.fingerprint}`;
   });
   const storePath = statuses[0]?.storePath;
-  return `${lines.join("\n")}\n${storePath ? `Store: ${storePath}\n` : ""}`;
+  const problem = statuses[0]?.storeProblem;
+  return (
+    `${lines.join("\n")}\n${storePath ? `Store: ${storePath}\n` : ""}` +
+    (problem ? `${STORE_PROBLEM_PREFIX}${problem}\n` : "")
+  );
 }
 
 function formatVendors(vendors: VendorAuthStatus[]): string {

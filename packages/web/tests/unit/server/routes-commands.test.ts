@@ -201,15 +201,52 @@ describe("commands route — init (setup wizard)", () => {
     }
   });
 
-  it("stays non-fatal when the store write fails", async () => {
-    stubManagedRun({ stdout: "n-dx initialized" });
+  /** Answer the store command with `store`; everything else as the git probe. */
+  function stubStore(store: () => Promise<Record<string, unknown>>) {
     execMock.mockImplementation(async (_bin: string, args: string[]) => {
-      if (args.includes("credentials.google")) throw new Error("store unavailable");
+      if (args.includes("credentials.google")) return store();
       return { stdout: "git version 2.45.0", stderr: "", exitCode: 0, error: null, launched: true };
     });
+  }
+
+  it("reports a store that exits non-zero, without the key", async () => {
+    // `exec` resolves on a failing exit — only the exit code says the key was lost.
+    stubManagedRun({ stdout: "n-dx initialized" });
+    stubStore(async () => ({
+      stdout: "",
+      stderr: `Error: credential store is locked (refusing to write ${KEY})\n`,
+      exitCode: 1,
+      error: null,
+      launched: true,
+    }));
+    await postInit({ provider: "google", googleApiKey: KEY });
+    const status = await waitForInit();
+
+    expect(status.error).toBeNull();
+    const warning = status.credentialWarning as string;
+    expect(warning).toContain("not stored");
+    expect(warning).toContain("ndx config credentials.google");
+    expect(warning).toContain("credential store is locked");
+    expect(JSON.stringify(status)).not.toContain(KEY);
+  });
+
+  it("reports a store command that could not run", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    stubStore(async () => { throw new Error("store unavailable"); });
+    await postInit({ provider: "google", googleApiKey: KEY });
+    const status = await waitForInit();
+
+    expect(status.error).toBeNull();
+    expect(status.credentialWarning).toContain("not stored");
+    expect(status.credentialWarning).toContain("store unavailable");
+  });
+
+  it("reports nothing when the key is stored", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
     await postInit({ provider: "google", googleApiKey: KEY });
     const status = await waitForInit();
     expect(status.error).toBeNull();
+    expect(status.credentialWarning).toBeNull();
   });
 
   it("runs no store command when no Google key was entered", async () => {

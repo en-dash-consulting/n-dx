@@ -20,7 +20,7 @@ import {
 } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { execFileSyncCli } from "./win-spawn.js";
+import { execFileSyncCli, spawnSyncCli } from "./win-spawn.js";
 import { relativeToRoot, resolveLayout, resolveNdxHome } from "./layout.js";
 import {
   describeUnrestrictedFile,
@@ -123,7 +123,10 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  * - **Credential choice** (`llm.<vendor>.auth`): which of the user's own
  *   credentials a vendor gets. `api` from the shared file is credential
  *   routing too (it sends the user's stored key), so it goes where the
- *   user's other credential settings go.
+ *   user's other credential settings go. Unlike the others, a committed
+ *   auth is a supported team setting (a repository's `cli` or `auto` always
+ *   applies), so the local value overrides it and never removes it — see
+ *   {@link SHARED_COPY_KEPT_SUFFIXES}.
  *
  * - **Security posture** (`web.auth`): whether the dashboard requires the
  *   per-user token is the user's decision, not the repository's, so `ndx
@@ -147,6 +150,13 @@ const LOCAL_ONLY_SETTINGS = {
   // shared config `bin` is a trust finding and `allowNpx` would opt every clone in.
   graview: new Set(["bin", "allowNpx"]),
 };
+
+/**
+ * `llm` settings in {@link LOCAL_ONLY_SETTINGS} whose shared copy is the
+ * repository's own choice rather than a stale or leaked one, so writing the
+ * local value never removes it from `.n-dx.json`.
+ */
+const SHARED_COPY_KEPT_SUFFIXES = [".auth"];
 
 /**
  * The value a package config file keeps for each of its settings in
@@ -927,8 +937,9 @@ function isValidGoogleApiKeyFormat(value) {
 /**
  * Run a lightweight preflight call to the Gemini API to validate the API key.
  *
- * Reads the API key from `api_key` or the variable `apiKeyEnv` names
- * (default GEMINI_API_KEY). The settings come from llm-client's
+ * Reads the API key through llm-client's `resolveVendorKey`: `api_key`, then
+ * the variable `apiKeyEnv` names (default GEMINI_API_KEY), then the per-user
+ * credential store. The settings come from llm-client's
  * `loadLLMConfig`, not the raw merged config: `apiKeyEnv` picks which variable
  * is sent, and a shared `.n-dx.json` may choose it only once the repository is
  * trusted (llm-client `credential-routing.ts`).
@@ -947,10 +958,10 @@ async function runGoogleApiPreflight(dir) {
     return { ok: true, vendor: LLM_VENDOR.GOOGLE };
   }
 
-  const { loadLLMConfig } = await import("@n-dx/llm-client");
-  const google = (await loadLLMConfig(dir)).google;
-  const apiKeyEnvVar = google?.apiKeyEnv || "GEMINI_API_KEY";
-  const apiKey = google?.api_key || process.env[apiKeyEnvVar];
+  const { loadLLMConfig, resolveVendorKey, vendorKeyEnv } = await import("@n-dx/llm-client");
+  const llmConfig = await loadLLMConfig(dir);
+  const apiKeyEnvVar = vendorKeyEnv(LLM_VENDOR.GOOGLE, llmConfig);
+  const apiKey = resolveVendorKey(LLM_VENDOR.GOOGLE, llmConfig)?.value;
 
   if (!apiKey) {
     return {
@@ -1139,10 +1150,11 @@ function validateGoogleApiKeyEnv(value) {
 /**
  * Validate CLI path by trying to run `<binary> --version`, with the vendor's
  * filtered environment ({@link loadVendorCliEnv}), never the whole parent one.
+ * Under `auth api` it resolves no key ({@link vendorEnvConfig}).
  * Returns { ok, version?, error? }.
  */
 async function testCliPath(cliPath, dir, vendor) {
-  const env = await loadVendorCheckEnv(dir, vendor);
+  const env = await loadVendorCheckEnv(dir, vendor, { versionProbe: true });
   try {
     const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
@@ -1817,10 +1829,21 @@ export async function loadVendorCliPath(dir, vendor) {
   return configured || vendor;
 }
 
+/**
+ * `-c` overrides for every `codex exec` core spawns: they blank the Codex
+ * credentials in the commands the agent runs, whatever the user's Codex
+ * config allows (llm-client `codexShellEnvFlags`).
+ * @returns {Promise<string[]>}
+ */
+export async function loadCodexShellEnvFlags() {
+  const { codexShellEnvFlags } = await import("@n-dx/llm-client");
+  return codexShellEnvFlags();
+}
+
 /** The auth preflight's arguments for a CLI vendor. */
-function vendorAuthPreflightArgs(vendor) {
+async function vendorAuthPreflightArgs(vendor) {
   return vendor === LLM_VENDOR.CODEX
-    ? ["exec", "--skip-git-repo-check", "Reply with exactly: ok"]
+    ? ["exec", ...(await loadCodexShellEnvFlags()), "--skip-git-repo-check", "Reply with exactly: ok"]
     : ["-p", "Reply with exactly: ok", "--output-format", "json"];
 }
 
@@ -1846,9 +1869,16 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
 
   const cliVendor = vendor === LLM_VENDOR.CODEX ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE;
   const binary = await loadVendorCliPath(dir, cliVendor);
-  const args = vendorAuthPreflightArgs(vendor);
+  const args = await vendorAuthPreflightArgs(vendor);
   // The agent loop's vendor environment: no credential outside the vendor's mode.
-  const env = await loadVendorCheckEnv(dir, cliVendor);
+  let env;
+  try {
+    env = await loadVendorCheckEnv(dir, cliVendor);
+  } catch (err) {
+    // llm.<vendor>.auth "api" with no usable key: a failed preflight, not a crash.
+    if (err?.reason !== "auth") throw err;
+    return { ok: false, binary, args, detail: err.message, errorCode: preflightNoKeyCode(cliVendor) };
+  }
   try {
     // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
     // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
@@ -1889,6 +1919,11 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
       errorCode: typeof err?.code === "string" ? err.code : undefined,
     };
   }
+}
+
+/** The preflight error code for `llm.<vendor>.auth api` with no usable key. */
+function preflightNoKeyCode(vendor) {
+  return `NDX_${vendor.toUpperCase()}_PREFLIGHT_NO_KEY`;
 }
 
 function isBareCommand(binary) {
@@ -2029,6 +2064,14 @@ async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
     }
     console.error(yellow("  Retry after resolving the issue: ndx config llm.vendor google"));
     console.error(dim(`  [${errorCode}]`));
+    return;
+  }
+
+  // CLI-based vendors under auth api with no usable key: the detail names the
+  // key and how to store it; login guidance would not help.
+  if (preflight.errorCode === preflightNoKeyCode(vendor)) {
+    console.error(red(`✗ ${preflight.detail}`));
+    console.error(dim(`  [${preflight.errorCode}]`));
     return;
   }
 
@@ -2643,10 +2686,11 @@ Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying
   NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH    Configured Claude command is not resolvable on PATH
   NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED  Claude CLI is present but needs authentication
+  NDX_CLAUDE_PREFLIGHT_NO_KEY         llm.claude.auth is "api" and no key may be used (ndx config credentials.claude)
   NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED  Claude appears authenticated/installed, but ndx cannot launch a usable executable
 
 Google preflight error codes:
-  NDX_GOOGLE_PREFLIGHT_NO_KEY           No GEMINI_API_KEY env var or llm.google.api_key in config
+  NDX_GOOGLE_PREFLIGHT_NO_KEY           No GEMINI_API_KEY env var, llm.google.api_key, or stored key (ndx config credentials.google)
   NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT  Key does not match expected format (starts with "AIza" or "AQ", ≥30 chars)
   NDX_GOOGLE_PREFLIGHT_AUTH_FAILED      Gemini API rejected the key (HTTP 400 or 403)
   NDX_GOOGLE_PREFLIGHT_HTTP_ERROR       Gemini API returned an unexpected HTTP error
@@ -3034,10 +3078,11 @@ async function loadAllConfigs(dir) {
  * Config I/O and foundation loading stay in the spawn-exempt config module.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
- * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions, subject?: string }} [options]
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions, subject?: string, versionProbe?: boolean }} [options]
  *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
  *   that omit it use the user's real store. `subject` names the caller in the
- *   untrusted-allow warning (default "the reviewer CLI").
+ *   untrusted-allow warning (default "the reviewer CLI"). `versionProbe`: see
+ *   {@link vendorEnvConfig}.
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
 export async function loadVendorCliEnv(dir, vendor, options = {}) {
@@ -3045,7 +3090,19 @@ export async function loadVendorCliEnv(dir, vendor, options = {}) {
   const envPolicy = await loadProjectEnvPolicy(dir);
   const llmConfig = await loadLLMConfig(dir);
   const policy = await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust, options.subject);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, policy);
+  return resolveVendorCliEnv(vendorEnvConfig(llmConfig, vendor, options.versionProbe), policy);
+}
+
+/**
+ * `llmConfig` for `vendor`'s child environment. A `--version` probe needs no
+ * credential, so there `llm.<vendor>.auth api` resolves as `cli`: the probe
+ * neither fails for a missing key nor runs a key helper. `auto` and `cli` stay
+ * as configured, so the probe still gets what the vendor's runs get.
+ */
+function vendorEnvConfig(llmConfig, vendor, versionProbe = false) {
+  const config = { ...llmConfig, vendor };
+  if (!versionProbe || llmConfig[vendor]?.auth !== "api") return config;
+  return { ...config, [vendor]: { ...llmConfig[vendor], auth: "cli" } };
 }
 
 /**
@@ -3056,12 +3113,13 @@ export async function loadVendorCliEnv(dir, vendor, options = {}) {
  * valid deny list, the user's local one included — never the parent environment.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
+ * @param {{ versionProbe?: boolean }} [options] see {@link vendorEnvConfig}
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-async function loadVendorCheckEnv(dir, vendor) {
+async function loadVendorCheckEnv(dir, vendor, { versionProbe = false } = {}) {
   const subject = `the ${vendor} CLI check`;
   try {
-    return await loadVendorCliEnv(dir, vendor, { subject });
+    return await loadVendorCliEnv(dir, vendor, { subject, versionProbe });
   } catch (err) {
     // llm.<vendor>.auth "api" with no key: a credential problem the check
     // reports as one, not a malformed env policy.
@@ -3069,7 +3127,7 @@ async function loadVendorCheckEnv(dir, vendor) {
     const { loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } = await import("@n-dx/llm-client");
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} ignores the malformed field.`);
-    return resolveVendorCliEnv({ ...(await loadLLMConfig(dir)), vendor }, repoEnvPolicy(dir));
+    return resolveVendorCliEnv(vendorEnvConfig(await loadLLMConfig(dir), vendor, versionProbe), repoEnvPolicy(dir));
   }
 }
 
@@ -3194,15 +3252,21 @@ async function resolveClaudeSettings(configs) {
 /**
  * Handle --test-connection mode.
  *
- * Reads Claude settings through llm-client's `loadClaudeConfig`, not the raw
+ * Reads Claude settings through llm-client's `loadLLMConfig`, not the raw
  * merged config: this call sends the API key, and a shared `.n-dx.json`
  * `api_endpoint` may choose its destination only once the repository is
- * trusted (llm-client `credential-routing.ts`).
+ * trusted (llm-client `credential-routing.ts`). The key is the one the API
+ * provider would send (`resolveVendorApiKey`): under `llm.claude.auth api` it
+ * may come from the credential store; under `cli` none is tested. The key
+ * value is never printed.
  */
 async function handleTestConnection(dir) {
-  const { loadClaudeConfig } = await import("@n-dx/llm-client");
-  const claudeConfig = await loadClaudeConfig(dir);
-  if (Object.keys(claudeConfig).length === 0) {
+  const { loadLLMConfig, resolveVendorAuth } = await import("@n-dx/llm-client");
+  const llmConfig = await loadLLMConfig(dir);
+  const claudeConfig = llmConfig.claude ?? {};
+  const auth = resolveVendorAuth(LLM_VENDOR.CLAUDE, llmConfig);
+  const apiKey = auth.mode === "api" ? auth.key?.value : undefined;
+  if (Object.keys(claudeConfig).length === 0 && !apiKey && !auth.storedKeyHeld) {
     console.error(
       "No Claude configuration set. Run 'claude login', or use 'ndx config credentials.claude' for a key or 'ndx config claude.cli_path <path>' for the binary first.",
     );
@@ -3212,10 +3276,10 @@ async function handleTestConnection(dir) {
   let tested = false;
   let hasFailure = false;
 
-  if (claudeConfig.api_key) {
+  if (apiKey) {
     tested = true;
     const result = await testApiConnection(
-      claudeConfig.api_key,
+      apiKey,
       claudeConfig.api_endpoint,
       claudeConfig.model,
     );
@@ -3228,6 +3292,16 @@ async function handleTestConnection(dir) {
       console.error("Testing API key... ✗ " + result.error);
       hasFailure = true;
     }
+  } else if (auth.auth !== "api" && (auth.storedKeyHeld || claudeConfig.api_key)) {
+    // auto never selects the API for a store-only key; cli never uses a key.
+    console.error(
+      `llm.claude.auth is "${auth.auth}": the API key is not used, so it is not tested. ` +
+        "Set 'ndx config llm.claude.auth api' to use and test it.",
+    );
+  } else if (auth.auth === "api") {
+    console.error("Testing API key... ✗ " + auth.apiRefusal.message);
+    hasFailure = true;
+    tested = true;
   }
 
   if (claudeConfig.cli_path) {
@@ -3244,7 +3318,7 @@ async function handleTestConnection(dir) {
   }
 
   if (!tested) {
-    console.error("No claude.api_key or claude.cli_path configured to test.");
+    console.error("No API key or claude.cli_path to test.");
     process.exit(1);
   }
   if (hasFailure) {
@@ -3542,8 +3616,11 @@ async function handleSetProjectSection(
   // and a committed secret at worst. Remove it, and any legacy `claude.*` copy
   // of an `llm.claude.*` key along with it — this one still fires, because a
   // secret mirrored into the shared file by an older version must not be left
-  // committed just because the mirror that put it there is gone.
-  if (targetFile === LOCAL_CONFIG_FILE) {
+  // committed just because the mirror that put it there is gone. A committed
+  // `llm.<vendor>.auth` is the repository's setting, so it stays.
+  const keepsSharedCopy = storagePkg === "llm"
+    && SHARED_COPY_KEPT_SUFFIXES.some((suffix) => storageSettingPath.endsWith(suffix));
+  if (targetFile === LOCAL_CONFIG_FILE && !keepsSharedCopy) {
     const sharedPaths = [[storagePkg, storageSettingPath]];
     if (storagePkg === "llm" && storageSettingPath.startsWith("claude.")) {
       sharedPaths.push(["claude", storageSettingPath.slice("claude.".length)]);
@@ -4081,26 +4158,38 @@ const CREDENTIAL_NAMES = new Set(["typesafe", "claude", "codex", "google"]);
  * only spawns it, and a value travels on stdin — never argv, so it is in no
  * process list and no spawn log.
  *
+ * On success, what the child wrote to stderr — a warning such as a Windows
+ * ACL it could not restrict — is forwarded to this process's stderr, since
+ * the command still did what was asked. On failure the caller reports
+ * `stderr`. The CLI never writes a credential value to either stream.
+ *
+ * A spawn refused before it starts — on Windows, a path holding a `%NAME%`
+ * cmd.exe would expand — is a failure like any other: its message becomes
+ * `stderr`, so the caller prints one line rather than a stack.
+ *
+ * @param {string[]} args
+ * @param {string} [input]
+ * @param {typeof spawnSyncCli} [spawn]
  * @returns {{ code: number, stdout: string, stderr: string }}
  */
-function spawnCredentialsCli(args, input) {
+export function spawnCredentialsCli(args, input, spawn = spawnSyncCli) {
   const script = createRequire(import.meta.url).resolve(
     "@n-dx/llm-client/dist/cli/credentials.js",
   );
+  let result;
   try {
-    const stdout = execFileSyncCli(process.execPath, [script, ...args], {
+    result = spawn(process.execPath, [script, ...args], {
       encoding: "utf-8",
       input: input ?? "",
       stdio: ["pipe", "pipe", "pipe"],
     });
-    return { code: 0, stdout, stderr: "" };
   } catch (err) {
-    return {
-      code: typeof err.status === "number" ? err.status : 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? err.message ?? ""),
-    };
+    return { code: 1, stdout: "", stderr: err instanceof Error ? err.message : String(err) };
   }
+  const code = typeof result.status === "number" ? result.status : 1;
+  const stderr = String(result.stderr || result.error?.message || "");
+  if (code === 0 && stderr) process.stderr.write(stderr);
+  return { code, stdout: String(result.stdout ?? ""), stderr };
 }
 
 /**
@@ -4331,12 +4420,16 @@ async function showVendorApiKey(dir, vendor, flags) {
     if ((await fileApiKeys(dir, which)).some((k) => k.vendor === vendor)) shadowedBy.push(which);
   }
   if (flags.json) {
-    const { name, source, backend, fingerprint } = JSON.parse(result.stdout).find((s) => s.name === vendor);
+    const { name, source, backend, fingerprint, storeProblem } = JSON.parse(result.stdout).find((s) => s.name === vendor);
     const configFiles = shadowedBy.map((which) => projectConfigLabel(dir, which));
-    console.log(JSON.stringify({ name, source, backend, fingerprint, configFiles }));
+    console.log(JSON.stringify({ name, source, backend, fingerprint, storeProblem, configFiles }));
     return;
   }
-  console.log(result.stdout.split("\n").find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
+  const lines = result.stdout.split("\n");
+  console.log(lines.find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
+  // Why the store was not read, with the fix (status reports it, not stderr).
+  const notRead = lines.find((l) => l.startsWith("Store not read: "));
+  if (notRead) console.log(notRead);
   for (const which of shadowedBy) {
     const move = which === LOCAL_CONFIG_FILE ? "ndx config credentials --import" : `ndx config credentials.${vendor}, then delete llm.${vendor}.api_key from that file`;
     console.log(`${projectConfigLabel(dir, which)} also holds a ${vendor} key, which is used instead. Move it: ${move}`);
@@ -4365,25 +4458,72 @@ async function fileApiKeys(dir, which) {
  * written to the store first and removed from the file only after that write
  * succeeded, so a failed write loses nothing. A vendor whose store entry is a
  * helper is skipped: the password-manager setup outranks a plaintext file key,
- * and overwriting it would put that key in the store as plaintext. Never
- * prints a value. Returns whether nothing failed.
+ * and overwriting it would put that key in the store as plaintext. A key the
+ * store already holds is only removed from the file. A different stored key
+ * is replaced only when `confirm` (a terminal) accepts a question naming both
+ * fingerprints; a no skips the vendor, and with no `confirm` the vendor is
+ * skipped as a failure, since nobody chose. Never prints a value.
+ * Returns whether nothing failed. Exported for tests, which inject `confirm`.
+ *
+ * @param {string} dir
+ * @param {((question: string) => Promise<boolean>) | null} confirm
  */
-async function importLocalApiKeys(dir) {
+export async function importLocalApiKeys(dir, confirm) {
   const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
   const status = spawnCredentialsCli(["status", "--json"]);
   if (status.code !== 0) {
     console.error(`Could not read the credential store; nothing imported: ${status.stderr.trim()}`);
     return false;
   }
-  const helperVendors = new Set(JSON.parse(status.stdout).filter((s) => s.backend === "helper").map((s) => s.name));
+  const statuses = JSON.parse(status.stdout);
+  // A store that was not read reports no entries, so the helper and
+  // different-key guards below would pass and `set` would replace what it holds.
+  const storeProblem = statuses.find((s) => s.storeProblem)?.storeProblem;
+  if (storeProblem) {
+    console.error(`The credential store was not read; nothing imported. ${storeProblem}`);
+    return false;
+  }
+  const { credentialFingerprint } = await import("@n-dx/llm-client");
+  const stored = new Map(statuses.map((s) => [s.name, s]));
   let allMoved = true;
   for (const { vendor, value } of await localFileApiKeys(dir)) {
-    if (helperVendors.has(vendor)) {
+    const entry = stored.get(vendor);
+    if (entry?.backend === "helper") {
       console.log(
         `Skipped the ${vendor} key: the credential store runs a helper for ${vendor}. ` +
           `The key stays in ${label}; remove it there by hand.`,
       );
       continue;
+    }
+    const fileFingerprint = credentialFingerprint(value);
+    if (entry?.backend) {
+      // An exported key hides the stored one's fingerprint: never a match.
+      const storedFingerprint = entry.source === "file" ? entry.fingerprint : null;
+      if (storedFingerprint === fileFingerprint) {
+        await removeFileApiKey(dir, LOCAL_CONFIG_FILE, vendor);
+        console.log(`The ${vendor} key in ${label} is already in the credential store; removed it from ${label}.`);
+        await setApiAuthIfUnset(dir, vendor);
+        continue;
+      }
+      const shown = storedFingerprint ?? "unknown: an exported key hides it";
+      const question =
+        `The credential store holds a different ${vendor} key (fingerprint ${shown}). ` +
+        `Replace it with the one in ${label} (fingerprint ${fileFingerprint})? [y/N] `;
+      if (!(confirm && (await confirm(question)))) {
+        const skipped =
+          `Skipped the ${vendor} key: the credential store holds a different one ` +
+          `(stored fingerprint ${shown}, ${label} fingerprint ${fileFingerprint}). ` +
+          `The key stays in ${label}, where it outranks the store; run ndx config credentials --import in a terminal to choose, or remove it there by hand.`;
+        if (confirm) {
+          // The operator answered no: their choice, not a failure.
+          console.log(skipped);
+        } else {
+          // Nobody could choose, so the import did not finish.
+          allMoved = false;
+          console.error(skipped);
+        }
+        continue;
+      }
     }
     const result = spawnCredentialsCli(["set", vendor], value);
     if (result.code !== 0) {
@@ -4411,23 +4551,47 @@ async function readAnswer() {
 }
 
 /**
+ * Ask a yes/no question on stderr; only a y or yes is a yes. Exported for
+ * tests, which inject `read` in place of the terminal.
+ *
+ * @param {string} question
+ * @param {() => Promise<string>} [read]
+ */
+export async function confirmOnTerminal(question, read = readAnswer) {
+  process.stderr.write(question);
+  return /^y(es)?$/i.test((await read()).trim());
+}
+
+/**
  * `ndx config credentials` with a key in `.n-dx.local.json`: `--import` moves
  * it without a prompt, a terminal is asked, and anything else is told how.
+ * A tracked (or untellable) local file is repository config: its keys belong
+ * to the repository, so they are never moved into this user's store and the
+ * shared file is never rewritten.
  */
 async function offerKeyImport(dir, flags) {
   const keys = await localFileApiKeys(dir);
   if (keys.length === 0) return;
   const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
   const names = keys.map((k) => k.vendor).join(", ");
+  const tracked = await localConfigTrackedStatus(dir);
+  if (tracked.tracked) {
+    console.log(
+      `${label} holds an API key (${names}), but the file belongs to the repository (${tracked.reason}), ` +
+        `so its keys are not moved to your credential store. Each one is used instead of the credential store's ` +
+        `until it is removed from ${label}. Store your own with: ndx config credentials.<vendor>`,
+    );
+    return;
+  }
+  const terminal = Boolean(process.stdin.isTTY && process.stderr.isTTY);
   if (flags.import !== "true") {
-    if (!(process.stdin.isTTY && process.stderr.isTTY)) {
+    if (!terminal) {
       console.log(`${label} holds an API key (${names}). Move it to the credential store: ndx config credentials --import`);
       return;
     }
-    process.stderr.write(`${label} holds an API key (${names}). Move it to the credential store? [y/N] `);
-    if (!/^y(es)?$/i.test((await readAnswer()).trim())) return;
+    if (!(await confirmOnTerminal(`${label} holds an API key (${names}). Move it to the credential store? [y/N] `))) return;
   }
-  if (!(await importLocalApiKeys(dir))) process.exit(1);
+  if (!(await importLocalApiKeys(dir, terminal ? confirmOnTerminal : null))) process.exit(1);
 }
 
 /**

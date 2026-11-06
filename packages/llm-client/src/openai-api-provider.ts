@@ -82,6 +82,9 @@ export function parseOpenAiTokenUsage(
  * 2. Environment variable (default: `OPENAI_API_KEY`)
  * 3. The per-user credential store's `codex` entry
  *
+ * It runs a stored helper and ignores `llm.codex.auth`, so a key found here
+ * never means "use the API": that is `resolveVendorAuth(...).mode`.
+ *
  * @returns The resolved API key, or undefined if not found.
  */
 export function resolveOpenAiApiKey(

@@ -120,7 +120,11 @@ export interface DisallowedToolsOptions {
  * - The commands that read a stored credential: `security
  *   find-generic-password` and each configured helper's command, as
  *   `Bash(<command>:*)` prefix rules, plus quoted spellings when a token has
- *   whitespace.
+ *   whitespace. These are prefix rules on the literal command, so unlike
+ *   hench's guard they miss an option before the subcommand (`security -q
+ *   find-generic-password`) or an escape sh strips (`find\-generic-password`).
+ *   Spellings are unbounded, so no rule list closes that: with `security` in
+ *   `guard.allowedCommands`, a Claude run can read the keychain.
  *
  * A deny rule outranks the bare grants above, and Claude Code applies
  * `Read(...)` and `Edit(...)` rules to every built-in tool that reads or edits

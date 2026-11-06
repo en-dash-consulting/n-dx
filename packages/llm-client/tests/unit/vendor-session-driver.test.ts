@@ -7,6 +7,8 @@ import {
 } from "../../src/vendor-session-driver.js";
 import type { VendorSessionDriver } from "../../src/vendor-session-driver.js";
 import { UsageMessageFilter } from "../../src/usage-dedup.js";
+import { codexShellEnvFlags, compileCodexPolicyFlags } from "../../src/codex-cli-provider.js";
+import { DEFAULT_EXECUTION_POLICY } from "../../src/runtime-contract.js";
 
 describe("vendorSessionDriver", () => {
   it("covers the two CLI vendors and nothing else", () => {
@@ -63,7 +65,10 @@ describe("claude turn spawn", () => {
 });
 
 describe("codex turn spawn", () => {
-  it("ignores fork and drops policy flags on resume", () => {
+  // `exec resume` rejects the sandbox and approval flags, but config is read
+  // per process: the overrides that blank the Codex key in the agent's
+  // commands must ride on every resumed turn too.
+  it("ignores fork and drops policy flags on resume, keeping the key-blanking overrides", () => {
     const { args } = codexSessionDriver.turnSpawn({
       systemPrompt: "",
       prompt: "hi",
@@ -71,7 +76,30 @@ describe("codex turn spawn", () => {
       resume: { sessionId: "t", fork: true },
       codex: { policyFlags: ["-s", "read-only"] },
     });
-    expect(args).toEqual(["exec", "resume", "t", "--json", "--skip-git-repo-check", "-m", "m", "-"]);
+    expect(args).toEqual([
+      "exec", "resume", "t", "--json", "--skip-git-repo-check",
+      ...codexShellEnvFlags(),
+      "-m", "m", "-",
+    ]);
+    expect(args).not.toContain("read-only");
+  });
+
+  // startVendorSession is public: a caller whose policy flags lack the
+  // overrides, or who passes none, must not start an agent that can read the
+  // Codex key. Flags that already end with them are not repeated.
+  const compiled = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
+  it.each([
+    ["absent", undefined, codexShellEnvFlags()],
+    ["without the overrides", ["-s", "read-only"], ["-s", "read-only", ...codexShellEnvFlags()]],
+    ["from compileCodexPolicyFlags", compiled, compiled],
+  ])("ends a fresh turn's flags with the key-blanking overrides when policy flags are %s", (_label, policyFlags, flags) => {
+    const { args } = codexSessionDriver.turnSpawn({
+      systemPrompt: "",
+      prompt: "hi",
+      ...(policyFlags ? { codex: { policyFlags } } : {}),
+    });
+    expect(args).toEqual(["exec", ...flags, "--json", "--skip-git-repo-check", "-"]);
+    expect(args.slice(1 + flags.length - codexShellEnvFlags().length, 1 + flags.length)).toEqual(codexShellEnvFlags());
   });
 });
 

@@ -89,11 +89,13 @@ export interface AnalysisRun {
   /** What this run left in `.sourcevision/`, for the next run to be measured against. */
   outcome?: AnalysisOutcome;
   /**
-   * Whether Jev's key resolved when the run ended and where from (`env`,
-   * `file` or `helper`); never the key. Absent on manifests written before it
-   * existed, so a reader treats a missing field as unknown, not unavailable.
+   * Whether Jev's key resolved during the run and where from (`env`, `file`
+   * or `helper`); never the key. A helper that failed during the run records
+   * `available: false, source: null`. A helper the run never called is not
+   * run to find out: `available: null`, unknown. Absent on manifests written
+   * before it existed, which a reader also treats as unknown.
    */
-  jev?: { available: boolean; source: "env" | "file" | "helper" | null };
+  jev?: { available: boolean | null; source: "env" | "file" | "helper" | null };
   /** What the re-run judgments decided, when a previous run existed. */
   rerun?: RerunSummary;
 }

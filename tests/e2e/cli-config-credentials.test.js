@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { CLI_PATH, DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
@@ -345,6 +346,98 @@ describe("ndx config credentials --import", () => {
     expect(r.out + r.err).not.toContain(KEY);
   }, DEFAULT_TIMEOUT);
 
+  const storedClaude = async () => JSON.parse(await readFile(join(home, "credentials.json"), "utf-8")).entries.claude;
+  const fingerprintOf = (value) => createHash("sha256").update(value).digest("hex").slice(0, 8);
+
+  it("removes a key the store already holds from the file without rewriting the store", async () => {
+    expect(config(["credentials.claude", "--stdin"], KEY).code).toBe(0);
+    const storePath = join(home, "credentials.json");
+    const before = await readFile(storePath, "utf-8");
+    const mtime = (await stat(storePath)).mtimeMs;
+    await seed({ claude: { api_key: KEY } });
+
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).toMatch(/claude key in .*\.n-dx\.local\.json is already in the credential store/);
+    expect(await readFile(localPath(), "utf-8")).not.toContain(KEY);
+    expect(await readFile(storePath, "utf-8")).toBe(before);
+    expect((await stat(storePath)).mtimeMs).toBe(mtime);
+  }, DEFAULT_TIMEOUT);
+
+  it("never replaces a different stored key without a terminal to confirm, names both fingerprints and fails", async () => {
+    const STORED = "sk-ant-placeholder-stored-9876543210";
+    expect(config(["credentials.claude", "--stdin"], STORED).code).toBe(0);
+    const before = await storedClaude();
+    await seed({ claude: { api_key: KEY } });
+
+    const r = config(["credentials", "--import", cwd]);
+    // Nobody could choose, so the import did not finish.
+    expect(r.code, r.err).toBe(1);
+    expect(await storedClaude()).toEqual(before);
+    expect(await readFile(localPath(), "utf-8")).toContain(KEY);
+    const skipped = r.err.split("\n").find((l) => /Skipped the claude key/.test(l));
+    expect(skipped).toContain(`stored fingerprint ${fingerprintOf(STORED)}`);
+    expect(skipped).toContain(`fingerprint ${fingerprintOf(KEY)}`);
+    for (const text of [r.out, r.err]) {
+      expect(text).not.toContain(KEY);
+      expect(text).not.toContain(STORED);
+    }
+  }, DEFAULT_TIMEOUT);
+
+  it("replaces a different stored key with the file's when the terminal answers y", async () => {
+    const STORED = "sk-ant-placeholder-stored-9876543210";
+    expect(config(["credentials.claude", "--stdin"], STORED).code).toBe(0);
+    await seed({ claude: { api_key: KEY } });
+
+    // The terminal's answer is injected; the credential CLI it drives is real.
+    const saved = { NDX_HOME: process.env.NDX_HOME, N_DX_HOME: process.env.N_DX_HOME };
+    process.env.NDX_HOME = home;
+    delete process.env.N_DX_HOME;
+    const questions = [];
+    try {
+      const { importLocalApiKeys, confirmOnTerminal } = await import("../../packages/core/config.js");
+      const confirm = (question) => {
+        questions.push(question);
+        return confirmOnTerminal(question, async () => "y\n");
+      };
+      expect(await importLocalApiKeys(cwd, confirm)).toBe(true);
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+
+    expect(questions).toHaveLength(1);
+    expect(questions[0]).toContain(`fingerprint ${fingerprintOf(STORED)}`);
+    expect(questions[0]).toContain(`fingerprint ${fingerprintOf(KEY)}`);
+    const store = await readFile(join(home, "credentials.json"), "utf-8");
+    expect(store).toContain(KEY);
+    expect(store).not.toContain(STORED);
+    const status = config(["credentials", cwd]).out;
+    expect(status).toMatch(new RegExp(`^claude: credential store.*${fingerprintOf(KEY)}`, "m"));
+    expect(await readFile(localPath(), "utf-8")).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+
+  it("leaves a git-tracked local file and the store alone, saying the file belongs to the repository", async () => {
+    await seed({ google: { api_key: KEY } });
+    const git = (args) => spawnSync("git", args, { cwd, stdio: "pipe" });
+    git(["init", "-q"]);
+    git(["add", "-f", "--", ".n-dx.local.json"]);
+    const before = await readFile(localPath(), "utf-8");
+
+    for (const args of [["credentials", "--import", cwd], ["credentials", cwd]]) {
+      const r = config(args);
+      expect(r.code, r.err).toBe(0);
+      expect(r.out).toMatch(/holds an API key \(google\), but the file belongs to the repository/);
+      // Config outranks the store, so storing a key alone does not switch keys.
+      expect(r.out).toMatch(/used instead of the credential store's until it is removed from .*\.n-dx\.local\.json/);
+      expect(r.out + r.err).not.toContain(KEY);
+    }
+    expect(await readFile(localPath(), "utf-8")).toBe(before);
+    expect(existsSync(join(home, "credentials.json"))).toBe(false);
+  }, DEFAULT_TIMEOUT);
+
   it("removes a key from the file only after the store write succeeded", async () => {
     await seed({ claude: { api_key: KEY } });
     // A file where the ndx home should be: the store cannot be written.
@@ -359,5 +452,70 @@ describe("ndx config credentials --import", () => {
     expect(r.stderr).toMatch(/Could not store the claude key; it stays in/);
     expect(await readFile(localPath(), "utf-8")).toContain(KEY);
     expect(r.stdout + r.stderr).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+});
+
+// A group- or world-readable store is refused on POSIX; Windows has no mode bits.
+describe.skipIf(isWin)("ndx config credentials with a store readable by others", () => {
+  const VENDOR_KEY = "sk-ant-placeholder-exposed-0123456789";
+  const storePath = () => join(home, "credentials.json");
+
+  beforeEach(async () => {
+    expect(config(["credentials.typesafe", "--stdin"], SECRET).code).toBe(0);
+    await chmod(storePath(), 0o644);
+  });
+
+  it("names the refusal and the chmod fix instead of not set", () => {
+    const r = config(["credentials"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("typesafe: unknown, the store was not read");
+    expect(r.out).not.toMatch(/typesafe: not set/);
+    expect(r.out).toContain(`Refusing to read the credential store ${storePath()}`);
+    expect(r.out).toContain(`chmod 600 ${storePath()}`);
+    expect(r.out + r.err).not.toContain(SECRET);
+  }, DEFAULT_TIMEOUT);
+
+  it("names the refusal when showing a vendor key", () => {
+    const r = config(["llm.claude.api_key", cwd]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("claude: unknown, the store was not read");
+    expect(r.out).toContain(`chmod 600 ${storePath()}`);
+    expect(r.out + r.err).not.toContain(SECRET);
+  }, DEFAULT_TIMEOUT);
+
+  it("forwards the credential CLI's warning from a successful set, never a value", async () => {
+    const r = config(["credentials.claude", "--stdin"], VENDOR_KEY);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/Stored claude/);
+    expect(r.err).toContain(`The credential store ${storePath()} was readable by other users (mode 0644)`);
+    expect((await stat(storePath())).mode & 0o777).toBe(0o600);
+    for (const text of [r.out, r.err]) {
+      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain(VENDOR_KEY);
+    }
+  }, DEFAULT_TIMEOUT);
+
+  it("imports nothing, naming the problem and the chmod fix, so a stored key is never replaced unseen", async () => {
+    // The store must be refused before the import: set it 0600, then 0644 again.
+    expect(config(["credentials.claude", "--stdin"], VENDOR_KEY).code).toBe(0);
+    await chmod(storePath(), 0o644);
+    const before = await readFile(storePath(), "utf-8");
+    const FILE_KEY = "sk-ant-placeholder-file-9876543210";
+    const localPath = join(cwd, ".n-dx.local.json");
+    await writeFile(localPath, JSON.stringify({ llm: { claude: { api_key: FILE_KEY } } }));
+
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code).toBe(1);
+    expect(await readFile(storePath(), "utf-8")).toBe(before);
+    expect(await readFile(localPath, "utf-8")).toContain(FILE_KEY);
+    expect(r.err).toContain("nothing imported");
+    expect(r.err).toContain(`Refusing to read the credential store ${storePath()}`);
+    expect(r.err).toContain(`chmod 600 ${storePath()}`);
+    expect(r.out + r.err).not.toMatch(/Moved the claude key/);
+    for (const text of [r.out, r.err]) {
+      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain(VENDOR_KEY);
+      expect(text).not.toContain(FILE_KEY);
+    }
   }, DEFAULT_TIMEOUT);
 });

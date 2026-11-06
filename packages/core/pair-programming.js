@@ -26,7 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
-import { isRepoRestricted, loadShellTestEnv, loadVendorCliEnv, loadVendorCliPath } from "./config.js";
+import { isRepoRestricted, loadCodexShellEnvFlags, loadShellTestEnv, loadVendorCliEnv, loadVendorCliPath } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -544,11 +544,13 @@ const doNotTrack = (child) => child;
  *
  * @param {string} dir
  * @param {"claude" | "codex" | undefined} reviewer
- * @returns {Promise<{ env: NodeJS.ProcessEnv } | { spawnError: string }>}
+ * @returns {Promise<{ env: NodeJS.ProcessEnv, codexShellEnvFlags: string[] } | { spawnError: string }>}
  */
 async function resolveReviewerEnv(dir, reviewer, trust) {
   try {
-    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust }) };
+    const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust });
+    const codexShellEnvFlags = reviewer === REVIEWER_VENDOR.CODEX ? await loadCodexShellEnvFlags() : [];
+    return { env, codexShellEnvFlags };
   } catch (err) {
     return { spawnError: `could not resolve the reviewer environment: ${err.message}` };
   }
@@ -558,15 +560,18 @@ async function resolveReviewerEnv(dir, reviewer, trust) {
  * Argv for a reviewer CLI that reads its prompt from stdin.
  * claude: `-p -`; codex: `exec -` (matches codex-cli-adapter). `--model` is
  * added only when a model is given, so the CLI's own default stays the default.
+ * `codexShellEnvFlags` ({@link loadCodexShellEnvFlags}) keep the Codex
+ * credentials out of the reviewer agent's commands; claude ignores them.
  *
  * @param {"claude" | "codex"} reviewer
  * @param {string} [model]
+ * @param {string[]} [codexShellEnvFlags]
  * @returns {string[]}
  */
-export function buildReviewerArgs(reviewer, model) {
+export function buildReviewerArgs(reviewer, model, codexShellEnvFlags = []) {
   const modelArgs = model ? ["--model", model] : [];
   return reviewer === REVIEWER_VENDOR.CODEX
-    ? ["exec", ...modelArgs, "-"]
+    ? ["exec", ...codexShellEnvFlags, ...modelArgs, "-"]
     : ["-p", "-", ...modelArgs];
 }
 
@@ -589,14 +594,14 @@ export function buildReviewerArgs(reviewer, model) {
 export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
   const resolved = await resolveReviewerEnv(dir, reviewer, trust);
   if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError };
-  const { env } = resolved;
+  const { env, codexShellEnvFlags } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
       // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
       // claude: `-p -` reads the full prompt from stdin.
       // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
-      const args = buildReviewerArgs(reviewer, model);
+      const args = buildReviewerArgs(reviewer, model, codexShellEnvFlags);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         env,
@@ -660,12 +665,12 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, ti
 export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
   const resolved = await resolveReviewerEnv(dir, reviewer, trust);
   if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError, output: "" };
-  const { env } = resolved;
+  const { env, codexShellEnvFlags } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
       // Deliver the prompt via stdin — same rationale as runReviewerLlm.
-      const args = buildReviewerArgs(reviewer, model);
+      const args = buildReviewerArgs(reviewer, model, codexShellEnvFlags);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         env,

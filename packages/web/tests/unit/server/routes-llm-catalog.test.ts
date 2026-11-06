@@ -16,7 +16,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
-import { TIER_MODELS } from "@n-dx/llm-client";
+import { TIER_MODELS, loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } from "@n-dx/llm-client";
 import { handleLlmRoute, validateCatalogModel } from "../../../src/server/routes-llm.js";
 import { CATALOG_CACHE_TTL_MS } from "../../../src/server/llm-catalog.js";
 
@@ -318,6 +318,42 @@ describe("GET /api/llm/catalog — installed CLI", () => {
     expect(codexEnv?.GITHUB_TOKEN).toBeUndefined();
     expect(codexEnv?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(codexEnv?.CODEX_ACCESS_TOKEN).toBe("sentinel-codex");
+  });
+
+  const claudeProbeEnv = (): NodeJS.ProcessEnv | undefined =>
+    execMock.mock.calls.find(([called]) => called === "claude")?.[2]?.env;
+
+  async function writeLocalClaudeAuth(auth: string): Promise<void> {
+    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { auth } } }), "utf-8");
+  }
+
+  it("probes claude under llm.claude.auth api with no usable key, falling back to the CLI login", async () => {
+    vi.stubEnv("NDX_HOME", await mkdtemp(join(tmpdir(), "ndx-llm-catalog-home-")));
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "sentinel-anthropic");
+    await writeLocalClaudeAuth("api");
+
+    const res = await fetch(`${baseUrl}/api/llm/catalog`);
+
+    expect(res.status).toBe(200);
+    const env = claudeProbeEnv();
+    expect(env).toBeDefined();
+    expect(env?.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(env?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+  });
+
+  it("under llm.claude.auth cli, hands claude the environment resolveVendorCliEnv gives cli runs", async () => {
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "sentinel-anthropic");
+    await writeLocalClaudeAuth("cli");
+
+    await getCatalog();
+
+    const config = await loadLLMConfig(projectDir);
+    const expected = resolveVendorCliEnv(
+      { ...config, vendor: "claude", claude: { ...config.claude, auth: "cli" } },
+      repoEnvPolicy(projectDir),
+    );
+    expect(claudeProbeEnv()).toEqual(expected);
+    expect(claudeProbeEnv()?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
   });
 
   it("applies the user's own hench.guard.env.deny to each probed CLI", async () => {

@@ -45,6 +45,7 @@ export default defineConfig({
     setupFiles: [
       "tests/setup/local-storage.ts",
       "tests/setup/preact-frame-leak-guard.ts",
+      "tests/setup/preact-compat.ts",
       "../../tests/setup-color-env.js",
       "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
       "../../tests/setup-ndx-home.js",

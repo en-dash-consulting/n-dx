@@ -139,19 +139,29 @@ describe("cross-vendor execution policy parity", () => {
     expect(DEFAULT_EXECUTION_POLICY).toEqual(STANDARD_POLICY);
   });
 
+  // Every policy ends with the overrides that keep the Codex credentials out
+  // of the agent's commands; llm-client's own tests pin their spelling.
+  const shellEnv = compileCodexPolicyFlags(STANDARD_POLICY, { resume: true });
+
   it("standard policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
+    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", ...shellEnv]);
   });
 
   it("read-only policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(READONLY_POLICY);
-    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request"]);
+    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", ...shellEnv]);
   });
 
   it("full-access policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(FULL_ACCESS_POLICY);
-    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox"]);
+    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...shellEnv]);
+  });
+
+  it("every policy blanks OPENAI_API_KEY in the agent's commands", () => {
+    for (const policy of [STANDARD_POLICY, READONLY_POLICY, FULL_ACCESS_POLICY]) {
+      expect(compileCodexPolicyFlags(policy)).toContain("shell_environment_policy.set.OPENAI_API_KEY=''");
+    }
   });
 
   it("every SandboxMode maps to a Codex flag", () => {

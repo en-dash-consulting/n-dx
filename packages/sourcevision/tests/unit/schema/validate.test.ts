@@ -79,6 +79,8 @@ describe("validateManifest lastAnalysis.jev", () => {
     [{ available: true, source: "file" }],
     [{ available: true, source: "helper" }],
     [{ available: false, source: null }],
+    // A helper the run never called: unknown.
+    [{ available: null, source: "helper" }],
   ])("accepts %j", (jev) => {
     expect(validateManifest(manifestWith(jev)).ok).toBe(true);
   });

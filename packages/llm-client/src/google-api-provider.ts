@@ -167,6 +167,9 @@ export function parseGeminiTokenUsage(
  * The `apiKeyEnv` default matches the canonical env var documented in
  * `GoogleConfig.apiKeyEnv` and used by the config preflight check.
  *
+ * It runs a stored helper and ignores `llm.google.auth`; whether the API is
+ * used is `resolveVendorAuth`'s decision.
+ *
  * @returns The resolved API key, or undefined if not found.
  */
 export function resolveGoogleApiKey(

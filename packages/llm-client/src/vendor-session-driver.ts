@@ -28,6 +28,7 @@ import type {
   RuntimeEventType,
 } from "./runtime-contract.js";
 import type { UsageMessageFilter } from "./usage-dedup.js";
+import { codexShellEnvFlags } from "./codex-cli-provider.js";
 import {
   mapCodexUsageToTokenUsage,
   parseStreamTokenUsageWithDiagnostic,
@@ -98,7 +99,10 @@ export interface CodexTurnFlags {
   /**
    * Sandbox and approval flags for a fresh `codex exec`
    * (see `compileCodexPolicyFlags`). Dropped on resume, where `exec resume`
-   * rejects them. A resumed turn does not keep the thread's starting policy:
+   * rejects them. The driver adds `codexShellEnvFlags` to every turn, fresh
+   * or resumed, so the agent's commands never see the Codex key whatever
+   * flags the caller passes. A resumed turn does not
+   * keep the thread's starting policy:
    * `exec resume` reads sandbox and approval from the invocation's config, so
    * the user's `~/.codex/config.toml` decides. Re-applying the policy on
    * resume is PRD item 31307b89.
@@ -543,7 +547,10 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
   //   1. No policy flags — resume rejects `-s/--sandbox` and
   //      `--approve-for-me`. The thread does not keep its starting policy:
   //      resume takes sandbox and approval from this invocation's config, so
-  //      the user's ~/.codex/config.toml decides (PRD item 31307b89).
+  //      the user's ~/.codex/config.toml decides (PRD item 31307b89). The
+  //      shell-environment overrides still go (`-c` is a global flag): config
+  //      is read per process, so without them a resumed agent's commands
+  //      would see the Codex key.
   //   2. The id is always explicit, never `--last`, which picks the newest
   //      session on the machine and would let any other codex run capture it.
   if (input.resume) {
@@ -552,6 +559,7 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
       args: [
         "exec", "resume", input.resume.sessionId,
         "--json", "--skip-git-repo-check",
+        ...codexShellEnvFlags(),
         ...modelArgs,
         "-", // resume reads the follow-up prompt from stdin
       ],
@@ -563,13 +571,26 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
     binary: "codex",
     args: [
       "exec",
-      ...(input.codex?.policyFlags ?? []),
+      ...withCodexShellEnvFlags(input.codex?.policyFlags ?? []),
       "--json", "--skip-git-repo-check",
       ...modelArgs,
       "-", // codex exec reads the prompt from stdin
     ],
     stdin,
   };
+}
+
+/**
+ * A fresh turn's policy flags, ending with {@link codexShellEnvFlags} whatever
+ * the caller passed: `startVendorSession` is public, and flags without them
+ * would let the agent's commands read the Codex key. `compileCodexPolicyFlags`
+ * output already ends with them, so it passes through unchanged.
+ */
+function withCodexShellEnvFlags(policyFlags: readonly string[]): string[] {
+  const envFlags = codexShellEnvFlags();
+  const tail = policyFlags.slice(-envFlags.length);
+  const present = tail.length === envFlags.length && tail.every((flag, i) => flag === envFlags[i]);
+  return present ? [...policyFlags] : [...policyFlags, ...envFlags];
 }
 
 /**

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runCredentialsCli } from "../../src/cli/credentials.js";
@@ -156,6 +156,7 @@ describe("status", () => {
       helperResult: null,
       envVar: "TYPESAFE_API_KEY",
       storePath: join(home, "credentials.json"),
+      storeProblem: null,
     });
     expect(out).not.toContain(VALUE);
     expect(out).not.toContain("placeholder-env-key");
@@ -189,6 +190,67 @@ describe("status", () => {
   it("says not set when nothing is", async () => {
     expect(await run(["status"])).toBe(0);
     expect(out).toContain("typesafe: not set");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "names a store readable by others and the chmod fix instead of not set, once, never the value",
+    async () => {
+      await run(["set", "typesafe"], VALUE);
+      const path = join(home, "credentials.json");
+      chmodSync(path, 0o644);
+      out = "";
+      err = "";
+      expect(await run(["status"])).toBe(0);
+      expect(out).toContain("typesafe: unknown, the store was not read");
+      expect(out).not.toContain("not set");
+      expect(out).toContain(`Store not read: Refusing to read the credential store ${path}`);
+      expect(out).toContain(`chmod 600 ${path}`);
+      // Reported in the output, so not warned on stderr as well.
+      expect(err).toBe("");
+      expect(out + err).not.toContain(VALUE);
+
+      out = "";
+      expect(await run(["status", "--json"])).toBe(0);
+      const [typesafe] = JSON.parse(out) as Array<{ source: unknown; storeProblem: string }>;
+      expect(typesafe!.source).toBeNull();
+      expect(typesafe!.storeProblem).toMatch(/chmod 600/);
+    },
+  );
+
+  it("names an invalid store without quoting its contents", async () => {
+    writeFileSync(join(home, "credentials.json"), `{"version":1,"entries":{"typesafe":"${VALUE}"`, { mode: 0o600 });
+    expect(await run(["status"])).toBe(0);
+    expect(out).toContain("typesafe: unknown, the store was not read");
+    expect(out).toMatch(/Store not read: Ignoring the credential store .*not valid JSON/);
+    expect(out + err).not.toContain(VALUE);
+  });
+
+  it("still names an exported key when the store was not read", async () => {
+    writeFileSync(join(home, "credentials.json"), "[]", { mode: 0o600 });
+    expect(await run(["status"], null, { TYPESAFE_API_KEY: "placeholder-env-key" })).toBe(0);
+    expect(out).toContain("typesafe: environment (TYPESAFE_API_KEY)");
+    expect(out).toContain("claude: unknown, the store was not read");
+  });
+});
+
+describe.skipIf(process.platform === "win32")("set over a store readable by others", () => {
+  it("tightens it to 0600 and warns that a key it held may have been read", async () => {
+    await run(["set", "typesafe"], VALUE);
+    const path = join(home, "credentials.json");
+    chmodSync(path, 0o644);
+    err = "";
+    expect(await run(["set", "claude"], "placeholder-claude-key")).toBe(0);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+    expect(err).toContain(`The credential store ${path} was readable by other users (mode 0644)`);
+    expect(err).toMatch(/Rotate any key/);
+    expect(out + err).not.toContain(VALUE);
+    expect(out + err).not.toContain("placeholder-claude-key");
+  });
+
+  it("does not warn when the store was already private", async () => {
+    await run(["set", "typesafe"], VALUE);
+    expect(await run(["set", "claude"], "placeholder-claude-key")).toBe(0);
+    expect(err).toBe("");
   });
 });
 

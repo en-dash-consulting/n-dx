@@ -172,19 +172,28 @@ export function mapApprovalToCodexFlag(policy: ApprovalPolicy): CodexApprovalPol
  * a preset is a name codex can retire, while `--sandbox` and `approval_policy`
  * are the underlying settings it is composed from.
  *
- * Note `codex exec resume` accepts neither `--sandbox` nor an approval flag —
- * policy belongs to the thread being resumed — so the resume path passes no
- * policy flags and does not call this function.
+ * Every result ends with {@link codexShellEnvFlags}, which keeps the Codex
+ * credentials out of the commands the agent runs.
+ *
+ * `codex exec resume` accepts neither `--sandbox` nor an approval flag —
+ * policy belongs to the thread being resumed — so `{ resume: true }` returns
+ * only the shell-environment overrides. Config is loaded per process, so a
+ * resumed run needs them as much as a fresh one.
  *
  * @example
  * ```ts
  * compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)
- * // → ["--sandbox", "workspace-write", "-c", "approval_policy=never"]
+ * // → ["--sandbox", "workspace-write", "-c", "approval_policy=never",
+ * //    "-c", "shell_environment_policy.set.OPENAI_API_KEY=''", …]
  * ```
  */
-export function compileCodexPolicyFlags(policy: ExecutionPolicy): string[] {
+export function compileCodexPolicyFlags(
+  policy: ExecutionPolicy,
+  options: { resume?: boolean } = {},
+): string[] {
+  if (options.resume) return codexShellEnvFlags();
   if (policy.approvals === "never" && policy.sandbox === "danger-full-access") {
-    return ["--dangerously-bypass-approvals-and-sandbox"];
+    return ["--dangerously-bypass-approvals-and-sandbox", ...codexShellEnvFlags()];
   }
 
   return [
@@ -192,7 +201,39 @@ export function compileCodexPolicyFlags(policy: ExecutionPolicy): string[] {
     mapSandboxToCodexFlag(policy.sandbox),
     "-c",
     `approval_policy=${mapApprovalToCodexFlag(policy.approvals)}`,
+    ...codexShellEnvFlags(),
   ];
+}
+
+/**
+ * The Codex credential names the agent's shell commands must not read: the
+ * key `resolveVendorCliEnv` writes under `llm.codex.auth` `api`, and the two
+ * tokens codex itself accepts.
+ */
+export const CODEX_AGENT_HIDDEN_ENV = ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"] as const;
+
+/**
+ * `-c` overrides that blank each {@link CODEX_AGENT_HIDDEN_ENV} name in the
+ * environment of every command the Codex agent runs.
+ *
+ * Codex builds that environment from `shell_environment_policy`: `inherit`,
+ * then the default `*KEY*`/`*SECRET*`/`*TOKEN*` excludes unless
+ * `ignore_default_excludes`, then `exclude`, then `set`, then `include_only`
+ * (https://developers.openai.com/codex/config-advanced). The user's
+ * `~/.codex/config.toml` can turn every filter off, so excluding is not
+ * enough; `set` runs after the excludes and an `-c` override of one `set`
+ * entry outranks the user's value for it, so each name reaches the command
+ * empty whatever that config says. Codex's own process keeps the real key:
+ * `set` applies only to the commands it spawns. A dotted `-c` path replaces
+ * that one entry and leaves the user's other `set` entries alone. `''` is a
+ * TOML literal string, which needs no quoting on any platform.
+ *
+ * Every `codex exec` n-dx spawns carries these: the provider and hench's
+ * adapter through {@link compileCodexPolicyFlags}, core's reviewer and auth
+ * check through `loadCodexShellEnvFlags` in its config module.
+ */
+export function codexShellEnvFlags(): string[] {
+  return CODEX_AGENT_HIDDEN_ENV.flatMap((name) => ["-c", `shell_environment_policy.set.${name}=''`]);
 }
 
 function isDebugEnabled(): boolean {

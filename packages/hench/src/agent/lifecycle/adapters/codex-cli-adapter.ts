@@ -64,8 +64,9 @@ export const codexCliAdapter: VendorAdapter = {
     //
     // opts.permissionMode and opts.forkSession are ignored: neither has a Codex
     // equivalent. The batch strategy's resume is a plain `exec resume`, which
-    // appends to the thread; the driver drops the policy flags there because
-    // the resumed thread keeps its own.
+    // appends to the thread; the driver drops the sandbox and approval flags
+    // there, which `exec resume` rejects, and keeps the shell-environment
+    // overrides that hide the Codex key from the agent's commands.
     const { binary, args, stdin } = codexSessionDriver.turnSpawn({
       systemPrompt,
       prompt: taskPrompt,

@@ -5,6 +5,8 @@
  *   tight loop, lose no update: the cross-process lock serializes their
  *   read-modify-write. Without it the second writer's read predates the
  *   first one's rename and its write drops that entry.
+ * - Ten writers racing to take over a dead holder's lock lose no update and
+ *   leave no lock or guard file behind.
  * - `dist/cli/credentials.js`, the file core spawns, takes the value on stdin
  *   and never prints it.
  *
@@ -13,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -22,6 +24,12 @@ const DIST = join(import.meta.dirname, "../../dist");
 const PUBLIC_URL = pathToFileURL(join(DIST, "public.js")).href;
 const CLI = join(DIST, "cli/credentials.js");
 const PER_WRITER = 25;
+/**
+ * The lost-update race on a dead holder's lock showed in 19 of 30 runs of 10
+ * writers before takeover was guarded; 10 runs miss it with odds near 1e-5.
+ */
+const TAKEOVER_RUNS = 10;
+const TAKEOVER_WRITERS = 10;
 
 let home: string;
 beforeEach(() => { home = mkdtempSync(join(tmpdir(), "ndx-cred-e2e-")); });
@@ -39,13 +47,16 @@ function childEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
  * entries once it reads a line on stdin. The barrier makes the two loops
  * overlap; without it one process's startup can outlast the other's writes.
  */
-function startWriter(id: string): { ready: Promise<void>; go: () => void; exit: Promise<number | null> } {
+function startWriter(
+  id: string,
+  { count = PER_WRITER, ndxHome = home }: { count?: number; ndxHome?: string } = {},
+): { ready: Promise<void>; go: () => void; exit: Promise<number | null> } {
   const script = `
     const { setCredential } = await import(${JSON.stringify(PUBLIC_URL)});
     process.stdout.write("ready\\n");
     process.stdin.once("data", () => {
-      for (let i = 0; i < ${PER_WRITER}; i++) {
-        setCredential("connection:${id}-" + i, "placeholder-${id}-" + i, { ndxHome: ${JSON.stringify(home)} });
+      for (let i = 0; i < ${count}; i++) {
+        setCredential("connection:${id}-" + i, "placeholder-${id}-" + i, { ndxHome: ${JSON.stringify(ndxHome)} });
       }
       process.exit(0);
     });
@@ -78,6 +89,24 @@ describe("credential store across processes", () => {
     const names = Object.keys(store.entries).sort();
     const expected = ["a", "b"].flatMap((id) => Array.from({ length: PER_WRITER }, (_, i) => `connection:${id}-${i}`)).sort();
     expect(names).toEqual(expected);
+  });
+
+  it("writers racing to take over a dead holder's lock lose no update", { timeout: WRITERS_TIMEOUT_MS * 2 }, async () => {
+    const dead = spawnSync(process.execPath, ["-e", ""]);
+    for (let run = 0; run < TAKEOVER_RUNS; run++) {
+      const runHome = join(home, `run-${run}`);
+      mkdirSync(runHome);
+      writeFileSync(join(runHome, "credentials.json.lock"), JSON.stringify({ pid: dead.pid, token: "dead", since: "2026-01-01T00:00:00.000Z" }));
+      const ids = Array.from({ length: TAKEOVER_WRITERS }, (_, i) => `w${i}`);
+      const writers = ids.map((id) => startWriter(id, { count: 1, ndxHome: runHome }));
+      await Promise.all(writers.map((w) => w.ready));
+      for (const w of writers) w.go();
+      expect(await Promise.all(writers.map((w) => w.exit))).toEqual(ids.map(() => 0));
+
+      const store = JSON.parse(readFileSync(join(runHome, "credentials.json"), "utf-8"));
+      expect(Object.keys(store.entries).sort(), `run ${run}`).toEqual(ids.map((id) => `connection:${id}-0`).sort());
+      expect(readdirSync(runHome).filter((f) => f !== "credentials.json"), `run ${run}`).toEqual([]);
+    }
   });
 
   it("the spawnable CLI stores a value from stdin and never prints it", () => {

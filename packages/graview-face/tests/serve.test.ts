@@ -16,11 +16,17 @@ import { underMount } from "../dev/hub-mount.js";
 const BIN = resolve(import.meta.dirname, "../bin/serve.js");
 const MOUNT = "/x/graview-face/";
 
-function freePort(): Promise<number> {
+/**
+ * A port free on `host`: probe the host the port will be bound on. A port free
+ * on 127.0.0.1 can be held on ::1 (macOS's `localhost`), and a runner that
+ * hands out ephemeral ports in order offers the port the previous test's face
+ * took on ::1.
+ */
+function freePort(host = "127.0.0.1"): Promise<number> {
   return new Promise((done, fail) => {
     const probe = createServer();
     probe.once("error", fail);
-    probe.listen(0, "127.0.0.1", () => {
+    probe.listen(0, host, () => {
       const { port } = probe.address() as { port: number };
       probe.close(() => done(port));
     });
@@ -133,7 +139,7 @@ describe("bin/serve.js when another checkout's face holds the port", () => {
   });
 
   it("takes the next free port when the default one is held", async () => {
-    const port = await freePort();
+    const port = await freePort("localhost");
     held.push(await hold(port));
     // An ambient PORT is a starting point, like the 5188 default.
     const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
@@ -143,7 +149,7 @@ describe("bin/serve.js when another checkout's face holds the port", () => {
   }, 90_000);
 
   it("refuses a port --port names when it is held, rather than serving somewhere else", async () => {
-    const port = await freePort();
+    const port = await freePort("localhost");
     held.push(await hold(port));
     const child = spawn(process.execPath, [BIN, "--port", String(port)], { env, stdio: ["pipe", "pipe", "pipe"] });
     children.push(child);

@@ -13,6 +13,7 @@
  */
 
 import {
+  ClaudeClientError,
   LLM_VENDOR,
   exec,
   listVendorModels,
@@ -81,6 +82,23 @@ function parseVersion(output: string): string | null {
 }
 
 /**
+ * The environment the vendor's runs get, under the project's own
+ * `llm.<vendor>.auth`. `--version` needs no credential, so where `api` has no
+ * usable key — the one case `resolveVendorCliEnv` refuses — the probe runs as
+ * `cli` instead of failing.
+ */
+function probeEnv(vendor: ListableVendor, projectDir: string, config: LLMConfig): NodeJS.ProcessEnv {
+  const policy = repoEnvPolicy(projectDir);
+  const vendorConfig: LLMConfig = { ...config, vendor };
+  try {
+    return resolveVendorCliEnv(vendorConfig, policy);
+  } catch (err) {
+    if (!(err instanceof ClaudeClientError) || err.reason !== "auth") throw err;
+    return resolveVendorCliEnv({ ...vendorConfig, [vendor]: { ...config[vendor], auth: "cli" } }, policy);
+  }
+}
+
+/**
  * `<binary> --version`, with the vendor's filtered environment from
  * `resolveVendorCliEnv` (the agent loop's resolver) under the project's
  * `guard.env` policy from `repoEnvPolicy` (the user's own deny entries, the
@@ -89,10 +107,7 @@ function parseVersion(output: string): string | null {
  */
 async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMConfig): Promise<CliInfo> {
   const binary = resolveBinary(vendor, config);
-  // `--version` needs no credential, so the probe runs as `llm.<vendor>.auth
-  // cli`: no API key in the child, and no refusal when `api` has none to give.
-  const probeConfig: LLMConfig = { ...config, vendor, [vendor]: { ...config[vendor], auth: "cli" } };
-  const env = resolveVendorCliEnv(probeConfig, repoEnvPolicy(projectDir));
+  const env = probeEnv(vendor, projectDir, config);
   const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS, env });
   if (!result.launched || result.exitCode !== 0) return { found: false, version: null, path: null };
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };

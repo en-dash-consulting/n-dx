@@ -13,7 +13,7 @@
  * tests/unit/windows-quoting-parity.test.js fails if the two diverge.
  */
 
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { logCliInvocation } from "./cli-log.js";
 
 /**
@@ -193,20 +193,43 @@ export function assertNoWindowsEnvExpansion(tokens, env) {
  * @param {object} options   execFileSync options (encoding, timeout, stdio, …).
  */
 export function execFileSyncCli(binary, args, options) {
+  const [file, argv, opts] = syncInvocation(binary, args, options, "execFileSyncCli");
+  return execFileSync(file, argv, { ...opts, windowsHide: true });
+}
+
+/**
+ * {@link execFileSyncCli} that never throws on a non-zero exit: it returns
+ * spawnSync's result, so a caller keeps the child's stderr when it succeeds
+ * too (warnings a successful command printed).
+ *
+ * @param {string} binary    Binary name or absolute path.
+ * @param {string[]} args    Argument list.
+ * @param {object} options   spawnSync options (encoding, input, timeout, stdio, …).
+ * @returns {import("node:child_process").SpawnSyncReturns<string>}
+ */
+export function spawnSyncCli(binary, args, options) {
+  const [file, argv, opts] = syncInvocation(binary, args, options, "spawnSyncCli");
+  return spawnSync(file, argv, { ...opts, windowsHide: true });
+}
+
+/**
+ * The `[file, args, options]` a synchronous spawn runs, logged; cmd.exe on
+ * Windows. The caller adds `windowsHide`, where the policy test can see it.
+ */
+function syncInvocation(binary, args, options, via) {
   if (process.platform === "win32") {
     assertNoWindowsEnvExpansion([binary, ...args], options?.env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(binary, args);
-    logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli", commandLine: cmdLine });
+    logCliInvocation({ binary, args, cwd: options?.cwd, via, commandLine: cmdLine });
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
     // per-token inner quotes (spaced paths) intact.
-    return execFileSync("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
-      windowsHide: true,
+    return ["cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
       ...options,
       windowsVerbatimArguments: true,
-    });
+    }];
   }
-  logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli" });
-  return execFileSync(binary, args, { ...options, windowsHide: true });
+  logCliInvocation({ binary, args, cwd: options?.cwd, via });
+  return [binary, args, options];
 }
 
 /**

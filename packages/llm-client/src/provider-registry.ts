@@ -41,9 +41,10 @@ import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, type LLMConfig } from "./llm-types.js";
 import { createClient } from "./create-client.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
-import { createOpenAiApiProvider, resolveOpenAiApiKey } from "./openai-api-provider.js";
-import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
+import { createOpenAiApiProvider } from "./openai-api-provider.js";
+import { createGoogleApiProvider } from "./google-api-provider.js";
 import { createLocalApiProvider } from "./local-api-provider.js";
+import { resolveVendorAuth } from "./vendor-auth.js";
 
 // ── Factory type ──────────────────────────────────────────────────────────
 
@@ -177,12 +178,12 @@ export function createDefaultRegistry(): ProviderRegistry {
     createClient({ claudeConfig: config.claude ?? {} }),
   );
 
-  // Codex: dual provider stack (API + CLI) with automatic detection.
-  // When an OpenAI API key is available (config or env), uses the API provider.
-  // Otherwise falls back to the CLI provider adapter.
+  // Codex: the API or the CLI login, as `llm.codex.auth` decides
+  // (resolveVendorAuth). No helper runs to decide: under `api` the mode does
+  // not depend on the key, and the API provider resolves it once.
   registry.register(LLM_VENDOR.CODEX, (config) => {
-    const apiKey = resolveOpenAiApiKey(config.codex);
-    if (apiKey) {
+    const codex = config.codex ? { codex: config.codex } : {};
+    if (resolveVendorAuth(LLM_VENDOR.CODEX, codex, { runHelpers: false }).mode === "api") {
       return createOpenAiApiProvider({ codexConfig: config.codex });
     }
 

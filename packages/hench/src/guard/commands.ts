@@ -179,49 +179,247 @@ function programName(token: string): string {
   return base.replace(/\.(exe|cmd|bat|com)$/i, "").toLowerCase();
 }
 
-/** Whitespace-separated words with their quotes removed (POSIX-style, no escapes). */
-function commandWords(command: string): string[] {
-  const words: string[] = [];
+/** Whether `run` appears in `words` as consecutive entries; an empty run always does. */
+function containsRun(words: readonly string[], run: readonly string[]): boolean {
+  for (let start = 0; start + run.length <= words.length; start++) {
+    if (run.every((token, i) => words[start + i] === token)) return true;
+  }
+  return false;
+}
+
+/** Characters a backslash escapes inside POSIX double quotes. */
+const DOUBLE_QUOTE_ESCAPABLE = new Set(["$", "`", '"', "\\", "\n"]);
+
+/**
+ * A word as sh passes it, plus what it may expand to. `pattern` is set when an
+ * unquoted `{ * ? [` appeared: sh brace-expands and globs after removing
+ * quotes, so the program may receive other words than `text`.
+ */
+interface CommandWord {
+  text: string;
+  /**
+   * Over-approximates every string the word could expand to: `*` and a brace
+   * group match anything, `?` and a bracket expression one character. Too
+   * wide on purpose — it only ever refuses a denied program's arguments.
+   */
+  pattern: RegExp | null;
+}
+
+/** Characters that start brace expansion or a glob when unquoted. */
+const EXPANSION_STARTS = new Set(["{", "*", "?", "["]);
+
+/**
+ * Whitespace-separated words as POSIX `sh` would pass them: quotes removed, an
+ * unquoted backslash dropped before the character it escapes, and inside
+ * double quotes a backslash dropped only before a character sh lets it escape
+ * there. So `find\-generic-password` reads as the word sh hands the program.
+ * Under cmd.exe a backslash is a path separator, not an escape, so it is kept,
+ * and nothing expands.
+ */
+function commandWords(command: string, shellKind: ShellKind): CommandWord[] {
+  const words: CommandWord[] = [];
   let word: string | null = null;
+  // Regex source for the word; `expands` says whether it differs from a literal.
+  let source = "";
+  let expands = false;
+  // Inside an unquoted brace group (depth) or bracket expression: already `.*` / `.`.
+  let braceDepth = 0;
+  let inBracket = false;
   let quote: string | null = null;
+  let escaped = false;
+  const posix = shellKind !== "cmd";
+
+  const literal = (ch: string): void => {
+    word = (word ?? "") + ch;
+    if (braceDepth === 0 && !inBracket) source += ch.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  };
+  const flush = (): void => {
+    if (word !== null) {
+      words.push({ text: word, pattern: expands ? new RegExp(`^${source}$`, "is") : null });
+    }
+    word = null;
+    source = "";
+    expands = false;
+    braceDepth = 0;
+    inBracket = false;
+  };
+
   for (const ch of command) {
-    if (quote) {
+    if (escaped) {
+      escaped = false;
+      // Inside double quotes sh keeps the backslash unless it escapes one of these.
+      if (quote === '"' && !DOUBLE_QUOTE_ESCAPABLE.has(ch)) literal("\\");
+      literal(ch);
+    } else if (quote === "'") {
       if (ch === quote) quote = null;
-      else word += ch;
+      else literal(ch);
+    } else if (quote === '"') {
+      if (ch === '"') quote = null;
+      else if (ch === "\\" && posix) escaped = true;
+      else literal(ch);
+    } else if (ch === "\\" && posix) {
+      word ??= "";
+      escaped = true;
     } else if (/\s/.test(ch)) {
-      if (word !== null) words.push(word);
-      word = null;
+      flush();
     } else if (ch === "'" || ch === '"') {
       word ??= "";
       quote = ch;
-    } else {
+    } else if (posix && inBracket) {
+      word += ch;
+      if (ch === "]") inBracket = false;
+    } else if (posix && braceDepth > 0) {
+      word += ch;
+      if (ch === "{") braceDepth++;
+      else if (ch === "}") braceDepth--;
+    } else if (posix && EXPANSION_STARTS.has(ch)) {
       word = (word ?? "") + ch;
+      expands = true;
+      if (ch === "{") { source += ".*"; braceDepth = 1; }
+      else if (ch === "*") source += ".*";
+      else if (ch === "?") source += ".";
+      else { source += "."; inBracket = true; }
+    } else {
+      literal(ch);
     }
   }
-  if (word !== null) words.push(word);
+  flush();
   return words;
 }
 
 /**
- * Refuse a command that reads a credential: one starting with any of
- * `deniedPrefixes` (token lists; the first compared by program name, so a
- * path or `.exe` spelling still matches). Checked before the allowlist, so it
- * holds even when a user widens `guard.allowedCommands` to include `op` or
- * `security`.
+ * macOS `security`'s command table, in its order (as the strings appear in
+ * `/usr/bin/security` on macOS 14). `security` runs the first entry its
+ * subcommand word is a prefix of: SecurityTool's `match_command` is
+ * `strncmp(command, name, strlen(name))` with no ambiguity check. So every
+ * non-empty prefix of `find-generic-password` (`f`, `find`, `find-generic`, …)
+ * runs it, because no earlier entry starts with `f`; `find-c` runs
+ * `find-certificate`. The comparison is case-sensitive, so
+ * `FIND-GENERIC-PASSWORD` is an unknown command; the guard folds case anyway,
+ * which refuses only spellings `security` would reject. Not run on the host
+ * (it needs approval): read from the binary's strings and Apple's source.
+ */
+const SECURITY_COMMANDS = [
+  "help", "list-keychains", "default-keychain", "login-keychain", "create-keychain",
+  "delete-keychain", "lock-keychain", "unlock-keychain", "set-keychain-settings",
+  "set-keychain-password", "show-keychain-info", "dump-keychain", "create-keypair",
+  "add-generic-password", "add-internet-password", "add-certificates", "find-generic-password",
+  "delete-generic-password", "set-generic-password-partition-list", "find-internet-password",
+  "delete-internet-password", "set-internet-password-partition-list", "find-key",
+  "set-key-partition-list", "find-certificate", "find-identity", "delete-certificate",
+  "delete-identity", "set-identity-preference", "create-db", "export", "import", "cms",
+  "install-mds", "add-trusted-cert", "remove-trusted-cert", "dump-trust-settings",
+  "user-trust-settings-enable", "trust-settings-export", "trust-settings-import", "verify-cert",
+  "authorize", "authorizationdb", "execute-with-privileges", "leaks", "error",
+  "create-filevaultmaster-keychain", "smartcards", "translocate-create",
+  "translocate-policy-check", "translocate-status-check", "translocate-original-path",
+  "requirement-evaluate", "filevault",
+];
+
+/** Where `security`'s subcommand word sits in `args`, after its global options. */
+function securitySubcommandIndex(args: readonly string[]): number {
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i]!;
+    if (arg === "--") return i + 1;
+    if (!arg.startsWith("-") || arg === "-") break;
+    const takesValue = arg.indexOf("p", 1);
+    i += takesValue !== -1 && takesValue === arg.length - 1 ? 2 : 1;
+  }
+  return i;
+}
+
+/**
+ * The subcommand `security <args>` runs, as `security` resolves it: global
+ * options parsed as its `getopt("hilp:qvR")` does (BSD getopt stops at the
+ * first operand or `--`; `-p` takes a value, attached or next), then the first
+ * table entry the word is a prefix of. `null` when no subcommand is named.
+ */
+function securitySubcommand(args: readonly string[]): string | null {
+  const word = args[securitySubcommandIndex(args)];
+  if (word === undefined) return null;
+  const folded = word.toLowerCase();
+  return SECURITY_COMMANDS.find((name) => name.startsWith(folded)) ?? word;
+}
+
+/**
+ * Whether `words` (program first) runs a command `prefix` names. The program
+ * is compared by name; the rest of `prefix` must appear as a run anywhere among
+ * the later words, so a global option cannot slip one past. For `security`,
+ * the subcommand it would actually run (an abbreviation resolved) is matched
+ * too.
+ */
+function runsDeniedPrefix(words: readonly CommandWord[], prefix: readonly string[]): boolean {
+  if (prefix.length === 0 || words.length === 0) return false;
+  const program = programName(prefix[0]!);
+  if (programName(words[0]!.text) !== program) return false;
+  const args = words.slice(1);
+  if (args.some((arg) => arg.pattern && mayExpandToDenied(arg.pattern, program, prefix.slice(1)))) {
+    return true;
+  }
+  const texts = args.map((arg) => arg.text);
+  // An expansion among security's global options, or as the subcommand, can
+  // add or drop an option word (a file named `-q`, `-qp`), which moves the
+  // subcommand: `security [-]q f list-keychains` runs `f`.
+  if (program === "security" && prefix.length > 1 &&
+      args.slice(0, securitySubcommandIndex(texts) + 1).some((arg) => arg.pattern)) {
+    return true;
+  }
+  if (words.length < prefix.length) return false;
+  if (containsRun(texts, prefix.slice(1))) return true;
+  return program === "security" && prefix.length > 1 && securitySubcommand(texts) === prefix[1];
+}
+
+/**
+ * Whether a word sh expands could become one of a denied prefix's later
+ * tokens — or, for `security`, an abbreviation that runs one. Which words the
+ * expansion yields depends on the filesystem at run time, so any possible
+ * match is refused.
+ */
+function mayExpandToDenied(pattern: RegExp, program: string, rest: readonly string[]): boolean {
+  return rest.some((token) => {
+    if (pattern.test(token)) return true;
+    if (program !== "security") return false;
+    for (let end = 1; end < token.length; end++) {
+      const abbreviation = token.slice(0, end);
+      if (pattern.test(abbreviation) && securitySubcommand([abbreviation]) === token) return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Refuse a command that reads a credential: one matching any of
+ * `deniedPrefixes` (token lists). The first token is compared by program name,
+ * so a path or `.exe` spelling still matches. The rest must appear as a run
+ * anywhere among the later words, not only right after the program, so a
+ * global option (`security -q find-generic-password`) cannot slip one past.
+ * A `security` subcommand is also resolved as `security` resolves it, so an
+ * abbreviation (`security find-generic`) is refused too; see
+ * {@link SECURITY_COMMANDS}.
+ * Words are unescaped as sh would (`find\-generic-password`). A later word
+ * with an unquoted brace or glob (`{find-generic-password,-s}`, `fin[d]-…`) is
+ * refused when its expansion could name the denied token. Checked before
+ * the allowlist, so it holds even when a user widens `guard.allowedCommands`
+ * to include `op` or `security`.
  *
  * Not a complete barrier: an allowed interpreter (`node -e`, `python -c`) can
  * still read the credential store or run a helper from inside it. Only the OS
  * keystore backends close that.
  *
- * @throws {GuardError} when the command starts with a denied prefix.
+ * @param shellKind - Which shell will interpret the command; decides whether a
+ *   backslash escapes. Defaults to POSIX, like {@link validateCommand}.
+ * @throws {GuardError} when the command matches a denied prefix.
  */
-export function assertNotCredentialCommand(command: string, deniedPrefixes: readonly (readonly string[])[]): void {
-  const words = commandWords(command.trim());
+export function assertNotCredentialCommand(
+  command: string,
+  deniedPrefixes: readonly (readonly string[])[],
+  shellKind: ShellKind = "posix",
+): void {
+  const words = commandWords(command.trim(), shellKind);
   if (words.length === 0) return;
   for (const prefix of deniedPrefixes) {
-    if (prefix.length === 0 || words.length < prefix.length) continue;
-    if (programName(words[0]!) !== programName(prefix[0]!)) continue;
-    if (prefix.slice(1).every((token, i) => words[i + 1] === token)) {
+    if (runsDeniedPrefix(words, prefix)) {
       throw new GuardError(
         `Command "${prefix.join(" ")}" reads a stored credential; the agent may not run it, ` +
           `whatever guard.allowedCommands lists.`,

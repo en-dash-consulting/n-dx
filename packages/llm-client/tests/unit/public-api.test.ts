@@ -118,6 +118,7 @@ import {
   // codex-cli-provider.ts
   createCodexCliClient,
   compileCodexPolicyFlags,
+  codexShellEnvFlags,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
   // openai-api-provider.ts
@@ -232,6 +233,10 @@ describe("public API — function exports", () => {
 
   it("exports createCodexCliClient as a function", () => {
     expect(typeof createCodexCliClient).toBe("function");
+  });
+
+  it("exports codexShellEnvFlags as a function", () => {
+    expect(typeof codexShellEnvFlags).toBe("function");
   });
 
   it("exports compileCodexPolicyFlags as a function", () => {

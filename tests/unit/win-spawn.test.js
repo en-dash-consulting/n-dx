@@ -6,6 +6,7 @@
  *    parity test (smoke-tests the twin is well-formed).
  *  - execFileSyncCli: runs a real process synchronously; verifies it works on the
  *    current platform and that the Windows path routes through cmd.exe.
+ *  - spawnSyncCli: the same invocation, returning stderr on success too.
  *  - spawnCli: spawns a real child process; verifies it works on the current
  *    platform and that stdin piping works.
  */
@@ -16,6 +17,7 @@ import {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   execFileSyncCli,
+  spawnSyncCli,
   spawnCli,
   assertNoWindowsEnvExpansion,
 } from "../../packages/core/win-spawn.js";
@@ -134,6 +136,27 @@ describe("execFileSyncCli", () => {
 // ---------------------------------------------------------------------------
 // spawnCli — functional smoke test
 // ---------------------------------------------------------------------------
+
+describe("spawnSyncCli", () => {
+  it("returns stdout and stderr of a successful run instead of dropping stderr", () => {
+    const r = spawnSyncCli(process.execPath, ["-e", "process.stdout.write('out'); process.stderr.write('warned')"], {
+      encoding: "utf-8",
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe("out");
+    expect(r.stderr).toBe("warned");
+  });
+
+  it("returns a non-zero exit with its stdin input delivered, without throwing", () => {
+    const r = spawnSyncCli(
+      process.execPath,
+      ["-e", "process.stdin.on('data', (d) => { process.stderr.write(String(d)); process.exit(3); })"],
+      { encoding: "utf-8", input: "fed" },
+    );
+    expect(r.status).toBe(3);
+    expect(r.stderr).toBe("fed");
+  });
+});
 
 describe("spawnCli", () => {
   it("spawns a child process that exits 0", async () => {

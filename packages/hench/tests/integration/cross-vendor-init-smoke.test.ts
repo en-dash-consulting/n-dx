@@ -222,7 +222,10 @@ describe("cross-vendor init-to-run smoke", () => {
       // never was, and --full-auto was removed in codex-cli 0.147.0.
       expect(flags).not.toContain("--approval-policy");
       expect(flags).not.toContain("--full-auto");
-      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
+      expect(flags).toEqual([
+        "--sandbox", "workspace-write", "-c", "approval_policy=never",
+        ...compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true }),
+      ]);
     });
 
     it("leads with --sandbox so the sandbox is stated before anything else", () => {
