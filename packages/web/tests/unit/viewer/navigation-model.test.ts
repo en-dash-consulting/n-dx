@@ -379,9 +379,11 @@ describe("rendered surfaces take their labels from the model", () => {
       }), root);
     });
     await settle();
-    const views = (STAGES.plan.tiles ?? []).map((t) => t.view);
-    for (const view of views) {
-      act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${view}"] .stage-tile-head`)?.click(); });
+    // The lifecycle band has no full-screen; every other tile opens by its key (panel, else view).
+    const tiles = (STAGES.plan.tiles ?? []).filter((t) => !t.band);
+    const views = tiles.map((t) => t.view);
+    for (const tile of tiles) {
+      act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${tile.panel ?? tile.view}"] .stage-tile-head`)?.click(); });
       await settle();
       const open = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen button")].find((b) => b.textContent === "Open ↗");
       act(() => { open?.click(); });
