@@ -120,6 +120,16 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 | `N` | Nothing fits |
 | `/` | Search capabilities and constraints |
 
+**Place on the map.** Every **Place** (an Inbox tile row, the Inbox page's **Place on the map ↗**, the area view's *Waiting in the Inbox* card) opens placement mode at `/product/place/<changeId>`: the spec map beside a wide "Where it goes" panel. The change detail panel keeps its compact 320px version, with a **Place on the map** switch. The breadcrumb reads "Placing N of M · title".
+
+- **Where it starts.** A strong, untied top pick zooms straight into its area with that block lit. Any other shortlist (possible, weak, tied, empty or unreadable) opens at the area level with each area's candidate count; a note says why, including "rex found no candidate" and "Could not read rex's shortlist". Choosing an area zooms in.
+- **Candidate cards.** The panel has one card per candidate: strength, reasons, area. A card lights its block, and a block selects its card; a block off the shortlist becomes the panel's pick. Candidates in other areas show as chips above the zoomed map and as cards; picking one moves the map and keeps your edits. Off-list blocks dim, except those sharing words with the change, marked `near`.
+- **Touches or amends.** rex's relation is pre-selected only for a strong, untied pick; otherwise the card asks whether the change alters what the capability promises. **Touches** writes at once. **Amends** is edited in the card (criteria or a replacement statement); each edit is re-checked by rex's read-only `POST /api/rex/changes/:id/placement/check`, and the card shows the same dry-run line as the Sidecar's placement card. **Place** waits for an accepted check, and for the target's criteria to load. The target's block shows the criteria count the amendment would leave ("12 → 13").
+- **Nothing fits.** Swaps the card for the proposal form and draws a dashed ghost block, titled as the form is, in the area the form names. The ghost follows the form's area and goes when a map pick moves away from it.
+- **Place & next, Place & add another.** **Place & next** opens the next Inbox change in placement mode, strongest first, and its own shortlist decides where its map starts. **Place & add another** keeps the panel open for an umbrella change; every home placed in the visit is marked on the map. Writes use the existing `/place` and `/propose` routes.
+- **Keys.** The Inbox page's keys work on the panel (table above): `J`/`K` and `S` open another change (after a plain Place, `J` lands on the change that took its slot), and `1`–`5`, `T`/`A`, `N`, `/` and `Enter` press the panel's controls.
+- **Drafts.** Leaving (Esc, the breadcrumb, another tab) with a pick or an edit keeps it as a draft for the browser session, one per change. The Inbox row says "draft · …", and **Place** resumes it at the step it was left with. Esc with no edits just leaves. A draft never reaches the PRD, and is dropped once the change is placed.
+
 Nothing is placed automatically. Every write goes through the placement routes below. Until a change is placed, the panel's **+ Add Task** carries a note that the task won't run.
 
 ## Inbox placement routes (v2)

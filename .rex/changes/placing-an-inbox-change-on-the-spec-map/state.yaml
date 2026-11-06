@@ -46,10 +46,24 @@ items:
     lastModified: "2026-11-06T00:46:40.388Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "464a9480-8e07-49cd-9889-21d2ae55f316":
-    lastModified: "2026-11-06T00:31:36.678Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:10:01.351Z"
+    completedAt: "2026-11-06T02:10:01.351Z"
+    endedAt: "2026-11-06T02:10:01.351Z"
+    activeIntervals: [{"end":"2026-11-06T02:10:01.351Z","start":"2026-11-06T02:10:01.351Z"}]
+    appliedAt: "2026-11-06T02:10:01.351Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T02:10:01.351Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4920123a-a3aa-45d3-bc9b-a576bec549aa":
-    lastModified: "2026-11-05T01:07:27.237Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:09:17.765Z"
+    completedAt: "2026-11-06T02:10:01.351Z"
+    endedAt: "2026-11-06T02:10:01.351Z"
+    activeIntervals: [{"end":"2026-11-06T02:10:01.351Z","start":"2026-11-06T02:09:17.765Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Documented placement mode in docs/packages/web.md; added patch changeset for @n-dx/web."
+    lastModified: "2026-11-06T02:10:01.351Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b91c7895-1d4e-4804-9a5d-d7233abf891a":
     status: "completed"
