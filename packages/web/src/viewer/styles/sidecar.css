@@ -108,6 +108,24 @@
   white-space: pre-wrap;
   font-size: 13px;
 }
+.sidecar-msg-assistant { white-space: normal; line-height: 1.5; overflow-wrap: anywhere; }
+.sidecar-md-heading { margin: 0 0 var(--space-2); font-size: 14px; }
+.sidecar-md-paragraph, .sidecar-md-list { margin: 0 0 var(--space-2); }
+.sidecar-md-list { padding-left: var(--space-4); }
+.sidecar-md-code {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-x: auto;
+}
+.sidecar-msg-assistant code { font-family: var(--font-mono); font-size: 12px; }
+.sidecar-msg-assistant :not(pre) > code { padding: 0 var(--space-1); border-radius: var(--radius-sm, 3px); background: var(--bg-surface); }
+.sidecar-msg-assistant a { color: var(--accent, var(--text)); text-decoration: underline; }
+.sidecar-msg-assistant > :last-child { margin-bottom: 0; }
 .sidecar-msg-user { align-self: flex-end; max-width: 85%; background: var(--bg-active, var(--bg-hover)); }
 .sidecar-msg-assistant { background: var(--bg); border: 1px solid var(--border); }
 .sidecar-msg-failure { color: var(--red, var(--text)); border: 1px solid var(--red, var(--border)); }

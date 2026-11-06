@@ -29,6 +29,7 @@ import {
 } from "./sidecar-tool-names.js";
 import type { ToolLineCard } from "./sidecar-tool-names.js";
 import { useHubProjects } from "./project-switcher.js";
+import { renderMarkdown } from "../utils/markdown.js";
 import {
   ExtensionTabPanel, ExtensionTabStrip, SIDECAR_TAB, extensionFramePath, useExtensionTabs,
 } from "./sidecar-extension-tabs.js";
@@ -209,7 +210,7 @@ export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
       if (frame.checkpoint) return null;
       const event = frame.event;
       if (event.type === "assistant" && event.text) {
-        return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, event.text);
+        return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, renderMarkdown(event.text, { classPrefix: "sidecar-md" }));
       }
       if (event.type === "tool_use" && event.toolCall) {
         return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result, card, connectionLabels });
