@@ -251,10 +251,12 @@ describe("ThrottleControlsPanel", () => {
       }),
     });
 
+    // Under preact/compat, as in the viewer, a range input's onChange listens on
+    // "input" (tests/setup/preact-compat.ts), so move the slider the way a
+    // drag does.
     const slider = root.querySelector(".throttle-slider") as HTMLInputElement;
-    const changeEvent = new Event("change", { bubbles: true });
-    Object.defineProperty(changeEvent, "target", { value: { value: "5" } });
-    slider.dispatchEvent(changeEvent);
+    slider.value = "5";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
 
     await vi.waitFor(() => {
       expect(fetchFn).toHaveBeenCalledWith(
