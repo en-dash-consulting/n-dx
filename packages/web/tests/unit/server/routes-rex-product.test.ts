@@ -302,6 +302,13 @@ describe("v2 product reads", () => {
       writeEmptyChangeState();
       expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("proposed");
     });
+
+    // Rex never clears startedAt: a failed `ndx work` run resets the task to pending and keeps it.
+    it("reads proposed when its task was reset to pending after starting", async () => {
+      writeEmptyChangeState(`  "${TASK_ID}":\n    status: "pending"\n    startedAt: "2026-11-05T12:00:00.000Z"\n`);
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("proposed");
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).stages["in-progress"]).toBe(0);
+    });
   });
 
   /** The change's own state row cleared, as before `ndx work` starts anything. */

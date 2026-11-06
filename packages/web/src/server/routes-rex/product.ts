@@ -209,8 +209,10 @@ const HISTORY_LIMIT = 100;
  * product-model.ts): shipped and applied from rex's state, then started, then
  * marked ready. Rex has no stage of its own to defer to.
  *
- * Started means the change or any live task or subtask under it. `ndx work`
- * records the start on the task it runs and leaves the change's own state empty.
+ * Started means the change or any live task or subtask under it is
+ * `in_progress` or `failing`. `ndx work` records the start on the task it runs
+ * and leaves the change's own state empty. Status, not `startedAt`: rex never
+ * clears `startedAt`, so a task reset to pending after a failed run keeps it.
  */
 function stageOf(change: RuleNode): ChangeStageWire {
   if (change.shippedIn) return "shipped";
@@ -223,7 +225,7 @@ function stageOf(change: RuleNode): ChangeStageWire {
 }
 
 const isStarted = (node: RuleNode): boolean =>
-  !!node.startedAt || node.status === "in_progress" || node.status === "failing";
+  node.status === "in_progress" || node.status === "failing";
 
 /** Tasks and subtasks under a change, skipping deleted and cancelled ones and their children. */
 function liveWorkUnder(node: RuleNode): RuleNode[] {
