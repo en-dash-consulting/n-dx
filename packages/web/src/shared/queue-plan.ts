@@ -6,17 +6,20 @@
 
 import { RUN_OPTION_SPECS } from "./run-options.js";
 import type { RunOptions } from "./run-options.js";
-
 export interface PlannedTask {
   id: string;
   title: string;
   reason: string;
+  /** The row's words on a v2 tree ("<task> · in <change>"); set by the server, absent on an excluded task. */
+  rowText?: string;
 }
 
 export interface PlannedLane {
   /** The whole lane: one `work` step per task, joined by `&&`. */
   command: string;
   changeId: string;
+  /** The change's title; absent from a planner that predates it. */
+  changeTitle?: string;
   /** The lane must run in a worktree of its own (every lane after the first, and lane 1 while a run is live here). */
   ownWorktree?: boolean;
   tasks: PlannedTask[];

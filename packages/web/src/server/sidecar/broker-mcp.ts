@@ -401,6 +401,8 @@ export function createBrokerMcpServer(
       // A work card shows what the run would be before the operator decides it, from the options start will use.
       if (name === "start_work") {
         annex.runOptions = workOptions(input);
+        const rowText = actions?.describeWork?.(String(input.taskId));
+        if (rowText) annex.rowText = rowText;
         if (actions) annex.preview = await actions.previewWork(String(input.taskId), annex.runOptions);
       }
       // A change-set card shows its items read against the PRD; one that cannot be written raises no card.

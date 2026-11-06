@@ -47,6 +47,8 @@ export interface CarryOutResult {
 export interface SidecarActions {
   /** A work card's preview: the task's `ndx work --resolve`, rendered. Never throws. */
   previewWork(taskId: string, options: Record<string, unknown> | undefined): Promise<string>;
+  /** The row a work card shows: the task and the change it sits in; null when the PRD does not know the task. */
+  describeWork?(taskId: string): string | null;
   /** Runs the command and waits for it (see {@link awaitSidecarCommand}); `signal` aborts the wait, never the command. */
   runCommand(argv: string[], signal?: AbortSignal, project?: string): Promise<CarryOutResult> | CarryOutResult;
   /** Starts the run and waits out its starting phase: a run hench refuses there is a failed result naming hench's reason. */

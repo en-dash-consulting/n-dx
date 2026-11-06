@@ -100,6 +100,8 @@ export interface LiveChainLink {
 /** Mirrors LiveRun in server/routes-live.ts. */
 export interface LiveRunFull extends LiveRunSummary {
   epicChain: LiveChainLink[];
+  /** The row's words on a v2 tree ("<task> · in <change>"); equals the title on v1. */
+  rowText?: string;
   status: string;
   worktree: LiveWorktreeFull;
   finishedAt: string | null;
@@ -136,6 +138,8 @@ export interface LiveNextTask {
   blockedBy?: string[];
   priority: string | null;
   epicChain: LiveChainLink[];
+  /** The row's words on a v2 tree ("<task> · in <change>"); equals the title on v1. */
+  rowText?: string;
 }
 
 /** Mirrors LiveQueuedRequest in server/routes-live.ts. */

@@ -76,6 +76,8 @@ import { rexAnalyzeJobStatus } from "./routes-rex-analysis.js";
 import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport, type ProcessCommandLine } from "./domain-gateway.js";
 import { collectCompletedIds, estimateCostFromTotals, findNextTask, findNextWorkTask, walkTree, type V2Tree } from "./rex-gateway.js";
+import { runsAsOneTask } from "./runnable-units.js";
+import { runnableRowText } from "./runnable-row.js";
 import { loadPRDSync, isV2Tree, PRD_CACHE_DIR, PRD_CACHE_JSON, type CachedPRDDocument } from "./prd-io.js";
 import { readLastEvent, resolveRunEventsFile } from "./run-tail.js";
 import { hubConfigPath, readHubConfig, resolveHubHome } from "../hub/index.js";
@@ -111,6 +113,8 @@ export interface LiveRun {
   taskTitle: string | null;
   /** The task's ancestors in its worktree's PRD, epic first; empty when the PRD does not know it. */
   epicChain: LiveChainLink[];
+  /** The row's words on a v2 tree: "<task> · in <change>", or "<change> · runs as one task". Absent when the PRD does not know the task. */
+  rowText?: string;
   status: string;
   /** Branch recorded at run start, else the worktree's current branch. */
   branch: string | null;
@@ -186,6 +190,8 @@ export interface LiveNextTask {
   blockedBy?: string[];
   priority: string | null;
   epicChain: LiveChainLink[];
+  /** The row's words on a v2 tree: "<task> · in <change>", or "<change> · runs as one task". */
+  rowText: string;
 }
 
 export interface LiveStartingExecution {
@@ -335,6 +341,8 @@ interface PrdIndex {
   /** The cache file's `mtimeMs:size` when parsed; "absent" when there was none. */
   signature: string;
   chains: Map<string, LiveChainLink[]>;
+  /** Ids of the changes `ndx work` runs as one task (no tasks of their own). */
+  units: Set<string>;
   /** Title per item — what names a task the run records do not cover, such as a queued one. */
   titles: Map<string, string>;
   /** Acceptance criteria per item, for items that list any. */
@@ -402,11 +410,12 @@ function prdIndexFor(rexDir: string): PrdIndex {
   const cached = prdIndexes.get(rexDir);
   if (cached && cached.signature === signature) return cached;
   const doc = signature === "absent" ? null : loadPRDSync(rexDir);
-  const index: PrdIndex = { signature, v2: isV2Tree(rexDir), chains: new Map(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
+  const index: PrdIndex = { signature, v2: isV2Tree(rexDir), chains: new Map(), units: new Set(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })));
       index.titles.set(item.id, item.title);
+      if (runsAsOneTask(item)) index.units.add(item.id);
       const criteria = item.acceptanceCriteria?.length ?? 0;
       if (criteria > 0) index.criteria.set(item.id, criteria);
     }
@@ -447,6 +456,11 @@ function rankNextTasks(index: PrdIndex, doc: CachedPRDDocument, excluded: Readon
       ...(entry.item.blockedBy?.length ? { blockedBy: entry.item.blockedBy } : {}),
       priority: entry.item.priority ?? null,
       epicChain: entry.parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })),
+      rowText: runnableRowText({
+        title: entry.item.title,
+        chain: entry.parents.map((p) => ({ title: p.title, itemType: itemTypeOf(p) })),
+        runsAsOneTask: runsAsOneTask(entry.item),
+      }),
     });
   }
   return next;
@@ -604,6 +618,9 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         taskId: digest.taskId,
         taskTitle: digest.taskTitle,
         epicChain: chains(digest.taskId),
+        ...(digest.taskId && digest.taskTitle
+          ? { rowText: runnableRowText({ title: digest.taskTitle, chain: chains(digest.taskId), runsAsOneTask: prdIndexFor(layout.rexDir).units.has(digest.taskId) }) }
+          : {}),
         status: digest.status,
         branch: digest.branch ?? ws.branch,
         worktree,

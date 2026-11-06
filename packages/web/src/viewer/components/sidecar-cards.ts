@@ -379,7 +379,7 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
           lane.ownWorktree ? h("p", { class: "sidecar-run-plan-worktree" }, OWN_WORKTREE_NOTE) : null,
           h("ol", { class: "sidecar-run-plan-tasks" },
             lane.tasks.map((task, i) => h("li", { class: "sidecar-run-plan-task", key: task.id },
-              h("span", { class: "sidecar-run-plan-task-title" }, `${task.title}${i === 0 ? " (starts first)" : ""}`),
+              h("span", { class: "sidecar-run-plan-task-title" }, `${task.rowText ?? task.title}${i === 0 ? " (starts first)" : ""}`),
               h("span", { class: "sidecar-run-plan-task-reason" }, task.reason),
               h("code", { class: "sidecar-run-plan-command" }, steps[i] ?? lane.command),
             ))),
@@ -634,6 +634,9 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
         )
       : null,
     !folded && card.kind === "command" ? h("div", { class: "sidecar-card-effects" }, sidecarCommandEffectsLine(card, manifest)) : null,
+    !folded && card.kind === "work" && card.rowText
+      ? h("p", { class: "sidecar-card-note sidecar-card-runnable" }, card.rowText)
+      : null,
     !folded && card.preview !== undefined
       ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
       : null,

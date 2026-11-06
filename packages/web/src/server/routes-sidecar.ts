@@ -94,7 +94,7 @@ import { readItemEditCall, writeItemEditCard } from "./sidecar/item-edit-card.js
 import { readStatusCall, writeStatusCard } from "./sidecar/status-card.js";
 import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
-import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
+import { describeRunnable, judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -447,6 +447,7 @@ export function sidecarActions(
         : { ok: false, text: `No GitHub facts for ${read.ref}: ${githubReason ?? "gh did not answer"}` };
     },
     postGithub: (draft) => postGithubDraft(exec, ctx.projectDir, draft),
+    describeWork: (taskId) => describeRunnable(ctx, taskId),
     async previewWork(taskId, options) {
       const read = await resolveTaskRun(ctx, taskId, options);
       const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);
