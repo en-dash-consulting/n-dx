@@ -875,6 +875,19 @@ describe("PlacementMode", () => {
       expect($$(".cp-card.is-checked .task-criterion")).toEqual([]);
     });
 
+    it("Esc in a text field, such as cancelling a criterion edit, stays in placement mode", async () => {
+      serve([change("a")], [placement("a", TWO)]);
+      const navigateTo = vi.fn();
+      await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+      await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-gift"] input[type="radio"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="amends"]')!.click(); });
+      await settle();
+      const field = $<HTMLInputElement>(".cp-amends input.cp-input")!;
+      await act(async () => { field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); });
+      expect(navigateTo).not.toHaveBeenCalledWith("plan");
+    });
+
     it("Esc with no edits just leaves and keeps nothing", async () => {
       serve([change("a")], [placement("a", TWO)]);
       const navigateTo = vi.fn();

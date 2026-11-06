@@ -56,7 +56,7 @@ import {
 } from "../components/prd-tree/change-placement.js";
 import { StrengthChip } from "../components/index.js";
 import { useInbox, type InboxRow } from "./inbox.js";
-import { pressPanelShortcut, useShortcuts } from "./inbox-triage.js";
+import { isTypingTarget, pressPanelShortcut, useShortcuts } from "./inbox-triage.js";
 import { AreaBlock, BlockLegend, areaBlock } from "./product-area-map.js";
 import { SpecMap, liveCapabilities } from "./area-spec-map.js";
 import { Pending } from "./product-pages.js";
@@ -335,11 +335,12 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
     pressPanelShortcut(panelRef.current, shortcut);
   });
   // Esc leaves placement mode. Whatever the form holds is already kept as a draft (WF10), so nothing is asked.
+  // Esc in a text field is the field's (a criterion edit cancels on it), so it never leaves from there.
   const leaveRef = useRef<() => void>();
   leaveRef.current = () => navigateTo?.("plan");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      if (e.key !== "Escape" || e.defaultPrevented || isTypingTarget(e.target) || document.querySelector('[aria-modal="true"]')) return;
       leaveRef.current?.();
     };
     document.addEventListener("keydown", onKey);
