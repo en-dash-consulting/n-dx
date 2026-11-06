@@ -46,6 +46,11 @@ export interface ViewMeta {
    * and stage sections resolve it.
    */
   blurb: string;
+  /**
+   * The words a v2 tree shows in place of `label` and `blurb`, where the v1
+   * ones name epics and features. Read through `viewLabelFor` / `viewBlurbFor`.
+   */
+  v2?: { label: string; blurb: string };
 }
 
 /**
@@ -197,6 +202,10 @@ export const VIEW_META = {
     glyph: "▦",
     product: "rex",
     blurb: "The full PRD tree — epics, features, tasks.",
+    v2: {
+      label: "Change tree",
+      blurb: "Every change with the tasks that make it, and their subtasks.",
+    },
   },
   product: {
     label: "Product",
@@ -221,6 +230,10 @@ export const VIEW_META = {
     glyph: "◎",
     product: "rex",
     blurb: "The next task with its run button, progress and open epics.",
+    v2: {
+      label: "Up Next",
+      blurb: "The next task with its run button, progress and open changes.",
+    },
   },
   "merge-graph": {
     label: "PRD Graph",
@@ -347,6 +360,18 @@ export function viewLabel(view: ViewId): string {
 
 export function viewBlurb(view: ViewId): string {
   return VIEW_META[view].blurb;
+}
+
+/** The view's name on a tree of this layout; v1 and views with no v2 wording read `label`. */
+export function viewLabelFor(view: ViewId, layout: "v1" | "v2"): string {
+  const meta: ViewMeta = VIEW_META[view];
+  return layout === "v2" && meta.v2 ? meta.v2.label : meta.label;
+}
+
+/** The view's blurb on a tree of this layout. */
+export function viewBlurbFor(view: ViewId, layout: "v1" | "v2"): string {
+  const meta: ViewMeta = VIEW_META[view];
+  return layout === "v2" && meta.v2 ? meta.v2.blurb : meta.blurb;
 }
 
 export function viewGlyph(view: ViewId): string {
