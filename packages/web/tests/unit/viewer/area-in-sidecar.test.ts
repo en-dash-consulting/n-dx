@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { PlanInAreaButton, PlanWithSidecarContext, type PlanWithSidecar } from "../../../src/viewer/components/plan-with-sidecar.js";
+import { PlanInAreaButton, PlanWithSidecarContext, planSurvivesAreaReport, type PlanWithSidecar } from "../../../src/viewer/components/plan-with-sidecar.js";
 import { pageItemFor, resolveLens, wantedLensFor, type SidecarPageSelection } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 
 const area = { id: "area-1", label: "Billing", capabilityId: null };
@@ -37,6 +37,34 @@ describe("the area view's page item", () => {
     const item = pageItemFor(page({ plan: { area: "area-1", seq: 1 } }));
     expect(item).toMatchObject({ kind: "area", ref: "area-1", lens: "plan" });
     expect(wantedLensFor(item, false)).toBe("plan");
+  });
+});
+
+describe("after Plan in this area", () => {
+  const planIn = { area: "area-1", seq: 1 };
+
+  it("survives the report of the same area and nothing else", () => {
+    expect(planSurvivesAreaReport(planIn, area)).toBe(true);
+    expect(planSurvivesAreaReport(planIn, null)).toBe(false);
+    expect(planSurvivesAreaReport(planIn, { id: "area-2" })).toBe(false);
+  });
+
+  it("leaves a whole-plan request and an absent one alone", () => {
+    expect(planSurvivesAreaReport({ area: null }, null)).toBe(true);
+    expect(planSurvivesAreaReport(null, { id: "area-2" })).toBe(true);
+  });
+
+  it("attaches the new area with Explain once the plan has been dropped", () => {
+    const plan = planSurvivesAreaReport(planIn, { id: "area-2" }) ? planIn : undefined;
+    const item = pageItemFor(page({ plan, areaView: { id: "area-2", label: "Auth", capabilityId: null } }));
+    expect(item).toEqual({ kind: "area", ref: "area-2", label: "Auth" });
+    expect(wantedLensFor(item, false)).toBe("explain");
+  });
+
+  it("no longer holds the old area with the Plan lens once the view closes", () => {
+    const plan = planSurvivesAreaReport(planIn, null) ? planIn : undefined;
+    expect(pageItemFor(page({ view: "plan", plan, areaView: null }))).toMatchObject({ kind: "plan" });
+    expect(pageItemFor(page({ view: "plan", plan, areaView: null }))).not.toMatchObject({ kind: "area" });
   });
 });
 

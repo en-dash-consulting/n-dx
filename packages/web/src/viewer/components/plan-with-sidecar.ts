@@ -20,6 +20,17 @@ export interface PlanWithSidecar {
   reportArea: (area: { id: string; label: string; capabilityId: string | null } | null) => void;
 }
 
+/**
+ * Whether an explicit area-scoped plan (Plan in this area, or a capture bar's
+ * area-scoped Plan with Sidecar) survives the area view's report. It ends when
+ * the view closes, another area opens or a capability is selected (each of
+ * which reports null first), so the new item can attach. A whole-plan request
+ * has no area to outlive and stays.
+ */
+export function planSurvivesAreaReport(plan: { area: string | null } | null, reported: { id: string } | null): boolean {
+  return plan === null || plan.area === null || (reported !== null && reported.id === plan.area);
+}
+
 /** "Plan in this area" in the area view's header; nothing while `web.sidecar` is off. */
 export function PlanInAreaButton({ areaId }: { areaId: string }) {
   const sidecar = useContext(PlanWithSidecarContext);

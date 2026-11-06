@@ -34,6 +34,7 @@ import {
   createCardDrafts,
   PlanWithSidecarContext,
   planFirstTurn,
+  planSurvivesAreaReport,
   DescribeInSidecarContext,
   DiagnoseInSidecarContext,
   GhostCardsContext,
@@ -240,6 +241,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     else void sidecar.send(planText);
   }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending, sidecar.followError]);
   const planSessionStarted = useRef(false);
+  const planWithRef = useRef(planWith);
+  planWithRef.current = planWith;
   // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar". A change sent to
   // Place or a run sent to Diagnose would outrank the Plan lens, so a click lets both go.
   const planWithSidecar = useMemo(
@@ -261,7 +264,14 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
         setPlanText(null);
         showSidecar();
       },
-      reportArea: setOpenArea,
+      reportArea: (area: { id: string; label: string; capabilityId: string | null } | null) => {
+        setOpenArea(area);
+        if (!planSurvivesAreaReport(planWithRef.current, area)) {
+          planWithRef.current = null;
+          setPlanWith(null);
+          setPlanText(null);
+        }
+      },
     } : null),
     [sidecarShell.button !== null, showSidecar],
   );
