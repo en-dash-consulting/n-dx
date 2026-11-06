@@ -398,6 +398,19 @@ describe("ChangesView filters", () => {
       expect(onClearArea).toHaveBeenCalledOnce();
     });
 
+    it("lands on Open, not the remembered filter, once the area is removed", () => {
+      localStorage.setItem("ndx.changes.filter", "stage:ready");
+      let area: string | null = "checkout";
+      const el = mount(h(ChangesView, { changes: AREA_ROWS, area, onClearArea: () => { area = null; } }));
+      act(() => { chip(el, "area").querySelector<HTMLButtonElement>("button.ch-filter-remove")!.click(); });
+      expect(area).toBeNull();
+      expect(localStorage.getItem("ndx.changes.filter")).toBe("open");
+      cleanupRenderedDiv(el);
+      const after = mount(h(ChangesView, { changes: AREA_ROWS, area }));
+      expect(chip(after, "open").getAttribute("aria-pressed")).toBe("true");
+      expect(ids(after).sort()).toEqual(["c1", "c2", "c3", "loose", "s1"]);
+    });
+
     it("clears the filter when another chip is picked", () => {
       const onClearArea = vi.fn();
       const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "checkout", onClearArea }));

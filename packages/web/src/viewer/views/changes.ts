@@ -323,6 +323,8 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea 
   const filter = inArea ? "area"
     : stage || gap || stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
   const pick = (value: string) => { setStored(value); storeFilter(value); if (inArea) onClearArea?.(); };
+  // Removing the area shows every open change, never whatever filter was remembered before it.
+  const removeArea = onClearArea ? () => pick("open") : undefined;
   // Named from the rows; an area with nothing open (or an unknown slug) shows its slug.
   const areaTitle = area ? inArea?.[0]?.areas?.find((a) => a.slug === area)?.title ?? area : null;
 
@@ -352,7 +354,7 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea 
           h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
             h(FilterChip, { value: "open", label: "Open", count: openTotal, active: filter === "open", onPick: pick }),
             h(FilterChip, { value: "applied", label: "Applied", count: appliedTotal, active: filter === "applied", onPick: pick }),
-            inArea && areaTitle ? h(AreaChip, { title: areaTitle, count: inArea.length, onRemove: onClearArea }) : null,
+            inArea && areaTitle ? h(AreaChip, { title: areaTitle, count: inArea.length, onRemove: removeArea }) : null,
             (stage || gap) && staged
               ? h(FilterChip, { value: filter, label: stage ? CHANGE_STAGE_LABELS[stage] : GAP_LABELS[gap!], count: staged.length, active: true, onPick: pick })
               : null,

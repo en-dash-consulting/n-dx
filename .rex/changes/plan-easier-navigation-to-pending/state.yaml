@@ -20,10 +20,14 @@ items:
     lastModified: "2026-11-06T05:17:50.557Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bc311c6d-feb0-4707-824d-ab998cb6d6ff":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T05:18:20.797Z"
-    activeIntervals: [{"start":"2026-11-06T05:18:20.797Z"}]
-    lastModified: "2026-11-06T05:18:21.429Z"
+    completedAt: "2026-11-06T05:29:02.872Z"
+    endedAt: "2026-11-06T05:29:02.872Z"
+    activeIntervals: [{"end":"2026-11-06T05:29:02.872Z","start":"2026-11-06T05:18:20.797Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "/api/rex/changes rows carry `areas` inverted from openChangesByArea; route carries ?area=<slug> on changes; ChangesView filters with removable chip; map badge and Moving now navigate with the area."
+    lastModified: "2026-11-06T05:29:02.872Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c21b26e5-e952-4ffa-bafb-d9090eec965a":
     lastModified: "2026-11-06T05:11:08.620Z"
