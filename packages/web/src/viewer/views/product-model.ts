@@ -483,7 +483,15 @@ export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
   code: CodeSite[];
   /** Open changes amending this capability, with what each would change. */
   pendingAmendments: PendingAmendment[];
+  /**
+   * Inbox changes held for placement that amend or touch this capability, such
+   * as the draft a spec edit here makes. Never in `openChanges`.
+   */
+  inboxChanges: HeldChange[];
 }
+
+/** An Inbox change held for placement: an overlay with no stage, since it has not entered one. */
+export type HeldChange = Omit<OpenChangeOverlay, "stage">;
 
 /** One open change's edit to a capability: a replacement statement and criterion deltas. */
 export interface PendingAmendment {

@@ -402,6 +402,7 @@ export const CAPABILITY_DETAIL_FIXTURE: CapabilityDetail = {
       },
     },
   ],
+  inboxChanges: [],
 };
 
 const DEFINE_AREA = PRODUCT_MAP_FIXTURE.areas[0]!;

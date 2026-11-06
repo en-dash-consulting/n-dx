@@ -216,7 +216,16 @@ export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaC
   code: Array<{ path: string; role?: string }>;
   /** Open changes amending this capability, with what each would change. */
   pendingAmendments: PendingAmendmentWire[];
+  /**
+   * Changes rex holds in the Inbox for placement that amend or touch this
+   * capability, such as the draft a Product-page spec edit makes. Never in
+   * `openChanges`: a held change counts only in the Inbox.
+   */
+  inboxChanges: HeldChangeWire[];
 }
+
+/** An Inbox change held for placement, as the capability page links to it. */
+export type HeldChangeWire = Omit<OpenChangeOverlayWire, "stage">;
 
 /** One open change's edit to a capability: replacement statement and criterion deltas. */
 export interface PendingAmendmentWire {
@@ -676,6 +685,24 @@ function pendingAmendments(index: TreeIndex, nodeId: string): PendingAmendmentWi
   return out;
 }
 
+/** Open changes rex holds for placement that amend or touch one node, in tree order. */
+function heldChanges(index: TreeIndex, nodeId: string): HeldChangeWire[] {
+  const out: HeldChangeWire[] = [];
+  for (const change of changesOf(index)) {
+    if (!isOpenChange(change) || !awaitsPlacement(index, change)) continue;
+    const amendment = (change.amends ?? []).find((a) => index.resolve(a.target)?.id === nodeId);
+    const touches = (change.touches ?? []).some((ref) => index.resolve(ref)?.id === nodeId);
+    if (!amendment && !touches) continue;
+    out.push({
+      id: change.id,
+      ...(change.displayId ? { displayId: change.displayId } : {}),
+      title: change.title,
+      ...(amendment ? { delta: amendment.delta } : {}),
+    });
+  }
+  return out;
+}
+
 /** One live capability, or `undefined` when `ref` names none. */
 export function buildCapabilityDetail(tree: V2Tree, ref: string): CapabilityDetailWire | undefined {
   const index = indexTree(tree);
@@ -728,6 +755,7 @@ export function buildCapabilityDetail(tree: V2Tree, ref: string): CapabilityDeta
     // Rex reports no code sites: realizedBy comes from git, which the reports do not read.
     code: [],
     pendingAmendments: pendingAmendments(index, node.id),
+    inboxChanges: heldChanges(index, node.id),
   };
 }
 

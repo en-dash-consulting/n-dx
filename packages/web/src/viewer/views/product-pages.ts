@@ -69,7 +69,7 @@ async function postProductEdit(edit: ProductEdit): Promise<void> {
   if (!res.ok) throw new Error(failureMessage(res.status, await res.json().catch(() => null)));
 }
 
-function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void }) {
+function CapabilityFromRoute({ id, onBack, onOpenChange }: { id: string; onBack: () => void; onOpenChange?: (id: string) => void }) {
   const { load, refetch } = useRefetchableProductRead(
     `/api/rex/product/capability/${encodeURIComponent(id)}`,
     (body) => body.capability as CapabilityDetail,
@@ -103,6 +103,7 @@ function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void })
       capability: load.data,
       onBack,
       onEdit,
+      ...(onOpenChange ? { onOpenChange } : {}),
     }),
   );
 }
@@ -162,7 +163,7 @@ export function ProductPage({ areaSlug = null, areaCapabilityId = null, placeCha
   if (placeChangeId) return h(PlacementMode, { key: placeChangeId, changeId: placeChangeId, navigateTo });
   return areaSlug
     ? h(AreaView, { slug: areaSlug, onBack: onLeaveArea, navigateTo, initialCapabilityId: areaCapabilityId })
-    : h(ProductMapPage, rest);
+    : h(ProductMapPage, { ...rest, navigateTo });
 }
 
 interface ProductMapPageProps {
@@ -170,7 +171,7 @@ interface ProductMapPageProps {
   initialTab?: ProductTab;
 }
 
-function ProductMapPage({ onCapabilityChange, initialTab = "map" }: ProductMapPageProps) {
+function ProductMapPage({ onCapabilityChange, initialTab = "map", navigateTo }: ProductMapPageProps & { navigateTo?: NavigateTo }) {
   const [tab, setTab] = useState<ProductTab>(initialTab);
   const [capabilityId, setCapabilityId] = useState<string | null>(null);
   // The open capability is what the page is about; the shell attaches it to Sidecar.
@@ -189,7 +190,11 @@ function ProductMapPage({ onCapabilityChange, initialTab = "map" }: ProductMapPa
     return tab === "requirements" ? h(RequirementsView, null) : h(Pending, { load });
   }
   if (capabilityId && tab === "map") {
-    return h(CapabilityFromRoute, { id: capabilityId, onBack: () => setCapabilityId(null) });
+    return h(CapabilityFromRoute, {
+      id: capabilityId,
+      onBack: () => setCapabilityId(null),
+      ...(navigateTo ? { onOpenChange: (id: string) => navigateTo("prd", { taskId: id }) } : {}),
+    });
   }
   return h(ProductTabs, { tab, onTab: setTab },
     tab === "requirements"

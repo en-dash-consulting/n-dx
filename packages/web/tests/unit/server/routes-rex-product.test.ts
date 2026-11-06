@@ -673,6 +673,17 @@ describe("v2 product reads", () => {
       expect(drafted).toMatchObject({ needsPlacement: true, amends: [{ id: CAPABILITY_ID, delta: "modified" }] });
     });
 
+    it("the capability lists its held draft as waiting in the Inbox, never as an open change", async () => {
+      meetCapability();
+      const draftId = (await post(edit(false))).body.drafts[0].id as string;
+      const capability = (await get(`product/capability/${CAPABILITY_ID}`)).body.capability as CapabilityDetailWire;
+      expect(capability.inboxChanges).toEqual([expect.objectContaining({ id: draftId, delta: "modified" })]);
+      expect(capability.openChanges.map((c) => c.id)).not.toContain(draftId);
+      const map = (await get("product")).body.map as ProductMapWire;
+      const row = map.areas.flatMap((a) => a.capabilities).find((c) => c.id === CAPABILITY_ID);
+      expect(row?.openChanges.map((c) => c.id)).not.toContain(draftId);
+    });
+
     it("edits a criterion's text and refuses an id the capability does not own", async () => {
       meetCapability();
       const changed = await post(edit(false, { criteria: [{ id: "c2", text: "A declined card shows the reason" }] }));

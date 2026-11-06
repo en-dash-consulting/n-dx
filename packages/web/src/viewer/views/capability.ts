@@ -329,12 +329,40 @@ function EditForm({ capability, onEdit }: {
   );
 }
 
+/**
+ * Inbox changes held for placement against this capability, such as the draft
+ * a spec edit here makes. Kept apart from Open changes: a held change has not
+ * entered a stage, and counts only in the Inbox.
+ */
+function WaitingInInbox({ changes, onOpenChange }: {
+  changes: CapabilityDetail["inboxChanges"];
+  onOpenChange?: (id: string) => void;
+}) {
+  if (changes.length === 0) return null;
+  return h("section", { class: "cap-inbox-changes", "aria-label": "Waiting in the Inbox" },
+    h("h3", { class: "section-header" }, `Waiting in the Inbox (${changes.length})`),
+    h("ul", { class: "pm-overlays" },
+      changes.map((change) =>
+        h("li", { key: change.id, class: "pm-overlay" },
+          h("span", { class: "pm-overlay-id" }, change.displayId ?? change.id),
+          " ",
+          onOpenChange
+            ? h("button", { type: "button", class: "ch-change-link", onClick: () => onOpenChange(change.id) }, change.title)
+            : h("span", { class: "pm-overlay-title" }, change.title),
+        ),
+      ),
+    ),
+  );
+}
+
 // ── View ─────────────────────────────────────────────────────────────
 
-export function CapabilityPage({ capability, onBack, onEdit }: {
+export function CapabilityPage({ capability, onBack, onEdit, onOpenChange }: {
   capability: CapabilityDetail;
   /** Returns to the Product page. Omitted, no back control renders. */
   onBack?: () => void;
+  /** Opens a change's panel. Omitted, Inbox changes render as plain titles. */
+  onOpenChange?: (id: string) => void;
   /**
    * Submits a direct edit to the spec. Omitted, the page is read-only and no
    * form renders — the Product page's own rows have nowhere to send one.
@@ -406,6 +434,8 @@ export function CapabilityPage({ capability, onBack, onEdit }: {
           ),
         )
       : null,
+
+    h(WaitingInInbox, { changes: capability.inboxChanges, onOpenChange }),
 
     capability.dependsOn.length > 0
       ? h("section", { class: "cap-depends-on", "aria-label": "Depends on" },
