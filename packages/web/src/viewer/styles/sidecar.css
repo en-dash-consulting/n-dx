@@ -407,7 +407,7 @@
 .sidecar-choice-row:hover { background: var(--bg-hover); }
 .sidecar-choice-row.is-selected { border-color: var(--accent); background: var(--bg-active); }
 .sidecar-choice-row:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
-.sidecar-choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sidecar-choice-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
 .sidecar-choice-label { color: var(--text); overflow-wrap: anywhere; }
 .sidecar-choice-description, .sidecar-choice-note { color: var(--text-muted); overflow-wrap: anywhere; }
 .sidecar-choice-note { margin: 0; }
