@@ -432,6 +432,13 @@ describe("v2 product reads", () => {
         applyChange();
         expect(await coverage()).toEqual({ total: 0, uncovered: 0 });
       });
+
+      it("leaves out a completed change awaiting apply, which ready treats as terminal", async () => {
+        withReqs(join(changeDir(), "index.md"), [req("r1", "automated")]);
+        const statePath = join(changeDir(), "state.yaml");
+        writeFileSync(statePath, readFileSync(statePath, "utf8").replace('    status: "in_progress"\n', '    status: "completed"\n'));
+        expect(await coverage()).toEqual({ total: 0, uncovered: 0 });
+      });
     });
 
     it("counts a change whose task is in_progress under in-progress, not proposed", async () => {

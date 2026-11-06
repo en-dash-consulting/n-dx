@@ -394,8 +394,8 @@ const readyRequirementCount = (node: RuleNode): number =>
 /**
  * Automated and metric requirements where `rex ready` reads them, and how many
  * open changes hold none. On v2 ready evaluates the change layer only
- * (`store/change-layer-store.ts`), so this counts open changes and their
- * non-terminal tasks; subtasks carry none of their own and inherit. Product-layer
+ * (`store/change-layer-store.ts`), so this counts open changes and their tasks
+ * that ready does not treat as terminal (a completed change awaiting apply is); subtasks carry none of their own and inherit. Product-layer
  * requirements are left out: ready never sees them. Manual ones are left out:
  * ready does not count them.
  */
@@ -403,7 +403,8 @@ function requirementCoverage(index: TreeIndex): { total: number; uncovered: numb
   let total = 0;
   let uncovered = 0;
   for (const change of changesOf(index)) {
-    if (!isOpenChange(change)) continue;
+    // Open but terminal to ready: a completed change awaiting apply, or a deferred one.
+    if (!isOpenChange(change) || READY_TERMINAL.has(change.status ?? "")) continue;
     const live = tasksOf(change).filter((t) => !READY_TERMINAL.has(t.status ?? ""));
     const count = readyRequirementCount(change) + live.reduce((n, t) => n + readyRequirementCount(t), 0);
     total += count;
