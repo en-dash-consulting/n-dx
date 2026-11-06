@@ -301,6 +301,23 @@ export function parsePorcelainPath(line: string): string {
 }
 
 /**
+ * True when every path a porcelain line touches matches `patterns`: for an R/C
+ * line that is the source as well as the target, so a move out of a
+ * non-matching path into one is not matched by its target alone.
+ */
+export function matchesPorcelainLine(
+  line: string,
+  patterns: readonly string[],
+  repoPrefix = "",
+): boolean {
+  const { from, to } = splitPorcelainPaths(line);
+  return (
+    matchesProjectPath(to, patterns, repoPrefix) &&
+    (from === undefined || matchesProjectPath(from, patterns, repoPrefix))
+  );
+}
+
+/**
  * A porcelain line's path for display: `old -> new` for an R/C line, so a move
  * out of a non-planning path names its source, otherwise the plain path.
  */
