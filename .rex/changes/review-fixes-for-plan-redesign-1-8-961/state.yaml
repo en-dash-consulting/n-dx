@@ -9,7 +9,14 @@ items:
     lastModified: "2026-11-06T03:26:28.214Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "29c2d919-e64d-4d40-9208-5996440f854a":
-    lastModified: "2026-11-06T03:21:55.075Z"
+    status: "completed"
+    startedAt: "2026-11-06T03:27:00.071Z"
+    completedAt: "2026-11-06T03:27:00.071Z"
+    endedAt: "2026-11-06T03:27:00.071Z"
+    activeIntervals: [{"end":"2026-11-06T03:27:00.071Z","start":"2026-11-06T03:27:00.071Z"}]
+    appliedAt: "2026-11-06T03:27:00.071Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T03:27:00.071Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d16dddb6-440d-4acc-9306-d27aabde0b50":
     status: "completed"
@@ -20,5 +27,10 @@ items:
     lastModified: "2026-11-06T03:24:51.617Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "df7e2b70-9d15-4ad9-bf60-5259db2b72ad":
-    lastModified: "2026-11-06T03:21:55.075Z"
+    status: "completed"
+    startedAt: "2026-11-06T03:26:35.586Z"
+    completedAt: "2026-11-06T03:27:00.071Z"
+    endedAt: "2026-11-06T03:27:00.071Z"
+    activeIntervals: [{"end":"2026-11-06T03:27:00.071Z","start":"2026-11-06T03:26:35.586Z"}]
+    lastModified: "2026-11-06T03:27:00.071Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -14,7 +14,7 @@
  * (name ellipsized) before the tabs would scroll.
  *
  * A tab is active on its own stage page and on any view that stage lists,
- * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Plan lit.
+ * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Tune lit.
  * Live is lit on every Live route and is not part of the stage loop.
  */
 

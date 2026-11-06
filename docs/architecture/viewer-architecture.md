@@ -83,7 +83,7 @@ All in `packages/web/src/viewer/components/`:
 
 | Component | File | Role |
 |-----------|------|------|
-| `TopNav` | `top-nav.ts` | Brand (also the way home), the three stage tabs, a divider, the Live tab, search. A stage tab is lit on its own page and on any view the stage lists |
+| `TopNav` | `top-nav.ts` | Brand (also the way home), the four stage tabs (Analysis, Plan, Work, Tune), a divider, the Live tab, search. A stage tab is lit on its own page and on any view the stage lists |
 | Live tab | `live-tab.ts` | Idle, running and attention states, with a peek of what is running |
 | `StageLinks` | `stage-links.ts` | Edge buttons stepping around the loop. Hidden when a scoped viewer has a single stage |
 | `ProjectContext` | `project-context.ts` | In the top bar: the project name (a project switcher behind a hub with several, `project-switcher.ts`), a Hub link behind the hub, the worktree · branch chip (`workspace-switcher.ts`), and `document.title` |
@@ -118,7 +118,7 @@ The alias is applied in two places that must agree:
 ### Settings and the commands sheet
 
 - **Settings are routes shown as an overlay.** `/robot-wrangler`, `/project`, `/workflow` and `/commands` are real routes. In `main.ts`, `settingsOpen = isSettingsView(view)` renders `SettingsOverlay` over the page. The page underneath stays mounted: `usePageEntry` tracks the last non-settings entry (home on a direct load), and closing navigates back to it. The bottom bar's cog navigates to `robot-wrangler`.
-- **The commands sheet is UI state, not a route.** `main.ts` holds `commandsOpen`; the Commands button toggles it and any change of `view` closes it. The sheet renders `command-reference`, which also has its own page at `/command-reference`. The `commands` settings view is a separate page.
+- **The commands sheet is UI state, not a route.** `main.ts` holds `commandsOpen`; the Commands button toggles it and any change of `view` closes it. The sheet renders `command-reference`, whose own page is `/commands/reference` (`/command-reference` redirects there). The `commands` settings view is a separate page.
 
 ## Package-scoped viewers
 
