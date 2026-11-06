@@ -1,8 +1,9 @@
 /**
- * The machine-diagnostic panels lived only in the Runs page's System status
- * drawer; when that drawer went, they stayed exported and tested but no view
- * mounted them. A panel in this list is either rendered by some view or gone
- * from the components barrel — never both exported and orphaned.
+ * An exported panel that no view renders is dead UI: the machine-diagnostic
+ * panels stayed exported and tested after the Runs page's System status drawer
+ * went, and nothing mounted them. Every `*Panel` the components barrel exports
+ * must be rendered by a view or by the app shell (`main.ts`), or be removed
+ * from the barrel.
  */
 
 import { describe, expect, it } from "vitest";
@@ -12,8 +13,7 @@ import { join } from "node:path";
 const VIEWER_DIR = join(import.meta.dirname!, "..", "..", "..", "src", "viewer");
 const VIEWS_DIR = join(VIEWER_DIR, "views");
 const BARREL = join(VIEWER_DIR, "components", "index.ts");
-
-const PANELS = ["WsHealthPanel", "ThrottleControlsPanel"];
+const SHELL = join(VIEWER_DIR, "main.ts");
 
 function collectTsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -21,13 +21,28 @@ function collectTsFiles(dir: string): string[] {
   );
 }
 
-describe("diagnostic panels", () => {
-  const barrel = readFileSync(BARREL, "utf-8");
-  const views = collectTsFiles(VIEWS_DIR).map((file) => readFileSync(file, "utf-8"));
+/** Names of every `*Panel` re-exported by the barrel (`export { A, B as C } from`). */
+function exportedPanels(barrel: string): string[] {
+  const names = new Set<string>();
+  for (const [, list] of barrel.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+    for (const item of list.split(",")) {
+      const name = item.trim().split(/\s+as\s+/).pop()!;
+      if (/^\w*Panel$/.test(name)) names.add(name);
+    }
+  }
+  return [...names].sort();
+}
 
-  it.each(PANELS)("%s is rendered by a view if the barrel exports it", (name) => {
-    if (!new RegExp(`export \\{[^}]*\\b${name}\\b`).test(barrel)) return;
-    const rendered = views.some((src) => new RegExp(`\\bh\\(\\s*${name}\\b`).test(src));
+describe("exported panels are mounted", () => {
+  const panels = exportedPanels(readFileSync(BARREL, "utf-8"));
+  const renderers = [...collectTsFiles(VIEWS_DIR), SHELL].map((file) => readFileSync(file, "utf-8"));
+
+  it("the barrel exports panels to check", () => {
+    expect(panels.length).toBeGreaterThan(0);
+  });
+
+  it.each(panels)("%s is rendered by a view or the shell", (name) => {
+    const rendered = renderers.some((src) => new RegExp(`\\bh\\(\\s*${name}\\b`).test(src));
     expect(rendered, `${name} is exported from components/index.ts but no view renders it`).toBe(true);
   });
 });
