@@ -28,7 +28,10 @@ items:
     lastModified: "2026-11-06T01:35:46.883Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2fc2b2e0-e31f-43a8-8978-885afd888c4b":
-    lastModified: "2026-11-05T23:12:04.536Z"
+    startedAt: "2026-11-06T01:36:00.391Z"
+    activeIntervals: [{"end":"2026-11-06T01:50:56.267Z","start":"2026-11-06T01:36:00.391Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (43):\n- renders tree after loading data\n- marks prunable items with strikethrough class\n- marks affected parent with modified indicator\n- renders epic impact badge for affected epics\n- renders legend with remove and affected indicators\n- renders filter controls and overall completion impact\n- filters to only show affected branches by default\n- shows remove indicator for prunable items\n… and 35 more"
+    lastModified: "2026-11-06T01:50:56.810Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "42ae74c1-1803-4dc0-b9fa-40fbd8c8ad97":
     status: "completed"
