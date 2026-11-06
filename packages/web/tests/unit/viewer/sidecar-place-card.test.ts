@@ -342,6 +342,7 @@ describe("placement card", () => {
 
   it("a settled card shows its placement read-only", async () => {
     const { el } = await draw(placementCard({ status: "approved" }));
+    await click(button(el, "sidecar-card-toggle"));
     expect(el.querySelector(".sidecar-place-shortlist")).toBeNull();
     expect(q(el, ".sidecar-place-check").textContent).toContain("Pay by card");
   });

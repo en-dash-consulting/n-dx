@@ -462,6 +462,23 @@
 .sidecar-run-plan-command { font-size: 11px; overflow-wrap: anywhere; }
 .sidecar-run-plan-actions { display: flex; align-items: center; gap: var(--space-2); }
 .sidecar-card-note, .sidecar-card-queued { margin: 0; color: var(--text-muted); }
+.sidecar-card-settled { display: flex; gap: var(--space-2); align-items: baseline; justify-content: space-between; min-width: 0; }
+.sidecar-card-settled .sidecar-card-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidecar-card-toggle, .sidecar-cards-decided-toggle {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.sidecar-card-toggle:hover, .sidecar-cards-decided-toggle:hover { color: var(--text); }
+.sidecar-card-toggle:focus-visible, .sidecar-cards-decided-toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.sidecar-cards-decided { display: flex; flex-direction: column; gap: var(--space-2); }
+.sidecar-cards-decided-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
 .sidecar-card-decide { display: flex; flex-direction: column; gap: var(--space-1); }
 .sidecar-card-reason { font: inherit; font-size: 12px; }
 .sidecar-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }

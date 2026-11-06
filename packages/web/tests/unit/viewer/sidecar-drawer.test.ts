@@ -1370,10 +1370,59 @@ describe("permission cards", () => {
       expect(el.classList.contains(`sidecar-card--${state}`), `${kind} ${state}`).toBe(true);
       expect(el.querySelector(".sidecar-card-title")?.textContent).toBe(title);
       expect(el.querySelector(".sidecar-card-kind")?.textContent).not.toBe("");
+      // A decided card is folded: open it to read its input.
+      if (state !== "pending") await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-card-toggle")!.click(); });
       expect(JSON.parse(el.querySelector(".sidecar-card-input")!.textContent!)).toEqual(input);
       if (note) expect(el.querySelector(".sidecar-card-note")?.textContent).toMatch(note);
       await act(async () => { render(null, host); });
     }
+  });
+
+  describe("decided cards fold", () => {
+    const draw = async (cards: SidecarCard[]): Promise<HTMLElement> => {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      await act(async () => {
+        render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => true) }), host);
+      });
+      return host;
+    };
+    const click = (el: Element | null) => act(async () => { (el as HTMLElement).click(); });
+
+    it("shows a decided card as its head and note, and expands on demand", async () => {
+      const host = await draw([card("d1", 1, { status: "approved" })]);
+      const toggle = host.querySelector<HTMLButtonElement>(".sidecar-card-toggle")!;
+      expect(host.querySelector(".sidecar-card-title")).not.toBeNull();
+      expect(host.querySelector(".sidecar-card-note")?.textContent).toBe("Approved");
+      expect(host.querySelector(".sidecar-card-input")).toBeNull();
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      await click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(host.querySelector(".sidecar-card-input")).not.toBeNull();
+      await click(toggle);
+      expect(host.querySelector(".sidecar-card-input")).toBeNull();
+      host.remove();
+    });
+
+    it("collapses several decided cards behind an N decided toggle and keeps pending cards open", async () => {
+      const host = await draw([
+        card("d1", 1, { status: "approved" }),
+        card("d2", 2, { status: "denied" }),
+        card("p1", 3),
+      ]);
+      expect(host.querySelectorAll(".sidecar-card")).toHaveLength(1);
+      expect(host.querySelector(".sidecar-card--pending .sidecar-card-input")).not.toBeNull();
+      const toggle = host.querySelector<HTMLButtonElement>(".sidecar-cards-decided-toggle")!;
+      expect(toggle.textContent).toBe("2 decided");
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      await click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(host.querySelectorAll(".sidecar-card")).toHaveLength(3);
+      expect(host.querySelectorAll(".sidecar-card--approved .sidecar-card-input, .sidecar-card--denied .sidecar-card-input")).toHaveLength(0);
+      // Pending first, decided after.
+      expect(host.querySelector(".sidecar-cards > li:first-child")?.classList.contains("sidecar-card--pending")).toBe(true);
+      host.remove();
+    });
   });
 
   describe("effects line layout tokens", () => {
