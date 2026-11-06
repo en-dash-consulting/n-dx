@@ -98,6 +98,24 @@ describe("the change-set card", () => {
     });
   });
 
+  it("shows an item's tags, and sends the edited tags, trimmed and deduplicated, with the approval", async () => {
+    const tagged: SidecarChangeSet = { ...V1, items: V1.items.map((item, i) => (i === 0 ? { ...item, tags: ["billing", "q4"] } : item)) };
+    const { el, decide } = await draw(changeSetCard(tagged));
+    const [first, second] = el.querySelectorAll(".sidecar-change-set-item");
+    expect(first.querySelector<HTMLInputElement>(".sidecar-change-set-tags")?.value).toBe("billing, q4");
+    expect(second.querySelector<HTMLInputElement>(".sidecar-change-set-tags")?.value).toBe("");
+    await type(first.querySelector<HTMLInputElement>(".sidecar-change-set-tags")!, "billing, refunds, , refunds");
+    await type(second.querySelector<HTMLInputElement>(".sidecar-change-set-tags")!, "ui");
+    await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+    expect(decide).toHaveBeenCalledWith("c1", {
+      approve: true,
+      edits: [
+        { index: 0, tags: ["billing", "refunds"] },
+        { index: 1, tags: ["ui"] },
+      ],
+    });
+  });
+
   it("sends no edits with a denial", async () => {
     const { el, decide } = await draw(changeSetCard(V1));
     await type(el.querySelector<HTMLInputElement>(".sidecar-change-set-title")!, "Refunds");
@@ -135,6 +153,6 @@ describe("the change-set card", () => {
 describe("changeSetEdits", () => {
   it("drops a draft that changes nothing", () => {
     const card = changeSetCard(V1);
-    expect(changeSetEdits(card, { 0: { title: "Refund flow ", description: "Shoppers ask for refunds.", criteria: "" } })).toEqual([]);
+    expect(changeSetEdits(card, { 0: { title: "Refund flow ", description: "Shoppers ask for refunds.", criteria: "", tags: "" } })).toEqual([]);
   });
 });

@@ -72,7 +72,7 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
   },
   propose_prd_change: {
     description: [
-      "Propose PRD items to add. Always waits for the operator's change-set card, on which the operator can edit each item's title, description and done-when before approving; the result lists the ids written.",
+      "Propose PRD items to add. Always waits for the operator's change-set card, on which the operator can edit each item's title, description, done-when and tags before approving; the result lists the ids written.",
       "On a v2 PRD (product/ and changes/): item 1 is one change and every later item is one of its tasks; give `target` (a capability or constraint id) to place the change, or omit it and the change lands in the Inbox awaiting placement.",
       "On a v1 PRD: each item is added as add_item adds it, at the root or under `parentId` (an existing item) or `parent` (the index of an earlier item on this card); `type` defaults to the parent's child type.",
       "Nothing is applied: a change is never applied from a card.",
@@ -83,6 +83,7 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
         type: z.string().optional().describe("v1: epic, feature, task or subtask; v2: change (item 1) or task"),
         description: z.string().optional(),
         acceptanceCriteria: z.array(z.string()).optional().describe("Done-when: what must be true for the item to be complete"),
+        tags: z.array(z.string()).optional().describe("Tags to put on the new item"),
         priority: z.enum(["critical", "high", "medium", "low"]).optional(),
         parentId: z.string().optional().describe("v1: an existing item to add under"),
         parent: z.number().int().min(0).optional().describe("v1: the index of an earlier item on this card to add under"),
