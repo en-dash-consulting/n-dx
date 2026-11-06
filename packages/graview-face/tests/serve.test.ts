@@ -10,19 +10,20 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { underMount } from "../dev/hub-mount.js";
 
 const BIN = resolve(import.meta.dirname, "../bin/serve.js");
 const MOUNT = "/x/graview-face/";
 
 /**
- * A port free on `host`: probe the host the port will be bound on. A port free
- * on 127.0.0.1 can be held on ::1 (macOS's `localhost`), and a runner that
- * hands out ephemeral ports in order offers the port the previous test's face
- * took on ::1.
+ * A port free on `host` a moment ago. Probed on the host serve.js will bind:
+ * `localhost` is `::1` on macOS, and a port free on 127.0.0.1 can be held
+ * there. macOS hands out ephemeral ports in sequence, so a 127.0.0.1 probe
+ * kept returning the very port an earlier serve.js had just taken on `::1`
+ * (CI runs 42170022634, 42149471914, 42135226016).
  */
-function freePort(host = "127.0.0.1"): Promise<number> {
+function freePort(host: string): Promise<number> {
   return new Promise((done, fail) => {
     const probe = createServer();
     probe.once("error", fail);
@@ -34,17 +35,19 @@ function freePort(host = "127.0.0.1"): Promise<number> {
 }
 
 /**
- * Resolves when serve.js prints its URL, which it does only after Vite's
- * listen() resolved; rejects if it exits first. No deadline of its own: the
- * beforeAll hook timeout is the hang guardrail.
+ * Resolves with the port serve.js prints in its URL on `host`, which it does
+ * only after Vite's listen() resolved; rejects if it exits first. No deadline
+ * of its own: the beforeAll hook timeout is the hang guardrail.
  */
-function listening(child: ChildProcess, host: string): Promise<void> {
+function listening(child: ChildProcess, host: string): Promise<number> {
   let output = "";
+  const url = new RegExp(`${host.replace(/\./g, "\\.")}:(\\d+)`);
   return new Promise((done, fail) => {
     const onData = (chunk: Buffer) => {
       // Vite bolds the port, so drop the colour codes before matching.
       output += String(chunk).replace(/\x1b\[[0-9;]*m/g, "");
-      if (output.includes(host)) done();
+      const match = url.exec(output);
+      if (match) done(Number(match[1]));
     };
     child.stdout?.on("data", onData);
     child.stderr?.on("data", onData);
@@ -69,11 +72,14 @@ describe("the mount the hub serves the face at", () => {
   });
 });
 
-/** Starts serve.js with `env` and resolves with its origin once it listens on `host`. */
+/**
+ * Starts serve.js with `env` and resolves with its origin once it listens on
+ * `host`. The origin uses the port serve.js reports: by hand, an ambient
+ * `PORT` someone took in the meantime moves it to the next one.
+ */
 async function startServe(env: NodeJS.ProcessEnv, host: string): Promise<{ child: ChildProcess; origin: string }> {
-  const port = await freePort();
-  const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
-  await listening(child, `${host}:${port}`);
+  const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(await freePort(host)) }, stdio: ["pipe", "pipe", "pipe"] });
+  const port = await listening(child, host);
   return { child, origin: `http://${host}:${port}` };
 }
 
@@ -102,12 +108,24 @@ describe("bin/serve.js by hand, with an ambient PORT", () => {
   });
 });
 
-/** Holds `port` on `localhost`, as another checkout's face would. */
-function hold(port: number): Promise<ReturnType<typeof createServer>> {
+/**
+ * Holds a port on `localhost`, as another checkout's face would. The OS picks
+ * it, so there is no window between choosing the port and holding it.
+ */
+function hold(): Promise<{ server: ReturnType<typeof createServer>; port: number }> {
   return new Promise((done, fail) => {
     const server = createServer();
     server.once("error", fail);
-    server.listen(port, "localhost", () => done(server));
+    server.listen(0, "localhost", () => done({ server, port: (server.address() as { port: number }).port }));
+  });
+}
+
+/** Stops serve.js and waits for it to let go of its port. */
+function stop(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((done) => {
+    child.once("exit", () => done());
+    child.kill();
   });
 }
 
@@ -133,14 +151,16 @@ describe("bin/serve.js when another checkout's face holds the port", () => {
   delete env["NDX_EXTENSION_NAME"];
   delete env["PORT"];
 
-  afterAll(async () => {
-    for (const child of children) child.kill();
-    await Promise.all(held.map((server) => new Promise((done) => server.close(done))));
+  // Each test's serve.js and held port go before the next test starts, so
+  // one test's server can never be holding the port the next one picks.
+  afterEach(async () => {
+    await Promise.all(children.splice(0).map(stop));
+    await Promise.all(held.splice(0).map((server) => new Promise((done) => server.close(done))));
   });
 
   it("takes the next free port when the default one is held", async () => {
-    const port = await freePort("localhost");
-    held.push(await hold(port));
+    const { server, port } = await hold();
+    held.push(server);
     // An ambient PORT is a starting point, like the 5188 default.
     const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
     children.push(child);
@@ -149,8 +169,8 @@ describe("bin/serve.js when another checkout's face holds the port", () => {
   }, 90_000);
 
   it("refuses a port --port names when it is held, rather than serving somewhere else", async () => {
-    const port = await freePort("localhost");
-    held.push(await hold(port));
+    const { server, port } = await hold();
+    held.push(server);
     const child = spawn(process.execPath, [BIN, "--port", String(port)], { env, stdio: ["pipe", "pipe", "pipe"] });
     children.push(child);
     const result = await outcome(child);

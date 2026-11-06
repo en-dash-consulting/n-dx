@@ -251,12 +251,11 @@ describe("ThrottleControlsPanel", () => {
       }),
     });
 
-    // Under preact/compat, as in the viewer, a range input's onChange listens on
-    // "input" (tests/setup/preact-compat.ts), so move the slider the way a
-    // drag does.
+    // The slider commits on "change", which a browser fires when a drag ends;
+    // the "input" events during the drag send nothing (the test below).
     const slider = root.querySelector(".throttle-slider") as HTMLInputElement;
     slider.value = "5";
-    slider.dispatchEvent(new Event("input", { bubbles: true }));
+    slider.dispatchEvent(new Event("change", { bubbles: true }));
 
     await vi.waitFor(() => {
       expect(fetchFn).toHaveBeenCalledWith(
@@ -267,5 +266,29 @@ describe("ThrottleControlsPanel", () => {
         }),
       );
     });
+  });
+
+  // tests/setup/preact-compat.ts loads compat, as the dashboard does; under it
+  // an `onChange` prop on a range input would listen for `input` instead.
+  it("sends no PUT while the concurrency slider is being dragged", async () => {
+    const fetchFn = mockFetch();
+    globalThis.fetch = fetchFn;
+    const root = renderToDiv(h(ThrottleControlsPanel, {}));
+
+    await vi.waitFor(() => {
+      expect(root.querySelector(".throttle-slider")).toBeTruthy();
+    });
+    fetchFn.mockClear();
+
+    const slider = root.querySelector(".throttle-slider") as HTMLInputElement;
+    for (const value of ["4", "5", "6"]) {
+      slider.value = value;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const puts = fetchFn.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
+    expect(puts).toEqual([]);
+    expect(slider.disabled).toBe(false);
   });
 });
