@@ -13,6 +13,7 @@ import type { GhostSource } from "../../../src/viewer/components/prd-tree/ghost-
 import { areaBlocks } from "../../../src/viewer/views/product-area-map.js";
 import { ChangesGlance } from "../../../src/viewer/views/changes-glance.js";
 import { LifecycleStrip, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
+import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { ProductAreaMap } from "../../../src/viewer/views/product-area-map.js";
 import type { AreaSection, ChangeSummary, ProductMap } from "../../../src/viewer/views/product-model.js";
 
@@ -47,6 +48,7 @@ const AREA = (id: string, caps: string[]): AreaSection => ({
   slug: id,
   title: id,
   capabilities: caps.map((c) => ({ id: c, title: c, status: "met", health: "ok", criteriaCount: 0, openChanges: [] })),
+  openChangeIds: [],
 }) as unknown as AreaSection;
 
 describe("ghost helpers", () => {
@@ -92,7 +94,8 @@ describe("the Plan surfaces", () => {
 
   async function mount(view: unknown, cards: GhostSource[], body: unknown) {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => body })));
-    await act(async () => { render(h(GhostCardsContext.Provider, { value: cards }, view as never), root); });
+    // The Plan grid reads the summary once and shares it; the strip and glance read it from there.
+    await act(async () => { render(h(GhostCardsContext.Provider, { value: cards }, h(ChangesSummaryProvider, null, view as never)), root); });
     await act(async () => {});
   }
 

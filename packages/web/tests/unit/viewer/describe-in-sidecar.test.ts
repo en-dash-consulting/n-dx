@@ -4,6 +4,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { DescribeInSidecarButton, DescribeInSidecarContext } from "../../../src/viewer/components/describe-in-sidecar.js";
 import { ChangesGlance } from "../../../src/viewer/views/changes-glance.js";
+import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { specGaps } from "../../../src/viewer/views/spec-gaps.js";
 import { pageItemFor, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 import type { ChangeSummary, GlanceChange } from "../../../src/viewer/views/product-model.js";
@@ -70,7 +71,7 @@ describe("Describe in Sidecar", () => {
     })));
     const navigateTo = vi.fn();
     const draw = async (value: { describe: () => void; attached: null } | null) => {
-      await act(async () => { render(h(DescribeInSidecarContext.Provider, { value }, h(ChangesGlance, { navigateTo })), root); });
+      await act(async () => { render(h(DescribeInSidecarContext.Provider, { value }, h(ChangesSummaryProvider, null, h(ChangesGlance, { navigateTo }))), root); });
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     };
     await draw(null);
