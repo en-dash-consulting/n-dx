@@ -118,7 +118,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
 | `ndx ci` | **full** | medium | Run-CI-check action in the Validation view with structured results from `--format=json` |
 | `ndx config` | full | medium | Three settings pages: Robot Wrangler (vendor, provider and model), Workflow (work settings, templates, CLI timeouts) and Project (analyze/plan settings, feature flags) |
-| `ndx auth` | **full** | low | Credential status chip on Robot Wrangler (GET `/api/commands/auth`), with re-check |
+| `ndx auth` | **full** | low | Credential status chip on Robot Wrangler (POST `/api/commands/auth`; re-check with `?refresh=true`; read-only cached verdict: GET `/api/commands/auth/cached`, which never spawns) |
 | `ndx install-sample` / `ndx destroy-sample` | **full** | low | Sample App panel in Commands view (`packages/web/src/viewer/views/commands.ts`) — Install/Destroy buttons, live status polling via GET `/api/commands/sample-status`, POST `/api/commands/install-sample` and `/api/commands/destroy-sample` |
 | `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
 | `ndx init` | n/a | — | One-time setup; dashboard requires init to exist |
