@@ -804,6 +804,24 @@ describe("PlacementMode", () => {
       expect($$(".cp-model-mark").map((el) => el.closest<HTMLElement>(".cp-card")?.dataset.target)).toEqual(["cap-gift"]);
       expect($$(".cp-card.is-checked")).toEqual([]);
     });
+
+    it("drops the earlier pick's card when a later draft picks nothing", async () => {
+      serve([change("a")], [placement("a", [rows[0]])]);
+      const answers: Record<string, unknown> = { ...toggle, [DRAFT]: draftBody("cap-gift", rows) };
+      also(answers);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      const draftButton = () => $$<HTMLButtonElement>("button").find((b) => b.textContent === "Draft with the model")!;
+      await act(async () => { draftButton().click(); });
+      await settle();
+      expect($('.cp-card[data-target="cap-gift"] .cp-model-mark')).not.toBeNull();
+
+      answers[DRAFT] = { layout: "v2", change: "a", relation: "touches", tied: false, shortlist: rows, warnings: [] };
+      await act(async () => { draftButton().click(); });
+      await settle();
+      expect($(".cp-draft-note")?.textContent).toContain("No draft from the model");
+      expect($$(".cp-model-mark")).toEqual([]);
+      expect($('.cp-card[data-target="cap-gift"]')).toBeNull();
+    });
   });
 
   it("is what the Product page shows at /product/place/<id>", async () => {

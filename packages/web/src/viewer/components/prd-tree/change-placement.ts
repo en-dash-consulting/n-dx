@@ -604,6 +604,8 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
 
   const askModel = async () => {
     setDraftNote(null);
+    // Each draft stands alone: an earlier pick's "model" card does not outlive it.
+    setModelPick(null);
     const answer = await draft.run();
     if (!answer) return;
     if (answer.proposal) { onDraftProposal(answer); return; }
