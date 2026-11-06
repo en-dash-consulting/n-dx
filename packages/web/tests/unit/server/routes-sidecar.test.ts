@@ -584,7 +584,7 @@ describe("broker", () => {
     const client = await brokerClient(id);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
+      "ask_choice", "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
       "propose_edit", "propose_item_edit", "propose_link", "propose_prd_change", "propose_run_plan", "propose_status", "run_command", "start_work",
     ]);
     await client.close();

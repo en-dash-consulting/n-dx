@@ -106,6 +106,7 @@ export type SidecarCardKind =
   | "link"
   | "item-edit"
   | "status"
+  | "choice"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -171,6 +172,20 @@ export interface SidecarStatusChange {
   rule: { allowed: true } | { allowed: false; message: string };
 }
 
+/** A choice card's question, options and (once sent) the operator's answer; mirrors `SidecarChoice` in shared/sidecar-card.ts. */
+export interface SidecarChoice {
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect: boolean;
+  answer?: SidecarChoiceAnswer;
+}
+
+/** The labels the operator picked and any text from the Other row. */
+export interface SidecarChoiceAnswer {
+  selected: string[];
+  other?: string;
+}
+
 /** An item-edit card's item and each changed field before and after; mirrors `SidecarItemEdit` in shared/sidecar-card.ts. */
 export interface SidecarItemEdit {
   itemId: string;
@@ -218,6 +233,8 @@ export interface SidecarCard {
   itemEdit?: SidecarItemEdit;
   /** A status card's change as read when it was raised. */
   statusChange?: SidecarStatusChange;
+  /** A choice card's question and options, and the answer once sent. */
+  choice?: SidecarChoice;
   /** An external-call card's connection, workspace host, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */
@@ -254,6 +271,8 @@ export interface SidecarCardDecision {
   path?: string;
   /** An external-call approval's arguments as edited on the card; the tool is called with these. */
   arguments?: Record<string, unknown>;
+  /** A choice card's answer: the option labels picked and the Other text; Send approves with it. */
+  answer?: SidecarChoiceAnswer;
 }
 
 /**
@@ -921,6 +940,7 @@ export function useSidecar(
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
         ...(decision.approve && decision.path !== undefined && { path: decision.path }),
         ...(decision.approve && decision.arguments !== undefined && { arguments: decision.arguments }),
+        ...(decision.approve && decision.answer !== undefined && { answer: decision.answer }),
       },
     );
     if (!mountedRef.current) return res.ok;

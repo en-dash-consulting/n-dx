@@ -132,7 +132,30 @@ export interface SidecarStatusChange {
   rule: { allowed: true } | { allowed: false; message: string };
 }
 
-export type SidecarItemStatus = "pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "cancelled" | "deleted";
+/** One option of a choice card. */
+export interface SidecarChoiceOption {
+  label: string;
+  description?: string;
+}
+
+/** The operator's answer to a choice card: the labels picked, and free text from the Other row. */
+export interface SidecarChoiceAnswer {
+  selected: string[];
+  other?: string;
+}
+
+/**
+ * A choice card (`ask_choice`): the agent's question with options to pick
+ * from. `answer` is set once the operator sends one; the card writes nothing.
+ */
+export interface SidecarChoice {
+  question: string;
+  options: SidecarChoiceOption[];
+  multiSelect: boolean;
+  answer?: SidecarChoiceAnswer;
+}
+
+export type SidecarItemStatus ="pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "cancelled" | "deleted";
 
 /** The operator's edit of one item, sent with the approval. */
 export interface SidecarChangeSetEdit {
