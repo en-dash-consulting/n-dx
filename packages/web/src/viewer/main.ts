@@ -35,6 +35,7 @@ import {
   PlanWithSidecarContext,
   planFirstTurn,
   planSurvivesAreaReport,
+  AskInSidecarContext,
   DescribeInSidecarContext,
   DiagnoseInSidecarContext,
   GhostCardsContext,
@@ -181,6 +182,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [openArea, setOpenArea] = useState<{ id: string; label: string; capabilityId: string | null } | null>(null);
   // The change "Describe in Sidecar" / "Tighten with Sidecar" attached (Describe lens); dropped with the page.
   const [describeChange, setDescribeChange] = useState<string | null>(null);
+  // The task, capability or zone "Ask Sidecar" / "Explain in Sidecar" attached (its kind's lens); dropped with the page.
+  const [askItem, setAskItem] = useState<{ kind: "task" | "capability" | "zone"; ref: string; seq: number } | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -209,12 +212,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, plan: planWith, areaView: openArea },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, ask: askItem, plan: planWith, areaView: openArea },
   );
   const showSidecar = sidecarShell.drawer.show;
   // The waiting change-set cards, read once for every Plan surface that draws their ghosts (UX5, SP5).
   const proposals = useSidecarProposals(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
-  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setDescribeChange(null); setPlanWith(null); setPlanText(null); }, [pageView]);
+  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setDescribeChange(null); setAskItem(null); setPlanWith(null); setPlanText(null); }, [pageView]);
   // Send the typed text once the open session has followed the attachment (a PATCH answers
   // the change), so the turn opens with the Plan lens and its target rather than racing them.
   const { sidecar, drawer } = sidecarShell;
@@ -249,6 +252,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const planWithSidecar = useMemo(
     () => (sidecarShell.button ? {
       plan: (text: string, area?: string) => {
+        setAskItem(null);
         setOpenChange(null);
         setDiagnoseTask(null);
         setDescribeChange(null);
@@ -258,6 +262,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
         showSidecar();
       },
       planIn: (areaId: string) => {
+        setAskItem(null);
         setOpenChange(null);
         setDiagnoseTask(null);
         setDescribeChange(null);
@@ -291,6 +296,20 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       attached: describeChange,
     } : null),
     [sidecarShell.button !== null, showSidecar, describeChange],
+  );
+  // Null while Sidecar is off, so no task, capability or zone page offers Ask or Explain. An ask
+  // outranks the Plan lens, so a click lets it go; a change sent to Place, Describe or Diagnose outranks the ask.
+  const askInSidecar = useMemo(
+    () => (sidecarShell.button ? {
+      ask: (kind: "task" | "capability" | "zone", ref: string) => {
+        setPlanWith(null);
+        setPlanText(null);
+        setAskItem((prev) => ({ kind, ref, seq: (prev?.seq ?? 0) + 1 }));
+        showSidecar();
+      },
+      attached: askItem ? { kind: askItem.kind, ref: askItem.ref } : null,
+    } : null),
+    [sidecarShell.button !== null, showSidecar, askItem],
   );
   // Null while Sidecar is off, so no failed run offers "Diagnose in Sidecar".
   const diagnoseInSidecar = useMemo(
@@ -391,7 +410,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
+  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(AskInSidecarContext.Provider, { value: askInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -470,7 +489,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  )))))));
+  ))))))));
 }
 
 const root = document.getElementById("app");

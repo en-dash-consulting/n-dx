@@ -15,6 +15,7 @@ import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
+import { AskInSidecarButton } from "../ask-in-sidecar.js";
 import { TrackerLinksEditor } from "../tracker-links.js";
 import { ChangeTrackerChip } from "../tracker-chip.js";
 import { TaskStartControl } from "../task-start-control.js";
@@ -1228,6 +1229,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       h("span", { class: `prd-level-badge prd-level-${itemType}` }, itemLabel),
       h("span", { class: "task-id" }, item.id.slice(0, 8)),
       h(CopyLinkButton, { path: `/prd/${item.id}`, compact: true }),
+      // Drawn only while web.sidecar is on. A task's lens is Describe, or Diagnose run after a failed run.
+      isWorkItemType(itemType) ? h(AskInSidecarButton, { kind: "task", itemId: item.id }) : null,
     ),
 
     // Editable title

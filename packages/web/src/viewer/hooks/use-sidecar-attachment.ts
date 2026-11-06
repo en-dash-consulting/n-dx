@@ -23,7 +23,7 @@ export interface SidecarLensInfo {
   target?: { kind: string; needs: string };
 }
 
-export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change" | "area";
+export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change" | "area" | "inbox";
 
 /** The thing the current page is about. `ref` is what the lens packet is pointed at; Plan and Live have none. */
 export interface SidecarPageItem {
@@ -63,6 +63,12 @@ export interface SidecarPageSelection {
   /** The change "Describe in Sidecar" / "Tighten with Sidecar" attached, by id; asks with Describe. */
   describeChangeId?: string | null;
   /**
+   * "Ask Sidecar" / "Explain in Sidecar" on a task, capability or zone page:
+   * attaches that item with its kind's default lens. `seq` counts the clicks,
+   * so each one re-attaches an item the operator had removed.
+   */
+  ask?: { kind: "task" | "capability" | "zone"; ref: string; seq: number } | null;
+  /**
    * "Plan with Sidecar" on a capture bar: asks with the Plan lens, aimed at
    * `area` when the capture was area-scoped. `seq` counts the clicks, so each
    * one starts again from the Plan lens.
@@ -83,6 +89,10 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   if (page.diagnoseTaskId) return { kind: "task", ref: page.diagnoseTaskId, label: page.diagnoseTaskId, lens: "diagnose-run" };
   if (page.describeChangeId) {
     return { kind: "change", ref: page.describeChangeId, label: page.describeChangeId, lens: "describe", key: `describe:${page.describeChangeId}` };
+  }
+  if (page.ask) {
+    const { kind, ref, seq } = page.ask;
+    return { kind, ref, label: ref, key: `ask:${kind}:${ref}:${seq}` };
   }
   if (page.plan) {
     const key = `plan-with:${page.plan.area ?? ""}:${page.plan.seq}`;
@@ -105,6 +115,8 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
     return { kind: "capability", ref: page.capabilityId, label: page.capabilityId };
   }
   if (page.view === "workspaces" && page.worktree) return { kind: "worktree", ref: page.worktree, label: page.worktree };
+  // The Inbox is about changes awaiting placement; one sent to Place is attached above.
+  if (page.view === "inbox") return { kind: "inbox", label: "Inbox" };
   if (page.view === "plan") return { kind: "plan", label: "Plan" };
   if (page.view === "live" || page.view === "live-analyze") return { kind: "live", label: "Live" };
   return null;
@@ -121,7 +133,8 @@ export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boole
     case "plan": return "plan";
     case "live": return "guide";
     case "worktree": return "diagnose-branch";
-    case "change": return "place";
+    case "change":
+    case "inbox": return "place";
     default: return GENERAL_LENS;
   }
 }

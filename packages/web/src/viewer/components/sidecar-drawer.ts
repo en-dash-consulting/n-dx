@@ -274,7 +274,7 @@ function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
   return h("div", { class: "sidecar-attachment" },
     item
       ? h("span", { class: "sidecar-chip sidecar-chip-item", "data-kind": item.kind },
-          h("span", { class: "sidecar-chip-label" }, `${item.kind === "plan" || item.kind === "live" ? "" : `${item.kind} `}${item.label}`),
+          h("span", { class: "sidecar-chip-label" }, `${item.kind === "plan" || item.kind === "live" || item.kind === "inbox" ? "" : `${item.kind} `}${item.label}`),
           h("button", {
             type: "button",
             class: "sidecar-chip-remove",

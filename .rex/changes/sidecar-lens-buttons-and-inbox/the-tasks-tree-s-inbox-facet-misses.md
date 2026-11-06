@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "On a tree with no live capability, the Tasks tree's Inbox facet lists every open change with needsPlacement (viewer test)"
   - "The facet's ids equal the Inbox section's rows on the same /api/rex/changes read"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"

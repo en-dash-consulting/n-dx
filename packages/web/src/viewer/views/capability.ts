@@ -19,7 +19,7 @@
 
 import { h } from "preact";
 import { useCallback, useMemo, useState } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { AskInSidecarButton, BrandedHeader } from "../components/index.js";
 import { CRITERIA_LABEL } from "../external.js";
 import {
   CAPABILITY_HEALTH_LABELS,
@@ -378,6 +378,7 @@ export function CapabilityPage({ capability, onBack, onEdit, onOpenChange }: {
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
       h("h2", { class: "view-title" }, capability.title),
+      h(AskInSidecarButton, { kind: "capability", itemId: capability.id }),
     ),
 
     h("nav", { class: "cap-breadcrumb", "aria-label": "Breadcrumb" },
