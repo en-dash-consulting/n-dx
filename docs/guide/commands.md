@@ -39,6 +39,7 @@ The PRD is the product's requirements (the product layer) plus the changes being
 |---------|-------------|
 | `rex product show [<node>] [dir]` | The areas, capabilities and constraints with computed status and health; with a node, its statement, capability criteria and changes |
 | `rex product edit <node> [dir]` | Edit a capability's or constraint's statement (`--statement`) or capability criteria (`--capability-criterion="<id>: <text>"`); `--editorial` for wording only |
+| `rex change inbox [--format=json] [dir]` | List every open change awaiting placement, oldest first: id, title, intent, age in days and the top 5 places it could go, with scores and reasons. On a v1 PRD it says "not applicable" and exits 0 |
 | `rex change place <change> [dir]` | Without `--target`, the shortlist of places a change could go; with `--target=<node> --relation=touches\|amends`, record it; with `--propose --type=capability\|constraint --under=<area> --title="…"`, propose a new node when nothing fits |
 | `rex change apply <change> [dir]` | Apply a change's amendments to the product layer, as a steward |
 | `rex release stamp <version> [dir]` | Stamp `shippedIn` on the changes a release ships |

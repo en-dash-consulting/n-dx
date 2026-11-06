@@ -106,7 +106,15 @@ describe("placement routes on a v2 project", () => {
     expect(status).toBe(200);
     const placement = body as ChangePlacement;
     expect(placement.layout).toBe("v2");
-    expect(placement.change).toEqual({ id: inboxId, title: "Pay by card retries a declined card", intent: "A shopper retries after a decline.", status: "pending", taskCount: 0 });
+    expect(placement.change).toEqual({
+      id: inboxId,
+      title: "Pay by card retries a declined card",
+      intent: "A shopper retries after a decline.",
+      status: "pending",
+      taskCount: 0,
+      createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      ageDays: 0,
+    });
     expect(["touches", "amends"]).toContain(placement.relation);
     expect(typeof placement.tied).toBe("boolean");
     expect(placement.shortlist[0]).toMatchObject({
@@ -142,6 +150,16 @@ describe("placement routes on a v2 project", () => {
     expect(Object.keys(body.placements).sort()).toEqual([inboxId, second.id].sort());
     const single = await json(await fetch(`${base}/changes/${inboxId}/placement`));
     expect(body.placements[inboxId]).toEqual(single.body);
+  });
+
+  it("GET changes/placements rows carry the change's age from its createdAt", async () => {
+    const createdAt = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    await withPrdModelTransaction(rexDir, (model) => {
+      (indexTree(model.tree).resolve(inboxId) as { createdAt?: string }).createdAt = createdAt;
+      return { tree: model.tree, result: undefined };
+    });
+    const { body } = await json(await fetch(`${base}/changes/placements`));
+    expect(body.placements[inboxId].change).toMatchObject({ createdAt, ageDays: 3 });
   });
 
   it("POST place touches a capability: clears needsPlacement, leaves the Inbox, logs and broadcasts", async () => {
@@ -481,6 +499,13 @@ describe("placement routes on a v1 project", () => {
   afterEach(async () => {
     await closeRouteTestServer(server);
     rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("GET changes/placements keeps its refusal: 409 naming v1", async () => {
+    const res = await fetch(`${base}/changes/placements`);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("v1");
+    expect(existsSync(join(tmpDir, ".rex", "product"))).toBe(false);
   });
 
   it.each([

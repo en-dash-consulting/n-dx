@@ -332,7 +332,18 @@ export interface PlacementCandidate {
 /** `GET /api/rex/changes/:id/placement` on a v2 project. */
 export interface ChangePlacement {
   layout: "v2";
-  change: { id: string; title: string; intent?: string; status: string; taskCount: number; tags?: string[] };
+  change: {
+    id: string;
+    title: string;
+    intent?: string;
+    status: string;
+    taskCount: number;
+    tags?: string[];
+    /** When the change was first recorded; absent when neither `createdAt` nor `lastModified` is set. */
+    createdAt?: string;
+    /** Whole days from `createdAt` to the read. */
+    ageDays?: number;
+  };
   /** The rules' relation for this change; every candidate carries it. */
   relation: PlacementRelation;
   /** The rule that set `relation`. */

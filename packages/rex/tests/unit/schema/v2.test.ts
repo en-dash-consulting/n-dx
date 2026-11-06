@@ -606,6 +606,7 @@ describe("isolation", () => {
         "cli/commands/prune.ts",
         "cli/commands/reorganize.ts",
         "cli/commands/reshape.ts",
+        "core/change-inbox.ts",
         ...readdirSync(join(srcRoot, "migrations/v1-to-v2"))
           .filter((f) => f.endsWith(".ts"))
           .map((f) => `migrations/v1-to-v2/${f}`),

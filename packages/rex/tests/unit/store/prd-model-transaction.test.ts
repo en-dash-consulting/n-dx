@@ -129,6 +129,31 @@ describe("withPrdModelTransaction", () => {
     expect(existsSync(prdLockPath(rexDir))).toBe(false);
   });
 
+  it("stamps createdAt once on a new change, and never on an edit or on another type", async () => {
+    const first = new Date("2026-11-01T10:00:00.000Z");
+    const later = new Date("2026-11-02T10:00:00.000Z");
+    const fresh = "d0000000-0000-4000-8000-0000000000aa";
+    await withPrdModelTransaction(
+      rexDir,
+      (model) => {
+        const next = structuredClone(model.tree);
+        next.changes.push({ id: fresh, type: "change", slug: "fresh-change", title: "Fresh change", needsPlacement: true } as RuleNode);
+        return { tree: next, result: undefined };
+      },
+      { now: () => first },
+    );
+    // An edit to the new change and to a change recorded before the field existed.
+    await withPrdModelTransaction(
+      rexDir,
+      (model) => ({ tree: retitle(retitle(model.tree, fresh, "Fresh change, renamed"), CHANGE, "Add Apple Pay, renamed"), result: undefined }),
+      { now: () => later },
+    );
+    const { tree } = await loadPrdModel(rexDir, quiet);
+    expect(find(tree.changes, fresh)).toMatchObject({ createdAt: first.toISOString(), lastModified: later.toISOString() });
+    expect(find(tree.changes, CHANGE)?.createdAt).toBeUndefined();
+    expect(find(tree.product, CAPABILITY)?.createdAt).toBeUndefined();
+  });
+
   it("refuses a v1 tree, naming the layout, before running the mutation", async () => {
     const v1Dir = join(tmp, "v1");
     await cp(V1_FIXTURE, join(v1Dir, PRD_TREE_DIRNAME), { recursive: true });

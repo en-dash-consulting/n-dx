@@ -92,6 +92,7 @@ rex product show .                                   # areas, capabilities, cons
 rex product show A1.1 .                              # one capability: statement, capability criteria, changes
 rex product edit A1.1 --capability-criterion="c3: A refund reaches the card" .     # revise it; drafts a change
 rex product edit A1.1 --statement="..." --editorial .                              # reword it; stays met
+rex change inbox .                                  # every change awaiting placement, with age and shortlist
 rex change place CH-2 .                              # the placement shortlist
 rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3: ..." .
 rex change place CH-2 --propose --type=capability --under=A1 --title="Refund by card" .   # nothing fits: propose a new node
