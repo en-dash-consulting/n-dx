@@ -168,6 +168,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [openCapability, setOpenCapability] = useState<string | null>(null);
   // The PRD page reports the task picked in its tree, which the route does not carry.
   const [openTask, setOpenTask] = useState<string | null>(null);
+  // The Zones page reports the zone open in its slideout, which the route does not carry.
+  const [openZone, setOpenZone] = useState<string | null>(null);
   // The Workspaces board reports the worktree card attached to Sidecar (Diagnose branch).
   const [openWorktree, setOpenWorktree] = useState<string | null>(null);
   // The change "Place with Sidecar" attached (Place lens); dropped when the operator leaves the page.
@@ -214,7 +216,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, inboxChangeId: inboxChange, ask: askItem, plan: planWith, areaView: openArea },
+    { view: pageView, zone: openZone ?? page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, inboxChangeId: inboxChange, ask: askItem, plan: planWith, areaView: openArea },
   );
   const showSidecar = sidecarShell.drawer.show;
   // The waiting change-set cards, read once for every Plan surface that draws their ghosts (UX5, SP5).
@@ -410,7 +412,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, setOpenZone, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(AskInSidecarContext.Provider, { value: askInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.

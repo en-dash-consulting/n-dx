@@ -9,6 +9,8 @@ import { ZoneSlideout } from "../../../src/viewer/components/zone-slideout.js";
 import { CapabilityPage } from "../../../src/viewer/views/capability.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 import type { Zone } from "../../../src/viewer/external.js";
+import { ZonesView } from "../../../src/viewer/views/zones.js";
+import type { LoadedData } from "../../../src/viewer/types.js";
 import { CAPABILITY_DETAIL_FIXTURE } from "../../fixtures/v2-product-map.js";
 
 const REGISTRY = [
@@ -134,6 +136,32 @@ describe("an ask when the page moves to another item in the same view", () => {
     expect(item).toMatchObject({ kind, ref: "B" });
     expect(wantedLensFor(item, false)).toBe("explain");
     expect(item?.key).toBeUndefined();
+  });
+
+  it("the Zones page reports the slideout's zone, so an ask follows it to B", () => {
+    const zoneA = { id: "A", name: "Zone A", description: "", files: [], entryPoints: [], cohesion: 0.7, coupling: 0.2 } as Zone;
+    const zoneB = { ...zoneA, id: "B", name: "Zone B" } as Zone;
+    const data = { manifest: null, inventory: null, imports: null, components: null, callGraph: null, zones: { zones: [zoneA, zoneB], crossings: [], unzoned: [] } } as unknown as LoadedData;
+    const reported: Array<string | null> = [];
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    act(() => { render(h(ZonesView, { data, onSelect: vi.fn(), onOpenZoneChange: (id) => { reported.push(id); } }), root); });
+    const open = (id: string) => act(() => {
+      root.querySelector(`g[data-zone-id="${id}"]`)?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+
+    open("A");
+    const ask = { kind: "zone" as const, ref: "A", seq: 1 };
+    const onA = pageItemFor({ view: "zones", zone: reported.at(-1) ?? null, taskId: null, ask });
+    expect(onA).toMatchObject({ kind: "zone", ref: "A", key: "ask:zone:A:1" });
+
+    open("B");
+    const onB = pageItemFor({ view: "zones", zone: reported.at(-1) ?? null, taskId: null, ask });
+    expect(onB).toMatchObject({ kind: "zone", ref: "B" });
+
+    act(() => { render(null, root); });
+    root.remove();
+    expect(reported.at(-1)).toBeNull();
   });
 });
 

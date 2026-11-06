@@ -21,8 +21,15 @@ items:
     lastModified: "2026-11-06T15:39:56.150Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "469f3744-d709-42b0-a2b1-7b382870dd14":
+    status: "completed"
+    startedAt: "2026-11-06T15:44:04.494Z"
+    completedAt: "2026-11-06T15:44:04.494Z"
+    endedAt: "2026-11-06T15:44:04.494Z"
+    activeIntervals: [{"end":"2026-11-06T15:44:04.494Z","start":"2026-11-06T15:44:04.494Z"}]
+    appliedAt: "2026-11-06T15:44:04.494Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b7192481fea2d1d0effbc05cec","https://www.notion.so/3f7a80b7192481d2b9dae4d27953f7a1","https://www.notion.so/3f7a80b7192481e7940ff74b8d2c8445"]
-    lastModified: "2026-11-06T15:37:26.971Z"
+    lastModified: "2026-11-06T15:44:04.494Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6917ec09-6f4c-4020-a98f-9b513e36f6dd":
     status: "completed"
@@ -35,7 +42,14 @@ items:
     lastModified: "2026-11-06T05:25:43.415Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6ee786f8-f957-437f-95b0-51d3cc14d95e":
-    lastModified: "2026-11-06T15:40:14.999Z"
+    status: "completed"
+    startedAt: "2026-11-06T15:40:23.526Z"
+    completedAt: "2026-11-06T15:44:04.494Z"
+    endedAt: "2026-11-06T15:44:04.494Z"
+    activeIntervals: [{"end":"2026-11-06T15:44:04.494Z","start":"2026-11-06T15:40:23.526Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "pageItemFor drops an ask unless the page still shows the asked task, zone or capability; viewer tests added."
+    lastModified: "2026-11-06T15:44:04.494Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a19056bd-24e5-4e73-a578-7d66484c432a":
     status: "completed"

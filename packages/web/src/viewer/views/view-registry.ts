@@ -113,6 +113,8 @@ export interface ViewRenderContext {
   setOpenCapability?: (id: string | null) => void;
   /** The PRD page reports the item selected in its tree, which the route does not carry. */
   setOpenTask?: (id: string | null) => void;
+  /** The Zones page reports the zone open in its slideout, which the route does not carry. */
+  setOpenZone?: (id: string | null) => void;
   /** Attach a Workspaces worktree card to Sidecar (null detaches); absent while Sidecar is off. */
   attachWorktree?: (key: string | null) => void;
   /** The worktree card attached to Sidecar, by workspace key. */
@@ -265,8 +267,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "iso-map": ({ data }) =>
     h(IsoMapView, { analysisStamp: isoMapAnalysisStamp(data) }),
 
-  "zones": ({ data, setDetail, navigateTo }) =>
-    h(ZonesView, { data, onSelect: setDetail, navigateTo }),
+  "zones": ({ data, setDetail, setOpenZone, navigateTo }) =>
+    h(ZonesView, { data, onSelect: setDetail, onOpenZoneChange: setOpenZone, navigateTo }),
 
   "files": ({ data, setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }) =>
     h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }),
