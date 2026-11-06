@@ -36,25 +36,34 @@ export interface StripCell {
   target: StripTarget;
   /** Said under the count when it is zero. */
   hintWhenZero?: boolean;
+  /** One line saying what the stage holds; shown under the count. */
+  hint?: string;
+  /** The count that reads as the pending pile. */
+  pile?: boolean;
   /** Changes a waiting Sidecar card proposes for this stage; noted apart, never in `count`. */
   waiting?: number;
 }
 
 /** The strip's short stage names; Open changes spells "awaiting-apply" out in full. */
-const STAGE_CELLS: ReadonlyArray<{ stage: OpenChangeStage; label: string }> = [
-  { stage: "proposed", label: "Proposed" },
-  { stage: "ready", label: "Ready" },
-  { stage: "in-progress", label: "In progress" },
-  { stage: "awaiting-apply", label: "Awaiting apply" },
+const STAGE_CELLS: ReadonlyArray<{ stage: OpenChangeStage; label: string; hint: string }> = [
+  { stage: "proposed", label: "Proposed", hint: "placed, not started: the pending pile" },
+  { stage: "ready", label: "Ready", hint: "can run now" },
+  { stage: "in-progress", label: "In progress", hint: "being worked on" },
+  { stage: "awaiting-apply", label: "Awaiting apply", hint: "done, waiting for a steward to apply it" },
 ];
+
+/** Said under the Inbox count. */
+export const INBOX_HINT = "waiting for a place on the map";
 
 /** The five v2 counts, in lifecycle order. */
 export function v2Cells(summary: ChangeSummary, waiting: { inbox: number; proposed: number } = { inbox: 0, proposed: 0 }): StripCell[] {
   return [
-    { key: "inbox", label: "Inbox", count: summary.inbox, target: { view: "inbox" }, waiting: waiting.inbox },
-    ...STAGE_CELLS.map(({ stage, label }): StripCell => ({
+    { key: "inbox", label: "Inbox", count: summary.inbox, target: { view: "inbox" }, hint: INBOX_HINT, waiting: waiting.inbox },
+    ...STAGE_CELLS.map(({ stage, label, hint }): StripCell => ({
       key: stage,
       label,
+      hint,
+      pile: stage === "proposed",
       count: summary.stages[stage],
       target: { view: "changes", stage },
       hintWhenZero: stage === "ready",
@@ -77,15 +86,19 @@ function open(navigateTo: NavigateTo, target: StripTarget): void {
 }
 
 function Count({ cell, navigateTo }: { cell: StripCell; navigateTo: NavigateTo }) {
-  return h("li", { class: "ls-cell", "data-stage": cell.key },
+  const hintId = `ls-hint-${cell.key}`;
+  return h("li", { class: cell.pile ? "ls-cell ls-pile" : "ls-cell", "data-stage": cell.key },
     h("button", {
       type: "button",
+      role: "link",
       class: "ls-count",
+      "aria-describedby": cell.hint ? hintId : undefined,
       onClick: () => open(navigateTo, cell.target),
     },
       h("span", { class: "ls-number" }, cell.count.toLocaleString()),
       h("span", { class: "ls-label" }, cell.label),
     ),
+    cell.hint ? h("span", { class: "ls-stage-hint", id: hintId }, cell.hint) : null,
     cell.hintWhenZero && cell.count === 0
       ? h("span", { class: "ls-hint" }, "needs an automated requirement · ", h("code", null, "rex ready"))
       : null,

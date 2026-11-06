@@ -75,6 +75,29 @@ describe("LifecycleStrip on v2", () => {
     expect(root.querySelector(".ls-next-why")?.textContent).toBe("Already in progress");
   });
 
+  it("announces every count as a link", async () => {
+    answer({ layout: "v2", summary: SUMMARY });
+    await mount();
+    const counts = [...root.querySelectorAll(".ls-count")];
+    expect(counts).toHaveLength(5);
+    for (const c of counts) expect(c.getAttribute("role")).toBe("link");
+  });
+
+  it("says what each stage holds, and Proposed reads as the pending pile", async () => {
+    answer({ layout: "v2", summary: SUMMARY });
+    await mount();
+    const hint = (k: string) => root.querySelector(`[data-stage="${k}"] .ls-stage-hint`)?.textContent;
+    expect(hint("inbox")).toBe("waiting for a place on the map");
+    expect(hint("proposed")).toBe("placed, not started: the pending pile");
+    expect(hint("ready")).toBe("can run now");
+    expect(hint("in-progress")).toBe("being worked on");
+    expect(hint("awaiting-apply")).toBe("done, waiting for a steward to apply it");
+    expect(root.querySelectorAll(".ls-pile")).toHaveLength(1);
+    expect(root.querySelector(".ls-pile")?.getAttribute("data-stage")).toBe("proposed");
+    const count = root.querySelector('[data-stage="proposed"] .ls-count')!;
+    expect(count.getAttribute("aria-describedby")).toBe(root.querySelector('[data-stage="proposed"] .ls-stage-hint')!.id);
+  });
+
   it("opens the Inbox page from the Inbox count", async () => {
     answer({ layout: "v2", summary: SUMMARY });
     await mount();
