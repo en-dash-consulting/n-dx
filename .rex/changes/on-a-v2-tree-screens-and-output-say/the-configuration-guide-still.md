@@ -7,6 +7,7 @@ description: "Adversarial review of 785c4836 (should-fix, low). docs/guide/confi
 acceptanceCriteria:
   - "docs/guide/configuration.md describes hench.readyNext with track, matching the dashboard toggle's description"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"

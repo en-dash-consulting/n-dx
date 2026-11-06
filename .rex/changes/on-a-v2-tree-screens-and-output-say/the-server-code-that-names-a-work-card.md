@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "A test fails if readQueuePlan stops applying withPlannedRowText to the planner's JSON"
   - "A broker test shows a start_work card carrying rowText when the actions provide describeWork"
 priority: "medium"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
