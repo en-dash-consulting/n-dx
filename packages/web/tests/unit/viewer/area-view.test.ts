@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { AreaInPlace, AreaView, areaCapabilityPath, areaCountLabels, areaPath, stewardLabel } from "../../../src/viewer/views/area.js";
+import { PlanWithSidecarContext, type PlanWithSidecar } from "../../../src/viewer/components/plan-with-sidecar.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -411,5 +412,46 @@ describe("a selected capability", () => {
       expect(root.querySelector(".area-capability")).toBeNull();
       expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
     });
+  });
+});
+
+describe("with the Sidecar on", () => {
+  const CAP_ID = AREA_DETAIL_FIXTURE.capabilities[0]!.id;
+  const CAP_URL = `/api/rex/product/capability/${CAP_ID}`;
+  const DETAIL = { ...CAPABILITY_DETAIL_FIXTURE, id: CAP_ID, title: AREA_DETAIL_FIXTURE.capabilities[0]!.title };
+  const sidecar = (): PlanWithSidecar => ({ plan: vi.fn(), planIn: vi.fn(), reportArea: vi.fn() });
+  const withSidecar = (value: PlanWithSidecar, props: Partial<Parameters<typeof AreaView>[0]> = {}) =>
+    h(PlanWithSidecarContext.Provider, { value }, h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug, ...props }));
+
+  it("reports the area it shows, and nothing once it closes", async () => {
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    const value = sidecar();
+    await mount(withSidecar(value));
+    await vi.waitFor(() =>
+      expect(value.reportArea).toHaveBeenLastCalledWith({ id: AREA_DETAIL_FIXTURE.id, label: AREA_DETAIL_FIXTURE.title, capabilityId: null }));
+    act(() => { render(null, root); });
+    expect(value.reportArea).toHaveBeenLastCalledWith(null);
+  });
+
+  it("reports the capability selected in it", async () => {
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE }, [CAP_URL]: { layout: "v2", capability: DETAIL } });
+    const value = sidecar();
+    await mount(withSidecar(value, { initialCapabilityId: CAP_ID }));
+    await vi.waitFor(() => expect(value.reportArea).toHaveBeenLastCalledWith({ id: AREA_DETAIL_FIXTURE.id, label: AREA_DETAIL_FIXTURE.title, capabilityId: CAP_ID }));
+  });
+
+  it("offers Plan in this area, aimed at the area's id", async () => {
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    const value = sidecar();
+    await mount(withSidecar(value));
+    await vi.waitFor(() => expect(root.querySelector(".area-plan-in")).not.toBeNull());
+    act(() => { root.querySelector<HTMLButtonElement>(".area-plan-in")!.click(); });
+    expect(value.planIn).toHaveBeenCalledWith(AREA_DETAIL_FIXTURE.id);
+  });
+
+  it("offers no Plan in this area while the Sidecar is off", async () => {
+    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
+    await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug }));
+    expect(root.querySelector(".area-plan-in")).toBeNull();
   });
 });
