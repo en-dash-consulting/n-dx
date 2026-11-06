@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { ChangeApplySection, effectLine, MOVED_NOTICE } from "../../../src/viewer/components/prd-tree/change-apply.js";
+import { ChangeApplySection, effectLine, isAwaitingApply, MOVED_NOTICE } from "../../../src/viewer/components/prd-tree/change-apply.js";
 import type { ChangeApply } from "../../../src/viewer/views/product-model.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 
@@ -24,7 +24,8 @@ function itemAt(stage: Stage): PRDItemData {
     case "in-progress": return { ...base, status: "in_progress" };
     case "awaiting-apply": return { ...base, status: "completed" };
     case "applied": return { ...base, status: "completed", appliedAt: "2026-11-05T00:00:00.000Z" };
-    case "shipped": return { ...base, status: "completed", appliedAt: "2026-11-05T00:00:00.000Z", shippedIn: "0.9.1" };
+    // A release stamps shippedIn on completed changes that were never applied, so no appliedAt here.
+    case "shipped": return { ...base, status: "completed", shippedIn: "0.9.1" };
   }
 }
 
@@ -189,6 +190,15 @@ describe("ChangeApplySection when the change moved since the preview", () => {
     await click(button("Apply"));
     expect(bodies.at(-1)).toEqual({ hash: "h2" });
     expect(onWritten).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("isAwaitingApply", () => {
+  it("is true only for a completed change with neither appliedAt nor shippedIn", () => {
+    expect(isAwaitingApply({ status: "completed" })).toBe(true);
+    expect(isAwaitingApply({ status: "in_progress" })).toBe(false);
+    expect(isAwaitingApply({ status: "completed", appliedAt: "2026-11-05T00:00:00.000Z" })).toBe(false);
+    expect(isAwaitingApply({ status: "completed", shippedIn: "0.9.1" })).toBe(false);
   });
 });
 
