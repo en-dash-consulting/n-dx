@@ -1,10 +1,24 @@
 schema: "rex/v2"
 items:
   "1f0d3831-bd75-4778-af25-7adbf98c6199":
-    lastModified: "2026-11-06T15:52:09.182Z"
+    status: "completed"
+    startedAt: "2026-11-06T15:56:54.616Z"
+    completedAt: "2026-11-06T15:56:54.616Z"
+    endedAt: "2026-11-06T15:56:54.616Z"
+    activeIntervals: [{"end":"2026-11-06T15:56:54.616Z","start":"2026-11-06T15:56:54.616Z"}]
+    appliedAt: "2026-11-06T15:56:54.616Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T15:56:54.616Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "293a63b3-bc3b-47a9-8596-6ea5dc7cc850":
-    lastModified: "2026-11-06T15:52:09.182Z"
+    status: "completed"
+    startedAt: "2026-11-06T15:56:12.188Z"
+    completedAt: "2026-11-06T15:56:54.616Z"
+    endedAt: "2026-11-06T15:56:54.616Z"
+    activeIntervals: [{"end":"2026-11-06T15:56:54.616Z","start":"2026-11-06T15:56:12.188Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "viewer-architecture.md now says hench owns Tune and a Rex viewer borrows it, showing only Rex's views."
+    lastModified: "2026-11-06T15:56:54.616Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "653ddf07-b10d-415a-a861-e5b1c129a21d":
     status: "completed"

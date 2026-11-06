@@ -125,7 +125,7 @@ The alias is applied in two places that must agree:
 `sourcevision serve` spawns the web CLI with `--scope=sourcevision` (`packages/sourcevision/src/cli/serve.ts`). `packages/web/src/cli/index.ts` accepts `--scope=` with `sourcevision`, `rex` or `hench`, and the server reports the scope on `GET /api/config`. The viewer fetches it before first render (`fetchBootConfig` in `main.ts`) and computes `validViews = buildValidViews(scope)`.
 
 - **Unified dashboard** (no scope, or `all`): every view in `SOURCEVISION_SCOPE_VIEWS`, `REX_SCOPE_VIEWS`, `HENCH_SCOPE_VIEWS` and `CROSS_CUTTING_VIEWS`.
-- **Scoped viewer:** that scope's list plus `CROSS_CUTTING_VIEWS` (`home`, the Live views, `workspaces`, `token-usage`, the settings views, `command-reference`). Each scope list includes its own stage page (`analyze`, `plan` or `work`) and no other.
+- **Scoped viewer:** that scope's list plus `CROSS_CUTTING_VIEWS` (`home`, the Live views, `workspaces`, `token-usage`, the settings views, `command-reference`). Each scope list includes its own stage page (`analyze`, `plan` or `work`). The one exception is `tune`: hench owns it, and a Rex viewer borrows it for the PRD Graph and Execution Log, which have no other stage there. A borrowed Tune page shows only Rex's views (`stageShowsView`).
 - **Consequences:** the top nav and stage links show only stages in `validViews`; `stageForView` takes `validViews`, so a view whose stage is absent lights no stage; settings entries and bottom-bar indicators are filtered the same way. The server skips watchers and routes for out-of-scope packages (`isInScope` in `server/start.ts`).
 
 Layering and barrel rules for `src/shared/` and the viewer are in `packages/web/AGENTS.md`.
