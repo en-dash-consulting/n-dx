@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-11-05T20:51:49.575Z
-- **Commit** — `38e1f3f8af52`
-- **Content hash** — `beee9c6e09119ff9` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-11-06T20:43:58.330Z
+- **Commit** — `26e33c82247b`
+- **Content hash** — `947ba663340e1a10` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
-- **Per-call total** — 23,554 tokens (what every surface costs, summed)
-- **Unique fixed text** — 15,049 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 23,562 tokens (what every surface costs, summed)
+- **Unique fixed text** — 15,058 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -115,7 +115,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 4,747 per-call / 4,745 unique, 9 surfaces
+## hench — 4,755 per-call / 4,754 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -123,7 +123,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
 | `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 40 | 184 | 115 | 299 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
-| `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 114 | 1,536 | 365 | 1,901 |
+| `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 114 | 1,534 | 375 | 1,909 |
 | `buildOrientationSystemPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | System prompt for the one-off repository orientation pass. | 10 | 147 | — | 147 |
 | `buildOrientationPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | Orientation task prompt — what to establish about the repo. | 36 | 391 | — | 391 |
 | `buildRetryNotice` | `packages/hench/src/agent/lifecycle/cli-loop.ts` | Notice appended on retry telling a fresh session what is on disk. | 4 | 55 | — | 55 |
@@ -164,6 +164,7 @@ it. This is the leverage ordering for a rewrite.
 | `formatItemSection` | rex | 29 | 1 | 29 |
 | `summarizePRD` | rex | 22 | 1 | 22 |
 | `formatAnnotatedFinding` | sourcevision | 15 | 1 | 15 |
+| `captureNoun` | hench | 11 | 1 | 11 |
 | `inboxClause` | hench | 11 | 1 | 11 |
 | `workflowBlock` | hench | 6 | 1 | 6 |
 | `formatChangeBrief` | hench | 5 | 1 | 5 |
