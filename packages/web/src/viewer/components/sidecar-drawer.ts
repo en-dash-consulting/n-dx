@@ -400,7 +400,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     h("header", { class: "sidecar-head" },
       h("span", { class: "sidecar-title" }, "Sidecar"),
       sidecar.session ? h("span", { class: "sidecar-session-name" }, sidecar.session.name) : null,
-      h(NewSessionButton, { sidecar, onStarted: () => setListing(false) }),
+      h(NewSessionButton, { sidecar, onDone: () => setListing(false) }),
       h("button", {
         type: "button",
         class: `sidecar-sessions-toggle${listing ? " active" : ""}`,

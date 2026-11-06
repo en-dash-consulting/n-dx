@@ -82,6 +82,8 @@ interface Server {
   pageAnswer?: () => Response | Promise<Response>;
   /** While set, PATCH /api/sidecar/sessions/:id answers 500 with this error. */
   patchError?: string;
+  /** While set, POST /api/sidecar/sessions answers 500 with this error. */
+  createError?: string;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -160,6 +162,7 @@ function stubServer(): void {
     }
     if (url === "/api/sidecar/sessions" && method === "GET") return json({ sessions: server.sessions });
     if (url === "/api/sidecar/sessions" && method === "POST") {
+      if (server.createError) return json({ error: server.createError }, 500);
       const created = { session: session({ id: "new", vendor: body.vendor, model: body.model }), running: false };
       server.sessions.push(created);
       return json(created, 201);
@@ -1643,6 +1646,16 @@ describe("attachment and lens", () => {
       expect(posts()[0].body).toMatchObject({ lens: "describe", target: { ref: "t1" } });
       expect(lastSidecar!.session?.id).toBe("new");
       expect(root.querySelector(".sidecar-composer")).not.toBeNull();
+    });
+
+    it("a refused New session from the list leaves the list and shows why", async () => {
+      server.sessions = [{ session: session({ id: "s1" }), running: false }];
+      server.createError = "Sidecar is off";
+      await openListed();
+      await click(root.querySelector(".sidecar-sessions .sidecar-new-session"));
+      expect(root.querySelector(".sidecar-sessions")).toBeNull();
+      expect(root.querySelector(".sidecar-error")?.textContent).toBe("Sidecar is off");
+      expect(lastSidecar!.session?.id).toBe("s1");
     });
 
     it("the live session it leaves stays in the list and resumes", async () => {
