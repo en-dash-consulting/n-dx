@@ -201,6 +201,20 @@ describe("git-preflight: formatGitInitCommitLines", () => {
     expect(lines.some((l) => l.includes("uncommitted"))).toBe(true);
     expect(lines.some((l) => l.includes("Please tell me who you are"))).toBe(true);
   });
+
+  it("says the baseline commit's files are staged, but an existing repo's are left uncommitted", () => {
+    const baseline = formatGitInitCommitLines({ status: "commit-failed", error: "x" }).join("\n");
+    const files = formatGitInitCommitLines({ status: "commit-failed", kind: "files", error: "x" }).join("\n");
+    expect(baseline).toContain("staged but uncommitted");
+    expect(files).toContain("left uncommitted");
+    expect(files).not.toContain("staged");
+  });
+
+  it("names at most five already-changed init files and counts the rest", () => {
+    const leftDirty = ["a", "b", "c", "d", "e", "f", "g"];
+    const lines = formatGitInitCommitLines({ status: "unchanged", kind: "files", leftDirty }).join("\n");
+    expect(lines).toContain("Left 7 init files you had already changed uncommitted: a, b, c, d, e and 2 more.");
+  });
 });
 
 describe.skipIf(!GIT_OK)("git-preflight: commitInitBaseline", () => {
@@ -405,7 +419,114 @@ describe.skipIf(!GIT_OK)("git-preflight: committing init's paths in an existing 
     const result = finishInitCommit(tmpDir, { gitResult: inside, before });
 
     expect(result.paths).toEqual([".sourcevision/CONTEXT.md"]);
+    expect(result.leftDirty).toEqual([".rex/item.md"]);
     expect(status()).toEqual([" M .rex/item.md"]);
+  });
+
+  it("commits nothing that appeared outside init's paths while init ran", async () => {
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    // Saved in another terminal while a prompt waited.
+    await writeFile(join(tmpDir, "notes.txt"), "mine\n");
+    await writeFile(join(tmpDir, ".env"), "SECRET=1\n");
+    await writeFile(join(tmpDir, "app.js"), "edited elsewhere\n");
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.paths).toEqual([".gitignore", ".n-dx.json", ".rex/config.json"]);
+    expect(status()).toEqual(["?? .env", "?? notes.txt", " M app.js"].sort());
+  });
+
+  it("commits only under the project directory when it is below the repository root", async () => {
+    const pkg = join(tmpDir, "packages", "foo");
+    await mkdir(join(pkg, ".rex"), { recursive: true });
+    await mkdir(join(tmpDir, "packages", "bar"), { recursive: true });
+    const before = snapshotDirtyPaths(pkg);
+    await writeFile(join(pkg, ".rex", "config.json"), "{}\n");
+    await writeFile(join(pkg, "CLAUDE.md"), "# foo\n");
+    await writeFile(join(tmpDir, "packages", "bar", "index.js"), "bar\n");
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# root\n");
+
+    const result = finishInitCommit(pkg, { gitResult: inside, before });
+
+    expect(result.paths).toEqual(["packages/foo/.rex/config.json", "packages/foo/CLAUDE.md"]);
+    expect(status()).toEqual(["?? CLAUDE.md", "?? packages/bar/index.js"]);
+  });
+
+  it("reports init paths the user had already changed and leaves them as they were", async () => {
+    await writeFile(join(tmpDir, ".gitignore"), "node_modules\ndist\n");
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# from an earlier init\n");
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# regenerated\n");
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.paths).toEqual([".n-dx.json", ".rex/config.json"]);
+    expect(result.leftDirty).toEqual([".gitignore", "CLAUDE.md"]);
+    expect(status()).toEqual([" M .gitignore", "?? CLAUDE.md"]);
+    const lines = formatGitInitCommitLines(result).join("\n");
+    expect(lines).toContain("Left 2 init files you had already changed uncommitted: .gitignore, CLAUDE.md.");
+    expect(lines).toContain("Commit them before `ndx work`.");
+  });
+
+  it("reports already-changed init paths even when there is nothing to commit", async () => {
+    await writeFile(join(tmpDir, "AGENTS.md"), "# pending\n");
+    const before = snapshotDirtyPaths(tmpDir);
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+    expect(result).toMatchObject({ status: "unchanged", leftDirty: ["AGENTS.md"] });
+    expect(formatGitInitCommitLines(result).join("\n")).toContain("Left 1 init file you had already changed");
+  });
+
+  it("does not run the project's commit hooks", async () => {
+    // tests/setup-session-env.js points the global core.hooksPath at an empty
+    // directory; a repository-local value overrides it.
+    const hooks = join(tmpDir, ".git", "hooks-under-test");
+    await mkdir(hooks, { recursive: true });
+    git("config", "core.hooksPath", hooks.split("\\").join("/"));
+    await writeFile(join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    await writeFile(join(hooks, "commit-msg"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+
+    const result = finishInitCommit(tmpDir, { gitResult: inside, before });
+
+    expect(result.status).toBe("committed");
+    expect(status()).toEqual([]);
+  });
+
+  it("leaves the real index untouched and says nothing is staged when the commit fails", async () => {
+    await writeFile(join(tmpDir, "app.js"), "staged edit\n");
+    git("add", "app.js");
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    const userStatus = status();
+
+    // No identity anywhere git looks, and no guessing one from the host.
+    const saved = { ...process.env };
+    const emptyGlobal = join(tmpDir, ".git", "empty-global-config");
+    await writeFile(emptyGlobal, "");
+    git("config", "--unset", "user.name");
+    git("config", "--unset", "user.email");
+    git("config", "user.useConfigOnly", "true");
+    for (const k of ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"]) {
+      delete process.env[k];
+    }
+    process.env.GIT_CONFIG_GLOBAL = emptyGlobal;
+    process.env.GIT_CONFIG_NOSYSTEM = "1";
+    let result;
+    try {
+      result = finishInitCommit(tmpDir, { gitResult: inside, before });
+    } finally {
+      for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+      Object.assign(process.env, saved);
+    }
+
+    expect(result).toMatchObject({ status: "commit-failed", kind: "files" });
+    expect(status()).toEqual(userStatus);
+    const lines = formatGitInitCommitLines(result).join("\n");
+    expect(lines).toContain("left uncommitted");
+    expect(lines).not.toContain("staged");
   });
 
   it("ignores the dashboard runtime files and both caches", () => {
