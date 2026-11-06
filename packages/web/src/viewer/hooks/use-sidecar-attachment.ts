@@ -68,6 +68,12 @@ export interface SidecarPageSelection {
    * one starts again from the Plan lens.
    */
   plan?: { area: string | null; seq: number } | null;
+  /**
+   * The area view that is open, on Plan's tile or the Product page: its area
+   * id and title, and the capability selected inside it. Asks with Explain on
+   * the area, or on the capability while one is selected.
+   */
+  areaView?: { id: string; label: string; capabilityId: string | null } | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
@@ -83,6 +89,13 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
     return page.plan.area
       ? { kind: "area", ref: page.plan.area, label: page.plan.area, lens: "plan", key }
       : { kind: "plan", label: "Plan", lens: "plan", key };
+  }
+  // The area view is open on Plan or Product: its selected capability, else the area itself.
+  if (page.areaView) {
+    const { id, label, capabilityId } = page.areaView;
+    return capabilityId
+      ? { kind: "capability", ref: capabilityId, label: capabilityId }
+      : { kind: "area", ref: id, label };
   }
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };

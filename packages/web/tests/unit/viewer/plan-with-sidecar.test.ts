@@ -2,9 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { PlanWithSidecarButton, PlanWithSidecarContext, planFirstTurn } from "../../../src/viewer/components/plan-with-sidecar.js";
+import { PlanInAreaButton, PlanWithSidecarButton, PlanWithSidecarContext, planFirstTurn, type PlanWithSidecar } from "../../../src/viewer/components/plan-with-sidecar.js";
 import { SmartAddInput } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
 import { pageItemFor, pageItemKey, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+
+const sidecarOf = (plan: PlanWithSidecar["plan"], extra: Partial<PlanWithSidecar> = {}): PlanWithSidecar =>
+  ({ plan, planIn: vi.fn(), reportArea: vi.fn(), ...extra });
 
 let root: HTMLDivElement;
 beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); });
@@ -19,26 +22,26 @@ describe("Plan with Sidecar button", () => {
 
   it("sends the typed text, trimmed, with no area from the plain capture bar", () => {
     const plan = vi.fn();
-    show(h(PlanWithSidecarContext.Provider, { value: { plan } }, h(PlanWithSidecarButton, { text: "  Add SSO  " })));
+    show(h(PlanWithSidecarContext.Provider, { value: sidecarOf(plan) }, h(PlanWithSidecarButton, { text: "  Add SSO  " })));
     act(() => { root.querySelector<HTMLButtonElement>("button")?.click(); });
     expect(plan).toHaveBeenCalledWith("Add SSO", undefined);
   });
 
   it("sends the area from an area-scoped capture", () => {
     const plan = vi.fn();
-    show(h(PlanWithSidecarContext.Provider, { value: { plan } }, h(PlanWithSidecarButton, { text: "Add SSO", areaId: "area-1" })));
+    show(h(PlanWithSidecarContext.Provider, { value: sidecarOf(plan) }, h(PlanWithSidecarButton, { text: "Add SSO", areaId: "area-1" })));
     act(() => { root.querySelector<HTMLButtonElement>("button")?.click(); });
     expect(plan).toHaveBeenCalledWith("Add SSO", "area-1");
   });
 
   it("is disabled until something is typed", () => {
-    show(h(PlanWithSidecarContext.Provider, { value: { plan: vi.fn() } }, h(PlanWithSidecarButton, { text: "   " })));
+    show(h(PlanWithSidecarContext.Provider, { value: sidecarOf(vi.fn()) }, h(PlanWithSidecarButton, { text: "   " })));
     expect(root.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
   });
 });
 
 describe("capture bar", () => {
-  const ctx = { plan: vi.fn() };
+  const ctx = sidecarOf(vi.fn());
   const realFetch = globalThis.fetch;
   // The bar reads the PRD for its scope list; an answer that never comes keeps its state updates out of the test.
   beforeEach(() => { globalThis.fetch = vi.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch; });

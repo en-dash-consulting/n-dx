@@ -175,6 +175,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [planWith, setPlanWith] = useState<{ area: string | null; seq: number } | null>(null);
   // The text that bar typed, waiting to go as the session's first turn once the session holds that lens and target.
   const [planText, setPlanText] = useState<string | null>(null);
+  // The area view that is open (Plan's tile or the Product page) and the capability selected in it; it reports itself while mounted.
+  const [openArea, setOpenArea] = useState<{ id: string; label: string; capabilityId: string | null } | null>(null);
   // The change "Describe in Sidecar" / "Tighten with Sidecar" attached (Describe lens); dropped with the page.
   const [describeChange, setDescribeChange] = useState<string | null>(null);
   const {
@@ -205,7 +207,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, plan: planWith },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, plan: planWith, areaView: openArea },
   );
   const showSidecar = sidecarShell.drawer.show;
   // The waiting change-set cards, read once for every Plan surface that draws their ghosts (UX5, SP5).
@@ -251,6 +253,15 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
         setPlanText(text);
         showSidecar();
       },
+      planIn: (areaId: string) => {
+        setOpenChange(null);
+        setDiagnoseTask(null);
+        setDescribeChange(null);
+        setPlanWith((prev) => ({ area: areaId, seq: (prev?.seq ?? 0) + 1 }));
+        setPlanText(null);
+        showSidecar();
+      },
+      reportArea: setOpenArea,
     } : null),
     [sidecarShell.button !== null, showSidecar],
   );

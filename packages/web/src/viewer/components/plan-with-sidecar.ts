@@ -14,6 +14,22 @@ import { useContext } from "preact/hooks";
 export interface PlanWithSidecar {
   /** Attach the Plan lens (and `areaId`, when given), open the drawer and send `text`. */
   plan: (text: string, areaId?: string) => void;
+  /** "Plan in this area": the Plan lens aimed at `areaId`, with no text to send. */
+  planIn: (areaId: string) => void;
+  /** The area view reports the area it shows (and its selected capability) while mounted; null when it closes. */
+  reportArea: (area: { id: string; label: string; capabilityId: string | null } | null) => void;
+}
+
+/** "Plan in this area" in the area view's header; nothing while `web.sidecar` is off. */
+export function PlanInAreaButton({ areaId }: { areaId: string }) {
+  const sidecar = useContext(PlanWithSidecarContext);
+  if (!sidecar) return null;
+  return h("button", {
+    type: "button",
+    class: "btn btn-small area-plan-in",
+    title: "Plan in this area with the Sidecar",
+    onClick: () => sidecar.planIn(areaId),
+  }, "Plan in this area");
 }
 
 /** What decides whether the waiting text can go as the turn. */

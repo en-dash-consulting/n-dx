@@ -14,7 +14,8 @@
  */
 
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useContext, useEffect, useState } from "preact/hooks";
+import { PlanInAreaButton, PlanWithSidecarContext } from "../components/index.js";
 import { useProductRead } from "../hooks/index.js";
 import { replaceAppHistory } from "../base-path.js";
 import { placementTab } from "../route-state.js";
@@ -103,6 +104,7 @@ function AreaHeader({ area, onOpenPage, capturing, onCapture }: AreaHeaderProps)
       h("span", { class: `tag area-steward${area.stewards.length === 0 ? " area-steward-none" : ""}` }, steward),
       h("div", { class: "area-actions" },
         h("button", { type: "button", class: "btn btn-small area-capture-toggle", "aria-expanded": capturing, onClick: onCapture }, "+ Change in this area"),
+        h(PlanInAreaButton, { areaId: area.id }),
         onOpenPage
           ? h("button", { type: "button", class: "btn btn-small area-open-page", onClick: onOpenPage }, "Open on Product page")
           : null),
@@ -161,6 +163,17 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
   useEffect(() => {
     if (!listed) setSelectedId(null);
   }, [listed]);
+  // The Sidecar attaches the area, or the capability selected in it, while the view is open.
+  const sidecar = useContext(PlanWithSidecarContext);
+  const loaded = load.state === "ready" ? load.data : null;
+  const areaId = loaded?.id ?? null;
+  const areaLabel = loaded?.title ?? "";
+  const attachedCapability = listed ? selectedId : null;
+  useEffect(() => {
+    if (!sidecar || !areaId) return undefined;
+    sidecar.reportArea({ id: areaId, label: areaLabel, capabilityId: attachedCapability });
+    return () => sidecar.reportArea(null);
+  }, [sidecar?.reportArea, areaId, areaLabel, attachedCapability]);
   const back = onBack
     ? h("button", { type: "button", class: "cap-back", onClick: onBack }, "Product")
     : null;
