@@ -41,7 +41,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
@@ -54,7 +54,7 @@ import { resolveOwnNdxCli, resolveOwnPackageCli, type CliInvocation } from "./ow
 import { refuseWhileRestricted } from "./trust-gate.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
-import { readConfigSnapshot, readHenchAgentSettings } from "./effective-agent-config.js";
+import { readEffectiveNdxConfig } from "./effective-agent-config.js";
 import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import type { SidecarCommandEnd } from "./sidecar/carry-out.js";
@@ -1760,19 +1760,17 @@ let authCheckCache: { key: string; result: AuthCheckResult } | null = null;
 let authCheckInFlight: Promise<AuthCheckResult> | null = null;
 
 /**
- * What the credential check depends on: the effective vendor, its CLI path and
- * the hench provider. A verdict is a hit only for the key it was made under, so
- * a change made outside the dashboard (`ndx config`, a hand edit, a branch
- * switch) is a miss — no watcher, and no save path has to remember to call
- * {@link invalidateAuthCheckCache}.
+ * What the credential check depends on: the effective vendor and that vendor's
+ * `llm.<vendor>` block (CLI path, auth mode, key, endpoint, model — everything
+ * `ndx auth`'s preflight reads). A verdict is a hit only for the key it was made
+ * under, so a change made outside the dashboard (`ndx config`, a hand edit, a
+ * branch switch) is a miss — no watcher, and no save path has to remember to
+ * call {@link invalidateAuthCheckCache}. Hashed so no API key is held as a key.
  */
 function authCheckKey(projectDir: string): string {
-  const snapshot = readConfigSnapshot(projectDir);
-  const llm = (snapshot.ndx["llm"] ?? {}) as Record<string, unknown>;
-  const vendor = typeof llm["vendor"] === "string" ? llm["vendor"] : "claude";
-  const block = (llm[vendor] ?? {}) as Record<string, unknown>;
-  const cliPath = typeof block["cli_path"] === "string" ? block["cli_path"] : null;
-  return JSON.stringify([vendor, cliPath, readHenchAgentSettings(snapshot).provider]);
+  const llm = (readEffectiveNdxConfig(projectDir)["llm"] ?? {}) as Record<string, unknown>;
+  const vendor = typeof llm["vendor"] === "string" && llm["vendor"] ? llm["vendor"] : "claude";
+  return createHash("sha256").update(JSON.stringify([vendor, llm[vendor] ?? null])).digest("hex");
 }
 
 /** The cached verdict when it was made under the config now in effect. */
