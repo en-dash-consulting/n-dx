@@ -15,6 +15,8 @@ import { h } from "preact";
 import { useContext, useMemo } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
 import { GhostCardsContext, ghostCountsByTarget } from "../components/index.js";
+import type { NavigateTo } from "../types.js";
+import { areaFilter, storeFilter } from "./changes.js";
 import type { AreaSection, ProductMap } from "./product-model.js";
 
 /** What tints a block. Defective outranks the status of the capabilities. */
@@ -245,6 +247,15 @@ export type OpenArea = (slug: string | null, title: string) => void;
  * block that folds smaller areas (no single area to filter to).
  */
 export type OpenAreaChanges = (areaId: string | null, title: string) => void;
+
+/**
+ * Opens Open changes on one area's changes, or on every open change for the
+ * folded block — never on whatever filter the page last remembered.
+ */
+export function openAreaChanges(navigateTo: NavigateTo, areaId: string | null): void {
+  storeFilter(areaId ? areaFilter(areaId) : "open");
+  navigateTo("changes");
+}
 
 export function AreaBlocks({ map, onOpenArea, onOpenChanges }: {
   map: ProductMap;

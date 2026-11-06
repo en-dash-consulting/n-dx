@@ -9,8 +9,10 @@ import {
   areaBlocks,
   blockName,
   blockStatus,
+  openAreaChanges,
 } from "../../../src/viewer/views/product-area-map.js";
 import { areaPath } from "../../../src/viewer/views/area.js";
+import { stageFilter, storeFilter } from "../../../src/viewer/views/changes.js";
 import { areaCapabilityOfTab, areaSlugOfTab, parsePathnameRoute, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
 import type { AreaSection, CapabilityRow, ProductMap } from "../../../src/viewer/views/product-model.js";
 import type { ViewId } from "../../../src/viewer/types.js";
@@ -167,6 +169,25 @@ describe("AreaBlock", () => {
     const block = areaBlocks([area("a", [cap()])])[0]!;
     await act(async () => { render(h(AreaBlock, { block, onOpen: () => {} }), root); });
     expect(root.querySelector(".pam-open")).toBeNull();
+  });
+});
+
+describe("openAreaChanges", () => {
+  afterEach(() => { localStorage.clear(); });
+
+  it("stores the area's filter and opens Open changes", () => {
+    const navigateTo = vi.fn();
+    openAreaChanges(navigateTo, "id-a");
+    expect(localStorage.getItem("ndx.changes.filter")).toBe("area:id-a");
+    expect(navigateTo).toHaveBeenCalledWith("changes");
+  });
+
+  it("replaces a remembered filter with Open for the folded block", () => {
+    storeFilter(stageFilter("ready"));
+    const navigateTo = vi.fn();
+    openAreaChanges(navigateTo, null);
+    expect(localStorage.getItem("ndx.changes.filter")).toBe("open");
+    expect(navigateTo).toHaveBeenCalledWith("changes");
   });
 });
 
