@@ -1903,20 +1903,18 @@ function printTagFilterCompletionSummary(
 // cmdRun — main entry point
 // ---------------------------------------------------------------------------
 
-export async function cmdRun(
-  dir: string,
-  flags: Record<string, string>,
-): Promise<void> {
-  // `--resolve` never reaches here: the CLI dispatches it to cmdResolve
-  // (run-resolve.ts), which reports this function's decisions without acting.
-
+/**
+ * The refusals that depend on the flags alone, gathered so `cmdRun` applies
+ * them before any environment check. Returns the parsed review options, whose
+ * own refusals are flag-only too.
+ */
+function validateRunFlags(flags: Record<string, string>): ReviewOptions {
   // --epic-by-epic walks every epic's tasks in order, and its selection path
   // carries no assignee filter. Accepting --mine there would run — and commit
   // under — tasks belonging to other people while the operator believes the
   // run was scoped to their own, so refuse instead of no-opping. Same reason
   // --review refuses on the api provider rather than reporting unreviewed runs
-  // as reviewed. Checked first: a contradictory invocation fails on its
-  // arguments before any environment check (config, PRD folder, git config).
+  // as reviewed.
   if (flags["mine"] === "true" && flags["epic-by-epic"] === "true") {
     throw new CLIError(
       "Cannot use --mine with --epic-by-epic.",
@@ -1924,6 +1922,25 @@ export async function cmdRun(
         "Drop --mine, or run without --epic-by-epic.",
     );
   }
+  if (flags["epic-by-epic"] === "true" && flags.epic) {
+    throw new CLIError(
+      "Cannot use --epic-by-epic with --epic.",
+      "Use --epic to scope to a single epic, or --epic-by-epic to process all epics sequentially.",
+    );
+  }
+  return parseReviewOptions(flags);
+}
+
+export async function cmdRun(
+  dir: string,
+  flags: Record<string, string>,
+): Promise<void> {
+  // `--resolve` never reaches here: the CLI dispatches it to cmdResolve
+  // (run-resolve.ts), which reports this function's decisions without acting.
+
+  // Argument errors come before environment errors (config, PRD folder, git
+  // config): a contradictory invocation fails on its arguments alone.
+  const reviewOpts = validateRunFlags(flags);
   const henchDir = resolveHenchPaths(dir).henchDir;
   // An invalid field in hench's config.json must not refuse the whole run —
   // fall back to that field's default and say so, so a bad edit (often made
@@ -1974,7 +1991,6 @@ export async function cmdRun(
   // that saved its own provider overrides it per task inside runOne.
   const provider: "cli" | "api" = invocationSettings.provider.value;
   const dryRun = flags["dry-run"] === "true";
-  const reviewOpts: ReviewOptions = parseReviewOptions(flags);
   // --no-rollback always wins; otherwise read config (defaults to true).
   // Note: the failure rollback is prompt-only — it never runs without an
   // interactive confirmation, so this flag only governs whether that prompt
@@ -2248,14 +2264,6 @@ export async function cmdRun(
     } else {
       info(`⚠ Context file not found: "${contextFilePath}" — proceeding without context`);
     }
-  }
-
-  // --epic-by-epic and --epic are mutually exclusive
-  if (epicByEpic && flags.epic) {
-    throw new CLIError(
-      "Cannot use --epic-by-epic with --epic.",
-      "Use --epic to scope to a single epic, or --epic-by-epic to process all epics sequentially.",
-    );
   }
 
   // Memory-based execution throttling.
