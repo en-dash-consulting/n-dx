@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "productTotals counts an open change whose only amendment removes an area"
   - "A change listed on an area and on one of its capabilities counts once"
   - "Tests in packages/web/tests/unit/viewer/product-view.test.ts cover each case and fail before the fix"
+  - "A test asserts the Product page's Open changes total equals the number of distinct open changes across Plan's area-map badges (the same per-area openChangeIds rule)"
 touches:
   - "e1a26302-7d80-46d4-9002-45e25119ba34"
 priority: "medium"
