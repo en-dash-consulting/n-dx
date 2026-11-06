@@ -385,8 +385,8 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const onResizeStart = (e: PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = width;
-    const move = (ev: PointerEvent) => applyWidth(startWidth + (startX - ev.clientX));
+    const startWidth = shownWidth;
+    const move = (ev: PointerEvent) => resizeTo(startWidth + (startX - ev.clientX));
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -395,11 +395,18 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     window.addEventListener("pointerup", up);
   };
 
+  // A wide drawer is already past the resize range: widening it is a no-op
+  // rather than a snap back to the stored width; narrowing leaves wide mode.
+  const resizeTo = (next: number) => {
+    if (isWide && next >= shownWidth) return;
+    applyWidth(next);
+  };
+
   const onResizeKey = (e: KeyboardEvent) => {
-    if (e.key === "ArrowLeft") applyWidth(width + WIDTH_STEP);
-    else if (e.key === "ArrowRight") applyWidth(width - WIDTH_STEP);
-    else if (e.key === "Home") applyWidth(SIDECAR_WIDTH_MIN);
-    else if (e.key === "End") applyWidth(SIDECAR_WIDTH_MAX);
+    if (e.key === "ArrowLeft") resizeTo(shownWidth + WIDTH_STEP);
+    else if (e.key === "ArrowRight") resizeTo(shownWidth - WIDTH_STEP);
+    else if (e.key === "Home") resizeTo(SIDECAR_WIDTH_MIN);
+    else if (e.key === "End") resizeTo(Math.max(SIDECAR_WIDTH_MAX, shownWidth));
     else return;
     e.preventDefault();
   };
@@ -441,7 +448,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       "aria-label": "Resize Sidecar",
       "aria-valuenow": shownWidth,
       "aria-valuemin": SIDECAR_WIDTH_MIN,
-      "aria-valuemax": SIDECAR_WIDTH_MAX,
+      "aria-valuemax": Math.max(SIDECAR_WIDTH_MAX, shownWidth),
       onPointerDown: onResizeStart,
       onKeyDown: onResizeKey,
     }),

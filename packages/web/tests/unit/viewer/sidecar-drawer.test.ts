@@ -453,6 +453,15 @@ describe("wide mode", () => {
     await mount();
     await pressCmdJ();
     const edge = root.querySelector<HTMLElement>(".sidecar-resize")!;
+    expect(edge.getAttribute("aria-valuemax")).toBe("960");
+    // Widening a wide drawer is a no-op, not a snap back to the stored width.
+    for (const key of ["ArrowLeft", "End"]) {
+      await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
+      expect((drawer() as HTMLElement).style.width).toBe("960px");
+    }
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("640px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
     await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
     expect((drawer() as HTMLElement).style.width).toBe("360px");
   });
