@@ -618,6 +618,27 @@ describe("broker", () => {
     await api(`/${id}/interrupt`, { method: "POST" });
   });
 
+  it("carries a choice card's answer from the decide route to the agent's tool result", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "ask_choice", arguments: { question: "Which store?", options: [{ label: "SQLite" }, { label: "Postgres" }] } });
+    const { cardId } = await cardAnnounced(id, "pending");
+
+    const notObject = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", answer: ["SQLite"] } });
+    expect(notObject.status).toBe(400);
+    const noAnswer = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve" } });
+    expect(noAnswer.status).toBe(400);
+
+    const decided = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", answer: { selected: [], other: "Redis" } } });
+    expect(decided.status).toBe(200);
+    const result = await call;
+    expect(result.isError).toBeFalsy();
+    expect(resultText(result)).toContain('wrote in (Other): "Redis"');
+
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
   it("puts the options start will use on a work card: an explicit requireUnblocked false drops the default", async () => {
     const id = await runningSession();
     const client = await brokerClient(id);
