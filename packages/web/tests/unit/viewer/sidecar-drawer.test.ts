@@ -459,11 +459,44 @@ describe("wide mode", () => {
       await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
       expect((drawer() as HTMLElement).style.width).toBe("960px");
     }
+    // Arrow-Right narrows by one step from the shown width and stays wide.
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("940px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    for (let i = 0; i < 15; i++) {
+      await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    }
+    expect((drawer() as HTMLElement).style.width).toBe("660px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    // Back inside 360–640: wide mode ends.
     await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
     expect((drawer() as HTMLElement).style.width).toBe("640px");
     expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
     await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
     expect((drawer() as HTMLElement).style.width).toBe("360px");
+  });
+
+  it("follows the pointer when dragging inward from wide mode, with no jump", async () => {
+    setViewport(1440);
+    localStorage.setItem("ndx-sidecar-wide", "1");
+    await mount();
+    await pressCmdJ();
+    const edge = root.querySelector<HTMLElement>(".sidecar-resize")!;
+    const move = async (x: number) => act(async () => { window.dispatchEvent(new MouseEvent("pointermove", { clientX: x })); });
+    await act(async () => { edge.dispatchEvent(new MouseEvent("pointerdown", { clientX: 500, bubbles: true, cancelable: true })); });
+    await move(505);
+    expect((drawer() as HTMLElement).style.width).toBe("955px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    await move(700);
+    expect((drawer() as HTMLElement).style.width).toBe("760px");
+    await move(400);
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    await move(900);
+    expect((drawer() as HTMLElement).style.width).toBe("560px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
+    window.dispatchEvent(new MouseEvent("pointerup"));
   });
 
   it("works with storage blocked", async () => {

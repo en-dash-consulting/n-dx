@@ -326,6 +326,8 @@ export interface SidecarDrawerProps {
 export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [width, setWidth] = useState(storedWidth);
   const [wide, setWide] = useState(storedWide);
+  // Width of a wide drawer the edge has narrowed but not yet out of wide mode.
+  const [wideWidth, setWideWidth] = useState<number | null>(null);
   const [viewport, setViewport] = useState(() => window.innerWidth);
   const [draft, setDraft] = useState("");
   const [listing, setListing] = useState(false);
@@ -356,6 +358,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const toggleWide = () => {
     const next = !wide;
     setWide(next);
+    setWideWidth(null);
     try { localStorage.setItem(WIDE_KEY, next ? "1" : "0"); } catch { /* blocked: the mode still applies */ }
   };
 
@@ -367,7 +370,8 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
 
   const canWiden = viewport >= SIDECAR_WIDE_MIN_VIEWPORT;
   const isWide = wide && canWiden;
-  const shownWidth = effectiveSidecarWidth(width, wide, viewport);
+  const fullWidth = effectiveSidecarWidth(width, wide, viewport);
+  const shownWidth = isWide && wideWidth !== null ? Math.min(wideWidth, fullWidth) : fullWidth;
 
   // The status dock is fixed to the viewport; it reads the drawer's width.
   useEffect(() => {
@@ -395,10 +399,15 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     window.addEventListener("pointerup", up);
   };
 
-  // A wide drawer is already past the resize range: widening it is a no-op
-  // rather than a snap back to the stored width; narrowing leaves wide mode.
+  // A wide drawer is past the resize range. The edge follows the pointer
+  // between the range and the full wide width, never shrinking on a widening
+  // move; wide mode ends only once the width is back inside the range.
   const resizeTo = (next: number) => {
-    if (isWide && next >= shownWidth) return;
+    if (isWide && next > SIDECAR_WIDTH_MAX) {
+      setWideWidth(next >= fullWidth ? null : next);
+      return;
+    }
+    setWideWidth(null);
     applyWidth(next);
   };
 
