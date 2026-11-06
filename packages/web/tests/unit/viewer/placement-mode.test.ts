@@ -78,7 +78,7 @@ function areaDetail(slug: string): AreaDetail {
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
     amends: [], touches: [], taskCount: 1, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
@@ -330,7 +330,7 @@ describe("PlacementMode", () => {
   });
 
   it("says so for a change that is not waiting in the Inbox", async () => {
-    serve([change("a", { awaitsPlacement: undefined, needsPlacement: false })], []);
+    serve([change("a", { awaitsPlacement: undefined, inbox: undefined, needsPlacement: false })], []);
     const navigateTo = vi.fn();
     await mount(h(PlacementMode, { changeId: "a", navigateTo }));
     expect($('.placing-container [role="status"]')?.textContent).toBe("This change is not waiting in the Inbox.");
@@ -1038,7 +1038,7 @@ describe("PlacementMode", () => {
     it("a change placed by another route loses its draft once the Inbox is read", async () => {
       sessionStorage.setItem(KEY, JSON.stringify({ step: "propose", type: "capability", under: "", title: "Gift receipts", statement: "", criteria: "" }));
       // `a` is no longer waiting; `b` is.
-      serve([change("a", { awaitsPlacement: undefined, needsPlacement: false }), change("b")], [placement("b", TWO)]);
+      serve([change("a", { awaitsPlacement: undefined, inbox: undefined, needsPlacement: false }), change("b")], [placement("b", TWO)]);
       await mount(h(PlacementMode, { changeId: "b", navigateTo: vi.fn() }));
       expect(sessionStorage.getItem(KEY)).toBeNull();
     });

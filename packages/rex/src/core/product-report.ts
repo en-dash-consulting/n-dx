@@ -20,7 +20,7 @@
 
 import type { ItemStatus } from "../schema/v1.js";
 import type { ChangeNode } from "../schema/v2.js";
-import { indexTree, isAppliedChange, isOpenChange, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
+import { indexTree, isAppliedChange, isInboxChange, isOpenChange, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
 import { compareReleases } from "./change-selection.js";
 import { computeEdges, productIndex, type CoChange } from "./product-edges.js";
 import { computeProductStatus, type Health, type IntentStatus, type ProductStatus } from "./product-status.js";
@@ -380,7 +380,7 @@ export function prdStatusReport(tree: V2Tree, options: { allReleases?: boolean }
 
   return {
     changes: countChanges(changes),
-    inbox: changes.filter((c) => isOpenChange(c) && c.needsPlacement).length,
+    inbox: changes.filter(isInboxChange).length,
     areas,
     releases,
     releasesOmitted: dropped.size,

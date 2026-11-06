@@ -1,7 +1,8 @@
 /**
  * `/api/status` carries `rex.inbox` on a v2 tree, counted with rex's own
- * `awaitsPlacement` and `needsPlacement`, and omits it on v1. Change rows carry
- * `awaitsPlacement` for held open changes only.
+ * `isInboxChange` (the rule `get_prd_status` counts by) and `needsPlacement`,
+ * and omits it on v1. Change rows carry `inbox` for every open Inbox change and
+ * `awaitsPlacement` for the held ones only.
  *
  * Tree: the fixture (it has capabilities, so an Inbox change is held), plus one
  * open Inbox change, one applied change still flagged `needsPlacement`, and one
@@ -85,6 +86,34 @@ describe("v2 Inbox counts", () => {
     const applied = changes.find((c) => c.id === APPLIED);
     expect(applied?.needsPlacement).toBe(true);
     expect(applied).not.toHaveProperty("awaitsPlacement");
+  });
+
+  describe("parity with rex's get_prd_status", () => {
+    const rexCount = async () => {
+      const { loadPrdModel, prdStatusReport } = await import("@n-dx/rex");
+      return prdStatusReport((await loadPrdModel(rexDir)).tree).inbox;
+    };
+
+    it("counts the same open Inbox changes on a tree with capabilities", async () => {
+      const web = (await get("/api/status")).rex.inbox.open;
+      expect(web).toBe(await rexCount());
+      expect(web).toBe(1);
+    });
+
+    it("counts the same on a tree with no live capability, where nothing is held", async () => {
+      // The area stays; its one capability goes, leaving nothing to place on.
+      const area = join(rexDir, "product", "checkout");
+      rmSync(join(area, "pay-by-card.md"));
+      writeFileSync(join(area, "state.yaml"), 'schema: "rex/v2"\nitems:\n  "a0000000-0000-4000-8000-000000000001":\n    status: "in_progress"\n');
+      clearStatusCache();
+      const web = (await get("/api/status")).rex.inbox.open;
+      expect(web).toBe(await rexCount());
+      expect(web).toBe(1);
+      // Not held, but still in the Inbox: the rows list it.
+      const { changes } = (await get("/api/rex/changes")) as { changes: ChangeRowWire[] };
+      expect(changes.filter((c) => c.inbox).map((c) => c.id)).toEqual([HELD]);
+      expect(changes.filter((c) => c.awaitsPlacement)).toEqual([]);
+    });
   });
 
   it("recounts only when the PRD cache file is rewritten", async () => {

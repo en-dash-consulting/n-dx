@@ -22,7 +22,7 @@
 
 import { h } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { StrengthChip, useProjectStatus } from "../components/index.js";
+import { PlaceWithSidecarButton, StrengthChip, useProjectStatus } from "../components/index.js";
 import type { GuessStrength } from "../components/index.js";
 import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree/placement-draft.js";
 import { useRefetchableProductRead } from "../hooks/index.js";
@@ -35,7 +35,9 @@ import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate }
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
 
-/** A guess's strength; `tied` when the top two candidates share a score. */
+/** Why a change waiting here matters; the empty state keeps it where the next capture will land. */
+export const HELD_EXPLANATION =
+  "A change held in the Inbox cannot close, and ndx work skips its tasks until it is placed.";
 
 /** IB7: strongest first, then possible, tied, weak. */
 const STRENGTH_RANK: Record<GuessStrength, number> = { strong: 0, possible: 1, tied: 2, weak: 3 };
@@ -94,7 +96,18 @@ function GuessLine({ row }: { row: InboxRow }) {
     candidate.area ? h("span", { class: "inbox-guess-area" }, `${candidate.area} › `) : null,
     h("span", { class: "inbox-guess-title" }, candidate.title),
     h(StrengthChip, { strength }),
+    h("span", { class: "inbox-guess-score", title: "Placement score" }, String(candidate.score)),
   );
+}
+
+/** "today", "1 day" or "N days" from a whole-day age; null while the shortlist has not said. */
+export function ageLabel(ageDays: number | undefined): string | null {
+  if (ageDays === undefined) return null;
+  return ageDays === 0 ? "today" : `${ageDays} day${ageDays === 1 ? "" : "s"}`;
+}
+
+function ageOf(row: InboxRow): string | null {
+  return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
 function shortId(change: ChangeRow): string {
@@ -106,6 +119,7 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
   const tags = row.shortlist && "placement" in row.shortlist ? row.shortlist.placement.change.tags ?? [] : [];
   // An unsaved placement left in placement mode (WF10).
   const draftNote = placementDraftNote(change.id);
+  const age = ageOf(row);
   // The row is the target; the title button gives it keyboard reach, and its
   // click bubbles here. Place opens placement mode when the page can, and
   // otherwise bubbles to the row too.
@@ -115,6 +129,7 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
+      age ? h("span", { class: "inbox-age", title: "Time in the Inbox" }, age) : null,
     ),
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
@@ -127,6 +142,9 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
           ? (e: MouseEvent) => { e.stopPropagation(); onPlace(change.id); }
           : undefined,
       }, "Place"),
+      // Present only while web.sidecar is on; its click must not open the row.
+      h("span", { class: "inbox-place-sidecar", onClick: (e: MouseEvent) => e.stopPropagation() },
+        h(PlaceWithSidecarButton, { changeId: change.id })),
     ),
   );
 }
@@ -156,7 +174,9 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
 
   return h("div", { class: "inbox-container" },
     sorted.length === 0
-      ? h("div", { class: "empty-state inbox-empty", role: "status" }, "Inbox is empty")
+      ? h("div", { class: "empty-state inbox-empty", role: "status" },
+          h("p", null, "Inbox is empty"),
+          h("p", { class: "section-sub" }, HELD_EXPLANATION))
       : h("ul", { class: "inbox-list" },
           shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace })),
         ),
@@ -236,7 +256,7 @@ export interface InboxRead {
 export function useInbox(): InboxRead {
   const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
   const waiting = useMemo(
-    () => (load.state === "ready" ? load.data.filter((c) => c.awaitsPlacement || isAppliedUnplaced(c)) : null),
+    () => (load.state === "ready" ? load.data.filter((c) => c.inbox || isAppliedUnplaced(c)) : null),
     [load],
   );
   // A change placed by any route (here, the CLI, another session) no longer waits: its draft goes (WF10).

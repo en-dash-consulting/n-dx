@@ -49,7 +49,7 @@ export type { ProposedWork } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
 // The Product, Changes and capability views on a v2 tree: rex's model and its
 // derived product status, never recomputed in web (routes-rex/product.ts).
-export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, awaitsPlacement, specHash, nodeSpec } from "@n-dx/rex";
+export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, isInboxChange, awaitsPlacement, specHash, nodeSpec } from "@n-dx/rex";
 export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 // The area view: which constraints bind a product node (`boundBy`) is rex's
 // rule, the one `get_capability` reports (routes-rex/product.ts).

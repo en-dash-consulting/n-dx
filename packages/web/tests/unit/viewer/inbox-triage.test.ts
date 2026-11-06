@@ -23,7 +23,7 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
     amends: [], touches: [], taskCount: 2, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
@@ -72,7 +72,7 @@ function serve(next: ChangeRow[], lists: ChangePlacement[]): void {
       const body = JSON.parse(String(init.body)) as Record<string, unknown>;
       posts.push({ url, body });
       const id = decodeURIComponent(url.split("/")[4]);
-      changes = changes.map((c) => (c.id === id ? { ...c, awaitsPlacement: undefined, needsPlacement: false } : c));
+      changes = changes.map((c) => (c.id === id ? { ...c, awaitsPlacement: undefined, inbox: undefined, needsPlacement: false } : c));
       return json({ change: id, target: body.target, relation: body.relation });
     }
     if (url === "/api/project") return json({ cliName: "ndx" });
@@ -250,7 +250,7 @@ describe("the Inbox page", () => {
   });
 
   it("shows the empty state when nothing waits", async () => {
-    serve([change("x", { awaitsPlacement: undefined })], []);
+    serve([change("x", { awaitsPlacement: undefined, inbox: undefined })], []);
     await mountPage();
     expect($(".inbox-empty")?.textContent).toBe("Inbox is empty");
     expect(counts()).toBe(" · 0 to place · 0 placed this visit");

@@ -185,6 +185,17 @@ export function isOpenChange(node: RuleNode): boolean {
 }
 
 /**
+ * An open change in the Inbox: `needsPlacement`, whether or not the product
+ * layer has anything to place it on. The one rule behind every Inbox count
+ * (`get_prd_status`, the dashboard's status route and the Inbox list). A
+ * change that is also held ({@link awaitsPlacement}) is the subset `ndx work`
+ * skips.
+ */
+export function isInboxChange(node: RuleNode): boolean {
+  return isOpenChange(node) && node.needsPlacement === true;
+}
+
+/**
  * Whether the product layer holds a live capability or constraint: the only
  * nodes a change is placed on. A fresh v2 project has neither, so nothing on
  * it can be placed.

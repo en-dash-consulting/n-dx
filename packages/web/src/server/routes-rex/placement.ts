@@ -42,9 +42,8 @@ import {
   prdLayout,
   loadPrdModel,
   indexTree,
-  isOpenChange,
+  isInboxChange,
   isAppliedChange,
-  awaitsPlacement,
   resolveStore,
   suggestPlacements,
   recordPlacement,
@@ -317,7 +316,7 @@ export interface ChangePlacementsWire {
 export function buildAwaitingPlacements(tree: V2Tree): ChangePlacementsWire["placements"] {
   const index = indexTree(tree);
   const waiting = index.entries.flatMap(({ node }) =>
-    node.type === "change" && (isOpenChange(node) ? awaitsPlacement(index, node) : isAppliedChange(node) && !!node.needsPlacement) ? [node.id] : [],
+    node.type === "change" && (isInboxChange(node) || (isAppliedChange(node) && !!node.needsPlacement)) ? [node.id] : [],
   );
   // One batch: rex builds its placement inputs once, not once per change.
   const areaOf = areaTitles(index);

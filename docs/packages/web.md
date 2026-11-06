@@ -153,10 +153,12 @@ and a held PRD lock `409` naming its PID.
 home skips the Inbox.
 
 `GET /api/status` adds `rex.inbox: { open, appliedUnplaced }` on a v2 tree and
-omits it on v1. `open` counts open changes awaiting placement (the ones
-`ndx work` refuses); `appliedUnplaced` counts applied changes still flagged
+omits it on v1. `open` counts every open change with `needsPlacement`, the
+count `get_prd_status` reports, with or without a capability to place it on;
+`appliedUnplaced` counts applied changes still flagged
 `needsPlacement`, which are history and never placeable. Change rows from
-`GET /api/rex/changes` carry `awaitsPlacement` for open held changes.
+`GET /api/rex/changes` carry `inbox` for those open Inbox changes and
+`awaitsPlacement` for the held subset (the ones `ndx work` refuses).
 `GET /api/rex/changes/placements` returns every awaiting change's shortlist in one request, keyed by change id; a change whose shortlist cannot be built gets `{ error }`.
 
 ## Tune tiles: Outcomes by tier and Your tooling

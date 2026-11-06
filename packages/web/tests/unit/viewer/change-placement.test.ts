@@ -45,7 +45,7 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
     amends: [], touches: [], taskCount: 1, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
@@ -249,7 +249,7 @@ describe("an Inbox change's panel", () => {
   });
 
   it("is a single Placed line for a change that has left the Inbox", async () => {
-    serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "cap-1", title: "Refunds" }] })], []);
+    serve([change("a", { awaitsPlacement: false, inbox: false, needsPlacement: false, touches: [{ id: "cap-1", title: "Refunds" }] })], []);
     const spies = await mountSection("a");
     expect($('[data-change-placement="placed"]')?.textContent).toBe("Placed: touches Refunds");
     expect($(".cp-note")).toBeNull();
@@ -344,7 +344,7 @@ describe("when the product map read fails", () => {
 // ── Writes ───────────────────────────────────────────────────────────
 
 describe("an applied change's panel", () => {
-  const applied = (id: string) => change(id, { stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z", awaitsPlacement: undefined });
+  const applied = (id: string) => change(id, { stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z", awaitsPlacement: undefined, inbox: undefined });
 
   it("offers touches only, with the explanatory note", async () => {
     serve([applied("a")], [placement("a", [candidate("cap-1")])]);
@@ -697,7 +697,7 @@ describe("Draft with the model (rex.placementDraft)", () => {
   });
 
   it("is hidden for an applied change, which takes touches only", async () => {
-    serve([change("a", { appliedAt: "2026-10-05T12:00:00.000Z", awaitsPlacement: undefined })], [placement("a", [candidate("cap-1")])], toggle(true));
+    serve([change("a", { appliedAt: "2026-10-05T12:00:00.000Z", awaitsPlacement: undefined, inbox: undefined })], [placement("a", [candidate("cap-1")])], toggle(true));
     await mountSection("a");
     expect($("[data-change-placement]")?.getAttribute("data-change-placement")).toBe("applied");
     expect(button("Draft with the model")).toBeNull();
@@ -803,7 +803,7 @@ describe("the change detail panel", () => {
   });
 
   it("has no section and no note for a placed change", async () => {
-    serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "t", title: "Refunds" }] })], []);
+    serve([change("a", { awaitsPlacement: false, inbox: false, needsPlacement: false, touches: [{ id: "t", title: "Refunds" }] })], []);
     await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));
     expect($(".cp-section")).toBeNull();
     expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Refunds");

@@ -214,6 +214,8 @@ export interface ChangeRow {
   needsPlacement?: boolean;
   /** Open and held for placement by rex: `ndx work` refuses it. Absent on applied history. */
   awaitsPlacement?: boolean;
+  /** In the Inbox: open with `needsPlacement`, held or not. The rows the Inbox lists and its count. */
+  inbox?: boolean;
   amends: AmendedNode[];
   touches: TouchedNode[];
   taskCount: number;

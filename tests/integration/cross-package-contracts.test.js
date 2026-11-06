@@ -1004,7 +1004,7 @@ describe("gateway export auto-detection", () => {
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "validateChangesMerge", "mergeChanges",
         "loadPrdModel", "productReport", "capabilityReport", "computeEdges", "indexTree",
-        "isOpenChange", "isAppliedChange", "awaitsPlacement", "specHash", "nodeSpec",
+        "isOpenChange", "isAppliedChange", "isInboxChange", "awaitsPlacement", "specHash", "nodeSpec",
         "loadTrailerCommits", "loadCommitFiles",
         "handleProductEdit", "ProductEditError", "withPrdModelTransaction", "applyChange",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",

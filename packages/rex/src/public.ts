@@ -101,7 +101,7 @@ export type {
 
 // ---- Schema: v2 tree index ---------------------------------------------------
 
-export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
+export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, isInboxChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
 export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
 
 // ---- Core: change placement --------------------------------------------------

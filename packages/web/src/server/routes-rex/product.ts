@@ -35,6 +35,7 @@ import {
   indexTree,
   isAppliedChange,
   isOpenChange,
+  isInboxChange,
   awaitsPlacement,
   nodeSpec,
   specHash,
@@ -124,6 +125,8 @@ export interface ChangeRowWire {
   needsPlacement?: boolean;
   /** Open and held for placement by rex: `ndx work` refuses it. Absent on applied history. */
   awaitsPlacement?: boolean;
+  /** In the Inbox: open with `needsPlacement`, held or not. The rows the Inbox lists and its count. */
+  inbox?: boolean;
   amends: Array<{ id: string; title: string; delta: AmendmentDeltaWire }>;
   touches: Array<{ id: string; title: string }>;
   taskCount: number;
@@ -625,6 +628,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         ...(change.appliedAt ? { appliedAt: change.appliedAt } : {}),
         ...(change.needsPlacement ? { needsPlacement: true } : {}),
         ...(isOpenChange(change) && awaitsPlacement(index, change) ? { awaitsPlacement: true } : {}),
+        ...(isInboxChange(change) ? { inbox: true } : {}),
         amends: (change.amends ?? []).map((a) => {
           const target = index.resolve(a.target);
           return target

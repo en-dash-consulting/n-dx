@@ -123,7 +123,7 @@ export { StrengthChip } from "./strength-chip.js";
 export type { GuessStrength } from "./strength-chip.js";
 export { HubSessionDrawer, HubCeilingMeter, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
 export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
-export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
+export { PlaceWithSidecarContext, PlaceWithSidecarButton } from "./place-with-sidecar.js";
 export { SidecarPlacementContext, createCardDrafts, draftOnTarget, useCardDraft, useCardDrafts } from "./sidecar-placement.js";
 export type { CardDrafts, PlacementDraft, SidecarPlacementShare } from "./sidecar-placement.js";
 export { TrackerCardForm, errorOf as trackerErrorOf } from "./tracker-card-form.js";

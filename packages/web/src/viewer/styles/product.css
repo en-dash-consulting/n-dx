@@ -582,6 +582,17 @@
   border-color: var(--accent);
 }
 
+.inbox-age,
+.inbox-guess-score {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox-age {
+  margin-left: auto;
+  font-size: var(--font-xs);
+}
+
 .inbox-more {
   align-self: flex-start;
   font-size: var(--font-sm);

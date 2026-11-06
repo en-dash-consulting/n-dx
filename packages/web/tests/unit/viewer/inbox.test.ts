@@ -13,6 +13,7 @@ import { InboxPage, InboxView, sortInbox, type InboxRow } from "../../../src/vie
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
 import { STAGES, viewBlurb, viewLabel } from "../../../src/viewer/views/index.js";
 import { buildValidViews } from "../../../src/shared/index.js";
+import { PlaceWithSidecarContext } from "../../../src/viewer/components/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import type { ChangePlacement, ChangeRow, PlacementStrength } from "../../../src/viewer/views/product-model.js";
 
@@ -25,16 +26,16 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
   return {
-    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, inbox: true, needsPlacement: true,
     amends: [], touches: [], taskCount: 1, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra,
   };
 }
 
 /** A shortlist whose best candidate has `strength`; `tied` marks a shared top score. */
-function placement(id: string, strength: PlacementStrength | null, opts: { tied?: boolean; score?: number; tags?: string[] } = {}): ChangePlacement {
+function placement(id: string, strength: PlacementStrength | null, opts: { tied?: boolean; score?: number; tags?: string[]; ageDays?: number } = {}): ChangePlacement {
   return {
     layout: "v2",
-    change: { id, title: `Change ${id}`, status: "pending", taskCount: 1, tags: opts.tags },
+    change: { id, title: `Change ${id}`, status: "pending", taskCount: 1, tags: opts.tags, ageDays: opts.ageDays },
     relation: "touches",
     relationRule: "a rule",
     tied: opts.tied ?? false,
@@ -172,7 +173,7 @@ describe("sortInbox", () => {
 describe("InboxPage on a v2 project", () => {
   it("lists only changes awaiting placement, strongest guess first, with guess and strength", async () => {
     serveInbox(
-      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined }), change("s")],
+      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined, inbox: undefined }), change("s")],
       [placement("w", "weak", { tags: ["web"] }), placement("s", "strong")],
     );
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
@@ -258,11 +259,45 @@ describe("InboxPage on a v2 project", () => {
     expect(rowIds()).toHaveLength(12);
   });
 
-  it("says 'Inbox is empty' at zero", async () => {
-    serveInbox([change("placed", { awaitsPlacement: undefined })], []);
+  it("says 'Inbox is empty' at zero, and that a held change cannot close and its tasks are skipped until placed", async () => {
+    serveInbox([change("placed", { awaitsPlacement: undefined, inbox: undefined })], []);
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
-    expect(root.querySelector(".inbox-empty")?.textContent).toBe("Inbox is empty");
+    const text = root.querySelector(".inbox-empty")?.textContent ?? "";
+    expect(text).toContain("Inbox is empty");
+    expect(text).toContain("A change held in the Inbox cannot close");
+    expect(text).toContain("ndx work skips its tasks until it is placed");
     expect(rowIds()).toEqual([]);
+  });
+
+  it("lists an Inbox change that is not held, as on a tree with no capability to place it on", async () => {
+    serveInbox([change("free", { awaitsPlacement: undefined })], []);
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(rowIds()).toEqual(["free"]);
+  });
+
+  it("shows each row's age, its top suggestion's score beside the strength chip, and Place with Sidecar while web.sidecar is on", async () => {
+    const place = vi.fn();
+    serveInbox([change("x"), change("y")], [placement("x", "strong", { score: 7, ageDays: 3 }), placement("y", "weak", { ageDays: 0 })]);
+    const navigateTo = vi.fn();
+    await mount(h(PlaceWithSidecarContext.Provider, { value: { place, attached: null } }, h(InboxPage, { navigateTo })));
+    const [first, second] = [...root.querySelectorAll<HTMLElement>(".inbox-row")];
+    expect(first!.querySelector(".inbox-age")?.textContent).toBe("3 days");
+    expect(second!.querySelector(".inbox-age")?.textContent).toBe("today");
+    expect(first!.querySelector(".inbox-guess-score")?.textContent).toBe("7");
+    expect(first!.querySelector(".inbox-guess-score")?.previousElementSibling?.classList.contains("inbox-strength")).toBe(true);
+    const sidecar = first!.querySelector<HTMLButtonElement>(".cp-place-with-sidecar")!;
+    expect(sidecar.textContent).toBe("Place with Sidecar");
+    expect(first!.querySelector(".inbox-place")).not.toBeNull();
+    act(() => { sidecar.click(); });
+    expect(place).toHaveBeenCalledWith("x");
+    // It does not also open the row.
+    expect(navigateTo).not.toHaveBeenCalled();
+  });
+
+  it("draws no Place with Sidecar while web.sidecar is off", async () => {
+    serveInbox([change("x")], [placement("x", "strong")]);
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(root.querySelector(".cp-place-with-sidecar")).toBeNull();
   });
 
   it("shows applied-but-unplaced history as a collapsed count until its list is read", async () => {

@@ -18,7 +18,7 @@ import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import {
   computeStats, collectCompletedIds, findNextTask, walkTree,
-  prdLayout, loadPrdModel, indexTree, isOpenChange, isAppliedChange, awaitsPlacement,
+  prdLayout, loadPrdModel, indexTree, isOpenChange, isAppliedChange, isInboxChange,
 } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import type { ReadinessScore, RepoIdentity, OutboundData, InfrastructureData } from "./domain-gateway.js";
@@ -455,7 +455,7 @@ async function countInbox(ctx: ServerContext): Promise<InboxCounts | undefined> 
     for (const { node, root } of index.entries) {
       if (root !== "changes" || node.type !== "change") continue;
       if (isOpenChange(node)) {
-        if (awaitsPlacement(index, node)) open++;
+        if (isInboxChange(node)) open++;
       } else if (isAppliedChange(node) && node.needsPlacement) {
         appliedUnplaced++;
       }
