@@ -11,6 +11,7 @@ import { act } from "preact/test-utils";
 import { InboxTriagePage, isTypingTarget, shortcutFor } from "../../../src/viewer/views/inbox-triage.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { takeTitleFocus } from "../../../src/viewer/components/prd-tree/change-placement.js";
+import { PlaceWithSidecarContext } from "../../../src/viewer/components/place-with-sidecar.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import type { ChangePlacement, ChangeRow, PlacementCandidate, ProductMap } from "../../../src/viewer/views/product-model.js";
 
@@ -363,5 +364,27 @@ describe("the page's keyboard", () => {
     } finally {
       dialog.remove();
     }
+  });
+});
+
+// ── Sidecar ──────────────────────────────────────────────────────────
+
+describe("the Sidecar drawer on the Inbox page", () => {
+  it("is told the selected change, follows the selection, and lets go on leaving", async () => {
+    serveThree();
+    const select = vi.fn();
+    await act(async () => {
+      render(h(PlaceWithSidecarContext.Provider, { value: { place: vi.fn(), attached: null, select } },
+        h(InboxTriagePage, { navigateTo: vi.fn() })), root);
+    });
+    await settle();
+    expect(selectedId()).toBe("c");
+    expect(select).toHaveBeenLastCalledWith("c");
+
+    await click($('.inbox-qitem[data-change-id="b"]'));
+    expect(select).toHaveBeenLastCalledWith("b");
+
+    act(() => { render(null, root); });
+    expect(select).toHaveBeenLastCalledWith(null);
   });
 });

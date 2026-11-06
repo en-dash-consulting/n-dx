@@ -16,8 +16,8 @@
  */
 
 import { h } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { StrengthChip, useProjectStatus } from "../components/index.js";
+import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { PlaceWithSidecarContext, StrengthChip, useProjectStatus } from "../components/index.js";
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
@@ -199,6 +199,14 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
   useEffect(() => {
     if (selected === null && ordered && order.length) setSelected(order[0]);
   }, [order, ordered, selected]);
+
+  // The Sidecar drawer attaches the selected change (Place lens); null while Sidecar is off.
+  const reportSelection = useContext(PlaceWithSidecarContext)?.select;
+  useEffect(() => {
+    if (!reportSelection) return;
+    reportSelection(selected);
+    return () => reportSelection(null);
+  }, [reportSelection, selected]);
 
   const select = (id: string) => {
     // The section asks the detail panel to focus the next title; here the

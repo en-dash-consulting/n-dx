@@ -4,6 +4,12 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { AskInSidecarButton, AskInSidecarContext } from "../../../src/viewer/components/ask-in-sidecar.js";
 import { pageItemFor, resolveLens, wantedLensFor } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
+import { ZoneSlideout } from "../../../src/viewer/components/zone-slideout.js";
+import { CapabilityPage } from "../../../src/viewer/views/capability.js";
+import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
+import type { Zone } from "../../../src/viewer/external.js";
+import { CAPABILITY_DETAIL_FIXTURE } from "../../fixtures/v2-product-map.js";
 
 const REGISTRY = [
   { id: "describe", available: true },
@@ -51,6 +57,37 @@ describe("Ask and Explain in Sidecar buttons", () => {
   });
 });
 
+describe("the pages that draw them", () => {
+  let root: HTMLDivElement;
+  beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); });
+  afterEach(() => { act(() => { render(null, root); }); root.remove(); });
+
+  const zone = {
+    id: "zone-1", name: "Zone One", description: "A test zone",
+    files: ["src/a.ts"], entryPoints: [], cohesion: 0.7, coupling: 0.2,
+  } as Zone;
+  const task: PRDItemData = { id: "task-1", title: "A task", status: "pending", level: "task" };
+  const pages = [
+    ["task", "task-1", "Ask Sidecar", () => h(TaskDetail, { item: task, allItems: [task], onUpdate: vi.fn() })],
+    ["capability", CAPABILITY_DETAIL_FIXTURE.id, "Explain in Sidecar", () => h(CapabilityPage, { capability: CAPABILITY_DETAIL_FIXTURE })],
+    ["zone", "zone-1", "Explain in Sidecar", () => h(ZoneSlideout, { zone, crossings: [], allZones: [zone], onClose: vi.fn() })],
+  ] as const;
+
+  it.each(pages)("a %s page offers its button, which asks about that item", (kind, id, label, page) => {
+    const ask = vi.fn();
+    act(() => { render(h(AskInSidecarContext.Provider, { value: { ask, attached: null } }, page()), root); });
+    const button = root.querySelector<HTMLButtonElement>(".ask-in-sidecar");
+    expect(button?.textContent).toBe(label);
+    act(() => { button?.click(); });
+    expect(ask).toHaveBeenCalledWith(kind, id);
+  });
+
+  it.each(pages)("a %s page draws no button while web.sidecar is off", (_kind, _id, _label, page) => {
+    act(() => { render(page(), root); });
+    expect(root.querySelector(".ask-in-sidecar")).toBeNull();
+  });
+});
+
 describe("the lens an ask attaches", () => {
   const page = { view: "prd" as const, zone: null, taskId: null };
 
@@ -87,6 +124,16 @@ describe("the Inbox page", () => {
     const item = pageItemFor({ ...inbox, changeId: "ch1" });
     expect(item).toMatchObject({ kind: "change", ref: "ch1" });
     expect(resolveLens(wantedLensFor(item, false), REGISTRY, item).running).toBe("place");
+  });
+
+  it("attaches the change selected in the triage queue and runs Place on it", () => {
+    const item = pageItemFor({ ...inbox, inboxChangeId: "ch2" });
+    expect(item).toMatchObject({ kind: "change", ref: "ch2" });
+    expect(resolveLens(wantedLensFor(item, false), REGISTRY, item).running).toBe("place");
+  });
+
+  it("ignores a stale queue selection off the Inbox page", () => {
+    expect(pageItemFor({ view: "plan", zone: null, taskId: null, inboxChangeId: "ch2" })).toMatchObject({ kind: "plan" });
   });
 
   it("names Place, waiting on a change, while none is selected", () => {

@@ -62,6 +62,8 @@ export interface SidecarPageSelection {
   diagnoseTaskId?: string | null;
   /** The change "Describe in Sidecar" / "Tighten with Sidecar" attached, by id; asks with Describe. */
   describeChangeId?: string | null;
+  /** The change selected in the Inbox triage queue; asks with Place on the Inbox page. */
+  inboxChangeId?: string | null;
   /**
    * "Ask Sidecar" / "Explain in Sidecar" on a task, capability or zone page:
    * attaches that item with its kind's default lens. `seq` counts the clicks,
@@ -115,8 +117,12 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
     return { kind: "capability", ref: page.capabilityId, label: page.capabilityId };
   }
   if (page.view === "workspaces" && page.worktree) return { kind: "worktree", ref: page.worktree, label: page.worktree };
-  // The Inbox is about changes awaiting placement; one sent to Place is attached above.
-  if (page.view === "inbox") return { kind: "inbox", label: "Inbox" };
+  // The Inbox is about changes awaiting placement: the selected one, else the queue.
+  if (page.view === "inbox") {
+    return page.inboxChangeId
+      ? { kind: "change", ref: page.inboxChangeId, label: page.inboxChangeId }
+      : { kind: "inbox", label: "Inbox" };
+  }
   if (page.view === "plan") return { kind: "plan", label: "Plan" };
   if (page.view === "live" || page.view === "live-analyze") return { kind: "live", label: "Live" };
   return null;

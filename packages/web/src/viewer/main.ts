@@ -184,6 +184,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [describeChange, setDescribeChange] = useState<string | null>(null);
   // The task, capability or zone "Ask Sidecar" / "Explain in Sidecar" attached (its kind's lens); dropped with the page.
   const [askItem, setAskItem] = useState<{ kind: "task" | "capability" | "zone"; ref: string; seq: number } | null>(null);
+  // The change selected in the Inbox triage queue (Place lens); the page reports it while mounted.
+  const [inboxChange, setInboxChange] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -212,7 +214,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, ask: askItem, plan: planWith, areaView: openArea },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, inboxChangeId: inboxChange, ask: askItem, plan: planWith, areaView: openArea },
   );
   const showSidecar = sidecarShell.drawer.show;
   // The waiting change-set cards, read once for every Plan surface that draws their ghosts (UX5, SP5).
@@ -318,7 +320,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   );
   // Null while Sidecar is off, so no change offers "Place with Sidecar".
   const placeWithSidecar = useMemo(
-    () => (sidecarShell.button ? { place: (id: string) => { setDescribeChange(null); setOpenChange(id); showSidecar(); }, attached: openChange } : null),
+    () => (sidecarShell.button ? { place: (id: string) => { setDescribeChange(null); setOpenChange(id); showSidecar(); }, attached: openChange, select: setInboxChange } : null),
     [sidecarShell.button !== null, showSidecar, openChange],
   );
   // The drawer's placement cards and one working copy per card, shared with placement mode (SP2).
