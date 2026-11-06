@@ -10,8 +10,12 @@ items:
     lastModified: "2026-11-06T03:36:41.609Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d7d02895-a0f3-439a-bd3c-1e7d75c4cd05":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T03:36:47.842Z"
-    activeIntervals: [{"start":"2026-11-06T03:36:47.842Z"}]
-    lastModified: "2026-11-06T03:36:48.465Z"
+    completedAt: "2026-11-06T03:45:02.546Z"
+    endedAt: "2026-11-06T03:45:02.546Z"
+    activeIntervals: [{"end":"2026-11-06T03:45:02.546Z","start":"2026-11-06T03:36:47.842Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Server computes openChangeIds per area (touches/amends on the area or its nodes, added amendments at their resolved under); area map block draws from it."
+    lastModified: "2026-11-06T03:45:02.546Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

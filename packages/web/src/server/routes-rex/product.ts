@@ -279,7 +279,9 @@ function overlaysByNode(index: TreeIndex, changes: ChangeRuleNode[]): Map<string
  * Distinct open changes per area id, each node counting toward its nearest
  * area: what a change touches or amends, and where an `added` amendment lands.
  * An unapplied addition's target names nothing yet, so it counts at its
- * `under`, followed through same-change parents to an existing node.
+ * `under`. An addition under another of the same change's additions needs no
+ * following: that chain's first addition sits under an existing node, and
+ * counts the change in the same area.
  */
 function openChangesByArea(index: TreeIndex, changes: ChangeRuleNode[]): Map<string, Set<string>> {
   const areaOf = new Map<string, string>();
@@ -292,20 +294,11 @@ function openChangesByArea(index: TreeIndex, changes: ChangeRuleNode[]): Map<str
   const out = new Map<string, Set<string>>();
   for (const change of changes) {
     if (!isOpenChange(change)) continue;
-    const amends = change.amends ?? [];
-    const addedByTarget = new Map(amends.filter((a) => a.delta === "added").map((a) => [a.target, a]));
-    const landing = (ref: string | undefined): RuleNode | undefined => {
-      const seen = new Set<string>();
-      while (ref !== undefined && !seen.has(ref)) {
-        const node = index.resolve(ref);
-        if (node) return node;
-        seen.add(ref);
-        ref = addedByTarget.get(ref)?.under;
-      }
-      return undefined;
-    };
     const refs = [
-      ...amends.map((a) => (a.delta === "added" ? landing(a.under) : index.resolve(a.target))),
+      ...(change.amends ?? []).map((a) => {
+        const ref = a.delta === "added" ? a.under : a.target;
+        return ref === undefined ? undefined : index.resolve(ref);
+      }),
       ...(change.touches ?? []).map((ref) => index.resolve(ref)),
     ];
     for (const node of refs) {

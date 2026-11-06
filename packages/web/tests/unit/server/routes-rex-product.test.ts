@@ -171,11 +171,6 @@ describe("v2 product reads", () => {
       expect((await area()).openChangeIds.sort()).toEqual([CHANGE_ID, OTHER_ID].sort());
     });
 
-    it("counts an addition under a same-change addition that lands in the area", async () => {
-      addChange([added("partial-refunds", "refunds", "constraint"), added("refunds", CAPABILITY_ID)]);
-      expect((await area()).openChangeIds).toContain(OTHER_ID);
-    });
-
     it("counts a change whose overlay is keyed by the area id", async () => {
       addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }]);
       const a = await area();
