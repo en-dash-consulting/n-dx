@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "03b49289-cca0-4880-a0ad-235b80a2088c":
-    lastModified: "2026-11-06T01:02:04.882Z"
+    status: "completed"
+    startedAt: "2026-11-06T20:27:35.783Z"
+    completedAt: "2026-11-06T20:32:19.455Z"
+    endedAt: "2026-11-06T20:32:19.455Z"
+    activeIntervals: [{"end":"2026-11-06T20:32:19.455Z","start":"2026-11-06T20:27:35.783Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench prints Change/Task with change; help text and rex next hint say task or change; reviewer prompt names Inbox change on v2"
+    lastModified: "2026-11-06T20:32:19.455Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "58e97129-66cf-472a-9371-cb2bf7ce9c14":
     status: "completed"
