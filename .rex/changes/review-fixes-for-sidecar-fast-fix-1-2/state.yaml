@@ -1,7 +1,7 @@
 schema: "rex/v2"
 items:
   "13ce5c45-49ae-496f-8665-88d75ed1c545":
-    lastModified: "2026-11-06T17:03:22.062Z"
+    lastModified: "2026-11-06T17:11:09.648Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3dbce690-339a-44f9-8154-0db093b49be2":
     status: "completed"
@@ -17,5 +17,15 @@ items:
     lastModified: "2026-11-06T17:03:24.865Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6ea32693-0356-466a-9a3e-696a101f2819":
-    lastModified: "2026-11-06T17:03:20.194Z"
+    status: "completed"
+    startedAt: "2026-11-06T17:08:20.491Z"
+    completedAt: "2026-11-06T17:11:33.949Z"
+    endedAt: "2026-11-06T17:11:33.949Z"
+    activeIntervals: [{"end":"2026-11-06T17:11:33.949Z","start":"2026-11-06T17:08:20.491Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "cmdRun resolves --task via new resolveTaskRefId (findV2Entry on v2, findItem on v1, foreign claims excluded) before the pre-run gate; trailer omitted when unresolved."
+    lastModified: "2026-11-06T17:11:33.949Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a5b0d661-af3a-4632-bdd4-d4466ebac054":
+    lastModified: "2026-11-06T17:11:09.648Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -996,6 +996,25 @@ export function createExecutionQueue(maxConcurrent: number): ExecutionQueue {
 // ---------------------------------------------------------------------------
 
 /**
+ * The canonical id of the item `--task <ref>` runs, or `undefined` when the
+ * ref names nothing. On v2 the ref may be a display id, an alias or a change,
+ * which resolves to that change's task no other worktree holds — the selection
+ * the brief makes (`findV2Entry`). On v1 it is the item id itself.
+ */
+export async function resolveTaskRefId(
+  rexDir: string,
+  ref: string,
+  claims?: TaskClaims,
+): Promise<string | undefined> {
+  const store = await resolveStore(rexDir);
+  const items = (await store.loadDocument()).items;
+  const tree = await loadV2Tree(store);
+  if (!tree) return findItem(items, ref)?.item.id;
+  const foreign = claims ? await claims.foreignClaims() : undefined;
+  return findV2Entry(tree, items, ref, foreign)?.item.id;
+}
+
+/**
  * Peek at the next task's scheduling priority without consuming it.
  *
  * Looks up the task (by explicit ID or auto-selection) and resolves
@@ -2377,6 +2396,13 @@ export async function cmdRun(
     // record, for the commits that happen later in the loop.
     const invocationGitOrigin = captureRunGitOrigin(dir);
 
+    // The gate's planning commit names the unit --task runs, by canonical id:
+    // restacks and landing key on it, and on v2 the flag may be a display id,
+    // an alias or a change. No trailer when the ref resolves to nothing.
+    const planningItemId = flags.task && flags.task !== "true"
+      ? await resolveTaskRefId(rexDir, flags.task, TaskClaims.forProject(dir, { readOnly: true }))
+      : undefined;
+
     // One-time pre-run commit gate: before the work loop begins, offer to
     // commit any pre-existing uncommitted changes so the user's in-progress
     // edits are not folded into hench's own commits. Runs once per invocation
@@ -2390,7 +2416,7 @@ export async function cmdRun(
       allowDirty,
       dryRun,
       origin: invocationGitOrigin,
-      ...(flags.task && flags.task !== "true" ? { itemId: flags.task } : {}),
+      ...(planningItemId ? { itemId: planningItemId } : {}),
       // Size-aware escalation config (hench.git.*); --allow-dirty above
       // takes precedence over both settings.
       checkpointThreshold: config.git?.checkpointThreshold,
