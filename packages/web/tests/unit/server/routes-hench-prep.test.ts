@@ -32,8 +32,14 @@ vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../src/server/stuck-tasks.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/server/stuck-tasks.js")>();
+  return { ...actual, loadStuckTaskIds: vi.fn(actual.loadStuckTaskIds) };
+});
+
 import { TIER_MODELS } from "@n-dx/llm-client";
 import { collectCompletedIds, findActionableTasks, findNextTask } from "../../../src/server/rex-gateway.js";
+import { loadStuckTaskIds } from "../../../src/server/stuck-tasks.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
 import {
@@ -784,6 +790,19 @@ describe("hench prep routes", () => {
       expect(new Set(ids).size).toBe(120);
       expect((await ready(port, "?offset=-3&limit=2")).tasks).toHaveLength(2);
       expect((await ready(port, "?offset=500")).tasks).toEqual([]);
+    });
+
+    it("?all=1 returns every actionable task from one selection and one runs scan", async () => {
+      await writeTasks(ctx, Array.from({ length: 3000 }, (_, i) => task(`t${String(i).padStart(4, "0")}`, { priority: i % 2 ? "low" : "high" })));
+      const port = await open(ctx);
+      vi.mocked(findActionableTasks).mockClear();
+      vi.mocked(loadStuckTaskIds).mockClear();
+      const { tasks, total } = await ready(port, "?all=1");
+      expect(tasks).toHaveLength(3000);
+      expect(total).toBe(3000);
+      expect(new Set(tasks.map((t) => t.id)).size).toBe(3000);
+      expect(findActionableTasks).toHaveBeenCalledTimes(1);
+      expect(loadStuckTaskIds).toHaveBeenCalledTimes(1);
     });
 
     it("on a v2 tree lists with rex's v2 selector: no Inbox change, a task-less change as one unit, a change's tasks", async () => {
