@@ -29,7 +29,14 @@ items:
     lastModified: "2026-11-06T02:47:07.760Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3a1f90aa-bf46-4a71-99be-47785695bd6d":
-    lastModified: "2026-11-05T01:08:43.256Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:52:17.912Z"
+    completedAt: "2026-11-06T02:53:06.689Z"
+    endedAt: "2026-11-06T02:53:06.689Z"
+    activeIntervals: [{"end":"2026-11-06T02:53:06.689Z","start":"2026-11-06T02:52:17.912Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added \"Sidecar on Plan and Tune\" to docs/packages/web.md and a patch changeset for @n-dx/web."
+    lastModified: "2026-11-06T02:53:06.689Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3dcb81db-6444-4129-9c97-8a62ad747581":
     status: "completed"
@@ -98,7 +105,14 @@ items:
     lastModified: "2026-11-05T19:06:21.933Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c226b635-1423-4093-8c70-50d677a34ba4":
-    lastModified: "2026-11-06T02:46:42.018Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:53:06.689Z"
+    completedAt: "2026-11-06T02:53:06.689Z"
+    endedAt: "2026-11-06T02:53:06.689Z"
+    activeIntervals: [{"end":"2026-11-06T02:53:06.689Z","start":"2026-11-06T02:53:06.689Z"}]
+    appliedAt: "2026-11-06T02:53:06.689Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T02:53:06.689Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d3112cec-53b7-4ce9-b011-209af418fa1b":
     status: "completed"

@@ -171,6 +171,29 @@ Two read-only tiles on the Tune page. Neither writes anything.
 
 **Your tooling.** A summary of what this project can run on: connected vendor CLIs, the model for each tier, review pairing and per-command route overrides. Editing stays in Settings. Vendor, tier and review lines link to the matching section of Settings › Robot Wrangler. No Settings field edits `llm.routes`, so the route line names `ndx config` instead of linking. The tile never runs a credential check, because the check sends a real prompt to the vendor CLI. It shows the result of the last check from Robot Wrangler when one exists. Otherwise it shows the vendor's catalog state.
 
+## Sidecar on Plan and Tune
+
+With `web.sidecar` on, Plan and Tune offer the Sidecar drawer as a second way to do what they already do. With it off, none of the entry points below render and every Plan and Tune element works as before.
+
+**Entry points.**
+
+| Where | Control | Opens |
+|---|---|---|
+| Capture bar, beside Preview | **Plan with Sidecar** | The Plan lens with the typed text, which goes as the session's first turn. Scoped to the area when the capture was. If the open session cannot take the turn, a new one starts or the drawer says why. |
+| Area view | (attaches itself) | An `area` page item, with Explain by default. **Plan in this area** switches to the Plan lens aimed at that area. Closing the view or opening another area drops the Plan lens. |
+| Inbox change | **Place with Sidecar** (replaces **Draft with the model**) | The Place lens on that change, with its placement card. |
+| Specs to tighten | **Tighten with Sidecar** | The Describe lens on the change. |
+| Open changes rows | **Describe in Sidecar** | The Describe lens on the change. |
+| Tune, Runs tile | **Diagnose in Sidecar** on a task's newest failed run | The Diagnose run lens on that task. |
+
+On Tune, the run classifier's verdict chip on a failed run shows whether or not the Sidecar is on. Your tooling also lists the Sidecar's vendor, model, mode and caps and each connection's sign-in state; Spend carries the Sidecar's own bucket.
+
+**One placement surface.** One place decides a change's placement at a time. While the drawer holds that change's placement card, the placement panel shrinks to one line, "Placing with Sidecar · decide in the drawer", and the spec map follows the card's selected row, both ways. **Place by hand** reopens the panel with the card's selection. It also covers the card's withdrawal after 60 seconds.
+
+**Ghost items.** While a change-set card waits, its items show wherever a change appears: the PRD tree, Open changes rows, markers on the area map and the area view's spec map, and a "+N waiting on a card" note in the lifecycle strip. Real counts never include them.
+
+**Without the Sidecar.** Everything above is hidden. Plan keeps Preview, Draft with the model and the placement panel; Specs to tighten still links to the filtered list; the Tune tiles keep working.
+
 ## Prepare task
 
 The Prepare task modal shows every per-task `ndx work` option before a run
