@@ -99,7 +99,8 @@ beforeEach(() => {
   // `/api/project` is cached per module; each case reads its own.
   clearProjectMetadataCache();
   localStorage.clear();
-  root = document.createElement("div");
+  sessionStorage.clear();
+  root =document.createElement("div");
   document.body.appendChild(root);
 });
 
@@ -222,6 +223,24 @@ describe("InboxPage on a v2 project", () => {
     await mount(h(InboxView, { rows: [{ change: change("x") }], appliedUnplaced: 0, onOpenChange }));
     act(() => { root.querySelector<HTMLButtonElement>(".inbox-place")!.click(); });
     expect(onOpenChange).toHaveBeenCalledWith("x");
+  });
+
+  it("shows an unsaved placement as 'draft · <relation> <target>' on the row, and a proposal as 'draft · proposes <title>' (WF10)", async () => {
+    const target = { target: "cap-gift", title: "Gift cards", area: "Payments" };
+    sessionStorage.setItem("ndx.placement-draft.x", JSON.stringify({ step: "place", target, relation: "amends", summary: "", proposed: "", criteria: [] }));
+    sessionStorage.setItem("ndx.placement-draft.y", JSON.stringify({ step: "propose", type: "capability", under: "", title: "Gift receipts", statement: "", criteria: "" }));
+    await mount(h(InboxView, { rows: [{ change: change("x") }, { change: change("y") }, { change: change("z") }], appliedUnplaced: 0, onOpenChange: vi.fn() }));
+    const notes = [...root.querySelectorAll<HTMLElement>(".inbox-row")].map((r) => r.querySelector(".inbox-draft")?.textContent ?? null);
+    expect(notes).toEqual(["draft · amends Gift cards", "draft · proposes Gift receipts", null]);
+  });
+
+  it("drops the draft of a change the Inbox no longer lists", async () => {
+    sessionStorage.setItem("ndx.placement-draft.gone", JSON.stringify({ step: "propose", type: "capability", under: "", title: "t", statement: "", criteria: "" }));
+    sessionStorage.setItem("ndx.placement-draft.x", JSON.stringify({ step: "propose", type: "capability", under: "", title: "t", statement: "", criteria: "" }));
+    serveInbox([change("x")], []);
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(sessionStorage.getItem("ndx.placement-draft.gone")).toBeNull();
+    expect(sessionStorage.getItem("ndx.placement-draft.x")).not.toBeNull();
   });
 
   it("names a shortlist that failed to load instead of a guess", async () => {

@@ -24,6 +24,7 @@ import { h } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { StrengthChip, useProjectStatus } from "../components/index.js";
 import type { GuessStrength } from "../components/index.js";
+import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree/placement-draft.js";
 import { useRefetchableProductRead } from "../hooks/index.js";
 import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
@@ -103,6 +104,8 @@ function shortId(change: ChangeRow): string {
 function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => void; onPlace?: (id: string) => void }) {
   const { change } = row;
   const tags = row.shortlist && "placement" in row.shortlist ? row.shortlist.placement.change.tags ?? [] : [];
+  // An unsaved placement left in placement mode (WF10).
+  const draftNote = placementDraftNote(change.id);
   // The row is the target; the title button gives it keyboard reach, and its
   // click bubbles here. Place opens placement mode when the page can, and
   // otherwise bubbles to the row too.
@@ -115,6 +118,7 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
     ),
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
+      draftNote ? h("span", { class: "tag inbox-draft", "data-draft": "placement" }, draftNote) : null,
       h("button", {
         type: "button",
         class: "btn btn-sm inbox-place",
@@ -235,6 +239,10 @@ export function useInbox(): InboxRead {
     () => (load.state === "ready" ? load.data.filter((c) => c.awaitsPlacement || isAppliedUnplaced(c)) : null),
     [load],
   );
+  // A change placed by any route (here, the CLI, another session) no longer waits: its draft goes (WF10).
+  useEffect(() => {
+    if (waiting) prunePlacementDrafts(new Set(waiting.map((c) => c.id)));
+  }, [waiting]);
   const shortlists = useShortlists(waiting);
   const { rows, applied } = useMemo(() => {
     const all = (waiting ?? []).map((change) => ({ change, shortlist: shortlists.get(change.id) }));

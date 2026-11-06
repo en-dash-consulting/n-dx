@@ -16,6 +16,7 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { StrengthChip } from "../components/index.js";
+import { placementDraftNote } from "../components/prd-tree/placement-draft.js";
 import type {
   AreaAppliedChange,
   AreaDetail,
@@ -92,6 +93,9 @@ function WaitingInInbox({ guesses, onPlace }: { guesses: readonly AreaInboxGuess
                 h("span", { class: "inbox-guess-label" }, "Best guess"),
                 h("span", { class: "inbox-guess-title" }, g.target.title),
                 h(StrengthChip, { strength: g.strength })),
+              placementDraftNote(g.id)
+                ? h("span", { class: "tag inbox-draft", "data-draft": "placement" }, placementDraftNote(g.id))
+                : null,
               h("button", {
                 type: "button",
                 class: "btn btn-sm inbox-place",

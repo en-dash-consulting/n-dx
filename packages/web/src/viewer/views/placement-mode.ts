@@ -32,6 +32,11 @@
  * panel's controls. Place & add another keeps the panel open (WF8): every home
  * placed in the visit is marked on the map with the change's marker.
  *
+ * Leaving (Esc, the breadcrumb, another tab) with a pick or an edit in the
+ * panel keeps it as a draft for the browser session (WF10, placement-draft.ts):
+ * the Inbox row says "draft · …", and Place resumes it at the step it was left
+ * with. Esc with no edits just leaves.
+ *
  * @module viewer/views/placement-mode
  */
 
@@ -329,6 +334,17 @@ export function PlacementMode({ changeId, navigateTo }: PlacementModeProps) {
     }
     pressPanelShortcut(panelRef.current, shortcut);
   });
+  // Esc leaves placement mode. Whatever the form holds is already kept as a draft (WF10), so nothing is asked.
+  const leaveRef = useRef<() => void>();
+  leaveRef.current = () => navigateTo?.("plan");
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      leaveRef.current?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   useEffect(() => {
     if (zoom !== undefined || !map || !read) return;
     const start = placement ? placementStart(placement, map) : { level: "map" as const };

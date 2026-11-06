@@ -129,6 +129,7 @@ function serveThree(): void {
 
 beforeEach(() => {
   for (const id of ["a", "b", "c"]) takeTitleFocus(id);
+  sessionStorage.clear();
   clearProjectMetadataCache();
   root = document.createElement("div");
   document.body.appendChild(root);

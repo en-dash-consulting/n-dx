@@ -222,6 +222,8 @@ const crumb = () => $$(".placing-crumb > button, .placing-crumb > b").map((el) =
 const lit = () => $$(".pam-block.pam-lit").map((el) => [el.dataset.block, el.querySelector(".pam-lit-note")?.textContent]);
 
 beforeEach(() => {
+  // Placement drafts live in sessionStorage for the browser session: none may carry over.
+  sessionStorage.clear();
   clearProjectMetadataCache();
   root = document.createElement("div");
   document.body.appendChild(root);
@@ -821,6 +823,99 @@ describe("PlacementMode", () => {
       expect($(".cp-draft-note")?.textContent).toContain("No draft from the model");
       expect($$(".cp-model-mark")).toEqual([]);
       expect($('.cp-card[data-target="cap-gift"]')).toBeNull();
+    });
+  });
+
+  describe("leaving keeps an unsaved placement as a draft (WF10)", () => {
+    const TWO = [candidate("cap-refund", { score: 9 }), candidate("cap-gift", { strength: "possible", score: 2 })];
+    const KEY = "ndx.placement-draft.a";
+    const typeInto = async (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+      await act(async () => { el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); });
+    };
+    const leave = async () => { await act(async () => { render(null, root); }); };
+    const pressEscape = async () => {
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); });
+    };
+
+    it("Esc leaves for Plan; a pick and an edit come back on the next Place, and nothing is written", async () => {
+      serve([change("a")], [placement("a", TWO)]);
+      const posts = also({});
+      const navigateTo = vi.fn();
+      await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+      await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-gift"] input[type="radio"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="amends"]')!.click(); });
+      await settle();
+      await typeInto($<HTMLInputElement>(".cp-amends input.cp-input")!, "Gift cards expire");
+      await pressEscape();
+      expect(navigateTo).toHaveBeenCalledWith("plan");
+      await leave();
+
+      await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+      expect($(".cp-card.is-checked")?.dataset.target).toBe("cap-gift");
+      expect($(".cp-card.is-checked .cp-relation")?.dataset.relation).toBe("amends");
+      expect($<HTMLInputElement>(".cp-amends input.cp-input")?.value).toBe("Gift cards expire");
+      // The map follows the resumed pick.
+      expect($$('.pam-block[aria-pressed="true"]').map((el) => el.dataset.block)).toEqual(["cap-gift"]);
+      expect(posts).toEqual([]);
+    });
+
+    it("keeps an edited criterion across the leave", async () => {
+      serve([change("a")], [placement("a", [candidate("cap-refund", { score: 9, criteria: [{ id: "c1", text: "Refund in 5 days" }] })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="amends"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLButtonElement>(".cp-card.is-checked .task-criterion-remove")!.click(); });
+      await settle();
+      await leave();
+
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect($$(".cp-card.is-checked .task-criterion")).toEqual([]);
+    });
+
+    it("Esc with no edits just leaves and keeps nothing", async () => {
+      serve([change("a")], [placement("a", TWO)]);
+      const navigateTo = vi.fn();
+      await mount(h(PlacementMode, { changeId: "a", navigateTo }));
+      await pressEscape();
+      expect(navigateTo).toHaveBeenCalledWith("plan");
+      expect(sessionStorage.getItem(KEY)).toBeNull();
+    });
+
+    it("resumes on the proposal step with what was typed, and the ghost block follows", async () => {
+      serve([change("a")], [placement("a", TWO)]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await press("n");
+      await typeInto($<HTMLInputElement>(".cp-propose input.cp-input")!, "Gift receipts");
+      await leave();
+
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      expect($(".cp-propose")).not.toBeNull();
+      expect($<HTMLInputElement>(".cp-propose input.cp-input")?.value).toBe("Gift receipts");
+    });
+
+    it("Place drops the draft", async () => {
+      serve([change("a")], [placement("a", TWO)]);
+      also({});
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
+      await settle();
+      expect(sessionStorage.getItem(KEY)).not.toBeNull();
+      await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="touches"]')!.click(); });
+      await settle();
+      await act(async () => { $<HTMLButtonElement>(".cp-place")!.click(); });
+      await settle();
+      expect(sessionStorage.getItem(KEY)).toBeNull();
+    });
+
+    it("a change placed by another route loses its draft once the Inbox is read", async () => {
+      sessionStorage.setItem(KEY, JSON.stringify({ step: "propose", type: "capability", under: "", title: "Gift receipts", statement: "", criteria: "" }));
+      // `a` is no longer waiting; `b` is.
+      serve([change("a", { awaitsPlacement: undefined, needsPlacement: false }), change("b")], [placement("b", TWO)]);
+      await mount(h(PlacementMode, { changeId: "b", navigateTo: vi.fn() }));
+      expect(sessionStorage.getItem(KEY)).toBeNull();
     });
   });
 

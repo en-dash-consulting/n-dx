@@ -166,6 +166,8 @@ const button = (label: string) => $$<HTMLButtonElement>("button").find((b) => b.
 beforeEach(() => {
   // A focus request is module state: no case may start with one pending.
   for (const id of ["a", "b", "c"]) takeTitleFocus(id);
+  // Placement drafts live in sessionStorage for the browser session: none may carry over.
+  sessionStorage.clear();
   clearProjectMetadataCache();
   root = document.createElement("div");
   document.body.appendChild(root);

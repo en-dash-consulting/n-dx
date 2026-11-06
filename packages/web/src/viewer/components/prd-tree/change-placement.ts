@@ -67,6 +67,13 @@ import type {
   ProposeChangeResult,
 } from "../../views/product-model.js";
 import { CriteriaEditor } from "./criteria-editor.js";
+import {
+  dropPlacementDraft,
+  loadPlacementDraft,
+  savePlacementDraft,
+  type PlaceStepDraft,
+  type ProposeStepDraft,
+} from "./placement-draft.js";
 
 // ── Title focus after Place & next ───────────────────────────────────
 
@@ -583,12 +590,21 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const shortlist = placement?.shortlist ?? [];
   // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
   const [requested] = useState(() => (another ? null : takePlacementRequest(changeId)));
+  // The pick and edits this form was left with (WF10); a caller's request outranks them.
+  const [saved] = useState<PlaceStepDraft | null>(() => {
+    if (another || requested) return null;
+    const draft = loadPlacementDraft(changeId);
+    return draft?.step === "place" ? draft : null;
+  });
+  // The saved amendment edits wait here until the target's criteria seed would otherwise replace them.
+  const savedCriteria = useRef(saved?.criteria.length ? saved.criteria : null);
+  const justRestored = useRef(false);
   // An extra place starts empty: the map's selection is the place just made.
-  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? (another ? null : selection) ?? null);
+  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? saved?.target ?? (another ? null : selection) ?? null);
   const seenSelection = useRef(selection?.target);
-  const [relation, setRelation] = useState<PlacementRelation | null>(requested?.relation ?? initialRelation(placement, wide));
-  const [summary, setSummary] = useState("");
-  const [proposed, setProposed] = useState("");
+  const [relation, setRelation] = useState<PlacementRelation | null>(requested?.relation ?? (saved ? saved.relation : initialRelation(placement, wide)));
+  const [summary, setSummary] = useState(saved?.summary ?? "");
+  const [proposed, setProposed] = useState(saved?.proposed ?? "");
   const [drafts, setDrafts] = useState<CriterionDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
@@ -618,7 +634,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   };
 
   // The rules' relation arrives with the shortlist; an extra place only touches.
-  useEffect(() => { if (placement && !requested) setRelation(initialRelation(placement, wide)); }, [placement?.relation]);
+  useEffect(() => { if (placement && !requested && !saved) setRelation(initialRelation(placement, wide)); }, [placement?.relation]);
   // A requested target becomes its shortlist row once read: that row carries type and criteria.
   useEffect(() => {
     const row = requested?.target && shortlist.find((c) => c.target === requested.target!.target);
@@ -641,6 +657,15 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   useEffect(() => {
     setRefusal(null);
     if (!chosen) { setDrafts([]); return; }
+    // Resuming a draft: its edited criteria stand in for the seed, once.
+    if (savedCriteria.current && chosen.target === saved?.target.target) {
+      setDrafts(savedCriteria.current);
+      savedCriteria.current = null;
+      // This commit still holds the empty list: saving it would overwrite the edits being restored.
+      justRestored.current = true;
+      return;
+    }
+    savedCriteria.current = null;
     const seed = (list: Array<{ id: string; text: string }>) =>
       setDrafts(list.map((c) => ({ id: c.id, text: c.text, original: c.text })));
     if (chosen.criteria) { seed(chosen.criteria); return; }
@@ -682,6 +707,15 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const pending: PendingCriteria | null = amending && chosen?.type === "capability"
     ? { target: chosen.target, delta: criteriaCountDelta(drafts) }
     : null;
+  // Whatever the form holds is kept as a draft, so leaving by any route loses nothing (WF10).
+  // A pick is the least that counts; no pick, no draft. An extra place after a write keeps none.
+  useEffect(() => {
+    if (another) return;
+    if (justRestored.current) { justRestored.current = false; return; }
+    savePlacementDraft(changeId, chosen
+      ? { step: "place", target: chosen, relation, summary, proposed, criteria: drafts }
+      : null);
+  }, [chosen?.target, relation, summary, proposed, drafts]);
   const pendingKey = pending ? `${pending.target}:${pending.delta}` : "";
   useEffect(() => { onPendingCriteria?.(pending); }, [pendingKey]);
   useEffect(() => () => onPendingCriteria?.(null), []);
@@ -835,15 +869,17 @@ interface ProposeFormProps {
   onGhost?: (ghost: ProposalGhost | null) => void;
   /** The area the form opens under when no draft names one: placement mode's zoomed area. */
   defaultUnder?: string;
+  /** The form as a leaving left it (WF10); it opens on this. */
+  saved?: ProposeStepDraft | null;
 }
 
-function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost, defaultUnder }: ProposeFormProps) {
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted, onGhost, defaultUnder, saved }: ProposeFormProps) {
   const initial = drafted?.proposal;
-  const [type, setType] = useState<"capability" | "constraint">(initial?.type ?? "capability");
-  const [under, setUnder] = useState(initial?.under ?? defaultUnder ?? "");
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [statement, setStatement] = useState(initial?.proposed ?? "");
-  const [criteria, setCriteria] = useState(criteriaLines(initial));
+  const [type, setType] = useState<"capability" | "constraint">(saved?.type ?? initial?.type ?? "capability");
+  const [under, setUnder] = useState(saved?.under ?? initial?.under ?? defaultUnder ?? "");
+  const [title, setTitle] = useState(saved?.title ?? initial?.title ?? "");
+  const [statement, setStatement] = useState(saved?.statement ?? initial?.proposed ?? "");
+  const [criteria, setCriteria] = useState(saved?.criteria ?? criteriaLines(initial));
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [draftNote, setDraftNote] = useState<DraftNote | null>(
@@ -855,6 +891,11 @@ function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed
   // The form closing, by Back or by a write, clears the ghost.
   useEffect(() => { onGhost?.(type === "capability" ? { title: title.trim() || changeTitle, under } : null); }, [type, title, under]);
   useEffect(() => () => onGhost?.(null), []);
+  // Typed text or a chosen type is an edit worth keeping (WF10); the area alone the map supplied is not.
+  useEffect(() => {
+    const edited = !!(title.trim() || statement.trim() || criteria.trim()) || type !== "capability" || under !== (defaultUnder ?? "");
+    savePlacementDraft(changeId, edited ? { step: "propose", type, under, title, statement, criteria } : null);
+  }, [type, under, title, statement, criteria]);
 
   const askModel = async () => {
     setDraftNote(null);
@@ -978,7 +1019,12 @@ interface Written {
 export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, onWritten, onInboxState, onPlaceOnMap, layout = "compact", selection, onChoose, onPendingCriteria, onGhost, onHomes, proposeUnder }: ChangePlacementSectionProps) {
   const cliName = useCliName();
   const inbox = useInbox();
-  const [proposing, setProposing] = useState(false);
+  // A draft left on the proposal step resumes there (WF10).
+  const [savedPropose, setSavedPropose] = useState<ProposeStepDraft | null>(() => {
+    const draft = loadPlacementDraft(changeId);
+    return draft?.step === "propose" ? draft : null;
+  });
+  const [proposing, setProposing] = useState(savedPropose !== null);
   const [another, setAnother] = useState(false);
   const [written, setWritten] = useState<Written | null>(null);
   const [drafted, setDrafted] = useState<PlacementDraft | null>(null);
@@ -1034,6 +1080,7 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
 
   const onPlaced = (result: PlaceChangeResult, target: PlacementTarget, mode: PlaceMode) => {
     const note: Written = { line: `Placed: ${result.relation} ${target.title}`, ...(result.warnings ? { warnings: result.warnings } : {}) };
+    dropPlacementDraft(changeId);
     afterWrite();
     // Every home placed while adding more is listed, with Remove, until Done.
     if (mode === "another" || another) {
@@ -1060,6 +1107,7 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       ...(result.warnings ? { warnings: result.warnings } : {}),
     });
     setProposing(false);
+    dropPlacementDraft(changeId);
     afterWrite();
     if (next) openNext(position.next);
   };
@@ -1099,18 +1147,18 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       place: {
         changeId, changeTitle, read, another, touchesOnly, hasNext: position.next !== null,
         onPlaced,
-        onNothingFits: () => { setDrafted(null); setProposing(true); },
+        onNothingFits: () => { setDrafted(null); setSavedPropose(null); setProposing(true); },
         // Done with no home left (all removed) puts the change back in the Inbox.
         onDone: () => { setAnother(false); if (!homes.length) setWritten(null); },
         homes: another ? homes : [], onRemoveHome: removeHome,
         draftEnabled,
-        onDraftProposal: (draft) => { setDrafted(draft); setProposing(true); },
+        onDraftProposal: (draft) => { setDrafted(draft); setSavedPropose(null); setProposing(true); },
         wide: layout === "wide", selection, onChoose, onPendingCriteria,
       },
       propose: {
         changeId, changeTitle, hasNext: position.next !== null,
-        onProposed, onBack: () => setProposing(false),
-        draftEnabled, drafted, onGhost, defaultUnder: proposeUnder,
+        onProposed, onBack: () => { setSavedPropose(null); setProposing(false); },
+        draftEnabled, drafted, onGhost, defaultUnder: proposeUnder, saved: savedPropose,
       },
     }),
   );
