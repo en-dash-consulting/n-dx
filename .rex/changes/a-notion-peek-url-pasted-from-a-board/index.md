@@ -11,6 +11,7 @@ touches:
   - "7df16224-db25-4a39-81d2-5c5c3904f4b9"
 priority: "medium"
 discoveredFrom: {"item":"f0c6ea64-7a37-4826-bc2f-aff8bf813737","run":"2f2299b2-a3d2-49b1-8312-ff01b7406eaa"}
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
