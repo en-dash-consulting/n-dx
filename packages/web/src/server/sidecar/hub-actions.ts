@@ -72,6 +72,8 @@ export function createHubActions(opts: HubActionsOptions): SidecarActions {
     writeLink: async () => refused,
     checkItemEdit: async () => HUB_NO_EFFECT,
     writeItemEdit: async () => refused,
+    checkStatus: async () => HUB_NO_EFFECT,
+    writeStatus: async () => refused,
     readRunPlan: async () => HUB_NO_EFFECT,
     githubReadsAllowed: () => false,
     branchHealthEnabled: () => false,

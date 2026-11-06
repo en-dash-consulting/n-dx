@@ -1360,6 +1360,32 @@ describe("permission cards", () => {
     });
   });
 
+  describe("status card", () => {
+    const status = (rule: NonNullable<SidecarCard["statusChange"]>["rule"], to = "deferred"): SidecarCard => card("s1", 1, {
+      kind: "status", tool: "propose_status", allowListKey: null,
+      input: { id: "t1", status: to },
+      statusChange: { itemId: "t1", itemTitle: "Write the cache", from: "in_progress", to, reason: "waiting on design", rule },
+    });
+
+    it("shows the move and rex's rule, offers no always-allow, and Approve sends a plain approval", async () => {
+      await openWith([status({ allowed: true })]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("t1: in progress → deferred");
+      expect(root.querySelector(".sidecar-status-item")?.textContent).toBe("t1 Write the cache");
+      expect(root.querySelector(".sidecar-status-move")?.textContent).toBe("in progress → deferred");
+      expect(root.querySelector(".sidecar-status-reason")?.textContent).toBe("Why: waiting on design");
+      expect(root.querySelector(".sidecar-status-rule")?.textContent).toBe("Rex allows this move without force.");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("quotes rex's refusal on a move rex will not make", async () => {
+      await openWith([status({ allowed: false, message: 'Cannot move from "completed" to "pending".' }, "pending")]);
+      expect(root.querySelector(".sidecar-status-refused")?.textContent).toBe('Rex refuses this move: Cannot move from "completed" to "pending".');
+    });
+  });
+
   describe("item-edit card", () => {
     const edit = (): SidecarCard => card("e1", 1, {
       kind: "item-edit", tool: "propose_item_edit", allowListKey: null,
@@ -1469,6 +1495,8 @@ describe("permission cards", () => {
     link: { tool: "propose_link", input: { itemId: "t1", ref: "WM-2054" }, title: "t1 → WM-2054" },
     // Without its fields (a card from before the item was read) the title is the item's id.
     "item-edit": { tool: "propose_item_edit", input: { id: "t1", tags: ["ui"] }, title: "t1" },
+    // Without its change (a card from before the status was read) the title is the item's id.
+    status: { tool: "propose_status", input: { id: "t1", status: "deferred" }, title: "t1" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },

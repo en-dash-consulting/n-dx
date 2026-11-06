@@ -105,6 +105,7 @@ export type SidecarCardKind =
   | "edit"
   | "link"
   | "item-edit"
+  | "status"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -160,6 +161,16 @@ export interface SidecarItemEditFields {
   priority?: "critical" | "high" | "medium" | "low";
 }
 
+/** A status card's item, its status and the proposed one, and rex's verdict on the move; mirrors `SidecarStatusChange` in shared/sidecar-card.ts. */
+export interface SidecarStatusChange {
+  itemId: string;
+  itemTitle: string;
+  from: string;
+  to: string;
+  reason?: string;
+  rule: { allowed: true } | { allowed: false; message: string };
+}
+
 /** An item-edit card's item and each changed field before and after; mirrors `SidecarItemEdit` in shared/sidecar-card.ts. */
 export interface SidecarItemEdit {
   itemId: string;
@@ -205,6 +216,8 @@ export interface SidecarCard {
   link?: SidecarLink;
   /** An item-edit card's fields as read when it was raised and as approval writes them. */
   itemEdit?: SidecarItemEdit;
+  /** A status card's change as read when it was raised. */
+  statusChange?: SidecarStatusChange;
   /** An external-call card's connection, workspace host, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */

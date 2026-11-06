@@ -117,6 +117,22 @@ export interface SidecarItemEdit {
   after: SidecarItemEditFields;
 }
 
+/**
+ * A status card: the item, its status when the card was raised (`from`), the
+ * proposed status (`to`) and rex's verdict on the move (`rule`, from rex's
+ * transition rule; `message` is rex's own wording when it refuses).
+ */
+export interface SidecarStatusChange {
+  itemId: string;
+  itemTitle: string;
+  from: SidecarItemStatus;
+  to: SidecarItemStatus;
+  reason?: string;
+  rule: { allowed: true } | { allowed: false; message: string };
+}
+
+export type SidecarItemStatus = "pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "cancelled" | "deleted";
+
 /** The operator's edit of one item, sent with the approval. */
 export interface SidecarChangeSetEdit {
   index: number;

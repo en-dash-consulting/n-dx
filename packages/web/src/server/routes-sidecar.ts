@@ -91,6 +91,7 @@ import { awaitSidecarCommand, renderWorkPreview, runFailedResult, SIDECAR_COMMAN
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { readLinkCall, writeLinkCard } from "./tracker/link-card.js";
 import { readItemEditCall, writeItemEditCard } from "./sidecar/item-edit-card.js";
+import { readStatusCall, writeStatusCard } from "./sidecar/status-card.js";
 import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
 import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
@@ -495,6 +496,14 @@ export function sidecarActions(
     },
     async writeItemEdit(itemEdit) {
       const written = await writeItemEditCard(ctx, itemEdit);
+      if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      return written;
+    },
+    checkStatus(input) {
+      return readStatusCall(ctx.rexDir, input);
+    },
+    async writeStatus(change) {
+      const written = await writeStatusCard(ctx, change);
       if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
       return written;
     },
