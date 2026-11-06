@@ -27,6 +27,7 @@ import { ProductPage } from "../../../src/viewer/views/product-pages.js";
 import { parsePathnameRoute, placeChangeOfTab, placementTab, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { createWSPipeline } from "../../../src/viewer/hooks/use-gateway.js";
 import type {
   AreaDetail,
   CapabilityRow,
@@ -693,17 +694,33 @@ describe("PlacementMode", () => {
     });
 
     describe("after a plain Place, the placed change has left the Inbox", () => {
+      /** Place's write comes back as `rex:prd-changed`: deliver it through every pipeline the views opened. */
+      const prdChanged = async () => {
+        const pipelines = vi.mocked(createWSPipeline).mock.calls.map(([config]) => config);
+        await act(async () => {
+          for (const config of pipelines) {
+            config.onFlush({ types: new Set(["rex:prd-changed"]), countByType: new Map(), messages: [], size: 1 });
+          }
+        });
+        await settle();
+      };
+
       const placeThen = async (key: string) => {
+        vi.mocked(createWSPipeline).mockClear();
         const all = ["a", "b", "c", "d"];
         serve(all.map((id) => change(id)), all.map((id) => placement(id, TWO)));
         const navigateTo = vi.fn();
         await mount(h(PlacementMode, { changeId: "c", navigateTo }));
-        // The refetch after Place no longer lists c.
+        expect($(".placing-label")?.textContent).toContain("Placing 3 of 4");
+        // The reread after Place no longer lists c.
         also({ "/api/rex/changes": { layout: "v2", changes: ["a", "b", "d"].map((id) => change(id)) } });
         await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-refund"] input[type="radio"]')!.click(); });
         await settle();
         await act(async () => { $<HTMLButtonElement>(".cp-place")!.click(); });
         await settle();
+        await prdChanged();
+        // c has left the Inbox order, so the label no longer counts it.
+        expect($(".placing-label")?.textContent).toBe("Placing · Change c");
         navigateTo.mockClear();
         await press(key);
         return navigateTo;
