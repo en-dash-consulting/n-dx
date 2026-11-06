@@ -138,6 +138,11 @@ async function fetchStatus(): Promise<ProjectStatus | null> {
   return fetchPromise;
 }
 
+/** The served tree's PRD layout from the shared status; `"v1"` until it lands or when there is no PRD. */
+export function useStatusLayout(): "v1" | "v2" {
+  return useProjectStatus()?.rex?.layout === "v2" ? "v2" : "v1";
+}
+
 /** Hook that returns project status, polling at a regular interval.
  *  Also listens for WebSocket events (hench:run-changed, rex:prd-changed)
  *  to refresh immediately when runs or PRD data change on disk.

@@ -12,7 +12,7 @@ import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId } from "../api.js";
-import { SETTINGS_ENTRIES, useCliName, viewLabel, viewGlyph, viewPixelIcon } from "../api.js";
+import { SETTINGS_ENTRIES, useCliName, useStatusLayout, viewLabelFor, viewGlyph, viewPixelIcon } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
 import { PixelIcon } from "./pixel-icons.js";
 import { ConfigFooter, type ServerIdentity } from "./config-footer.js";
@@ -33,6 +33,7 @@ export interface SettingsOverlayProps {
 
 export function SettingsOverlay({ view, validViews, onNavigate, onClose, server = null, children }: SettingsOverlayProps) {
   const cliName = useCliName();
+  const layout = useStatusLayout();
 
   const entries = useMemo(() => SETTINGS_ENTRIES
     .filter((e) => validViews.has(e.view))
@@ -40,8 +41,8 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
       view: e.view,
       glyph: viewGlyph(e.view),
       pixelIcon: viewPixelIcon(e.view),
-      label: resolveCliLabel(viewLabel(e.view), cliName),
-    })), [validViews, cliName]);
+      label: resolveCliLabel(viewLabelFor(e.view, layout), cliName),
+    })), [validViews, cliName, layout]);
 
   const current = entries.find((e) => e.view === view);
 
