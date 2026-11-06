@@ -614,12 +614,10 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const [draftNote, setDraftNote] = useState<DraftNote | null>(null);
   const draft = useDraft(changeId);
   const criteriaRef = useRef<HTMLDivElement>(null);
-  // With Sidecar on, its Place lens drafts; the one-shot model draft is the Sidecar-off path in the wide panel.
-  const sidecarOn = useContext(PlaceWithSidecarContext) !== null;
   // The model's pick in the wide panel: a card marked "model", never checked for the person.
   const [modelPick, setModelPick] = useState<PlacementTarget | null>(null);
   // Drafting is for open changes: rex refuses an applied one, and an extra place only touches.
-  const canDraft = draftEnabled && !touchesOnly && !another && !(wide && sidecarOn);
+  const canDraft = draftEnabled && !touchesOnly && !another;
 
   const askModel = async () => {
     setDraftNote(null);
@@ -1059,7 +1057,9 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
   const [drafted, setDrafted] = useState<PlacementDraft | null>(null);
   const [homes, setHomes] = useState<PlacedHome[]>([]);
   const [removeRefusal, setRemoveRefusal] = useState<Refusal | null>(null);
-  const draftEnabled = useFeatureToggle(PLACEMENT_DRAFT_FEATURE, false);
+  // With Sidecar on, "Place with Sidecar" replaces the one-shot draft in both layouts (SP3).
+  const sidecarOn = useContext(PlaceWithSidecarContext) !== null;
+  const draftEnabled = useFeatureToggle(PLACEMENT_DRAFT_FEATURE, false) && !sidecarOn;
 
   const row = inbox.load.state === "ready" ? inbox.load.data.find((c) => c.id === changeId) : undefined;
   const inInbox = !!row?.awaitsPlacement && !written;

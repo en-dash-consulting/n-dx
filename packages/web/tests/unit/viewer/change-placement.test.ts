@@ -23,6 +23,7 @@ import {
   takePlacementRequest,
   takeTitleFocus,
 } from "../../../src/viewer/components/prd-tree/change-placement.js";
+import { PlaceWithSidecarContext } from "../../../src/viewer/components/place-with-sidecar.js";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -637,6 +638,38 @@ describe("Nothing fits", () => {
     expect($(".cp-refusal-hint")?.textContent).toBe(REFUSAL_HINTS["empty-title"]);
     await click(button("Back to the shortlist"));
     expect($(".cp-shortlist")).not.toBeNull();
+  });
+});
+
+describe("Place with Sidecar replaces Draft with the model (SP3)", () => {
+  const toggle = (enabled: boolean) => ({ "/api/features": { toggles: [{ key: PLACEMENT_DRAFT_FEATURE, enabled }] } });
+  const sidecar = { attached: null, place: vi.fn() };
+  const mountWith = async (layout: "compact" | "wide", sidecarOn: boolean) => {
+    await mount(h(PlaceWithSidecarContext.Provider, { value: sidecarOn ? sidecar : null },
+      h(ChangePlacementSection, { changeId: "a", changeTitle: "Change a", onOpenChange: vi.fn(), layout })));
+  };
+
+  it.each(["compact", "wide"] as const)("%s: web.sidecar on shows Place with Sidecar, not the draft", async (layout) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountWith(layout, true);
+    expect(button("Place with Sidecar")).not.toBeNull();
+    expect(button("Draft with the model")).toBeNull();
+    await click(button("Nothing fits"));
+    expect(button("Draft with the model")).toBeNull();
+  });
+
+  it.each(["compact", "wide"] as const)("%s: web.sidecar off, placementDraft on shows the draft only", async (layout) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountWith(layout, false);
+    expect(button("Draft with the model")).not.toBeNull();
+    expect(button("Place with Sidecar")).toBeNull();
+  });
+
+  it.each(["compact", "wide"] as const)("%s: both off shows neither", async (layout) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(false));
+    await mountWith(layout, false);
+    expect(button("Draft with the model")).toBeNull();
+    expect(button("Place with Sidecar")).toBeNull();
   });
 });
 

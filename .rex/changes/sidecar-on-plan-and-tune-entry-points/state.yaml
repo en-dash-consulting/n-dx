@@ -93,7 +93,14 @@ items:
     lastModified: "2026-11-05T22:31:55.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "df78a8d3-c5a4-434e-86b9-840a59b77c2f":
-    lastModified: "2026-11-05T01:08:20.159Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:39:00.885Z"
+    completedAt: "2026-11-06T02:41:29.455Z"
+    endedAt: "2026-11-06T02:41:29.455Z"
+    activeIntervals: [{"end":"2026-11-06T02:41:29.455Z","start":"2026-11-06T02:39:00.885Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "change-placement.ts: draftEnabled = rex.placementDraft && !sidecarOn in ChangePlacementSection, so both layouts drop Draft with the model while web.sidecar is on."
+    lastModified: "2026-11-06T02:41:29.455Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f453e786-c4bb-4f28-b049-3912ce0e02b0":
     status: "completed"
