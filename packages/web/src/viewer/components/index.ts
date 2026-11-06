@@ -132,6 +132,8 @@ export { CreateInTrackerButton, TrackerChip, asTrackerChipRead, useTrackerChips 
 export type { TrackerChipRead } from "./tracker-chip.js";
 export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
 export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
+export { ItemEditBody, itemEditDraftOf, itemEditEdits, listDiff } from "./sidecar-item-edit.js";
+export type { ItemEditBodyProps, ItemEditDraft } from "./sidecar-item-edit.js";
 export { PlanWithSidecarContext, PlanWithSidecarButton, PlanInAreaButton, planFirstTurn, planSurvivesAreaReport } from "./plan-with-sidecar.js";
 export type { PlanWithSidecar } from "./plan-with-sidecar.js";
 export { DescribeInSidecarContext, DescribeInSidecarButton } from "./describe-in-sidecar.js";

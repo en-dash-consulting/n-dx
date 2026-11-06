@@ -95,6 +95,28 @@ export interface SidecarLink {
   label: string | null;
 }
 
+/** An item's fields an item-edit card can change; a field left out is not edited. */
+export interface SidecarItemEditFields {
+  title?: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  tags?: string[];
+  priority?: "critical" | "high" | "medium" | "low";
+}
+
+/**
+ * An item-edit card: the item, and for each field the call changes its value
+ * when the card was raised (`before`) and the value approval writes (`after`).
+ * Both hold the same keys; the operator's edits replace `after`.
+ */
+export interface SidecarItemEdit {
+  itemId: string;
+  /** The item's title when the card was raised. */
+  itemTitle: string;
+  before: SidecarItemEditFields;
+  after: SidecarItemEditFields;
+}
+
 /** The operator's edit of one item, sent with the approval. */
 export interface SidecarChangeSetEdit {
   index: number;

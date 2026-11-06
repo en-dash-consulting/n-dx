@@ -24,6 +24,7 @@ export const BROKER_TOOL_NAMES = [
   "place_change_card",
   "propose_edit",
   "propose_link",
+  "propose_item_edit",
   "github_read",
   "draft_github_post",
   "migration_decision",
@@ -52,6 +53,7 @@ export type SidecarCardKind =
   | "placement"
   | "edit"
   | "link"
+  | "item-edit"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -86,6 +88,8 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerCardTool, BrokerToolPolic
   propose_edit: { card: "edit", allowList: "never" },
   // A link changes what the tracker and the PRD say about each other: decided card by card, like a PRD write.
   propose_link: { card: "link", allowList: "never" },
+  // An edit of an existing item rewrites what the PRD asks of it: decided card by card, like every PRD write.
+  propose_item_edit: { card: "item-edit", allowList: "never" },
   github_read: { card: "network-read", allowList: "per-project" },
   draft_github_post: { card: "draft-post", allowList: "never" },
   migration_decision: { card: "migration-decision", allowList: "never" },

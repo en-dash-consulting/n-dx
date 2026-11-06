@@ -100,15 +100,15 @@ export const PLACE_INSTRUCTIONS = [
 
 /**
  * Describe. The agent cannot judge a model's answer, so the instructions name
- * the check it makes (vague done-when) and the one route for a fix: tightened
- * wording in the reply, which the operator applies. No tool edits an existing
- * task yet, and `propose_prd_change` only adds items.
+ * the check it makes (vague done-when) and the one route for a fix: an
+ * item-edit card carrying the tightened criteria, which the operator can
+ * adjust before approving. `propose_prd_change` only adds items.
  */
 export const DESCRIBE_INSTRUCTIONS = [
   "## How to describe",
   "Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.",
   "- Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as \"works\", \"properly\" or \"better\" doing the work. Quote it and say what cannot be checked.",
-  "- For every vague check, quote it and give the tightened wording in your reply, then say the operator applies it with `rex update` or the item editor. Do not call `propose_prd_change` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.",
+  "- For every vague check, quote it and give the tightened wording in your reply, then raise one `propose_item_edit` card for the task with `acceptanceCriteria`: the task's full done-when list with the vague checks replaced and the rest kept as they are. The operator sees each check before and after, can adjust the wording, and nothing is written before Approve. Do not call `propose_prd_change` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.",
   "- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.",
   "- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.",
 ].join("\n");
