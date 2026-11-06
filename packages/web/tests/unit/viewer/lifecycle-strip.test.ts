@@ -9,7 +9,7 @@ vi.mock("../../../src/viewer/hooks/use-project-status.js", async (orig) => ({
   useProjectStatus: () => status.value,
 }));
 
-import { LifecycleStrip, v1Cells, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
+import { LifecycleStrip, inboxAlsoInStageNote, v1Cells, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { ChangesView } from "../../../src/viewer/views/changes.js";
 import type { ChangeRow, ChangeSummary } from "../../../src/viewer/views/product-model.js";
@@ -139,6 +139,10 @@ describe("LifecycleStrip on v2", () => {
     const cell = root.querySelector('[data-stage="inbox"]')!;
     expect(cell.querySelector(".ls-count")?.textContent).toBe("1Inbox");
     expect(cell.querySelector(".ls-also-in-stage")?.textContent).toBe("1 also in a stage: no capability to place it on yet");
+  });
+
+  it("says them, not it, when more than one Inbox change is also in a stage", () => {
+    expect(inboxAlsoInStageNote(2)).toBe("2 also in a stage: no capability to place them on yet");
   });
 
   it("shows no note when every Inbox change is held", async () => {

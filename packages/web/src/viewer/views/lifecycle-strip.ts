@@ -58,7 +58,8 @@ const STAGE_CELLS: ReadonlyArray<{ stage: OpenChangeStage; label: string; hint: 
 export const INBOX_HINT = "waiting for a place on the map";
 
 /** Said beside the Inbox count when some of it is also in a stage. */
-export const inboxAlsoInStageNote = (n: number): string => `${n.toLocaleString()} also in a stage: no capability to place it on yet`;
+export const inboxAlsoInStageNote = (n: number): string =>
+  `${n.toLocaleString()} also in a stage: no capability to place ${n === 1 ? "it" : "them"} on yet`;
 
 /** The five v2 counts, in lifecycle order. */
 export function v2Cells(summary: ChangeSummary, waiting: { inbox: number; proposed: number } = { inbox: 0, proposed: 0 }): StripCell[] {

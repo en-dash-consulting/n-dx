@@ -12,7 +12,14 @@ items:
     lastModified: "2026-11-06T17:38:21.038Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "61a2bc6b-aaf1-4b81-8e6c-2360bbafdf0f":
-    lastModified: "2026-11-06T17:38:15.464Z"
+    status: "completed"
+    startedAt: "2026-11-06T17:41:36.380Z"
+    completedAt: "2026-11-06T17:44:39.912Z"
+    endedAt: "2026-11-06T17:44:39.912Z"
+    activeIntervals: [{"end":"2026-11-06T17:44:39.912Z","start":"2026-11-06T17:41:36.380Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Summary wire carries inboxInStage; lifecycle strip notes it beside the Inbox count, hidden at zero. Commit a6ecde735."
+    lastModified: "2026-11-06T17:44:39.912Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b8022ca-0e3a-4aba-8dd1-ab32a6bf1b75":
     status: "completed"
