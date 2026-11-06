@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "After Ask Sidecar on task T1, opening task T2 in the same view attaches T2 (its kind's default lens), not T1 (viewer test)"
   - "After Explain in Sidecar on capability or zone A, opening B in the same view attaches B (viewer test)"
 priority: "low"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
