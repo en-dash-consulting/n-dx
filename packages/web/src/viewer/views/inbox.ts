@@ -25,7 +25,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { PlaceWithSidecarButton, StrengthChip, useProjectStatus } from "../components/index.js";
 import type { GuessStrength } from "../components/index.js";
 import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree/placement-draft.js";
-import { useRefetchableProductRead } from "../hooks/index.js";
+import { resolveCliLabel, useCliName, useRefetchableProductRead } from "../hooks/index.js";
 import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
@@ -35,9 +35,12 @@ import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate }
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
 
-/** Why a change waiting here matters; the empty state keeps it where the next capture will land. */
+/**
+ * Why a change waiting here matters; the empty state keeps it where the next
+ * capture will land. `{cli}` is the project's CLI name (resolveCliLabel).
+ */
 export const HELD_EXPLANATION =
-  "A change held in the Inbox cannot close, and ndx work skips its tasks until it is placed.";
+  "A change held in the Inbox cannot close, and {cli} work skips its tasks until it is placed.";
 
 /** IB7: strongest first, then possible, tied, weak. */
 const STRENGTH_RANK: Record<GuessStrength, number> = { strong: 0, possible: 1, tied: 2, weak: 3 };
@@ -168,6 +171,7 @@ export interface InboxViewProps {
 }
 
 export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll }: InboxViewProps) {
+  const cliName = useCliName();
   const sorted = sortInbox(rows);
   const shown = limit === undefined ? sorted : sorted.slice(0, limit);
   const hidden = sorted.length - shown.length;
@@ -176,7 +180,7 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
     sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
-          h("p", { class: "section-sub" }, HELD_EXPLANATION))
+          h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
       : h("ul", { class: "inbox-list" },
           shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace })),
         ),

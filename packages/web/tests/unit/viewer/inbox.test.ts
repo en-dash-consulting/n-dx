@@ -265,7 +265,7 @@ describe("InboxPage on a v2 project", () => {
     const text = root.querySelector(".inbox-empty")?.textContent ?? "";
     expect(text).toContain("Inbox is empty");
     expect(text).toContain("A change held in the Inbox cannot close");
-    expect(text).toContain("ndx work skips its tasks until it is placed");
+    expect(text).toContain("n-dx work skips its tasks until it is placed");
     expect(rowIds()).toEqual([]);
   });
 
