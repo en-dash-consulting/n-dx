@@ -8,9 +8,9 @@ acceptanceCriteria:
   - "ndx ci gateway-imports reports a packages/hench/src .mjs or .js file importing @n-dx/rex outside src/prd/rex-gateway.ts as a violation"
   - "A test in tests/e2e/cli-ci.test.js covers a non-.ts file in a gated consumer"
 priority: "low"
-discoveredFrom: {"item":"4191f655-9b6c-4527-8672-36b21879b36f","run":"74104ab6-74d7-4c86-b756-e6651a09059e"}
 tags:
   - "ndx-adversarial-review"
   - "severity:low"
 source: "ndx-adversarial-review"
+discoveredFrom: {"item":"4191f655-9b6c-4527-8672-36b21879b36f","run":"74104ab6-74d7-4c86-b756-e6651a09059e"}
 ---
