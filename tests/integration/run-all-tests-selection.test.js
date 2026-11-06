@@ -81,6 +81,7 @@ describe("run-all-tests.mjs affected gate on a stale build", () => {
     "scripts/run-all-tests.mjs",
     "scripts/lib/select-suites.mjs",
     "scripts/lib/stale-dist.mjs",
+    "packages/core/build-identity.mjs",
     "packages/core/win-spawn.js",
     "packages/core/cli-log.js",
   ];

@@ -1,7 +1,8 @@
 /**
  * `/api/hub/*` — the hub's own API, distinct from any project server's.
  *
- *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count
+ *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count,
+ *                                     and the build it runs (version, build-stamp hash)
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
@@ -68,6 +69,7 @@ import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject,
 import type { NewProjectPlan } from "./new-project.js";
 import { EXTENSION_API_VERSION, buildExtensionsAnswer, resolveFrameUrl } from "./extensions.js";
 import { SidecarManager } from "./sidecars.js";
+import { hubBuildIdentity } from "./build-identity.js";
 import { DEFAULT_IDLE_STOP_MINUTES } from "./frame-keys.js";
 import { probeHubLens } from "./session-host.js";
 
@@ -463,6 +465,9 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
       startedAt: hub.startedAt,
       registryPath: hub.registryPath,
       projects: hub.listProjects().length,
+      // `ndx start` compares this with the build it would spawn, so a hub
+      // left running from an older dist/ is named rather than misread.
+      build: hubBuildIdentity(),
     });
     return true;
   }

@@ -59,6 +59,7 @@ import { NDX_HOME_ENV, resolveLayout, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 import { localConfigIsRepositoryConfig } from "./claude-integration.js";
+import { packageBuildIdentity } from "./build-identity.mjs";
 
 /**
  * Core's own CLI, beside this file. Not `join(__dir, "cli.js")`: callers pass
@@ -955,11 +956,12 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
 async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FILES, showMcp = true, hubPortFlag = null) {
   const info = await readPidFile(dir, files);
   if (!info) {
-    log("No background server recorded.");
-    // Still check if something is on the port
-    if (await isPortInUse(port)) {
-      log(`Note: Port ${port} is in use by another process.`);
-    }
+    // This user's hub may be up without this directory registered with it —
+    // and on the default port, the hub *is* the process on the port, which
+    // the generic note below would call "another process".
+    const hub = showMcp ? await findOwnRunningHub(hubHome(), hubPortFlag) : null;
+    const shownDir = resolve(dir) === resolve(process.cwd()) ? "." : dir;
+    for (const line of formatUnrecordedStatus({ port, hub, portInUse: await isPortInUse(port), dir: shownDir })) log(line);
     return;
   }
 
@@ -994,6 +996,56 @@ async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FI
     await removePidFile(dir, files);
     await removePortFile(dir, files);
   }
+}
+
+/**
+ * What `ndx start status` says for a directory with no pid or marker file.
+ * Pure, so the wording is unit-tested.
+ *
+ * "No registration is recorded", not "not registered": the record is the
+ * marker file in the directory, and the hub's registry may still hold the
+ * project after the marker was deleted (a `git clean`). Running the start
+ * command is right either way — registering again is idempotent.
+ *
+ * @param {object} args
+ * @param {number} args.port            The dashboard port this directory would use.
+ * @param {{ port: number, pid: number } | null} args.hub  This user's hub, when one answers.
+ * @param {boolean} args.portInUse      Whether something listens on `port`.
+ * @param {string} [args.dir]           The directory, as the start command should name it.
+ * @returns {string[]}
+ */
+export function formatUnrecordedStatus({ port, hub, portInUse, dir = "." }) {
+  const lines = [];
+  if (hub) {
+    const target = /\s/.test(dir) ? `"${dir}"` : dir;
+    lines.push(
+      `The n-dx hub is running on port ${hub.port} (PID ${hub.pid}), but no registration with it is recorded for this directory.`,
+      `  Run 'ndx start ${target}' to register it.`,
+    );
+  } else {
+    lines.push("No background server recorded.");
+  }
+  // The hub on another port says nothing about who holds this one.
+  if (portInUse && hub?.port !== port) lines.push(`Note: Port ${port} is in use by another process.`);
+  return lines;
+}
+
+/**
+ * This user's hub, on one of {@link knownHubPorts}, when one is listening and
+ * is identified as theirs; null otherwise. Nothing credentialed is sent to a
+ * listener that is not.
+ *
+ * @param {string} home
+ * @param {number | null} flagPort
+ * @returns {Promise<{ port: number, pid: number } | null>}
+ */
+async function findOwnRunningHub(home, flagPort) {
+  for (const port of await knownHubPorts(home, flagPort)) {
+    if (!(await isPortInUse(port))) continue;
+    const own = await identifyOwnHub(port, home);
+    if (own.ok) return { port, pid: own.pid };
+  }
+  return null;
 }
 
 // ── Hub mode (0.7.0) ─────────────────────────────────────────────────────────
@@ -1122,22 +1174,26 @@ export function hubDashboardUrl(hubPort, projectId, nonce) {
  * Ask a server this process has identified as this user's own for a landing
  * nonce (`POST /api/auth/nonce`, with the per-user token). `request` is
  * {@link credentialedHubRequest} for the hub, or a direct request to a
- * single-project server whose listener was checked first. Null when it
- * cannot be had — an older server without the route, or an error.
+ * single-project server whose listener was checked first. `nonce` is null
+ * when it cannot be had; `status` says why — see {@link noNonceNote}.
+ *
+ * @returns {Promise<{ nonce: string | null, status: number }>}
  */
 async function mintLandingNonce(request) {
   const { status, body } = await request("POST", "/api/auth/nonce");
-  return status === 200 && typeof body?.nonce === "string" ? body.nonce : null;
+  return { nonce: status === 200 && typeof body?.nonce === "string" ? body.nonce : null, status };
 }
 
 /**
  * A single-project or preview server's landing nonce, asked of `port` only
  * once its one listener is `pid` — the process `ndx start` itself spawned —
  * so the per-user token goes nowhere else.
+ *
+ * @returns {Promise<{ nonce: string | null, status: number }>}
  */
 async function mintNonceFromSpawnedServer(port, pid) {
   const listeners = listenerPidsOnPort(port);
-  if (listeners.length !== 1 || listeners[0] !== pid) return null;
+  if (listeners.length !== 1 || listeners[0] !== pid) return { nonce: null, status: 0 };
   return mintLandingNonce((method, path) => serverRequest(port, method, path));
 }
 
@@ -1146,8 +1202,150 @@ function serverRequest(port, method, path, timeoutMs = PROBE_TIMEOUT_MS) {
   return hubRequest(port, method, path, undefined, timeoutMs, { sendToken: true });
 }
 
-/** What to print beside a URL that could not be given a nonce while a token is required. */
-const NO_NONCE_NOTE = "  (could not get a sign-in link from the server; run 'ndx start' again, or restart the server if it predates this ndx)";
+/**
+ * Answers to `POST /api/auth/nonce` that mean the server has no such route: a
+ * build from before landing nonces. A hub that old proxies the root request
+ * and answers 409 once several projects are registered; a project server
+ * answers 404.
+ */
+const NONCE_ROUTE_MISSING = new Set([404, 405, 409]);
+
+/**
+ * The checkout a source-linked `@n-dx/web` sits in (`<checkout>/packages/web`).
+ *
+ * @param {import("./build-identity.mjs").PackageBuildIdentity} web
+ */
+function checkoutOf(web) {
+  return web.packageDir ? dirname(dirname(web.packageDir)) : null;
+}
+
+/**
+ * Which server a fix is for, and the commands that stop and start it.
+ *
+ * @typedef {object} ServerCommands
+ * @property {"hub" | "here"} kind  The per-user hub, or a single-project (or preview) server.
+ * @property {string} stop          The command that stops it.
+ * @property {string} start         The command that starts it again as the same kind of server.
+ */
+
+/** @type {ServerCommands} */
+export const HUB_SERVER_COMMANDS = { kind: "hub", stop: "ndx hub stop", start: "ndx start" };
+
+/**
+ * The single-project or preview server `ndx <commandName>` started, by the
+ * commands that address it again. `--here` is always named: a bare `ndx start`
+ * registers with the hub instead.
+ *
+ * @param {string} commandName  "start" or "web".
+ * @param {boolean} isPreview
+ * @returns {ServerCommands}
+ */
+export function hereServerCommands(commandName, isPreview) {
+  const mode = isPreview ? "--preview" : "--here";
+  return { kind: "here", stop: `ndx ${commandName} ${mode} stop`, start: `ndx ${commandName} ${mode}` };
+}
+
+/**
+ * The rebuild for a source-linked install: web and every workspace package it
+ * depends on. Web alone type-checks against its dependencies' dist/ and runs
+ * their dist/ at run time, so building only web fails or leaves them stale.
+ */
+const WEB_REBUILD_COMMAND = `pnpm --filter "@n-dx/web..." build`;
+
+/**
+ * The commands that bring a server back in line with this ndx. Pure, so the
+ * wording is unit-tested.
+ *
+ * Restarting alone respawns whatever `dist/` is on disk, so when that is
+ * itself older than its source (a source-linked install that was not rebuilt)
+ * the fix starts with the rebuild — the advice this replaces, "restart the
+ * server", could not work there.
+ *
+ * @param {import("./build-identity.mjs").PackageBuildIdentity} web  The web build this ndx spawns.
+ * @param {ServerCommands} server  Which server, and how to stop and start it.
+ * @returns {string}
+ */
+export function serverRefreshFix(web, server) {
+  const restart = `'${server.stop}', then '${server.start}'`;
+  const rebuild = `run '${WEB_REBUILD_COMMAND}'${checkoutOf(web) ? ` in ${checkoutOf(web)}` : ""}`;
+  if (web.sourceLinked && web.lagging === true) return `${rebuild}, then ${restart}`;
+  if (server.kind === "hub") return `restart the hub: ${restart}`;
+  // A single-project server was just spawned from the dist/ on disk, so a
+  // restart would start the same build again.
+  return web.sourceLinked ? `${rebuild}, then ${restart}` : "reinstall n-dx so @n-dx/web matches this ndx";
+}
+
+/**
+ * What to print beside a URL that could not be given a nonce while a token
+ * is required. Pure, so the wording is unit-tested.
+ *
+ * A server without the nonce route is older than this ndx, and the note says
+ * so with a fix that works ({@link serverRefreshFix}). Anything else — a
+ * timeout, a refused token — is worth one more try.
+ *
+ * @param {number} status  What `POST /api/auth/nonce` answered (0: nothing).
+ * @param {string} fix     {@link serverRefreshFix}'s answer for this server.
+ * @returns {string}
+ */
+export function noNonceNote(status, fix) {
+  if (NONCE_ROUTE_MISSING.has(status)) {
+    return `  (no sign-in link: the server is older than this ndx and cannot issue one — ${fix})`;
+  }
+  return "  (could not get a sign-in link from the server; run 'ndx start' again)";
+}
+
+/**
+ * The warning for a source-linked install whose `@n-dx/web` `dist/` is not a
+ * build of its current source, or null when there is nothing to warn about.
+ * Pure, so the wording is unit-tested.
+ *
+ * Checked before the server is spawned or the hub is joined: a stale `dist/`
+ * runs older code than this CLI, which surfaces later as routes the CLI
+ * expects and the server lacks — first among them the landing nonce.
+ *
+ * Only a `dist/` that is `lagging` — last written before the newest source
+ * edit — is warned about. A watch build (`pnpm dev`) never writes the build
+ * stamp but keeps `dist/` current, and warning there on every start would
+ * teach people to ignore the warning.
+ *
+ * @param {import("./build-identity.mjs").PackageBuildIdentity} web
+ * @param {ServerCommands} server
+ * @returns {string | null}
+ */
+export function staleWebDistWarning(web, server) {
+  if (!web.sourceLinked || web.lagging !== true) return null;
+  return `Warning: ${join(web.packageDir, "dist")} is older than its source, so the server runs older code than this ndx.\n` +
+    `  To fix: ${serverRefreshFix(web, server)}.`;
+}
+
+/**
+ * Why the running hub is not the build this ndx would start, or null when it
+ * is (or when there is nothing to compare). Pure, so it is unit-tested.
+ *
+ * `build` is `/api/hub/health`'s `build` field: `{ version, sourceHash }`. A
+ * hub without one predates the field, and so this ndx. A version or source
+ * hash that differs from the web package this ndx spawns means the hub was
+ * started from another build and kept running across an upgrade or rebuild.
+ * A hash is compared only when both sides have one; a published install
+ * ships no build stamp.
+ *
+ * @param {unknown} build
+ * @param {import("./build-identity.mjs").PackageBuildIdentity} web
+ * @returns {string | null}
+ */
+export function hubBuildMismatch(build, web) {
+  if (!build || typeof build !== "object") {
+    return "the running n-dx hub predates this ndx (it reports no build identity)";
+  }
+  const { version, sourceHash } = /** @type {{ version?: unknown, sourceHash?: unknown }} */ (build);
+  if (typeof version === "string" && web.version && version !== web.version) {
+    return `the running n-dx hub is @n-dx/web ${version}, and this ndx starts ${web.version}`;
+  }
+  if (typeof sourceHash === "string" && web.sourceHash && sourceHash !== web.sourceHash) {
+    return `the running n-dx hub was started from another build of @n-dx/web (${sourceHash.slice(0, 12)}; on disk now: ${web.sourceHash.slice(0, 12)})`;
+  }
+  return null;
+}
 
 /**
  * Whether the per-user token is required, from the three places that may turn
@@ -2114,6 +2312,11 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // it from the first probe; an existing file is reused, never rotated.
   const authEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"], home);
   const { tokenFile, token } = resolveStartToken(authEnabled, home);
+  // The web build this ndx would spawn. A source-linked install whose dist/
+  // lags its source starts a hub older than this CLI; say so before it does.
+  const web = packageBuildIdentity(resolve(__dir, tools.web));
+  const staleDist = staleWebDistWarning(web, HUB_SERVER_COMMANDS);
+  if (staleDist) console.error(staleDist);
   try {
     hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
   } catch (err) {
@@ -2146,6 +2349,11 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // the pid file lets stop/status/refresh recognise a hub registration.
   const health = await credentialedHubRequest(hubPort, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
   const hubPid = typeof health.body?.pid === "number" ? health.body.pid : (hub.pid ?? process.pid);
+  // A hub that kept running across an upgrade or rebuild serves older code
+  // than this CLI expects. Only a reused hub can differ; one just spawned is
+  // the build on disk, which the stale-dist check above already judged.
+  const mismatch = !hub.spawned && health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
+  if (mismatch) console.error(`Warning: ${mismatch}.\n  To fix: ${serverRefreshFix(web, HUB_SERVER_COMMANDS)}.`);
   try {
     await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
   } catch {
@@ -2155,14 +2363,14 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   const base = `http://127.0.0.1:${hubPort}/p/${encodeURIComponent(id)}`;
   // The printed and opened URL carries a single-use nonce the hub minted for
   // this run — never the token itself.
-  const nonce = token
+  const { nonce, status: nonceStatus } = token
     ? await mintLandingNonce((method, path) => credentialedHubRequest(hubPort, method, path, undefined, PROBE_TIMEOUT_MS, { home }))
-    : null;
+    : { nonce: null, status: 0 };
   const dashboardUrl = hubDashboardUrl(hubPort, id, nonce);
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
   log(`  URL: ${dashboardUrl}`);
-  if (token && !nonce) log(NO_NONCE_NOTE);
+  if (token && !nonce) log(noNonceNote(nonceStatus, serverRefreshFix(web, HUB_SERVER_COMMANDS)));
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");
@@ -2404,6 +2612,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   if (flags.debug) serveArgs.push("--debug");
   else if (flags.verbose) serveArgs.push("--verbose");
 
+  // The web build about to be spawned; a source-linked dist/ that lags its
+  // source runs older code than this CLI.
+  const web = packageBuildIdentity(resolve(__dir, tools.web));
+  const hereServer = hereServerCommands(commandName, isPreview);
+  const staleDist = staleWebDistWarning(web, hereServer);
+  if (staleDist) console.error(staleDist);
+
   // --- Background mode ---
   if (isBackground) {
     // Remove stale port file before spawning so we can detect the fresh one
@@ -2446,9 +2661,11 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // Process is alive but port file not written yet — use requested port as fallback
       await writePidFile(absDir, child.pid, port, files);
       log(`${label} started in background (PID ${child.pid}).`);
-      const fallbackNonce = hereToken ? await mintNonceFromSpawnedServer(port, child.pid) : null;
+      const { nonce: fallbackNonce, status: fallbackStatus } = hereToken
+        ? await mintNonceFromSpawnedServer(port, child.pid)
+        : { nonce: null, status: 0 };
       log(`  URL: ${urlWithNonce(`http://127.0.0.1:${port}/`, fallbackNonce)}`);
-      if (hereToken && !fallbackNonce) log(NO_NONCE_NOTE);
+      if (hereToken && !fallbackNonce) log(noNonceNote(fallbackStatus, serverRefreshFix(web, hereServer)));
       log(`Use '${stopCmd}' to stop it.`);
       return 0;
     }
@@ -2462,9 +2679,11 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
     log(`${label} started in background (PID ${child.pid}).`);
     // Asked of the server just spawned, once its listener is that process.
-    const hereNonce = hereToken ? await mintNonceFromSpawnedServer(actualPort, child.pid) : null;
+    const { nonce: hereNonce, status: hereNonceStatus } = hereToken
+      ? await mintNonceFromSpawnedServer(actualPort, child.pid)
+      : { nonce: null, status: 0 };
     log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
-    if (hereToken && !hereNonce) log(NO_NONCE_NOTE);
+    if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, hereServer)));
 
     // The preview serves one HTML document — no MCP endpoints to advertise.
     if (isPreview) {
