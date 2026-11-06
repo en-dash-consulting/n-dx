@@ -309,6 +309,19 @@ describe("v2 product reads", () => {
       expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("proposed");
       expect(((await get("changes/summary")).body.summary as ChangeSummary).stages["in-progress"]).toBe(0);
     });
+
+    it("reads in-progress while one task is completed and another is still pending", async () => {
+      const secondTaskId = "c0000000-0000-4000-8000-000000000003";
+      writeFileSync(
+        join(rexDir, "changes", "add-apple-pay", "show-the-total.md"),
+        `---\nid: "${secondTaskId}"\ntype: "task"\ntitle: "Show the total"\nslug: "show-the-total"\n---\n`,
+      );
+      writeEmptyChangeState(
+        `  "${TASK_ID}":\n    status: "completed"\n    startedAt: "2026-11-05T12:00:00.000Z"\n    completedAt: "2026-11-05T13:00:00.000Z"\n` +
+        `  "${secondTaskId}":\n    status: "pending"\n`,
+      );
+      expect(((await get("changes")).body.changes as ChangeRow[])[0].stage).toBe("in-progress");
+    });
   });
 
   /** The change's own state row cleared, as before `ndx work` starts anything. */

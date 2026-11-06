@@ -209,10 +209,10 @@ const HISTORY_LIMIT = 100;
  * product-model.ts): shipped and applied from rex's state, then started, then
  * marked ready. Rex has no stage of its own to defer to.
  *
- * Started means the change or any live task or subtask under it is
- * `in_progress` or `failing`. `ndx work` records the start on the task it runs
- * and leaves the change's own state empty. Status, not `startedAt`: rex never
- * clears `startedAt`, so a task reset to pending after a failed run keeps it.
+ * Started means the change is `in_progress` or `failing`, or a live task or
+ * subtask under it is that or `completed`. `ndx work` records the start on the
+ * task it runs and leaves the change's own state empty. Status, not `startedAt`:
+ * rex never clears `startedAt`, so a task reset to pending after a failed run keeps it.
  */
 function stageOf(change: RuleNode): ChangeStageWire {
   if (change.shippedIn) return "shipped";
@@ -220,11 +220,13 @@ function stageOf(change: RuleNode): ChangeStageWire {
   // Completed but not applied: rex.applyOn is review or release, so only a steward's
   // apply (MCP, CLI) or a release stamp moves it on. The dashboard has no apply action.
   if (change.status === "completed") return "awaiting-apply";
-  if (isStarted(change) || liveWorkUnder(change).some(isStarted)) return "in-progress";
+  if (isActive(change) || liveWorkUnder(change).some((n) => isActive(n) || n.status === "completed")) {
+    return "in-progress";
+  }
   return change.ready ? "ready" : "proposed";
 }
 
-const isStarted = (node: RuleNode): boolean =>
+const isActive = (node: RuleNode): boolean =>
   node.status === "in_progress" || node.status === "failing";
 
 /** Tasks and subtasks under a change, skipping deleted and cancelled ones and their children. */
