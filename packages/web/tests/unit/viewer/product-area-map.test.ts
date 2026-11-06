@@ -4,6 +4,8 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import {
   AreaBlock,
+  BLOCK_STATUS_LABELS,
+  BLOCK_STATUS_ORDER,
   MAX_BLOCKS,
   ProductAreaMap,
   areaBlocks,
@@ -218,6 +220,17 @@ describe("ProductAreaMap", () => {
     expect(root.querySelector(".pam-legend")?.textContent).toContain("Defective");
     blocks[1]!.click();
     expect(onOpenArea).toHaveBeenCalledWith("b", "B");
+  });
+
+  it("explains size, tint and the open badge in one line, naming every block status", async () => {
+    await mount({ layout: "v2", map });
+    const key = root.querySelector(".pam-key")?.textContent ?? "";
+    expect(key).toMatch(/size = capabilities/);
+    expect(key).toMatch(/N open/);
+    for (const status of BLOCK_STATUS_ORDER) expect(key).toContain(BLOCK_STATUS_LABELS[status]);
+    // The tint names are the legend's swatch names, which tint the blocks.
+    const swatches = [...root.querySelectorAll(".pam-legend .pam-swatch")].map((s) => s.parentElement?.textContent);
+    expect(swatches).toEqual(BLOCK_STATUS_ORDER.map((s) => BLOCK_STATUS_LABELS[s]));
   });
 
   it("passes the area slug (what ?area= takes) from a badge, and none from the folded block's", async () => {

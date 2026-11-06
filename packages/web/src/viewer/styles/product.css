@@ -811,6 +811,7 @@
 .pam-swatch.pam-proposed { background: var(--text-muted); }
 .pam-swatch.pam-defective { background: var(--red); }
 .pam-legend-open { position: static; }
+.pam-key { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--font-sm); }
 
 /* ── Area view (views/area.ts) ─────────────────────────────────── */
 

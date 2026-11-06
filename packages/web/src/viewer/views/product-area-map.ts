@@ -237,6 +237,15 @@ export function BlockLegend() {
 }
 
 /**
+ * What the product map's three encodings mean, in one line. The tint names come
+ * from `BLOCK_STATUS_LABELS`, so they cannot drift from the block statuses.
+ */
+export function mapKey(): string {
+  const tints = BLOCK_STATUS_ORDER.map((s) => BLOCK_STATUS_LABELS[s]).join(", ");
+  return `Block size = capabilities in the area · tint = computed status (${tints}) · N open = open changes touching it`;
+}
+
+/**
  * Opens an area from its block: its slug and title, or a null slug for the
  * block that folds the smaller areas (which opens the whole map).
  */
@@ -284,6 +293,7 @@ export function AreaBlocks({ map, onOpenArea, onOpenChanges }: {
             : undefined,
         }))),
     h(BlockLegend, null),
+    h("p", { class: "pam-key" }, mapKey()),
   );
 }
 
