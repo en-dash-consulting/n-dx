@@ -811,7 +811,9 @@ export interface ProductTotals {
 
 export function productTotals(map: ProductMap): ProductTotals {
   const capabilities = map.areas.flatMap((area) => area.capabilities);
-  const openChangeIds = new Set<string>();
+  // The server's per-area set holds changes no capability overlay carries (one
+  // that adds a capability, one that removes an area); the area map counts it.
+  const openChangeIds = new Set<string>(map.areas.flatMap((area) => area.openChangeIds));
   for (const capability of capabilities) {
     for (const change of capability.openChanges) openChangeIds.add(change.id);
   }
