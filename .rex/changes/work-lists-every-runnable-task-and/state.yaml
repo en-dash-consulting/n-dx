@@ -1,14 +1,21 @@
 schema: "rex/v2"
 items:
+  "3adf86fa-fa8e-4038-9b0c-b866f1281c4f":
+    lastModified: "2026-11-06T18:45:20.932Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9f53670-8e31-4f3f-a630-786ca4800d3a":
     lastModified: "2026-11-06T00:17:27.006Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e07a0471-db0d-4301-9485-1dc5462a9b6d":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-06T18:38:29.856Z"
-    activeIntervals: [{"start":"2026-11-06T18:38:29.856Z"}]
-    lastModified: "2026-11-06T18:38:30.520Z"
+    completedAt: "2026-11-06T18:45:44.278Z"
+    endedAt: "2026-11-06T18:45:44.278Z"
+    activeIntervals: [{"end":"2026-11-06T18:45:44.278Z","start":"2026-11-06T18:38:29.856Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ready to run pages every actionable task via rex's v2 selector, names each row's change, and the view has Show all N, search and priority/change/tag filters."
+    lastModified: "2026-11-06T18:45:44.278Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fab17b38-480a-43f4-97d9-be9b8f77d45a":
-    lastModified: "2026-11-06T00:19:12.904Z"
+    lastModified: "2026-11-06T18:45:20.932Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
