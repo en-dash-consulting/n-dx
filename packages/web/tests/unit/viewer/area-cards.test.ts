@@ -72,6 +72,14 @@ describe("filled cards", () => {
     expect(onOpenAreaChanges).toHaveBeenCalledOnce();
   });
 
+  it("offers Open changes when the only open change adds a capability under the area", () => {
+    mount({ ...EMPTY, openChanges: [{ id: "c3", title: "Add refunds", stage: "proposed", delta: "added" }] }, { onOpenAreaChanges: vi.fn() });
+    const moving = card("moving");
+    expect(moving.querySelector("[data-open-changes]")?.textContent).toBe("Open in Open changes");
+    expect(moving.querySelector(".area-card-empty")).toBeNull();
+    expect(moving.textContent).toContain("added");
+  });
+
   it("offers no Open changes link with nothing moving or nowhere to go", () => {
     mount(area);
     expect(card("moving").querySelector("[data-open-changes]")).toBeNull();

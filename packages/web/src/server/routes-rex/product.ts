@@ -746,9 +746,17 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
   for (const { node, root } of index.entries) {
     if (root === "product" && node.type !== "area" && nearestArea(node.id) === area.id) owned.add(node.id);
   }
+  // Applied history only: an applied addition's target names the node it made.
   const relatesHere = (change: ChangeRuleNode): boolean =>
     (change.amends ?? []).some((a) => owned.has(index.resolve(a.target)?.id ?? "")) ||
     (change.touches ?? []).some((t) => owned.has(index.resolve(t)?.id ?? ""));
+  // Moving now lists the badge's open changes (openChangesByArea), so the map,
+  // this card and Open changes' ?area= filter cannot disagree.
+  const movingHere = new Set(section.openChangeIds);
+  const deltaHere = (change: ChangeRuleNode) => (change.amends ?? []).find((a) => {
+    const ref = a.delta === "added" ? a.under : a.target;
+    return ref !== undefined && owned.has(index.resolve(ref)?.id ?? "");
+  })?.delta;
 
   const edges = computeEdges(tree);
   const bound = new Set([area.id, ...section.capabilities.map((c) => c.id)].flatMap((id) => edges.boundBy[id] ?? []));
@@ -770,6 +778,10 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
       continue;
     }
     if (!isOpenChange(change)) continue;
+    if (movingHere.has(change.id)) {
+      const delta = deltaHere(change);
+      openChanges.push({ ...brief, stage: stageOf(change), ...(delta ? { delta } : {}) });
+    }
     const guess = guesses.get(change.id);
     if (guess) {
       if ("error" in guess) continue;
@@ -779,9 +791,6 @@ export function buildAreaDetail(tree: V2Tree, ref: string): AreaDetailWire | und
       if (target && (target.type === "capability" || target.type === "constraint") && owned.has(target.id)) {
         inbox.push({ ...brief, target: { id: target.id, title: target.title, type: target.type }, relation: suggestion.relation, strength: suggestion.tied ? "tied" : top.strength });
       }
-    } else if (relatesHere(change)) {
-      const delta = (change.amends ?? []).find((a) => owned.has(index.resolve(a.target)?.id ?? ""))?.delta;
-      openChanges.push({ ...brief, stage: stageOf(change), ...(delta ? { delta } : {}) });
     }
   }
   const recentlyApplied = applied

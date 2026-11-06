@@ -203,7 +203,23 @@ describe("v2 product reads", () => {
         expect(filtered.map((r) => r.id).sort()).toEqual([...a.openChangeIds].sort());
         expect(filtered).toHaveLength(a.openChangeIds.length);
       });
+
+      it(`lists the badge's open changes in the area view's Moving now: ${label}`, async () => {
+        seed();
+        const a = await area();
+        const detail = (await get(`product/area/${a.slug}`)).body.area as AreaDetail;
+        expect(detail.openChanges.map((c) => c.id).sort()).toEqual([...a.openChangeIds].sort());
+        expect(detail.counts.openChanges).toBe(a.openChangeIds.length);
+      });
     }
+
+    it("lists a change that only adds a capability under the area in Moving now, as added", async () => {
+      applyChange();
+      addChange([added("refunds", AREA_ID)]);
+      const detail = (await get("product/area/checkout")).body.area as AreaDetail;
+      expect(detail.openChanges).toEqual([{ id: OTHER_ID, title: "Other", stage: expect.any(String), delta: "added" }]);
+      expect(detail.counts.openChanges).toBe(1);
+    });
   });
 
   it("GET /changes lists each change with its stage, map links and task progress", async () => {
