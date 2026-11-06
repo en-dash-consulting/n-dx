@@ -254,6 +254,24 @@ describe("n-dx init provider selection", () => {
     }
   });
 
+  it("ignores the dashboard's usage ledger and pid/port markers on the .ndx/ layout, once", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-webignore-"));
+    try {
+      await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+      run(["init", "--provider=claude", tmpDir], { env: pathEnvWith(binDir) });
+      run(["init", "--provider=claude", tmpDir], { env: pathEnvWith(binDir) });
+
+      const lines = (await readFile(join(tmpDir, ".gitignore"), "utf-8")).split("\n").map((l) => l.trim());
+      for (const entry of [".ndx/web-usage.jsonl", ".ndx/web.pid", ".ndx/web.port"]) {
+        expect(lines.filter((l) => l === entry), entry).toHaveLength(1);
+      }
+    } finally {
+      await removeDirs(binDir, tmpDir);
+    }
+  });
+
   it("persists selected provider to project settings", async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-persist-"));

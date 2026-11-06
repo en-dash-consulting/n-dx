@@ -120,7 +120,7 @@ import {
   dim,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
-import { ensureGitignoreEntry } from "./gitignore.js";
+import { ensureGitignoreEntry, ensureWebRuntimeIgnores } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
 import { DEFAULT_MIGRATION_PLAN_OUT, hasV2Tree, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
@@ -1681,6 +1681,8 @@ async function handleInit(rest) {
   // it produces carries PRD data and run summaries, so it must not be
   // committable by accident.
   ensureGitignoreEntry(dir, "ndx-export/");
+  // The dashboard's pid/port markers and spend ledger are machine-local.
+  ensureWebRuntimeIgnores(dir, layout);
   // Every vendor-CLI invocation appends to claude_commands.log in the project
   // (cli-log.js); left untracked it shows in every git status, and hench's
   // uncommitted-work gate refuses to complete a task over it.

@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-06T02:43:22.429Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5635b3c2-9d02-49e5-b0f9-0e69a43a1383":
-    lastModified: "2026-11-06T00:14:25.390Z"
+    status: "completed"
+    startedAt: "2026-11-06T03:02:21.056Z"
+    completedAt: "2026-11-06T03:06:18.732Z"
+    endedAt: "2026-11-06T03:06:18.732Z"
+    activeIntervals: [{"end":"2026-11-06T03:06:18.732Z","start":"2026-11-06T03:02:21.056Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ensureWebRuntimeIgnores (gitignore.js) called from init and migrate-layout; template and generated-files.md list the .ndx/ spellings"
+    lastModified: "2026-11-06T03:06:18.732Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b4233b1-cb6a-4b38-a21b-7d0143d48bd4":
     status: "completed"

@@ -51,7 +51,7 @@ import { join, resolve } from "path";
 import { buildCommitMessage } from "./commit-trailers.js";
 import { isInsideGitRepo } from "./git-preflight.js";
 import { ensureGitattributesRules } from "./gitattributes-pins.js";
-import { ensureGitignoreEntry, isGitTracked } from "./gitignore.js";
+import { ensureGitignoreEntry, ensureWebRuntimeIgnores, isGitTracked } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
@@ -403,6 +403,7 @@ export async function runMigrateLayout(dir, flags = [], deps = {}) {
   const target = resolveLayout(root);
   ensureGitignoreEntry(root, relativeToRoot(target, target.localConfigFile));
   ensureGitignoreEntry(root, "ndx-export/");
+  ensureWebRuntimeIgnores(root, target);
   ensureGitattributesRules(root, target);
 
   for (const [name, count] of Object.entries(rewrites)) {

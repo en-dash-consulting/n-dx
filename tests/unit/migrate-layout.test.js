@@ -264,6 +264,10 @@ describe.skipIf(!GIT_OK)("runMigrateLayout", () => {
     expect(ignore).toContain(".ndx/rex/execution-log*.jsonl");
     expect(ignore).toContain(".ndx/config.local.json");
     expect(ignore).toContain(".n-dx2.json");
+    // The dashboard's machine-local files are topped up, not left to the rewrite.
+    for (const entry of [".ndx/web-usage.jsonl", ".ndx/web.pid", ".ndx/web.port"]) {
+      expect(ignore.split("\n"), entry).toContain(entry);
+    }
     expect(ignore).toContain("packages/thing/.rex/execution-log*.jsonl");
     expect(readFileSync(join(dir, ".gitattributes"), "utf-8"))
       .toContain(".ndx/rex/prd_tree/** merge=rex-prd");
