@@ -43,6 +43,7 @@ import { CopyTextButton } from "./copy-text-button.js";
 import { linkHref, linkText } from "./tracker-links.js";
 import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
 import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "./sidecar-external-call.js";
+import { ItemEditBody, itemEditDraftOf, itemEditEdits, type ItemEditDraft } from "./sidecar-item-edit.js";
 
 /** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
 export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
@@ -55,6 +56,7 @@ export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>>
   placement: "Placement",
   edit: "Edit",
   link: "Link",
+  "item-edit": "Item edit",
   "network-read": "Network read",
   "draft-post": "Draft post",
   "draft-file": "Draft file",
@@ -108,6 +110,9 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       // The card's own link, as approval will write it; the call's input only when the card carries none.
       case "link":
         return card.link ? `${card.link.itemId} → ${linkText(card.link.ref, card.link.label)}` : [str(input.itemId), str(input.ref)].filter(Boolean).join(" → ");
+      // The item and the fields approval writes.
+      case "item-edit":
+        return card.itemEdit ? `${card.itemEdit.itemId}: ${Object.keys(card.itemEdit.after).join(", ")}` : str(input.id);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
       case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
       case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
@@ -523,10 +528,13 @@ interface CardProps {
   /** The first waiting external-call card's arguments as edited; null while a field's text is not a value, undefined before any edit. */
   externalEdit: ExternalCallEdit | undefined;
   onExternalEdit: (edit: ExternalCallEdit) => void;
+  /** The first waiting item-edit card's fields as the operator is editing them. */
+  itemEditDraft: ItemEditDraft;
+  onItemEditDraft: (draft: ItemEditDraft) => void;
   onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, itemEditDraft, onItemEditDraft, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   // A decided card is one line (head + note) until the operator opens its body.
   const [open, setOpen] = useState(false);
@@ -551,6 +559,11 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
     : card.placement
       ? [
           h(PlacementBody, { card, editable, onEdit: onPlacementEdit, edit: placementEdit }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
+    : card.itemEdit
+      ? [
+          h(ItemEditBody, { card, editable, draft: editable ? itemEditDraft : {}, onDraft: onItemEditDraft }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
     : card.link
@@ -618,6 +631,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                     card.changeSet
                       ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
                       : card.placement ? "Place"
+                      : card.itemEdit ? "Approve and write"
                       : draft ? "Post under your gh login" : card.kind === "draft-file" ? "Save file" : "Approve"),
               // Leaving the change in the Inbox settles the card as denied and writes nothing.
               card.placement
@@ -675,12 +689,17 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [deciding, setDeciding] = useState(false);
   const [path, setPath] = useState("");
   const [externalEdit, setExternalEdit] = useState<ExternalCallEdit | undefined>(undefined);
+  const [itemEditDraft, setItemEditDraft] = useState<ItemEditDraft>({});
   const [decidedOpen, setDecidedOpen] = useState(false);
   const firstId = first?.id ?? null;
   const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
+  const firstItemEdit = first?.itemEdit;
 
-  // A note, a change set's or placement's edits, and a draft's path belong to the card they were typed on.
-  useEffect(() => { setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined); }, [firstId]);
+  // A note, a change set's, item edit's or placement's edits, and a draft's path belong to the card they were typed on.
+  useEffect(() => {
+    setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined);
+    setItemEditDraft(firstItemEdit ? itemEditDraftOf(firstItemEdit) : {});
+  }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
@@ -702,6 +721,12 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
           const check = await checkPlacementRequest(first.placement.change, mine.body);
           setPlacementEdit((current) => (current === mine ? { ...mine, check } : current));
         }
+        return;
+      }
+      // The values the operator left on an item-edit card are what an approval writes.
+      if (decision.approve && first.itemEdit) {
+        const fields = itemEditEdits(first.itemEdit, itemEditDraft);
+        await decide(first.id, Object.keys(fields).length > 0 ? { ...decision, edits: fields } : decision);
         return;
       }
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];
@@ -757,6 +782,8 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       onPlacementEdit: setPlacementEdit,
       externalEdit: card.id === firstId ? externalEdit : undefined,
       onExternalEdit: setExternalEdit,
+      itemEditDraft: card.id === firstId ? itemEditDraft : {},
+      onItemEditDraft: setItemEditDraft,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
       path,
       onPath: setPath,

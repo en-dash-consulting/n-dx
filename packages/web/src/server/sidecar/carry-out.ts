@@ -2,8 +2,9 @@
  * What an approved broker call does.
  *
  * The broker decides a call (`broker.ts`); this module carries out the
- * decided call and words the tool result the session's agent reads. Seven
- * tools run today: `run_command` as the workspace's Sidecar command job,
+ * decided call and words the tool result the session's agent reads. These
+ * tools run today: `propose_item_edit` as its item-edit card's write through
+ * rex's `edit_item` (`item-edit-card.ts`), with the operator's edits, `run_command` as the workspace's Sidecar command job,
  * `start_work` through the hench execute route, `propose_prd_change` as
  * its change-set card's PRD write (`change-set.ts`), with the operator's
  * edits, `propose_run_plan`, which starts nothing: it names the chosen
@@ -24,7 +25,7 @@
  */
 
 import { laneSteps, stepRunOptions } from "../../shared/index.js";
-import type { QueuePlan, SidecarChangeSet, SidecarLink, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet, SidecarItemEdit, SidecarLink, SidecarPlacement } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
 
@@ -58,6 +59,10 @@ export interface SidecarActions {
   checkLink(input: Record<string, unknown>): Promise<SidecarLink | string>;
   /** An approved link card's write: the ref onto the item's issues (v2) or links (v1). Never throws. */
   writeLink(link: SidecarLink): Promise<CarryOutResult>;
+  /** An item-edit call read against the PRD for its card: each changed field before and after, or why no card can be raised. Writes nothing. */
+  checkItemEdit(input: Record<string, unknown>): Promise<SidecarItemEdit | string>;
+  /** An approved item-edit card's write through rex's edit_item, with the operator's edits. Never throws. */
+  writeItemEdit(itemEdit: SidecarItemEdit): Promise<CarryOutResult>;
   /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
   /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
@@ -184,6 +189,13 @@ async function carryOut(
       // The card's link, read when it was raised; never the raw input.
       if (!card?.link) return { ok: false, text: "A link is written only from its approved card; nothing was written." };
       return actions.writeLink(card.link);
+    }
+    case "propose_item_edit": {
+      // The card's fields, with the operator's edits; never the raw input.
+      if (!card?.itemEdit) return { ok: false, text: "An item edit is written only from its approved card; nothing was written." };
+      const written = await actions.writeItemEdit(card.itemEdit);
+      const edited = written.ok && card.edited ? " The operator edited it before approving; the edited values were written." : "";
+      return { ...written, text: `${written.text}${edited}` };
     }
     case "github_read": {
       const read = githubReadOf(input);

@@ -104,6 +104,7 @@ export type SidecarCardKind =
   | "placement"
   | "edit"
   | "link"
+  | "item-edit"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -150,6 +151,23 @@ export interface SidecarPlacement {
 /** A link card's item, tracker ref and the tracker's label; mirrors `SidecarLink` in shared/sidecar-card.ts. */
 export interface SidecarLink { itemId: string; title: string; ref: string; label: string | null }
 
+/** The fields an item-edit card changes; mirrors `SidecarItemEditFields` in shared/sidecar-card.ts. */
+export interface SidecarItemEditFields {
+  title?: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  tags?: string[];
+  priority?: "critical" | "high" | "medium" | "low";
+}
+
+/** An item-edit card's item and each changed field before and after; mirrors `SidecarItemEdit` in shared/sidecar-card.ts. */
+export interface SidecarItemEdit {
+  itemId: string;
+  itemTitle: string;
+  before: SidecarItemEditFields;
+  after: SidecarItemEditFields;
+}
+
 /** One choice of an external-call card's picker; mirrors `SidecarFieldOption` in shared/sidecar-card.ts. */
 export interface SidecarFieldOption { value: string | number | boolean; label: string }
 
@@ -185,6 +203,8 @@ export interface SidecarCard {
   placement?: SidecarPlacement;
   /** A link card's item and tracker ref as approval writes them. */
   link?: SidecarLink;
+  /** An item-edit card's fields as read when it was raised and as approval writes them. */
+  itemEdit?: SidecarItemEdit;
   /** An external-call card's connection, workspace host, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */
@@ -211,8 +231,8 @@ export interface SidecarCardDecision {
   reason?: string;
   /** "Always allow": only when the card has an allowListKey. */
   remember?: boolean;
-  /** A change-set approval's item edits; the approval writes the edited values. */
-  edits?: SidecarChangeSetEdit[] | PlacementEditBody;
+  /** A change-set approval's item edits, or an item-edit approval's field values; the approval writes the edited values. */
+  edits?: SidecarChangeSetEdit[] | PlacementEditBody | SidecarItemEditFields;
   /** A placement edit's dry run as the operator reviewed it; the server refuses the approval when its re-check moved from it. */
   reviewed?: SidecarPlacementCheck;
   /** A run-plan card's Start lane: the 0-based lane whose first task to start. */

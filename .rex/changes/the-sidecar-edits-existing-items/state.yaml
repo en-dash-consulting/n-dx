@@ -7,7 +7,14 @@ items:
     lastModified: "2026-11-06T00:15:55.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8334c419-88f6-4cc6-90d1-b22c88dc06fd":
-    lastModified: "2026-11-06T00:15:26.858Z"
+    status: "completed"
+    startedAt: "2026-11-06T17:59:03.369Z"
+    completedAt: "2026-11-06T18:14:30.344Z"
+    endedAt: "2026-11-06T18:14:30.344Z"
+    activeIntervals: [{"end":"2026-11-06T18:14:30.344Z","start":"2026-11-06T17:59:03.369Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "propose_item_edit broker tool + item-edit card (before/after diff, editable values) writing through rex handleEditItem; Describe lens uses it."
+    lastModified: "2026-11-06T18:14:30.344Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bd3a071a-6ad5-402d-9ae8-b872bd1969ed":
     lastModified: "2026-11-06T00:16:41.857Z"
