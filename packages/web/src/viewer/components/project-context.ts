@@ -23,7 +23,7 @@ import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId } from "../types.js";
 import { useProjectMetadata, useCliName, resolveCliLabel } from "../hooks/index.js";
-import { VIEW_META, PRODUCT_LABELS } from "../api.js";
+import { VIEW_META, PRODUCT_LABELS, viewLabelFor, useStatusLayout } from "../api.js";
 import type { ViewMeta } from "../api.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
 import { HubLink, ProjectSwitcher, useHubProjects } from "./project-switcher.js";
@@ -49,7 +49,8 @@ export function ProjectContext({ view, hubFetcher }: ProjectContextProps) {
   // during render and take the whole dashboard down at exactly the moment the
   // user is recovering from a crash.
   const meta = VIEW_META[view] as ViewMeta | undefined;
-  const label = meta ? resolveCliLabel(meta.label, cliName) : null;
+  const layout = useStatusLayout();
+  const label = meta ? resolveCliLabel(viewLabelFor(view, layout), cliName) : null;
 
   useEffect(() => {
     const parts: string[] = [];

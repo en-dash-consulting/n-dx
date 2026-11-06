@@ -12,7 +12,7 @@ import { ActionIcon } from "./action-icon.js";
 import { BodyPortal } from "./body-portal.js";
 import { useState, useEffect } from "preact/hooks";
 import type { ViewId } from "../api.js";
-import { viewLabel } from "../api.js";
+import { viewLabelFor, useStatusLayout } from "../api.js";
 
 interface GuideProps {
   view: ViewId;
@@ -192,7 +192,7 @@ export function Guide({ view }: GuideProps) {
     return () => { cancelled = true; };
   }, [open, view]);
   const content = guideContent(key, layout);
-  const title = viewLabel(key);
+  const title = viewLabelFor(key, useStatusLayout());
 
   // Close on Escape key
   useEffect(() => {
