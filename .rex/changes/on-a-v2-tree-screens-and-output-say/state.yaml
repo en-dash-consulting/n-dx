@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-06T01:02:04.882Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "58e97129-66cf-472a-9371-cb2bf7ce9c14":
-    lastModified: "2026-11-06T01:00:43.535Z"
+    status: "completed"
+    startedAt: "2026-11-06T19:56:29.390Z"
+    completedAt: "2026-11-06T20:08:55.048Z"
+    endedAt: "2026-11-06T20:08:55.048Z"
+    activeIntervals: [{"end":"2026-11-06T20:08:55.048Z","start":"2026-11-06T19:56:29.390Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Server marks task-less v2 changes runsAsOneTask (rex changeWorkShape via the gateway) on /data/prd.json, /api/rex/prd and change rows; detail panel shows Start/runs/usage for them; run-settings PUT accepts them and still refuses a change with tasks; Changes view reads \"runs as one task\"."
+    lastModified: "2026-11-06T20:08:55.048Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5d18cc19-98d9-4045-8ff8-0920f44875eb":
     lastModified: "2026-11-06T19:55:51.518Z"

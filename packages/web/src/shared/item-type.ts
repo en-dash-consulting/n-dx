@@ -155,9 +155,10 @@ export function isRootType(type: string): boolean {
 /**
  * Is this an actionable unit of work rather than a grouping?
  *
- * A task-less `change` is itself the unit `ndx work` runs, but it reads as a
- * container here because the dashboard asks this question to decide whether a
- * row can be started, and a change's tasks are what get started.
+ * Task or subtask only, judged on the type alone. A task-less `change` is also
+ * a unit `ndx work` runs, but that depends on its children, not its type: the
+ * server marks it `runsAsOneTask` (`server/runnable-units.ts`), and Start and
+ * run settings ask `isRunnableItem` / `isRunnableUnit` instead of this.
  */
 export function isWorkItemType(type: string): boolean {
   return type === "task" || type === "subtask";

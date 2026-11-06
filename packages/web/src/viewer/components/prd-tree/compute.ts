@@ -7,6 +7,17 @@ import type { PRDItemData, BranchStats, ItemStatus } from "./types.js";
 import { isWorkItemType, itemTypeOf } from "../../external.js";
 
 /**
+ * Can `ndx work` run this item? A task or subtask, or a change the server
+ * flagged `runsAsOneTask` (rex's selection rule: a change with no tasks is
+ * itself the unit). Decides Start, run history and usage in the detail panel;
+ * `isWorkItemType` stays task|subtask for callers that mean exactly that.
+ */
+export function isRunnableItem(item: PRDItemData): boolean {
+  const type = itemTypeOf(item);
+  return isWorkItemType(type) || (type === "change" && item.runsAsOneTask === true);
+}
+
+/**
  * Compute stats for a list of items, counting only tasks and subtasks
  * (matching Rex's computeStats behavior).
  */
