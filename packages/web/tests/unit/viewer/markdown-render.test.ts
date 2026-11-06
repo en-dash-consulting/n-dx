@@ -55,6 +55,13 @@ describe("Sidecar reply markdown", () => {
     expect(row.textContent).toBe("Half **bold and `code and [lin");
   });
 
+  it("shows each single-newline line of a paragraph on its own line", () => {
+    const row = reply("Done.\nRun `ndx work` next.\nThen check Live.");
+    expect(row.querySelectorAll("p")).toHaveLength(1);
+    expect(row.querySelectorAll("p br")).toHaveLength(2);
+    expect(row.querySelector("p")?.innerHTML).toBe("Done.<br>Run <code>ndx work</code> next.<br>Then check Live.");
+  });
+
   it("renders an unclosed fence as the code so far", () => {
     expect(reply("```\nconst a").querySelector("pre code")?.textContent).toBe("const a");
   });

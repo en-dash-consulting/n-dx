@@ -234,7 +234,7 @@ export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
       if (frame.checkpoint) return null;
       const event = frame.event;
       if (event.type === "assistant" && event.text) {
-        return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, renderMarkdown(event.text, { classPrefix: "sidecar-md" }));
+        return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, renderMarkdown(event.text, { classPrefix: "sidecar-md", breaks: true }));
       }
       if (event.type === "tool_use" && event.toolCall) {
         return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result, card, connectionLabels });

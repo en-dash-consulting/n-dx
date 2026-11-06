@@ -15,6 +15,11 @@ import { h, type ComponentChildren } from "preact";
 export interface MarkdownOptions {
   /** Class prefix for block elements: `<prefix>-heading|paragraph|list|code`. */
   classPrefix?: string;
+  /**
+   * Keep single line breaks inside a paragraph as `<br>` (chat replies).
+   * Off by default: wrapped source lines join into one paragraph.
+   */
+  breaks?: boolean;
 }
 
 const SAFE_LINK = /^(https?:\/\/|mailto:)/i;
@@ -124,7 +129,13 @@ export function renderMarkdown(markdown: string, options: MarkdownOptions = {}):
       i += 1;
     }
     const k = `p-${key += 1}`;
-    blocks.push(h("p", { class: `${prefix}-paragraph`, key: k }, renderInlineMarkdown(paragraphLines.join(" "), k)));
+    const content: ComponentChildren[] = options.breaks
+      ? paragraphLines.flatMap((text, n) => [
+          ...(n > 0 ? [h("br", { key: `${k}-br-${n}` })] : []),
+          ...renderInlineMarkdown(text, `${k}-${n}`),
+        ])
+      : renderInlineMarkdown(paragraphLines.join(" "), k);
+    blocks.push(h("p", { class: `${prefix}-paragraph`, key: k }, content));
   }
 
   return blocks;
