@@ -176,7 +176,7 @@ export interface ChangeSummaryWire {
   open: GlanceChangeWire[];
   /** `null` when nothing is actionable outside another worktree's claims. */
   next: NextPickWire | null;
-  /** Automated and metric requirements on the product layer, and the capabilities that hold none. */
+  /** Automated and metric requirements on open changes and their tasks, where `rex ready` reads them, and the open changes that hold none. */
   requirements: { total: number; uncovered: number };
 }
 
@@ -382,20 +382,32 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
   return { ...(body ? { statement: body } : {}), areas, constraints };
 }
 
+/** Statuses `rex ready` never evaluates (`core/ready.ts`). */
+const READY_TERMINAL = new Set(["completed", "deferred", "cancelled", "deleted"]);
+
+/** A node's automated and metric requirements: the kinds `rex ready` counts. */
+const readyRequirementCount = (node: RuleNode): number =>
+  node.type === "change" || node.type === "task"
+    ? (node.requirements ?? []).filter((r) => r.validationType === "automated" || r.validationType === "metric").length
+    : 0;
+
 /**
- * Automated and metric requirements on live capabilities and constraints, and how
- * many capabilities hold none. Manual ones are left out: `rex ready`
- * (`core/ready.ts`) only counts these two kinds, and the tile explains Ready.
+ * Automated and metric requirements where `rex ready` reads them, and how many
+ * open changes hold none. On v2 ready evaluates the change layer only
+ * (`store/change-layer-store.ts`), so this counts open changes and their
+ * non-terminal tasks; subtasks carry none of their own and inherit. Product-layer
+ * requirements are left out: ready never sees them. Manual ones are left out:
+ * ready does not count them.
  */
 function requirementCoverage(index: TreeIndex): { total: number; uncovered: number } {
   let total = 0;
   let uncovered = 0;
-  for (const { node, root } of index.entries) {
-    if (root !== "product") continue;
-    if (node.type !== "capability" && node.type !== "constraint") continue;
-    const count = (node.requirements ?? []).filter((r) => r.validationType === "automated" || r.validationType === "metric").length;
+  for (const change of changesOf(index)) {
+    if (!isOpenChange(change)) continue;
+    const live = tasksOf(change).filter((t) => !READY_TERMINAL.has(t.status ?? ""));
+    const count = readyRequirementCount(change) + live.reduce((n, t) => n + readyRequirementCount(t), 0);
     total += count;
-    if (node.type === "capability" && count === 0) uncovered++;
+    if (count === 0) uncovered++;
   }
   return { total, uncovered };
 }

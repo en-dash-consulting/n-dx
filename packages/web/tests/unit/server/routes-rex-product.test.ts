@@ -382,7 +382,7 @@ describe("v2 product reads", () => {
             reason: expect.any(String),
             summary: expect.any(String),
           },
-          // The fixture's one capability holds no requirement.
+          // The fixture's one open change and its task hold no requirement.
           requirements: { total: 0, uncovered: 1 },
         },
       });
@@ -398,18 +398,40 @@ describe("v2 product reads", () => {
       expect(summary.open.map((c) => c.id)).toEqual([CHANGE_ID]);
     });
 
-    it("counts only automated and metric requirements, as rex ready does", async () => {
-      const file = join(rexDir, "product", "checkout", "pay-by-card.md");
+    describe("requirement coverage reads the change layer, as rex ready does on v2", () => {
       const req = (id: string, validationType: string) =>
         `{"id":"${id}","title":"${id}","category":"technical","validationType":"${validationType}","acceptanceCriteria":["x"]}`;
-      const original = readFileSync(file, "utf8");
-      // The requirements line goes just before the closing frontmatter fence.
-      const withReqs = (reqs: string[]) =>
-        writeFileSync(file, original.replace(/\n---\n*$/, `\nrequirements: [${reqs.join(",")}]\n---\n`));
-      withReqs([req("r1", "manual")]);
-      expect(((await get("changes/summary")).body.summary as ChangeSummary).requirements).toEqual({ total: 0, uncovered: 1 });
-      withReqs([req("r1", "manual"), req("r2", "automated")]);
-      expect(((await get("changes/summary")).body.summary as ChangeSummary).requirements).toEqual({ total: 1, uncovered: 0 });
+      /** Put a requirements line just before a node file's closing frontmatter fence. */
+      const withReqs = (file: string, reqs: string[]): void => {
+        const original = readFileSync(file, "utf8");
+        writeFileSync(file, original.replace(/\n---\n/, `\nrequirements: [${reqs.join(",")}]\n---\n`));
+      };
+      const coverage = async () => ((await get("changes/summary")).body.summary as ChangeSummary).requirements;
+      const changeDir = () => join(rexDir, "changes", "add-apple-pay");
+
+      it("ignores product-layer requirements, which rex ready never reads", async () => {
+        withReqs(join(rexDir, "product", "checkout", "pay-by-card.md"), [req("r1", "automated")]);
+        expect(await coverage()).toEqual({ total: 0, uncovered: 1 });
+      });
+
+      it("counts automated and metric requirements on a task, not manual ones", async () => {
+        withReqs(join(changeDir(), "wire-the-button.md"), [req("r1", "manual"), req("r2", "automated"), req("r3", "metric")]);
+        expect(await coverage()).toEqual({ total: 2, uncovered: 0 });
+      });
+
+      it("counts a requirement on the change itself", async () => {
+        withReqs(join(changeDir(), "index.md"), [req("r1", "automated")]);
+        expect(await coverage()).toEqual({ total: 1, uncovered: 0 });
+      });
+
+      it("leaves out a completed task and an applied change", async () => {
+        withReqs(join(changeDir(), "wire-the-button.md"), [req("r1", "automated")]);
+        const statePath = join(changeDir(), "state.yaml");
+        writeFileSync(statePath, `${readFileSync(statePath, "utf8")}  "${TASK_ID}":\n    status: "completed"\n`);
+        expect(await coverage()).toEqual({ total: 0, uncovered: 1 });
+        applyChange();
+        expect(await coverage()).toEqual({ total: 0, uncovered: 0 });
+      });
     });
 
     it("counts a change whose task is in_progress under in-progress, not proposed", async () => {

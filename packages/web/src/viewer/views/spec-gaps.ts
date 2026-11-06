@@ -3,8 +3,9 @@
  * each open the Open changes list on that filter. Rows at zero are hidden.
  *
  * Reads `GET /api/rex/changes/summary`, the same fast read as the lifecycle strip.
- * Requirement coverage joins once the project has a structured requirement; until
- * then one line says why `rex ready` marks nothing ready.
+ * Requirement coverage joins once an open change or its task has an automated or
+ * metric requirement, the nodes `rex ready` reads; until then one line says why
+ * `rex ready` marks nothing ready.
  *
  * @module viewer/views/spec-gaps
  */
@@ -28,7 +29,7 @@ export interface SpecGapRow {
 
 export interface SpecGaps {
   rows: SpecGapRow[];
-  /** Set when the project holds no structured requirement. */
+  /** Set when no open change or task holds an automated or metric requirement. */
   readyLine: boolean;
 }
 
@@ -47,7 +48,7 @@ export function specGaps(summary: ChangeSummary): SpecGaps {
     { key: "review", label: "Amendments awaiting review", count: summary.stages["awaiting-apply"], filter: stageFilter("awaiting-apply") },
   ];
   const { total, uncovered } = summary.requirements;
-  if (total > 0) rows.push({ key: "requirements", label: "Capabilities without an automated requirement", count: uncovered });
+  if (total > 0) rows.push({ key: "requirements", label: "Open changes without an automated requirement", count: uncovered });
   return { rows: rows.filter((r) => r.count > 0), readyLine: total === 0 };
 }
 

@@ -267,7 +267,7 @@ export interface ChangeSummary {
   stages: Record<OpenChangeStage, number>;
   open: GlanceChange[];
   next: NextPick | null;
-  /** Automated and metric requirements on the product layer, and the capabilities that hold none. */
+  /** Automated and metric requirements on open changes and their tasks, where `rex ready` reads them, and the open changes that hold none. */
   requirements: { total: number; uncovered: number };
 }
 
