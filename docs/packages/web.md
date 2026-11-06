@@ -5,7 +5,7 @@
 ## Features
 
 - **Plan as tiles** — after the capture bar, Plan lays out tiles: Product map (full width), Inbox, Open changes and Validation. Open changes carries two tabs: **List** (the Changes view) and **Tree** (the PRD tree, with Sidecar ghost rows). Select a tile to open it full-screen in place, with the detail panel beside it; **Open ↗** goes to the tile's own page. On a v1 project a Tasks tile stands in for the v2 tiles.
-- **Plan's glance panels** — three panels read from one fast summary route, `GET /api/rex/changes/summary`, so they load on large PRDs.
+- **Plan's glance panels** — the lifecycle strip and the open-changes glance read one fast summary route, `GET /api/rex/changes/summary`, so they load on large PRDs; the product area map reads `GET /api/rex/product`.
   - **Lifecycle strip.** Under the capture bar, five counts in rex's change stages. Each opens the list it counts: Inbox opens the Inbox page, the rest open Open changes filtered to that stage.
     - **Inbox** — changes awaiting placement.
     - **Proposed** — placed changes that are not yet Ready.
