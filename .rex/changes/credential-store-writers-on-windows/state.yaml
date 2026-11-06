@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "6ce19e18-3b29-47f9-a1ae-251ac3e4031f":
-    lastModified: "2026-11-06T21:14:35.851Z"
+    status: "completed"
+    startedAt: "2026-11-06T21:15:02.784Z"
+    completedAt: "2026-11-06T21:22:10.800Z"
+    endedAt: "2026-11-06T21:22:10.800Z"
+    activeIntervals: [{"end":"2026-11-06T21:22:10.800Z","start":"2026-11-06T21:15:02.784Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "On win32, EPERM/EBUSY/EACCES from lock-family stat/read/link are contention retried within the lock budget; delete-pending link targets detected by a probe link instead of falling to mkdir; release retried; LockFs + platform seams; unit tests."
+    lastModified: "2026-11-06T21:22:10.800Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8dd961e5-f11e-487b-a559-062f1102839d":
+    status: "completed"
+    startedAt: "2026-11-06T21:22:10.800Z"
+    completedAt: "2026-11-06T21:22:10.800Z"
+    endedAt: "2026-11-06T21:22:10.800Z"
+    activeIntervals: [{"end":"2026-11-06T21:22:10.800Z","start":"2026-11-06T21:22:10.800Z"}]
+    appliedAt: "2026-11-06T21:22:10.800Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-06T21:14:31.091Z"
-    lastModified: "2026-11-06T21:14:51.026Z"
+    lastModified: "2026-11-06T21:22:10.800Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

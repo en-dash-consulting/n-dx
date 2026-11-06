@@ -144,6 +144,8 @@ export interface CredentialWriteOptions extends CredentialStoreOptions {
   lockTimeoutMs?: number;
   /** Whether a lock holder's PID is running (`kill(pid, 0)`); injectable for tests. */
   pidAlive?: (pid: number) => boolean;
+  /** The lock's stat, read and link calls; injectable for tests. */
+  lockFs?: LockFs;
   /** Runs `icacls` on win32; injectable so the ACL path is testable anywhere. */
   execFileSyncImpl?: typeof execFileSyncCli;
   /** The current user's name for the ACL grant; injectable for tests. */
@@ -776,6 +778,8 @@ function updateStore(options: CredentialWriteOptions, mutate: (store: StoreFile)
   const seams: LockSeams = {
     now: options.clock ?? defaultLockSeams.now,
     pidAlive: options.pidAlive ?? defaultLockSeams.pidAlive,
+    platform,
+    fs: options.lockFs,
   };
   withStoreLock(path, options.lockTimeoutMs ?? 10_000, seams, () => {
     const store = readStoreForWrite(path);
@@ -964,22 +968,53 @@ const LOCK_POLL_MS = 25;
  */
 export const EMPTY_LOCK_STALE_MS = 5_000;
 
+/** The filesystem calls the lock observes and publishes with. */
+export interface LockFs {
+  stat: (path: string) => Stats;
+  readFile: (path: string) => string;
+  link: (existingPath: string, newPath: string) => void;
+}
+
+const nodeLockFs: LockFs = {
+  stat: (path) => statSync(path),
+  readFile: (path) => readFileSync(path, "utf-8"),
+  link: (existingPath, newPath) => linkSync(existingPath, newPath),
+};
+
 /** What the lock consults about the outside world; injectable for tests. */
 export interface LockSeams {
   /** Milliseconds now, for an empty lock's age. */
   now: () => number;
   /** Whether a holder's PID is still running. */
   pidAlive: (pid: number) => boolean;
+  /** Whose filesystem rules apply. Defaults to `process.platform`. */
+  platform?: NodeJS.Platform;
+  /** Defaults to node:fs. */
+  fs?: LockFs;
 }
 
 const defaultLockSeams: LockSeams = { now: () => Date.now(), pidAlive: (pid) => pidAlive(pid) };
+
+/**
+ * Codes Windows returns for a lock file another process is deleting: opening,
+ * statting or linking to a delete-pending name fails with these, not ENOENT
+ * or EEXIST. A real permission problem gives the same codes; it persists, so
+ * it still ends in the lock's timeout, which carries it as the cause.
+ */
+const WINDOWS_CONTENTION_CODES = new Set(["EPERM", "EBUSY", "EACCES"]);
+
+function isContention(err: unknown, seams: LockSeams): boolean {
+  return (seams.platform ?? process.platform) === "win32" && WINDOWS_CONTENTION_CODES.has(errorCode(err) ?? "");
+}
 
 /**
  * Run `fn` holding `<store>.lock`. The lock file records the holder's PID and
  * is created already filled, so it is never seen empty. A lock whose PID is
  * dead, or an empty one an older n-dx left past {@link EMPTY_LOCK_STALE_MS},
  * is taken over. A live holder is waited for up to `timeoutMs` however old
- * its lock, then the call fails naming it.
+ * its lock, then the call fails naming it. On Windows, a lock-family call
+ * that fails because another writer is deleting the file counts as contended
+ * and is retried within the same budget; only a successful publication enters.
  */
 function withStoreLock<T>(storePath: string, timeoutMs: number, seams: LockSeams, fn: () => T): T {
   const lockPath = `${storePath}.lock`;
@@ -987,14 +1022,23 @@ function withStoreLock<T>(storePath: string, timeoutMs: number, seams: LockSeams
   const deadline = Date.now() + timeoutMs;
 
   for (;;) {
-    if (createFilled(lockPath, content)) break;
-    const holder = inspectLock(lockPath, seams.now());
-    if (holder !== undefined && lockIsStale(holder, seams) && takeOverStaleLock(lockPath, holder, seams)) continue;
+    let holder: LockState | undefined;
+    let contention: unknown;
+    try {
+      if (createFilled(lockPath, content, seams)) break;
+      holder = inspectLock(lockPath, seams);
+      if (holder !== undefined && lockIsStale(holder, seams) && takeOverStaleLock(lockPath, holder, seams)) continue;
+    } catch (err) {
+      if (!isContention(err, seams)) throw err;
+      contention = err;
+    }
     if (Date.now() >= deadline) {
       throw new Error(
         `Timed out waiting for the credential store lock ${lockPath}` +
           (holder?.pid !== undefined ? ` (held by PID ${holder.pid} since ${holder.since}).` : ".") +
-          ` If no n-dx process is running, delete ${lockPath}.`,
+          ` If no n-dx process is running, delete ${lockPath}.` +
+          (contention === undefined ? "" : ` Last error: ${errorMessage(contention)}`),
+        contention === undefined ? undefined : { cause: contention },
       );
     }
     sleepSync(LOCK_POLL_MS);
@@ -1003,9 +1047,25 @@ function withStoreLock<T>(storePath: string, timeoutMs: number, seams: LockSeams
   try {
     return fn();
   } finally {
-    // Remove only our own lock. Nobody else removes a live lock, so it is
-    // still ours when its content is.
-    removeIfOwn(lockPath, content);
+    releaseLock(lockPath, content, seams, timeoutMs);
+  }
+}
+
+/**
+ * Remove only our own lock. Nobody else removes a live lock, so it is still
+ * ours when its content is. Windows contention is retried for up to
+ * `budgetMs`, so a reader racing the release cannot fail a write that landed.
+ */
+function releaseLock(lockPath: string, content: string, seams: LockSeams, budgetMs: number): void {
+  const deadline = Date.now() + budgetMs;
+  for (;;) {
+    try {
+      removeIfOwn(lockPath, content, seams);
+      return;
+    } catch (err) {
+      if (!isContention(err, seams) || Date.now() >= deadline) throw err;
+    }
+    sleepSync(LOCK_POLL_MS);
   }
 }
 
@@ -1028,8 +1088,14 @@ const LOCK_OWNER_FILE = "owner.json";
  * the filled temp file is renamed to `<path>/owner.json`. The directory is
  * visible owner-less for a moment; {@link lockIsStale} never judges an
  * owner-less directory stale, so that moment cannot cost its writer the lock.
+ *
+ * On Windows, linking onto a name another process is deleting also fails
+ * with EPERM. A link to a fresh name settles which it was: when that link
+ * works the volume has hard links, so `path` is occupied and this returns
+ * false; when it fails too the volume has none and mkdir takes over.
  */
-export function createFilled(path: string, content: string): boolean {
+export function createFilled(path: string, content: string, seams: LockSeams = defaultLockSeams): boolean {
+  const fs = seams.fs ?? nodeLockFs;
   const tmp = `${path}.${randomUUID()}.tmp`;
   const fd = openSync(tmp, "wx", 0o600);
   try {
@@ -1039,11 +1105,12 @@ export function createFilled(path: string, content: string): boolean {
       closeSync(fd);
     }
     try {
-      linkSync(tmp, path);
+      fs.link(tmp, path);
       return true;
     } catch (err) {
       if (errorCode(err) === "EEXIST") return false;
       if (!UNSUPPORTED_LINK_CODES.has(errorCode(err) ?? "")) throw err;
+      if (isContention(err, seams) && hardLinksWork(tmp, fs)) return false;
     }
     try {
       mkdirSync(path, { mode: 0o700 });
@@ -1063,17 +1130,29 @@ export function createFilled(path: string, content: string): boolean {
   }
 }
 
+/** Whether `tmp` can be hard-linked to a name nobody else uses. */
+function hardLinksWork(tmp: string, fs: LockFs): boolean {
+  const probe = `${tmp}.probe`;
+  try {
+    fs.link(tmp, probe);
+  } catch {
+    return false;
+  }
+  rmSync(probe, { force: true });
+  return true;
+}
+
 /** Remove a lock or guard only while it still holds our content. */
-function removeIfOwn(path: string, content: string): void {
-  if (inspectLock(path)?.raw === content) removeLock(path);
+function removeIfOwn(path: string, content: string, seams: LockSeams): void {
+  if (inspectLock(path, seams)?.raw === content) removeLock(path, seams);
 }
 
 /**
  * Remove a lock or guard of either form. A directory loses its owner file
  * first; until the directory itself goes it reads as owner-less, so as held.
  */
-function removeLock(path: string): void {
-  if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+function removeLock(path: string, seams: LockSeams): void {
+  if (!statIfPresent(path, seams.fs ?? nodeLockFs)?.isDirectory()) {
     rmSync(path, { force: true });
     return;
   }
@@ -1102,22 +1181,37 @@ export interface LockState {
   ageMs: number;
 }
 
-/** The lock (or guard) as it is now, or undefined when there is none. */
-export function inspectLock(lockPath: string, now: number = Date.now()): LockState | undefined {
+function statIfPresent(path: string, fs: LockFs): Stats | undefined {
+  try {
+    return fs.stat(path);
+  } catch (err) {
+    if (errorCode(err) === "ENOENT") return undefined;
+    throw err;
+  }
+}
+
+/**
+ * The lock (or guard) as it is now, or undefined when there is none. A file
+ * Windows is deleting throws (EPERM/EBUSY) rather than reading as absent:
+ * the caller retries, and nothing mistakes a lock it could not read for gone.
+ */
+export function inspectLock(lockPath: string, seams: LockSeams = defaultLockSeams): LockState | undefined {
+  const fs = seams.fs ?? nodeLockFs;
+  const now = seams.now();
   let stats: Stats;
   let raw: string;
   let form: LockState["form"] = "file";
   try {
-    stats = statSync(lockPath);
+    stats = fs.stat(lockPath);
     if (stats.isDirectory()) {
       form = "directory";
-      const owner = readOwnerFile(join(lockPath, LOCK_OWNER_FILE));
+      const owner = readOwnerFile(join(lockPath, LOCK_OWNER_FILE), fs);
       if (owner === undefined) {
         return { form, raw: "", identity: `dir:${stats.ino}:${stats.mtimeMs}:`, ageMs: now - stats.mtimeMs };
       }
       [stats, raw] = owner;
     } else {
-      raw = readFileSync(lockPath, "utf-8");
+      raw = fs.readFile(lockPath);
     }
   } catch (err) {
     if (errorCode(err) === "ENOENT") return undefined;
@@ -1143,9 +1237,9 @@ export function inspectLock(lockPath: string, now: number = Date.now()): LockSta
 }
 
 /** A directory lock's owner file and its stats, or undefined while it is not renamed in. */
-function readOwnerFile(path: string): [Stats, string] | undefined {
+function readOwnerFile(path: string, fs: LockFs): [Stats, string] | undefined {
   try {
-    return [statSync(path), readFileSync(path, "utf-8")];
+    return [fs.stat(path), fs.readFile(path)];
   } catch (err) {
     if (errorCode(err) === "ENOENT") return undefined;
     throw err;
@@ -1183,18 +1277,18 @@ export function takeoverGuardPath(lockPath: string, judged: LockState): string {
 export function takeOverStaleLock(lockPath: string, judged: LockState, seams: LockSeams = defaultLockSeams): boolean {
   const guard = takeoverGuardPath(lockPath, judged);
   const content = holderContent();
-  if (!createFilled(guard, content)) {
+  if (!createFilled(guard, content, seams)) {
     reclaimAbandonedGuard(guard, seams);
     return false;
   }
   try {
-    const current = inspectLock(lockPath, seams.now());
+    const current = inspectLock(lockPath, seams);
     if (current === undefined) return true;
     if (current.identity !== judged.identity || !lockIsStale(current, seams)) return false;
-    removeLock(lockPath);
+    removeLock(lockPath, seams);
     return true;
   } finally {
-    removeIfOwn(guard, content);
+    removeIfOwn(guard, content, seams);
   }
 }
 
@@ -1207,8 +1301,8 @@ export function takeOverStaleLock(lockPath: string, judged: LockState, seams: Lo
  * writer killed inside the guard, and this keeps it recoverable.
  */
 function reclaimAbandonedGuard(guard: string, seams: LockSeams): void {
-  const state = inspectLock(guard, seams.now());
-  if (state?.pid !== undefined && !seams.pidAlive(state.pid)) removeLock(guard);
+  const state = inspectLock(guard, seams);
+  if (state?.pid !== undefined && !seams.pidAlive(state.pid)) removeLock(guard, seams);
 }
 
 /** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */

@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { platform, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -26,6 +26,7 @@ import {
   setCredential,
   unsetCredential,
   type CredentialWriteOptions,
+  type LockFs,
 } from "../../src/credential-store.js";
 
 /** Pass-through fs spies: which paths were opened, and what each link carried. */
@@ -541,6 +542,105 @@ describe("an ndx home without hard links", () => {
 function holder(pid: number): string {
   return JSON.stringify({ pid, token: `t${pid}`, since: "2026-01-01T00:00:00.000Z" });
 }
+
+describe("Windows delete-pending lock files", () => {
+  const lockPath = (): string => `${storePath()}.lock`;
+  /** icacls stand-in, so the win32 write path runs on any host. */
+  const icacls = ((_binary: string, args: string[]) => (args.length === 1 ? `${args[0]} alice:(F)` : "")) as unknown as
+    CredentialWriteOptions["execFileSyncImpl"];
+
+  /**
+   * Real fs whose `op` on `target` throws `code` the first `times` calls, as
+   * Windows does for a file another process is deleting.
+   */
+  function flakyLockFs(op: keyof LockFs, code: string, target: string, times = 1) {
+    const state = { thrown: 0 };
+    const fail = (which: keyof LockFs, path: string): void => {
+      if (which !== op || path !== target || state.thrown >= times) return;
+      state.thrown++;
+      throw Object.assign(new Error(`${code}: operation not permitted, ${op} '${path}'`), { code });
+    };
+    const fs: LockFs = {
+      stat: (p) => { fail("stat", p); return statSync(p); },
+      readFile: (p) => { fail("readFile", p); return readFileSync(p, "utf-8"); },
+      link: (a, b) => { fail("link", b); linkSync(a, b); },
+    };
+    return { fs, state };
+  }
+
+  const win32 = (lockFs: LockFs, extra: Partial<CredentialWriteOptions> = {}): CredentialWriteOptions => ({
+    ...options, platform: "win32", execFileSyncImpl: icacls, username: "alice", lockFs, lockTimeoutMs: 2_000, ...extra,
+  });
+
+  for (const [op, code] of [["stat", "EPERM"], ["stat", "EBUSY"], ["readFile", "EPERM"], ["readFile", "EACCES"]] as const) {
+    it(`retries when inspecting a dead holder's lock fails with ${code} on ${op}, and the update lands`, () => {
+      writeFileSync(lockPath(), holder(1002));
+      const { fs, state } = flakyLockFs(op, code, lockPath());
+      setCredential("typesafe", PLACEHOLDER, win32(fs, { pidAlive: () => false }));
+      expect(state.thrown).toBe(1);
+      expect(resolveCredential("typesafe", { ...options, platform: "win32" })?.value).toBe(PLACEHOLDER);
+      expect(readdirSync(home)).toEqual(["credentials.json"]);
+    });
+  }
+
+  it("retries a link onto a delete-pending lock without taking the no-hard-links path", () => {
+    const { fs, state } = flakyLockFs("link", "EPERM", lockPath());
+    setCredential("typesafe", PLACEHOLDER, win32(fs));
+    expect(state.thrown).toBe(1);
+    // The probe linked, so the retry linked the lock rather than making a directory.
+    expect(fsCalls.linked.filter((l) => l.dst.startsWith(`${lockPath()}.`) && l.dst.endsWith(".tmp.probe"))).toHaveLength(1);
+    expect(fsCalls.linked.filter((l) => l.dst === lockPath())).toHaveLength(1);
+    expect(resolveCredential("typesafe", { ...options, platform: "win32" })?.value).toBe(PLACEHOLDER);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("createFilled counts a delete-pending link target as held and leaves nothing behind", () => {
+    const { fs } = flakyLockFs("link", "EPERM", lockPath());
+    expect(createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs })).toBe(false);
+    expect(readdirSync(home)).toEqual([]);
+  });
+
+  it("still takes the directory path on Windows when the volume has no hard links", () => {
+    fsCalls.linkError = "EPERM";
+    try {
+      const lockFs: LockFs = { stat: (p) => statSync(p), readFile: (p) => readFileSync(p, "utf-8"), link: (a, b) => linkSync(a, b) };
+      expect(createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs: lockFs })).toBe(true);
+      expect(statSync(lockPath()).isDirectory()).toBe(true);
+      rmSync(lockPath(), { recursive: true });
+      setCredential("typesafe", PLACEHOLDER, win32(lockFs));
+      expect(resolveCredential("typesafe", { ...options, platform: "win32" })?.value).toBe(PLACEHOLDER);
+      expect(readdirSync(home)).toEqual(["credentials.json"]);
+    } finally {
+      fsCalls.linkError = undefined;
+    }
+  });
+
+  it("retries the release when reading its own lock fails, so a landed write never throws", () => {
+    // With no earlier lock, the first read of the lock file is the release's.
+    const { fs, state } = flakyLockFs("readFile", "EPERM", lockPath());
+    setCredential("typesafe", PLACEHOLDER, win32(fs));
+    expect(state.thrown).toBe(1);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("a persistent EPERM still ends in the lock timeout, carrying the error", () => {
+    writeFileSync(lockPath(), holder(1002));
+    const { fs } = flakyLockFs("stat", "EPERM", lockPath(), Infinity);
+    expect(() => setCredential("typesafe", PLACEHOLDER, win32(fs, { lockTimeoutMs: 100, pidAlive: () => false })))
+      .toThrow(/^Timed out waiting for the credential store lock .+ If no n-dx process is running, delete .+ Last error: EPERM/);
+    expect(readFileSync(lockPath(), "utf-8")).toBe(holder(1002));
+    expect(existsSync(storePath())).toBe(false);
+  });
+
+  it("off Windows the same EPERM is not contention: it throws at once", () => {
+    writeFileSync(lockPath(), holder(1002));
+    const { fs, state } = flakyLockFs("stat", "EPERM", lockPath());
+    expect(() => setCredential("typesafe", PLACEHOLDER, { ...options, platform: "linux", lockFs: fs, pidAlive: () => false }))
+      .toThrow(/^EPERM/);
+    expect(state.thrown).toBe(1);
+    expect(existsSync(storePath())).toBe(false);
+  });
+});
 
 describe("Windows owner-only ACL", () => {
   type Call = { binary: string; args: string[] };
