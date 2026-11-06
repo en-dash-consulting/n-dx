@@ -6,7 +6,9 @@
  * positioned inside the page body, stays on the page's own right edge, and
  * the status dock moves left by the drawer's width (`--sidecar-w`, UX10).
  * Default 440 px, resizable 360–640 px by dragging or arrowing its left edge;
- * the width is remembered.
+ * the width is remembered. A wide-mode toggle in the head widens it to most of
+ * the viewport (at 960 px and up) and lifts the tool-result cap; that choice is
+ * remembered too. Under 960 px the drawer takes at most 85% of the viewport.
  *
  * Inside: the head, the transcript, the session's permission cards
  * (sidecar-cards.ts), an orange paused bar above the composer while the turn
@@ -40,6 +42,28 @@ export const SIDECAR_WIDTH_MIN = 360;
 export const SIDECAR_WIDTH_MAX = 640;
 const WIDTH_KEY = "ndx-sidecar-width";
 const WIDTH_STEP = 20;
+const WIDE_KEY = "ndx-sidecar-wide";
+/** Below this viewport width the page needs the room: no wide mode. */
+export const SIDECAR_WIDE_MIN_VIEWPORT = 960;
+/** Wide mode leaves the page at least this much. */
+const WIDE_PAGE_MIN = 480;
+const WIDE_SHARE = 0.7;
+/** On a narrow viewport the drawer never takes more than this share of it. */
+const NARROW_SHARE = 0.85;
+
+/** The drawer's width in px for the chosen width and mode at this viewport. */
+export function effectiveSidecarWidth(width: number, wide: boolean, viewport: number): number {
+  if (viewport < SIDECAR_WIDE_MIN_VIEWPORT) return Math.min(width, Math.round(viewport * NARROW_SHARE));
+  return wide ? Math.max(width, Math.min(Math.round(viewport * WIDE_SHARE), viewport - WIDE_PAGE_MIN)) : width;
+}
+
+function storedWide(): boolean {
+  try {
+    return localStorage.getItem(WIDE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function clampSidecarWidth(width: number): number {
   if (!Number.isFinite(width)) return SIDECAR_WIDTH_DEFAULT;
@@ -301,6 +325,8 @@ export interface SidecarDrawerProps {
 
 export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [width, setWidth] = useState(storedWidth);
+  const [wide, setWide] = useState(storedWide);
+  const [viewport, setViewport] = useState(() => window.innerWidth);
   const [draft, setDraft] = useState("");
   const [listing, setListing] = useState(false);
   const [lensMenu, setLensMenu] = useState(false);
@@ -319,15 +345,36 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const applyWidth = useCallback((next: number) => {
     const w = clampSidecarWidth(next);
     setWidth(w);
-    try { localStorage.setItem(WIDTH_KEY, String(w)); } catch { /* storage full or blocked: the width still applies */ }
+    // Dragging or arrowing the edge is a choice of width, so it leaves wide mode.
+    setWide(false);
+    try {
+      localStorage.setItem(WIDTH_KEY, String(w));
+      localStorage.setItem(WIDE_KEY, "0");
+    } catch { /* storage full or blocked: the width still applies */ }
   }, []);
+
+  const toggleWide = () => {
+    const next = !wide;
+    setWide(next);
+    try { localStorage.setItem(WIDE_KEY, next ? "1" : "0"); } catch { /* blocked: the mode still applies */ }
+  };
+
+  useEffect(() => {
+    const onResize = () => setViewport(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const canWiden = viewport >= SIDECAR_WIDE_MIN_VIEWPORT;
+  const isWide = wide && canWiden;
+  const shownWidth = effectiveSidecarWidth(width, wide, viewport);
 
   // The status dock is fixed to the viewport; it reads the drawer's width.
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--sidecar-w", `${width}px`);
+    root.style.setProperty("--sidecar-w", `${shownWidth}px`);
     return () => { root.style.removeProperty("--sidecar-w"); };
-  }, [width]);
+  }, [shownWidth]);
 
   // Follow the newest frame.
   useEffect(() => {
@@ -382,8 +429,8 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
 
   return h("aside", {
     id: "sidecar-drawer",
-    class: "sidecar-drawer",
-    style: { width: `${width}px` },
+    class: `sidecar-drawer${isWide ? " sidecar-drawer--wide" : ""}`,
+    style: { width: `${shownWidth}px` },
     "aria-label": "Sidecar",
   },
     h("div", {
@@ -392,7 +439,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       tabIndex: 0,
       "aria-orientation": "vertical",
       "aria-label": "Resize Sidecar",
-      "aria-valuenow": width,
+      "aria-valuenow": shownWidth,
       "aria-valuemin": SIDECAR_WIDTH_MIN,
       "aria-valuemax": SIDECAR_WIDTH_MAX,
       onPointerDown: onResizeStart,
@@ -408,6 +455,16 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
         "aria-pressed": listing ? "true" : "false",
         onClick: () => setListing((v) => !v),
       }, "Sessions"),
+      canWiden
+        ? h("button", {
+            type: "button",
+            class: `sidecar-wide-toggle${isWide ? " active" : ""}`,
+            "aria-pressed": isWide ? "true" : "false",
+            "aria-label": "Wide mode",
+            title: isWide ? "Narrow the drawer" : "Widen the drawer",
+            onClick: toggleWide,
+          }, "↔")
+        : null,
       h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Sidecar", title: "Close (⌘J)" }, "×"),
     ),
     h(ExtensionTabStrip, { tabs, active, onSelect: selectTab }),

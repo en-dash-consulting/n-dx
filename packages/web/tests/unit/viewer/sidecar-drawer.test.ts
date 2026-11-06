@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
-import { SidecarDock, SidecarFrameRow, clampSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
+import { SidecarDock, SidecarFrameRow, clampSidecarWidth, effectiveSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
 import {
   isSidecarShortcut,
   mergeFrames,
@@ -412,6 +412,76 @@ describe("the top-nav button", () => {
     await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
     expect((drawer() as HTMLElement).style.width).toBe("360px");
     expect(localStorage.getItem("ndx-sidecar-width")).toBe("360");
+  });
+});
+
+describe("wide mode", () => {
+  const original = window.innerWidth;
+  const setViewport = (w: number) => { (window as { innerWidth: number }).innerWidth = w; };
+  const toggle = () => root.querySelector<HTMLButtonElement>(".sidecar-wide-toggle");
+  afterEach(() => { setViewport(original); vi.restoreAllMocks(); });
+
+  it("computes the width: wide takes most of the viewport and leaves the page 480 px", () => {
+    expect(effectiveSidecarWidth(440, false, 1440)).toBe(440);
+    expect(effectiveSidecarWidth(440, true, 1440)).toBe(960);
+    expect(effectiveSidecarWidth(440, true, 1920)).toBe(1344);
+    expect(effectiveSidecarWidth(440, true, 960)).toBe(480);
+    expect(effectiveSidecarWidth(640, true, 960)).toBe(640);
+  });
+
+  it("widens the drawer, lifts the result cap and is remembered across a reopen", async () => {
+    setViewport(1440);
+    await mount();
+    await pressCmdJ();
+    expect(toggle()!.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => { toggle()!.click(); });
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(true);
+    expect(document.documentElement.style.getPropertyValue("--sidecar-w")).toBe("960px");
+    expect(localStorage.getItem("ndx-sidecar-wide")).toBe("1");
+    await pressCmdJ();
+    await pressCmdJ();
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+    await act(async () => { toggle()!.click(); });
+    expect((drawer() as HTMLElement).style.width).toBe("440px");
+    expect(localStorage.getItem("ndx-sidecar-wide")).toBe("0");
+  });
+
+  it("leaves wide mode when the edge is resized", async () => {
+    setViewport(1440);
+    localStorage.setItem("ndx-sidecar-wide", "1");
+    await mount();
+    await pressCmdJ();
+    const edge = root.querySelector<HTMLElement>(".sidecar-resize")!;
+    await act(async () => { edge.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
+    expect((drawer() as HTMLElement).style.width).toBe("360px");
+  });
+
+  it("works with storage blocked", async () => {
+    setViewport(1440);
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    await mount();
+    await pressCmdJ();
+    await act(async () => { toggle()!.click(); });
+    expect((drawer() as HTMLElement).style.width).toBe("960px");
+  });
+
+  it("keeps the drawer usable on a narrow viewport: no toggle, no wide, at most 85%", async () => {
+    setViewport(800);
+    localStorage.setItem("ndx-sidecar-wide", "1");
+    await mount();
+    await pressCmdJ();
+    expect(toggle()).toBeNull();
+    expect(drawer()!.classList.contains("sidecar-drawer--wide")).toBe(false);
+    expect((drawer() as HTMLElement).style.width).toBe("440px");
+    expect(effectiveSidecarWidth(640, false, 500)).toBe(425);
+  });
+
+  it("styles the toggle and lifts the cap with tokens only", () => {
+    const css = readFileSync(join(__dirname, "../../../src/viewer/styles/sidecar.css"), "utf8");
+    expect(css).toMatch(/\.sidecar-drawer--wide \.sidecar-tool-output \{ max-height: none; \}/);
+    expect(css).toMatch(/\.sidecar-wide-toggle\.active \{[^}]*var\(--bg-active\)/);
   });
 });
 

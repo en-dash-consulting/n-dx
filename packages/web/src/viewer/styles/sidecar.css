@@ -62,6 +62,7 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+.sidecar-wide-toggle,
 .sidecar-close {
   display: inline-flex;
   align-items: center;
@@ -76,7 +77,9 @@
   line-height: 1;
   cursor: pointer;
 }
+.sidecar-wide-toggle:hover,
 .sidecar-close:hover { color: var(--text); background: var(--bg-hover); }
+.sidecar-wide-toggle.active { color: var(--text); background: var(--bg-active); }
 .sidecar-sessions-toggle { margin-left: auto; }
 
 .sidecar-paused {
@@ -178,6 +181,9 @@
   border-radius: 4px;
   color: var(--text);
 }
+/* Wide mode has the room: tool results show whole. */
+.sidecar-drawer--wide .sidecar-tool-input,
+.sidecar-drawer--wide .sidecar-tool-output { max-height: none; }
 .sidecar-tool-pending { margin: 0; font-style: italic; }
 
 .sidecar-agent {
