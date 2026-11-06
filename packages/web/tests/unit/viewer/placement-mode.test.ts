@@ -51,9 +51,9 @@ const cap = (id: string, title: string, criteriaCount = 1): CapabilityRow =>
 
 const MAP: ProductMap = {
   areas: [
-    { id: "area-pay", slug: "payments", title: "Payments", capabilities: [cap("cap-refund", "Refunds", 3), cap("cap-gift", "Gift cards")] },
-    { id: "area-ship", slug: "shipping", title: "Shipping", capabilities: [cap("cap-label", "Shipping labels")] },
-    { id: "area-tax", slug: "tax", title: "Tax", capabilities: [cap("cap-vat", "VAT")] },
+    { id: "area-pay", slug: "payments", title: "Payments", capabilities: [cap("cap-refund", "Refunds", 3), cap("cap-gift", "Gift cards")], openChangeIds: [] },
+    { id: "area-ship", slug: "shipping", title: "Shipping", capabilities: [cap("cap-label", "Shipping labels")], openChangeIds: [] },
+    { id: "area-tax", slug: "tax", title: "Tax", capabilities: [cap("cap-vat", "VAT")], openChangeIds: [] },
   ],
   constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all" }],
 };
