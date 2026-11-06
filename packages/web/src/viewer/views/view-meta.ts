@@ -104,7 +104,7 @@ export const VIEW_META = {
     label: "Work",
     glyph: "▶",
     product: "hench",
-    blurb: "Get it done: hand the next task to the agent, pick a run mode, follow its runs.",
+    blurb: "Get it done: hand the next task to the agent, pick a run mode, see what each worktree is running.",
   },
   tune: {
     label: "Tune",

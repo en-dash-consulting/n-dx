@@ -33,6 +33,7 @@ import {
   isLiveView,
   ENRICHMENT_THRESHOLDS,
   stageForView,
+  stageViews,
   tilePlacesView,
   type StageId,
 } from "../../../src/viewer/views/index.js";
@@ -163,6 +164,9 @@ describe("navigation model: labels", () => {
   it("stage blurbs do not advertise what moved to Tune and Settings", () => {
     expect(viewBlurb("plan")).not.toMatch(/planning commands/i);
     expect(viewBlurb("work")).not.toMatch(/costs?|spend/i);
+    // The Runs list is a Tune tile.
+    expect(stageViews("tune")).toContain("hench-runs");
+    expect(viewBlurb("work")).not.toMatch(/\bruns\b/i);
   });
 
   it("the home blurb counts the four stages", () => {
