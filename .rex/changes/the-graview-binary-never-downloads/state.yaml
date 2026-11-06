@@ -8,6 +8,7 @@ items:
     activeIntervals: [{"end":"2026-11-05T15:57:05.902Z","start":"2026-11-05T15:57:05.902Z"}]
     appliedAt: "2026-11-05T15:57:05.902Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
     assignee: "Sterling H <sterling.h@endash.us>"
     lastModified: "2026-11-05T15:57:05.902Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

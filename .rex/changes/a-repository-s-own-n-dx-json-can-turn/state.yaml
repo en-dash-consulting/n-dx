@@ -10,5 +10,6 @@ items:
     resolutionDetail: "Fix e8abbbd21 (run d0f7df28): web.sidecarGithubReads from tracked or committed config applies only once the checkout is trusted (new network-reads trust finding). Gate failed only on graview-app-trust, pre-existing on main: it inherits NDX_CLI_PATH under ndx work (2 fail with it set, 2 pass without). Affected gate outside hench passes 9/9 suites. Review low finding captured as 8f66583f."
     appliedAt: "2026-10-30T23:52:36.306Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
     lastModified: "2026-10-30T23:52:36.306Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

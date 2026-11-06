@@ -10,5 +10,6 @@ items:
     resolutionDetail: "Hub card Initialize implemented (158f1dd23) and hardened after adversarial review: git default from wizard preflight, running card kept through unreachable ticks, 409/lost-server tests, AGENTS.md budget restored."
     appliedAt: "2026-11-04T16:12:33.182Z"
     appliedAmendsHash: "550d18593abfd537463748f237d9e53c677a1d81d1d6ba1220254ade386d798e"
+    shippedIn: "0.10.3"
     lastModified: "2026-11-04T16:12:33.182Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

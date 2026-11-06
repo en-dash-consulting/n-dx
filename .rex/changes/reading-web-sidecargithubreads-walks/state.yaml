@@ -10,5 +10,6 @@ items:
     resolutionDetail: "Fix 56f79cc11 with review repair 00aa4e118 (run b5553246): llm-client repoTrustStateOf decides trust state from config, findings and the trust record without the inventory walk; resolveGithubReads uses it. Tests spy on the inventory (web) and on readdirSync (llm-client). Gate failed only on graview-app-trust, pre-existing (NDX_CLI_PATH inherited under ndx work; fix in #940); the affected gate outside hench passes 8/8 suites. Review dropped the remaining per-request git spawn (removing it needs caching, which the intent rejected)."
     appliedAt: "2026-11-02T19:17:25.401Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
     lastModified: "2026-11-02T19:17:25.401Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
