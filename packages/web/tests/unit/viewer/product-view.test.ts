@@ -252,12 +252,14 @@ describe("capability ordering", () => {
     const badges = PRODUCT_MAP_FIXTURE.areas.map((area) => areaBlock(area).openChanges);
     expect(badges).toEqual(PRODUCT_MAP_FIXTURE.areas.map((a) => a.openChangeIds.length));
 
-    // One change spans two areas: it counts once, as the area map's rule says.
+    // One change spans two areas and counts once; another only adds a
+    // capability under the first area, so no capability overlay carries it.
     const areas = PRODUCT_MAP_FIXTURE.areas.map((area, i) => (
-      i === 0 ? { ...area, openChangeIds: [...area.openChangeIds, "change-run-field"] } : area
+      i === 0 ? { ...area, openChangeIds: [...area.openChangeIds, "change-run-field", "change-add-only"] } : area
     ));
     const distinct = new Set(areas.flatMap((a) => a.openChangeIds)).size;
 
+    expect(distinct).toBe(6);
     expect(productTotals({ ...PRODUCT_MAP_FIXTURE, areas }).openChanges).toBe(distinct);
     expect(productTotals(PRODUCT_MAP_FIXTURE).openChanges).toBe(5);
   });
