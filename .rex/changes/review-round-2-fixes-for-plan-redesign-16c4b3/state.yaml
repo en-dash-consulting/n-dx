@@ -11,10 +11,17 @@ items:
     lastModified: "2026-11-06T16:13:31.350Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "16c4b3b7-deb4-4bfc-97fb-27651c5dfab0":
-    lastModified: "2026-11-06T16:09:52.637Z"
+    lastModified: "2026-11-06T16:18:24.809Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "27b86abd-678f-4f5c-86ae-8618b47ca7c2":
-    lastModified: "2026-11-06T16:09:52.637Z"
+    status: "completed"
+    startedAt: "2026-11-06T16:15:47.527Z"
+    completedAt: "2026-11-06T16:18:50.609Z"
+    endedAt: "2026-11-06T16:18:50.609Z"
+    activeIntervals: [{"end":"2026-11-06T16:18:50.609Z","start":"2026-11-06T16:15:47.527Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ChangeApplySection derives awaiting-apply from the detail item; no /api/rex/changes fetch per panel."
+    lastModified: "2026-11-06T16:18:50.609Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2fb8468b-d432-4948-9372-a0093fafdf40":
     status: "completed"
@@ -25,4 +32,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "SpecGapsPanel reads useChangesSummary(); test mounts under ChangesSummaryProvider and asserts one summary read."
     lastModified: "2026-11-06T16:15:38.966Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd231b6b-4b32-4d7b-aa77-b569bb0f3cb4":
+    lastModified: "2026-11-06T16:18:24.809Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

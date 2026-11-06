@@ -1253,7 +1253,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       : null,
 
     // Apply…: a change awaiting apply, previewed before it writes
-    isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, changeId: item.id, onWritten: onPrdChanged }) : null,
+    isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, item, onWritten: onPrdChanged }) : null,
 
     // Status selector
     h(

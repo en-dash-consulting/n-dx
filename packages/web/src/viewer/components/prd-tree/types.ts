@@ -110,6 +110,10 @@ export interface PRDItemData {
   completedAt?: string;
   activeIntervals?: ActiveIntervalData[];
   failureReason?: string;
+  /** v2 change: when it was applied to the product map. */
+  appliedAt?: string;
+  /** v2 change: the release that shipped it. */
+  shippedIn?: string;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.branch */
   branch?: string | null;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.sourceFile */

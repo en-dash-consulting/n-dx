@@ -9,12 +9,23 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ChangeApplySection, effectLine, MOVED_NOTICE } from "../../../src/viewer/components/prd-tree/change-apply.js";
-import type { ChangeApply, ChangeRow, ChangeStage } from "../../../src/viewer/views/product-model.js";
+import type { ChangeApply } from "../../../src/viewer/views/product-model.js";
+import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 
 const ID = "c1";
 
-function row(stage: ChangeStage): ChangeRow {
-  return { id: ID, title: "Add Apple Pay", stage, amends: [], touches: [], taskCount: 1, completedTaskCount: 1, criteriaGap: false, openBlockers: 0 };
+type Stage = "proposed" | "ready" | "in-progress" | "awaiting-apply" | "applied" | "shipped";
+
+/** The change's detail item as the tree serves it, for each stage the panel tells apart. */
+function itemAt(stage: Stage): PRDItemData {
+  const base = { id: ID, title: "Add Apple Pay" };
+  switch (stage) {
+    case "proposed": case "ready": return { ...base, status: "pending" };
+    case "in-progress": return { ...base, status: "in_progress" };
+    case "awaiting-apply": return { ...base, status: "completed" };
+    case "applied": return { ...base, status: "completed", appliedAt: "2026-11-05T00:00:00.000Z" };
+    case "shipped": return { ...base, status: "completed", appliedAt: "2026-11-05T00:00:00.000Z", shippedIn: "0.9.1" };
+  }
 }
 
 const PREVIEW: ChangeApply = {
@@ -32,16 +43,22 @@ type Answer = { status: number; body: unknown };
 
 let root: HTMLDivElement;
 let posts: string[];
+/** Every URL requested, any method. */
+let requests: string[];
+let stage: Stage;
 /** Each POST's JSON body, undefined when it sent none. */
 let bodies: unknown[];
 /** Per URL, one answer for every call or a queue answered in order. */
 let answers: Record<string, Answer | Answer[]>;
 
-function serve(stage: ChangeStage): void {
+function serve(at: Stage): void {
+  stage = at;
   posts = [];
+  requests = [];
   bodies = [];
   answers = {};
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    requests.push(url);
     if (init?.method === "POST") {
       posts.push(url);
       bodies.push(init.body === undefined ? undefined : JSON.parse(String(init.body)));
@@ -49,8 +66,7 @@ function serve(stage: ChangeStage): void {
       const a = (Array.isArray(queued) ? queued.shift() : queued) ?? { status: 200, body: PREVIEW };
       return new Response(JSON.stringify(a.body), { status: a.status, headers: { "Content-Type": "application/json" } });
     }
-    const body = url === "/api/rex/changes" ? { layout: "v2", changes: [row(stage)] } : undefined;
-    return new Response(JSON.stringify(body ?? { error: "not found" }), { status: body ? 200 : 404, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
   }));
 }
 
@@ -59,7 +75,7 @@ async function settle(): Promise<void> {
 }
 
 async function mount(onWritten = vi.fn()): Promise<typeof onWritten> {
-  await act(async () => { render(h(ChangeApplySection, { changeId: ID, onWritten }), root); });
+  await act(async () => { render(h(ChangeApplySection, { item: itemAt(stage), onWritten }), root); });
   await settle();
   return onWritten;
 }
@@ -93,10 +109,17 @@ describe("ChangeApplySection", () => {
     expect(button("Apply…")).not.toBeNull();
   });
 
-  it.each<ChangeStage>(["proposed", "ready", "in-progress", "applied", "shipped"])("shows nothing for a %s change", async (stage) => {
-    serve(stage);
+  it.each<Stage>(["proposed", "ready", "in-progress", "applied", "shipped"])("shows nothing for a %s change", async (at) => {
+    serve(at);
     await mount();
     expect(root.textContent).toBe("");
+  });
+
+  it("opening a change's detail requests nothing, not the change list, and still shows Apply…", async () => {
+    serve("awaiting-apply");
+    await mount();
+    expect(requests).toEqual([]);
+    expect(button("Apply…")).not.toBeNull();
   });
 
   it("Apply… previews each amendment's effect and writes nothing until Apply", async () => {

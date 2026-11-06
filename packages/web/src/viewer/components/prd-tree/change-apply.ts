@@ -14,8 +14,8 @@
 
 import { h } from "preact";
 import { useState } from "preact/hooks";
-import { useRefetchableProductRead } from "../../hooks/index.js";
-import type { AppliedAmendment, ChangeApply, ChangeRow } from "../../views/product-model.js";
+import type { AppliedAmendment, ChangeApply } from "../../views/product-model.js";
+import type { PRDItemData } from "./types.js";
 
 type Answer = { ok: true; result: ChangeApply } | { ok: false; message: string; moved?: boolean };
 
@@ -54,24 +54,29 @@ type Step =
   | { kind: "refused"; message: string }
   | { kind: "applied"; result: ChangeApply };
 
+/** Awaiting apply: its work is done and rex has neither applied nor shipped it. */
+export function isAwaitingApply(item: Pick<PRDItemData, "status" | "appliedAt" | "shippedIn">): boolean {
+  return item.status === "completed" && !item.appliedAt && !item.shippedIn;
+}
+
 export interface ChangeApplySectionProps {
-  changeId: string;
+  /** The change's own detail item: awaiting-apply is read from it, not from the change list. */
+  item: Pick<PRDItemData, "id" | "status" | "appliedAt" | "shippedIn">;
   /** After the apply wrote: refresh the tree and anything else reading the PRD. */
   onWritten?: () => void;
 }
 
 /** Key it by change id: its state belongs to one change. */
-export function ChangeApplySection({ changeId, onWritten }: ChangeApplySectionProps) {
-  const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
+export function ChangeApplySection({ item, onWritten }: ChangeApplySectionProps) {
+  const changeId = item.id;
   const [step, setStep] = useState<Step>({ kind: "idle" });
-  const row = load.state === "ready" ? load.data.find((c) => c.id === changeId) : undefined;
 
   if (step.kind === "applied") {
     return h("div", { class: "task-section ca-section", "data-change-apply": "applied" },
       h("div", { class: "cp-placed-line" }, `Applied. ${step.result.applied.length ? `${step.result.applied.length} amendment${step.result.applied.length === 1 ? "" : "s"} on the product map.` : "It carried no amendments."}`),
     );
   }
-  if (row?.stage !== "awaiting-apply") return null;
+  if (!isAwaitingApply(item)) return null;
 
   const preview = async (moved?: boolean) => {
     setStep({ kind: "busy" });
@@ -88,7 +93,6 @@ export function ChangeApplySection({ changeId, onWritten }: ChangeApplySectionPr
       return;
     }
     setStep({ kind: "applied", result: answer.result });
-    refetch();
     onWritten?.();
   };
   const busy = step.kind === "busy";
