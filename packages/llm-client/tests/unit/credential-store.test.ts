@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { platform, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -32,6 +32,8 @@ import {
 const fsCalls = vi.hoisted(() => ({
   opened: [] as string[],
   linked: [] as { src: string; dst: string; contentAtLink: string }[],
+  /** When set, linkSync fails with this code, as on a volume without hard links. */
+  linkError: undefined as string | undefined,
 }));
 vi.mock("node:fs", async (importOriginal) => {
   const fs = await importOriginal<typeof import("node:fs")>();
@@ -43,6 +45,9 @@ vi.mock("node:fs", async (importOriginal) => {
     },
     linkSync: (src: string, dst: string) => {
       fsCalls.linked.push({ src: String(src), dst: String(dst), contentAtLink: fs.readFileSync(src, "utf-8") });
+      if (fsCalls.linkError !== undefined) {
+        throw Object.assign(new Error(`${fsCalls.linkError}: link '${src}' -> '${dst}'`), { code: fsCalls.linkError });
+      }
       return fs.linkSync(src, dst);
     },
   };
@@ -440,6 +445,96 @@ describe("createFilled", () => {
     expect(linked[0].dst).toBe("credentials.json.lock");
     expect(linked[1].dst).toMatch(/^credentials\.json\.lock\.[0-9a-f]{16}\.takeover$/);
     expect(linked[2].dst).toBe("credentials.json.lock");
+  });
+});
+
+describe("an ndx home without hard links", () => {
+  const lockPath = (): string => `${storePath()}.lock`;
+  const ownerPath = (): string => join(lockPath(), "owner.json");
+  const farFuture = () => Date.now() + 365 * 24 * 3_600_000;
+
+  afterEach(() => {
+    fsCalls.linkError = undefined;
+  });
+
+  for (const code of ["ENOTSUP", "EOPNOTSUPP", "ENOSYS", "EPERM", "EXDEV"]) {
+    it(`writes and removes credentials when link fails with ${code}`, () => {
+      fsCalls.linkError = code;
+      setCredential("typesafe", PLACEHOLDER, options);
+      expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+      expect(unsetCredential("typesafe", options)).toBe(true);
+      expect(readdirSync(home).filter((f) => f !== "credentials.json")).toEqual([]);
+    });
+  }
+
+  it("publishes a directory lock whose owner file is complete when it appears", () => {
+    fsCalls.linkError = "ENOTSUP";
+    const content = holder(process.pid);
+    expect(createFilled(lockPath(), content)).toBe(true);
+    expect(statSync(lockPath()).isDirectory()).toBe(true);
+    expect(readFileSync(ownerPath(), "utf-8")).toBe(content);
+    expect(readdirSync(lockPath())).toEqual(["owner.json"]);
+    expect(inspectLock(lockPath())?.pid).toBe(process.pid);
+    // A second writer finds it held.
+    expect(createFilled(lockPath(), holder(1001))).toBe(false);
+    expect(readFileSync(ownerPath(), "utf-8")).toBe(content);
+    expect(readdirSync(home)).toEqual(["credentials.json.lock"]);
+  });
+
+  it("never judges an owner-less lock directory stale: its writer is about to rename the owner in", () => {
+    fsCalls.linkError = "ENOTSUP";
+    mkdirSync(lockPath());
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: farFuture, pidAlive: () => false,
+    })).toThrow(/Timed out/);
+    expect(existsSync(lockPath())).toBe(true);
+    expect(existsSync(storePath())).toBe(false);
+  });
+
+  it("waits for a live holder's directory lock however old", () => {
+    fsCalls.linkError = "ENOTSUP";
+    mkdirSync(lockPath());
+    writeFileSync(ownerPath(), holder(1001));
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: farFuture, pidAlive: (pid) => pid === 1001,
+    })).toThrow(/held by PID 1001/);
+    expect(readFileSync(ownerPath(), "utf-8")).toBe(holder(1001));
+  });
+
+  it("takes over a dead holder's directory lock, through a directory guard", () => {
+    fsCalls.linkError = "ENOTSUP";
+    mkdirSync(lockPath());
+    writeFileSync(ownerPath(), holder(1002));
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, pidAlive: () => false });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("reclaims a dead holder's directory guard and waits on a live one's", () => {
+    fsCalls.linkError = "ENOTSUP";
+    const LIVE = 1001;
+    const DEAD = 1002;
+    const seams = { now: farFuture, pidAlive: (pid: number) => pid === LIVE };
+    mkdirSync(lockPath());
+    writeFileSync(ownerPath(), holder(DEAD));
+    const judged = inspectLock(lockPath())!;
+    const guard = takeoverGuardPath(lockPath(), judged);
+    mkdirSync(guard);
+    writeFileSync(join(guard, "owner.json"), holder(LIVE));
+    expect(takeOverStaleLock(lockPath(), judged, seams)).toBe(false);
+    expect(existsSync(guard)).toBe(true);
+    expect(existsSync(ownerPath())).toBe(true);
+
+    writeFileSync(join(guard, "owner.json"), holder(DEAD));
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, clock: seams.now, pidAlive: seams.pidAlive });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("still fails on a link error that is not a missing capability", () => {
+    fsCalls.linkError = "EIO";
+    expect(() => setCredential("typesafe", PLACEHOLDER, options)).toThrow(/EIO/);
+    expect(readdirSync(home)).toEqual([]);
   });
 });
 

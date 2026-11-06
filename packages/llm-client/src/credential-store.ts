@@ -59,6 +59,7 @@ import {
   openSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
   statSync,
   writeSync,
@@ -1012,11 +1013,21 @@ function holderContent(): string {
   return JSON.stringify({ pid: process.pid, token: randomUUID(), since: new Date().toISOString() });
 }
 
+/** linkSync codes that mean the volume has no hard links (exFAT, FAT, smbfs). */
+const UNSUPPORTED_LINK_CODES = new Set(["ENOTSUP", "EOPNOTSUPP", "ENOSYS", "EPERM", "EXDEV"]);
+/** The holder file inside a lock or guard published as a directory. */
+const LOCK_OWNER_FILE = "owner.json";
+
 /**
  * Create `path` holding `content`, or return false when it exists. The
  * content goes to a private temp file first and is hard-linked into place, so
  * the file appears complete or not at all, and the link's EEXIST is the same
  * exclusive test `open(..., "wx")` gives.
+ *
+ * Where the volume has no hard links, `mkdir(path)` is the exclusive test and
+ * the filled temp file is renamed to `<path>/owner.json`. The directory is
+ * visible owner-less for a moment; {@link lockIsStale} never judges an
+ * owner-less directory stale, so that moment cannot cost its writer the lock.
  */
 export function createFilled(path: string, content: string): boolean {
   const tmp = `${path}.${randomUUID()}.tmp`;
@@ -1027,11 +1038,26 @@ export function createFilled(path: string, content: string): boolean {
     } finally {
       closeSync(fd);
     }
-    linkSync(tmp, path);
+    try {
+      linkSync(tmp, path);
+      return true;
+    } catch (err) {
+      if (errorCode(err) === "EEXIST") return false;
+      if (!UNSUPPORTED_LINK_CODES.has(errorCode(err) ?? "")) throw err;
+    }
+    try {
+      mkdirSync(path, { mode: 0o700 });
+    } catch (err) {
+      if (errorCode(err) === "EEXIST") return false;
+      throw err;
+    }
+    try {
+      renameSync(tmp, join(path, LOCK_OWNER_FILE));
+    } catch (err) {
+      rmdirSync(path);
+      throw err;
+    }
     return true;
-  } catch (err) {
-    if (errorCode(err) === "EEXIST") return false;
-    throw err;
   } finally {
     rmSync(tmp, { force: true });
   }
@@ -1039,12 +1065,34 @@ export function createFilled(path: string, content: string): boolean {
 
 /** Remove a lock or guard only while it still holds our content. */
 function removeIfOwn(path: string, content: string): void {
-  if (inspectLock(path)?.raw === content) rmSync(path, { force: true });
+  if (inspectLock(path)?.raw === content) removeLock(path);
+}
+
+/**
+ * Remove a lock or guard of either form. A directory loses its owner file
+ * first; until the directory itself goes it reads as owner-less, so as held.
+ */
+function removeLock(path: string): void {
+  if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+    rmSync(path, { force: true });
+    return;
+  }
+  rmSync(join(path, LOCK_OWNER_FILE), { force: true });
+  try {
+    rmdirSync(path);
+  } catch (err) {
+    if (errorCode(err) !== "ENOENT") throw err;
+  }
 }
 
 /** One observation of the lock file. */
 export interface LockState {
-  /** The file's content; empty only for a lock an older n-dx created. */
+  /** A file, or a directory holding owner.json where hard links are absent. */
+  form: "file" | "directory";
+  /**
+   * The holder's record; empty for a lock an older n-dx created, or for a
+   * directory whose owner file is not renamed in yet.
+   */
   raw: string;
   /** Inode, mtime and content: a replaced lock never matches the old one. */
   identity: string;
@@ -1058,14 +1106,29 @@ export interface LockState {
 export function inspectLock(lockPath: string, now: number = Date.now()): LockState | undefined {
   let stats: Stats;
   let raw: string;
+  let form: LockState["form"] = "file";
   try {
     stats = statSync(lockPath);
-    raw = readFileSync(lockPath, "utf-8");
+    if (stats.isDirectory()) {
+      form = "directory";
+      const owner = readOwnerFile(join(lockPath, LOCK_OWNER_FILE));
+      if (owner === undefined) {
+        return { form, raw: "", identity: `dir:${stats.ino}:${stats.mtimeMs}:`, ageMs: now - stats.mtimeMs };
+      }
+      [stats, raw] = owner;
+    } else {
+      raw = readFileSync(lockPath, "utf-8");
+    }
   } catch (err) {
     if (errorCode(err) === "ENOENT") return undefined;
     throw err;
   }
-  const state: LockState = { raw, identity: `${stats.ino}:${stats.mtimeMs}:${raw}`, ageMs: now - stats.mtimeMs };
+  const state: LockState = {
+    form,
+    raw,
+    identity: `${form === "directory" ? "dir:" : ""}${stats.ino}:${stats.mtimeMs}:${raw}`,
+    ageMs: now - stats.mtimeMs,
+  };
   try {
     const parsed: unknown = JSON.parse(raw);
     if (isRecord(parsed) && typeof parsed.pid === "number") {
@@ -1079,13 +1142,28 @@ export function inspectLock(lockPath: string, now: number = Date.now()): LockSta
   return state;
 }
 
+/** A directory lock's owner file and its stats, or undefined while it is not renamed in. */
+function readOwnerFile(path: string): [Stats, string] | undefined {
+  try {
+    return [statSync(path), readFileSync(path, "utf-8")];
+  } catch (err) {
+    if (errorCode(err) === "ENOENT") return undefined;
+    throw err;
+  }
+}
+
 /**
- * A dead holder's lock, or an unreadable one past the threshold. A filled lock
- * with a live PID is never stale however old: a paused writer (sleep, SIGSTOP,
- * swap) or a lagging clock on a network home must not cost a live lock.
+ * A dead holder's lock, or an older n-dx's unreadable lock file past the
+ * threshold. A filled lock with a live PID is never stale however old: a
+ * paused writer (sleep, SIGSTOP, swap) or a lagging clock on a network home
+ * must not cost a live lock. Nor is a directory without a readable holder:
+ * its writer may be paused between mkdir and renaming the owner in, and an
+ * age rule there would reopen the empty-lock window. Deleting it by hand, as
+ * the timeout message says, is the way out.
  */
 export function lockIsStale(lock: LockState, seams: LockSeams = defaultLockSeams): boolean {
-  return lock.pid !== undefined ? !seams.pidAlive(lock.pid) : lock.ageMs >= EMPTY_LOCK_STALE_MS;
+  if (lock.pid !== undefined) return !seams.pidAlive(lock.pid);
+  return lock.form === "file" && lock.ageMs >= EMPTY_LOCK_STALE_MS;
 }
 
 /** The guard every writer that judged this lock stale contends for. */
@@ -1113,7 +1191,7 @@ export function takeOverStaleLock(lockPath: string, judged: LockState, seams: Lo
     const current = inspectLock(lockPath, seams.now());
     if (current === undefined) return true;
     if (current.identity !== judged.identity || !lockIsStale(current, seams)) return false;
-    rmSync(lockPath, { force: true });
+    removeLock(lockPath);
     return true;
   } finally {
     removeIfOwn(guard, content);
@@ -1130,7 +1208,7 @@ export function takeOverStaleLock(lockPath: string, judged: LockState, seams: Lo
  */
 function reclaimAbandonedGuard(guard: string, seams: LockSeams): void {
   const state = inspectLock(guard, seams.now());
-  if (state?.pid !== undefined && !seams.pidAlive(state.pid)) rmSync(guard, { force: true });
+  if (state?.pid !== undefined && !seams.pidAlive(state.pid)) removeLock(guard);
 }
 
 /** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */
