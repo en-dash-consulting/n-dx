@@ -279,6 +279,20 @@
   color: var(--text-muted);
 }
 
+/* The area chip is a label, not a button; only its × acts. */
+.ch-filter-area { cursor: default; padding-right: var(--space-1); }
+.ch-filter-remove {
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0 var(--space-1);
+  cursor: pointer;
+}
+.ch-filter-remove:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.ch-filter-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .ch-map-links {
   margin: var(--space-2) 0 0;
   padding: 0;

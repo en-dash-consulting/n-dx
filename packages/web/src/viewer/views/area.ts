@@ -207,7 +207,12 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
       h(SpecMap, { capabilities: area.capabilities, constraints: area.constraints, selectedId, onSelect: setSelectedId }),
       selected
         ? h(AreaCapability, { key: selected.id, capabilityId: selected.id, title: selected.title, onClose: () => setSelectedId(null) })
-        : h(AreaCards, { area, onOpenChange: openChange, onPlace: placeChange }),
+        : h(AreaCards, {
+            area,
+            onOpenChange: openChange,
+            onPlace: placeChange,
+            onOpenAreaChanges: navigateTo ? () => navigateTo("changes", { area: area.slug }) : undefined,
+          }),
     ),
   );
 }

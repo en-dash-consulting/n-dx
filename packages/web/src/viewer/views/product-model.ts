@@ -222,6 +222,18 @@ export interface ChangeRow {
   criteriaGap: boolean;
   /** Distinct blockers, on the change or its open tasks, that are not completed. */
   openBlockers: number;
+  /**
+   * The areas whose `openChangeIds` list this change, in the map's order.
+   * Absent on applied history and on an open change no area counts.
+   */
+  areas?: AreaRef[];
+}
+
+/** An area an open change counts toward: what Open changes' area filter matches and names. */
+export interface AreaRef {
+  id: string;
+  slug: string;
+  title: string;
 }
 
 // ── Plan's glance read ───────────────────────────────────────────────

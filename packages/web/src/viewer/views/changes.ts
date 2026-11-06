@@ -205,11 +205,6 @@ export function stageFilter(stage: OpenChangeStage): string {
   return `${STAGE_PREFIX}${stage}`;
 }
 
-/** The filter that shows one area's open changes; a product map badge opens the page on it. */
-export function areaFilter(areaId: string): string {
-  return `area:${areaId}`;
-}
-
 /** The gaps Plan's Specs to tighten tile counts; each opens this page on its changes. */
 export type GapKind = "no-criteria" | "task-criteria" | "blocked";
 
@@ -282,12 +277,37 @@ function FilterChip({ value, label, count, active, onPick }: {
   }, label, h("span", { class: "ch-filter-count" }, `${count}`));
 }
 
+/** The open changes the map counts on the area `slug`: its badge's `openChangeIds`. */
+export function changesInArea(changes: readonly ChangeRow[], slug: string): ChangeRow[] {
+  return changes.filter((c) => c.areas?.some((a) => a.slug === slug));
+}
+
+/** The area filter's chip: always active, with its own remove button beside the label. */
+function AreaChip({ title, count, onRemove }: { title: string; count: number; onRemove?: () => void }) {
+  return h("span", { class: "ch-filter ch-filter-active ch-filter-area", "data-filter": "area" },
+    `Area: ${title}`,
+    h("span", { class: "ch-filter-count" }, `${count}`),
+    onRemove
+      ? h("button", {
+          type: "button",
+          class: "ch-filter-remove",
+          "aria-label": `Remove the ${title} area filter`,
+          onClick: onRemove,
+        }, "×")
+      : null,
+  );
+}
+
 // ── View ─────────────────────────────────────────────────────────────
 
-export function ChangesView({ changes, onSelectChange }: {
+export function ChangesView({ changes, onSelectChange, area = null, onClearArea }: {
   changes: ChangeRow[];
   /** Opens a change. Omitted, titles render as plain text. */
   onSelectChange?: (id: string) => void;
+  /** An area slug (`?area=`): the page lists only that area's open changes. */
+  area?: string | null;
+  /** Clears the area filter; the chip's remove button and every other chip call it. */
+  onClearArea?: () => void;
 }) {
   const [stored, setStored] = useState(readStoredFilter);
   const groups = groupChangesByRelease(changes);
@@ -296,16 +316,22 @@ export function ChangesView({ changes, onSelectChange }: {
 
   // A remembered release that no longer exists falls back to the default.
   const known = new Set(groups.map(filterOf));
-  const stage = stageOfFilter(stored);
-  const gap = gapOfFilter(stored);
-  const filter = stage || gap || stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
-  const pick = (value: string) => { setStored(value); storeFilter(value); };
+  const inArea = area ? changesInArea(changes, area) : null;
+  // The area filter outranks the remembered one; it lives in the address, not storage.
+  const stage = inArea ? null : stageOfFilter(stored);
+  const gap = inArea ? null : gapOfFilter(stored);
+  const filter = inArea ? "area"
+    : stage || gap || stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
+  const pick = (value: string) => { setStored(value); storeFilter(value); if (inArea) onClearArea?.(); };
+  // Named from the rows; an area with nothing open (or an unknown slug) shows its slug.
+  const areaTitle = area ? inArea?.[0]?.areas?.find((a) => a.slug === area)?.title ?? area : null;
 
   // A stage counts placed changes only: one rex holds for placement is the Inbox's.
-  const staged = stage ? changes.filter((c) => c.stage === stage && !c.awaitsPlacement)
+  const staged = inArea ? inArea
+    : stage ? changes.filter((c) => c.stage === stage && !c.awaitsPlacement)
     : gap ? changes.filter((c) => !isAppliedStage(c.stage) && !c.awaitsPlacement && hasGap(c, gap))
     : null;
-  const mode: GroupMode = stage || gap || filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
+  const mode: GroupMode = inArea || stage || gap || filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
   const shown = (staged ? groupChangesByRelease(staged) : groups).filter((g) =>
     mode === "open" ? g.appliedCount < g.changeCount
     : mode === "applied" ? g.appliedCount > 0
@@ -326,6 +352,7 @@ export function ChangesView({ changes, onSelectChange }: {
           h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
             h(FilterChip, { value: "open", label: "Open", count: openTotal, active: filter === "open", onPick: pick }),
             h(FilterChip, { value: "applied", label: "Applied", count: appliedTotal, active: filter === "applied", onPick: pick }),
+            inArea && areaTitle ? h(AreaChip, { title: areaTitle, count: inArea.length, onRemove: onClearArea }) : null,
             (stage || gap) && staged
               ? h(FilterChip, { value: filter, label: stage ? CHANGE_STAGE_LABELS[stage] : GAP_LABELS[gap!], count: staged.length, active: true, onPick: pick })
               : null,

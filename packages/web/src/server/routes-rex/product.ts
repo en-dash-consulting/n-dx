@@ -132,6 +132,18 @@ export interface ChangeRowWire {
   criteriaGap: boolean;
   /** Distinct blockers, on the change or its open tasks, that are not completed. */
   openBlockers: number;
+  /**
+   * The areas whose `openChangeIds` list this change, in the map's order.
+   * Absent on applied history and on an open change no area counts.
+   */
+  areas?: AreaRefWire[];
+}
+
+/** An area an open change counts toward: what Open changes' area filter matches and names. */
+export interface AreaRefWire {
+  id: string;
+  slug: string;
+  title: string;
 }
 
 /** The stages an open change can be in. */
@@ -570,10 +582,13 @@ function gapOf(index: TreeIndex, change: ChangeRuleNode, tasks: RuleNode[]): { c
 /** Every live, not cancelled change: open ones and applied ones. */
 export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
-  return changesOf(index)
+  const changes = changesOf(index);
+  const areasOf = areasByChange(index, openChangesByArea(index, changes));
+  return changes
     .filter((change) => isOpenChange(change) || isAppliedChange(change))
     .map((change) => {
       const tasks = tasksOf(change);
+      const areas = areasOf.get(change.id);
       return {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
@@ -599,8 +614,28 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         taskCount: tasks.length,
         completedTaskCount: tasks.filter((t) => t.status === "completed").length,
         ...gapOf(index, change, tasks),
+        ...(areas ? { areas } : {}),
       };
     });
+}
+
+/**
+ * Each open change's areas, inverted from {@link openChangesByArea} so Open
+ * changes' area filter and the map's badge read one rule. Areas run in tree
+ * order, as the map lists them.
+ */
+function areasByChange(index: TreeIndex, openByArea: Map<string, Set<string>>): Map<string, AreaRefWire[]> {
+  const out = new Map<string, AreaRefWire[]>();
+  for (const { node, root } of index.entries) {
+    if (root !== "product" || node.type !== "area") continue;
+    const ref: AreaRefWire = { id: node.id, slug: node.slug ?? node.id, title: node.title };
+    for (const changeId of openByArea.get(node.id) ?? []) {
+      const refs = out.get(changeId) ?? [];
+      refs.push(ref);
+      out.set(changeId, refs);
+    }
+  }
+  return out;
 }
 
 /** Open changes' amendments to one node, in tree order. */

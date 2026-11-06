@@ -201,8 +201,11 @@ function ProductMapPage({ onCapabilityChange, initialTab = "map" }: ProductMapPa
   );
 }
 
-/** The Changes view; a change opens as its item in the Tasks tree. */
-export function ChangesPage({ navigateTo }: { navigateTo?: NavigateTo }) {
+/**
+ * The Changes view; a change opens as its item in the Tasks tree. `area` is
+ * the route's `?area=` slug, and clearing it navigates to the bare page.
+ */
+export function ChangesPage({ navigateTo, area = null }: { navigateTo?: NavigateTo; area?: string | null }) {
   const load = useProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Changes" });
   if (load.state !== "ready") return h(Pending, { load });
@@ -211,6 +214,8 @@ export function ChangesPage({ navigateTo }: { navigateTo?: NavigateTo }) {
     h(ChangesView, {
       changes: load.data,
       onSelectChange: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
+      area,
+      onClearArea: navigateTo ? () => navigateTo("changes") : undefined,
     }),
   );
 }

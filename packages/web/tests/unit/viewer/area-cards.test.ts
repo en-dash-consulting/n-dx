@@ -16,7 +16,7 @@ let root: HTMLDivElement;
 beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); });
 afterEach(() => { act(() => { render(null, root); }); root.remove(); });
 
-const mount = (area: AreaDetail, props: { onOpenChange?: (id: string) => void; onPlace?: (id: string) => void } = {}) =>
+const mount = (area: AreaDetail, props: { onOpenChange?: (id: string) => void; onPlace?: (id: string) => void; onOpenAreaChanges?: () => void } = {}) =>
   act(() => { render(h(AreaCards, { area, ...props }), root); });
 const card = (id: string) => root.querySelector<HTMLElement>(`[data-card="${id}"]`)!;
 
@@ -61,6 +61,22 @@ describe("filled cards", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]!.querySelector(".area-stage")?.textContent).toBe("In progress");
     expect(card("moving").querySelector(".area-card-empty")).toBeNull();
+  });
+
+  it("opens Open changes filtered to the area from Moving now", () => {
+    const onOpenAreaChanges = vi.fn();
+    mount(area, { onOpenAreaChanges });
+    const open = card("moving").querySelector<HTMLButtonElement>("button[data-open-changes]")!;
+    expect(open.textContent).toBe("Open in Open changes");
+    act(() => open.click());
+    expect(onOpenAreaChanges).toHaveBeenCalledOnce();
+  });
+
+  it("offers no Open changes link with nothing moving or nowhere to go", () => {
+    mount(area);
+    expect(card("moving").querySelector("[data-open-changes]")).toBeNull();
+    mount(EMPTY, { onOpenAreaChanges: vi.fn() });
+    expect(card("moving").querySelector("[data-open-changes]")).toBeNull();
   });
 
   it("offers Place on each Inbox row and passes the change id", () => {

@@ -175,11 +175,12 @@ describe("AreaBlock", () => {
 describe("openAreaChanges", () => {
   afterEach(() => { localStorage.clear(); });
 
-  it("stores the area's filter and opens Open changes", () => {
+  it("opens Open changes at ?area=<slug>, leaving the remembered filter alone", () => {
+    storeFilter(stageFilter("ready"));
     const navigateTo = vi.fn();
-    openAreaChanges(navigateTo, "id-a");
-    expect(localStorage.getItem("ndx.changes.filter")).toBe("area:id-a");
-    expect(navigateTo).toHaveBeenCalledWith("changes");
+    openAreaChanges(navigateTo, "checkout");
+    expect(navigateTo).toHaveBeenCalledWith("changes", { area: "checkout" });
+    expect(localStorage.getItem("ndx.changes.filter")).toBe(stageFilter("ready"));
   });
 
   it("replaces a remembered filter with Open for the folded block", () => {
@@ -219,14 +220,14 @@ describe("ProductAreaMap", () => {
     expect(onOpenArea).toHaveBeenCalledWith("b", "B");
   });
 
-  it("passes the area id from a badge, and no id from the folded block's", async () => {
+  it("passes the area slug (what ?area= takes) from a badge, and none from the folded block's", async () => {
     const onOpenChanges = vi.fn();
     const areas = Array.from({ length: MAX_BLOCKS + 1 }, (_, i) => area(`a${i}`, [cap()], [`c${i}`]));
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ layout: "v2", map: { areas, constraints: [] } }) })));
     await act(async () => { render(h(ProductAreaMap, { onOpenArea, onOpenChanges }), root); });
     await act(async () => {});
     root.querySelector<HTMLButtonElement>('[data-open-changes="id-a3"]')!.click();
-    expect(onOpenChanges).toHaveBeenLastCalledWith("id-a3", "A3");
+    expect(onOpenChanges).toHaveBeenLastCalledWith("a3", "A3");
     root.querySelector<HTMLButtonElement>('[data-open-changes="folded"]')!.click();
     expect(onOpenChanges).toHaveBeenLastCalledWith(null, "+2 smaller areas");
     expect(onOpenArea).not.toHaveBeenCalled();

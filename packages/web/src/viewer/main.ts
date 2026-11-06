@@ -128,6 +128,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     selectedRunId,
     selectedTaskId,
     selectedTab,
+    selectedArea,
     askSeed,
     navigateTo,
     handleSidebarNav,
@@ -388,7 +389,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.

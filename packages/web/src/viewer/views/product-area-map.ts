@@ -16,7 +16,7 @@ import { useContext, useMemo } from "preact/hooks";
 import { useProductRead } from "../hooks/index.js";
 import { GhostCardsContext, ghostCountsByTarget } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
-import { areaFilter, storeFilter } from "./changes.js";
+import { storeFilter } from "./changes.js";
 import type { AreaSection, ProductMap } from "./product-model.js";
 
 /** What tints a block. Defective outranks the status of the capabilities. */
@@ -243,17 +243,22 @@ export function BlockLegend() {
 export type OpenArea = (slug: string | null, title: string) => void;
 
 /**
- * Opens Open changes from a block's badge: the area's id, or a null id for the
+ * Opens Open changes from a block's badge: the area's slug, or null for the
  * block that folds smaller areas (no single area to filter to).
  */
-export type OpenAreaChanges = (areaId: string | null, title: string) => void;
+export type OpenAreaChanges = (areaSlug: string | null, title: string) => void;
 
 /**
- * Opens Open changes on one area's changes, or on every open change for the
- * folded block — never on whatever filter the page last remembered.
+ * Opens Open changes at `?area=<slug>`, which lists the changes the badge
+ * counted. The folded block opens on every open change, never on whatever
+ * filter the page last remembered.
  */
-export function openAreaChanges(navigateTo: NavigateTo, areaId: string | null): void {
-  storeFilter(areaId ? areaFilter(areaId) : "open");
+export function openAreaChanges(navigateTo: NavigateTo, areaSlug: string | null): void {
+  if (areaSlug) {
+    navigateTo("changes", { area: areaSlug });
+    return;
+  }
+  storeFilter("open");
   navigateTo("changes");
 }
 
@@ -275,7 +280,7 @@ export function AreaBlocks({ map, onOpenArea, onOpenChanges }: {
           block,
           onOpen: () => onOpenArea(block.slug, block.label),
           onOpenChanges: onOpenChanges
-            ? () => onOpenChanges(block.slug === null ? null : block.key, block.label)
+            ? () => onOpenChanges(block.slug, block.label)
             : undefined,
         }))),
     h(BlockLegend, null),

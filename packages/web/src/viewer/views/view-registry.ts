@@ -107,6 +107,8 @@ export interface ViewRenderContext {
   selectedTaskId: string | null;
   /** The tab the route names on a view that keeps it in its path (Commands: `reference`). */
   selectedTab?: string | null;
+  /** The area slug `?area=` names on Open changes, which it filters to that area. */
+  selectedArea?: string | null;
   /** The Product page reports the capability it has open, so Sidecar can attach it. */
   setOpenCapability?: (id: string | null) => void;
   /** The PRD page reports the item selected in its tree, which the route does not carry. */
@@ -200,7 +202,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
         return h(ProductAreaMap, {
           onOpenArea: (slug: string | null, title: string) =>
             grid.openTile("product-map", slug ? { id: slug, label: title } : undefined),
-          onOpenChanges: (areaId: string | null) => openAreaChanges(ctx.navigateTo, areaId),
+          onOpenChanges: (areaSlug: string | null) => openAreaChanges(ctx.navigateTo, areaSlug),
         });
       }
       const slug = grid.focus?.id;
@@ -307,8 +309,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
       navigateTo,
     }),
 
-  "changes": ({ navigateTo }) =>
-    h(ChangesPage, { navigateTo }),
+  "changes": ({ navigateTo, selectedArea }) =>
+    h(ChangesPage, { navigateTo, area: selectedArea ?? null }),
 
   // The Plan section shows a few rows; the page is the triage queue.
   "inbox": ({ navigateTo, inSection }) =>

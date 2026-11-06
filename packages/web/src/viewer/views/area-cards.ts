@@ -13,7 +13,7 @@
  * @module viewer/views/area-cards
  */
 
-import { h } from "preact";
+import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { StrengthChip } from "../components/index.js";
 import { placementDraftNote } from "../components/prd-tree/placement-draft.js";
@@ -64,12 +64,21 @@ function day(at: string): string {
   return /^\d{4}-\d{2}-\d{2}/.test(at) ? at.slice(0, 10) : at;
 }
 
-function MovingNow({ changes, onOpenChange }: { changes: readonly OpenChangeOverlay[]; onOpenChange?: (id: string) => void }) {
+function MovingNow({ changes, onOpenChange, onOpenAll }: {
+  changes: readonly OpenChangeOverlay[];
+  onOpenChange?: (id: string) => void;
+  onOpenAll?: () => void;
+}) {
   const rows = distinctChanges(changes);
   return h(Card, { id: "moving", title: "Moving now", count: rows.length },
     rows.length === 0
       ? h(Empty, null, "Nothing is moving here. No open change touches or amends this area.")
-      : h("ul", { class: "area-card-list" },
+      : h(Fragment, null,
+        onOpenAll
+          ? h("button", { type: "button", class: "btn btn-sm area-open-changes", "data-open-changes": "area", onClick: onOpenAll },
+              "Open in Open changes")
+          : null,
+        h("ul", { class: "area-card-list" },
           rows.map((c) =>
             h("li", { key: c.id, class: "area-card-row", "data-change-id": c.id },
               h("span", { class: "ch-display-id" }, shortId(c)),
@@ -77,7 +86,7 @@ function MovingNow({ changes, onOpenChange }: { changes: readonly OpenChangeOver
                 ? h("button", { type: "button", class: "ch-change-link", onClick: () => onOpenChange(c.id) }, c.title)
                 : h("span", null, c.title),
               h("span", { class: `tag area-stage area-stage-${c.stage}` }, CHANGE_STAGE_LABELS[c.stage]),
-              c.delta ? h("span", { class: "tag" }, c.delta) : null))));
+              c.delta ? h("span", { class: "tag" }, c.delta) : null)))));
 }
 
 function WaitingInInbox({ guesses, onPlace }: { guesses: readonly AreaInboxGuess[]; onPlace?: (id: string) => void }) {
@@ -154,12 +163,14 @@ export interface AreaCardsProps {
   onOpenChange?: (id: string) => void;
   /** Places an Inbox change; absent, Place is disabled. */
   onPlace?: (id: string) => void;
+  /** Opens Open changes filtered to this area; absent, Moving now has no link to it. */
+  onOpenAreaChanges?: () => void;
 }
 
 /** The four cards, in the order the design reads them. */
-export function AreaCards({ area, onOpenChange, onPlace }: AreaCardsProps) {
+export function AreaCards({ area, onOpenChange, onPlace, onOpenAreaChanges }: AreaCardsProps) {
   return h("aside", { class: "area-cards", "aria-label": "Area activity" },
-    h(MovingNow, { changes: area.openChanges, onOpenChange }),
+    h(MovingNow, { changes: area.openChanges, onOpenChange, onOpenAll: onOpenAreaChanges }),
     h(WaitingInInbox, { guesses: area.inbox, onPlace }),
     h(RecentlyApplied, { changes: area.recentlyApplied }),
     h(WhereItLives, { area }));

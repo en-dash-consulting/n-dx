@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ViewId } from "../../../src/viewer/types.js";
 import { parseLegacyHashRoute, parsePathnameRoute, resolveLocationRoute, routeTab } from "../../../src/viewer/route-state.js";
-import { entryUrl } from "../../../src/viewer/hooks/use-route-state.js";
+import { entryUrl, routeArea } from "../../../src/viewer/hooks/use-route-state.js";
 
 const VIEWS = new Set<ViewId>([
   "overview",
@@ -41,6 +41,24 @@ describe("route-state: Settings › Commands tab", () => {
   it("emits the tab in the entry's URL, so a reload keeps it", () => {
     expect(entryUrl(entry("reference"))).toBe("/commands/reference");
     expect(entryUrl(entry(null))).toBe("/commands");
+  });
+});
+
+describe("route-state: Open changes area filter", () => {
+  const entry = (view: ViewId, area: string | null, section: string | null = null) => ({
+    view, file: null, zone: null, runId: null, taskId: null, tab: null, askSeed: null, area, section,
+  });
+
+  it("carries ?area=<slug> on Open changes only", () => {
+    expect(entryUrl(entry("changes", "checkout"))).toBe("/changes?area=checkout");
+    expect(entryUrl(entry("changes", null))).toBe("/changes");
+    expect(entryUrl(entry("prd", "checkout"))).toBe("/prd");
+    expect(routeArea("changes", "checkout")).toBe("checkout");
+    expect(routeArea("product", "checkout")).toBeNull();
+  });
+
+  it("keeps a section beside the area", () => {
+    expect(entryUrl(entry("changes", "a b", "top"))).toBe("/changes?section=top&area=a+b");
   });
 });
 

@@ -186,6 +186,24 @@ describe("v2 product reads", () => {
       addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }], [CAPABILITY_ID]);
       expect((await area()).openChangeIds.filter((id) => id === OTHER_ID)).toHaveLength(1);
     });
+
+    // Open changes' ?area=<slug> keeps the rows naming that slug; its count must be the badge's.
+    const cases: Array<[string, () => void]> = [
+      ["an amendment to a capability", () => {}],
+      ["an addition under the area", () => addChange([added("refunds", AREA_ID)])],
+      ["a removal of the area itself", () => addChange([{ target: AREA_ID, delta: "removed", summary: "Retire checkout" }])],
+      ["a touch on the area and its capability", () => addChange([], [AREA_ID, CAPABILITY_ID])],
+    ];
+    for (const [label, seed] of cases) {
+      it(`filters /changes by area to the badge's open changes: ${label}`, async () => {
+        seed();
+        const a = await area();
+        const rows = (await get("changes")).body.changes as ChangeRow[];
+        const filtered = rows.filter((r) => r.areas?.some((ref) => ref.slug === a.slug));
+        expect(filtered.map((r) => r.id).sort()).toEqual([...a.openChangeIds].sort());
+        expect(filtered).toHaveLength(a.openChangeIds.length);
+      });
+    }
   });
 
   it("GET /changes lists each change with its stage, map links and task progress", async () => {
@@ -209,8 +227,16 @@ describe("v2 product reads", () => {
         // one open task does: no gap.
         criteriaGap: false,
         openBlockers: 0,
+        // The area whose openChangeIds lists it: Open changes' ?area= filter matches this.
+        areas: [{ id: AREA_ID, slug: "checkout", title: "Checkout" }],
       }],
     });
+  });
+
+  it("GET /changes names no area on applied history", async () => {
+    applyChange();
+    const rows = (await get("changes")).body.changes as ChangeRow[];
+    expect(rows[0]!.areas).toBeUndefined();
   });
 
   describe("GET /changes gap fields", () => {
