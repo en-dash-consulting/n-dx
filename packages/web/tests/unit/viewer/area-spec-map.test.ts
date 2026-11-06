@@ -153,7 +153,7 @@ describe("SpecMap", () => {
       `${3 * SPEC_BLOCK_REM_PER_CRITERION}rem`,
       `${SPEC_BLOCK_FLOOR_REM}rem`,
     ]);
-    expect(blocks[0]!.querySelector(".pam-open")?.textContent).toBe("1");
+    expect(blocks[0]!.querySelector(".pam-open")?.textContent).toBe("1 open");
     expect(blocks[1]!.querySelector(".pam-open")).toBeNull();
     expect(blocks[0]!.getAttribute("aria-label")).toBe("Automatic placement: 2 criteria, changing, 1 open change");
   });

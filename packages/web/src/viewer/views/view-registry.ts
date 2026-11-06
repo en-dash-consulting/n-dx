@@ -75,6 +75,7 @@ import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
 import { ProductAreaMap } from "./product-area-map.js";
+import { areaFilter, storeFilter } from "./changes.js";
 import { AreaInPlace } from "./area.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
@@ -200,6 +201,10 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
         return h(ProductAreaMap, {
           onOpenArea: (slug: string | null, title: string) =>
             grid.openTile("product-map", slug ? { id: slug, label: title } : undefined),
+          onOpenChanges: (areaId: string | null) => {
+            if (areaId) storeFilter(areaFilter(areaId));
+            ctx.navigateTo("changes");
+          },
         });
       }
       const slug = grid.focus?.id;

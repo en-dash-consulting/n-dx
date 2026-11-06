@@ -124,9 +124,43 @@ describe("AreaBlock", () => {
     await act(async () => { render(h(AreaBlock, { block, onOpen }), root); });
     const button = root.querySelector("button")!;
     expect(button.getAttribute("aria-label")).toBe("A: 1 capability, met, 1 open change");
-    expect(button.querySelector(".pam-open")?.textContent).toBe("1");
+    expect(button.querySelector(".pam-open")?.textContent).toBe("1 open");
     button.click();
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  describe("with an open-changes handler", () => {
+    const mountBadge = async (openChangeIds: string[], onOpen = vi.fn(), onOpenChanges = vi.fn()) => {
+      const block = areaBlocks([area("a", [cap()], openChangeIds)])[0]!;
+      await act(async () => { render(h(AreaBlock, { block, onOpen, onOpenChanges }), root); });
+      return { onOpen, onOpenChanges };
+    };
+
+    it("shows 'N open' as text on its own labelled button, apart from the block button", async () => {
+      await mountBadge(["x", "y"]);
+      const badge = root.querySelector<HTMLButtonElement>("button.pam-open")!;
+      expect(badge.textContent).toBe("2 open");
+      expect(badge.getAttribute("aria-label")).toBe("2 open changes in A: open the list");
+      const block = root.querySelector<HTMLButtonElement>("button.pam-block")!;
+      expect(block.contains(badge)).toBe(false);
+      expect(block.querySelector("button")).toBeNull();
+    });
+
+    it("opens the changes from the badge and the area from the block, each alone", async () => {
+      const { onOpen, onOpenChanges } = await mountBadge(["x"]);
+      root.querySelector<HTMLButtonElement>("button.pam-open")!.click();
+      expect(onOpenChanges).toHaveBeenCalledOnce();
+      expect(onOpen).not.toHaveBeenCalled();
+      root.querySelector<HTMLButtonElement>("button.pam-block")!.click();
+      expect(onOpen).toHaveBeenCalledOnce();
+      expect(onOpenChanges).toHaveBeenCalledOnce();
+    });
+
+    it("draws no badge button when nothing is open", async () => {
+      await mountBadge([]);
+      expect(root.querySelector(".pam-open")).toBeNull();
+      expect(root.querySelector(".pam-cell")).toBeNull();
+    });
   });
 
   it("omits the marker when no change is open", async () => {
@@ -162,6 +196,19 @@ describe("ProductAreaMap", () => {
     expect(root.querySelector(".pam-legend")?.textContent).toContain("Defective");
     blocks[1]!.click();
     expect(onOpenArea).toHaveBeenCalledWith("b", "B");
+  });
+
+  it("passes the area id from a badge, and no id from the folded block's", async () => {
+    const onOpenChanges = vi.fn();
+    const areas = Array.from({ length: MAX_BLOCKS + 1 }, (_, i) => area(`a${i}`, [cap()], [`c${i}`]));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ layout: "v2", map: { areas, constraints: [] } }) })));
+    await act(async () => { render(h(ProductAreaMap, { onOpenArea, onOpenChanges }), root); });
+    await act(async () => {});
+    root.querySelector<HTMLButtonElement>('[data-open-changes="id-a3"]')!.click();
+    expect(onOpenChanges).toHaveBeenLastCalledWith("id-a3", "A3");
+    root.querySelector<HTMLButtonElement>('[data-open-changes="folded"]')!.click();
+    expect(onOpenChanges).toHaveBeenLastCalledWith(null, "+2 smaller areas");
+    expect(onOpenArea).not.toHaveBeenCalled();
   });
 
   it("opens the folded block with no slug", async () => {

@@ -205,6 +205,11 @@ export function stageFilter(stage: OpenChangeStage): string {
   return `${STAGE_PREFIX}${stage}`;
 }
 
+/** The filter that shows one area's open changes; a product map badge opens the page on it. */
+export function areaFilter(areaId: string): string {
+  return `area:${areaId}`;
+}
+
 /** The gaps Plan's Specs to tighten tile counts; each opens this page on its changes. */
 export type GapKind = "no-criteria" | "task-criteria" | "blocked";
 

@@ -144,9 +144,14 @@ export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" 
  * One block of the map. Reusable: the area view passes a capability's title,
  * size and status. A native button, so Enter and Space open it.
  */
-export function AreaBlock({ block, onOpen, selected, basisRem, lit, near, pending, placed }: {
+export function AreaBlock({ block, onOpen, onOpenChanges, selected, basisRem, lit, near, pending, placed }: {
   block: AreaBlockModel;
   onOpen: () => void;
+  /**
+   * Makes the "N open" badge its own button, beside the block (a button cannot
+   * hold a button). Without it the badge is plain text on the block.
+   */
+  onOpenChanges?: () => void;
   selected?: boolean;
   /**
    * The block's flex-basis in rem. Without it every block starts from the
@@ -172,19 +177,24 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit, near, pendin
   const note = lit ?? near;
   const named = note ? `${blockName(block)}; ${note}` : blockName(block);
   const label = placed ? `${named}; this change is placed here` : named;
-  return h("button", {
+  // The badge is a button only when it has somewhere to go.
+  const badgeButton = onOpenChanges !== undefined && block.openChanges > 0;
+  const sizing = {
+    // Bigger blocks grow wider; the stylesheet's basis keeps a one-unit block
+    // legible unless the caller sizes the basis itself.
+    flexGrow: String(Math.max(1, block.size)),
+    ...(basisRem === undefined ? {} : { flexBasis: `${basisRem}rem` }),
+  };
+  const openText = `${block.openChanges} open`;
+  const button = h("button", {
     type: "button",
     class: `pam-block pam-${block.status}${lit ? " pam-lit" : near ? " pam-near" : ""}${placed ? " pam-placed" : ""}`,
     // Only blocks that can be selected carry a pressed state.
     "aria-pressed": selected === undefined ? undefined : String(selected),
     "data-status": block.status,
     "data-block": block.key,
-    // Bigger blocks grow wider; the stylesheet's basis keeps a one-unit block
-    // legible unless the caller sizes the basis itself.
-    style: {
-      flexGrow: String(Math.max(1, block.size)),
-      ...(basisRem === undefined ? {} : { flexBasis: `${basisRem}rem` }),
-    },
+    // With a badge button the wrapper takes the sizing and the block fills it.
+    style: badgeButton ? undefined : sizing,
     "aria-label": pending ? `${label}; ${block.unit} ${pending} with this amendment` : label,
     onClick: onOpen,
   },
@@ -192,14 +202,24 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit, near, pendin
     note ? h("span", { class: lit ? "pam-lit-note" : "pam-near-note", "aria-hidden": "true" }, note) : null,
     h("span", { class: `pam-size${pending ? " pam-pending" : ""}`, "aria-hidden": "true" }, pending ?? String(block.size)),
     placed ? h("span", { class: "pam-placed-mark", "aria-hidden": "true" }, "● this change") : null,
-    block.openChanges > 0
-      ? h("span", { class: "pam-open", "aria-hidden": "true", title: plural(block.openChanges, "open change", "open changes") },
-          String(block.openChanges))
+    block.openChanges > 0 && !badgeButton
+      ? h("span", { class: "pam-open", "aria-hidden": "true", title: plural(block.openChanges, "open change", "open changes") }, openText)
       : null,
     block.ghosts
       ? h("span", { class: "pam-ghost-mark", "aria-hidden": "true", "data-ghost": block.key, title: `${plural(block.ghosts, "item", "items")} waiting on a card` },
           `+${block.ghosts}`)
       : null,
+  );
+  if (!badgeButton) return button;
+  return h("div", { class: "pam-cell", style: sizing },
+    button,
+    h("button", {
+      type: "button",
+      class: "pam-open pam-open-button",
+      "data-open-changes": block.key,
+      "aria-label": `${plural(block.openChanges, "open change", "open changes")} in ${block.label}: open the list`,
+      onClick: onOpenChanges,
+    }, openText),
   );
 }
 
@@ -210,7 +230,7 @@ export function BlockLegend() {
       h("li", { key: status },
         h("span", { class: `pam-swatch pam-${status}`, "aria-hidden": "true" }),
         BLOCK_STATUS_LABELS[status])),
-    h("li", null, h("span", { class: "pam-open pam-legend-open", "aria-hidden": "true" }, "n"), "open changes"),
+    h("li", null, h("span", { class: "pam-open pam-legend-open", "aria-hidden": "true" }, "n open"), "open changes"),
   );
 }
 
@@ -220,7 +240,17 @@ export function BlockLegend() {
  */
 export type OpenArea = (slug: string | null, title: string) => void;
 
-export function AreaBlocks({ map, onOpenArea }: { map: ProductMap; onOpenArea: OpenArea }) {
+/**
+ * Opens Open changes from a block's badge: the area's id, or a null id for the
+ * block that folds smaller areas (no single area to filter to).
+ */
+export type OpenAreaChanges = (areaId: string | null, title: string) => void;
+
+export function AreaBlocks({ map, onOpenArea, onOpenChanges }: {
+  map: ProductMap;
+  onOpenArea: OpenArea;
+  onOpenChanges?: OpenAreaChanges;
+}) {
   const cards = useContext(GhostCardsContext);
   const ghostCounts = useMemo(() => ghostCountsByTarget(cards), [cards]);
   if (map.areas.length === 0) {
@@ -229,15 +259,22 @@ export function AreaBlocks({ map, onOpenArea }: { map: ProductMap; onOpenArea: O
   return h("div", { class: "pam" },
     h("div", { class: "pam-blocks" },
       areaBlocks(map.areas, ghostCounts).map((block) =>
-        h(AreaBlock, { key: block.key, block, onOpen: () => onOpenArea(block.slug, block.label) }))),
+        h(AreaBlock, {
+          key: block.key,
+          block,
+          onOpen: () => onOpenArea(block.slug, block.label),
+          onOpenChanges: onOpenChanges
+            ? () => onOpenChanges(block.slug === null ? null : block.key, block.label)
+            : undefined,
+        }))),
     h(BlockLegend, null),
   );
 }
 
 /** The Product tile's panel on Plan. */
-export function ProductAreaMap({ onOpenArea }: { onOpenArea: OpenArea }) {
+export function ProductAreaMap({ onOpenArea, onOpenChanges }: { onOpenArea: OpenArea; onOpenChanges?: OpenAreaChanges }) {
   const load = useProductRead("/api/rex/product", (body) => body.map as ProductMap);
-  if (load.state === "ready") return h(AreaBlocks, { map: load.data, onOpenArea });
+  if (load.state === "ready") return h(AreaBlocks, { map: load.data, onOpenArea, onOpenChanges });
   if (load.state === "loading") return h("div", { class: "pam-pending", role: "status" }, "Loading...");
   if (load.state === "v1") return null;
   return h("div", { role: "alert" }, `Could not load the product map: ${load.message}`);

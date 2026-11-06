@@ -773,6 +773,13 @@
   text-align: center;
 }
 
+/* A block with a badge button: the wrapper is the flex item, the block fills it. */
+.pam-cell { position: relative; display: flex; min-width: 6rem; flex-basis: 8rem; }
+.pam-cell > .pam-block { flex: 1 1 auto; }
+.pam-open-button { border: 0; font-family: inherit; cursor: pointer; }
+.pam-open-button:hover { background: color-mix(in srgb, var(--accent) 80%, var(--text)); }
+.pam-open-button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
 .pam-legend {
   display: flex;
   flex-wrap: wrap;
