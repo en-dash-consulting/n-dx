@@ -264,11 +264,11 @@ function runPlanResult(card: SidecarCard | undefined): CarryOutResult {
   if (!card) return { ok: false, text: "A run plan is never allowed without its card; nothing ran." };
   const { runPlan, lane: chosen } = card;
   const lane = runPlan && chosen !== undefined ? runPlan.lanes[chosen] : undefined;
-  if (!runPlan || !lane || chosen === undefined || lane.tasks.length === 0) return { ok: false, text: "The card carried no lane; nothing started." };
+  if (!runPlan || !lane || chosen === undefined || lane.tasks.length === 0) return { ok: false, text: "The card carried no track; nothing started." };
   if (lane.ownWorktree) {
     return {
       ok: false,
-      text: `Lane ${chosen + 1} was chosen, but it must run in a worktree of its own: its command targets the current checkout, and two runs in one checkout collide. Nothing started; tell the operator to run the lane's command from a terminal in a worktree of its own.`,
+      text: `Track ${chosen + 1} was chosen, but it must run in a worktree of its own: its command targets the current checkout, and two runs in one checkout collide. Nothing started; tell the operator to run the track's command from a terminal in a worktree of its own.`,
     };
   }
   const steps = laneSteps(lane);
@@ -277,7 +277,7 @@ function runPlanResult(card: SidecarCard | undefined): CarryOutResult {
   if (unmapped.length > 0) {
     return {
       ok: false,
-      text: `Lane ${chosen + 1} was chosen, but its first step is \`${steps[0]}\`, which carries ${unmapped.join(" ")} and a work card cannot. Nothing started; tell the operator to run the lane's command from a terminal.`,
+      text: `Track ${chosen + 1} was chosen, but its first step is \`${steps[0]}\`, which carries ${unmapped.join(" ")} and a work card cannot. Nothing started; tell the operator to run the track's command from a terminal.`,
     };
   }
   const remaining = rest.map((task, i) => `${task.id} ${task.title}: ${steps[i + 1] ?? "(no command)"}${withOptions(steps[i + 1])}`);
@@ -286,7 +286,7 @@ function runPlanResult(card: SidecarCard | undefined): CarryOutResult {
     : "";
   return {
     ok: true,
-    text: `The operator chose lane ${chosen + 1} (change ${lane.changeId}). Nothing has started. Call start_work for its first task only: ${first.id} ${first.title} (\`${steps[0]}\`)${withOptions(steps[0])}.${later}`,
+    text: `The operator chose track ${chosen + 1} (change ${lane.changeId}). Nothing has started. Call start_work for its first task only: ${first.id} ${first.title} (\`${steps[0]}\`)${withOptions(steps[0])}.${later}`,
   };
 }
 

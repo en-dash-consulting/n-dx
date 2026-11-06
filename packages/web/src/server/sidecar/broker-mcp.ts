@@ -95,9 +95,9 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
   },
   propose_run_plan: {
     description: [
-      "Propose the queue planner's run plan. Always waits for the operator's run-plan card, which lists each lane with its exact `ndx work` command as the planner printed it; you give no commands.",
-      "The operator copies the commands or chooses Start lane; the result then names the lane's first task, for which you call start_work.",
-      "Refused when the planner has no lane. Starts nothing.",
+      "Propose the queue planner's run plan. Always waits for the operator's run-plan card, which lists each track with its exact `ndx work` command as the planner printed it; you give no commands.",
+      "The operator copies the commands or chooses Start track; the result then names the track's first task, for which you call start_work.",
+      "Refused when the planner has no track. Starts nothing.",
     ].join(" "),
     input: { note: z.string().optional().describe("One line on why this plan, shown on the card") },
   },
@@ -451,7 +451,7 @@ export function createBrokerMcpServer(
         if (!actions) return text("No card was raised: this server cannot read the queue planner. Nothing started.", true);
         const plan = await actions.readRunPlan(extra.signal);
         if (typeof plan === "string") return text(`No card was raised: ${plan}. Nothing started.`, true);
-        if (plan.lanes.length === 0) return text(`No card was raised: the planner has no lane (${plan.summary}). Nothing started.`, true);
+        if (plan.lanes.length === 0) return text(`No card was raised: the planner has no track (${plan.summary}). Nothing started.`, true);
         annex.runPlan = plan;
       }
       if (name === "github_read") {
