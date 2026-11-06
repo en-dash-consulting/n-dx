@@ -157,14 +157,17 @@ export interface ChangeSetDraft {
   title: string;
   description: string;
   criteria: string;
+  /** Comma-separated. */
+  tags: string;
 }
 
 type ChangeSetItem = NonNullable<SidecarCard["changeSet"]>["items"][number];
 
+const tagList = (text: string): string[] => [...new Set(text.split(",").map((t) => t.trim()).filter(Boolean))];
 const criteriaLines = (text: string): string[] => text.split("\n").map((l) => l.trim()).filter(Boolean);
 
 function draftOf(item: ChangeSetItem): ChangeSetDraft {
-  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n") };
+  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n"), tags: (item.tags ?? []).join(", ") };
 }
 
 /** The edits an approval sends: only the items, and fields, the operator changed. */
@@ -180,6 +183,8 @@ export function changeSetEdits(card: SidecarCard, drafts: Readonly<Record<number
     if (draft.description.trim() !== (item.description ?? "").trim()) edit.description = draft.description;
     const criteria = criteriaLines(draft.criteria);
     if (criteria.join("\n") !== (item.acceptanceCriteria ?? []).join("\n")) edit.acceptanceCriteria = criteria;
+    const tags = tagList(draft.tags);
+    if (tags.join("\n") !== (item.tags ?? []).join("\n")) edit.tags = tags;
     if (Object.keys(edit).length > 1) edits.push(edit);
   }
   return edits;
@@ -236,6 +241,7 @@ function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) 
                 h("input", { type: "text", class: "sidecar-change-set-title", "aria-label": `Title of ${label}`, value: draft.title, onInput: set("title") }),
                 h("textarea", { class: "sidecar-change-set-description", "aria-label": `Description of ${label}`, rows: 2, value: draft.description, onInput: set("description") }),
                 h("textarea", { class: "sidecar-change-set-criteria", "aria-label": `Done when (one per line) for ${label}`, rows: 2, placeholder: "Done when… (one per line)", value: draft.criteria, onInput: set("criteria") }),
+                h("input", { type: "text", class: "sidecar-change-set-tags", "aria-label": `Tags (comma separated) for ${label}`, placeholder: "Tags, comma separated", value: draft.tags, onInput: set("tags") }),
               )
             : h("div", { class: "sidecar-change-set-fields" },
                 h("p", { class: "sidecar-change-set-title" }, item.title, written?.ids?.[index] ? h("code", null, ` ${written.ids[index]}`) : null),
@@ -243,6 +249,7 @@ function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) 
                 item.acceptanceCriteria?.length
                   ? h("ul", { class: "sidecar-change-set-criteria", "aria-label": "Done when" }, item.acceptanceCriteria.map((c) => h("li", null, c)))
                   : null,
+                item.tags?.length ? h("p", { class: "sidecar-change-set-tags", "aria-label": "Tags" }, item.tags.join(", ")) : null,
               ),
         );
       }),

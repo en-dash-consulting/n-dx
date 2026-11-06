@@ -18,6 +18,7 @@ export interface SidecarChangeSetItem {
   description?: string;
   /** Done-when: the item's acceptance criteria. */
   acceptanceCriteria?: string[];
+  tags?: string[];
   priority?: string;
   /** An existing item it goes under. */
   parentId?: string;
@@ -139,6 +140,7 @@ export interface SidecarChangeSetEdit {
   title?: string;
   description?: string;
   acceptanceCriteria?: string[];
+  tags?: string[];
 }
 
 /** One choice of a picker an external-call card draws for a property. */
