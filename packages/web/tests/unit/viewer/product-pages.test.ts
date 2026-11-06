@@ -375,13 +375,27 @@ describe("on a v1 project", () => {
     expect(root.querySelector(".pm-area, [data-change-id]")).toBeNull();
   });
 
-  it("the /requirements route still shows the requirements view, with no Product tabs", async () => {
+  const v1Tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Product views"] [role="tab"]')];
+
+  it("the /requirements route shows the requirements view under the Product tabs", async () => {
     stubRoutes({ "/api/rex/product": { layout: "v1" } });
     await mount(h(ProductPage, { initialTab: "requirements" }));
     // The requirements view mounts once the product read lands, and reads on mount.
     await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
     await settle();
-    expect(root.querySelector('[role="tablist"]')).toBeNull();
+    expect(v1Tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(v1Tabs()[1].getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector(".pm-no-product-layer")).toBeNull();
+  });
+
+  it("the Product page opens on Map with the migrate notice, and Requirements is one click away", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v1" } });
+    await mount(h(ProductPage, null));
+    expect(v1Tabs().map((t) => t.textContent)).toEqual(["Map", "Requirements"]);
+    expect(root.querySelector(".pm-no-product-layer")).not.toBeNull();
+    act(() => { v1Tabs()[1].click(); });
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
+    await settle();
     expect(root.querySelector(".pm-no-product-layer")).toBeNull();
   });
 });

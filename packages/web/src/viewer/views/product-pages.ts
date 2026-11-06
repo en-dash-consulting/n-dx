@@ -14,6 +14,7 @@
  */
 
 import { h } from "preact";
+import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { failureMessage, useCliName, useProductRead, useRefetchableProductRead } from "../hooks/index.js";
@@ -109,13 +110,37 @@ const PRODUCT_TABS: readonly { id: ProductTab; label: string }[] = [
   { id: "requirements", label: "Requirements" },
 ];
 
+/** The Map/Requirements tablist and its panel, shared by the v1 and v2 renderings. */
+function ProductTabs({ tab, onTab, children }: {
+  tab: ProductTab;
+  onTab: (tab: ProductTab) => void;
+  children?: ComponentChildren;
+}) {
+  return h("div", null,
+    h("div", { class: "stage-section-tablist", role: "tablist", "aria-label": "Product views" },
+      PRODUCT_TABS.map((t) =>
+        h("button", {
+          key: t.id,
+          type: "button",
+          role: "tab",
+          id: `product-tab-${t.id}`,
+          "aria-selected": String(tab === t.id),
+          "aria-controls": "product-tabpanel",
+          class: `stage-section-tab${tab === t.id ? " active" : ""}`,
+          onClick: () => onTab(t.id),
+        }, t.label)),
+    ),
+    h("div", { id: "product-tabpanel", role: "tabpanel", "aria-labelledby": `product-tab-${tab}` }, children),
+  );
+}
+
 /**
  * The Product page: the map and the requirements view as tabs, and a
  * capability's page opened from a map row.
  *
  * `/requirements` renders this page with `initialTab="requirements"`. On a v1
- * project, which has no product layer, that route shows the requirements view
- * alone; the Map tab still says to migrate.
+ * project, which has no product layer, the same tabs show: Map says to
+ * migrate, Requirements reads v1 data and renders the requirements view.
  */
 export function ProductPage({ onCapabilityChange, initialTab = "map" }: {
   onCapabilityChange?: (id: string | null) => void;
@@ -131,7 +156,8 @@ export function ProductPage({ onCapabilityChange, initialTab = "map" }: {
   const load = useProductRead("/api/rex/product", (body) => body.map as ProductMap);
   if (load.state === "loading") return h(Pending, { load });
   if (load.state === "v1") {
-    return tab === "requirements" ? h(RequirementsView, null) : h(NoProductLayer, { title: "Product" });
+    return h(ProductTabs, { tab, onTab: setTab },
+      tab === "requirements" ? h(RequirementsView, null) : h(NoProductLayer, { title: "Product" }));
   }
   if (load.state !== "ready") {
     // A failed map read must not hide the requirements view, which reads its own data.
@@ -140,28 +166,13 @@ export function ProductPage({ onCapabilityChange, initialTab = "map" }: {
   if (capabilityId && tab === "map") {
     return h(CapabilityFromRoute, { id: capabilityId, onBack: () => setCapabilityId(null) });
   }
-  return h("div", null,
-    h("div", { class: "stage-section-tablist", role: "tablist", "aria-label": "Product views" },
-      PRODUCT_TABS.map((t) =>
-        h("button", {
-          key: t.id,
-          type: "button",
-          role: "tab",
-          id: `product-tab-${t.id}`,
-          "aria-selected": String(tab === t.id),
-          "aria-controls": "product-tabpanel",
-          class: `stage-section-tab${tab === t.id ? " active" : ""}`,
-          onClick: () => setTab(t.id),
-        }, t.label)),
-    ),
-    h("div", { id: "product-tabpanel", role: "tabpanel", "aria-labelledby": `product-tab-${tab}` },
-      tab === "requirements"
-        ? h(RequirementsView, null)
-        : h("div", null,
-            h(StaleNotice, { message: load.refreshError }),
-            h(ProductView, { map: load.data, onSelectCapability: setCapabilityId }),
-          ),
-    ),
+  return h(ProductTabs, { tab, onTab: setTab },
+    tab === "requirements"
+      ? h(RequirementsView, null)
+      : h("div", null,
+          h(StaleNotice, { message: load.refreshError }),
+          h(ProductView, { map: load.data, onSelectCapability: setCapabilityId }),
+        ),
   );
 }
 
