@@ -1890,6 +1890,21 @@ export async function cmdRun(
 ): Promise<void> {
   // `--resolve` never reaches here: the CLI dispatches it to cmdResolve
   // (run-resolve.ts), which reports this function's decisions without acting.
+
+  // --epic-by-epic walks every epic's tasks in order, and its selection path
+  // carries no assignee filter. Accepting --mine there would run — and commit
+  // under — tasks belonging to other people while the operator believes the
+  // run was scoped to their own, so refuse instead of no-opping. Same reason
+  // --review refuses on the api provider rather than reporting unreviewed runs
+  // as reviewed. Checked first: a contradictory invocation fails on its
+  // arguments before any environment check (config, PRD folder, git config).
+  if (flags["mine"] === "true" && flags["epic-by-epic"] === "true") {
+    throw new CLIError(
+      "Cannot use --mine with --epic-by-epic.",
+      "--epic-by-epic processes every epic in order and cannot filter by assignee. " +
+        "Drop --mine, or run without --epic-by-epic.",
+    );
+  }
   const henchDir = resolveHenchPaths(dir).henchDir;
   // An invalid field in hench's config.json must not refuse the whole run —
   // fall back to that field's default and say so, so a bad edit (often made
@@ -1987,20 +2002,6 @@ export async function cmdRun(
   // matches only when it was set to that same identity string. Like --tags,
   // this only constrains autoselection: an explicit --task bypasses it.
   const mine = flags["mine"] === "true";
-  // --epic-by-epic walks every epic's tasks in order, and its selection path
-  // carries no assignee filter. Accepting --mine there would run — and commit
-  // under — tasks belonging to other people while the operator believes the
-  // run was scoped to their own, so refuse instead of no-opping. Same reason
-  // --review refuses on the api provider rather than reporting unreviewed runs
-  // as reviewed. Checked before resolveActor so a contradictory invocation
-  // fails on its arguments rather than after reading git config.
-  if (mine && flags["epic-by-epic"] === "true") {
-    throw new CLIError(
-      "Cannot use --mine with --epic-by-epic.",
-      "--epic-by-epic processes every epic in order and cannot filter by assignee. " +
-        "Drop --mine, or run without --epic-by-epic.",
-    );
-  }
   const epicRefusal = await refuseEpicFlagsOnV2(rexDir, flags);
   if (epicRefusal) throw epicRefusal;
   const assignee = mine ? await resolveActor(dir) : undefined;
