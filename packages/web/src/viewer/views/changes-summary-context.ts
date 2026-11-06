@@ -12,15 +12,25 @@
 import { createContext, h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useContext } from "preact/hooks";
+import { isDeployedMode } from "../deployed-mode.js";
 import { useProductRead, type Load } from "../hooks/index.js";
 import type { ChangeSummary } from "./product-model.js";
 
 const ChangesSummaryContext = createContext<Load<ChangeSummary> | null>(null);
 
-/** Reads the summary once and shares it with every panel beneath. */
-export function ChangesSummaryProvider({ children }: { children?: ComponentChildren }) {
+/** A static export has no server: the panels that read the summary are hidden there. */
+const NO_SERVER: Load<ChangeSummary> = { state: "error", message: "the change summary needs the dashboard server" };
+
+function SummaryRead({ children }: { children?: ComponentChildren }) {
   const load = useProductRead("/api/rex/changes/summary", (body) => body.summary as ChangeSummary);
   return h(ChangesSummaryContext.Provider, { value: load }, children);
+}
+
+/** Reads the summary once and shares it with every panel beneath. */
+export function ChangesSummaryProvider({ children }: { children?: ComponentChildren }) {
+  return isDeployedMode()
+    ? h(ChangesSummaryContext.Provider, { value: NO_SERVER }, children)
+    : h(SummaryRead, null, children);
 }
 
 /** The shared summary read; a panel outside a provider is a wiring bug. */

@@ -61,6 +61,18 @@ describe("Plan's changes summary read", () => {
     expect(summaryRequests()).toBe(2);
   });
 
+  it("reads nothing on a static export, where the panels are hidden", async () => {
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-11-05T00:00:00Z" };
+    try {
+      await act(async () => { render(h(ChangesSummaryProvider, null, h(ChangesGlance, { navigateTo })), root); });
+      await act(async () => {});
+      expect(summaryRequests()).toBe(0);
+      expect(subscribers.refreshes).toHaveLength(0);
+    } finally {
+      delete window.__NDX_DEPLOYED__;
+    }
+  });
+
   it("refuses a panel mounted without the provider", () => {
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(h(ChangesGlance, { navigateTo }), root)).toThrow(/ChangesSummaryProvider/);

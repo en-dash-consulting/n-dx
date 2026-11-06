@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-06T03:36:41.609Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94a2fc84-71b6-4dfe-a6ea-10f2f703a63b":
-    lastModified: "2026-11-06T03:36:39.384Z"
+    status: "completed"
+    startedAt: "2026-11-06T03:45:11.911Z"
+    completedAt: "2026-11-06T03:49:53.401Z"
+    endedAt: "2026-11-06T03:49:53.401Z"
+    activeIntervals: [{"end":"2026-11-06T03:49:53.401Z","start":"2026-11-06T03:45:11.911Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ChangesSummaryProvider around the plan stage reads the summary once; strip and glance consume it; test counts requests."
+    lastModified: "2026-11-06T03:49:53.401Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b57c204d-a3e0-4d6d-97b4-8315d315a100":
     lastModified: "2026-11-06T03:36:41.609Z"
