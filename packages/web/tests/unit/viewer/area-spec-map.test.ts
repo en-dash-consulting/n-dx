@@ -101,6 +101,25 @@ describe("ghost markers from waiting cards", () => {
     expect(mountWithCards([]).querySelector("[data-ghost]")).toBeNull();
   });
 
+  it("gives the +N marker and the proposed-capability block distinct classes", () => {
+    const [a] = CAPS;
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    act(() => {
+      render(
+        h(GhostCardsContext.Provider, { value: [card([{ parentId: a.id }])] as never },
+          h(SpecMap, { capabilities: CAPS, constraints: AREA_DETAIL_FIXTURE.constraints, onSelect: vi.fn(), ghost: { title: "New" } })),
+        root!,
+      );
+    });
+    const mark = root.querySelector(`.pam-block [data-ghost="${a.id}"]`)!;
+    const block = root.querySelector('div[data-ghost="true"]')!;
+    expect(mark.classList.contains("pam-ghost-mark")).toBe(true);
+    expect(mark.classList.contains("pam-ghost")).toBe(false);
+    expect(block.classList.contains("pam-ghost")).toBe(true);
+    expect(block.classList.contains("pam-ghost-mark")).toBe(false);
+  });
+
   it("marks a targeted constraint band in its flow, with the count in words", () => {
     const band = AREA_DETAIL_FIXTURE.constraints[0];
     const el = mountWithCards([card([{ parentId: band.id }, { parentId: band.id }])]);

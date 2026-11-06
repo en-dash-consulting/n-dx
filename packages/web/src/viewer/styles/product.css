@@ -929,7 +929,7 @@
 .placing-chip-title { font-weight: 600; overflow-wrap: anywhere; }
 
 /* Items a waiting Sidecar card proposes for the block (SP5): dashed, apart from the real open-change count. */
-.pam-ghost {
+.pam-ghost-mark {
   position: absolute;
   bottom: var(--space-1);
   right: var(--space-1);

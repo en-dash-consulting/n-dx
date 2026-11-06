@@ -122,8 +122,8 @@ describe("the Plan surfaces", () => {
   it("the map marks the block a waiting item targets", async () => {
     const map: ProductMap = { areas: [AREA("a1", ["cap-1"]), AREA("a2", ["cap-2"])], constraints: [] };
     await mount(h(ProductAreaMap, { onOpenArea: vi.fn() }), [PLACED], { map });
-    expect(root.querySelector('[data-block="a1"] .pam-ghost')?.textContent).toBe("+2");
-    expect(root.querySelector('[data-block="a2"] .pam-ghost')).toBeNull();
+    expect(root.querySelector('[data-block="a1"] .pam-ghost-mark')?.textContent).toBe("+2");
+    expect(root.querySelector('[data-block="a2"] .pam-ghost-mark')).toBeNull();
     expect(root.querySelector('[data-block="a1"] .pam-open')).toBeNull();
   });
 });

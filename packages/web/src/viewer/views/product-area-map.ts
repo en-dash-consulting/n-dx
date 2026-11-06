@@ -197,7 +197,7 @@ export function AreaBlock({ block, onOpen, selected, basisRem, lit, near, pendin
           String(block.openChanges))
       : null,
     block.ghosts
-      ? h("span", { class: "pam-ghost", "aria-hidden": "true", "data-ghost": block.key, title: `${plural(block.ghosts, "item", "items")} waiting on a card` },
+      ? h("span", { class: "pam-ghost-mark", "aria-hidden": "true", "data-ghost": block.key, title: `${plural(block.ghosts, "item", "items")} waiting on a card` },
           `+${block.ghosts}`)
       : null,
   );
