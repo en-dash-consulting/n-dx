@@ -973,12 +973,15 @@ export interface LockFs {
   stat: (path: string) => Stats;
   readFile: (path: string) => string;
   link: (existingPath: string, newPath: string) => void;
+  /** Remove a file; a missing one is not an error. */
+  rm: (path: string) => void;
 }
 
 const nodeLockFs: LockFs = {
   stat: (path) => statSync(path),
   readFile: (path) => readFileSync(path, "utf-8"),
   link: (existingPath, newPath) => linkSync(existingPath, newPath),
+  rm: (path) => rmSync(path, { force: true }),
 };
 
 /** What the lock consults about the outside world; injectable for tests. */
@@ -1048,6 +1051,7 @@ function withStoreLock<T>(storePath: string, timeoutMs: number, seams: LockSeams
     return fn();
   } finally {
     releaseLock(lockPath, content, seams, timeoutMs);
+    sweepStrandedTemps(seams.fs ?? nodeLockFs);
   }
 }
 
@@ -1093,11 +1097,17 @@ const LOCK_OWNER_FILE = "owner.json";
  * with EPERM. A link to a fresh name settles which it was: when that link
  * works the volume has hard links, so `path` is occupied and this returns
  * false; when it fails too the volume has none and mkdir takes over.
+ *
+ * Nothing after a publication can throw: a temp file that will not go is
+ * left to {@link sweepStrandedTemps}, so a published lock always returns true
+ * and is released by its writer.
  */
 export function createFilled(path: string, content: string, seams: LockSeams = defaultLockSeams): boolean {
   const fs = seams.fs ?? nodeLockFs;
+  sweepStrandedTemps(fs);
   const tmp = `${path}.${randomUUID()}.tmp`;
   const fd = openSync(tmp, "wx", 0o600);
+  let tmpMoved = false;
   try {
     try {
       writeSync(fd, content);
@@ -1120,13 +1130,39 @@ export function createFilled(path: string, content: string, seams: LockSeams = d
     }
     try {
       renameSync(tmp, join(path, LOCK_OWNER_FILE));
+      tmpMoved = true;
     } catch (err) {
       rmdirSync(path);
       throw err;
     }
     return true;
   } finally {
-    rmSync(tmp, { force: true });
+    if (!tmpMoved) discardTemp(tmp, fs);
+  }
+}
+
+/**
+ * Temp files whose removal failed, retried on every later lock call and after
+ * each release. Windows refuses to delete a file a scanner or the indexer has
+ * just opened. Its removal decides nothing, so its failure must not turn a
+ * published lock into an error: the writer would lose its update and its own
+ * live PID would hold the lock until it exits. A temp file that outlives the
+ * process is private and inert.
+ */
+const strandedTemps = new Set<string>();
+
+function discardTemp(tmp: string, fs: LockFs): void {
+  try {
+    fs.rm(tmp);
+  } catch {
+    strandedTemps.add(tmp);
+  }
+}
+
+function sweepStrandedTemps(fs: LockFs): void {
+  for (const tmp of [...strandedTemps]) {
+    strandedTemps.delete(tmp);
+    discardTemp(tmp, fs);
   }
 }
 
@@ -1138,7 +1174,7 @@ function hardLinksWork(tmp: string, fs: LockFs): boolean {
   } catch {
     return false;
   }
-  rmSync(probe, { force: true });
+  discardTemp(probe, fs);
   return true;
 }
 

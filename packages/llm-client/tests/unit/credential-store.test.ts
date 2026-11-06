@@ -553,10 +553,11 @@ describe("Windows delete-pending lock files", () => {
    * Real fs whose `op` on `target` throws `code` the first `times` calls, as
    * Windows does for a file another process is deleting.
    */
-  function flakyLockFs(op: keyof LockFs, code: string, target: string, times = 1) {
+  function flakyLockFs(op: keyof LockFs, code: string, target: string | ((path: string) => boolean), times = 1) {
     const state = { thrown: 0 };
+    const matches = typeof target === "string" ? (path: string) => path === target : target;
     const fail = (which: keyof LockFs, path: string): void => {
-      if (which !== op || path !== target || state.thrown >= times) return;
+      if (which !== op || !matches(path) || state.thrown >= times) return;
       state.thrown++;
       throw Object.assign(new Error(`${code}: operation not permitted, ${op} '${path}'`), { code });
     };
@@ -564,9 +565,14 @@ describe("Windows delete-pending lock files", () => {
       stat: (p) => { fail("stat", p); return statSync(p); },
       readFile: (p) => { fail("readFile", p); return readFileSync(p, "utf-8"); },
       link: (a, b) => { fail("link", b); linkSync(a, b); },
+      rm: (p) => { fail("rm", p); rmSync(p, { force: true }); },
     };
     return { fs, state };
   }
+
+  /** The lock's own temp files, not the store writer's. */
+  const lockTemp = (path: string): boolean => path.startsWith(`${lockPath()}.`) && path.endsWith(".tmp");
+  const lockTempsIn = (): string[] => readdirSync(home).filter((name) => lockTemp(join(home, name)));
 
   const win32 = (lockFs: LockFs, extra: Partial<CredentialWriteOptions> = {}): CredentialWriteOptions => ({
     ...options, platform: "win32", execFileSyncImpl: icacls, username: "alice", lockFs, lockTimeoutMs: 2_000, ...extra,
@@ -603,7 +609,9 @@ describe("Windows delete-pending lock files", () => {
   it("still takes the directory path on Windows when the volume has no hard links", () => {
     fsCalls.linkError = "EPERM";
     try {
-      const lockFs: LockFs = { stat: (p) => statSync(p), readFile: (p) => readFileSync(p, "utf-8"), link: (a, b) => linkSync(a, b) };
+      const lockFs: LockFs = {
+        stat: (p) => statSync(p), readFile: (p) => readFileSync(p, "utf-8"), link: (a, b) => linkSync(a, b), rm: (p) => rmSync(p, { force: true }),
+      };
       expect(createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs: lockFs })).toBe(true);
       expect(statSync(lockPath()).isDirectory()).toBe(true);
       rmSync(lockPath(), { recursive: true });
@@ -639,6 +647,42 @@ describe("Windows delete-pending lock files", () => {
       .toThrow(/^EPERM/);
     expect(state.thrown).toBe(1);
     expect(existsSync(storePath())).toBe(false);
+  });
+
+  for (const host of ["win32", "linux"] as const) {
+    it(`on ${host}, a temp file that will not go after the link still lets the writer hold, write and release the lock`, () => {
+      const { fs, state } = flakyLockFs("rm", "EPERM", lockTemp, Infinity);
+      setCredential("typesafe", PLACEHOLDER, win32(fs, { platform: host }));
+      expect(state.thrown).toBeGreaterThan(0);
+      expect(resolveCredential("typesafe", { ...options, platform: host })?.value).toBe(PLACEHOLDER);
+      expect(existsSync(lockPath())).toBe(false);
+      expect(lockTempsIn()).toHaveLength(1);
+
+      // The stranded temp file goes with the next lock call that can remove it.
+      unsetCredential("typesafe", win32(flakyLockFs("rm", "EPERM", () => false).fs, { platform: host }));
+      expect(readdirSync(home)).toEqual(["credentials.json"]);
+    });
+  }
+
+  it("a temp file that resists removal once is gone after the release", () => {
+    const { fs, state } = flakyLockFs("rm", "EBUSY", lockTemp);
+    setCredential("typesafe", PLACEHOLDER, win32(fs));
+    expect(state.thrown).toBe(1);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("createFilled returns the published lock when its temp file cannot be removed", () => {
+    const { fs } = flakyLockFs("rm", "EPERM", lockTemp, Infinity);
+    const content = holder(process.pid);
+    expect(createFilled(lockPath(), content, { now: Date.now, pidAlive: () => true, platform: "win32", fs })).toBe(true);
+    expect(readFileSync(lockPath(), "utf-8")).toBe(content);
+  });
+
+  it("a createFilled that throws leaves no lock behind", () => {
+    const { fs } = flakyLockFs("link", "EIO", lockPath());
+    expect(() => createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs }))
+      .toThrow(/^EIO/);
+    expect(readdirSync(home)).toEqual([]);
   });
 });
 
