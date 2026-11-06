@@ -484,10 +484,10 @@ describe("StagePage", () => {
     expect(full.querySelector('.stage-tile-content > div > [data-rendered="prd"]')).not.toBeNull();
   });
 
-  it("a v1 project shows a Tasks tile in place of the Product, Inbox and Open changes tiles", async () => {
+  it("a v1 project shows Tasks and Product tiles in place of the Inbox and Open changes tiles", async () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
     await mount(page("plan"));
-    expect(planTiles()).toEqual(["prd", "validation"]);
+    expect(planTiles()).toEqual(["prd", "product", "validation"]);
     const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
     expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
     expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");

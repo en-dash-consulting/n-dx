@@ -217,7 +217,11 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "validation", cols: 6 },
     ],
     // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
-    v1Tiles: [{ view: "prd", cols: 8, rows: 2 }],
+    // Product stays, because its tablist is how a v1 project reaches Requirements.
+    v1Tiles: [
+      { view: "prd", cols: 8, rows: 2 },
+      { view: "product", cols: 4, rows: 2, requiresServer: true },
+    ],
     // A tab of the Product page; its route still opens that tab. Tasks (`prd`)
     // keeps its route and breadcrumb under Plan as a tab of Open changes.
     alsoOwns: ["requirements"],

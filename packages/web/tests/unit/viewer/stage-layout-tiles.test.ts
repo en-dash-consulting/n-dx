@@ -17,6 +17,7 @@ vi.mock("../../../src/viewer/components/index.js", async (importOriginal) => ({
 }));
 
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
+import { ProductPage } from "../../../src/viewer/views/product-pages.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 
 const withLayout = (layout: "v1" | "v2") => ({ rex: { layout } }) as unknown as Pick<ProjectStatus, "rex">;
@@ -61,7 +62,9 @@ describe("Plan tiles before the first status", () => {
     status = withLayout("v1");
     mount();
     expect(tiles()).toContain("prd");
-    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
+    // v1 keeps a Product tile (its tabs lead to Requirements), not the v2 Inbox or changes.
+    expect(tiles()).toContain("product");
+    for (const v of ["inbox", "changes"]) expect(tiles()).not.toContain(v);
   });
 
   it("brings the v2 tiles in once status says v2", () => {
@@ -76,6 +79,39 @@ describe("Plan tiles before the first status", () => {
     status = { rex: { exists: false } } as unknown as Pick<ProjectStatus, "rex">;
     mount();
     for (const v of V2_ONLY) expect(tiles()).toContain(v);
+  });
+});
+
+describe("Plan on a v1 project", () => {
+  it("reaches Requirements through the Product tile's tabs", async () => {
+    status = withLayout("v1");
+    const fetched: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      fetched.push(url);
+      const body = url === "/api/rex/product" ? { layout: "v1" }
+        : url === "/api/rex/requirements/coverage" ? { byCategory: {}, byValidationType: {}, byPriority: {} }
+        : url === "/api/rex/requirements/traceability" ? { matrix: [] }
+        : {};
+      return { ok: true, status: 200, json: async () => body };
+    }));
+    await act(async () => {
+      render(h(StagePage, {
+        stage: "plan",
+        validViews: buildValidViews(null),
+        navigateTo: () => {},
+        renderView: (v) => (v === "product" ? h(ProductPage, null) : h("div", { class: `view-${v}` })),
+      }), root);
+    });
+    expect(tiles()).toContain("product");
+
+    const tab = await vi.waitFor(() => {
+      const t = [...root.querySelectorAll<HTMLButtonElement>('[data-tile="product"] [aria-label="Product views"] [role="tab"]')]
+        .find((b) => b.textContent === "Requirements");
+      expect(t).toBeDefined();
+      return t!;
+    });
+    await act(async () => { tab.click(); });
+    await vi.waitFor(() => expect(fetched).toContain("/api/rex/requirements/coverage"));
   });
 });
 

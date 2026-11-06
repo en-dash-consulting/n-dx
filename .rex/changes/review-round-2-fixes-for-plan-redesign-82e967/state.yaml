@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "2bbebad7-f4c6-4cde-abd3-700d834cc27b":
-    lastModified: "2026-11-06T15:58:53.112Z"
+    status: "completed"
+    startedAt: "2026-11-06T15:59:01.990Z"
+    completedAt: "2026-11-06T16:01:53.140Z"
+    endedAt: "2026-11-06T16:01:53.140Z"
+    activeIntervals: [{"end":"2026-11-06T16:01:53.140Z","start":"2026-11-06T15:59:01.990Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added a Product tile to Plan's v1Tiles; its tablist reaches Requirements. Test mounts Plan on v1 and clicks the Requirements tab."
+    lastModified: "2026-11-06T16:01:53.140Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82e9677c-14b3-4b7d-8380-0e6531eba663":
     lastModified: "2026-11-06T15:58:55.471Z"
