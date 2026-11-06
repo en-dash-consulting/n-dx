@@ -888,6 +888,14 @@ function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed
   const draft = useDraft(changeId);
   const areas = map?.areas ?? [];
 
+  // The map moving to another area while the form is open takes the form with it, so both name one area (WF6).
+  // Only a change of the map's area counts: the form's own choice moves the map, never the other way round.
+  const followed = useRef(defaultUnder);
+  useEffect(() => {
+    if (defaultUnder === followed.current) return;
+    followed.current = defaultUnder;
+    if (defaultUnder) setUnder(defaultUnder);
+  }, [defaultUnder]);
   // The form closing, by Back or by a write, clears the ghost.
   useEffect(() => { onGhost?.(type === "capability" ? { title: title.trim() || changeTitle, under } : null); }, [type, title, under]);
   useEffect(() => () => onGhost?.(null), []);

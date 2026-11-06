@@ -494,6 +494,29 @@ describe("PlacementMode", () => {
       expect($('.pam-block[data-block="cap-vat"]')).not.toBeNull();
     });
 
+    it("follows the map to another area, and re-picking the old area in the form brings the map back", async () => {
+      serve([change("a", { title: "Print gift receipts" })], [placement("a", [candidate("cap-label", { score: 9 })])]);
+      await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+      await nothingFits();
+      const under = () => $<HTMLSelectElement>(".cp-propose label:nth-of-type(2) select")!;
+      expect(under().value).toBe("area-ship");
+
+      // Zoom to the area level, then into Payments: the form and the ghost go there.
+      await act(async () => { $<HTMLButtonElement>(".placing-crumb-map")!.click(); });
+      await settle();
+      await act(async () => { $<HTMLButtonElement>('.pam-block[data-block="area-pay"]')!.click(); });
+      await settle();
+      expect(crumb()).toEqual(["Plan", "Product map", "Payments"]);
+      expect(under().value).toBe("area-pay");
+      expect(ghost()).toHaveLength(1);
+
+      // Choosing Shipping in the form moves the map back and redraws the ghost.
+      await act(async () => { under().value = "area-ship"; under().dispatchEvent(new Event("change", { bubbles: true })); });
+      await settle();
+      expect(crumb()).toEqual(["Plan", "Product map", "Shipping"]);
+      expect(ghost()).toHaveLength(1);
+    });
+
     it("at the area level, opens with no area and draws no ghost until one is chosen", async () => {
       serve([change("a")], [placement("a", [candidate("cap-label", { strength: "possible", score: 2 })])]);
       await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
