@@ -86,6 +86,8 @@ export interface ConstraintRowWire {
   statement?: string;
   health: CapabilityHealthWire;
   appliesTo: "all" | string[];
+  /** Open changes that touch or amend the constraint; a top-level one sits in no area's openChangeIds. */
+  openChanges: OpenChangeOverlayWire[];
 }
 
 export interface AreaSectionWire {
@@ -502,6 +504,7 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
         ...(row.statement ? { statement: row.statement } : {}),
         health: row.health,
         appliesTo: appliesTo === undefined || appliesTo === "all" ? "all" : appliesTo.map((ref) => titleOf(index, ref).title),
+        openChanges: overlays.get(row.id) ?? [],
       });
     } else if (area) {
       area.capabilities.push({

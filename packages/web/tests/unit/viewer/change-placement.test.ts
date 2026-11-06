@@ -78,7 +78,7 @@ const MAP: ProductMap = {
       { id: "cap-label", title: "Shipping labels", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
     ], openChangeIds: [] },
   ],
-  constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all" }],
+  constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all", openChanges: [] }],
 };
 
 // ── Harness ──────────────────────────────────────────────────────────

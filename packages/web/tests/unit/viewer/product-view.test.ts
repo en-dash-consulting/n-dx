@@ -268,14 +268,33 @@ describe("capability ordering", () => {
     const totals = productTotals({
       areas: [{ id: "a", slug: "a", title: "A", capabilities: [row({ health: "defective" })], openChangeIds: [] }],
       constraints: [
-        { id: "c1", title: "C1", health: "defective", appliesTo: "all" },
-        { id: "c2", title: "C2", health: "ok", appliesTo: "all" },
+        { id: "c1", title: "C1", health: "defective", appliesTo: "all", openChanges: [] },
+        { id: "c2", title: "C2", health: "ok", appliesTo: "all", openChanges: [] },
       ],
     });
 
     expect(totals.defective).toBe(2);
     // The capability count stays a capability count.
     expect(totals.capabilities).toBe(1);
+  });
+
+  it("counts an open change whose only reference is a top-level constraint", () => {
+    // A top-level constraint sits under no area: no area set or capability overlay holds the change.
+    const change = { id: "ch-con", title: "Tighten", stage: "ready" as const };
+    const shared = { id: "ch-shared", title: "Shared", stage: "ready" as const };
+    const totals = productTotals({
+      areas: [{
+        id: "a", slug: "a", title: "A",
+        capabilities: [row({ id: "one", title: "One", openChanges: [shared] })],
+        openChangeIds: ["ch-shared"],
+      }],
+      constraints: [
+        { id: "c1", title: "C1", health: "ok", appliesTo: "all", openChanges: [change, { ...change, delta: "modified" }] },
+        { id: "c2", title: "C2", health: "ok", appliesTo: "all", openChanges: [shared] },
+      ],
+    });
+
+    expect(totals.openChanges).toBe(2);
   });
 
   it("treats revised or defective as needing attention", () => {
