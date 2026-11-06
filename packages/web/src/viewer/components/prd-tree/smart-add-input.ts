@@ -55,7 +55,8 @@ export type CaptureArea = Pick<AreaDetail, "id" | "slug" | "title" | "capabiliti
 /** The product map a capture in `area` searches: that area and the constraints binding it. */
 export function areaSearchMap(area: CaptureArea): ProductMap {
   return {
-    areas: [{ id: area.id, slug: area.slug, title: area.title, capabilities: area.capabilities }],
+    // A search map: nothing reads its open-change counts.
+    areas: [{ id: area.id, slug: area.slug, title: area.title, capabilities: area.capabilities, openChangeIds: [] }],
     constraints: area.constraints,
   };
 }

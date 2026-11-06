@@ -22,6 +22,14 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 }));
 
 const AREA_URL = `/api/rex/product/area/${AREA_DETAIL_FIXTURE.slug}`;
+
+/** A valid v2 status: Plan mounts its v2-only tiles (the Product map) only once a layout is known. */
+const V2_STATUS = {
+  initialized: true,
+  sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 0, modulesComplete: 0, modulesTotal: 0 },
+  rex: { exists: true, layout: "v2", percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
+  hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
+};
 let root: HTMLDivElement;
 
 function stubRoutes(routes: Record<string, unknown>): void {
@@ -146,6 +154,7 @@ describe("from Plan's product map", () => {
     stubRoutes({
       "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
       [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
+      "/api/status": V2_STATUS,
     });
     const navigateTo = vi.fn();
     await mount(h("div", null, renderActiveView("plan", {
@@ -182,6 +191,7 @@ describe("from Plan's product map", () => {
     stubRoutes({
       "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
       [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
+      "/api/status": V2_STATUS,
     });
     const navigateTo = vi.fn();
     await mount(h("div", null, renderActiveView("plan", {
