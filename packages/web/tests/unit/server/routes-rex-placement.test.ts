@@ -176,9 +176,25 @@ describe("placement routes on a v2 project", () => {
   it("POST unplace refuses a node the change does not touch, and a body with no target, writing nothing", async () => {
     const refused = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
     expect(refused.status).toBe(422);
-    expect(refused.body.kind).toBe("not-a-target");
+    expect(refused.body.kind).toBe("not-touched");
     expect((await json(await send(`changes/${inboxId}/unplace`, {}))).status).toBe(400);
     expect((await json(await send(`changes/nope/unplace`, { target: CAPABILITY_ID }))).status).toBe(404);
+    expect(frames).toEqual([]);
+  });
+
+  it("POST unplace refuses a cancelled change with change-not-open, writing nothing", async () => {
+    await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" });
+    await withPrdModelTransaction(rexDir, ({ tree }) => {
+      indexTree(tree).resolve(inboxId)!.status = "cancelled";
+      return { tree, result: undefined };
+    });
+    frames.length = 0;
+    const before = indexTree((await loadModel(rexDir)).tree).resolve(inboxId)!;
+    const refused = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
+    expect(refused).toMatchObject({ status: 422, body: { kind: "change-not-open" } });
+    const after = indexTree((await loadModel(rexDir)).tree).resolve(inboxId)!;
+    expect({ touches: after.touches, needsPlacement: after.needsPlacement }).toEqual({ touches: before.touches, needsPlacement: before.needsPlacement });
+    expect(after.touches).toEqual([CAPABILITY_ID]);
     expect(frames).toEqual([]);
   });
 

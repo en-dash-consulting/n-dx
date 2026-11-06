@@ -216,6 +216,7 @@ export function placedLine(change: Pick<ChangeRow, "amends" | "touches">): strin
 /** What a refusal asks of the person, by rex's `kind`. */
 export const REFUSAL_HINTS: Record<PlacementRefusalKind, string> = {
   "not-a-target": "Choose a capability or constraint from the list or the search.",
+  "not-touched": "It is no longer a home of this change. Reload the tree.",
   "content-needs-amends": "A replacement statement or criteria edits need Amends.",
   "already-amends": "This change already amends it. Choose another place.",
   "already-proposed": "This change already proposes that. Change the title or the area.",

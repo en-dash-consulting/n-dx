@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
-import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement, suggestPlacements } from "../../../src/core/change-place.js";
+import { ChangePlacementError, recordPlacement, recordProposal, recordUnplacement, suggestPlacement, suggestPlacements } from "../../../src/core/change-place.js";
 import { placementStrength } from "../../../src/core/placement.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
@@ -354,6 +354,45 @@ describe("recordPlacement", () => {
 
   it("refuses a ref that is not a change", () => {
     expect(() => suggestPlacement(tree(), "card")).toThrow(/No live change "card"/);
+  });
+});
+
+describe("recordUnplacement", () => {
+  const amended = { amends: [{ target: "card", delta: "modified", summary: "s", proposed: "x" }] };
+
+  it("takes back one touches by any ref, leaving the input tree alone", () => {
+    const input = tree({ touches: ["card", "refund"], needsPlacement: undefined });
+    const out = recordUnplacement(input, "CH-1", "A1.1", NOW);
+    expect({ change: out.change, target: out.target }).toEqual({ change: "ch", target: "card" });
+    expect(changeIn(out.tree).touches).toEqual(["refund"]);
+    expect(changeIn(out.tree).needsPlacement).toBeUndefined();
+    expect(changeIn(input).touches).toEqual(["card", "refund"]);
+  });
+
+  it("returns a change left with no home to the Inbox", () => {
+    const { tree: next } = recordUnplacement(tree({ touches: ["card"], needsPlacement: undefined }), "ch", "card", NOW);
+    expect(changeIn(next)).not.toHaveProperty("touches");
+    expect(changeIn(next).needsPlacement).toBe(true);
+  });
+
+  it("keeps a change that still amends something out of the Inbox", () => {
+    const { tree: next } = recordUnplacement(tree({ ...amended, touches: ["refund"], needsPlacement: undefined }), "ch", "refund", NOW);
+    expect(changeIn(next).needsPlacement).toBeUndefined();
+  });
+
+  it.each([
+    ["not-touched", "a target it does not touch", { touches: ["refund"] }, "card", /^Change CH-1 does not touch "card"$/],
+    ["not-touched", "a target it amends", { ...amended, touches: ["refund"] }, "card", /does not touch "card"/],
+    ["not-touched", "an unknown target", { touches: ["card"] }, "nope", /does not touch "nope"/],
+    ["change-not-open", "a cancelled change", { touches: ["card"], status: "cancelled" }, "card", /is cancelled; only an open or applied change is placed/],
+    ["no-such-change", "a deleted change", { touches: ["card"], status: "deleted" }, "card", /No live change "ch"/],
+    // Closed in v2 and back in the Inbox: the rules say a person must confirm its targets first.
+    ["rule-errors", "the last home of an applied change", { ...APPLIED, touches: ["card"], needsPlacement: undefined }, "card", /still needs placement/],
+  ])("refuses %s: %s", (kind, _label, changeFields, target, message) => {
+    const err = (() => { try { recordUnplacement(tree(changeFields), "ch", target, NOW); } catch (e) { return e as ChangePlacementError; } })();
+    expect(err).toBeInstanceOf(ChangePlacementError);
+    expect(err?.kind).toBe(kind);
+    expect(err?.message).toMatch(message);
   });
 });
 

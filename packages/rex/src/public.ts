@@ -109,12 +109,13 @@ export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOption
 // CLI (`rex change place`) and MCP (`place_change`) call. `placementStrength`
 // holds the strength bands, so no surface keeps its own thresholds.
 // `recordProposal` records a new capability or constraint when nothing fits.
+// `recordUnplacement` takes back one touches.
 
 // `draftChangePlacement` asks the configured `prd.place` text model for a pick
 // or a proposal and writes nothing; a drafted proposal has no target, so
 // accepting it through `recordProposal` mints the new node's id.
 
-export { suggestPlacement, suggestPlacements, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
+export { suggestPlacement, suggestPlacements, recordPlacement, recordProposal, recordUnplacement, ChangePlacementError } from "./core/change-place.js";
 export type {
   ChangePlacementErrorKind, PlacementSuggestion, PlacementSuggestionResult, SuggestedPlacementCandidate, SuggestedPlacementRow, RecordPlacementInput, RecordPlacementResult,
   RecordProposalInput, RecordProposalOptions, RecordProposalResult, PlacementDraft, DraftedProposal,

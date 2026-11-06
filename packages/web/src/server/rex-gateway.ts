@@ -72,10 +72,11 @@ export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
 // run), so the shortlist, the strength bands and the refusals stay rex's.
 // `suggestPlacements` ranks one change or many against one tree, building rex's
 // placement inputs once: the area read and the Inbox list rank every Inbox change.
-export { suggestPlacements, recordPlacement, recordProposal, ChangePlacementError, placementStrength } from "@n-dx/rex";
+// `recordUnplacement` is "Place & add another"'s Remove: rex refuses a closed change and runs its rules.
+export { suggestPlacements, recordPlacement, recordProposal, recordUnplacement, ChangePlacementError, placementStrength } from "@n-dx/rex";
 export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
 export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
-export type { RecordProposalInput, RecordProposalOptions, RecordProposalResult } from "@n-dx/rex";
+export type { RecordProposalInput, RecordProposalResult } from "@n-dx/rex";
 export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
 // "Draft with the model" (behind rex.placementDraft): the `prd.place` text
 // model drafts a pick or a proposal and writes nothing.

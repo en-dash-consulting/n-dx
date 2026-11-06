@@ -126,7 +126,7 @@ Nothing is placed automatically. Every write goes through the placement routes b
 
 On a v2 project a change captured without a home waits in the Inbox. Three routes
 read and settle it. Rex decides everything (`suggestPlacement`, `recordPlacement`,
-`recordProposal`); the server enriches the shortlist and writes through rex's v2
+`recordProposal`, `recordUnplacement`); the server enriches the shortlist and writes through rex's v2
 transaction, the execution log and the `rex:prd-changed` broadcast. A v1 tree
 answers `409`, an unknown change `404`, any other rex refusal `422 { error, kind }`,
 and a held PRD lock `409` naming its PID.
@@ -136,6 +136,7 @@ and a held PRD lock `409` naming its PID.
 | `GET /api/rex/changes/:id/placement` | `{ layout: "v2", change, relation, tied, shortlist }`. Each shortlist entry carries `target`, `type`, `title`, `area`, `statement`, `criteria`, `score`, `strength` (`strong`/`possible`/`weak`) and `reasons`. |
 | `POST /api/rex/changes/:id/place` | Places the change on a capability or constraint (`touches` or `amends`): `{ change, target, relation, warnings? }`. |
 | `POST /api/rex/changes/:id/propose` | Records a new capability or constraint when nothing fits: `{ change, proposed: { target, under, title, type }, warnings? }`. |
+| `POST /api/rex/changes/:id/unplace` | Takes back one `touches` (`{ target }`) through rex's `recordUnplacement`: `{ change, target }`. A change left with no home returns to the Inbox. A cancelled change answers `422 change-not-open`, a target it does not touch `422 not-touched`. |
 
 `POST /api/rex/items` on v2 also accepts `touches`, so a change captured with a
 home skips the Inbox.

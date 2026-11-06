@@ -394,11 +394,12 @@ export interface PlacementDraft {
 
 /**
  * Why rex refused a placement or a proposal: the `kind` of a 422 answer from
- * `/place` or `/propose`, mirroring rex's `ChangePlacementErrorKind`.
+ * `/place`, `/propose` or `/unplace`, mirroring rex's `ChangePlacementErrorKind`.
  * `no-such-change` arrives as a 404 instead.
  */
 export type PlacementRefusalKind =
   | "not-a-target"
+  | "not-touched"
   | "content-needs-amends"
   | "already-amends"
   | "already-proposed"

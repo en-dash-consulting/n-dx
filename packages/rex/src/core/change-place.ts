@@ -27,6 +27,9 @@
  * - {@link draftPlacement} asks an injected text model (`prd.place`) for a
  *   pick or a proposal and returns it unwritten, for a person to accept
  *   through the two above.
+ * - {@link recordUnplacement} takes back one `touches` target. An amendment is
+ *   edited, not removed there. A change left with no home goes back to the
+ *   Inbox (`needsPlacement`).
  *
  * An open change is placed either way. An applied change (migrated history
  * still in the Inbox) is placed with `touches` only: its amendments already
@@ -67,6 +70,7 @@ import {
 /** Why a placement was refused. Each surface words its own hint by kind; the message is the MCP wording. */
 export type ChangePlacementErrorKind =
   | "not-a-target"
+  | "not-touched"
   | "content-needs-amends"
   | "already-amends"
   | "already-proposed"
@@ -352,6 +356,38 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
     throw new ChangePlacementError(plain, "apply-problems");
   }
   return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy };
+}
+
+export interface RecordUnplacementResult {
+  /** The new tree; the input is not modified. */
+  tree: V2Tree;
+  change: string;
+  /** Id of the capability or constraint the change no longer touches. */
+  target: string;
+}
+
+/**
+ * Take back the change `changeRef`'s touches of `targetRef`. Only a touches
+ * goes: an amendment is edited, not removed here. A change left with neither
+ * amends nor touches returns to the Inbox. A cancelled or deleted change is
+ * refused, as {@link recordPlacement} refuses it.
+ */
+export function recordUnplacement(tree: V2Tree, changeRef: string, targetRef: string, now: Date): RecordUnplacementResult {
+  const next = structuredClone(tree);
+  const index = indexTree(next);
+  const change = placeableChange(index, changeRef) as ChangeNode & RuleNode;
+  const target = index.resolve(targetRef);
+  const touches = change.touches ?? [];
+  const rest = target ? touches.filter((ref) => index.resolve(ref) !== target) : touches;
+  if (!target || rest.length === touches.length) {
+    throw new ChangePlacementError(`Change ${change.displayId ?? change.id} does not touch "${targetRef}"`, "not-touched");
+  }
+  if (rest.length) change.touches = rest;
+  else delete change.touches;
+  if (!change.amends?.length && !rest.length) change.needsPlacement = true;
+
+  refuseRuleErrors(next, change, now);
+  return { tree: next, change: change.id, target: target.id };
 }
 
 export interface RecordProposalInput {

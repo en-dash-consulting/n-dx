@@ -19,7 +19,7 @@
  *                                         on the loaded tree: what it would record, or the refusal kind. Writes nothing.
  *
  * Rex decides everything (`suggestPlacements`, `recordPlacement`,
- * `recordProposal`); this module enriches the shortlist with what the viewer
+ * `recordProposal`, `recordUnplacement`); this module enriches the shortlist with what the viewer
  * shows and writes through rex's v2 transaction, as `place_change` does.
  * {@link writePlacement} is the one write: the two POST routes and an
  * approved Sidecar placement card (`sidecar/carry-out.ts`) all go through it.
@@ -49,6 +49,7 @@ import {
   suggestPlacements,
   recordPlacement,
   recordProposal,
+  recordUnplacement,
   ChangePlacementError,
   placementStrength,
   withPrdModelTransaction,
@@ -647,6 +648,9 @@ async function handlePlacementCheck(changeRef: string, req: IncomingMessage, res
  * `POST /api/rex/changes/:id/unplace` `{ target }`: take back one touches a
  * "Place & add another" session added. Only a touches goes: an amendment is
  * edited, not removed here. A change left with no home returns to the Inbox.
+ * Rex's `recordUnplacement` decides: it refuses a cancelled change
+ * (`change-not-open`), a target the change does not touch (`not-touched`) and
+ * a result its rules reject, as it does for a placement.
  */
 async function handleUnplace(changeRef: string, req: IncomingMessage, res: ServerResponse, ctx: ServerContext, broadcast?: WebSocketBroadcaster): Promise<boolean> {
   const json = parseJson(await readBody(req, res));
@@ -662,20 +666,8 @@ async function handleUnplace(changeRef: string, req: IncomingMessage, res: Serve
   try {
     const now = new Date();
     const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
-      const tree = structuredClone(model.tree);
-      const index = indexTree(tree);
-      const change = index.resolve(changeRef);
-      if (!change || change.type !== "change") throw new ChangePlacementError(`No change "${changeRef}"`, "no-such-change");
-      const node = index.resolve(target);
-      const rest = (change.touches ?? []).filter((ref) => index.resolve(ref) !== node);
-      if (!node || rest.length === (change.touches ?? []).length) {
-        const plain = `Change ${change.displayId ?? change.id} does not touch "${target}"`;
-        throw new ChangePlacementError(plain, "not-a-target", plain);
-      }
-      if (rest.length) change.touches = rest;
-      else delete change.touches;
-      if (!change.amends?.length && !rest.length) change.needsPlacement = true;
-      return { tree, result: { change: change.id, target: node.id } };
+      const { tree, change, target: removed } = recordUnplacement(model.tree, changeRef, target, now);
+      return { tree, result: { change, target: removed } };
     }, { now: () => now });
     await publish(ctx, { timestamp: now.toISOString(), itemId: result.change, event: "change_unplaced", detail: `touches ${result.target} (via web)` }, broadcast);
     jsonResponse(res, 200, result);

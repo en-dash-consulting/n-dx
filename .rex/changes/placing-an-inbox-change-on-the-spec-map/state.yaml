@@ -71,7 +71,14 @@ items:
     lastModified: "2026-11-06T02:00:07.813Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bf33ecdf-ee3a-4324-b26f-9536834a1a15":
-    lastModified: "2026-11-06T00:31:31.779Z"
+    status: "completed"
+    startedAt: "2026-11-06T02:00:15.530Z"
+    completedAt: "2026-11-06T02:06:09.078Z"
+    endedAt: "2026-11-06T02:06:09.078Z"
+    activeIntervals: [{"end":"2026-11-06T02:06:09.078Z","start":"2026-11-06T02:00:15.530Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "recordUnplacement in rex core/change-place.ts (open-change check, v2 rules, not-touched kind); /unplace calls it via rex-gateway; gateway held at 137 by dropping unused RecordProposalOptions."
+    lastModified: "2026-11-06T02:06:09.078Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cc097ef0-8d88-4c42-ba95-6bd6bcf1db59":
     status: "completed"

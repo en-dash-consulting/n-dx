@@ -226,6 +226,7 @@ function placementRefusal(err: ChangePlacementError): CLIError {
       );
     case "applied-change-amends":
       return new CLIError(err.plain, "Pass --relation=touches with --target, and no --proposed or capability criteria.");
+    case "not-touched":
     case "already-amends":
     case "already-proposed":
     case "rule-errors":
