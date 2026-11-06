@@ -33,7 +33,7 @@ export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, 
 // On a v2 tree the dashboard's PRD cache is the change-layer projection
 // `resolveStore` returns, not a parse of `prd_tree/`.
 export { prdLayout } from "@n-dx/rex";
-export { findNextWorkTask } from "@n-dx/rex";
+export { findNextWorkTask, findActionableWork } from "@n-dx/rex";
 // Item writes on a v2 tree: the guard narrows resolveStore's answer to the
 // change-layer store, and completion is rex's own v2 completion (apply-on-complete).
 export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
@@ -224,7 +224,7 @@ export { PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS, parsePlacementSettin
 export type { PlacementAutoAccept, PlacementSettings } from "@n-dx/rex";
 
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
-export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
+export type { Proposal } from "@n-dx/rex";
 
 // ---- Rex Markdown serializer / parser (used by prd-io cache) ----------------
 export { serializeDocument, parseDocument } from "@n-dx/rex";
