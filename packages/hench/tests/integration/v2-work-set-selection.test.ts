@@ -22,7 +22,7 @@ import {
   WORK_SET_EXHAUSTED,
   WorkSetExhaustedError,
 } from "../../src/agent/planning/work-selection.js";
-import { peekNextTaskPriority, refuseEpicFlagsOnV2 } from "../../src/cli/commands/run.js";
+import { cmdRun, peekNextTaskPriority, refuseEpicFlagsOnV2 } from "../../src/cli/commands/run.js";
 import { cmdPlanQueue } from "../../src/cli/commands/plan-queue.js";
 import type { QueuePlan } from "../../src/queue/plan-queue.js";
 import { DEFAULT_HENCH_CONFIG } from "../../src/schema/v1.js";
@@ -176,6 +176,58 @@ describe("on a branch with a work set", () => {
     } finally {
       log.mockRestore();
     }
+  });
+
+  describe("through `hench run` itself (dry run)", () => {
+    /** A configured vendor whose CLI is found, so a dry run reaches selection; node stands in for the binary. */
+    beforeEach(async () => {
+      await writeFile(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+      await writeFile(join(root, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { cli_path: process.execPath } } }));
+      await writeFile(join(root, ".gitignore"), ".n-dx.local.json\n");
+      git("add", "-A");
+      git("commit", "-q", "-m", "vendor");
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    async function dryRun(flags: Record<string, string>): Promise<string> {
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        await cmdRun(root, { ...flags, "dry-run": "true" });
+        return log.mock.calls.map((c) => c.map(String).join(" ")).join("\n");
+      } finally {
+        log.mockRestore();
+      }
+    }
+
+    it("--auto runs the set's task; with --any, the PRD's next task", async () => {
+      // The brief names its unit under "## Current task"; siblings appear elsewhere in it.
+      expect(await dryRun({ auto: "true" })).toContain(`ID: ${DOCS_ID}`);
+      expect(await dryRun({ auto: "true" })).not.toContain(`ID: ${WIRE_ID}`);
+      expect(await dryRun({ auto: "true", any: "true" })).toContain(`ID: ${WIRE_ID}`);
+    });
+
+    it("an explicit --task outside the set runs", async () => {
+      expect(await dryRun({ auto: "true", task: WIRE_ID })).toContain(`ID: ${WIRE_ID}`);
+    });
+
+    it("--loop on a spent set ends cleanly, saying so", async () => {
+      await (await store()).updateItem(DOCS_ID, { status: "completed" });
+      git("add", "-A");
+      git("commit", "-q", "-m", "docs done");
+      const out = await dryRun({ loop: "true" });
+      expect(out).toContain(`${WORK_SET_EXHAUSTED} — loop finished after 0 task(s).`);
+      expect(out).not.toContain("All tasks complete");
+    });
+
+    it("--auto on a spent set fails with the work-set message", async () => {
+      await (await store()).updateItem(DOCS_ID, { status: "completed" });
+      git("add", "-A");
+      git("commit", "-q", "-m", "docs done");
+      await expect(dryRun({ auto: "true" })).rejects.toThrow(WORK_SET_EXHAUSTED);
+    });
   });
 
   it("--epic-by-epic is still refused: a v2 tree has no epics to walk", async () => {
