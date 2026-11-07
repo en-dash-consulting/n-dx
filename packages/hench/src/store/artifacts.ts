@@ -300,10 +300,16 @@ export function parsePorcelainPath(line: string): string {
   return splitPorcelainPaths(line).to;
 }
 
+/** The source path of an R/C porcelain line, or undefined for any other line. */
+export function porcelainSourcePath(line: string): string | undefined {
+  return splitPorcelainPaths(line).from;
+}
+
 /**
- * True when every path a porcelain line touches matches `patterns`: for an R/C
- * line that is the source as well as the target, so a move out of a
- * non-matching path into one is not matched by its target alone.
+ * True when every path a porcelain line leaves changed matches `patterns`. A
+ * rename (R) removes its source, so the source must match as well as the
+ * target: a move out of a non-matching path into one is not matched by its
+ * target alone. A copy (C) leaves its source in place, so only the target counts.
  */
 export function matchesPorcelainLine(
   line: string,
@@ -311,9 +317,10 @@ export function matchesPorcelainLine(
   repoPrefix = "",
 ): boolean {
   const { from, to } = splitPorcelainPaths(line);
+  const isRename = line.slice(0, 2).includes("R");
   return (
     matchesProjectPath(to, patterns, repoPrefix) &&
-    (from === undefined || matchesProjectPath(from, patterns, repoPrefix))
+    (!isRename || from === undefined || matchesProjectPath(from, patterns, repoPrefix))
   );
 }
 

@@ -75,6 +75,14 @@ describe("hench run — flag conflict refusals", () => {
     expect(stderr).not.toContain("No PRD folder");
   });
 
+  it("refuses --review with --no-review on a project with no PRD folder", () => {
+    const { stderr, code } = runResult(["run", "--review", "--no-review", tmpDir]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("--review and --no-review were both passed");
+    expect(stderr).not.toContain("No PRD folder");
+  });
+
   it("accepts --epic-by-epic on its own (the refusal is the combination, not the flag)", () => {
     // Guards against a refusal written so broadly it breaks --epic-by-epic
     // itself. This run gets past argument validation; whatever it does next
