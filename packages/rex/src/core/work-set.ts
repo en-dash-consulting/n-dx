@@ -21,7 +21,9 @@
  *   deleted), through nested changes. A unit already on another branch, by
  *   its own or an inherited `delivery`, is refused, naming that branch and the
  *   change it inherits from, unless the caller passes `move`, which gives the
- *   unit its own `delivery`; one already on this branch is left alone. A
+ *   unit its own `delivery` and, for a named change, also moves the change's
+ *   own `delivery` so tasks it gains later follow it; one already on this
+ *   branch is left alone. A
  *   refusal throws {@link WorkSetError} before anything is changed.
  * - **Unassign.** Removes `delivery` from the named task, or from a change and
  *   every live node under it, whatever its status, so the units inheriting
@@ -106,6 +108,8 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
   const index = indexTree(tree);
   const problems: string[] = [];
   const units = new Set<RuleNode>();
+  /** Named changes, and changes under them, whose own `delivery` their tasks may inherit. */
+  const owners = new Set<RuleNode>();
   for (const ref of refs) {
     const node = index.resolve(ref);
     if (!node) problems.push(`No change or task "${ref}"`);
@@ -116,6 +120,7 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
       const open = openUnits(node);
       if (open.length === 0) problems.push(`Change ${label(node)} has no open task to assign`);
       for (const unit of open) units.add(unit);
+      for (const n of liveSubtree(node)) if (n.type === "change" && n.delivery !== undefined) owners.add(n);
     } else problems.push(`${label(node)} is a ${node.type}: a work set holds changes and tasks`);
   }
 
@@ -135,8 +140,17 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
   }
   if (problems.length > 0) throw new WorkSetError(`Cannot assign to branch "${branch}": ${problems.join("; ")}`, problems);
 
+  // Moving a change moves the delivery its tasks inherit, so tasks it gains later follow it.
+  const retarget: RuleNode[] = [];
+  for (const owner of options.move ? owners : []) {
+    const from = owner.delivery?.branch;
+    if (units.has(owner) || from === undefined || from === branch) continue;
+    retarget.push(owner);
+    report.moved.push({ id: owner.id, from });
+    report.assigned.push(owner.id);
+  }
   const assigned = new Set(report.assigned);
-  for (const unit of units) if (assigned.has(unit.id)) unit.delivery = { ...unit.delivery, branch };
+  for (const node of [...units, ...retarget]) if (assigned.has(node.id)) node.delivery = { ...node.delivery, branch };
   return { tree, report, changed: assigned.size > 0 };
 }
 

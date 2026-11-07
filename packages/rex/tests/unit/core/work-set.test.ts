@@ -193,6 +193,15 @@ describe("inherited delivery", () => {
     expect(readWorkSet(plan.tree, "feat/x").ids).toEqual(["s1"]);
   });
 
+  it("moving the change moves its own delivery, so a task added later follows it", () => {
+    const plan = planAssignToBranch(splitSolo(task("s1")), ["solo"], "feat/x", { move: true });
+    expect(plan.report.moved).toEqual([{ id: "s1", from: "feat/solo" }, { id: "solo", from: "feat/solo" }]);
+    expect(deliveries(plan.tree)).toEqual({ solo: { branch: "feat/x" }, s1: { branch: "feat/x" } });
+    (plan.tree.changes[1] as { children: unknown[] }).children.push(task("s-later"));
+    expect(readWorkSet(plan.tree, "feat/x").ids).toEqual(["s1", "s-later"]);
+    expect(readWorkSet(plan.tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: false });
+  });
+
   it("removing the change drops the inherited tasks and every task delivery equal to it", () => {
     const tree = splitSolo(task("s1"), task("s2", { delivery: { branch: "feat/solo" } }), task("s3", { delivery: { branch: "feat/other" } }));
     const plan = planUnassignFromBranch(tree, ["solo"], "feat/solo");
