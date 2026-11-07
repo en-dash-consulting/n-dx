@@ -9,7 +9,7 @@ acceptanceCriteria:
 touches:
   - "89ecd7f3-ca6a-4833-90a4-7bc7b1017e94"
 priority: "high"
+discoveredFrom: {"item":"c1cea4f6-bf60-4e78-a038-49994901772f"}
 run: {"models":{"claude":"claude-sonnet-5-5"},"review":false}
 source: "ndx-capture"
-discoveredFrom: {"item":"c1cea4f6-bf60-4e78-a038-49994901772f"}
 ---
