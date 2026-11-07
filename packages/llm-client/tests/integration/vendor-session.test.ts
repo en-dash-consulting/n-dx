@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -265,6 +265,25 @@ describe("codex sessions", () => {
     await working;
     await session.interrupt();
     expect((await pending).status).toBe("interrupted");
+  });
+
+  it("refuses a turn whose turn config flags throw, spawning nothing, and stays usable", async () => {
+    let refuse = true;
+    const session = startVendorSession({
+      vendor: "codex",
+      cwd: dir,
+      binary: fake("codex"),
+      codex: { turnConfigFlags: () => { if (refuse) throw new Error("bad project config"); return []; } },
+    });
+    await expect(session.sendTurn("hello")).rejects.toThrow("bad project config");
+    expect(session.turns).toBe(0);
+    expect(session.state).toBe("idle");
+    expect(existsSync(log)).toBe(false);
+
+    refuse = false;
+    const turn = await session.sendTurn("hello");
+    expect(turn).toMatchObject({ turn: 1, status: "completed" });
+    expect(calls()).toHaveLength(1);
   });
 
   it("carries the whole agent message", async () => {

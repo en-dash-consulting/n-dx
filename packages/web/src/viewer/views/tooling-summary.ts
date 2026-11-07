@@ -61,7 +61,7 @@ export interface SidecarToolingLine {
   connections: Array<{ id: string; label: string; state: ToolingConnection["state"]; stateLabel: string; detail: string }>;
 }
 
-/** Sessions run on Claude Code: the resumable vendor (a Codex session is refused). */
+/** The tile names Claude Code whatever vendor a session runs on; a worktree session may also run on Codex. */
 const SIDECAR_VENDOR_LABEL = "Claude Code";
 
 const CONNECTION_STATE_LABEL: Record<ToolingConnection["state"], string> = {

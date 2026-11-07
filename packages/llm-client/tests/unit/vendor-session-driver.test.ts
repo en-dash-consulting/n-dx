@@ -121,6 +121,18 @@ describe("codex turn spawn", () => {
     expect(resumed.join(" ")).toContain('sandbox_mode="workspace-write"');
   });
 
+  it("reads turn config flags afresh for each turn and puts them after the config flags", () => {
+    let calls = 0;
+    const codex = {
+      configFlags: ["--ignore-user-config"],
+      turnConfigFlags: () => ["-c", `mcp_servers.rex${++calls}.enabled=false`],
+    };
+    const fresh = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", codex }).args;
+    expect(fresh.slice(0, 4)).toEqual(["exec", "--ignore-user-config", "-c", "mcp_servers.rex1.enabled=false"]);
+    const resumed = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", resume: { sessionId: "t" }, codex }).args;
+    expect(resumed.slice(0, 6)).toEqual(["exec", "resume", "--ignore-user-config", "-c", "mcp_servers.rex2.enabled=false", "t"]);
+  });
+
   // startVendorSession is public: a caller whose policy flags lack the
   // overrides, or who passes none, must not start an agent that can read the
   // Codex key. Flags that already end with them are not repeated.
