@@ -1,10 +1,14 @@
 schema: "rex/v2"
 items:
   "423da32e-7728-4fdc-93ef-039f7fef121a":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-07T02:39:25.318Z"
-    activeIntervals: [{"start":"2026-11-07T02:39:25.318Z"}]
-    lastModified: "2026-11-07T02:39:25.984Z"
+    completedAt: "2026-11-07T02:50:14.710Z"
+    endedAt: "2026-11-07T02:50:14.710Z"
+    activeIntervals: [{"end":"2026-11-07T02:50:14.710Z","start":"2026-11-07T02:39:25.318Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench selection (autoselect, menu, queue peek, --loop, --plan-queue) narrows to rex currentWorkSet; --any skips it; --task bypasses; WorkSetExhaustedError ends the loop with the work-set message; --resolve reports workSet; help in hench and core."
+    lastModified: "2026-11-07T02:50:14.710Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "438dd97f-37e2-4c72-8f94-bdebe90b8183":
     lastModified: "2026-11-07T02:14:53.778Z"
