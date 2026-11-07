@@ -170,7 +170,8 @@ describe.skipIf(!HAS_CODEX)("codex flag surface (installed CLI)", () => {
   // process and never reaches the model.
   it("codex accepts every -c override the compiler emits, value included", () => {
     for (const [label, policy] of POLICIES) {
-      const args = compileCodexPolicyFlags(policy);
+      // The resume form states the sandbox as a `-c sandbox_mode=` value too.
+      const args = [...compileCodexPolicyFlags(policy), ...compileCodexPolicyFlags(policy, { resume: true })];
       const overrides = args.filter((a, i) => args[i - 1] === "-c");
 
       for (const override of overrides) {

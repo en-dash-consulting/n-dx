@@ -67,23 +67,58 @@ describe("claude turn spawn", () => {
 });
 
 describe("codex turn spawn", () => {
-  // `exec resume` rejects the sandbox and approval flags, but config is read
-  // per process: the overrides that blank the Codex key in the agent's
-  // commands must ride on every resumed turn too.
-  it("ignores fork and drops policy flags on resume, keeping the key-blanking overrides", () => {
+  // `exec resume` rejects --sandbox, but config is read per process: the
+  // policy overrides and the ones that blank the Codex key in the agent's
+  // commands must ride on every resumed turn.
+  it("ignores fork and sends the resume policy, not the fresh flags, on resume", () => {
+    const resumePolicyFlags = compileCodexPolicyFlags(
+      { ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only" },
+      { resume: true },
+    );
     const { args } = codexSessionDriver.turnSpawn({
       systemPrompt: "",
       prompt: "hi",
       model: "m",
       resume: { sessionId: "t", fork: true },
-      codex: { policyFlags: ["-s", "read-only"] },
+      codex: { policyFlags: ["-s", "read-only"], resumePolicyFlags },
     });
     expect(args).toEqual([
       "exec", "resume", "t", "--json", "--skip-git-repo-check",
-      ...codexShellEnvFlags(),
+      ...resumePolicyFlags,
       "-m", "m", "-",
     ]);
-    expect(args).not.toContain("read-only");
+    expect(args).toContain('sandbox_mode="read-only"');
+    expect(args).not.toContain("-s");
+    expect(args).not.toContain("--sandbox");
+  });
+
+  it("keeps the key-blanking overrides on a resume with no resume policy", () => {
+    const { args } = codexSessionDriver.turnSpawn({
+      systemPrompt: "",
+      prompt: "hi",
+      resume: { sessionId: "t" },
+      codex: { policyFlags: ["-s", "read-only"] },
+    });
+    expect(args).toEqual(["exec", "resume", "t", "--json", "--skip-git-repo-check", ...codexShellEnvFlags(), "-"]);
+  });
+
+  it("puts config flags right after exec and exec resume, and blanks the hidden names, on every turn", () => {
+    const codex = {
+      policyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY),
+      resumePolicyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true }),
+      configFlags: ["--ignore-user-config", "-c", "features.apps=false"],
+      hiddenEnv: ["NDX_X"],
+    };
+    const blanked = codexShellEnvFlags(["NDX_X"]);
+    const fresh = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", codex }).args;
+    expect(fresh.slice(0, 4)).toEqual(["exec", "--ignore-user-config", "-c", "features.apps=false"]);
+    expect(fresh.slice(4, 4 + codex.policyFlags.length - codexShellEnvFlags().length + blanked.length)).toEqual([
+      ...codex.policyFlags.slice(0, -codexShellEnvFlags().length), ...blanked,
+    ]);
+    const resumed = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", resume: { sessionId: "t" }, codex }).args;
+    expect(resumed.slice(0, 6)).toEqual(["exec", "resume", "--ignore-user-config", "-c", "features.apps=false", "t"]);
+    expect(resumed.join(" ")).toContain(blanked.join(" "));
+    expect(resumed.join(" ")).toContain('sandbox_mode="workspace-write"');
   });
 
   // startVendorSession is public: a caller whose policy flags lack the

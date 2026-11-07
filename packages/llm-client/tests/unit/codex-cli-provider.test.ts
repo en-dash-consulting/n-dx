@@ -87,6 +87,17 @@ describe("Codex policy flag compilation", () => {
       expect(names).toEqual([...CODEX_AGENT_HIDDEN_ENV]);
       expect(names).toContain("OPENAI_API_KEY");
     });
+
+    it("blanks extra names after the credentials, once each", () => {
+      expect(codexShellEnvFlags(["NDX_X", "OPENAI_API_KEY", "NDX_X"])).toEqual([
+        ...SHELL_ENV, "-c", "shell_environment_policy.set.NDX_X=''",
+      ]);
+    });
+
+    it("refuses an extra name that is not a bare key", () => {
+      expect(() => codexShellEnvFlags(["A.B"])).toThrow(/not an environment variable name/);
+      expect(() => codexShellEnvFlags(["A=''"])).toThrow(/not an environment variable name/);
+    });
   });
 
   describe("compileCodexPolicyFlags", () => {
@@ -104,10 +115,25 @@ describe("Codex policy flag compilation", () => {
       }
     });
 
-    it("gives a resumed spawn only the shell-environment overrides", () => {
-      // codex exec resume takes no --sandbox or approval flag, but reads config
-      // per process, so the overrides must still reach it.
-      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true })).toEqual(SHELL_ENV);
+    it("re-applies the policy on resume with -c overrides and no --sandbox", () => {
+      // codex exec resume rejects --sandbox, and a resumed thread does not keep
+      // its starting policy, so both halves travel as config overrides.
+      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true })).toEqual([
+        "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', ...SHELL_ENV,
+      ]);
+      expect(compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only" }, { resume: true })).toEqual([
+        "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="never"', ...SHELL_ENV,
+      ]);
+    });
+
+    it("uses the same two overrides for danger-full-access + never on resume, never the bypass flag", () => {
+      const flags = compileCodexPolicyFlags(
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "never" },
+        { resume: true },
+      );
+      expect(flags).toEqual(["-c", 'sandbox_mode="danger-full-access"', "-c", 'approval_policy="never"', ...SHELL_ENV]);
+      expect(flags).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+      expect(flags).not.toContain("--sandbox");
     });
 
     it("never emits --full-auto, which codex exec no longer accepts", () => {

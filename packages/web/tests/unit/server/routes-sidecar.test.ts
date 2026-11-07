@@ -280,7 +280,7 @@ describe("sessions", () => {
     expect((await api(`/${id}`, { method: "PATCH", body: { name: "Done" } })).status).toBe(200);
     });
 
-  // #901 F1: `codex exec resume` drops the read-only sandbox, so Codex is refused until 31307b89.
+  // #901 F1: Codex stays refused until project MCP servers are kept out of its turns (0b3b3a8c).
   it("refuses a Codex session without writing a record", async () => {
     const res = await api("", { method: "POST", body: { vendor: "codex", name: "Plan" } });
     expect(res.status).toBe(400);
