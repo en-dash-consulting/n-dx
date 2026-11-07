@@ -111,6 +111,32 @@ export function isDefaultBranch(cwd: string, branch: string): boolean {
 }
 
 /**
+ * The checked-out branch of the workspace at `projectDir`, or null when that
+ * workspace has no work-set branch: it is on the default branch, HEAD is
+ * detached, or `projectDir` is not in a git repository.
+ *
+ * Callers pass the workspace directory they resolved (the MCP server's
+ * `workspace.projectDir`, the CLI's dir argument), never `process.cwd()`.
+ * The default branch is read by {@link isDefaultBranch}, so there is one
+ * resolver for it.
+ */
+export function currentWorkSetBranch(projectDir: string): string | null {
+  let branch: string;
+  try {
+    // Unlike `rev-parse --abbrev-ref`, this fails on a detached HEAD.
+    branch = execFileSync(
+      "git",
+      ["symbolic-ref", "--quiet", "--short", "HEAD"],
+      { cwd: projectDir, encoding: "utf-8", ...QUIET_GIT },
+    ).trim();
+  } catch {
+    return null;
+  }
+  if (!branch || isDefaultBranch(projectDir, branch)) return null;
+  return branch;
+}
+
+/**
  * Get the YYYY-MM-DD date of the first commit on the current branch.
  *
  * Resolution order:

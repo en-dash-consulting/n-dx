@@ -202,6 +202,7 @@ export {
   getFirstCommitDate,
   generatePRDFilename,
   resolvePRDFilename,
+  currentWorkSetBranch,
 } from "./store/branch-naming.js";
 
 // ---- Store: branch-scoped PRD discovery and resolution ---------------------
