@@ -27,7 +27,7 @@ import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions, NewSessionButton } from "./sidecar-sessions.js";
 import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
 import {
-  TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultIsError,
+  TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultFailed,
 } from "./sidecar-tool-names.js";
 import type { ToolLineCard } from "./sidecar-tool-names.js";
 import { useHubProjects } from "./project-switcher.js";
@@ -186,7 +186,7 @@ function SidecarToolRow({ seq, call, result, card, connectionLabels }: {
 }) {
   const [expanded, setExpanded] = useState(false);
   const bodyId = `sidecar-tool-${seq}`;
-  const status = toolLineStatus(card, result !== undefined, result !== undefined && toolResultIsError(result.output));
+  const status = toolLineStatus(card, result !== undefined, result !== undefined && toolResultFailed(result));
   return h("li", { class: "sidecar-tool", "data-seq": seq },
     h("button", {
       type: "button",

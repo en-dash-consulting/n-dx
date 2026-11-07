@@ -66,7 +66,8 @@ export interface SidecarRuntimeEvent {
   type: "assistant" | "tool_use" | "tool_result" | "completion" | "failure" | "token_usage";
   text?: string;
   toolCall?: { tool: string; input: Record<string, unknown>; id?: string };
-  toolResult?: { tool: string; output: string; durationMs: number; id?: string };
+  /** `isError` is the vendor's verdict when it gave one; absent on older frames and when unknown. */
+  toolResult?: { tool: string; output: string; durationMs: number; id?: string; isError?: boolean };
   failure?: { message?: string };
   /** On `token_usage`: what the call sent in and got back. */
   tokenUsage?: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
