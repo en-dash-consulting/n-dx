@@ -13,6 +13,7 @@ import {
 import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 import {
   actionableV2Entries,
+  branchWorkSet,
   inboxRefusal,
   loadV2Tree,
   namedChangeEntry,
@@ -20,6 +21,7 @@ import {
   readTreeAsReset,
   resolveV2Entry,
   V2_HAS_NO_EPICS,
+  WorkSetExhaustedError,
 } from "./work-selection.js";
 import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
@@ -268,6 +270,12 @@ export interface SelectTaskOptions {
   tags?: string[];
   /** Only select tasks assigned to this identity (`ndx work --mine`). */
   assignee?: string;
+  /**
+   * The checkout whose branch work set narrows autoselection on a v2 tree
+   * (rex's `currentWorkSet`). Absent under `--any`. An explicit `taskId`
+   * bypasses it, as it does `assignee`.
+   */
+  workSetDir?: string;
   /** Cross-worktree claims. The selected task is claimed before it is returned. */
   claims?: TaskClaims;
   /** The project's CLI command name, for the refusal's advice. */
@@ -310,7 +318,8 @@ export interface SelectTaskOptions {
  * than a spin.
  *
  * @throws {Error} "No actionable tasks found in PRD" / "... in epic" when
- *   selection comes up empty — the sentinel `--loop` reads as "done".
+ *   selection comes up empty — the sentinel `--loop` reads as "done" — or
+ *   {@link WorkSetExhaustedError} when the branch's work set has nothing left.
  */
 export async function selectTaskEntry(
   rawItems: PRDItem[],
@@ -364,6 +373,7 @@ export async function selectTaskEntry(
   // Tasks other worktrees hold are passed over — not folded into skipIds,
   // which would make their parents look finished.
   const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
+  const workSet = tree ? branchWorkSet(tree, options.workSetDir) : null;
 
   for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
     // rex's collectActionable reads `skipIds` only as "done" for dependency
@@ -381,8 +391,9 @@ export async function selectTaskEntry(
         excludeIds: new Set([...(excludeIds ?? []), ...claimedElsewhere]),
         ...(tags?.length ? { tags } : {}),
         ...(assignee ? { assignee } : {}),
+        ...(workSet ? { workSet: new Set(workSet.ids) } : {}),
       });
-      if (!candidate) throw new Error("No actionable tasks found in PRD");
+      if (!candidate) throw workSet ? new WorkSetExhaustedError(workSet.branch) : new Error("No actionable tasks found in PRD");
     } else if (epicId) {
       // Epic filter active: get all actionable tasks and filter to the epic.
       const epicTaskIds = collectEpicTaskIds(items, epicId);
@@ -540,12 +551,16 @@ export interface ActionableTask {
  * and passes the chosen id back as an explicit task, which bypasses the filter
  * by design. Without it the flag silently did nothing on the most common human
  * path, offering every actionable task regardless of who it belongs to.
+ *
+ * `workSetDir` narrows the menu to that checkout's branch work set for the
+ * same reason (see {@link SelectTaskOptions.workSetDir}).
  */
 export async function getActionableTasks(
   store: PRDStore,
   limit = 20,
   claims?: TaskClaims,
   assignee?: string,
+  workSetDir?: string,
 ): Promise<ActionableTask[]> {
   const doc = await store.loadDocument();
   const completedIds = collectCompletedIds(doc.items);
@@ -555,8 +570,12 @@ export async function getActionableTasks(
     ...(assignee ? { assignee } : {}),
   };
   const tree = await loadV2Tree(store);
+  const workSet = tree ? branchWorkSet(tree, workSetDir) : null;
   const entries = tree
-    ? actionableV2Entries(tree, doc.items, selectOptions).slice(0, limit)
+    ? actionableV2Entries(tree, doc.items, {
+        ...selectOptions,
+        ...(workSet ? { workSet: new Set(workSet.ids) } : {}),
+      }).slice(0, limit)
     : findActionableTasks(
         doc.items,
         completedIds,

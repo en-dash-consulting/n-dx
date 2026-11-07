@@ -1027,6 +1027,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
       { flag: "--epic-by-epic", description: "Process epics sequentially" },
       { flag: "--mine", description: "Only pick tasks whose assignee matches the current user (resolved from git identity). An explicit --task bypasses it. Refused with --epic-by-epic" },
+      { flag: "--any", description: "Pick outside the branch's work set. On a branch with assigned tasks (rex branch add), autoselection, --loop and --plan-queue pick only from them; an explicit --task bypasses it" },
       { flag: "--tags=<a,b>", description: "Only pick tasks carrying at least one of these tags" },
       { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially" },

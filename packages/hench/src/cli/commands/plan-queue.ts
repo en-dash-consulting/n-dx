@@ -17,7 +17,7 @@ import { listWorktrees, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { loadConfig } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
-import { loadV2Tree } from "../../agent/planning/work-selection.js";
+import { branchWorkSet, loadV2Tree, WORK_SET_EXHAUSTED } from "../../agent/planning/work-selection.js";
 import { resolveProjectCliName } from "../../agent/planning/cli-identity.js";
 import { TaskClaims } from "../../process/task-claims.js";
 import { countActiveLocksReadOnly } from "../../process/limiter.js";
@@ -54,13 +54,17 @@ function touchesOf(change: TreeNode): string[] {
  * The planner's input from a v2 tree: the ready units in selection order,
  * passing over `excludeIds`, then any open task of the same change whose
  * every open blocker is already a candidate, so a lane can run it after them.
+ * With `workSet` (a branch work set), only its units are planned.
  */
 export function queueInputFromTree(
   tree: V2Tree,
-  options: { excludeIds?: ReadonlySet<string>; defaultTier: string },
+  options: { excludeIds?: ReadonlySet<string>; workSet?: ReadonlySet<string>; defaultTier: string },
 ): { tasks: QueueTask[]; changes: Map<string, QueueChange> } {
   const index = indexTree(tree);
-  const units = findActionableWork(tree, options.excludeIds?.size ? { excludeIds: options.excludeIds } : {});
+  const units = findActionableWork(tree, {
+    ...(options.excludeIds?.size ? { excludeIds: options.excludeIds } : {}),
+    ...(options.workSet ? { workSet: options.workSet } : {}),
+  });
   const changes = new Map<string, QueueChange>();
   const tasks: QueueTask[] = [];
   const candidates = new Set<string>();
@@ -96,6 +100,7 @@ export function queueInputFromTree(
       const siblings = new Set((change.children ?? []).map((c) => c.id));
       for (const task of change.children ?? []) {
         if (task.type !== "task" || candidates.has(task.id) || options.excludeIds?.has(task.id)) continue;
+        if (options.workSet && !options.workSet.has(task.id)) continue;
         if (!ACTIONABLE.has(task.status ?? "pending")) continue;
         const open = (task.blockedBy ?? [])
           .map((ref) => index.resolve(ref))
@@ -193,7 +198,13 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
   // Every live claim, this worktree's own included: a task a running process
   // holds is not ready, and offering it would start a second run of it.
   const claimed = await TaskClaims.forProject(dir, { readOnly: true }).liveClaims();
-  const { tasks, changes } = queueInputFromTree(tree, { excludeIds: new Set(claimed.keys()), defaultTier: tier });
+  // On a branch with a work set only its tasks are planned, as `ndx work` picks; --any plans outside it.
+  const workSet = branchWorkSet(tree, flags.any === "true" ? undefined : dir);
+  const { tasks, changes } = queueInputFromTree(tree, {
+    excludeIds: new Set(claimed.keys()),
+    ...(workSet ? { workSet: new Set(workSet.ids) } : {}),
+    defaultTier: tier,
+  });
   const cliName = resolveProjectCliName(dir);
   const blocked = new Set(tasks.filter((t) => t.blockedBy.length > 0).map((t) => t.id));
   const plan = planQueue({
@@ -205,7 +216,11 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
   });
 
   if (flags.format === "json") {
-    output(JSON.stringify(plan, null, 2));
+    output(JSON.stringify({ ...plan, ...(workSet ? { workSetBranch: workSet.branch } : {}) }, null, 2));
+    return;
+  }
+  if (workSet && tasks.length === 0) {
+    output(WORK_SET_EXHAUSTED);
     return;
   }
   for (const line of formatPlan(plan)) output(line);

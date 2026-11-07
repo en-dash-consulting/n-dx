@@ -264,6 +264,11 @@ describe("help.js", () => {
       expect(output.toLowerCase()).toContain("mcp");
     });
 
+    it("ndx work lists --any, which picks outside the branch's work set", () => {
+      // Forwarded to `hench run`, which narrows selection to the branch's work set without it.
+      expect(formatOrchestratorCommandHelp("work")).toMatch(/--any\s+Pick outside the branch's work set/);
+    });
+
     it("returns null for a command with no help definition", () => {
       expect(formatOrchestratorCommandHelp("nonexistent")).toBeNull();
     });
