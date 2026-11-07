@@ -568,6 +568,7 @@ export function toPersistedEvent(event: RuntimeEvent): PersistedRuntimeEvent {
   if (event.toolResult) {
     persisted.toolResult = { tool: event.toolResult.tool, output: event.toolResult.output, durationMs: event.toolResult.durationMs };
     if (event.toolResult.id !== undefined) persisted.toolResult.id = event.toolResult.id;
+    if (event.toolResult.isError !== undefined) persisted.toolResult.isError = event.toolResult.isError;
   }
   if (event.tokenUsage) persisted.tokenUsage = { ...event.tokenUsage };
   if (event.failure) {

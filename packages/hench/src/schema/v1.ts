@@ -1056,6 +1056,8 @@ export interface PersistedRuntimeEvent {
     durationMs: number;
     /** `toolCall.id` of the call this answers, when known. */
     id?: string;
+    /** Whether the call failed, when the vendor reported it. Absent in older frames and when unknown. */
+    isError?: boolean;
   };
 
   /** Token usage for this turn or cumulative (type: "token_usage"). */

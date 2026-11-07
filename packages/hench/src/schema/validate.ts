@@ -372,6 +372,7 @@ const PersistedRuntimeEventSchema = z.object({
     output: z.string(),
     durationMs: z.number(),
     id: z.string().optional(),
+    isError: z.boolean().optional(),
   }).optional(),
   tokenUsage: TokenUsageSchema.optional(),
   failure: z.object({
