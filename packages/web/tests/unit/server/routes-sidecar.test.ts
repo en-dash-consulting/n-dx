@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -19,7 +19,6 @@ import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
-  CODEX_SIDECAR_UNAVAILABLE,
   createAnnouncingBroker,
   handleSidecarRoute,
   readWorktreeBranchHealth,
@@ -280,13 +279,11 @@ describe("sessions", () => {
     expect((await api(`/${id}`, { method: "PATCH", body: { name: "Done" } })).status).toBe(200);
     });
 
-  // #901 F1: Codex stays refused until project MCP servers are kept out of its turns (0b3b3a8c).
-  it("refuses a Codex session without writing a record", async () => {
+  it("creates a Codex session", async () => {
     const res = await api("", { method: "POST", body: { vendor: "codex", name: "Plan" } });
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
-    expect(registry.list({ worktree: root })).toEqual([]);
-    expect((await (await api("")).json()).sessions).toEqual([]);
+    expect(res.status).toBe(201);
+    expect((await res.json()).session).toMatchObject({ vendor: "codex", worktree: root });
+    expect(registry.list({ worktree: root })).toHaveLength(1);
   });
 
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
@@ -472,11 +469,23 @@ describe("turns", () => {
     await turnClosed(id);
   });
 
-  it("refuses a turn on a Codex session already in the index rather than resuming it", async () => {
+  it("runs a turn on a Codex session", async () => {
+    mkdirSync(join(root, ".git"));
+    const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
+    const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
+    expect(res.status).toBe(202);
+    await turnClosed(id);
+    expect(spawns).toBe(1);
+  });
+
+  it("refuses a Codex turn, naming the file, when the project Codex config cannot be read with confidence", async () => {
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".codex"));
+    writeFileSync(join(root, ".codex", "config.toml"), "[mcp_servers.rex\ncommand = \"ndx\"\n");
     const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
     const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
+    expect((await res.json()).error).toContain(join(root, ".codex", "config.toml"));
     expect(spawns).toBe(0);
     expect(registry.get(id)?.cursor).toBe(0);
   });

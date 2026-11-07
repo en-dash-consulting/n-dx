@@ -132,7 +132,7 @@ import {
   type SidecarTurnOutcome,
   type WorktreeSidecarRegistryOptions,
 } from "./sidecar/session-registry.js";
-import { hubVendorRefusal, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
+import { hubVendorRefusal, sidecarCodexProjectFlags, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
 import {
@@ -638,15 +638,6 @@ function defaultBrokerFor(projectDir: string, broadcast: WebSocketBroadcaster): 
   }
   return broker;
 }
-
-/**
- * Why a Codex Sidecar session is refused, at create and at every turn.
- * A resumed turn now re-applies the read-only policy (see `spawn-policy.ts`);
- * the refusal stays until project MCP servers are also kept out of Codex
- * turns, which lifts it (PRD item 0b3b3a8c).
- */
-export const CODEX_SIDECAR_UNAVAILABLE =
-  "Codex Sidecar sessions are unavailable until a resumed turn keeps the read-only sandbox";
 
 /** Answer an error; true, so a handler can `return refuse(…)`. */
 function refuse(res: ServerResponse, status: number, message: string): true {
@@ -1403,9 +1394,8 @@ function readNameAndModel(body: Record<string, unknown>): { name?: string; model
 function createWorktreeSession(registry: SidecarSessionRegistry, worktree: string, body: Record<string, unknown>): CreateAnswer {
   const vendor = optionalString(body, "vendor");
   if (!vendor || vendor instanceof Error || !vendorSessionDriver(vendor)) {
-    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude)` };
+    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude, codex)` };
   }
-  if (vendor === "codex") return { status: 400, error: CODEX_SIDECAR_UNAVAILABLE };
   const fields = readNameAndModel(body);
   if (fields instanceof Error) return { status: 400, error: fields.message };
   const lens = optionalString(body, "lens");
@@ -1507,8 +1497,14 @@ async function handleSessionRoutes(
       const prompt = body.prompt;
       if (typeof prompt !== "string" || !prompt.trim()) return refuse(res, 400, `"prompt" must be a non-empty string`);
       if (session.endedAt) return refuse(res, 409, `Sidecar session ${id} has ended`);
-      // A Codex session indexed before the create refusal must not resume without its sandbox.
-      if (session.vendor === "codex") return refuse(res, 409, CODEX_SIDECAR_UNAVAILABLE);
+      // Refused here, so no turn is recorded; the spawn reads the files again.
+      if (session.vendor === "codex") {
+        try {
+          sidecarCodexProjectFlags(session.worktree);
+        } catch (err) {
+          return refuse(res, 409, errorMessage(err));
+        }
+      }
       if (registry.isRunning(id)) return refuse(res, 409, `A turn is already running in Sidecar session ${id}`);
       startTurn(registry, broker, id, prompt, broadcast);
       const started = registry.get(id) ?? session;
