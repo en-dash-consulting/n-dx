@@ -9,11 +9,11 @@
  * loop, which costs more per turn and lets one task's framing bleed into the
  * next.
  *
- * The identity key bounds *whose* transcript it is. `codex exec resume` takes
- * no sandbox or approval flags — the thread keeps the policy that created it —
- * so a chain resumed across a worktree, ref, source-state or policy change
- * would run this task inside another context's assumptions with no signal at
- * all. Every check below therefore has a named code, and the bias throughout is
+ * The identity key bounds *whose* transcript it is. A chain resumed across a
+ * worktree, ref, source-state or policy change would run this task inside
+ * another context's assumptions with no signal at all (the resumed spawn
+ * re-applies the current policy, but the transcript was built under the old
+ * one). Every check below therefore has a named code, and the bias throughout is
  * a false miss (one cold start) over a wrong hit.
  */
 
@@ -337,9 +337,9 @@ describe("isBatchChainUsable — identity", () => {
   });
 
   it("refuses a chain opened under different permissions", () => {
-    // `codex exec resume` accepts no sandbox or approval flags, so a resumed
-    // thread keeps the policy it was created with. Tightening the policy
-    // between tasks has to end the chain or it does not take effect at all.
+    // A resumed spawn re-applies the current policy, but the thread's history
+    // was built under the old permissions, so a policy change between tasks
+    // ends the chain rather than continuing it.
     expect(reasonFor(chainEntry({ policyHash: "ph-2" }), { identity: IDENTITY })).toBe(
       "policy-changed",
     );
