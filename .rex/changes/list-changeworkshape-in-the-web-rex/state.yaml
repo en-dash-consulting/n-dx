@@ -1,6 +1,15 @@
 schema: "rex/v2"
 items:
   "723bade3-7910-4c28-a1f4-90637ad9ea55":
+    status: "completed"
+    startedAt: "2026-11-07T05:52:05.778Z"
+    completedAt: "2026-11-07T05:53:01.683Z"
+    endedAt: "2026-11-07T05:53:01.683Z"
+    activeIntervals: [{"end":"2026-11-07T05:53:01.683Z","start":"2026-11-07T05:52:05.778Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Listed changeWorkShape in the web rex-gateway source-export contract list; cross-package-contracts.test.js passes (328)."
+    appliedAt: "2026-11-07T05:53:01.683Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-07T05:51:37.364Z"
-    lastModified: "2026-11-07T05:51:42.287Z"
+    lastModified: "2026-11-07T05:53:01.683Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
