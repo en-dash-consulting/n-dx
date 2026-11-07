@@ -92,6 +92,11 @@ export function changeWorkShape(change: { children?: readonly WorkShapeChild[] }
 
 const ACTIONABLE: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["pending", "in_progress", "failing"]);
 
+/** Pending, in progress or failing (absent reads as pending): the statuses a unit is worked in. */
+export function isActionableStatus(status: ItemStatus | undefined): boolean {
+  return ACTIONABLE.has(status ?? "pending");
+}
+
 /** Every autonomous candidate, best first. */
 export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions = {}): WorkUnit[] {
   const index = indexTree(tree);
@@ -164,7 +169,7 @@ function openBlockers(index: TreeIndex, node: RuleNode): string[] {
 
 /** Pending, in progress or failing, with every blocker completed. */
 function runnableIn(index: TreeIndex, node: RuleNode): boolean {
-  return ACTIONABLE.has(node.status ?? "pending") && openBlockers(index, node).length === 0;
+  return isActionableStatus(node.status) && openBlockers(index, node).length === 0;
 }
 
 /** The unit autonomous selection runs next, or `null` when none is actionable. */

@@ -18,7 +18,14 @@ items:
     lastModified: "2026-11-07T02:14:43.451Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7567a708-d942-448f-9869-3cbc2aed9bab":
-    lastModified: "2026-11-07T02:14:27.127Z"
+    status: "completed"
+    startedAt: "2026-11-07T02:18:19.225Z"
+    completedAt: "2026-11-07T02:25:57.890Z"
+    endedAt: "2026-11-07T02:25:57.890Z"
+    activeIntervals: [{"end":"2026-11-07T02:25:57.890Z","start":"2026-11-07T02:18:19.225Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Optional delivery { branch } on the v2 state row (DeliverySchema, non-empty string); core/work-set.ts with planAssignToBranch / planUnassignFromBranch / readWorkSet and transactional assignToBranch / unassignFromBranch. Schema, state-writer, state-merge, core and integration tests."
+    lastModified: "2026-11-07T02:25:57.890Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8bc1f961-778d-4eac-8370-2cea280bfcb6":
     lastModified: "2026-11-07T02:14:37.721Z"
