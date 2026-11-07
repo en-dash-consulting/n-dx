@@ -17,7 +17,14 @@ items:
     lastModified: "2026-11-07T01:55:12.476Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9889cbdd-1a37-4d18-ab5f-cdef0e7967c5":
-    lastModified: "2026-11-07T01:51:22.761Z"
+    status: "completed"
+    startedAt: "2026-11-07T01:55:46.316Z"
+    completedAt: "2026-11-07T01:58:57.900Z"
+    endedAt: "2026-11-07T01:58:57.900Z"
+    activeIntervals: [{"end":"2026-11-07T01:58:57.900Z","start":"2026-11-07T01:55:46.316Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "stage-tiles.css: .stage-tile-title min-width 0, wraps at words (overflow-wrap/word-break normal); .stage-tile-head .stage-section-badge flex-shrink 0. Commit c01f2709d."
+    lastModified: "2026-11-07T01:58:57.900Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a4e86fcf-f11a-46cf-ac1c-27102bae5722":
     createdAt: "2026-11-07T01:51:12.232Z"
