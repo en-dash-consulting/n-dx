@@ -94,6 +94,29 @@ describe("findUncommittedWork", () => {
     expect(part.other).toEqual([".rex/changes/ch/app.ts"]);
   });
 
+  it("discounts a copy from src/ into .rex/ by its target: the source stays in place", async () => {
+    await expect(
+      findUncommittedWork(
+        withDirty(["C  src/app.ts -> .rex/changes/x/app.md"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
+  });
+
+  it("files a copy from src/ into .rex/ under prd", async () => {
+    const part = await partitionDirtyPaths(OUTSIDE_ANY_REPO, {
+      listDirty: async () => ["C  src/app.ts -> .rex/changes/x/app.md"],
+    });
+    expect(part.prd).toEqual([".rex/changes/x/app.md"]);
+    expect(part.other).toEqual([]);
+  });
+
+  it("names a rename source containing ' -> ' in full", async () => {
+    const result = await findUncommittedWork(
+      withDirty(["R  src/a -> b.ts -> .rex/changes/x/b.ts"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+    );
+    expect(result).toEqual({ clean: false, paths: ["src/a -> b.ts"] });
+  });
+
   it("does not count the PRD paths the completion commit still covers", async () => {
     await expect(
       findUncommittedWork(

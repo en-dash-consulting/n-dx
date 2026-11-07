@@ -40,10 +40,10 @@ import {
 } from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
-  formatPorcelainPath,
   matchesPorcelainLine,
   matchesProjectPath,
   parsePorcelainPath,
+  porcelainSourcePath,
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../../store/artifacts.js";
@@ -327,7 +327,7 @@ export async function findUncommittedWork(
 function reportedPath(line: string, discountPaths: readonly string[], repoPrefix: string): string {
   const target = parsePorcelainPath(line);
   if (!matchesProjectPath(target, discountPaths, repoPrefix)) return target;
-  return formatPorcelainPath(line).split(" -> ")[0] ?? target;
+  return porcelainSourcePath(line) ?? target;
 }
 
 /**
