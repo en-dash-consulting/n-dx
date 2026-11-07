@@ -1027,7 +1027,9 @@ describe("gateway export auto-detection", () => {
         "parseApplyOn", "parsePlacementSettings",
         "suggestPlacements", "recordPlacement", "recordProposal", "recordUnplacement", "ChangePlacementError", "placementStrength", "draftChangePlacement",
         // The Sidecar change-set card flags proposed items with smart add's own matcher.
-        "findDuplicateItem"],
+        "findDuplicateItem",
+        // Ready to run shows a change with no tasks as one task.
+        "changeWorkShape"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);
