@@ -119,6 +119,21 @@ describe("round-trip", () => {
     expect(serializeStateYaml(file)).toContain(`    futureRow: {"a":[2,1],"z":2}\n`);
   });
 
+  it("writes delivery as one JSON line, reads it back, and refuses an empty or non-string branch", async () => {
+    const file = emptyStateFile();
+    file.items[ID_A] = { status: "pending", delivery: { branch: "feat/pay" } };
+    await save(file);
+    expect(await readState()).toContain(`    delivery: {"branch":"feat/pay"}\n`);
+    expect((await loadStateFile(folder)).items[ID_A].delivery).toEqual({ branch: "feat/pay" });
+
+    for (const bad of [`{"branch":""}`, `{"branch":7}`, `{}`]) {
+      const text = [`schema: "rex/v2"`, `items:`, `  "${ID_B}":`, `    delivery: ${bad}`, ``].join("\n");
+      expect(() => parseStateYaml(text), bad).toThrow(/invalid state\.yaml: items\..*\.delivery/);
+    }
+    file.items[ID_A].delivery = { branch: "" };
+    await expect(save(file)).rejects.toThrow(/delivery\.branch/);
+  });
+
   it("round-trips every known field through parse and serialize", () => {
     const file: StateFile = {
       schema: SCHEMA_VERSION_V2,
@@ -134,6 +149,7 @@ describe("round-trip", () => {
           appliedAt: "2026-10-02T00:00:00.000Z",
           appliedAmendsHash: "def",
           prs: ["https://github.com/o/r/pull/1"],
+          delivery: { branch: "feat/pay" },
           ready: false,
           resolutionDetail: "line one\nline \"two\": # not a comment",
         },

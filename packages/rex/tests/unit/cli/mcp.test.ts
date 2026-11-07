@@ -36,6 +36,7 @@ const EXPECTED_TOOLS = [
   "get_capability",
   "place_change",
   "apply_change",
+  "assign_to_branch",
 ];
 
 const EXPECTED_RESOURCES = ["prd", "workflow", "log"];

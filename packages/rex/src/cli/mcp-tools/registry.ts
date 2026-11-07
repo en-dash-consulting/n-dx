@@ -32,6 +32,7 @@ import { getProductTool } from "./get-product.js";
 import { getCapabilityTool } from "./get-capability.js";
 import { placeChangeTool } from "./place-change.js";
 import { applyChangeTool } from "./apply-change.js";
+import { assignToBranchTool } from "./assign-to-branch.js";
 import type { ToolDefinition } from "./tool.js";
 
 export const REX_MCP_TOOLS: readonly ToolDefinition[] = [
@@ -57,4 +58,5 @@ export const REX_MCP_TOOLS: readonly ToolDefinition[] = [
   getCapabilityTool,
   placeChangeTool,
   applyChangeTool,
+  assignToBranchTool,
 ];

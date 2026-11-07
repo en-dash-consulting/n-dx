@@ -100,6 +100,7 @@ a status-only change does not rewrite the node's Markdown.
 | Execution | `status`, `startedAt`, `completedAt`, `endedAt`, `activeIntervals`, `failureReason`, `resolutionType`, `resolutionDetail` |
 | Product evidence | `metAt`, `revisedAt`, `reviewedHash`, `checks` |
 | Change evidence | `appliedAt`, `appliedAmendsHash`, `shippedIn`, `prs`, `issues` |
+| Work set | `delivery` (`{ branch }`, a non-empty branch name: the branch whose work set holds this task, or this change when it has no tasks; a change's own `delivery` also covers its open tasks that have none, and a task's own overrides it) |
 | Bookkeeping | `assignee`, `ready`, `needsPlacement`, `createdAt` (changes; stamped once on first write, absent on changes recorded before it), `lastModified`, `lastModifiedBy`, reserved `links` |
 
 The work statuses are `pending`, `in_progress`, `completed`, `failing`,

@@ -10,6 +10,7 @@ import {
   generatePRDFilename,
   resolvePRDFilename,
   isDefaultBranch,
+  currentWorkSetBranch,
 } from "../../../src/store/branch-naming.js";
 
 // ---------------------------------------------------------------------------
@@ -174,6 +175,70 @@ describe("isDefaultBranch", () => {
     // engaged rather than the (now-unverified) origin/HEAD name being trusted.
     expect(isDefaultBranch(tmpDir, "main")).toBe(true);
     expect(isDefaultBranch(tmpDir, "feature/x")).toBe(false);
+  });
+});
+
+describe("currentWorkSetBranch", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-work-set-branch-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns the branch name on a feature branch", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "checkout", "-b", "feature/x");
+    expect(currentWorkSetBranch(tmpDir)).toBe("feature/x");
+  });
+
+  it("returns null on the default branch", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    expect(currentWorkSetBranch(tmpDir)).toBeNull();
+  });
+
+  it("reads the branch name exactly when a tag shares it", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    // A tag named like the branch makes `symbolic-ref --short` print "heads/<name>".
+    git(tmpDir, "tag", "main");
+    expect(currentWorkSetBranch(tmpDir)).toBeNull();
+    git(tmpDir, "checkout", "-b", "feature/x");
+    git(tmpDir, "tag", "feature/x");
+    expect(currentWorkSetBranch(tmpDir)).toBe("feature/x");
+  });
+
+  it("returns null on a detached HEAD", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "checkout", "--detach");
+    expect(currentWorkSetBranch(tmpDir)).toBeNull();
+  });
+
+  it("returns null outside a git repository", async () => {
+    const nonGit = await mkdtemp(join(tmpdir(), "rex-no-git-"));
+    try {
+      expect(currentWorkSetBranch(nonGit)).toBeNull();
+    } finally {
+      await rm(nonGit, { recursive: true, force: true });
+    }
+  });
+
+  it("treats the branch origin/HEAD names as the default, and main as a work set then", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "remote", "add", "origin", "https://example.invalid/repo.git");
+    git(tmpDir, "update-ref", "refs/remotes/origin/trunk", "HEAD");
+    git(tmpDir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
+
+    expect(currentWorkSetBranch(tmpDir)).toBe("main");
+    git(tmpDir, "checkout", "-b", "trunk");
+    expect(currentWorkSetBranch(tmpDir)).toBeNull();
   });
 });
 

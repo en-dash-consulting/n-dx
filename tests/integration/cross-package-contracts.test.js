@@ -524,6 +524,8 @@ describe("web → rex gateway contract", () => {
     "isAppliedChange",
     "specHash",
     "nodeSpec",
+    // Ready to run shows a change with no tasks as one task
+    "changeWorkShape",
     // trailer-commit evidence — the commits and files a Sidecar lens packet quotes
     "loadTrailerCommits",
     "loadCommitFiles",
@@ -1001,7 +1003,7 @@ describe("gateway export auto-detection", () => {
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
-        "collectAllIds", "findNextTask", "findNextWorkTask", "findActionableWork", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
+        "collectAllIds", "findNextTask", "findNextWorkTask", "findActionableWork", "changeWorkShape", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "validateChangesMerge", "mergeChanges",

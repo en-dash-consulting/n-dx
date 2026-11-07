@@ -80,6 +80,21 @@ describe("rows merge by id", () => {
     expect(rows(merged)[A]).toEqual({ status: "in_progress", startedAt: "2026-10-01T00:00:00Z", assignee: "Sam <sam@example.com>" });
   });
 
+  it("merges two branches assigning different tasks of one change to their work sets", () => {
+    const base = state({ [PARENT]: { status: "in_progress" }, [A]: { status: "pending" }, [B]: { status: "pending" } });
+    const ours = state({ [PARENT]: { status: "in_progress" }, [A]: { status: "pending", delivery: { branch: "feat/a" } }, [B]: { status: "pending" } });
+    const theirs = state({ [PARENT]: { status: "in_progress" }, [A]: { status: "pending" }, [B]: { status: "pending", delivery: { branch: "feat/b" } } });
+
+    const { merged, conflicts } = mergeStateYaml(base, ours, theirs);
+
+    expect(conflicts).toEqual([]);
+    expect(rows(merged)).toEqual({
+      [PARENT]: { status: "in_progress" },
+      [A]: { status: "pending", delivery: { branch: "feat/a" } },
+      [B]: { status: "pending", delivery: { branch: "feat/b" } },
+    });
+  });
+
   it("drops a row removed on one side and unchanged on the other", () => {
     const base = state({ [A]: { status: "pending" }, [B]: { status: "pending" } });
     const { merged, conflicts } = mergeStateYaml(base, state({ [B]: { status: "pending" } }), base);

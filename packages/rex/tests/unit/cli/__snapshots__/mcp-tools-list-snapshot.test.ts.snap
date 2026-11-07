@@ -31,6 +31,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "items": {
             "type": "string"
           }
+        },
+        "any": {
+          "description": "Pick outside the current branch's work set. Without it, on a branch with assigned tasks (v2), only those are picked.",
+          "type": "boolean"
         }
       },
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -1091,6 +1095,37 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       },
       "required": [
         "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "assign_to_branch",
+    "description": "Add changes and tasks to the current git branch's work set, or take them off with remove (v2 PRD). The work set is the tasks assigned to the branch, recorded as delivery: { branch } in state.yaml; a task sits on at most one branch. A change id assigns its open tasks (a change with no tasks counts as one task, and its branch covers the tasks it is later split into, unless a task has its own). A task already on another branch is refused, naming it, unless move is true. Removing a change takes off the tasks that inherit from it; a task that only inherits is listed under inherited with its change, unchanged. Acts on the checked-out branch of the session's workspace; refused on the default branch and on a detached HEAD. Writes the PRD; commits nothing. Returns what was written (id, title, status; movedFrom for a moved task).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Change or task ids, display ids (e.g. CH-12) or aliases"
+        },
+        "remove": {
+          "description": "Take the named tasks off this branch's work set instead of adding them",
+          "type": "boolean"
+        },
+        "move": {
+          "description": "When adding: take over tasks that are on another branch instead of refusing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ids"
       ],
       "$schema": "http://json-schema.org/draft-07/schema#"
     },

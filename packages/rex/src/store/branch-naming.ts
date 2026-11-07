@@ -50,6 +50,7 @@ export function resolveGitBranch(cwd: string): string {
 export const DEFAULT_BRANCHES = ["main", "master"] as const;
 
 const ORIGIN_PREFIX = "refs/remotes/origin/";
+const HEADS_PREFIX = "refs/heads/";
 
 /**
  * The branch `origin/HEAD` points at, or null when the clone has no
@@ -108,6 +109,36 @@ function refExists(cwd: string, ref: string): boolean {
 export function isDefaultBranch(cwd: string, branch: string): boolean {
   const origin = resolveOriginDefaultBranch(cwd);
   return origin ? branch === origin : (DEFAULT_BRANCHES as readonly string[]).includes(branch);
+}
+
+/**
+ * The checked-out branch of the workspace at `projectDir`, or null when that
+ * workspace has no work-set branch: it is on the default branch, HEAD is
+ * detached, or `projectDir` is not in a git repository.
+ *
+ * Callers pass the workspace directory they resolved (the MCP server's
+ * `workspace.projectDir`, the CLI's dir argument), never `process.cwd()`.
+ * The default branch is read by {@link isDefaultBranch}, so there is one
+ * resolver for it.
+ */
+export function currentWorkSetBranch(projectDir: string): string | null {
+  let ref: string;
+  try {
+    // Unlike `rev-parse --abbrev-ref`, this fails on a detached HEAD. The full
+    // ref, not `--short`: a tag sharing the branch's name makes `--short`
+    // print `heads/<name>`.
+    ref = execFileSync(
+      "git",
+      ["symbolic-ref", "--quiet", "HEAD"],
+      { cwd: projectDir, encoding: "utf-8", ...QUIET_GIT },
+    ).trim();
+  } catch {
+    return null;
+  }
+  if (!ref.startsWith(HEADS_PREFIX)) return null;
+  const branch = ref.slice(HEADS_PREFIX.length);
+  if (!branch || isDefaultBranch(projectDir, branch)) return null;
+  return branch;
 }
 
 /**

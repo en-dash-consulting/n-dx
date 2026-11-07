@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "84d82d83-e4ff-44d6-b44f-ec27846e12dd":
+    status: "completed"
+    startedAt: "2026-11-07T05:49:58.583Z"
+    completedAt: "2026-11-07T05:49:58.583Z"
+    endedAt: "2026-11-07T05:49:58.583Z"
+    activeIntervals: [{"end":"2026-11-07T05:49:58.583Z","start":"2026-11-07T05:49:58.583Z"}]
+    appliedAt: "2026-11-07T05:49:58.583Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-07T02:25:26.424Z"
+    lastModified: "2026-11-07T05:49:58.583Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bf6bfa6a-c7a1-4d8f-80df-7b141f4fc47d":
+    status: "completed"
+    startedAt: "2026-11-07T05:34:47.356Z"
+    completedAt: "2026-11-07T05:43:57.140Z"
+    endedAt: "2026-11-07T05:43:57.140Z"
+    activeIntervals: [{"end":"2026-11-07T05:43:57.140Z","start":"2026-11-07T05:34:47.356Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "work-set.ts: one rule (own delivery, else nearest enclosing change's) used by readWorkSet, assign refusal and unassign; remove reports inherited tasks with their change; CLI/MCP output, help, docs, changesets; core, selection, get_next_task and CLI tests."
+    lastModified: "2026-11-07T05:43:57.140Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e3300b25-4c33-4b45-9f5a-3828cfafd459":
+    status: "completed"
+    startedAt: "2026-11-07T05:44:05.877Z"
+    completedAt: "2026-11-07T05:49:58.583Z"
+    endedAt: "2026-11-07T05:49:58.583Z"
+    activeIntervals: [{"end":"2026-11-07T05:49:58.583Z","start":"2026-11-07T05:44:05.877Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex findNextWorkTask gains a workspace overload returning { task, workSet } (narrowed unless any); hench branchWorkSet/nextV2Selection read the set from it; currentWorkSet dropped from hench gateway; cap back to 69; contract lists and gateways.md updated; patch changeset for rex+hench."
+    lastModified: "2026-11-07T05:49:58.583Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
