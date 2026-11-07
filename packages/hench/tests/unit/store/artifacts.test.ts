@@ -6,6 +6,7 @@ import {
   isHenchRuntimeArtifact,
   formatPorcelainPath,
   parsePorcelainPath,
+  porcelainSourcePath,
   splitPorcelainLines,
 } from "../../../src/store/artifacts.js";
 
@@ -148,6 +149,16 @@ describe("parsePorcelainPath", () => {
   it("strips the quotes git adds around paths with special characters", () => {
     expect(parsePorcelainPath('?? "my file.ts"')).toBe("my file.ts");
     expect(parsePorcelainPath('R  "old one.ts" -> "new one.ts"')).toBe("new one.ts");
+  });
+
+  it.each([
+    ["R  src/plain.ts -> \".rex/x/p -> q.ts\"", "src/plain.ts", ".rex/x/p -> q.ts"],
+    ["R  \"src/a -> b.ts\" -> .rex/x/moved.ts", "src/a -> b.ts", ".rex/x/moved.ts"],
+    ["R  \"src/has space.ts\" -> .rex/x/hs.ts", "src/has space.ts", ".rex/x/hs.ts"],
+    ["R  src/app.ts -> .rex/changes/x/app.ts", "src/app.ts", ".rex/changes/x/app.ts"],
+  ])("splits %s on the quoting git uses", (line, from, to) => {
+    expect(porcelainSourcePath(line)).toBe(from);
+    expect(parsePorcelainPath(line)).toBe(to);
   });
 
   it("does not split a non-rename path that contains an arrow", () => {

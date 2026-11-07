@@ -40,8 +40,10 @@ import {
 } from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
+  matchesPorcelainLine,
   matchesProjectPath,
   parsePorcelainPath,
+  porcelainSourcePath,
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../../store/artifacts.js";
@@ -311,10 +313,21 @@ export async function findUncommittedWork(
 
   const paths = operatorLines
     .filter((line) => !(stagedCommitFollows && isFullyStaged(line)))
-    .map(parsePorcelainPath)
-    .filter((path) => !matchesProjectPath(path, discountPaths, repoPrefix));
+    .filter((line) => !matchesPorcelainLine(line, discountPaths, repoPrefix))
+    .map((line) => reportedPath(line, discountPaths, repoPrefix));
 
   return { clean: paths.length === 0, paths };
+}
+
+/**
+ * The path to name for a leftover line: its target, except a rename whose
+ * target the discount covers but whose source it does not, where the source is
+ * what left the tree and the target alone would read as innocent.
+ */
+function reportedPath(line: string, discountPaths: readonly string[], repoPrefix: string): string {
+  const target = parsePorcelainPath(line);
+  if (!matchesProjectPath(target, discountPaths, repoPrefix)) return target;
+  return porcelainSourcePath(line) ?? target;
 }
 
 /**
@@ -386,7 +399,7 @@ export async function partitionDirtyPaths(
   const other: string[] = [];
   for (const line of lines) {
     const path = parsePorcelainPath(line);
-    if (matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix)) prd.push(path);
+    if (matchesPorcelainLine(line, PRD_COMMIT_PATHS, repoPrefix)) prd.push(path);
     else other.push(path);
   }
   return { prd, other };

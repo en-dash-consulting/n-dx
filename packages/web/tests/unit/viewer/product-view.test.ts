@@ -115,6 +115,27 @@ describe("ProductView", () => {
     expect(broken?.textContent).toContain("Autonomous task runs");
   });
 
+  it("draws each open change on a constraint row as an overlay", () => {
+    const change = PRODUCT_MAP_FIXTURE.areas[0].capabilities
+      .flatMap((c) => c.openChanges)[0];
+    const [first, second] = PRODUCT_MAP_FIXTURE.constraints;
+    const map = {
+      ...PRODUCT_MAP_FIXTURE,
+      constraints: [
+        { ...first, openChanges: [{ ...change, title: "Gateway rule tightened" }] },
+        second,
+      ],
+    };
+    const el = mount(h(ProductView, { map }));
+
+    const withChange = el.querySelector(`[data-constraint-id="${first.id}"]`);
+    expect(withChange?.querySelectorAll(".pm-overlay")).toHaveLength(1);
+    expect(withChange?.querySelector(".pm-overlay-title")?.textContent).toBe("Gateway rule tightened");
+
+    const without = el.querySelector(`[data-constraint-id="${second.id}"]`);
+    expect(without?.querySelector(".pm-overlay-none")).not.toBeNull();
+  });
+
   // Counted from the fixture by hand, not from productTotals: asserting the
   // view against the same function the view calls would pass for any value
   // that function returned, including a wrong one.

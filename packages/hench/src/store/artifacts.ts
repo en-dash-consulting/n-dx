@@ -278,13 +278,27 @@ function unquotePorcelainPath(path: string): string {
     : trimmed;
 }
 
-/** Split a porcelain line into its path(s); `from` is set only for R/C lines. */
+/**
+ * Index of the " -> " separating an R/C line's source from its target. Git
+ * quotes any path containing a space, so a separator inside a path is always
+ * inside quotes: skip a quoted source to its closing quote (a backslash
+ * escapes the next character), otherwise the source is unquoted and has no
+ * space, so the first " -> " is the separator. -1 when there is none.
+ */
+function renameArrowIndex(path: string): number {
+  if (!path.startsWith('"')) return path.indexOf(" -> ");
+  let i = 1;
+  while (i < path.length && path[i] !== '"') i += path[i] === "\\" ? 2 : 1;
+  return path.startsWith(" -> ", i + 1) ? i + 1 : -1;
+}
+
+/** Split a porcelain line into its path(s);`from` is set only for R/C lines. */
 function splitPorcelainPaths(line: string): { from?: string; to: string } {
   const status = line.slice(0, 2);
   const path = line.length > 3 ? line.slice(3) : line.trim();
 
   if (status.includes("R") || status.includes("C")) {
-    const arrow = path.lastIndexOf(" -> ");
+    const arrow = renameArrowIndex(path);
     if (arrow !== -1) {
       return {
         from: unquotePorcelainPath(path.slice(0, arrow)),
@@ -298,6 +312,30 @@ function splitPorcelainPaths(line: string): { from?: string; to: string } {
 /** The path a porcelain line leaves behind: the new path of an R/C line. */
 export function parsePorcelainPath(line: string): string {
   return splitPorcelainPaths(line).to;
+}
+
+/** The source path of an R/C porcelain line, or undefined for any other line. */
+export function porcelainSourcePath(line: string): string | undefined {
+  return splitPorcelainPaths(line).from;
+}
+
+/**
+ * True when every path a porcelain line leaves changed matches `patterns`. A
+ * rename (R) removes its source, so the source must match as well as the
+ * target: a move out of a non-matching path into one is not matched by its
+ * target alone. A copy (C) leaves its source in place, so only the target counts.
+ */
+export function matchesPorcelainLine(
+  line: string,
+  patterns: readonly string[],
+  repoPrefix = "",
+): boolean {
+  const { from, to } = splitPorcelainPaths(line);
+  const isRename = line.slice(0, 2).includes("R");
+  return (
+    matchesProjectPath(to, patterns, repoPrefix) &&
+    (!isRename || from === undefined || matchesProjectPath(from, patterns, repoPrefix))
+  );
 }
 
 /**
