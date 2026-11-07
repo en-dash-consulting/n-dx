@@ -278,13 +278,27 @@ function unquotePorcelainPath(path: string): string {
     : trimmed;
 }
 
-/** Split a porcelain line into its path(s); `from` is set only for R/C lines. */
+/**
+ * Index of the " -> " separating an R/C line's source from its target. Git
+ * quotes any path containing a space, so a separator inside a path is always
+ * inside quotes: skip a quoted source to its closing quote (a backslash
+ * escapes the next character), otherwise the source is unquoted and has no
+ * space, so the first " -> " is the separator. -1 when there is none.
+ */
+function renameArrowIndex(path: string): number {
+  if (!path.startsWith('"')) return path.indexOf(" -> ");
+  let i = 1;
+  while (i < path.length && path[i] !== '"') i += path[i] === "\\" ? 2 : 1;
+  return path.startsWith(" -> ", i + 1) ? i + 1 : -1;
+}
+
+/** Split a porcelain line into its path(s);`from` is set only for R/C lines. */
 function splitPorcelainPaths(line: string): { from?: string; to: string } {
   const status = line.slice(0, 2);
   const path = line.length > 3 ? line.slice(3) : line.trim();
 
   if (status.includes("R") || status.includes("C")) {
-    const arrow = path.lastIndexOf(" -> ");
+    const arrow = renameArrowIndex(path);
     if (arrow !== -1) {
       return {
         from: unquotePorcelainPath(path.slice(0, arrow)),
