@@ -155,11 +155,12 @@ export function toolLineStatus(card: ToolLineCard | undefined, hasResult: boolea
 }
 
 /**
- * Whether a tool result's output is an error. The wire has no flag: the vendor
- * parser (llm-client's Claude stream-json reader) prefixes `[error] ` to the
- * output of a result the CLI marked `is_error`, which includes a broker
- * refusal (an MCP `isError` result).
+ * Whether a tool result is a failure. The vendor parser sets `isError` when
+ * the stream reports it (Claude's `is_error`, which includes a broker refusal;
+ * a Codex command's failed status or non-zero exit), and it wins. Frames
+ * recorded before the flag existed have none: for them, fall back to the
+ * `[error] ` prefix the Claude parser writes on an `is_error` result.
  */
-export function toolResultIsError(output: string): boolean {
-  return output.startsWith("[error] ");
+export function toolResultFailed(result: { output: string; isError?: boolean }): boolean {
+  return result.isError ?? result.output.startsWith("[error] ");
 }
