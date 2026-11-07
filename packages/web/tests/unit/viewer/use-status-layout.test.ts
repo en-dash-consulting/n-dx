@@ -30,9 +30,9 @@ describe("useStatusLayout", () => {
     vi.stubGlobal("fetch", fetch);
     const root = document.createElement("div");
     act(() => { render(h("div", null, h(Probe, null), h(Probe, null), h(Probe, null), h(Probe, null)), root); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
-
-    expect([...root.querySelectorAll(".probe")].map((e) => e.textContent)).toEqual(["v2", "v2", "v2", "v2"]);
+    await vi.waitFor(() => {
+      expect([...root.querySelectorAll(".probe")].map((e) => e.textContent)).toEqual(["v2", "v2", "v2", "v2"]);
+    });
     expect(openWebSocket).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledTimes(1);
     act(() => { render(null, root); });
