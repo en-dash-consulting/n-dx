@@ -43,7 +43,7 @@ The PRD is the product's requirements (the product layer) plus the changes being
 | `rex change place <change> [dir]` | Without `--target`, the shortlist of places a change could go; with `--target=<node> --relation=touches\|amends`, record it; with `--propose --type=capability\|constraint --under=<area> --title="…"`, propose a new node when nothing fits |
 | `rex change apply <change> [dir]` | Apply a change's amendments to the product layer, as a steward |
 | `rex branch add <id>… [--move]` | Put a change's open tasks (or named tasks) on the current branch's work set. A task already on another branch is refused unless `--move` takes it over |
-| `rex branch remove <id>…` | Take tasks, or a change's tasks, off the current branch's work set |
+| `rex branch remove <id>…` | Take tasks, or a change's tasks, off the current branch's work set. A task that is on the branch only through its change stays; remove the change |
 | `rex branch show` | List the current branch's open tasks, grouped by change. `--format=json` for scripts |
 | `rex next [--any] [dir]` | The next actionable task. On a branch with a work set only its tasks are picked; `--any` picks outside it |
 | `rex release stamp <version> [dir]` | Stamp `shippedIn` on the changes a release ships |

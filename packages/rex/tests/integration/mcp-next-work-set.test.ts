@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createRexMcpServer } from "../../src/cli/mcp.js";
-import { FIXTURE_TASK, copyV2Fixture } from "../helpers/v2-fixture.js";
+import { FIXTURE_CHANGE, FIXTURE_TASK, copyV2Fixture } from "../helpers/v2-fixture.js";
 
 /** A second, low-priority task in the fixture change: picked only through a work set. */
 const LOW_TASK = "c0000000-0000-4000-8000-0000000000a1";
@@ -89,5 +89,27 @@ describe("get_next_task with a branch work set", () => {
     // The completed assignment still makes this a work-set branch; main is unaffected.
     git("checkout", "-q", "main");
     expect((await call("get_next_task")).item.id).toBe(FIXTURE_TASK);
+  });
+
+  it("picks the tasks a task-less change on the branch is later split into", async () => {
+    // Make CH-1 task-less, as a change is before hench splits it.
+    await call("update_task_status", { id: FIXTURE_TASK, status: "deleted" });
+    await call("update_task_status", { id: LOW_TASK, status: "deleted" });
+    git("checkout", "-q", "-b", "feat/split");
+    const assigned = await call("assign_to_branch", { ids: [FIXTURE_CHANGE] });
+    expect(assigned.assigned.map((u: { id: string }) => u.id)).toEqual([FIXTURE_CHANGE]);
+
+    const split = (await call("add_item", { type: "task", title: "Show the sheet", parentId: FIXTURE_CHANGE })).id;
+    const next = await call("get_next_task");
+    expect(next.item.id).toBe(split);
+    expect(next.workSetBranch).toBe("feat/split");
+
+    // A split task moved to another branch gets its own delivery and leaves this set.
+    git("checkout", "-q", "-b", "feat/other");
+    await call("assign_to_branch", { ids: [split], move: true });
+    git("checkout", "-q", "feat/split");
+    const spent = await call("get_next_task");
+    expect(spent.next).toBeNull();
+    expect(spent.workSetBranch).toBe("feat/split");
   });
 });

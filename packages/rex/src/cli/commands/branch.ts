@@ -2,7 +2,9 @@
  * `rex branch add|remove|show` — the current branch's work set.
  *
  * A work set is the tasks assigned to a branch, recorded per task as
- * `delivery: { branch }` in `state.yaml` (`core/work-set.ts`). Every
+ * `delivery: { branch }` in `state.yaml` (`core/work-set.ts`); a change's own
+ * `delivery` covers its tasks that have none, so `show` lists them and
+ * removing the change takes them off. Every
  * subcommand acts on the checked-out branch and refuses on the default branch
  * or a detached HEAD. None of them commits: the assignment is a PRD edit like
  * any other, committed with the branch's work.
@@ -15,6 +17,7 @@ import {
   assignToBranch,
   describeUnits,
   groupWorkSet,
+  inheritedUnits,
   requireWorkSetBranch,
   unassignFromBranch,
   WorkSetError,
@@ -97,7 +100,11 @@ async function remove(rexDir: string, branch: string, refs: string[], json: bool
     ...u,
     from: report.removed.find((r) => r.id === u.id)?.from,
   }));
-  if (json) return result(JSON.stringify({ branch, removed }, null, 2));
-  if (removed.length === 0) return result("Nothing to remove: none of those is on a branch.");
+  const inherited = inheritedUnits(tree, report.inherited);
+  if (json) return result(JSON.stringify({ branch, removed, ...(inherited.length > 0 ? { inherited } : {}) }, null, 2));
   for (const u of removed) result(`Removed from ${u.from}: ${unitLine(u)}`);
+  for (const u of inherited) {
+    result(`Not removed: ${unitLine(u)} inherits ${u.from} from change ${nodeLabel(u.change)}  ${u.change.title}; remove the change to take it off.`);
+  }
+  if (removed.length === 0 && inherited.length === 0) result("Nothing to remove: none of those is on a branch.");
 }

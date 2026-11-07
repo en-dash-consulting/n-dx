@@ -22,6 +22,7 @@ export function usage(): void {
           { name: "echo \"desc\" | add", description: "Pipe text as description (combinable with other sources)" },
           { name: "product <show|edit> [node]", description: "v2: show the product layer, or edit a node's statement/capability criteria" },
           { name: "change <place|apply> <id>", description: "v2: place a change on the product layer, or apply its amendments" },
+          { name: "branch <add|remove|show> [id…]", description: "v2: assign tasks to the current branch's work set, take them off, or list it" },
           { name: "update <id> [dir]", description: "Update item status/priority" },
           { name: "remove <epic|task> <id>", description: "Remove an epic or task and all descendants" },
           { name: "move <id> [dir]", description: "Move item to new parent (reparent)" },
