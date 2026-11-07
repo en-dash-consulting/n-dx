@@ -28,10 +28,14 @@ items:
     lastModified: "2026-11-07T02:25:57.890Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8bc1f961-778d-4eac-8370-2cea280bfcb6":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-07T02:26:06.789Z"
-    activeIntervals: [{"start":"2026-11-07T02:26:06.789Z"}]
-    lastModified: "2026-11-07T02:26:07.467Z"
+    completedAt: "2026-11-07T02:32:31.205Z"
+    endedAt: "2026-11-07T02:32:31.205Z"
+    activeIntervals: [{"end":"2026-11-07T02:32:31.205Z","start":"2026-11-07T02:26:06.789Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex branch add/remove/show (cli/commands/branch.ts) and MCP assign_to_branch, with tests, docs and changeset"
+    lastModified: "2026-11-07T02:32:31.205Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d20fbfb8-af73-4dba-9fea-e514cc253512":
     createdAt: "2026-11-07T02:14:22.081Z"
