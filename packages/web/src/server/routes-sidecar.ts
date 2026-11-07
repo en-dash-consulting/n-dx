@@ -25,7 +25,7 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments? }`; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments?, answer? }`; `answer` (`{ selected: string[], other? }`), only on a choice-card approval and required there; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval (a list of item edits), an item-edit approval (an object of the card's fields) or a placement approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | GET  | `/api/sidecar/ledger/latest` | each open session's latest `unfinished` and `decision` notes, which the hub snapshot shows per worktree |
  * | POST | `/api/sidecar/handoff` | the hub's drill-down (`{ question, vendor }`): resume the latest open session or create one, leave a `handoff` entry naming the question, carry the ledger on its next turn |
@@ -90,6 +90,8 @@ import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardS
 import { awaitSidecarCommand, renderWorkPreview, runFailedResult, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { readLinkCall, writeLinkCard } from "./tracker/link-card.js";
+import { readItemEditCall, writeItemEditCard } from "./sidecar/item-edit-card.js";
+import { readStatusCall, writeStatusCard } from "./sidecar/status-card.js";
 import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
 import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
@@ -486,6 +488,22 @@ export function sidecarActions(
     },
     async writeLink(link) {
       const written = await writeLinkCard(ctx, link);
+      if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      return written;
+    },
+    checkItemEdit(input) {
+      return readItemEditCall(ctx.rexDir, input);
+    },
+    async writeItemEdit(itemEdit) {
+      const written = await writeItemEditCard(ctx, itemEdit);
+      if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      return written;
+    },
+    checkStatus(input) {
+      return readStatusCall(ctx.rexDir, input);
+    },
+    async writeStatus(change) {
+      const written = await writeStatusCard(ctx, change);
       if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
       return written;
     },
@@ -1532,6 +1550,9 @@ async function handleSessionRoutes(
       if (body.arguments !== undefined && (typeof body.arguments !== "object" || body.arguments === null || Array.isArray(body.arguments))) {
         return refuse(res, 400, `"arguments" must be an object`);
       }
+      if (body.answer !== undefined && (typeof body.answer !== "object" || body.answer === null || Array.isArray(body.answer))) {
+        return refuse(res, 400, `"answer" must be an object`);
+      }
       // A placement card's edit is a placement: dry-run it, against the dry run the operator reviewed, before the card is touched.
       const waiting = broker.cards(id).find((c) => c.id === cardId);
       let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, PlacementEditRefusal> | undefined;
@@ -1549,6 +1570,7 @@ async function handleSessionRoutes(
           ...(body.lane !== undefined && { lane: body.lane }),
           ...(body.path !== undefined && { path: body.path }),
           ...(body.arguments !== undefined && { arguments: body.arguments }),
+          ...(body.answer !== undefined && { answer: body.answer }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {

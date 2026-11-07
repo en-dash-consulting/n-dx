@@ -25,7 +25,6 @@ export { createRexMcpServer } from "@n-dx/rex";
 
 // ---- Rex legacy PRD migration -----------------------------------------------
 export { ensureLegacyPrdMigrated } from "@n-dx/rex";
-export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 
 // ---- Rex folder-tree storage path -------------------------------------------
 export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, cascadeParentCompletion } from "@n-dx/rex";
@@ -77,7 +76,7 @@ export { suggestPlacements, recordPlacement, recordProposal, recordUnplacement, 
 export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
 export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
 export type { RecordProposalInput, RecordProposalResult } from "@n-dx/rex";
-export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
+export type { PlacementCandidate, PlacementStrength } from "@n-dx/rex";
 // "Draft with the model" (behind rex.placementDraft): the `prd.place` text
 // model drafts a pick or a proposal and writes nothing.
 export { draftChangePlacement } from "@n-dx/rex";
@@ -193,7 +192,10 @@ export { applyReshape, reasonForReshape } from "@n-dx/rex";
 export type { ReshapeProposal } from "@n-dx/rex";
 
 // ---- Rex MCP tool handlers (direct invocation) -----------------------------
-export { handleEditItem } from "@n-dx/rex";
+// The Sidecar's item-edit and status cards write through the handlers MCP edit_item
+// and update_task_status run; validateTransition is the rule update_task_status
+// applies, which the status card quotes before approval.
+export { handleEditItem, handleUpdateTaskStatus, validateTransition } from "@n-dx/rex";
 
 // ---- Rex PRD tree backup snapshots (undo for reorganize/prune/reshape/fix) --
 export { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "@n-dx/rex";

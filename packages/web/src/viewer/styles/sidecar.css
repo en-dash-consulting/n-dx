@@ -374,6 +374,44 @@
 }
 .sidecar-link p { margin: 0 0 4px; font-size: 12px; overflow-wrap: anywhere; }
 .sidecar-link-note { color: var(--text-muted); }
+
+/* Item-edit card: each field before and after; the proposed value is editable while the card waits. */
+.sidecar-item-edit { display: flex; flex-direction: column; gap: var(--space-1); font-size: 12px; }
+.sidecar-item-edit p { margin: 0; overflow-wrap: anywhere; }
+.sidecar-item-edit-fields { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; }
+.sidecar-item-edit-label { font-weight: 600; }
+.sidecar-item-edit-field { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; }
+.sidecar-item-edit-value { display: flex; flex-direction: column; overflow-wrap: anywhere; white-space: pre-wrap; }
+.sidecar-item-edit-list { margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.sidecar-item-edit-removed, .sidecar-item-edit-removed del { color: var(--red); }
+.sidecar-item-edit-added, .sidecar-item-edit-added ins { color: var(--green); text-decoration: none; }
+.sidecar-item-edit-kept { color: var(--text-muted); }
+.sidecar-item-edit-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; }
+.sidecar-item-edit-note { color: var(--text-muted); }
+
+/* Status card: the move and rex's verdict on it. */
+.sidecar-status { display: flex; flex-direction: column; gap: var(--space-1); font-size: 12px; }
+.sidecar-status p { margin: 0; overflow-wrap: anywhere; }
+.sidecar-status-from { color: var(--red); }
+.sidecar-status-to { color: var(--green); text-decoration: none; font-weight: 600; }
+.sidecar-status-refused { color: var(--red); }
+.sidecar-status-reason, .sidecar-status-note { color: var(--text-muted); }
+/* Choice card: the question, one row per option, an Other row. */
+.sidecar-choice { display: flex; flex-direction: column; gap: var(--space-2); font-size: 12px; }
+.sidecar-choice-question { margin: 0; color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.sidecar-choice-rows { display: flex; flex-direction: column; gap: var(--space-1); }
+.sidecar-choice-row {
+  display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); cursor: pointer;
+}
+.sidecar-choice-row:hover { background: var(--bg-hover); }
+.sidecar-choice-row.is-selected { border-color: var(--accent); background: var(--bg-active); }
+.sidecar-choice-row:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sidecar-choice-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
+.sidecar-choice-label { color: var(--text); overflow-wrap: anywhere; }
+.sidecar-choice-description, .sidecar-choice-note { color: var(--text-muted); overflow-wrap: anywhere; }
+.sidecar-choice-note { margin: 0; }
+.sidecar-choice-other-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; }
 .sidecar-card-details summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
 
 /* Change-set card (story 11) */
