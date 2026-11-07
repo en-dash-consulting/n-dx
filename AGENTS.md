@@ -167,7 +167,7 @@ Codex truncates past `project_doc_max_bytes`. Put detail in `docs/`.
 
 ## n-dx Orchestration Commands
 
-Run `ndx <command> --help` for full usage, or see `README.md` for the command reference and direct-tool-access aliases (`ndx rex`, `ndx hench`, `ndx sv`, or the standalone binaries).
+Run `ndx <command> --help` for usage, or see `README.md` for commands and direct-tool aliases (`ndx rex`, `ndx hench`, `ndx sv`, or the standalone binaries).
 
 **Gotcha:** `ndx work` autonomous runs (`--auto`/`--loop`/`--epic-by-epic`) default `--permission-mode` to `acceptEdits` so the spawned Claude session won't stall in plan mode — override with `--permission-mode` or `hench.permissionMode`. This default is enforced repo-wide via the hench system prompt for all CLI-provider runs (see the `/no-plan-mode` skill).
 
@@ -269,6 +269,7 @@ Two MCP servers provide structured access to project data. They are configured i
 - `reorganize`
 - `place_change`
 - `apply_change`
+- `assign_to_branch`
 
 ### sourcevision
 

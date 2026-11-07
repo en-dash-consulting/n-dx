@@ -50,6 +50,7 @@ const EXPECTED: Record<string, Access | { args: unknown; access: Access }[]> = {
     { args: { id: "CH-1", target: "A1.1", relation: "amends" }, access: "write" },
   ],
   apply_change: "write",
+  assign_to_branch: "write",
 };
 
 describe("rex MCP tool access kinds", () => {

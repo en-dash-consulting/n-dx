@@ -467,6 +467,7 @@ const SUBCOMMAND_REGISTRY = {
     { name: "add", parent: "rex", category: "Rex", summary: "Add items to the PRD (manual or smart LLM mode)", keywords: ["create", "epic", "feature", "task", "subtask", "LLM", "smart"], related: ["analyze", "update"] },
     { name: "product", parent: "rex", category: "Rex", summary: "Show or edit the product layer of a v2 PRD", keywords: ["v2", "capability", "constraint", "capability criteria", "editorial"], related: ["change", "add"] },
     { name: "change", parent: "rex", category: "Rex", summary: "Place or apply a change on a v2 PRD", keywords: ["v2", "placement", "amend", "touches", "apply"], related: ["product", "add"] },
+    { name: "branch", parent: "rex", category: "Rex", summary: "Assign tasks to the current branch's work set", keywords: ["v2", "work set", "branch", "assign", "delivery"], related: ["change", "next"] },
     { name: "update", parent: "rex", category: "Rex", summary: "Update item status, priority, or title", keywords: ["modify", "change", "complete", "status"], related: ["add", "next"] },
     { name: "move", parent: "rex", category: "Rex", summary: "Reparent an item in the PRD tree", keywords: ["reparent", "hierarchy", "reorganize"], related: ["reshape"] },
     { name: "reshape", parent: "rex", category: "Rex", summary: "LLM-powered PRD restructuring", keywords: ["restructure", "merge", "split", "reorganize", "LLM"], related: ["prune", "move"] },
