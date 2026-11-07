@@ -7,7 +7,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -51,6 +51,8 @@ function flagValue(args: string[], flag: string): string | undefined {
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "sidecar-spawn-"));
+  // The repository root: a Codex turn reads project config up to here and no further.
+  mkdirSync(join(root, ".git"));
   spawned = [];
 });
 
@@ -280,6 +282,34 @@ describe("Codex spawn", () => {
       expect(overrides(args).filter((o) => o.startsWith("mcp_servers."))).toEqual([]);
       expect(env?.[KEY_VAR]).toBeUndefined();
     }
+  });
+
+  it("turns off every project MCP server but the broker, re-reading the project config for each turn", async () => {
+    mkdirSync(join(root, ".codex"));
+    const config = join(root, ".codex", "config.toml");
+    writeFileSync(config, [
+      "[mcp_servers.rex]", 'command = "ndx"', 'args = ["rex", "mcp", "."]',
+      "[mcp_servers.sourcevision]", 'command = "ndx"', 'args = ["sv", "mcp", "."]',
+      "[mcp_servers.ndx-sidecar]", 'url = "http://elsewhere"',
+    ].join("\n"));
+    const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), endpoint)(record("codex")), vendor: "codex", cwd: root, spawn: recordingSpawn });
+    await session.sendTurn("one");
+    writeFileSync(config, '[mcp_servers.rex]\ncommand = "ndx"\n[mcp_servers.docs]\nurl = "u"\n');
+    await session.sendTurn("two");
+
+    const [fresh, resumed] = spawned.map((s) => overrides(s.args).filter((o) => o.endsWith(".enabled=false")));
+    expect(fresh).toEqual(["mcp_servers.rex.enabled=false", "mcp_servers.sourcevision.enabled=false"]);
+    expect(resumed).toEqual(["mcp_servers.rex.enabled=false", "mcp_servers.docs.enabled=false"]);
+    expect(spawned[1].args.slice(0, 2)).toEqual(["exec", "resume"]);
+  });
+
+  it("refuses a turn, naming the file, when a project config cannot be read with confidence, and spawns nothing", async () => {
+    mkdirSync(join(root, "pkg", ".codex"), { recursive: true });
+    const config = join(root, "pkg", ".codex", "config.toml");
+    writeFileSync(config, '[mcp_servers.rex]\ncommand = "ndx\n');
+    const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), endpoint)({ ...record("codex"), worktree: join(root, "pkg") }), vendor: "codex", cwd: root, spawn: recordingSpawn });
+    await expect(session.sendTurn("one")).rejects.toThrow(config);
+    expect(spawned).toEqual([]);
   });
 
   it("a Claude session's environment gets no broker header variable", async () => {

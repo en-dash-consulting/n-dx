@@ -37,10 +37,13 @@
  *   Its headers travel as `env_http_headers`, each mapped to a variable set
  *   only in the Codex child's environment and blanked in every command the
  *   agent runs, so the broker credential is in neither argv (which is
- *   logged) nor an MCP config file. With no endpoint, no `mcp_servers` flag.
- *
- * The routes still refuse Codex sessions until project MCP servers are kept
- * out of their turns (PRD item 0b3b3a8c).
+ *   logged) nor an MCP config file. With no endpoint, no broker flag.
+ * - `-c mcp_servers.<name>.enabled=false` for every server a repository's own
+ *   `.codex/config.toml` declares, from the session's checkout up to the
+ *   repository root, re-read for each turn ({@link sidecarCodexProjectFlags}):
+ *   `--ignore-user-config` does not skip project config. A file that exists
+ *   but cannot be read with confidence refuses the turn before anything is
+ *   spawned.
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
@@ -51,7 +54,7 @@
 
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { compileCodexPolicyFlags } from "@n-dx/llm-client";
+import { CodexProjectConfigError, codexProjectMcpDisableFlags, compileCodexPolicyFlags } from "@n-dx/llm-client";
 import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy } from "@n-dx/llm-client";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
@@ -131,6 +134,22 @@ export interface SidecarCodexSpawn {
 }
 
 /**
+ * The flags that turn off every MCP server the project Codex config for `cwd`
+ * declares, except the broker.
+ *
+ * @throws Error naming the file when a project config exists but cannot be
+ *   read with confidence: the turn must not start.
+ */
+export function sidecarCodexProjectFlags(cwd: string): string[] {
+  try {
+    return codexProjectMcpDisableFlags(cwd, [SIDECAR_BROKER_NAME]);
+  } catch (error) {
+    if (!(error instanceof CodexProjectConfigError)) throw error;
+    throw new Error(`A Codex Sidecar turn cannot start: it could not keep this repository's MCP servers out. ${error.message}`);
+  }
+}
+
+/**
  * A Codex Sidecar turn's flags, fresh and resumed, and the broker header
  * variables its child environment carries.
  *
@@ -138,8 +157,10 @@ export interface SidecarCodexSpawn {
  *   outlasts `tool_timeout_sec` (60 s by default), and a broker call waits on
  *   its card until the operator decides or the turn stops, so a call may wait
  *   as long as the session can be resumed.
+ * @param cwd The session's checkout, where each turn reads the project Codex
+ *   config ({@link sidecarCodexProjectFlags}).
  */
-export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, idleMs: number): SidecarCodexSpawn {
+export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, idleMs: number, cwd: string): SidecarCodexSpawn {
   const configFlags = [
     "--ignore-user-config",
     "-c", "features.apps=false",
@@ -168,6 +189,7 @@ export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, i
       policyFlags: compileCodexPolicyFlags(SIDECAR_CODEX_POLICY),
       resumePolicyFlags: compileCodexPolicyFlags(SIDECAR_CODEX_POLICY, { resume: true }),
       configFlags,
+      turnConfigFlags: () => sidecarCodexProjectFlags(cwd),
       hiddenEnv: Object.keys(env),
     },
     env,

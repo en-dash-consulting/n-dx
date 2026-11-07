@@ -122,6 +122,13 @@ export interface CodexTurnFlags {
    */
   readonly configFlags?: readonly string[];
   /**
+   * More of the same, computed afresh for each turn and placed after
+   * {@link configFlags}: for flags that depend on files that can change
+   * between turns (a project `.codex/config.toml`). A throw refuses the turn
+   * before anything is spawned; the session stays usable.
+   */
+  readonly turnConfigFlags?: () => readonly string[];
+  /**
    * Environment variable names, beyond the Codex credentials, that the
    * agent's commands must read empty: variables set in the Codex child's
    * environment for Codex itself (`codexShellEnvFlags(hiddenEnv)`).
@@ -565,7 +572,7 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
     : input.prompt;
   const modelArgs = input.model ? ["-m", input.model] : [];
 
-  const configFlags = input.codex?.configFlags ?? [];
+  const configFlags = [...(input.codex?.configFlags ?? []), ...(input.codex?.turnConfigFlags?.() ?? [])];
   const hiddenEnv = input.codex?.hiddenEnv ?? [];
 
   // Codex cannot fork, so a resume always appends to the thread. Two

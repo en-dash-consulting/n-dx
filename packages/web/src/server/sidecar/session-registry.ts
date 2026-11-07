@@ -240,7 +240,7 @@ export function sidecarSessionConnect(
     if (refusal) throw new Error(refusal);
     const endpoint = broker?.(record.id);
     const isCodex = record.vendor === "codex";
-    const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs);
+    const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
     return {
       ...resolveSidecarSessionEnv(envDir ?? record.worktree),
       ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),

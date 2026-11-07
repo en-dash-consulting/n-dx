@@ -32,6 +32,7 @@ import type {
   ClaudeTurnFlags,
   CodexTurnFlags,
   SessionResume,
+  SessionTurnSpawn,
   VendorSessionDriver,
 } from "./vendor-session-driver.js";
 import { vendorSessionDriver } from "./vendor-session-driver.js";
@@ -189,9 +190,10 @@ function createSession(
     });
   }
 
-  function runTurn(prompt: string, turn: number): Promise<SessionTurnResult> {
+  /** The next turn's spawn. A throw (from `codex.turnConfigFlags`) refuses the turn before anything runs. */
+  function turnSpawn(prompt: string): SessionTurnSpawn {
     const resume: SessionResume | undefined = pending ?? (sessionId ? { sessionId } : undefined);
-    const spawnSpec = driver.turnSpawn({
+    return driver.turnSpawn({
       systemPrompt: opts.systemPrompt ?? "",
       prompt,
       model: opts.model,
@@ -199,7 +201,9 @@ function createSession(
       claude: opts.claude,
       codex: opts.codex,
     });
+  }
 
+  function runTurn(spawnSpec: SessionTurnSpawn, turn: number): Promise<SessionTurnResult> {
     return new Promise((resolve) => {
       const events: RuntimeEvent[] = [];
       let tokenUsage: TokenUsage = { input: 0, output: 0 };
@@ -334,9 +338,10 @@ function createSession(
       if (state === "running") throw new Error("A turn is already running in this session");
       state = "running";
       interrupted = false;
-      turns += 1;
       try {
-        return await runTurn(prompt, turns);
+        const spawnSpec = turnSpawn(prompt);
+        turns += 1;
+        return await runTurn(spawnSpec, turns);
       } finally {
         if (state === "running") state = "idle";
       }
