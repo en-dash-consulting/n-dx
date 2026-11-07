@@ -1,0 +1,14 @@
+---
+id: "7567a708-d942-448f-9869-3cbc2aed9bab"
+type: "task"
+title: "Work sets: an optional per-task `delivery: { branch }` in state.yaml, with assign and unassign"
+slug: "work-sets-an-optional-per-task"
+description: "Breakdown P2-1 task 1 (the S1 field). Add an optional `delivery: { branch: string }` to the v2 state row (packages/rex/src/schema/v2.ts, beside shippedIn and prs), written by packages/rex/src/store/state-writer.ts and read back by prd-model-reader.ts, and validated (a non-string or empty branch is a validation error). Add rex core functions (e.g. packages/rex/src/core/work-set.ts) that the CLI and MCP in a later task call: assign a list of item ids to a branch, unassign them, and read a branch's work set. Assigning a change writes `delivery` on every open task under it (pending, in_progress or failing; never completed or deleted ones). A change with no tasks (changeWorkShape 'unit' in core/change-selection.ts) counts as one task and gets `delivery` on its own row. A task (or task-less change) whose `delivery.branch` names a different branch is refused, naming that branch, unless the caller passes `move`; assigning to the branch it is already on is a no-op. Unassigning removes the field. The reader returns the ids of the units assigned to a branch, and also whether that branch has any assignment at all (any status), because a later task treats 'branch has no assignments' as 'no work set'. The functions take the branch as a parameter; reading the current branch is a separate task. This is a soft-frozen schema surface: the field is optional and additive, so old trees load unchanged. Operator notes: scope is P2-1 only. No dashboard UI, no 'Start a branch', no work-sets.json mirror, no cross-worktree refusal (P2-2 and P2-3, later PRs). hench reaches rex only through packages/hench/src/prd/rex-gateway.ts; read docs/architecture/gateways.md and the gateway ceiling in tests/e2e/architecture-policy.test.js before adding to it, and prefer one export over several. PRD writes go through withPrdModelTransaction. Run the static root policy suites before finishing (tests/e2e/architecture-policy, domain-isolation, shell-spawn inventory, wall-clock inventory, layout-literal, obfuscated-code). Add a patch changeset (scoped name, e.g. @n-dx/rex) for every package you touch. Do not write under .claude/."
+acceptanceCriteria:
+  - "`delivery: { branch }` round-trips through state.yaml and an invalid value fails validation (schema and store tests)"
+  - "Assigning a change writes every open task, a task-less change gets the field on its own row, and a task on another branch is refused unless `move` is passed (core tests)"
+  - "Two branches assigning different tasks of the same change merge through the rex-state driver without a conflict (state-merge test)"
+priority: "high"
+run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "ndx-capture"
+---
