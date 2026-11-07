@@ -4,10 +4,14 @@ items:
     lastModified: "2026-11-07T01:39:01.814Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "31307b89-23f6-452a-bd9d-b765e4c23901":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-07T01:43:22.914Z"
-    activeIntervals: [{"start":"2026-11-07T01:43:22.914Z"}]
-    lastModified: "2026-11-07T01:43:23.598Z"
+    completedAt: "2026-11-07T01:53:29.659Z"
+    endedAt: "2026-11-07T01:53:29.659Z"
+    activeIntervals: [{"end":"2026-11-07T01:53:29.659Z","start":"2026-11-07T01:43:22.914Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Resume re-applies Codex policy via -c overrides (llm-client, hench); Sidecar Codex turns carry --ignore-user-config, features off, and the ndx-sidecar broker via -c flags with headers in child env only."
+    lastModified: "2026-11-07T01:53:29.659Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "84d07c33-0fb2-4a54-9e9b-88acd0abd9cb":
     createdAt: "2026-11-07T01:37:00.640Z"
