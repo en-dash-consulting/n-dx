@@ -8,14 +8,25 @@
  * `unit`) counts as one task and carries `delivery` on its own row. A unit
  * sits on at most one branch.
  *
+ * ## Inheritance
+ *
+ * A change's own `delivery` covers every unit under it that has none of its
+ * own, so a task-less change assigned to a branch keeps the tasks it is later
+ * split into on that branch. A unit's own `delivery` overrides the nearest
+ * enclosing change's. {@link effectiveDelivery} is that one rule, and every
+ * reader and both plans use it.
+ *
  * - **Assign.** A task names itself; a change names every open unit under it
  *   (pending, in progress or failing; never completed, deferred, cancelled or
- *   deleted), through nested changes. A unit already on another branch is
- *   refused, naming that branch, unless the caller passes `move`; one already
- *   on this branch is left alone. A refusal throws {@link WorkSetError} before
- *   anything is changed.
+ *   deleted), through nested changes. A unit already on another branch, by
+ *   its own or an inherited `delivery`, is refused, naming that branch and the
+ *   change it inherits from, unless the caller passes `move`, which gives the
+ *   unit its own `delivery`; one already on this branch is left alone. A
+ *   refusal throws {@link WorkSetError} before anything is changed.
  * - **Unassign.** Removes `delivery` from the named task, or from a change and
- *   every live node under it, whatever its status.
+ *   every live node under it, whatever its status, so the units inheriting
+ *   from the change drop out with it. A named task that only inherits keeps
+ *   its branch; it is reported with the change it inherits from.
  * - **Read.** {@link readWorkSet}: the open units on a branch, and whether the
  *   branch has any assignment at all, since a branch without one has no work
  *   set and selection there is unchanged.
@@ -62,6 +73,14 @@ export interface AssignReport {
 export interface UnassignReport {
   /** Nodes whose `delivery` was removed, with the branch they were on. */
   removed: Array<{ id: string; from: string }>;
+  /** Named tasks that stay on the branch through their change's `delivery`, with that change's id. */
+  inherited: Array<{ id: string; from: string; change: string }>;
+}
+
+/** The branch a node is on, and the node whose `delivery` puts it there: itself or an enclosing change. */
+export interface EffectiveDelivery {
+  branch: string;
+  owner: RuleNode;
 }
 
 export interface WorkSetPlan<R> {
@@ -100,12 +119,15 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
     } else problems.push(`${label(node)} is a ${node.type}: a work set holds changes and tasks`);
   }
 
+  const deliveryOf = deliveryResolver(index);
   const report: AssignReport = { branch, assigned: [], moved: [], unchanged: [] };
   for (const unit of units) {
-    const from = unit.delivery?.branch;
+    const current = deliveryOf(unit);
+    const from = current?.branch;
     if (from === branch) report.unchanged.push(unit.id);
-    else if (from !== undefined && !options.move) {
-      problems.push(`${label(unit)} is on branch "${from}"; pass move to take it onto "${branch}"`);
+    else if (current !== undefined && !options.move) {
+      const via = current.owner === unit ? "" : ` through change ${label(current.owner)}`;
+      problems.push(`${label(unit)} is on branch "${from}"${via}; pass move to take it onto "${branch}"`);
     } else {
       if (from !== undefined) report.moved.push({ id: unit.id, from });
       report.assigned.push(unit.id);
@@ -124,34 +146,53 @@ export function planUnassignFromBranch(input: V2Tree, refs: readonly string[], o
   const index = indexTree(tree);
   const problems: string[] = [];
   const nodes = new Set<RuleNode>();
+  const tasks = new Set<RuleNode>();
   for (const ref of refs) {
     const node = index.resolve(ref);
     if (!node) problems.push(`No change or task "${ref}"`);
-    else if (node.type === "task") nodes.add(node);
-    else if (node.type === "change") for (const n of liveSubtree(node)) nodes.add(n);
+    else if (node.type === "task") {
+      nodes.add(node);
+      tasks.add(node);
+    } else if (node.type === "change") for (const n of liveSubtree(node)) nodes.add(n);
     else problems.push(`${label(node)} is a ${node.type}: a work set holds changes and tasks`);
   }
   if (problems.length > 0) throw new WorkSetError(`Cannot unassign: ${problems.join("; ")}`, problems);
 
-  const report: UnassignReport = { removed: [] };
+  const report: UnassignReport = { removed: [], inherited: [] };
   for (const node of nodes) {
     if (node.delivery === undefined || (onBranch !== undefined && node.delivery.branch !== onBranch)) continue;
     report.removed.push({ id: node.id, from: node.delivery.branch });
     delete node.delivery;
   }
+  // Read after the removals, so a task named beside its change no longer inherits.
+  const deliveryOf = deliveryResolver(index);
+  for (const task of tasks) {
+    const current = deliveryOf(task);
+    if (current && current.owner !== task && (onBranch === undefined || current.branch === onBranch)) {
+      report.inherited.push({ id: task.id, from: current.branch, change: current.owner.id });
+    }
+  }
   return { tree, report, changed: report.removed.length > 0 };
 }
 
-/** The work set of `branch`: its open units, and whether it has any assignment at all. */
+/** The work set of `branch`: its open units, by their own or an inherited `delivery`, and whether it has any assignment at all. */
 export function readWorkSet(tree: V2Tree, branch: string): WorkSet {
+  const index = indexTree(tree);
+  const deliveryOf = deliveryResolver(index);
   const ids: string[] = [];
   let hasAssignments = false;
-  for (const { node } of indexTree(tree).entries) {
-    if (node.delivery?.branch !== branch) continue;
-    hasAssignments = true;
-    if (isUnit(node) && isActionableStatus(node.status)) ids.push(node.id);
+  for (const { node } of index.entries) {
+    if (node.delivery?.branch === branch) hasAssignments = true;
+    if (isUnit(node) && isActionableStatus(node.status) && deliveryOf(node)?.branch === branch) ids.push(node.id);
   }
   return { branch, ids, hasAssignments };
+}
+
+/** The branch the node `ref` names is on, by its own or its nearest enclosing change's `delivery`; undefined when on none. */
+export function effectiveDelivery(tree: V2Tree, ref: string): EffectiveDelivery | undefined {
+  const index = indexTree(tree);
+  const node = index.resolve(ref);
+  return node ? deliveryResolver(index)(node) : undefined;
 }
 
 /** A unit as output names it. */
@@ -204,6 +245,24 @@ export function describeUnits(tree: V2Tree, ids: readonly string[]): UnitInfo[] 
   });
 }
 
+/** A task that only inherits its branch, as output names it, with the change it inherits from. */
+export interface InheritedUnitInfo extends UnitInfo {
+  from: string;
+  change: { id: string; displayId?: string; title: string };
+}
+
+/** {@link UnassignReport.inherited} as output names it; an id the tree does not hold is skipped. */
+export function inheritedUnits(tree: V2Tree, inherited: UnassignReport["inherited"]): InheritedUnitInfo[] {
+  const index = indexTree(tree);
+  return inherited.flatMap(({ id, from, change }) => {
+    const node = index.resolve(id);
+    const owner = index.resolve(change);
+    if (!node || !owner) return [];
+    const changeInfo = { id: owner.id, ...(owner.displayId ? { displayId: owner.displayId } : {}), title: owner.title };
+    return [{ ...unitInfo(node), from, change: changeInfo }];
+  });
+}
+
 /** The open units on `branch`, grouped by the change they belong to, in tree order. */
 export function groupWorkSet(tree: V2Tree, branch: string): WorkSetGroup[] {
   const ids = new Set(readWorkSet(tree, branch).ids);
@@ -247,6 +306,18 @@ function assertBranch(branch: string): void {
   if (!DeliverySchema.safeParse({ branch }).success || branch.trim() !== branch) {
     throw new WorkSetError(`Invalid branch name ${JSON.stringify(branch)}: expected a non-empty name without surrounding whitespace`);
   }
+}
+
+/** A node's own `delivery`, else the nearest enclosing change's. */
+function deliveryResolver(index: ReturnType<typeof indexTree>): (node: RuleNode) => EffectiveDelivery | undefined {
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  return (node) => {
+    for (let at: RuleNode | undefined = node; at; at = parentOf.get(at)) {
+      if (at.delivery !== undefined) return { branch: at.delivery.branch, owner: at };
+      if (parentOf.get(at)?.type !== "change") return undefined;
+    }
+    return undefined;
+  };
 }
 
 /** A task, or a change worked as one unit. */

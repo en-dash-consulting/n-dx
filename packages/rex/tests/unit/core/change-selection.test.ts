@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { addTask } from "../../../src/core/change-completion.js";
 import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, openChangeTasks, resolveWorkById } from "../../../src/core/change-selection.js";
+import { planAssignToBranch, readWorkSet } from "../../../src/core/work-set.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -274,6 +275,15 @@ describe("workSet", () => {
 
   it("keeps claims working inside the set", () => {
     expect(ids(t, { workSet: new Set(["in", "solo"]), excludeIds: new Set(["in"]) })).toEqual(["solo"]);
+  });
+
+  it("selects the tasks a task-less change on the branch is split into, but not one with its own branch", () => {
+    let split = planAssignToBranch(tree(change("solo"), change("other")), ["solo"], "feat/solo").tree;
+    split = addTask(split, "solo", task("t1", { status: "pending" }), new Date(0)).tree;
+    split = addTask(split, "solo", task("t2", { status: "pending", delivery: { branch: "feat/elsewhere" } }), new Date(0)).tree;
+    const workSet = new Set(readWorkSet(split, "feat/solo").ids);
+    expect(ids(split, { workSet })).toEqual(["t1"]);
+    expect(findNextWork(split, { workSet })).toMatchObject({ kind: "task", node: { id: "t1" }, change: { id: "solo" } });
   });
 });
 

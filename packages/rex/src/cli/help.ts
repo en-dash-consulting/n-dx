@@ -263,9 +263,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "A branch's work set is the tasks assigned to it, recorded on the branch as\n" +
       "delivery: { branch } in state.yaml. A task sits on at most one branch.\n\n" +
       "add: assign tasks to the checked-out branch. A change id assigns its open\n" +
-      "tasks (a change with no tasks counts as one task). A task already on another\n" +
-      "branch is refused, naming it, unless --move takes it over.\n" +
-      "remove: clear tasks (or a change's tasks) from the checked-out branch.\n" +
+      "tasks (a change with no tasks counts as one task, and its branch covers the\n" +
+      "tasks it is later split into unless a task has its own). A task already on\n" +
+      "another branch is refused, naming it, unless --move takes it over.\n" +
+      "remove: clear tasks (or a change's tasks) from the checked-out branch. A task\n" +
+      "on it only through its change stays; remove the change.\n" +
       "show: list the branch's open tasks grouped by change, with their status.\n\n" +
       "Ids are full ids, display ids or change ids. Refused on the default branch\n" +
       "and on a detached HEAD: a work set belongs to a feature branch. Nothing is\n" +

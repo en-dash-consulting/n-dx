@@ -12,6 +12,7 @@ import { z } from "zod";
 import {
   assignToBranch,
   describeUnits,
+  inheritedUnits,
   requireWorkSetBranch,
   unassignFromBranch,
   WorkSetError,
@@ -38,7 +39,8 @@ export async function handleAssignToBranch(projectDir: string, rexDir: string, a
       const report = await unassignFromBranch(rexDir, args.ids, branch);
       const { tree } = await loadPrdModel(rexDir);
       const removed = describeUnits(tree, report.removed.map((r) => r.id));
-      return textResult(JSON.stringify({ branch, removed }));
+      const inherited = inheritedUnits(tree, report.inherited);
+      return textResult(JSON.stringify({ branch, removed, ...(inherited.length > 0 ? { inherited } : {}) }));
     }
     const report = await assignToBranch(rexDir, args.ids, branch, { move: args.move });
     const { tree } = await loadPrdModel(rexDir);
@@ -56,8 +58,9 @@ export const assignToBranchTool = defineTool({
   description:
     "Add changes and tasks to the current git branch's work set, or take them off with remove (v2 PRD). The work set is the tasks " +
     "assigned to the branch, recorded as delivery: { branch } in state.yaml; a task sits on at most one branch. A change id " +
-    "assigns its open tasks (a change with no tasks counts as one task). A task already on another branch is refused, naming it, " +
-    "unless move is true. Acts on the checked-out branch of the session's workspace; refused on the default branch and on a " +
+    "assigns its open tasks (a change with no tasks counts as one task, and its branch covers the tasks it is later split into, " +
+    "unless a task has its own). A task already on another branch is refused, naming it, unless move is true. Removing a change " +
+    "takes off the tasks that inherit from it; a task that only inherits is listed under inherited with its change, unchanged. Acts on the checked-out branch of the session's workspace; refused on the default branch and on a " +
     "detached HEAD. Writes the PRD; commits nothing. Returns what was written (id, title, status; movedFrom for a moved task).",
   schema: {
     ids: z.array(z.string()).describe("Change or task ids, display ids (e.g. CH-12) or aliases"),

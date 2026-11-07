@@ -4,14 +4,16 @@
  * on the default branch and a detached HEAD, and nothing is committed.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { FIXTURE_TASK, copyV2Fixture } from "../helpers/v2-fixture.js";
 
-const cliPath = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
+/** A task CH-1 gains after it was assigned while task-less. */
+const SPLIT_TASK = "c0000000-0000-4000-8000-0000000000b1";
+const cliPath =join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
 
 let dir: string;
 const git = (...args: string[]) =>
@@ -79,6 +81,34 @@ describe("rex branch", () => {
     // remove acts on this branch only
     git("checkout", "-q", "feat/one");
     expect(rex("remove", FIXTURE_TASK).stdout).toContain("Nothing to remove");
+  });
+
+  it("shows the tasks a task-less change on the branch is split into, and removing the change drops them", async () => {
+    const changeDir = join(dir, ".rex", "changes", "add-apple-pay");
+    await rm(join(changeDir, "wire-the-button.md"));
+    git("checkout", "-q", "-b", "feat/split");
+    const add = rex("add", "CH-1");
+    expect(add.status, add.stderr).toBe(0);
+    expect(add.stdout).toContain("Added to feat/split: CH-1");
+
+    // The split: a task with no delivery of its own.
+    await writeFile(
+      join(changeDir, "show-the-sheet.md"),
+      `---\nid: "${SPLIT_TASK}"\ntype: "task"\ntitle: "Show the sheet"\nslug: "show-the-sheet"\n---\n`,
+    );
+    const show = rex("show");
+    expect(show.stdout).toContain("CH-1  Add Apple Pay");
+    expect(show.stdout).toContain("Show the sheet  [pending]");
+
+    const inherits = rex("remove", SPLIT_TASK);
+    expect(inherits.status, inherits.stderr).toBe(0);
+    expect(inherits.stdout).toContain("inherits feat/split from change CH-1");
+    expect(rex("show").stdout).toContain("Show the sheet  [pending]");
+
+    const removed = rex("remove", "CH-1");
+    expect(removed.status, removed.stderr).toBe(0);
+    expect(removed.stdout).toContain("Removed from feat/split: CH-1");
+    expect(rex("show").stdout).toContain("has no work set");
   });
 
   it("refuses on the default branch and on a detached HEAD", () => {
