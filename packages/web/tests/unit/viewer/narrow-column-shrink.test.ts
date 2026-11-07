@@ -30,6 +30,12 @@ describe("Tasks row in a narrowed column", () => {
     expect(declarations(prd, sel)).toMatch(/min-width:\s*0/);
   });
 
+  it(".prd-node-title shrinks from its content width, not from a 0% basis", () => {
+    // flex: 1 (basis 0%) gives the title no width at all once the row is
+    // short of space, while the tag list keeps what it needs.
+    expect(declarations(prd, ".prd-node-title")).toMatch(/flex:\s*1 1 auto/);
+  });
+
   it(".prd-tag-list shrinks and wraps", () => {
     const d = declarations(prd, ".prd-tag-list");
     expect(d).not.toMatch(/flex-shrink:\s*0/);
