@@ -169,6 +169,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
       statement: "Cross-package imports pass through a gateway module; no zone cycles.",
       health: "ok",
       appliesTo: "all",
+      openChanges: [],
     },
     {
       id: "constraint-cross-os",
@@ -177,6 +178,7 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
       statement: "Every command behaves the same on Windows, macOS and Linux.",
       health: "defective",
       appliesTo: ["Autonomous task runs", "Per-task token accounting"],
+      openChanges: [],
     },
   ],
 };

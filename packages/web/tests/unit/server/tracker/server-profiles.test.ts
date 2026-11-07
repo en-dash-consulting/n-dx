@@ -188,6 +188,16 @@ describe("item URL template", () => {
     expect(trackerItemIdOfRef(caos, url!)).toBe(uuid);
   });
 
+  it("reads the id from a URL copied from the browser, ignoring workspace, title slug and query", () => {
+    const caos = (loadServerProfile("caos", { ndxHome }) as ServerProfile).tracker!;
+    const browser = "https://www.notion.so/ws/Some-Title-3b3a80b7192480f7b5fce8093ba5f7f0?pvs=4";
+    expect(trackerItemIdOfRef(caos, browser)).toBe(uuid);
+    expect(trackerItemIdOfRef(caos, "https://www.notion.so/ws/3b3a80b7192480f7b5fce8093ba5f7f0#top")).toBe(uuid);
+    // No id in the tail: read as before. A foreign site is never touched.
+    expect(trackerItemIdOfRef(caos, "https://www.notion.so/ws/Some-Title")).toBe("ws/Some-Title");
+    expect(trackerItemIdOfRef(caos, "https://other.example/Some-Title-3b3a80b7192480f7b5fce8093ba5f7f0")).toBe("https://other.example/Some-Title-3b3a80b7192480f7b5fce8093ba5f7f0");
+  });
+
   it("puts {id} in as given, and returns any ref the template did not build unchanged", () => {
     const mapping = { itemUrlTemplate: "https://desk.example/t/{id}/view" };
     expect(trackerItemUrl(mapping, "a b")).toBe("https://desk.example/t/a%20b/view");

@@ -41,7 +41,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
@@ -54,6 +54,7 @@ import { resolveOwnNdxCli, resolveOwnPackageCli, type CliInvocation } from "./ow
 import { refuseWhileRestricted } from "./trust-gate.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { readEffectiveNdxConfig } from "./effective-agent-config.js";
 import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import type { SidecarCommandEnd } from "./sidecar/carry-out.js";
@@ -1750,12 +1751,32 @@ interface AuthCheckResult {
  * mounts its chip on every navigation — without a cache, each visit costs a
  * spawn and rapid Re-checks stack processes. What the check reports only
  * changes when credentials or LLM config change, so the result is cached for
- * the server's lifetime and invalidated on LLM config saves
+ * the server's lifetime, keyed by the effective vendor config
+ * ({@link authCheckKey}) and dropped on dashboard LLM config saves
  * ({@link invalidateAuthCheckCache}); `?refresh=true` forces a fresh run.
  * Concurrent requests share the in-flight check instead of spawning again.
  */
-let authCheckCache: AuthCheckResult | null = null;
+let authCheckCache: { key: string; result: AuthCheckResult } | null = null;
 let authCheckInFlight: Promise<AuthCheckResult> | null = null;
+
+/**
+ * What the credential check depends on: the effective vendor and that vendor's
+ * `llm.<vendor>` block (CLI path, auth mode, key, endpoint, model — everything
+ * `ndx auth`'s preflight reads). A verdict is a hit only for the key it was made
+ * under, so a change made outside the dashboard (`ndx config`, a hand edit, a
+ * branch switch) is a miss — no watcher, and no save path has to remember to
+ * call {@link invalidateAuthCheckCache}. Hashed so no API key is held as a key.
+ */
+function authCheckKey(projectDir: string): string {
+  const llm = (readEffectiveNdxConfig(projectDir)["llm"] ?? {}) as Record<string, unknown>;
+  const vendor = typeof llm["vendor"] === "string" && llm["vendor"] ? llm["vendor"] : "claude";
+  return createHash("sha256").update(JSON.stringify([vendor, llm[vendor] ?? null])).digest("hex");
+}
+
+/** The cached verdict when it was made under the config now in effect. */
+function currentAuthVerdict(projectDir: string): AuthCheckResult | null {
+  return authCheckCache && authCheckCache.key === authCheckKey(projectDir) ? authCheckCache.result : null;
+}
 
 /** Drop the cached credential-check result (call when LLM config changes). */
 export function invalidateAuthCheckCache(): void {
@@ -1799,16 +1820,18 @@ async function handleAuth(
   const refresh = new URL(req.url || "/", "http://localhost")
     .searchParams.get("refresh") === "true";
 
-  if (!refresh && authCheckCache) {
-    jsonResponse(res, 200, { ...authCheckCache, cached: true });
+  const verdict = refresh ? null : currentAuthVerdict(ctx.projectDir);
+  if (verdict) {
+    jsonResponse(res, 200, { ...verdict, cached: true });
     return true;
   }
 
   // Whoever asks while a check runs gets that check's answer — a forced
   // refresh included, since the in-flight result is just as fresh.
   if (!authCheckInFlight) {
+    const key = authCheckKey(ctx.projectDir);
     authCheckInFlight = runAuthCheck(ctx).then((result) => {
-      authCheckCache = result;
+      authCheckCache = { key, result };
       authCheckInFlight = null;
       return result;
     });
@@ -1825,8 +1848,9 @@ async function handleAuth(
  * leave the live check, which runs the vendor CLI on a real prompt, to Robot
  * Wrangler's Re-check.
  */
-function handleAuthCached(res: ServerResponse): boolean {
-  jsonResponse(res, 200, authCheckCache ? { ...authCheckCache, cached: true } : { cached: false });
+function handleAuthCached(res: ServerResponse, ctx: ServerContext): boolean {
+  const verdict = currentAuthVerdict(ctx.projectDir);
+  jsonResponse(res, 200, verdict ? { ...verdict, cached: true } : { cached: false });
   return true;
 }
 
@@ -2314,7 +2338,7 @@ export function handleCommandsRoute(
     return handleAuth(req, res, ctx);
   }
   if (path === "auth/cached" && method === "GET") {
-    return handleAuthCached(res);
+    return handleAuthCached(res, ctx);
   }
   if (path === "validate-tokens" && method === "POST") {
     return handleValidateTokens(req, res, ctx);
