@@ -142,7 +142,16 @@
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  /* Shrinks beside the count badge and wraps between words, never inside one. */
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* The "N open" count keeps its own space beside the title. */
+.stage-tile-head .stage-section-badge {
+  flex-shrink: 0;
 }
 
 .stage-tile-blurb {
