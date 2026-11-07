@@ -89,6 +89,8 @@ const POLL_INTERVAL_MS = 10_000;
 
 let cachedStatus: ProjectStatus | null = null;
 let fetchPromise: Promise<ProjectStatus | null> | null = null;
+/** `useStatusLayout` subscribers, told of every status the fetcher caches. */
+const statusListeners = new Set<(status: ProjectStatus) => void>();
 
 /**
  * Shape check for the `/api/status` body, run once here rather than left to
@@ -128,6 +130,7 @@ async function fetchStatus(): Promise<ProjectStatus | null> {
       const data: unknown = await res.json();
       if (!isValidProjectStatus(data)) return null;
       cachedStatus = data;
+      for (const listener of statusListeners) listener(data);
       return data;
     } catch {
       return null;
@@ -136,6 +139,25 @@ async function fetchStatus(): Promise<ProjectStatus | null> {
     }
   })();
   return fetchPromise;
+}
+
+/**
+ * The served tree's PRD layout from the shared status; `"v1"` until it lands
+ * or when there is no PRD.
+ *
+ * Reads the module cache and listens for its updates rather than calling
+ * `useProjectStatus`: that hook opens a WebSocket and a poll per instance, and
+ * this one is called by every tile, section and title on a page.
+ */
+export function useStatusLayout(): "v1" | "v2" {
+  const [status, setStatus] = useState<ProjectStatus | null>(cachedStatus);
+  useEffect(() => {
+    statusListeners.add(setStatus);
+    if (cachedStatus) setStatus(cachedStatus);
+    else void fetchStatus();
+    return () => { statusListeners.delete(setStatus); };
+  }, []);
+  return status?.rex?.layout === "v2" ? "v2" : "v1";
 }
 
 /** Hook that returns project status, polling at a regular interval.

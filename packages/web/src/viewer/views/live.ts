@@ -42,7 +42,6 @@ import {
   attentionReason,
   attentionRuns,
   canEndRun,
-  chainLabel,
   endableDeadRuns,
   endDeadPrompt,
   endUnknownPrompt,
@@ -51,6 +50,7 @@ import {
   machineTiles,
   phaseSegments,
   reconcileNotice,
+  runnableRowParts,
   runningItems,
   stopAllPrompt,
   stoppableRuns,
@@ -253,12 +253,12 @@ function RunMeta({ run }: { run: LiveRunFull }) {
 }
 
 function RunCard({ run, navigateTo }: { run: LiveRunFull; navigateTo: NavigateTo }) {
-  const chain = chainLabel(run.epicChain);
+  const { text, chain } = runnableRowParts(run, run.taskTitle ?? run.runId);
   return h("li", { class: "live-card" },
     h(PeekLink, { target: runTarget(run), navigateTo, class: "live-card-link" },
       h("span", { class: "live-tile-kind", "aria-hidden": "true" }, "Task"),
       h("span", { class: "live-card-body" },
-        h("span", { class: "live-card-title" }, run.taskTitle ?? run.runId),
+        h("span", { class: "live-card-title" }, text),
         chain ? h("span", { class: "live-card-chain" }, chain) : null,
         h(RunMeta, { run }),
         run.lastProgress ? h("span", { class: "live-card-step" }, run.lastProgress) : null,
@@ -453,13 +453,15 @@ function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: N
       next.length === 0
         ? h("p", { key: "l", class: "live-muted" }, "Nothing actionable in the PRD.")
         : h("ol", { key: "l", class: "live-queue" }, next.map((t: LiveNextTask) =>
-        h("li", { key: t.id },
-          h("a", {
+        h("li", { key: t.id }, (() => {
+          const { text, chain } = runnableRowParts(t, t.title);
+          return h("a", {
             class: "live-queue-item",
             href: "#",
             onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo("prd", { taskId: t.id }); },
-          }, h("span", { class: "live-card-title" }, t.title),
-            chainLabel(t.epicChain) ? h("span", { class: "live-card-chain" }, chainLabel(t.epicChain)) : null),
+          }, h("span", { class: "live-card-title" }, text),
+            chain ? h("span", { class: "live-card-chain" }, chain) : null);
+        })(),
         ))),
     ];
   return h("section", { class: "live-side-section", "aria-labelledby": readyNext ? "live-ready-h" : "live-queue-h" },
@@ -557,8 +559,8 @@ function IdleState({ snapshot, analyzedAt, jobs, refresh, navigateTo }: {
         h("h3", null, "Start the next task"),
         next
           ? [
-            h("p", { key: "t", class: "live-card-title" }, next.title),
-            chainLabel(next.epicChain) ? h("p", { key: "c", class: "live-card-chain" }, chainLabel(next.epicChain)) : null,
+            h("p", { key: "t", class: "live-card-title" }, runnableRowParts(next, next.title).text),
+            runnableRowParts(next, next.title).chain ? h("p", { key: "c", class: "live-card-chain" }, runnableRowParts(next, next.title).chain) : null,
             h(TaskStartControl, { key: "b", task: next, label: "Start working", runModes: true, onStarted: () => { void refresh(); }, navigateTo }),
           ]
           : h("p", { class: "live-muted" }, "Nothing actionable in the PRD."),

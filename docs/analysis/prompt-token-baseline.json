@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23554,
-    "uniqueTokens": 15049,
+    "perCallTokens": 23562,
+    "uniqueTokens": 15058,
     "skills": 14,
     "skillTokens": 23605
   },
@@ -120,8 +120,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4747,
-      "uniqueTokens": 4745
+      "perCallTokens": 4755,
+      "uniqueTokens": 4754
     },
     "core": {
       "surfaces": 1,
@@ -351,6 +351,14 @@
       "tokens": 15,
       "usedBy": [
         "buildMetaEnvelope"
+      ]
+    },
+    {
+      "pkg": "hench",
+      "name": "captureNoun",
+      "tokens": 11,
+      "usedBy": [
+        "buildReviewBrief"
       ]
     },
     {
@@ -861,12 +869,13 @@
       "inline": false,
       "literals": 114,
       "constants": {
+        "captureNoun": 11,
         "inboxClause": 11,
         "reportOutputLines": 353
       },
-      "ownTokens": 1536,
-      "fixedChars": 7601,
-      "fixedTokens": 1901
+      "ownTokens": 1534,
+      "fixedChars": 7635,
+      "fixedTokens": 1909
     },
     {
       "pkg": "hench",
@@ -1074,8 +1083,8 @@
       }
     ]
   },
-  "contentHash": "beee9c6e09119ff9",
-  "recordedAt": "2026-11-05T20:51:49.575Z",
-  "commit": "38e1f3f8af52",
+  "contentHash": "947ba663340e1a10",
+  "recordedAt": "2026-11-06T20:43:58.330Z",
+  "commit": "26e33c82247b",
   "dirty": false
 }

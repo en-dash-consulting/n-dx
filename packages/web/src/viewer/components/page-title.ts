@@ -11,19 +11,20 @@
 
 import { h } from "preact";
 import type { ViewId } from "../types.js";
-import { VIEW_META, isStageId, isLiveView, viewBlurb, viewGlyph } from "../api.js";
+import { VIEW_META, isStageId, isLiveView, viewLabelFor, viewBlurbFor, viewGlyph, useStatusLayout } from "../api.js";
 import type { ViewMeta } from "../api.js";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 export function PageTitle({ view }: { view: ViewId }) {
   const cliName = useCliName();
+  const layout = useStatusLayout();
   // Looked up rather than asserted: a restored navigation state can name a
   // view a newer build removed (see project-context.ts).
   const meta = VIEW_META[view] as ViewMeta | undefined;
   if (!meta || view === "home" || isStageId(view) || isLiveView(view)) return null;
   return h("div", { class: "page-title" },
     h("span", { class: "page-title-glyph", "aria-hidden": "true" }, viewGlyph(view)),
-    h("h1", { class: "page-title-text" }, resolveCliLabel(meta.label, cliName)),
-    h("p", { class: "page-title-blurb" }, resolveCliLabel(viewBlurb(view), cliName)),
+    h("h1", { class: "page-title-text" }, resolveCliLabel(viewLabelFor(view, layout), cliName)),
+    h("p", { class: "page-title-blurb" }, resolveCliLabel(viewBlurbFor(view, layout), cliName)),
   );
 }

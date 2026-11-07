@@ -92,6 +92,8 @@ export interface PlannedTask {
 export interface PlannedLane {
   command: string;
   changeId: string;
+  /** The change's title; its id when the PRD does not name it. */
+  changeTitle: string;
   /**
    * The lane must run in a worktree of its own: true for every lane after the
    * first, and for lane 1 too while a run is live in this worktree. Each
@@ -104,7 +106,7 @@ export interface PlannedLane {
 
 /** What a lane that needs its own worktree is told, in the text plan. */
 export const OWN_WORKTREE_NOTE =
-  "Run this lane in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
+  "Run this track in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
 
 export interface QueuePlan {
   lanes: PlannedLane[];
@@ -156,7 +158,7 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
     if (cold) {
       exclude(t, `tagged ${cold}: cold-only, run it on its own`);
     } else if (!LANE_TIERS.has(t.tier)) {
-      exclude(t, `effective tier ${t.tier} (${t.tierSource}): lanes take light or standard only`);
+      exclude(t, `effective tier ${t.tier} (${t.tierSource}): tracks take light or standard only`);
     } else {
       eligible.push(t);
     }
@@ -170,7 +172,7 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
     if (stranded.length === 0) break;
     for (const t of stranded) {
       const missing = t.blockedBy.find((b) => !ids.has(b)) as string;
-      exclude(t, `waits on ${missing}, which is not in a lane`);
+      exclude(t, `waits on ${missing}, which is not in a track`);
     }
     const gone = new Set(stranded.map((t) => t.id));
     laneable = laneable.filter((t) => !gone.has(t.id));
@@ -188,7 +190,7 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
     // The cap keeps a prefix of the dependency order, so a kept task's
     // blockers are kept too; an over-cap task waits for a later plan.
     for (const t of ordered.slice(LANE_TASK_CAP)) {
-      exclude(t, `over the ${LANE_TASK_CAP}-task lane cap for change ${changeId}; plan again after the lane ends`);
+      exclude(t, `over the ${LANE_TASK_CAP}-task track cap for change ${changeId}; plan again after the track ends`);
     }
     return { change: changeOf(group[0]), tasks: ordered.slice(0, LANE_TASK_CAP) };
   });
@@ -201,15 +203,15 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
       if (chosen.length >= free) {
         return free === 0
           ? `no free run slot: ${activeRuns} active of ${runLimit}`
-          : `no free run slot: ${free} free of ${runLimit}, taken by earlier lanes`;
+          : `no free run slot: ${free} free of ${runLimit}, taken by earlier tracks`;
       }
       if (chosen.length === 0) return undefined;
       const first = chosen[0].change;
-      if (first.touches.length === 0) return `lane 1 (change ${first.id}) has no touches, so it runs alone`;
-      if (lane.change.touches.length === 0) return `change ${lane.change.id} has no touches, so it is never paired with another lane`;
+      if (first.touches.length === 0) return `track 1 (change ${first.id}) has no touches, so it runs alone`;
+      if (lane.change.touches.length === 0) return `change ${lane.change.id} has no touches, so it is never paired with another track`;
       for (const other of chosen) {
         const overlap = sharedTouch(lane.change, other.change);
-        if (overlap) return `change ${lane.change.id} touches ${overlap}, as change ${other.change.id} in an earlier lane does`;
+        if (overlap) return `change ${lane.change.id} touches ${overlap}, as change ${other.change.id} in an earlier track does`;
       }
       return undefined;
     })();
@@ -222,12 +224,13 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
   const lanes: PlannedLane[] = chosen.map((lane, i) => ({
     command: input.command(lane.tasks.map((t) => t.id)),
     changeId: lane.change.id,
+    changeTitle: lane.change.title,
     ownWorktree: i > 0 || hereBusy,
     tasks: lane.tasks.map((t, j) => ({
       id: t.id,
       title: t.title,
       reason:
-        `lane ${i + 1}, step ${j + 1} of ${lane.tasks.length}: change ${lane.change.id}, tier ${t.tier}` +
+        `track ${i + 1}, step ${j + 1} of ${lane.tasks.length}: change ${lane.change.id}, tier ${t.tier}` +
         (t.blockedBy.length > 0 ? `, after ${t.blockedBy.join(", ")}` : ""),
     })),
   }));
@@ -245,17 +248,17 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
     tasks.length === 0
       ? "No ready tasks."
       : free === 0
-        ? `No lanes: ${activeRuns} run${activeRuns === 1 ? "" : "s"} active of a limit of ${runLimit}, so no run slot is free.`
+        ? `No tracks: ${activeRuns} run${activeRuns === 1 ? "" : "s"} active of a limit of ${runLimit}, so no run slot is free.`
         : lanes.length === 0
-          ? "No lanes: every ready task is excluded."
-          : `${lanes.length} lane${lanes.length === 1 ? "" : "s"} for ${free} free run slot${free === 1 ? "" : "s"} (${activeRuns} active of ${runLimit}).`;
+          ? "No tracks: every ready task is excluded."
+          : `${lanes.length} track${lanes.length === 1 ? "" : "s"} for ${free} free run slot${free === 1 ? "" : "s"} (${activeRuns} active of ${runLimit}).`;
   const worktreeNote =
     lanes.length === 0
       ? ""
       : hereBusy
-        ? " A run is live in this worktree, so every lane must run in its own worktree."
+        ? " A run is live in this worktree, so every track must run in its own worktree."
         : lanes.length > 1
-          ? " Lane 1 runs in this worktree; every later lane must run in its own worktree."
+          ? " Track 1 runs in this worktree; every later track must run in its own worktree."
           : "";
   const summary = verdict + worktreeNote + scopeNote;
 

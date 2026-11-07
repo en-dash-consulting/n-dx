@@ -95,6 +95,8 @@ describe("Live Ready next", () => {
     expect(side.textContent).toContain("lane 1, step 2 of 2: change c1, tier light, after t1");
     expect(side.textContent).toContain("tagged migration: cold-only");
     expect(side.textContent).toContain(PLAN.summary);
+    expect(side.textContent).toContain("Track 1");
+    expect(side.textContent).toContain("Not in a track");
   });
 
   it("tells every lane after the first to run in its own worktree, and lane 1 nothing", async () => {
@@ -111,8 +113,8 @@ describe("Live Ready next", () => {
     expect(lanes).toHaveLength(3);
     expect(lanes.map((l) => l.querySelector(".live-ready-worktree")?.textContent ?? null)).toEqual([
       null,
-      expect.stringContaining("Run this lane in its own worktree"),
-      expect.stringContaining("Run this lane in its own worktree"),
+      expect.stringContaining("Run this track in its own worktree"),
+      expect.stringContaining("Run this track in its own worktree"),
     ]);
   });
 

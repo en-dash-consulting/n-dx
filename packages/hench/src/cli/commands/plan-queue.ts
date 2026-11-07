@@ -129,14 +129,14 @@ export function laneCommand(cliName: string, taskIds: readonly string[], blocked
 export function formatPlan(plan: QueuePlan): string[] {
   const lines = [plan.summary];
   plan.lanes.forEach((lane, i) => {
-    lines.push("", `Lane ${i + 1} (change ${lane.changeId}):`);
+    lines.push("", `Track ${i + 1} (change ${lane.changeId}):`);
     if (lane.ownWorktree) lines.push(`  ${OWN_WORKTREE_NOTE}`);
     else if (plan.lanes.length > 1) lines.push("  Runs in this worktree.");
     lines.push(`  ${lane.command}`);
     for (const t of lane.tasks) lines.push(`  • ${t.title} (${t.id}): ${t.reason}`);
   });
   if (plan.excluded.length > 0) {
-    lines.push("", "Not in a lane:");
+    lines.push("", "Not in a track:");
     for (const t of plan.excluded) lines.push(`  • ${t.title} (${t.id}): ${t.reason}`);
   }
   return lines;

@@ -53,7 +53,7 @@ export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing 
 export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>> = {
   command: "Command",
   work: "Work",
-  "change-set": "Change set",
+  "change-set": "PRD edits",
   "run-plan": "Run plan",
   placement: "Placement",
   edit: "Edit",
@@ -106,7 +106,7 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
         return str(input.taskId) ? [cliName, ...workCommandArgs({ taskId: str(input.taskId), options, dir: "." })].join(" ") : "";
       }
       case "change-set": return count(input.items, "item", "items");
-      case "run-plan": return card.runPlan ? count(card.runPlan.lanes, "lane", "lanes") : "";
+      case "run-plan": return card.runPlan ? count(card.runPlan.lanes, "track", "tracks") : "";
       // The card's own placement, as approval will write it; the call's input only when the card carries none.
       case "placement":
         return card.placement ? placementTitle(card.placement) : str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
@@ -305,7 +305,7 @@ export function runPlanRestartPrompt(plan: SidecarCard, lane: number): string {
   const first = planned?.tasks[0];
   const { options } = stepRunOptions(planned ? laneSteps(planned)[0] ?? "" : "");
   const withOptions = Object.keys(options).length > 0 ? ` with options ${JSON.stringify(options)}` : "";
-  return `Start lane ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""}${withOptions} only. Do not propose a new run plan.`;
+  return `Start track ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""}${withOptions} only. Do not propose a new run plan.`;
 }
 
 /**
@@ -359,27 +359,27 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
         const steps = laneSteps(lane);
         return h("li", { class: "sidecar-run-plan-lane", "data-lane": index, key: lane.changeId },
           h("div", { class: "sidecar-run-plan-lane-head" },
-            h("span", { class: "sidecar-run-plan-lane-title" }, `Lane ${index + 1} · change ${lane.changeId}`),
+            h("span", { class: "sidecar-run-plan-lane-title" }, `Track ${index + 1} · change ${lane.changeId}`),
             decidable
               ? h("button", {
                   type: "button",
                   class: "sidecar-run-plan-start",
                   disabled: deciding,
                   onClick: () => onStartLane(index),
-                }, "Start lane")
+                }, "Start track")
               : startAgain(card, index, cards, onRestartLane)
                 ? h("button", {
                     type: "button",
                     class: "sidecar-run-plan-start sidecar-run-plan-restart",
                     disabled: deciding,
                     onClick: () => onRestartLane!(index),
-                  }, "Start lane")
+                  }, "Start track")
                 : laneBadge(runPlanLaneState(card, index, cards)),
           ),
           lane.ownWorktree ? h("p", { class: "sidecar-run-plan-worktree" }, OWN_WORKTREE_NOTE) : null,
           h("ol", { class: "sidecar-run-plan-tasks" },
             lane.tasks.map((task, i) => h("li", { class: "sidecar-run-plan-task", key: task.id },
-              h("span", { class: "sidecar-run-plan-task-title" }, `${task.title}${i === 0 ? " (starts first)" : ""}`),
+              h("span", { class: "sidecar-run-plan-task-title" }, `${task.rowText ?? task.title}${i === 0 ? " (starts first)" : ""}`),
               h("span", { class: "sidecar-run-plan-task-reason" }, task.reason),
               h("code", { class: "sidecar-run-plan-command" }, steps[i] ?? lane.command),
             ))),
@@ -387,7 +387,7 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
       })),
     h("div", { class: "sidecar-run-plan-actions" },
       h(CopyTextButton, { text: runPlanCommands(plan), class: "sidecar-run-plan-copy", label: "Copy commands", caption: "Copy commands" }),
-      h("span", { class: "sidecar-run-plan-hint" }, "Start lane asks for one work card, for the lane's first task. Nothing runs without it."),
+      h("span", { class: "sidecar-run-plan-hint" }, "Start track asks for one work card, for the track's first task. Nothing runs without it."),
     ),
   );
 }
@@ -634,6 +634,9 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
         )
       : null,
     !folded && card.kind === "command" ? h("div", { class: "sidecar-card-effects" }, sidecarCommandEffectsLine(card, manifest)) : null,
+    !folded && card.kind === "work" && card.rowText
+      ? h("p", { class: "sidecar-card-note sidecar-card-runnable" }, card.rowText)
+      : null,
     !folded && card.preview !== undefined
       ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
       : null,

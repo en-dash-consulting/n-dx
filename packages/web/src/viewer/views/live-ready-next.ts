@@ -27,7 +27,7 @@ function TaskLine({ task, navigateTo }: { task: PlanTask; navigateTo: NavigateTo
       class: "live-queue-item",
       href: "#",
       onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo("prd", { taskId: task.id }); },
-    }, h("span", { class: "live-card-title" }, task.title)),
+    }, h("span", { class: "live-card-title" }, task.rowText ?? task.title)),
     h("span", { class: "live-card-chain" }, task.reason));
 }
 
@@ -66,7 +66,7 @@ export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navi
           plan.lanes.length > 0
             ? h("ol", { key: "l", class: "live-ready-lanes" }, plan.lanes.map((lane, i) =>
               h("li", { key: lane.changeId, class: "live-ready-lane" },
-                h("span", { class: "live-side-title" }, `Lane ${i + 1}`),
+                h("span", { class: "live-side-title" }, `Track ${i + 1}`),
                 // Every command targets `.`; two runs in one checkout collide.
                 lane.ownWorktree
                   ? h("p", { class: "live-ready-worktree" }, OWN_WORKTREE_NOTE)
@@ -76,7 +76,7 @@ export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navi
             : null,
           plan.excluded.length > 0
             ? h("details", { key: "x", class: "live-ready-excluded" },
-              h("summary", null, `Not in a lane (${plan.excluded.length})`),
+              h("summary", null, `Not in a track (${plan.excluded.length})`),
               h("ul", null, plan.excluded.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))
             : null,
         ],

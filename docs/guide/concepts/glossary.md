@@ -13,7 +13,10 @@ Each term is shown with an example from n-dx's own PRD.
 | **Capability** | One thing the product does: a one-sentence statement plus its capability criteria, the standing spec it is met against. May hold sub-capabilities one level deep | Execute work › Session strategy: "A forked task session edits like a fresh one" |
 | **Constraint** | A rule that applies across capabilities, checked by a test | Architecture integrity (gateways, spawn-only), checked by `architecture-policy.test.js` |
 | **Change** | A bounded piece of work that adds, modifies, removes or fixes capabilities. Ticket-shaped; its release is a field, not a folder | "Forked sessions recover from a read-only refusal" (#473): touches Session strategy, planned for 1.0.1 |
-| **Task, subtask** | The steps of a change; what `ndx work` runs. A change with no tasks is itself the unit of work | "Tell the forked session that orientation is over" |
+| **Task, subtask** | A task is one step `ndx work` runs to make its change true; a subtask is a step within a task. A task is always shown inside its change | "Tell the forked session that orientation is over", in "Forked sessions recover from a read-only refusal" |
+| **Runs as one task** | What a change with no tasks reads. It is itself the unit of work: it shows Start, takes run settings and `ndx work --task=<id>` runs it whole. Add a task and it stops reading this | A small fix with no tasks added |
+| **PRD edits** | The Sidecar card that proposes edits to the PRD: the changes, tasks and subtasks it would add or alter. Nothing is written until you accept it. Not a change: a change is one piece of work, and a card may hold several | A card listing two new tasks for "Forked sessions recover from a read-only refusal" |
+| **Track** | One group of ready tasks that can run side by side, as listed by `ndx work --plan-queue` and on Live's Ready next. Each track names its change and has its own Start track command | Track 1 · change "Forked sessions recover from a read-only refusal" |
 | **Apply** | The step that writes a change's amendments into the product layer when it completes. Deterministic; no model is called | A change that modifies a Session strategy capability criterion completes; apply rewrites it, restamps the spec hash and adds a History line. (A touches-only fix such as #473 is never applied: its history and health are computed) |
 | **Evidence** | What machines record as work happens | Commits with `N-DX-Item` trailers, hench run records, test results |
 | **Status** | Where a capability stands against intent (see below). Computed | Session strategy reads *changing* while an amendment to it is unapplied |
@@ -46,7 +49,7 @@ Nobody sets either by hand. Both are computed from files and state.
 
 | Relationship to the product layer | Kind |
 |-----------------------------------|------|
-| Amends, added | Feature |
+| Amends, added | Feature (a kind of change, not a v1 level) |
 | Amends, modified | Enhancement |
 | Amends, removed | Retirement |
 | Touches a defective capability | Fix |

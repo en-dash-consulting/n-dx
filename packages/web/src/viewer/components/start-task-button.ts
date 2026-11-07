@@ -52,7 +52,7 @@ import type { RunMode } from "../external.js";
 export interface StartTaskButtonProps {
   taskId: string;
   onStarted: () => void;
-  /** Button label while idle. Defaults to "Start Task". */
+  /** Button label while idle. Defaults to "Start". */
   label?: string;
   /**
    * Run in this workspace instead of the one the viewer is mounted under.
@@ -93,7 +93,7 @@ export interface StartTaskButtonProps {
 /** Default task count when the operator picks "a set number" without typing one. */
 const DEFAULT_ITERATIONS = 3;
 
-export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo, liveHref, runModes = false }: StartTaskButtonProps) {
+export function StartTaskButton({ taskId, onStarted, label = "Start", workspace, ariaLabel, navigateTo, liveHref, runModes = false }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Set when the server reported a refusal `rex migrate-slugs` would fix. */
