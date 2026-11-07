@@ -804,11 +804,41 @@ function codexCommandFailed(item: Record<string, unknown>): boolean | undefined 
 }
 
 /**
+ * The tool name of a Codex `mcp_tool_call` item: `mcp__<server>__<tool>` from
+ * the item's own `server` and `tool` fields. Never from the model's spelling,
+ * which normalises a hyphen in the server name to an underscore.
+ */
+function codexMcpToolName(item: Record<string, unknown>): string | undefined {
+  if (typeof item.server !== "string" || !item.server) return undefined;
+  if (typeof item.tool !== "string" || !item.tool) return undefined;
+  return `mcp__${item.server}__${item.tool}`;
+}
+
+/**
+ * The output of a completed Codex `mcp_tool_call` item: the text parts of
+ * `result.content` joined by newlines, or `error.message` when there is no
+ * result (a transport failure or a timeout).
+ */
+function codexMcpToolOutput(item: Record<string, unknown>): string {
+  const result = item.result as { content?: unknown } | null | undefined;
+  if (result && Array.isArray(result.content)) {
+    return result.content
+      .filter((part): part is { type: "text"; text: string } =>
+        !!part && typeof part === "object" && part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text)
+      .join("\n");
+  }
+  const error = item.error as { message?: unknown } | null | undefined;
+  return typeof error?.message === "string" ? error.message : "";
+}
+
+/**
  * Parse one JSONL line of `codex exec --json` into a RuntimeEvent.
  *
- * Supported types: `item.started` (`command_execution` → `shell` tool_use),
- * `item.completed` (`agent_message` → assistant; `command_execution` →
- * `shell` tool_result; `file_change` → `apply_patch` tool_use), `message`,
+ * Supported types: `item.started` (`command_execution` → `shell` tool_use;
+ * `mcp_tool_call` → `mcp__<server>__<tool>` tool_use), `item.completed`
+ * (`agent_message` → assistant; `command_execution` → `shell` tool_result;
+ * `mcp_tool_call` → tool_result; `file_change` → `apply_patch` tool_use), `message`,
  * `function_call`, `function_call_output`, `error`, `turn.failed`, and the
  * completion family (`summary`, `response.completed`, `done`, `complete`).
  * Anything else, and non-JSON, returns `null`.
@@ -852,6 +882,22 @@ export function parseCodexJsonLine(
           toolCall: { tool: "shell", input: { command: item.command } },
         };
       }
+      if (item?.type === "mcp_tool_call") {
+        const tool = codexMcpToolName(item);
+        if (!tool) return null;
+        const args = item.arguments;
+        return {
+          type: "tool_use" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolCall: {
+            tool,
+            input: args && typeof args === "object" && !Array.isArray(args) ? args as Record<string, unknown> : {},
+            ...(typeof item.id === "string" && item.id ? { id: item.id } : {}),
+          },
+        };
+      }
       return null;
     }
 
@@ -888,6 +934,27 @@ export function parseCodexJsonLine(
             tool: "shell",
             output: outputCandidate.slice(0, MAX_TOOL_OUTPUT_LENGTH),
             durationMs: 0,
+            ...(isError !== undefined ? { isError } : {}),
+          },
+        };
+      }
+
+      // An MCP tool call. Failure is read from `status` alone: a tool that
+      // returns isError arrives with `error: null` and no flag in its result.
+      if (itemType === "mcp_tool_call") {
+        const tool = codexMcpToolName(item);
+        if (!tool) return null;
+        const isError = item.status === "failed" ? true : item.status === "completed" ? false : undefined;
+        return {
+          type: "tool_result" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolResult: {
+            tool,
+            output: codexMcpToolOutput(item).slice(0, MAX_TOOL_OUTPUT_LENGTH),
+            durationMs: 0,
+            ...(typeof item.id === "string" && item.id ? { id: item.id } : {}),
             ...(isError !== undefined ? { isError } : {}),
           },
         };
