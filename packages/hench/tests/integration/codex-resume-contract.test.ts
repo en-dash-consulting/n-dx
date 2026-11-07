@@ -195,14 +195,18 @@ describe("codex batch resume — contract", () => {
     expect(cli.invocations).toHaveLength(1);
     // Exact, not "contains": a resume that also carried `-s`/`--approve-for-me`
     // dies on codex's own argument parsing, and one that carried `--last` would
-    // capture whichever session the machine touched most recently. The `-c`
-    // overrides keep the Codex credentials out of the resumed agent's commands.
+    // capture whichever session the machine touched most recently. The first
+    // two `-c` overrides re-apply the run's policy, which a resumed thread
+    // does not keep; the rest keep the Codex credentials out of the resumed
+    // agent's commands.
     expect(cli.invocations[0]!.args).toEqual([
       "exec",
       "resume",
       THREAD,
       "--json",
       "--skip-git-repo-check",
+      "-c", 'sandbox_mode="workspace-write"',
+      "-c", 'approval_policy="never"',
       "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",

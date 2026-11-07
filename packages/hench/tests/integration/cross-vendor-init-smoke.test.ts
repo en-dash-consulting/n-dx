@@ -224,8 +224,19 @@ describe("cross-vendor init-to-run smoke", () => {
       expect(flags).not.toContain("--full-auto");
       expect(flags).toEqual([
         "--sandbox", "workspace-write", "-c", "approval_policy=never",
-        ...compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true }),
+        "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
+        "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
+        "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
       ]);
+    });
+
+    it("a resumed spawn re-applies the same policy as -c overrides, with no --sandbox", () => {
+      const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true });
+      expect(flags).toEqual([
+        "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"',
+        ...compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY).slice(4),
+      ]);
+      expect(flags).not.toContain("--sandbox");
     });
 
     it("leads with --sandbox so the sandbox is stated before anything else", () => {

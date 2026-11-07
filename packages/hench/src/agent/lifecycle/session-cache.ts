@@ -780,10 +780,11 @@ export interface PolicyFingerprintInput {
 /**
  * Hash the permissions a chain was opened under.
  *
- * `codex exec resume` accepts no sandbox or approval flags — the thread keeps
- * whatever policy created it — so tightening the policy between tasks would
- * otherwise leave the next task running under the looser one, invisibly. This
- * value makes that a named miss instead.
+ * A resumed Codex spawn re-applies the current policy as `-c` overrides
+ * (`codex exec resume` rejects `--sandbox`), but the thread's transcript was
+ * built under the policy that opened the chain, so a task under a changed
+ * policy starts a fresh chain rather than continuing one whose history
+ * assumed other permissions. This value makes that a named miss.
  *
  * Arrays are sorted before hashing, because a reordered allowlist grants the
  * same permissions. `allowedGitSubcommands` hashes as the grant it produces:

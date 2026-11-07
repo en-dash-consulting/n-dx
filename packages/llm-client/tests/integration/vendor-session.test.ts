@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -245,8 +245,8 @@ describe("codex sessions", () => {
       "--json", "--skip-git-repo-check", "-",
     ]);
     expect(a.stdin).toBe("SYSTEM:\nsys\n\nTASK:\nhello");
-    // A resumed turn drops the sandbox flag but keeps the overrides that
-    // blank the Codex key in the agent's commands: config is per process.
+    // A resumed turn with no resume policy drops the sandbox flag but keeps
+    // the overrides that blank the Codex key: config is per process.
     expect(b.argv).toEqual([
       "exec", "resume", "thread-1", "--json", "--skip-git-repo-check",
       ...codexShellEnvFlags(),
@@ -265,6 +265,25 @@ describe("codex sessions", () => {
     await working;
     await session.interrupt();
     expect((await pending).status).toBe("interrupted");
+  });
+
+  it("refuses a turn whose turn config flags throw, spawning nothing, and stays usable", async () => {
+    let refuse = true;
+    const session = startVendorSession({
+      vendor: "codex",
+      cwd: dir,
+      binary: fake("codex"),
+      codex: { turnConfigFlags: () => { if (refuse) throw new Error("bad project config"); return []; } },
+    });
+    await expect(session.sendTurn("hello")).rejects.toThrow("bad project config");
+    expect(session.turns).toBe(0);
+    expect(session.state).toBe("idle");
+    expect(existsSync(log)).toBe(false);
+
+    refuse = false;
+    const turn = await session.sendTurn("hello");
+    expect(turn).toMatchObject({ turn: 1, status: "completed" });
+    expect(calls()).toHaveLength(1);
   });
 
   it("carries the whole agent message", async () => {
@@ -355,6 +374,20 @@ describe("child environment", () => {
   it("passes an explicit env through unchanged", async () => {
     const explicit = { ONLY: "this" };
     expect(await spawnedEnv({ env: explicit })).toBe(explicit);
+  });
+
+  it("adds the named extra variables to the filtered env and widens nothing else", async () => {
+    const env = await spawnedEnv({ extraEnv: { NDX_EXTRA: "value" } });
+    expect(env.NDX_EXTRA).toBe("value");
+    expect(env[SECRET]).toBeUndefined();
+    expect(env.PATH).toBe(process.env.PATH);
+    expect(process.env.NDX_EXTRA).toBeUndefined();
+  });
+
+  it("adds the extra variables over an explicit env without changing it", async () => {
+    const explicit = { ONLY: "this" };
+    expect(await spawnedEnv({ env: explicit, extraEnv: { NDX_EXTRA: "value" } })).toEqual({ ONLY: "this", NDX_EXTRA: "value" });
+    expect(explicit).toEqual({ ONLY: "this" });
   });
 });
 
