@@ -640,12 +640,10 @@ function defaultBrokerFor(projectDir: string, broadcast: WebSocketBroadcaster): 
 }
 
 /**
- * Why a Codex Sidecar session is refused. `codex exec resume` takes its
- * sandbox and approval policy from the invocation's config, not the thread,
- * so from the second turn the user's `~/.codex/config.toml` would decide and
- * the session could write the worktree with no card. Re-applying the policy
- * on resume is PRD item 31307b89; until it lands, Codex is refused at create
- * and at every turn.
+ * Why a Codex Sidecar session is refused, at create and at every turn.
+ * A resumed turn now re-applies the read-only policy (see `spawn-policy.ts`);
+ * the refusal stays until project MCP servers are also kept out of Codex
+ * turns, which lifts it (PRD item 0b3b3a8c).
  */
 export const CODEX_SIDECAR_UNAVAILABLE =
   "Codex Sidecar sessions are unavailable until a resumed turn keeps the read-only sandbox";

@@ -245,8 +245,8 @@ describe("codex sessions", () => {
       "--json", "--skip-git-repo-check", "-",
     ]);
     expect(a.stdin).toBe("SYSTEM:\nsys\n\nTASK:\nhello");
-    // A resumed turn drops the sandbox flag but keeps the overrides that
-    // blank the Codex key in the agent's commands: config is per process.
+    // A resumed turn with no resume policy drops the sandbox flag but keeps
+    // the overrides that blank the Codex key: config is per process.
     expect(b.argv).toEqual([
       "exec", "resume", "thread-1", "--json", "--skip-git-repo-check",
       ...codexShellEnvFlags(),
@@ -355,6 +355,20 @@ describe("child environment", () => {
   it("passes an explicit env through unchanged", async () => {
     const explicit = { ONLY: "this" };
     expect(await spawnedEnv({ env: explicit })).toBe(explicit);
+  });
+
+  it("adds the named extra variables to the filtered env and widens nothing else", async () => {
+    const env = await spawnedEnv({ extraEnv: { NDX_EXTRA: "value" } });
+    expect(env.NDX_EXTRA).toBe("value");
+    expect(env[SECRET]).toBeUndefined();
+    expect(env.PATH).toBe(process.env.PATH);
+    expect(process.env.NDX_EXTRA).toBeUndefined();
+  });
+
+  it("adds the extra variables over an explicit env without changing it", async () => {
+    const explicit = { ONLY: "this" };
+    expect(await spawnedEnv({ env: explicit, extraEnv: { NDX_EXTRA: "value" } })).toEqual({ ONLY: "this", NDX_EXTRA: "value" });
+    expect(explicit).toEqual({ ONLY: "this" });
   });
 });
 
