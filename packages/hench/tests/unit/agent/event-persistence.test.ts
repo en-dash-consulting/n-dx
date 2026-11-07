@@ -165,6 +165,17 @@ describe("RunRecord schema — events field", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("validates tool_result frames with and without the error flag, and rejects a non-boolean flag", () => {
+    const frame = (toolResult: Record<string, unknown>) => ({
+      type: "tool_result", vendor: "codex", turn: 1, timestamp: "2025-06-01T00:00:03.000Z", toolResult,
+    }) as PersistedRuntimeEvent;
+    const base = { tool: "shell", output: "out", durationMs: 0 };
+    expect(validateRunRecord(makeRun({ events: [frame({ ...base, isError: true }), frame({ ...base, isError: false })] })).ok).toBe(true);
+    // Frames recorded before the flag existed carry none.
+    expect(validateRunRecord(makeRun({ events: [frame(base)] })).ok).toBe(true);
+    expect(validateRunRecord(makeRun({ events: [frame({ ...base, isError: "yes" })] })).ok).toBe(false);
+  });
+
   it("rejects events with missing required fields", () => {
     const run = makeRun({
       events: [
@@ -210,6 +221,17 @@ describe("toPersistedEvent — RuntimeEvent → PersistedRuntimeEvent", () => {
     const persisted = toPersistedEvent(event);
     expect(persisted.type).toBe("tool_result");
     expect(persisted.toolResult).toEqual({ tool: "Edit", output: "File edited successfully", durationMs: 25 });
+  });
+
+  it("copies a tool_result's error flag, true or false, and omits it when unknown", () => {
+    const withFlag = (isError: boolean) => toPersistedEvent(makeEvent({
+      type: "tool_result",
+      toolResult: { tool: "shell", output: "out", durationMs: 0, id: "c1", isError },
+    })).toolResult;
+    expect(withFlag(true)).toEqual({ tool: "shell", output: "out", durationMs: 0, id: "c1", isError: true });
+    expect(withFlag(false)?.isError).toBe(false);
+    const unknown = toPersistedEvent(makeEvent({ type: "tool_result", toolResult: { tool: "shell", output: "out", durationMs: 0 } }));
+    expect(unknown.toolResult).not.toHaveProperty("isError");
   });
 
   it("converts a token_usage event", () => {

@@ -199,9 +199,35 @@ describe("claude tool results", () => {
     const events = claudeSessionDriver.parseLineEvents(twoResults, 2);
     expect(events.map((e) => [e.type, e.turn, e.toolResult])).toEqual([
       ["tool_result", 2, { tool: "", output: "     1\tconst a = 1;", durationMs: 0, id: "toolu_01A" }],
-      ["tool_result", 2, { tool: "", output: "line one\nline two", durationMs: 0, id: "toolu_01B" }],
+      ["tool_result", 2, { tool: "", output: "line one\nline two", durationMs: 0, id: "toolu_01B", isError: false }],
     ]);
     expect(claudeSessionDriver.parseLine(twoResults, 2)?.toolResult?.id).toBe("toolu_01A");
+  });
+
+  it("flags a result from is_error, and keeps the [error] prefix only when it is true", () => {
+    const line = (isError: boolean, text: string) => JSON.stringify({
+      type: "user",
+      message: { role: "user", content: [{ tool_use_id: "toolu_E", type: "tool_result", is_error: isError, content: text }] },
+    });
+    expect(claudeSessionDriver.parseLineEvents(line(true, "boom"), 1)[0].toolResult).toEqual({
+      tool: "", output: "[error] boom", durationMs: 0, id: "toolu_E", isError: true,
+    });
+    // A successful call whose output happens to start with "[error] " is still a success.
+    expect(claudeSessionDriver.parseLineEvents(line(false, "[error] printed"), 1)[0].toolResult).toEqual({
+      tool: "", output: "[error] printed", durationMs: 0, id: "toolu_E", isError: false,
+    });
+  });
+
+  it("leaves the flag unset when the block says nothing about errors", () => {
+    expect(claudeSessionDriver.parseLineEvents(twoResults, 2)[0].toolResult).not.toHaveProperty("isError");
+  });
+
+  it("flags a top-level tool_result from is_error when present", () => {
+    const top = (extra: Record<string, unknown>) =>
+      claudeSessionDriver.parseLine(JSON.stringify({ type: "tool_result", output: "out", ...extra }), 1)?.toolResult;
+    expect(top({ is_error: true })?.isError).toBe(true);
+    expect(top({ is_error: false })?.isError).toBe(false);
+    expect(top({})).not.toHaveProperty("isError");
   });
 
   it("caps a result's output like any tool output", () => {
@@ -222,5 +248,34 @@ describe("claude tool results", () => {
     expect(claudeSessionDriver.parseLineEvents(call, 1)).toHaveLength(1);
     expect(codexSessionDriver.parseLineEvents(JSON.stringify({ type: "summary", result: "ok" }), 1)).toHaveLength(1);
     expect(codexSessionDriver.parseLineEvents("", 1)).toEqual([]);
+  });
+});
+
+describe("codex tool results", () => {
+  // Modelled on the real fixture packages/hench/tests/fixtures/codex-file-change-real.jsonl;
+  // the failed variants are not captured from a live CLI.
+  const commandItem = (fields: Record<string, unknown>) => JSON.stringify({
+    type: "item.completed",
+    item: { id: "item_1", type: "command_execution", command: "bash -lc 'false'", aggregated_output: "out", ...fields },
+  });
+  const flag = (fields: Record<string, unknown>) => codexSessionDriver.parseLine(commandItem(fields), 1)?.toolResult;
+
+  it("flags a command that exited non-zero or failed", () => {
+    expect(flag({ exit_code: 1, status: "failed" })?.isError).toBe(true);
+    expect(flag({ exit_code: 2 })?.isError).toBe(true);
+    expect(flag({ status: "failed" })?.isError).toBe(true);
+  });
+
+  it("marks a command that completed with exit code 0 as not failed", () => {
+    expect(flag({ exit_code: 0, status: "completed" })).toEqual({ tool: "shell", output: "out", durationMs: 0, isError: false });
+  });
+
+  it("leaves the flag unset when the item carries neither status nor exit code", () => {
+    expect(flag({})).not.toHaveProperty("isError");
+  });
+
+  it("leaves function_call_output unflagged: it carries no status", () => {
+    const line = JSON.stringify({ type: "function_call_output", output: "x" });
+    expect(codexSessionDriver.parseLine(line, 1)?.toolResult).not.toHaveProperty("isError");
   });
 });
