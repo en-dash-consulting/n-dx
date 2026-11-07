@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "3c749a61-122e-492c-b1d2-87404244803e":
-    lastModified: "2026-11-07T01:51:27.752Z"
+    status: "completed"
+    startedAt: "2026-11-07T01:59:07.141Z"
+    completedAt: "2026-11-07T02:01:17.486Z"
+    endedAt: "2026-11-07T02:01:17.486Z"
+    activeIntervals: [{"end":"2026-11-07T02:01:17.486Z","start":"2026-11-07T01:59:07.141Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: ".app-body is an inline-size container; below 640 px the stage links hide and the gutters drop."
+    lastModified: "2026-11-07T02:01:17.486Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "65f61f71-2e28-4f13-bf00-34549bc5157d":
     status: "completed"
