@@ -650,7 +650,8 @@ describe("Windows delete-pending lock files", () => {
   });
 
   for (const host of ["win32", "linux"] as const) {
-    it(`on ${host}, a temp file that will not go after the link still lets the writer hold, write and release the lock`, () => {
+    // A real Windows file reports mode 0o666, which the linux read refuses.
+    it.skipIf(host === "linux" && isWindows)(`on ${host}, a temp file that will not go after the link still lets the writer hold, write and release the lock`, () => {
       const { fs, state } = flakyLockFs("rm", "EPERM", lockTemp, Infinity);
       setCredential("typesafe", PLACEHOLDER, win32(fs, { platform: host }));
       expect(state.thrown).toBeGreaterThan(0);
