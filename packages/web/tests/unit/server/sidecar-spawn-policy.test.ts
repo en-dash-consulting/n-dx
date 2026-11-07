@@ -312,6 +312,17 @@ describe("Codex spawn", () => {
     expect(spawned).toEqual([]);
   });
 
+  it.each(["a.b", "my server"])("refuses a turn when a project server is named %j, naming the file and the server, and spawns nothing", async (name) => {
+    mkdirSync(join(root, ".codex"));
+    const config = join(root, ".codex", "config.toml");
+    writeFileSync(config, `[mcp_servers.rex]\ncommand = "ndx"\n[mcp_servers.${JSON.stringify(name)}]\ncommand = "x"\n`);
+    const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), endpoint)(record("codex")), vendor: "codex", cwd: root, spawn: recordingSpawn });
+    const turn = session.sendTurn("one");
+    await expect(turn).rejects.toThrow(config);
+    await expect(turn).rejects.toThrow(JSON.stringify(name));
+    expect(spawned).toEqual([]);
+  });
+
   it("a Claude session's environment gets no broker header variable", async () => {
     const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), endpoint)(record("claude")), vendor: "claude", cwd: root, spawn: recordingSpawn });
     await session.sendTurn("one");

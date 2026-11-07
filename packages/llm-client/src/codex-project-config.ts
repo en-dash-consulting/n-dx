@@ -304,7 +304,12 @@ export function codexProjectConfigPaths(cwd: string): string[] {
  *   be read, or cannot be parsed with confidence.
  */
 export function codexProjectMcpServerNames(cwd: string): string[] {
-  const names: string[] = [];
+  return projectMcpServers(cwd).map((server) => server.name);
+}
+
+/** {@link codexProjectMcpServerNames}, each with the first file that declares it. */
+function projectMcpServers(cwd: string): { name: string; file: string }[] {
+  const servers: { name: string; file: string }[] = [];
   for (const file of codexProjectConfigPaths(cwd)) {
     let text: string;
     try {
@@ -321,20 +326,31 @@ export function codexProjectMcpServerNames(cwd: string): string[] {
       if (!(error instanceof TomlSubsetError)) throw error;
       throw new CodexProjectConfigError(file, `its MCP servers cannot be read with confidence (${error.message})`);
     }
-    for (const name of found) if (!names.includes(name)) names.push(name);
+    for (const name of found) if (!servers.some((server) => server.name === name)) servers.push({ name, file });
   }
-  return names;
+  return servers;
 }
 
 /**
  * `-c mcp_servers.<name>.enabled=false` for every project MCP server `cwd`
- * would load, except those in `keep`. A name that is not a bare TOML key is
- * quoted in the path.
+ * would load, except those in `keep`.
  *
- * @throws CodexProjectConfigError as {@link codexProjectMcpServerNames}.
+ * Only a bare TOML key (`[A-Za-z0-9_-]+`) is emitted. Whether codex's `-c`
+ * parser honours a quoted path segment is unverified on the real CLI: if it
+ * splits on `.`, `mcp_servers."a.b"` misses the server and leaves it enabled.
+ * So a name that is not a bare key refuses rather than being quoted.
+ *
+ * @throws CodexProjectConfigError as {@link codexProjectMcpServerNames}, and
+ *   naming the file and the server when a server to disable is not a bare key.
  */
 export function codexProjectMcpDisableFlags(cwd: string, keep: readonly string[] = []): string[] {
-  return codexProjectMcpServerNames(cwd)
-    .filter((name) => !keep.includes(name))
-    .flatMap((name) => ["-c", `mcp_servers.${BARE_KEY.test(name) ? name : JSON.stringify(name)}.enabled=false`]);
+  const servers = projectMcpServers(cwd).filter((server) => !keep.includes(server.name));
+  const unaddressable = servers.find((server) => !BARE_KEY.test(server.name));
+  if (unaddressable) {
+    throw new CodexProjectConfigError(
+      unaddressable.file,
+      `declares MCP server ${JSON.stringify(unaddressable.name)}, whose name is not a bare TOML key ([A-Za-z0-9_-]), so a -c override cannot be trusted to disable it`,
+    );
+  }
+  return servers.flatMap((server) => ["-c", `mcp_servers.${server.name}.enabled=false`]);
 }
