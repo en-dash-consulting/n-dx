@@ -5,10 +5,14 @@ items:
     lastModified: "2026-11-07T05:34:20.670Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bf6bfa6a-c7a1-4d8f-80df-7b141f4fc47d":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-07T05:34:47.356Z"
-    activeIntervals: [{"start":"2026-11-07T05:34:47.356Z"}]
-    lastModified: "2026-11-07T05:34:48.007Z"
+    completedAt: "2026-11-07T05:43:57.140Z"
+    endedAt: "2026-11-07T05:43:57.140Z"
+    activeIntervals: [{"end":"2026-11-07T05:43:57.140Z","start":"2026-11-07T05:34:47.356Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "work-set.ts: one rule (own delivery, else nearest enclosing change's) used by readWorkSet, assign refusal and unassign; remove reports inherited tasks with their change; CLI/MCP output, help, docs, changesets; core, selection, get_next_task and CLI tests."
+    lastModified: "2026-11-07T05:43:57.140Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e3300b25-4c33-4b45-9f5a-3828cfafd459":
     lastModified: "2026-11-07T05:34:23.848Z"
