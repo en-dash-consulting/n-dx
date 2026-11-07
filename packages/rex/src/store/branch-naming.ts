@@ -50,6 +50,7 @@ export function resolveGitBranch(cwd: string): string {
 export const DEFAULT_BRANCHES = ["main", "master"] as const;
 
 const ORIGIN_PREFIX = "refs/remotes/origin/";
+const HEADS_PREFIX = "refs/heads/";
 
 /**
  * The branch `origin/HEAD` points at, or null when the clone has no
@@ -121,17 +122,21 @@ export function isDefaultBranch(cwd: string, branch: string): boolean {
  * resolver for it.
  */
 export function currentWorkSetBranch(projectDir: string): string | null {
-  let branch: string;
+  let ref: string;
   try {
-    // Unlike `rev-parse --abbrev-ref`, this fails on a detached HEAD.
-    branch = execFileSync(
+    // Unlike `rev-parse --abbrev-ref`, this fails on a detached HEAD. The full
+    // ref, not `--short`: a tag sharing the branch's name makes `--short`
+    // print `heads/<name>`.
+    ref = execFileSync(
       "git",
-      ["symbolic-ref", "--quiet", "--short", "HEAD"],
+      ["symbolic-ref", "--quiet", "HEAD"],
       { cwd: projectDir, encoding: "utf-8", ...QUIET_GIT },
     ).trim();
   } catch {
     return null;
   }
+  if (!ref.startsWith(HEADS_PREFIX)) return null;
+  const branch = ref.slice(HEADS_PREFIX.length);
   if (!branch || isDefaultBranch(projectDir, branch)) return null;
   return branch;
 }

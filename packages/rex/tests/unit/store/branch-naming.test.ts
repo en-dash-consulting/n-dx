@@ -202,6 +202,17 @@ describe("currentWorkSetBranch", () => {
     expect(currentWorkSetBranch(tmpDir)).toBeNull();
   });
 
+  it("reads the branch name exactly when a tag shares it", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    // A tag named like the branch makes `symbolic-ref --short` print "heads/<name>".
+    git(tmpDir, "tag", "main");
+    expect(currentWorkSetBranch(tmpDir)).toBeNull();
+    git(tmpDir, "checkout", "-b", "feature/x");
+    git(tmpDir, "tag", "feature/x");
+    expect(currentWorkSetBranch(tmpDir)).toBe("feature/x");
+  });
+
   it("returns null on a detached HEAD", () => {
     initRepo(tmpDir);
     git(tmpDir, "commit", "--allow-empty", "-m", "init");
