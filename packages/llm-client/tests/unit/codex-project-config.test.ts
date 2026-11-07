@@ -98,15 +98,31 @@ describe("project config files", () => {
     ]);
   });
 
-  it("disables every declared server but the kept ones, quoting a name that is not a bare key", () => {
+  it("disables every declared server but the kept ones", () => {
     writeConfig(join(root, "repo"), '[mcp_servers.rex]\ncommand = "ndx"\n[mcp_servers.sourcevision]\ncommand = "ndx"\n[mcp_servers.ndx-sidecar]\nurl = "u"\n');
-    writeConfig(join(root, "repo", "pkg"), '[mcp_servers."my server"]\ncommand = "x"\n[mcp_servers.rex]\ncommand = "y"\n');
+    writeConfig(join(root, "repo", "pkg"), '[mcp_servers.my_server]\ncommand = "x"\n[mcp_servers.rex]\ncommand = "y"\n');
     writeConfig(root, '[mcp_servers.outside]\ncommand = "z"\n');
     expect(codexProjectMcpDisableFlags(join(root, "repo", "pkg", "src"), ["ndx-sidecar"])).toEqual([
-      "-c", 'mcp_servers."my server".enabled=false',
+      "-c", "mcp_servers.my_server.enabled=false",
       "-c", "mcp_servers.rex.enabled=false",
       "-c", "mcp_servers.sourcevision.enabled=false",
     ]);
+  });
+
+  // Whether codex's -c parser honours a quoted path segment is unverified on
+  // the real CLI, so a name no bare path can address refuses the turn.
+  it.each(["a.b", "my server"])("refuses a server named %j, naming the file and the server", (name) => {
+    writeConfig(join(root, "repo"), "[mcp_servers.rex]\ncommand = \"ndx\"\n");
+    const file = writeConfig(join(root, "repo", "pkg"), `[mcp_servers.${JSON.stringify(name)}]\ncommand = "x"\n`);
+    const call = () => codexProjectMcpDisableFlags(join(root, "repo", "pkg"), ["ndx-sidecar"]);
+    expect(call).toThrow(CodexProjectConfigError);
+    expect(call).toThrow(file);
+    expect(call).toThrow(JSON.stringify(name));
+  });
+
+  it("does not refuse a kept server whatever its name", () => {
+    writeConfig(join(root, "repo"), '[mcp_servers."a.b"]\nurl = "u"\n');
+    expect(codexProjectMcpDisableFlags(join(root, "repo"), ["a.b"])).toEqual([]);
   });
 
   it("gives no flags without a project config", () => {
