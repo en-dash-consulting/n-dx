@@ -172,7 +172,7 @@ Codex truncates past `project_doc_max_bytes`. Put detail in `docs/`.
 
 ## n-dx Orchestration Commands
 
-Run `ndx <command> --help` for full usage, or see `README.md` for the command reference and direct-tool-access aliases (`ndx rex`, `ndx hench`, `ndx sv`, or the standalone binaries).
+Run `ndx <command> --help` for usage, or see `README.md` for commands and direct-tool aliases (`ndx rex`, `ndx hench`, `ndx sv`, or the standalone binaries).
 
 **Gotcha:** `ndx work` autonomous runs (`--auto`/`--loop`/`--epic-by-epic`) default `--permission-mode` to `acceptEdits` so the spawned Claude session won't stall in plan mode — override with `--permission-mode` or `hench.permissionMode`. This default is enforced repo-wide via the hench system prompt for all CLI-provider runs (see the `/no-plan-mode` skill).
 
@@ -216,6 +216,7 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 - `get_capabilities` — server capabilities and configuration, plus the `workspace` block (`projectDir`, `source`, `refused`) naming the tree this session writes
 - `get_product`, `get_capability` — v2 standing requirements, capability criteria and derived status
 - `place_change`, `apply_change` — v2 placement and application of amendments to the product layer
+- `assign_to_branch` — add changes and tasks to the current branch's work set, or take them off (`remove`; `move` takes tasks from another branch); refused on the default branch and a detached HEAD
 
 > **`ndx work` applies a saved `run` block.** Precedence per setting: CLI flag > the task's `run` > `hench.*` > `llm.*` > default, resolved per task after selection — so in `--loop` / `--iterations` / `--epic-by-epic` each task uses its own saved settings, while an explicit flag applies to every task in the loop. A saved `provider` picks the cli or api loop for that task. `--no-review` and `--no-skip-test-gate` turn a saved setting off for one run. A saved value the active vendor cannot honour is skipped with a warning and never stops a loop; a malformed block is ignored whole. `ndx work --task=<id> --resolve .` prints every setting with the key that supplied it (`task.run` when the saved block won), the `saved` block itself, and each saved setting's `fallback`.
 

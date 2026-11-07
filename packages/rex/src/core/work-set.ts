@@ -30,6 +30,7 @@
 
 import { DeliverySchema } from "../schema/v2.js";
 import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { currentWorkSetBranch } from "../store/branch-naming.js";
 import { withPrdModelTransaction } from "../store/prd-model-transaction.js";
 import { changeWorkShape, isActionableStatus } from "./change-selection.js";
 
@@ -115,8 +116,8 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
   return { tree, report, changed: assigned.size > 0 };
 }
 
-/** Remove `delivery` from the nodes `refs` name, and from everything under a named change. */
-export function planUnassignFromBranch(input: V2Tree, refs: readonly string[]): WorkSetPlan<UnassignReport> {
+/** Remove `delivery` from the nodes `refs` name, and from everything under a named change; with `onBranch`, only where it names that branch. */
+export function planUnassignFromBranch(input: V2Tree, refs: readonly string[], onBranch?: string): WorkSetPlan<UnassignReport> {
   const tree = structuredClone(input);
   const index = indexTree(tree);
   const problems: string[] = [];
@@ -132,7 +133,7 @@ export function planUnassignFromBranch(input: V2Tree, refs: readonly string[]): 
 
   const report: UnassignReport = { removed: [] };
   for (const node of nodes) {
-    if (node.delivery === undefined) continue;
+    if (node.delivery === undefined || (onBranch !== undefined && node.delivery.branch !== onBranch)) continue;
     report.removed.push({ id: node.id, from: node.delivery.branch });
     delete node.delivery;
   }
@@ -151,6 +152,64 @@ export function readWorkSet(tree: V2Tree, branch: string): WorkSet {
   return { branch, ids, hasAssignments };
 }
 
+/** A unit as output names it. */
+export interface UnitInfo {
+  id: string;
+  displayId?: string;
+  title: string;
+  status: string;
+}
+
+/** One change of a work set with its units. A task-less change lists itself as its only unit. */
+export interface WorkSetGroup {
+  change: { id: string; displayId?: string; title: string };
+  units: UnitInfo[];
+}
+
+/**
+ * The checked-out branch of `projectDir`. Throws {@link WorkSetError} on the
+ * default branch or a detached HEAD, which have no work set.
+ */
+export function requireWorkSetBranch(projectDir: string): string {
+  const branch = currentWorkSetBranch(projectDir);
+  if (branch === null) {
+    throw new WorkSetError(
+      "A work set belongs to a feature branch, and this checkout is on the default branch or a detached HEAD. Switch to a feature branch first.",
+    );
+  }
+  return branch;
+}
+
+/** `ids` as output names them, in the order given; an id the tree does not hold is skipped. */
+export function describeUnits(tree: V2Tree, ids: readonly string[]): UnitInfo[] {
+  const index = indexTree(tree);
+  return ids.flatMap((id) => {
+    const node = index.resolve(id);
+    return node ? [unitInfo(node)] : [];
+  });
+}
+
+/** The open units on `branch`, grouped by the change they belong to, in tree order. */
+export function groupWorkSet(tree: V2Tree, branch: string): WorkSetGroup[] {
+  const ids = new Set(readWorkSet(tree, branch).ids);
+  const groups = new Map<string, WorkSetGroup>();
+  for (const { node, parent } of indexTree(tree).entries) {
+    if (!ids.has(node.id)) continue;
+    const owner = node.type === "task" && parent ? parent : node;
+    let group = groups.get(owner.id);
+    if (!group) {
+      group = { change: { id: owner.id, ...(owner.displayId ? { displayId: owner.displayId } : {}), title: owner.title }, units: [] };
+      groups.set(owner.id, group);
+    }
+    group.units.push(unitInfo(node));
+  }
+  return [...groups.values()];
+}
+
+function unitInfo(node: RuleNode): UnitInfo {
+  return { id: node.id, ...(node.displayId ? { displayId: node.displayId } : {}), title: node.title, status: node.status ?? "pending" };
+}
+
 /** {@link planAssignToBranch} on the tree under `rexDir`, inside the PRD transaction. */
 export async function assignToBranch(rexDir: string, refs: readonly string[], branch: string, options: AssignOptions = {}): Promise<AssignReport> {
   const { result } = await withPrdModelTransaction(rexDir, ({ tree }) => {
@@ -161,9 +220,9 @@ export async function assignToBranch(rexDir: string, refs: readonly string[], br
 }
 
 /** {@link planUnassignFromBranch} on the tree under `rexDir`, inside the PRD transaction. */
-export async function unassignFromBranch(rexDir: string, refs: readonly string[]): Promise<UnassignReport> {
+export async function unassignFromBranch(rexDir: string, refs: readonly string[], onBranch?: string): Promise<UnassignReport> {
   const { result } = await withPrdModelTransaction(rexDir, ({ tree }) => {
-    const plan = planUnassignFromBranch(tree, refs);
+    const plan = planUnassignFromBranch(tree, refs, onBranch);
     return { tree: plan.tree, result: plan.report };
   });
   return result;

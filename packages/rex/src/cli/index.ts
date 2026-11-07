@@ -415,7 +415,7 @@ async function dispatchCommand(
   // their own dir resolution and requireRexDir check inside the case block.
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
-    "log", "parse-md", "product", "change", "migrate-diff",
+    "log", "parse-md", "product", "change", "branch", "migrate-diff",
     // Invoked by git with temp-file paths (%O %A %B) from any cwd —
     // there is no project dir to check.
     "merge-driver", "merge-state",
@@ -580,6 +580,18 @@ async function dispatchCommand(
       await cmdChange(dir, sub, ref, flags, multiFlags);
       break;
     }
+    case "branch": {
+      // `branch add|remove <id>… [dir]`, `branch show [dir]`: a trailing
+      // existing directory is the project dir, everything else is an id.
+      const [sub, ...rest] = positional;
+      const last = rest[rest.length - 1];
+      const lastIsDir = last !== undefined && existsSync(last) && statSync(last).isDirectory();
+      const dir = lastIsDir ? resolve(last) : process.cwd();
+      requireRexDir(dir);
+      const { cmdBranch } = await import("./commands/branch.js");
+      await cmdBranch(dir, sub, lastIsDir ? rest.slice(0, -1) : rest, flags);
+      break;
+    }
     case "tree-diff": {
       const { cmdTreeDiff } = await import("./commands/tree-diff.js");
       await cmdTreeDiff(resolveDir(positional), flags);
@@ -701,7 +713,7 @@ async function dispatchCommand(
         "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
-        "release", "reorganize", "health", "product", "change", "mcp",
+        "release", "reorganize", "health", "product", "change", "branch", "mcp",
         "migrate-plan", "migrate-diff", "migrate-apply", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];

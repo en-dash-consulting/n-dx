@@ -54,6 +54,7 @@ registration order and complete schemas are pinned by
 | `get_capability` | V2 capability detail and derived status |
 | `place_change` | V2 placement suggestions or chosen product target |
 | `apply_change` | Apply v2 amendments under validation and the PRD lock |
+| `assign_to_branch` | Add or remove tasks on the current branch's work set under the PRD lock |
 
 ## Sourcevision MCP inventory
 
