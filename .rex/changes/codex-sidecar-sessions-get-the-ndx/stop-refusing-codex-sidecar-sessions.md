@@ -1,0 +1,14 @@
+---
+id: "0b3b3a8c-f6d7-44ec-b289-8c6a2e57205c"
+type: "task"
+title: "Stop refusing Codex Sidecar sessions and keep project MCP servers out of their turns"
+slug: "stop-refusing-codex-sidecar-sessions"
+description: "Operator note. Builds on the two tasks before it in this change (mcp_tool_call parsing; the Sidecar Codex spawn with the broker and the re-applied resume policy).\n\n1. Stop refusing Codex. Remove the CODEX_SIDECAR_UNAVAILABLE refusal in packages/web/src/server/routes-sidecar.ts at create (~line 1410, 400, no record) and at turn time (~line 1513, 409, no spawn), and the constant (~line 650) once nothing uses it. Update the route tests that assert the refusal. Keep hubVendorRefusal (packages/web/src/server/sidecar/spawn-policy.ts): hub-scope sessions stay Claude-only.\n\n2. Keep project MCP servers out. --ignore-user-config skips only the user's $CODEX_HOME/config.toml. A repository's own `.codex/config.toml` (ndx init writes one with rex and sourcevision stdio servers; see packages/core/codex-integration.js) may still load as project config. Codex project config was not tested on the real CLI, so on every turn, fresh and resumed, read each `.codex/config.toml` from the session's cwd up to the repository root, collect its MCP server names, and add `-c mcp_servers.<name>.enabled=false` for each, except `ndx-sidecar`. Names come from `[mcp_servers.<name>]` headers (and their subtables such as `[mcp_servers.<name>.env]`), dotted keys `mcp_servers.<name>.<key> = ...`, and an inline `mcp_servers = { ... }` table. Quote a name that is not a bare TOML key in the -c path. llm-client takes no dependencies; packages/llm-client/src/codex-user-config.ts already has a TOML-subset reader to reuse or extend.\n\nFail closed: if a file exists but cannot be read, or the reader cannot resolve with confidence every mention of mcp_servers to a server name (a malformed header, an unterminated string, a form it does not handle), refuse the turn with a clear reason naming the file, and spawn nothing.\n\n3. Add a `@n-dx/web` patch changeset, and `@n-dx/llm-client` if it changes (scoped names). Run the six static root policy tests (architecture-policy, domain-isolation, shell-spawn inventory, wall-clock inventory, layout-literal, obfuscated-code) before finishing."
+acceptanceCriteria:
+  - "Route tests show a Codex Sidecar session is created (no 400) and its turn spawns (no 409), while a hub-scope Codex session is still refused"
+  - "A spawn test with a project .codex/config.toml declaring rex and sourcevision servers yields -c mcp_servers.rex.enabled=false and -c mcp_servers.sourcevision.enabled=false, and none for ndx-sidecar"
+  - "An unparseable project .codex/config.toml refuses the turn with a reason naming the file, and no process is spawned"
+priority: "medium"
+run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "hub-pr3"
+---
