@@ -6,6 +6,7 @@ import type { SkippedClaim } from "../mcp-tools/claims.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection, type SelectionExplanation } from "../../core/next-task.js";
 import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
+import { currentWorkSet } from "../../core/work-set.js";
 
 import { info, result } from "../output.js";
 import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
@@ -55,20 +56,37 @@ export async function cmdNext(
  * `rex next` on a v2 tree: selection through `findNextWork` (placed changes and
  * their tasks, task-less changes as units, never the Inbox). `--format=json`
  * keeps the v1 fields and adds `changeId`, the change the unit belongs to.
+ *
+ * On a branch with a work set ({@link currentWorkSet}) only its units are
+ * picked unless `--any`; JSON then adds `workSetBranch`.
  */
 async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<string, string>): Promise<void> {
   const tree = await store.loadTree();
+  const workSet = flags.any === "true" ? null : currentWorkSet(tree, dir);
   const { excludeIds, skipped } = await foreignClaims(dir);
   const completed = completedWorkIds(tree);
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
-  const next = findNextWorkTask(tree, { excludeIds });
+  const next = findNextWorkTask(tree, { excludeIds, ...(workSet ? { workSet: new Set(workSet.ids) } : {}) });
   if (!next && tree.changes.length === 0 && flags.format !== "json") {
     result("No changes in PRD. Run: rex add --title=\"...\" " + dir);
     return;
   }
+  const workSetField = workSet ? { workSetBranch: workSet.branch } : {};
+  if (!next && workSet) {
+    if (flags.format === "json") {
+      result(JSON.stringify({ item: null, ...workSetField, message: WORK_SET_EXHAUSTED, skippedClaimed }, null, 2));
+      return;
+    }
+    result(WORK_SET_EXHAUSTED);
+    printSkippedClaims(skippedClaimed, flags.verbose === "true");
+    return;
+  }
   if (!next) return printNoneLeft(skippedClaimed, flags);
-  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id }, true);
+  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id, ...workSetField }, true);
 }
+
+/** Said when the branch's work set has nothing left to pick. */
+const WORK_SET_EXHAUSTED = "Nothing left in this branch's work set; --any picks outside it";
 
 /**
  * Tasks another worktree holds a live claim on are passed over, not treated
@@ -98,7 +116,7 @@ function printNext(
   explanation: SelectionExplanation,
   skippedClaimed: SkippedClaim[],
   flags: Record<string, string>,
-  v2Fields: { changeId?: string } = {},
+  v2Fields: { changeId?: string; workSetBranch?: string } = {},
   v2 = false,
 ): void {
   if (flags.format === "json") {

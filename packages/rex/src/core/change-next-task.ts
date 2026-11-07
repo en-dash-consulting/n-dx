@@ -21,6 +21,8 @@ export interface NextWorkOptions {
   excludeIds?: ReadonlySet<string>;
   /** Only units carrying at least one of these tags (the unit's own, as on v1). */
   tags?: readonly string[];
+  /** Only units in this branch work set, as {@link findActionableWork} reads it. */
+  workSet?: ReadonlySet<string>;
 }
 
 export interface NextWorkTask {
@@ -34,7 +36,7 @@ export interface NextWorkTask {
 
 /** The unit autonomous selection runs next, in `get_next_task`'s v1 shape; `null` when none is actionable. */
 export function findNextWorkTask(tree: V2Tree, options: NextWorkOptions = {}): NextWorkTask | null {
-  const actionable = findActionableWork(tree, { excludeIds: options.excludeIds });
+  const actionable = findActionableWork(tree, { excludeIds: options.excludeIds, workSet: options.workSet });
   const tags = options.tags ?? [];
   const unit = actionable.find((u) => tags.length === 0 || (u.node.tags ?? []).some((t) => tags.includes(t)));
   if (!unit) return null;

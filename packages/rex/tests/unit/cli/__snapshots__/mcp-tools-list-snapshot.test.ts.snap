@@ -31,6 +31,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "items": {
             "type": "string"
           }
+        },
+        "any": {
+          "description": "Pick outside the current branch's work set. Without it, on a branch with assigned tasks (v2), only those are picked.",
+          "type": "boolean"
         }
       },
       "$schema": "http://json-schema.org/draft-07/schema#"

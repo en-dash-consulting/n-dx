@@ -248,6 +248,35 @@ describe("an excluded change covers the work inside it", () => {
   });
 });
 
+describe("workSet", () => {
+  const t = tree(change("c", { children: [task("in"), task("out")] }), change("solo"), change("other"));
+
+  it("selects only units whose id is in the set", () => {
+    expect(ids(t, { workSet: new Set(["in"]) })).toEqual(["in"]);
+  });
+
+  it("passes over units outside the set, and a change id does not stand for its tasks", () => {
+    expect(ids(t, { workSet: new Set(["c"]) })).toEqual([]);
+  });
+
+  it("yields no candidates for an empty set", () => {
+    expect(ids(t, { workSet: new Set() })).toEqual([]);
+    expect(findNextWork(t, { workSet: new Set() })).toBeNull();
+  });
+
+  it("selects a task-less change by its own id", () => {
+    expect(findNextWork(t, { workSet: new Set(["solo"]) })).toMatchObject({ kind: "change", node: { id: "solo" } });
+  });
+
+  it("filters nothing when no workSet is given", () => {
+    expect(ids(t)).toEqual(["in", "out", "solo", "other"]);
+  });
+
+  it("keeps claims working inside the set", () => {
+    expect(ids(t, { workSet: new Set(["in", "solo"]), excludeIds: new Set(["in"]) })).toEqual(["solo"]);
+  });
+});
+
 describe("compareReleases", () => {
   it("orders numerically, prerelease first, absent last", () => {
     const sorted = ["1.10.0", undefined, "v1.2.0", "1.2.0-rc.1", "@n-dx/core@0.9.0", "1.2"].sort(compareReleases);
