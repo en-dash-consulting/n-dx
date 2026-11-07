@@ -19,6 +19,8 @@
  * - **Read.** {@link readWorkSet}: the open units on a branch, and whether the
  *   branch has any assignment at all, since a branch without one has no work
  *   set and selection there is unchanged.
+ * - **Select.** {@link currentWorkSet}: the checked-out branch's set, which
+ *   `get_next_task` and `rex next` narrow selection to unless asked for `any`.
  *
  * The plan functions are pure: they return a new tree and write nothing.
  * {@link assignToBranch} and {@link unassignFromBranch} run them inside
@@ -178,6 +180,19 @@ export function requireWorkSetBranch(projectDir: string): string {
     );
   }
   return branch;
+}
+
+/**
+ * The work set selection is narrowed to in `projectDir`: its checked-out
+ * branch's, when that branch has any assignment. Null on the default branch,
+ * a detached HEAD or a branch with no assignment, where selection is not
+ * narrowed. A set whose `ids` is empty has nothing left to pick.
+ */
+export function currentWorkSet(tree: V2Tree, projectDir: string): WorkSet | null {
+  const branch = currentWorkSetBranch(projectDir);
+  if (branch === null) return null;
+  const set = readWorkSet(tree, branch);
+  return set.hasAssignments ? set : null;
 }
 
 /** `ids` as output names them, in the order given; an id the tree does not hold is skipped. */

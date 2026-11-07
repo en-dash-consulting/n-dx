@@ -78,8 +78,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Finds the highest-priority task that is ready to work on (not blocked,\n" +
       "not deferred). On a v2 tree a change with no tasks counts as one task.\n" +
       "Shows the task or change with its parent chain and explains why\n" +
-      "it was selected.",
+      "it was selected. On a branch with a work set (rex branch add), only\n" +
+      "that branch's tasks are picked.",
     options: [
+      { flag: "--any", description: "Pick outside the current branch's work set" },
       { flag: "--format=json", description: "Output as JSON" },
     ],
     examples: [

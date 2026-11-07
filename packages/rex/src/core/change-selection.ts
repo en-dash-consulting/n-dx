@@ -32,7 +32,9 @@
  *
  * `ready` is informational. `readyOnly` and `assignee` (`--ready-only`,
  * `--mine`) narrow the candidates only when asked; a task inherits either
- * value from its change unless it sets its own `ready`.
+ * value from its change unless it sets its own `ready`. `workSet` narrows them
+ * to a branch's work set, matched on the unit's own id; claims (`excludeIds`)
+ * still apply inside it.
  *
  * ## Order
  *
@@ -72,6 +74,12 @@ export interface WorkSelectionOptions {
   readyOnly?: boolean;
   /** Only units this identity is assigned, directly or through the change (`--mine`). */
   assignee?: string;
+  /**
+   * Only units whose own id is in the set: a branch's work set
+   * (`core/work-set.ts`). A task matches by its id, a task-less change by the
+   * change's. An empty set yields no candidates; omitted, nothing is filtered.
+   */
+  workSet?: ReadonlySet<string>;
 }
 
 /** A child as {@link changeWorkShape} reads it: a change-layer node or its projected item. */
@@ -133,6 +141,7 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
     (u) =>
       !exclude.has(u.node.id) &&
       !held(u.change) &&
+      (!options.workSet || options.workSet.has(u.node.id)) &&
       (!options.readyOnly || (u.node.ready ?? u.change.ready) === true) &&
       (!options.assignee || u.node.assignee === options.assignee || u.change.assignee === options.assignee),
   );
