@@ -112,7 +112,7 @@ describe("findUncommittedWork", () => {
 
   it("names a rename source containing ' -> ' in full", async () => {
     const result = await findUncommittedWork(
-      withDirty(["R  src/a -> b.ts -> .rex/changes/x/b.ts"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      withDirty(['R  "src/a -> b.ts" -> .rex/changes/x/b.ts'], { discountPaths: [...PRD_COMMIT_PATHS] }),
     );
     expect(result).toEqual({ clean: false, paths: ["src/a -> b.ts"] });
   });
