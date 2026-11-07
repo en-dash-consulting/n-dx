@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   claudeSessionDriver,
@@ -277,5 +279,50 @@ describe("codex tool results", () => {
   it("leaves function_call_output unflagged: it carries no status", () => {
     const line = JSON.stringify({ type: "function_call_output", output: "x" });
     expect(codexSessionDriver.parseLine(line, 1)?.toolResult).not.toHaveProperty("isError");
+  });
+});
+
+describe("codex mcp tool calls", () => {
+  // Verbatim `codex exec --json` lines from codex-cli 0.164.0-alpha.11.1
+  // (2026-11-06), in this order: success started, success completed, tool
+  // error result, transport failure, timeout.
+  const [started, success, toolError, transport, timeout] = readFileSync(
+    fileURLToPath(new URL("../fixtures/codex-mcp-tool-call-0.164.0-alpha.11.1.jsonl", import.meta.url)),
+    "utf-8",
+  ).split("\n").filter(Boolean);
+  const result = (line: string) => codexSessionDriver.parseLine(line, 1)?.toolResult;
+  const tool = "mcp__ndx-sidecar__propose_status";
+  const callError = "tool call error: tool call failed for `ndx-sidecar/propose_status`\n\nCaused by:\n    ";
+
+  it("maps item.started to a tool use named from the event's server and tool", () => {
+    const event = codexSessionDriver.parseLine(started, 1);
+    expect(event?.type).toBe("tool_use");
+    expect(event?.toolCall).toEqual({ tool, input: { mode: "success" }, id: "item_1" });
+  });
+
+  it("maps a completed call to a successful result with its text content", () => {
+    expect(result(success)).toEqual({ tool, output: "probe accepted", durationMs: 0, id: "item_1", isError: false });
+  });
+
+  it("flags a tool error result from status alone: error is null", () => {
+    expect(result(toolError)).toEqual({ tool, output: "probe rejected", durationMs: 0, id: "item_2", isError: true });
+  });
+
+  it("flags a transport failure and reports error.message", () => {
+    const r = result(transport);
+    expect(r?.tool).toBe(tool);
+    expect(r?.isError).toBe(true);
+    expect(r?.output.startsWith(`${callError}Transport send error: `)).toBe(true);
+    expect(r?.output.endsWith("error sending request for url (http://127.0.0.1:58821/mcp)")).toBe(true);
+  });
+
+  it("flags a timeout and reports error.message", () => {
+    expect(result(timeout)).toEqual({
+      tool,
+      output: `${callError}timed out awaiting tools/call after 1000ms`,
+      durationMs: 0,
+      id: "item_1",
+      isError: true,
+    });
   });
 });

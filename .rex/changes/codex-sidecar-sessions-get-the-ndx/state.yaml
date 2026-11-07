@@ -11,5 +11,12 @@ items:
     lastModified: "2026-11-07T01:38:51.994Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f7893c86-bb20-487e-bb38-3863d250f8a1":
-    lastModified: "2026-11-07T01:38:55.199Z"
+    status: "completed"
+    startedAt: "2026-11-07T01:39:36.242Z"
+    completedAt: "2026-11-07T01:43:13.956Z"
+    endedAt: "2026-11-07T01:43:13.956Z"
+    activeIntervals: [{"end":"2026-11-07T01:43:13.956Z","start":"2026-11-07T01:39:36.242Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "parseCodexJsonLine maps mcp_tool_call started/completed to tool_use/tool_result named mcp__<server>__<tool>; isError from status only; tests from verbatim codex-cli 0.164.0-alpha.11.1 lines."
+    lastModified: "2026-11-07T01:43:13.956Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
