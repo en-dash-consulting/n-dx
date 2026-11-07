@@ -788,7 +788,10 @@
 .prd-tag-list {
   display: flex;
   gap: var(--space-1);
-  flex-shrink: 0;
+  /* Shrinks and wraps its tags with the row, so a column narrowed by the
+     Sidecar drawer never pushes the row's actions past its right edge. */
+  flex: 0 1 auto;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
