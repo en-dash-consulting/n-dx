@@ -51,7 +51,7 @@ import { renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
-import { hubVendorRefusal, sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
+import { hubVendorRefusal, sidecarCodexSpawn, sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
 
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
@@ -208,30 +208,43 @@ export function createWorktreeSidecarRegistry(
 ): SidecarSessionRegistry {
   const { broker, ...rest } = opts;
   const dir = worktreeSidecarDir(projectDir);
-  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker) });
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, undefined, rest.ttlMs) });
 }
 
 /**
  * What every Sidecar session's vendor CLI is opened with: the filtered
- * environment, the read-only spawn flags for the session's scope and a fresh
- * MCP config naming only the broker.
+ * environment, the read-only spawn flags for the session's scope and the
+ * broker as its only MCP server.
+ *
+ * Claude reads the broker from a fresh MCP config file. Codex gets it through
+ * `-c` flags, its headers through variables set in its child environment
+ * only; its MCP config file names no server, so the broker credential is
+ * written nowhere a Codex session reads.
  *
  * @param envDir The project whose env policy and LLM config the session
  *   takes; defaults to the session's own checkout. A hub session runs in no
  *   checkout, so it takes its host project's.
+ * @param idleMs The session idle window, which bounds how long a Codex broker
+ *   call may wait on its card. Read on every connect, so a saved change
+ *   applies to the next session opened.
  */
 export function sidecarSessionConnect(
   dir: string,
   broker?: WorktreeSidecarRegistryOptions["broker"],
   envDir?: string,
+  idleMs: SidecarRegistryOptions["ttlMs"] = DEFAULT_SIDECAR_TTL_MS,
 ): SidecarSessionConnect {
   return (record) => {
     // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
     const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
     if (refusal) throw new Error(refusal);
+    const endpoint = broker?.(record.id);
+    const isCodex = record.vendor === "codex";
+    const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs);
     return {
       ...resolveSidecarSessionEnv(envDir ?? record.worktree),
-      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id)), record.scope),
+      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),
+      ...(isCodex && Object.keys(codex.env).length > 0 && { extraEnv: codex.env }),
     };
   };
 }
@@ -250,7 +263,7 @@ export interface HubSidecarRegistryOptions extends WorktreeSidecarRegistryOption
  */
 export function createHubSidecarRegistry(opts: HubSidecarRegistryOptions): SidecarSessionRegistry {
   const { broker, dir, hostProjectDir, ...rest } = opts;
-  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir) });
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir, rest.ttlMs) });
 }
 
 /** An open vendor session, and where its running turn's events go. */

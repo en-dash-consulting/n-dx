@@ -17,11 +17,11 @@ import { sidecarSessionConnect, type SidecarSessionRecord } from "../../../src/s
 import { removeTestDir } from "../../helpers/server-route-test-support.js";
 
 let root: string;
-let spawned: Array<{ binary: string; args: string[] }>;
+let spawned: Array<{ binary: string; args: string[]; env?: NodeJS.ProcessEnv }>;
 
-/** A CLI that names a session and exits; records each spawn's argv. */
-const recordingSpawn: NonNullable<VendorSessionOptions["spawn"]> = (binary, args) => {
-  spawned.push({ binary, args });
+/** A CLI that names a session and exits; records each spawn's argv and environment. */
+const recordingSpawn: NonNullable<VendorSessionOptions["spawn"]> = (binary, args, opts) => {
+  spawned.push({ binary, args, env: opts.env });
   const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
   const stdout = new PassThrough();
   const stdin = new PassThrough();
@@ -200,13 +200,92 @@ describe("with an operator's connections declared", () => {
 });
 
 describe("Codex spawn", () => {
-  it("runs in a read-only sandbox that never asks for approval", async () => {
-    const connect = sidecarSessionConnect(join(root, "sidecar"));
+  const KEY = "broker-credential-7f3a";
+  const KEY_VAR = "NDX_SIDECAR_HEADER_X_NDX_SIDECAR_KEY";
+  const WORKSPACE_VAR = "NDX_SIDECAR_HEADER_X_NDX_WORKSPACE";
+  const URL = "http://127.0.0.1:3117/api/sidecar/sessions/sess-1/mcp";
+  const endpoint = (id: string) => ({
+    url: `http://127.0.0.1:3117/api/sidecar/sessions/${id}/mcp`,
+    headers: { "x-ndx-sidecar-key": KEY, "x-ndx-workspace": "main" },
+  });
+
+  /** The `-c` values of an argv. */
+  const overrides = (args: string[]) => args.filter((_a, i) => args[i - 1] === "-c");
+
+  async function twoTurns(connect: ReturnType<typeof sidecarSessionConnect>): Promise<void> {
     const session = startVendorSession({ ...connect(record("codex")), vendor: "codex", cwd: root, spawn: recordingSpawn });
     await session.sendTurn("one");
-    const { args } = spawned[0];
-    expect(flagValue(args, "--sandbox")).toBe("read-only");
-    expect(flagValue(args, "-c")).toBe("approval_policy=never");
-    expect(args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+    await session.sendTurn("two");
+    expect(spawned).toHaveLength(2);
+  }
+
+  it("runs in a read-only sandbox that never asks for approval, fresh and resumed", async () => {
+    await twoTurns(sidecarSessionConnect(join(root, "sidecar")));
+    const [fresh, resumed] = spawned.map((s) => s.args);
+    expect(flagValue(fresh, "--sandbox")).toBe("read-only");
+    expect(overrides(fresh)).toContain("approval_policy=never");
+    expect(fresh).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+
+    // `exec resume` rejects --sandbox, and the thread does not keep its
+    // starting policy: the resumed turn re-applies it as overrides.
+    expect(resumed.slice(0, 2)).toEqual(["exec", "resume"]);
+    expect(resumed).not.toContain("--sandbox");
+    expect(overrides(resumed)).toEqual(expect.arrayContaining(['sandbox_mode="read-only"', 'approval_policy="never"']));
+  });
+
+  it("carries the broker on every turn through -c flags, its credential only in the child's environment", async () => {
+    const dir = join(root, ".hench", "sidecar");
+    await twoTurns(sidecarSessionConnect(dir, endpoint, undefined, () => 7_200_000));
+
+    const [fresh, resumed] = spawned;
+    expect(fresh.args.slice(0, 2)).toEqual(["exec", "--ignore-user-config"]);
+    expect(resumed.args.slice(0, 3)).toEqual(["exec", "resume", "--ignore-user-config"]);
+    expect(resumed.args).toContain("t-1");
+    for (const { args, env } of spawned) {
+      expect(overrides(args)).toEqual(expect.arrayContaining([
+        "features.apps=false",
+        "features.shell_snapshot=false",
+        `mcp_servers.ndx-sidecar.url="${URL}"`,
+        "mcp_servers.ndx-sidecar.required=true",
+        "mcp_servers.ndx-sidecar.startup_timeout_sec=30",
+        // The idle window, 2 h, in whole seconds.
+        "mcp_servers.ndx-sidecar.tool_timeout_sec=7200",
+        `mcp_servers.ndx-sidecar.env_http_headers={"x-ndx-sidecar-key"="${KEY_VAR}", "x-ndx-workspace"="${WORKSPACE_VAR}"}`,
+        // The agent's commands read the header variables empty.
+        `shell_environment_policy.set.${KEY_VAR}=''`,
+        `shell_environment_policy.set.${WORKSPACE_VAR}=''`,
+      ]));
+      expect(args.join(" ")).not.toContain(KEY);
+      expect(env?.[KEY_VAR]).toBe(KEY);
+      expect(env?.[WORKSPACE_VAR]).toBe("main");
+    }
+    expect(process.env[KEY_VAR]).toBeUndefined();
+
+    // The MCP config file a Codex session could read names no server.
+    const config = readFileSync(join(dir, "sess-1.mcp.json"), "utf-8");
+    expect(JSON.parse(config)).toEqual({ mcpServers: {} });
+    expect(config).not.toContain(KEY);
+  });
+
+  it("follows a saved idle window for the tool timeout", async () => {
+    await twoTurns(sidecarSessionConnect(join(root, "sidecar"), endpoint, undefined, () => 90_500));
+    for (const { args } of spawned) expect(overrides(args)).toContain("mcp_servers.ndx-sidecar.tool_timeout_sec=91");
+  });
+
+  it("without a broker endpoint, names no MCP server but still skips the user config and both features", async () => {
+    await twoTurns(sidecarSessionConnect(join(root, "sidecar")));
+    for (const { args, env } of spawned) {
+      expect(args).toContain("--ignore-user-config");
+      expect(overrides(args)).toEqual(expect.arrayContaining(["features.apps=false", "features.shell_snapshot=false"]));
+      expect(overrides(args).filter((o) => o.startsWith("mcp_servers."))).toEqual([]);
+      expect(env?.[KEY_VAR]).toBeUndefined();
+    }
+  });
+
+  it("a Claude session's environment gets no broker header variable", async () => {
+    const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), endpoint)(record("claude")), vendor: "claude", cwd: root, spawn: recordingSpawn });
+    await session.sendTurn("one");
+    expect(spawned[0].env?.[KEY_VAR]).toBeUndefined();
+    expect(spawned[0].args).not.toContain("--ignore-user-config");
   });
 });

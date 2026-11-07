@@ -75,6 +75,14 @@ export interface VendorSessionOptions {
   readonly envPolicy?: EnvPolicyConfig;
   /** LLM config supplying a configured API key when {@link env} is omitted. */
   readonly llmConfig?: LLMConfig;
+  /**
+   * Named variables added to the child environment after it is resolved —
+   * values the caller supplies itself (the Sidecar's broker headers), never
+   * ones read from the parent. Widens nothing else: the env policy still
+   * decides every inherited variable. A Codex caller that sets one should
+   * also name it in `codex.hiddenEnv`, so the agent's commands read it empty.
+   */
+  readonly extraEnv?: Readonly<Record<string, string>>;
   readonly claude?: ClaudeTurnFlags;
   readonly codex?: CodexTurnFlags;
   /** Called with each event as it is parsed. */
@@ -159,8 +167,9 @@ function createSession(
   initial: SessionResume | undefined,
 ): VendorSession {
   const spawnImpl = opts.spawn ?? spawnCli;
-  const env = opts.env
+  const baseEnv = opts.env
     ?? resolveVendorCliEnv({ ...opts.llmConfig, vendor: driver.vendor }, opts.envPolicy);
+  const env = opts.extraEnv ? { ...baseEnv, ...opts.extraEnv } : baseEnv;
   // One filter for the whole session: message ids are unique per
   // conversation, and a resumed turn may replay none of them.
   const usageFilter = new UsageMessageFilter();
