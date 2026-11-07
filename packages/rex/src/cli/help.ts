@@ -274,7 +274,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     examples: [
       { command: "rex branch add CH-2", description: "Put CH-2's open tasks on this branch" },
-      { command: "rex branch add 8bc1f961 --move", description: "Take a task from another branch" },
+      { command: "rex branch add <task-id> --move", description: "Take a task from another branch" },
       { command: "rex branch remove CH-2", description: "Take them off again" },
       { command: "rex branch show", description: "List this branch's work set" },
     ],
