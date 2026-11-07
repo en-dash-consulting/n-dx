@@ -103,7 +103,7 @@ Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/p
 | Tool | Description |
 |------|-------------|
 | `get_prd_status` | PRD overview. v2: change counts, the Inbox count, product status per area and change counts per release. v1: the item tree with completion stats |
-| `get_next_task` | Next actionable task (skips tasks another worktree has claimed) |
+| `get_next_task` | Next actionable task (skips tasks another worktree has claimed). On a branch with a work set, picks only from it; `any: true` picks outside it |
 | `claim_task` | Hold a task for this worktree |
 | `release_task` | Give back a claim |
 | `add_item` | Add an item. v2: pass `type` (`change`, the default, lands in the Inbox; `task` or `subtask` with `parentId`), and optionally `amends` or `touches`. v1: pass `level`. `acceptanceCriteria` is the item's "done when". Optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins |
