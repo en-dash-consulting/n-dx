@@ -62,7 +62,8 @@
  *   operations hench also has to scope to it)
  * - v2 work selection (prdLayout, isChangeLayerStore, findNextWorkTask,
  *   findActionableWork, resolveWorkById — what `get_next_task` runs on a v2
- *   tree, so `ndx work` picks the same unit)
+ *   tree, so `ndx work` picks the same unit; currentWorkSet — the branch work
+ *   set that selection narrows to)
  * - v2 agent brief (buildChangeBrief — the selected unit's brief, built from
  *   its change and the product nodes it touches or amends)
  * - v2 completion (completeV2Work — what `update_task_status` runs on a v2
@@ -161,6 +162,12 @@ export {
   resolveWorkById,
   openChangeTasks,
 } from "@n-dx/rex";
+
+// The checked-out branch's work set (null on the default branch, a detached
+// HEAD or a branch with no assignment). `ndx work` narrows autoselection to it
+// as `get_next_task` and `rex next` do; which branch has a set and which units
+// are in it is rex's rule.
+export { currentWorkSet } from "@n-dx/rex";
 
 // ---- v2 agent brief -----------------------------------------------------------
 // On a v2 tree the brief is the unit's change and the capabilities and

@@ -57,6 +57,8 @@ const EXPECTED_EXPORTS = [
   "findActionableWork",
   "resolveWorkById",
   "openChangeTasks",
+  // the checked-out branch's work set, which v2 autoselection narrows to
+  "currentWorkSet",
   // v2 agent brief
   "buildChangeBrief",
   // v2 completion — what update_task_status runs on a v2 tree

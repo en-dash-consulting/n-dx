@@ -14,6 +14,7 @@
 
 import {
   awaitsPlacement,
+  currentWorkSet,
   findActionableWork,
   findItem,
   findNextWorkTask,
@@ -51,6 +52,32 @@ export function readTreeAsReset(tree: V2Tree, ids: ReadonlySet<string>): V2Tree 
   return { product: tree.product, changes: reset(tree.changes) };
 }
 
+/** Said when the branch's work set has nothing left; rex next says the same. */
+export const WORK_SET_EXHAUSTED = "Nothing left in this branch's work set; --any picks outside it";
+
+/**
+ * Autoselection found nothing inside the branch's work set. `--loop` reads it
+ * as "done", like the empty-selection error it replaces.
+ */
+export class WorkSetExhaustedError extends Error {
+  constructor(readonly branch: string) {
+    super(WORK_SET_EXHAUSTED);
+    this.name = "WorkSetExhaustedError";
+  }
+}
+
+/** A branch work set as rex reads it: the branch and its open units. */
+export type BranchWorkSet = NonNullable<ReturnType<typeof currentWorkSet>>;
+
+/**
+ * The work set selection in `projectDir` is narrowed to, by get_next_task's
+ * rule: null on the default branch, a detached HEAD or a branch with no
+ * assignment, and null when `projectDir` is absent (`--any`).
+ */
+export function branchWorkSet(tree: V2Tree, projectDir: string | undefined): BranchWorkSet | null {
+  return projectDir ? currentWorkSet(tree, projectDir) : null;
+}
+
 export interface V2SelectOptions {
   /** Units to pass over: stuck, over their attempt limit, or claimed elsewhere. */
   excludeIds?: ReadonlySet<string>;
@@ -58,6 +85,8 @@ export interface V2SelectOptions {
   tags?: readonly string[];
   /** Only units assigned to this identity, directly or through their change (`--mine`). */
   assignee?: string;
+  /** Only units in this branch work set ({@link branchWorkSet}); an empty set selects nothing. */
+  workSet?: ReadonlySet<string>;
 }
 
 /**
@@ -77,7 +106,11 @@ export function nextV2Entry(tree: V2Tree, options: V2SelectOptions = {}): V2Entr
     const mine = new Set(findActionableWork(tree, { assignee: options.assignee }).map((u) => u.node.id));
     for (const unit of findActionableWork(tree)) if (!mine.has(unit.node.id)) excludeIds.add(unit.node.id);
   }
-  const next = findNextWorkTask(tree, { excludeIds, ...(options.tags?.length ? { tags: options.tags } : {}) });
+  const next = findNextWorkTask(tree, {
+    excludeIds,
+    ...(options.tags?.length ? { tags: options.tags } : {}),
+    ...(options.workSet ? { workSet: options.workSet } : {}),
+  });
   return next ? { item: next.item, parents: next.parents, explanation: next.explanation } : null;
 }
 
@@ -90,6 +123,7 @@ export function actionableV2Entries(
   const units = findActionableWork(tree, {
     ...(options.excludeIds?.size ? { excludeIds: options.excludeIds } : {}),
     ...(options.assignee ? { assignee: options.assignee } : {}),
+    ...(options.workSet ? { workSet: options.workSet } : {}),
   });
   return units.flatMap((u) => findItem(items, u.node.id) ?? []);
 }

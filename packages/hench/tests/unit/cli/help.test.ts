@@ -75,6 +75,12 @@ describe("hench CLI help", () => {
       expect(output).toContain("--auto");
     });
 
+    it("run help lists --any, which picks outside the branch's work set", () => {
+      showCommandHelp("run");
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).toMatch(/--any\s+Pick outside the branch's work set/);
+    });
+
     it("status help includes --last and --format flags", () => {
       showCommandHelp("status");
       const output = logSpy.mock.calls[0][0] as string;

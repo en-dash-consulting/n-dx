@@ -632,6 +632,23 @@ describe("on a v2 tree", () => {
     expect(r.task?.level).toBe("task");
   });
 
+  it("names the branch's work set: none without one, branch and ids with one, none under --any", async () => {
+    expect((await resolve({ task: WIRE_ID })).workSet).toBeNull();
+    const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+    await appendFile(stateFile, `  "${WIRE_ID}":\n    delivery: {"branch":"feat/ws"}\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "assign");
+    // On the branch the task was not assigned to, there is no set.
+    expect((await resolve({ task: WIRE_ID })).workSet).toBeNull();
+    git(projectDir, "checkout", "-q", "-b", "feat/ws");
+    const r = await resolve({ task: WIRE_ID });
+    expect(r.workSet).toEqual({ branch: "feat/ws", ids: [WIRE_ID] });
+    expect(codes(r)).toEqual([]);
+    const any = await resolve({ task: WIRE_ID, any: "true" });
+    expect(any.workSet).toBeNull();
+    expect(any.command).toContain("--any");
+  });
+
   it("reports the next task, passing over one another worktree holds", async () => {
     const shipId = "c0000000-0000-4000-8000-000000000003";
     await writeFile(
