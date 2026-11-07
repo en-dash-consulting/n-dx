@@ -31,7 +31,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, v2RefPriority, V2_HAS_NO_EPICS, WORK_SET_EXHAUSTED, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, nextV2Selection, v2RefPriority, V2_HAS_NO_EPICS, WORK_SET_EXHAUSTED, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -1070,12 +1070,11 @@ export async function peekNextTaskPriority(
 
   if (tree) {
     // The same selection runOne makes on a v2 tree (no epic level to scope to).
-    const workSet = branchWorkSet(tree, workSetDir);
-    const next = nextV2Entry(tree, {
+    const { entry: next } = nextV2Selection(tree, {
       ...(excludeTaskIds ? { excludeIds: excludeTaskIds } : {}),
       ...(tags?.length ? { tags } : {}),
       ...(assignee ? { assignee } : {}),
-      ...(workSet ? { workSet: new Set(workSet.ids) } : {}),
+      ...(workSetDir ? { workspace: workSetDir } : {}),
     });
     if (next) {
       return resolveSchedulingPriority({
@@ -1861,8 +1860,8 @@ function isNoTasksError(err: unknown): boolean {
 }
 
 /**
- * The checkout whose branch work set narrows autoselection (rex's
- * `currentWorkSet`), as a selection option: none under `--any`. Selection
+ * The checkout whose branch work set narrows autoselection (the `workspace`
+ * rex's `findNextWorkTask` works the set out from), as a selection option: none under `--any`. Selection
  * there is unchanged on the default branch, a detached HEAD and a branch with
  * no assignment, which have no work set.
  */

@@ -17,7 +17,7 @@ import {
   inboxRefusal,
   loadV2Tree,
   namedChangeEntry,
-  nextV2Entry,
+  nextV2Selection,
   readTreeAsReset,
   resolveV2Entry,
   V2_HAS_NO_EPICS,
@@ -272,7 +272,7 @@ export interface SelectTaskOptions {
   assignee?: string;
   /**
    * The checkout whose branch work set narrows autoselection on a v2 tree
-   * (rex's `currentWorkSet`). Absent under `--any`. An explicit `taskId`
+   * (the `workspace` rex's `findNextWorkTask` works the set out from). Absent under `--any`. An explicit `taskId`
    * bypasses it, as it does `assignee`.
    */
   workSetDir?: string;
@@ -373,7 +373,6 @@ export async function selectTaskEntry(
   // Tasks other worktrees hold are passed over — not folded into skipIds,
   // which would make their parents look finished.
   const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
-  const workSet = tree ? branchWorkSet(tree, options.workSetDir) : null;
 
   for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
     // rex's collectActionable reads `skipIds` only as "done" for dependency
@@ -387,12 +386,14 @@ export async function selectTaskEntry(
     };
     let candidate: TreeEntry | null;
     if (tree) {
-      candidate = nextV2Entry(tree, {
+      // rex's selector narrows to the checkout's branch work set and returns it.
+      const { entry, workSet } = nextV2Selection(tree, {
         excludeIds: new Set([...(excludeIds ?? []), ...claimedElsewhere]),
         ...(tags?.length ? { tags } : {}),
         ...(assignee ? { assignee } : {}),
-        ...(workSet ? { workSet: new Set(workSet.ids) } : {}),
+        ...(options.workSetDir ? { workspace: options.workSetDir } : {}),
       });
+      candidate = entry;
       if (!candidate) throw workSet ? new WorkSetExhaustedError(workSet.branch) : new Error("No actionable tasks found in PRD");
     } else if (epicId) {
       // Epic filter active: get all actionable tasks and filter to the epic.

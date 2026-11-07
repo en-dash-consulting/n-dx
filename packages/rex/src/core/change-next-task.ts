@@ -3,7 +3,8 @@
  * selects, answered in the v1 shape (`item`, `parents`, `explanation`) so
  * callers written for v1 read it unchanged. The item is the unit as
  * `changeLayerItems` projects it, so it also carries its v2 fields (`type`,
- * `displayId`, …). Pure; the v1 counterpart is `core/next-task.ts`.
+ * `displayId`, …). Pure, except that a `workspace` reads its checked-out
+ * branch; the v1 counterpart is `core/next-task.ts`.
  *
  * @module rex/core/change-next-task
  */
@@ -15,6 +16,7 @@ import { findActionableWork, type WorkUnit } from "./change-selection.js";
 import { changeLayerItems } from "./layer-projection.js";
 import type { SelectionExplanation } from "./next-task.js";
 import { findItem } from "./tree.js";
+import { currentWorkSet, type WorkSet } from "./work-set.js";
 
 export interface NextWorkOptions {
   /** Ids to pass over: units another worktree has claimed. */
@@ -23,6 +25,25 @@ export interface NextWorkOptions {
   tags?: readonly string[];
   /** Only units in this branch work set, as {@link findActionableWork} reads it. */
   workSet?: ReadonlySet<string>;
+}
+
+/**
+ * {@link NextWorkOptions} for a checkout: selection works out the branch work
+ * set itself, by {@link currentWorkSet}'s rule, and returns it with the unit.
+ */
+export interface WorkspaceNextWorkOptions extends NextWorkOptions {
+  /** The checkout whose branch work set narrows selection; it replaces `workSet` when the branch has one. */
+  workspace: string;
+  /** Do not narrow to the work set (`--any`); `workSet` in the result is null. */
+  any?: boolean;
+}
+
+/** {@link findNextWorkTask}'s answer for a workspace. */
+export interface WorkspaceNextWork {
+  /** The unit to run next; `null` when none is actionable (inside the work set, when there is one). */
+  task: NextWorkTask | null;
+  /** The work set selection was narrowed to; null when it was not narrowed. An empty `ids` has nothing left. */
+  workSet: WorkSet | null;
 }
 
 export interface NextWorkTask {
@@ -34,8 +55,25 @@ export interface NextWorkTask {
   explanation: SelectionExplanation;
 }
 
-/** The unit autonomous selection runs next, in `get_next_task`'s v1 shape; `null` when none is actionable. */
-export function findNextWorkTask(tree: V2Tree, options: NextWorkOptions = {}): NextWorkTask | null {
+/**
+ * The unit autonomous selection runs next, in `get_next_task`'s v1 shape;
+ * `null` when none is actionable. Given a `workspace`, the answer is
+ * {@link WorkspaceNextWork}: selection narrowed to that checkout's branch work
+ * set (unless `any`), with the set it used.
+ */
+export function findNextWorkTask(tree: V2Tree, options: WorkspaceNextWorkOptions): WorkspaceNextWork;
+export function findNextWorkTask(tree: V2Tree, options?: NextWorkOptions): NextWorkTask | null;
+export function findNextWorkTask(
+  tree: V2Tree,
+  options: NextWorkOptions | WorkspaceNextWorkOptions = {},
+): NextWorkTask | WorkspaceNextWork | null {
+  if (!("workspace" in options) || typeof options.workspace !== "string") return selectNext(tree, options);
+  const workSet = options.any ? null : currentWorkSet(tree, options.workspace);
+  const task = selectNext(tree, workSet ? { ...options, workSet: new Set(workSet.ids) } : options);
+  return { task, workSet };
+}
+
+function selectNext(tree: V2Tree, options: NextWorkOptions): NextWorkTask | null {
   const actionable = findActionableWork(tree, { excludeIds: options.excludeIds, workSet: options.workSet });
   const tags = options.tags ?? [];
   const unit = actionable.find((u) => tags.length === 0 || (u.node.tags ?? []).some((t) => tags.includes(t)));

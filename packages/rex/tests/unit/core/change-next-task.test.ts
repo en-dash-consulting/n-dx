@@ -1,4 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { completedWorkIds, findNextWorkTask } from "../../../src/core/change-next-task.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
@@ -51,6 +55,53 @@ describe("findNextWorkTask", () => {
     expect(findNextWorkTask(t, { excludeIds: new Set(["a"]) })?.item.id).toBe("b");
     expect(findNextWorkTask(t, { tags: ["x"] })?.item.id).toBe("a");
     expect(findNextWorkTask(t, { tags: ["y"] })).toBeNull();
+  });
+});
+
+describe("findNextWorkTask with a workspace", () => {
+  let dir: string;
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, encoding: "utf-8", stdio: "pipe" });
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "rex-next-workspace-"));
+    git("init", "--initial-branch=main");
+    git("commit", "--allow-empty", "-m", "init");
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const t = () =>
+    tree(
+      change("urgent", { priority: "critical" }),
+      change("mine", { priority: "low", delivery: { branch: "feature/x" } }),
+    );
+
+  it("narrows to the checked-out branch's work set and returns it", () => {
+    git("checkout", "-b", "feature/x");
+    const { task: next, workSet } = findNextWorkTask(t(), { workspace: dir });
+    expect(next?.item.id).toBe("mine");
+    expect(workSet).toMatchObject({ branch: "feature/x", ids: ["mine"] });
+  });
+
+  it("does not narrow under any, or on the default branch", () => {
+    git("checkout", "-b", "feature/x");
+    expect(findNextWorkTask(t(), { workspace: dir, any: true })).toMatchObject({ task: { item: { id: "urgent" } }, workSet: null });
+    git("checkout", "main");
+    expect(findNextWorkTask(t(), { workspace: dir })).toMatchObject({ task: { item: { id: "urgent" } }, workSet: null });
+  });
+
+  it("returns the set with no task when the set has nothing left", () => {
+    git("checkout", "-b", "feature/x");
+    const done = tree(change("urgent"), change("mine", { status: "completed", delivery: { branch: "feature/x" } }));
+    expect(findNextWorkTask(done, { workspace: dir })).toEqual({ task: null, workSet: { branch: "feature/x", ids: [], hasAssignments: true } });
+  });
+
+  it("leaves callers without a workspace unchanged", () => {
+    git("checkout", "-b", "feature/x");
+    expect(findNextWorkTask(t())?.item.id).toBe("urgent");
   });
 });
 
