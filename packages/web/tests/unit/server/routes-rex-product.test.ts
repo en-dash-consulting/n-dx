@@ -208,6 +208,18 @@ describe("v2 product reads", () => {
       expect((await area()).openChangeIds.filter((id) => id === OTHER_ID)).toHaveLength(1);
     });
 
+    it("puts a change on a top-level constraint in that constraint's overlays, not an area's", async () => {
+      const TOP_ID = "a0000000-0000-4000-8000-0000000000c1";
+      writeFileSync(join(rexDir, "product", "no-secrets.md"), [
+        "---", `id: "${TOP_ID}"`, 'type: "constraint"', 'title: "No secrets"', 'slug: "no-secrets"', 'appliesTo: "all"', "---", "",
+      ].join("\n"));
+      addChange([], [TOP_ID]);
+      const map = (await get("product")).body.map as ProductMap;
+      const constraint = map.constraints.find((c) => c.id === TOP_ID);
+      expect(constraint?.openChanges.map((c) => c.id)).toEqual([OTHER_ID]);
+      expect(map.areas.flatMap((a) => a.openChangeIds)).not.toContain(OTHER_ID);
+    });
+
     // Open changes' ?area=<slug> keeps the rows naming that slug; its count must be the badge's.
     const cases: Array<[string, () => void]> = [
       ["an amendment to a capability", () => {}],

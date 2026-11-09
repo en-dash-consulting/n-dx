@@ -1088,7 +1088,7 @@ describe("SmartAddInput placement choice on a v2 PRD", () => {
       slug: "payments",
       title: "Payments",
       capabilities: [{ id: AREA_CAP, title: "Refund an order", status: "met", health: "ok", criteriaCount: 1, openChanges: [] }],
-      constraints: [{ id: AREA_RULE, title: "Card data stays encrypted", health: "ok", appliesTo: ["Payments"] }],
+      constraints: [{ id: AREA_RULE, title: "Card data stays encrypted", health: "ok", appliesTo: ["Payments"], openChanges: [] }],
     } as unknown as CaptureArea;
 
     async function search(root: HTMLElement, text: string) {

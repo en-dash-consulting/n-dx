@@ -64,7 +64,7 @@ const MAP: ProductMap = {
     { id: "area-ship", slug: "shipping", title: "Shipping", capabilities: [cap("cap-label", "Shipping labels")], openChangeIds: [] },
     { id: "area-tax", slug: "tax", title: "Tax", capabilities: [cap("cap-vat", "VAT")], openChangeIds: [] },
   ],
-  constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all" }],
+  constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all", openChanges: [] }],
 };
 
 function areaDetail(slug: string): AreaDetail {
