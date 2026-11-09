@@ -12,6 +12,7 @@ touches:
   - "7de075e7-b519-4f53-a17d-d0eea465530b"
 priority: "medium"
 discoveredFrom: {"item":"6a45f6d1-b249-48ff-8e90-e45a7b49fc04","run":"7a64c65a-ecc3-42a5-9124-86591c0c24bb"}
+run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
