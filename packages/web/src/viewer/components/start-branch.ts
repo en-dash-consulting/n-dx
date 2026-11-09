@@ -44,9 +44,12 @@ const NOT_SWITCHED_REASON: Record<NotSwitched["reason"], string> = {
   "run-active": "a run is live in this checkout",
 };
 
-/** The prefilled name for a change. */
+/**
+ * The prefilled name for a change. The slug is repository content, so any
+ * character outside [A-Za-z0-9._/-] (the set the server accepts) becomes `-`.
+ */
 export function branchNameFor(change: Pick<StartBranchChange, "slug">): string {
-  return `feat/${change.slug}`;
+  return `feat/${change.slug.replace(/[^A-Za-z0-9._/-]/g, "-")}`;
 }
 
 export interface StartBranchDialogProps {

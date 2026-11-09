@@ -174,7 +174,9 @@ describe("start a branch routes", () => {
     expect(await emptyStacked.json()).toMatchObject({ code: "NO_WORK_SET_BRANCH" });
     git(root, "checkout", "--quiet", "main");
     git(root, "branch", "-D", "feat/empty");
-    for (const name of ["bad..name", "-x", "@{-1}"]) {
+    // Legal to git, but each would reach a shell through the switchCommand a dirty checkout gets.
+    const metacharacters = [";", "$", "&", "|", "`", "(", ")", "'", '"', "<", ">"].map((c) => `feat/x${c}y`);
+    for (const name of ["bad..name", "-x", "@{-1}", ...metacharacters]) {
       const bad = await post({ changeIds: [CHANGE], name, base: "default" });
       expect(bad.status).toBe(400);
       expect(await bad.json()).toMatchObject({ code: "INVALID_NAME" });

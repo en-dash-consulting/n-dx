@@ -19,10 +19,12 @@ const BILL = { id: "c-2", title: "Rework billing", slug: "rework-billing" };
 
 let root: HTMLDivElement | undefined;
 let posts: unknown[];
+let changes: Array<{ id: string; displayId?: string; title: string; slug: string }> = [PAY, BILL];
 
 afterEach(() => {
   if (root) cleanupRenderedDiv(root);
   root = undefined;
+  changes = [PAY, BILL];
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
 });
@@ -43,7 +45,7 @@ async function mount(
       posts.push(JSON.parse(init.body as string));
       return { ok: reply.status < 300, status: reply.status, json: async () => reply.body };
     }
-    return { ok: true, status: 200, json: async () => ({ branch, workSet, defaultBranch: "main", changes: [PAY, BILL] }) };
+    return { ok: true, status: 200, json: async () => ({ branch, workSet, defaultBranch: "main", changes }) };
   }));
   const onClose = vi.fn();
   const onSwitched = vi.fn();
@@ -63,6 +65,13 @@ describe("Start a branch dialog", () => {
     expect(box("c-1").checked).toBe(true);
     expect(box("c-2").checked).toBe(false);
     expect(nameInput().value).toBe("feat/add-apple-pay");
+  });
+
+  it("prefills only [A-Za-z0-9._/-] when the slug carries other characters", async () => {
+    changes = [{ id: "c-3", title: "Hostile", slug: "x;touch$IFS/tmp/p`id`" }];
+    await mount(null, undefined, "c-3");
+    expect(nameInput().value).toBe("feat/x-touch-IFS/tmp/p-id-");
+    expect(nameInput().value).toMatch(/^[A-Za-z0-9._/-]+$/);
   });
 
   it("names the branch from the first selected change, and keeps a typed name", async () => {

@@ -94,6 +94,8 @@ export const ASSIGN_COMMIT_SUBJECT = "chore(prd): assign changes to this branch"
 const START_PATH = "branch/start";
 const OPEN_STATUSES: ReadonlySet<string> = new Set(["pending", "in_progress", "failing"]);
 const GIT_TIMEOUT_MS = 15_000;
+/** Branch names the route accepts: no character a POSIX shell treats as syntax, so `switchCommand` is safe to paste. */
+const SAFE_BRANCH_NAME = /^[A-Za-z0-9._/-]+$/;
 
 export function routeBranchStart(
   path: string,
@@ -224,7 +226,8 @@ async function handleStart(
 
     const checked = await git(cwd, ["check-ref-format", "--branch", body.name]);
     // `--branch` also expands `@{-1}` and the like; only a name that is its own expansion is a new branch name.
-    if (body.name.startsWith("-") || !checked.ok || checked.stdout !== body.name) {
+    // Git allows `;` `$` and the rest, but the reply hands the name back inside a command the user pastes into a shell.
+    if (body.name.startsWith("-") || !SAFE_BRANCH_NAME.test(body.name) || !checked.ok || checked.stdout !== body.name) {
       return refuse(res, 400, "INVALID_NAME", `"${body.name}" is not a valid branch name.`);
     }
     if (await refExists(cwd, `refs/heads/${body.name}`)) {
