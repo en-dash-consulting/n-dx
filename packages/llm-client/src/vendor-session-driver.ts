@@ -308,6 +308,7 @@ function claudeToolResultEvents(
         output: (b.is_error === true ? "[error] " : "") + claudeToolResultText(b.content).slice(0, MAX_TOOL_OUTPUT_LENGTH),
         durationMs: 0,
         ...(typeof b.tool_use_id === "string" && b.tool_use_id ? { id: b.tool_use_id } : {}),
+        ...(typeof b.is_error === "boolean" ? { isError: b.is_error } : {}),
       },
     }];
   });
@@ -437,6 +438,7 @@ function parseClaudeEventObject(
           output: output.slice(0, MAX_TOOL_OUTPUT_LENGTH),
           durationMs: 0,
           ...(typeof event.tool_use_id === "string" && event.tool_use_id ? { id: event.tool_use_id } : {}),
+          ...(typeof event.is_error === "boolean" ? { isError: event.is_error } : {}),
         },
       };
     }
@@ -790,6 +792,18 @@ export function normalizeCodexResponse(raw: unknown): NormalizedCodexResponse {
 }
 
 /**
+ * Whether a completed Codex `command_execution` item failed: `true` for a
+ * `failed` status or a non-zero exit code, `false` for a `completed` status or
+ * exit code 0, `undefined` when the item carries neither.
+ */
+function codexCommandFailed(item: Record<string, unknown>): boolean | undefined {
+  const exitCode = typeof item.exit_code === "number" ? item.exit_code : undefined;
+  if (item.status === "failed" || (exitCode !== undefined && exitCode !== 0)) return true;
+  if (item.status === "completed" || exitCode === 0) return false;
+  return undefined;
+}
+
+/**
  * Parse one JSONL line of `codex exec --json` into a RuntimeEvent.
  *
  * Supported types: `item.started` (`command_execution` → `shell` tool_use),
@@ -864,6 +878,7 @@ export function parseCodexJsonLine(
           (typeof item.result === "string" && item.result) ||
           (typeof item.text === "string" && item.text) ||
           "";
+        const isError = codexCommandFailed(item);
         return {
           type: "tool_result" as RuntimeEventType,
           vendor,
@@ -873,6 +888,7 @@ export function parseCodexJsonLine(
             tool: "shell",
             output: outputCandidate.slice(0, MAX_TOOL_OUTPUT_LENGTH),
             durationMs: 0,
+            ...(isError !== undefined ? { isError } : {}),
           },
         };
       }

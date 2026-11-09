@@ -963,10 +963,15 @@ describe("tool calls", () => {
   const call = (seq: number, tool: string, input: Record<string, unknown>, id?: string): SidecarFrame => ({
     seq, at: "t", type: "event", event: { type: "tool_use", toolCall: { tool, input, ...(id ? { id } : {}) } },
   });
-  const result = (seq: number, tool: string, output: string, callId?: string): SidecarFrame => ({
+  const result = (seq: number, tool: string, output: string, callId?: string, isError?: boolean): SidecarFrame => ({
     seq, at: "t", type: "event",
-    event: { type: "tool_result", toolResult: { tool, output, durationMs: 5, ...(callId ? { id: callId } : {}) } },
+    event: {
+      type: "tool_result",
+      toolResult: { tool, output, durationMs: 5, ...(callId ? { id: callId } : {}), ...(isError !== undefined ? { isError } : {}) },
+    },
   });
+  const statuses = () => [...root.querySelectorAll<HTMLElement>(".sidecar-tool")]
+    .map((t) => t.querySelector(".sidecar-tool-status")!.textContent);
 
   it("pairs a result naming its call by id with that call, whatever the order", () => {
     const paired = pairToolResults([
@@ -1054,7 +1059,7 @@ describe("tool calls", () => {
     expect(tools[0].querySelector(".sidecar-tool-wire")!.textContent).toBe("mcp__ndx-sidecar__fake__create_ticket");
   });
 
-  it("reads a card-less call whose result is an error as Failed, keeping its details", async () => {
+  it("falls back to the [error] prefix for an unflagged (older) result: Failed, keeping its details", async () => {
     server.sessions = [{ session: session(), running: false }];
     server.frames = [
       call(1, "mcp__ndx-sidecar__run_command", { argv: ["rm"] }, "toolu_A"),
@@ -1071,6 +1076,30 @@ describe("tool calls", () => {
 
     await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
     expect(tools[0].querySelector(".sidecar-tool-output")!.textContent).toBe("[error] command not allowed");
+  });
+
+  it("reads a flagged Codex result as Failed though its output has no [error] prefix", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "shell", { command: "false" }),
+      result(2, "shell", "exit 1", undefined, true),
+      call(3, "shell", { command: "true" }),
+      result(4, "shell", "", undefined, false),
+    ];
+    await mount();
+    await pressCmdJ();
+    expect(statuses()).toEqual(["Failed", "Done"]);
+  });
+
+  it("reads a result flagged as no error as Done though its output starts with [error] ", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "Bash", { command: "echo '[error] x'" }, "toolu_A"),
+      result(2, "", "[error] x", "toolu_A", false),
+    ];
+    await mount();
+    await pressCmdJ();
+    expect(statuses()).toEqual(["Done"]);
   });
 
   it("uses the connection's label from its external-call card and shows the waiting state", async () => {
