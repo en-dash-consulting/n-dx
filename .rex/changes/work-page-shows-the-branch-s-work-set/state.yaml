@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "1d9ec823-10c5-4a4b-86d2-b17335e0a662":
+    status: "completed"
+    startedAt: "2026-11-09T17:28:31.617Z"
+    completedAt: "2026-11-09T17:28:31.617Z"
+    endedAt: "2026-11-09T17:28:31.617Z"
+    activeIntervals: [{"end":"2026-11-09T17:28:31.617Z","start":"2026-11-09T17:28:31.617Z"}]
+    appliedAt: "2026-11-09T17:28:31.617Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-09T17:05:01.808Z"
-    lastModified: "2026-11-09T17:05:30.853Z"
+    lastModified: "2026-11-09T17:28:31.617Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96d87594-7e56-4c39-9bbf-c632612f5c61":
     status: "completed"
@@ -25,8 +32,12 @@ items:
     lastModified: "2026-11-09T17:13:35.921Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f6300273-9ee4-46c2-8a4a-30cc4b200d69":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-09T17:18:11.543Z"
-    activeIntervals: [{"start":"2026-11-09T17:18:11.543Z"}]
-    lastModified: "2026-11-09T17:18:12.244Z"
+    completedAt: "2026-11-09T17:28:31.617Z"
+    endedAt: "2026-11-09T17:28:31.617Z"
+    activeIntervals: [{"end":"2026-11-09T17:28:31.617Z","start":"2026-11-09T17:18:11.543Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added GET/POST /api/rex/branch/start (routes-rex/branch-start.ts) and the Start a branch dialog on Work and Changes; route and viewer tests pass."
+    lastModified: "2026-11-09T17:28:31.617Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

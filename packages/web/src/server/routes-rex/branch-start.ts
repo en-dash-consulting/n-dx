@@ -237,7 +237,9 @@ async function handleStart(
     }
 
     // Decide before creating anything, so the answer matches what was done.
-    const status = await git(cwd, ["status", "--porcelain"]);
+    // `--untracked-files=all` overrides a `status.showUntrackedFiles=no` config, which would hide a
+    // just-captured change: the commit below would sweep it in, and a roll-back's `git clean` delete it.
+    const status = await git(cwd, ["status", "--porcelain", "--untracked-files=all"]);
     if (!status.ok) throw new Error(`git status failed: ${status.stderr}`);
     const { here } = await repositoryRunSlotUsage(ctx);
     const reason = status.stdout !== "" ? "dirty" : here.length > 0 ? "run-active" : null;
@@ -292,7 +294,7 @@ async function switchAssignCommit(
     if (result.isError) throw new Error(text);
     const { assigned } = JSON.parse(text) as { assigned?: unknown[] };
 
-    const changed = await git(cwd, ["status", "--porcelain", "--", ...roots]);
+    const changed = await git(cwd, ["status", "--porcelain", "--untracked-files=all", "--", ...roots]);
     if (!changed.ok) throw new Error(`git status failed: ${changed.stderr}`);
     if (changed.stdout !== "") {
       const added = await git(cwd, ["add", "--all", "--", ...roots]);

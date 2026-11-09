@@ -102,6 +102,19 @@ describe("start a branch routes", () => {
     expect(readFileSync(stateFile(), "utf-8")).toBe(before.state);
   });
 
+  it("counts an untracked PRD file as dirty even when status.showUntrackedFiles is off, and leaves it alone", async () => {
+    // A just-captured change is untracked. Hidden from a plain `status`, it would be
+    // swept into the assignment commit, or removed by the roll-back's `git clean`.
+    git(root, "config", "status.showUntrackedFiles", "no");
+    const captured = join(ctx.rexDir, "changes", "captured-not-committed.md");
+    writeFileSync(captured, "wip\n");
+    const res = await post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ switched: false, reason: "dirty" });
+    expect(head()).toBe("main");
+    expect(readFileSync(captured, "utf-8")).toBe("wip\n");
+  });
+
   it("with a live run creates the branch only and says how to switch", async () => {
     const locks = join(root, ".hench", "locks");
     mkdirSync(locks, { recursive: true });
