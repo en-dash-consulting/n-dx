@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "21973e6f-ab9b-44b9-aa49-cb6daa659948":
+    status: "completed"
+    startedAt: "2026-11-09T17:49:45.786Z"
+    completedAt: "2026-11-09T17:49:45.786Z"
+    endedAt: "2026-11-09T17:49:45.786Z"
+    activeIntervals: [{"end":"2026-11-09T17:49:45.786Z","start":"2026-11-09T17:49:45.786Z"}]
+    appliedAt: "2026-11-09T17:49:45.786Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-09T17:46:08.305Z"
-    lastModified: "2026-11-09T17:46:26.004Z"
+    lastModified: "2026-11-09T17:49:45.786Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "63837517-f337-4dfd-baf3-c306683eb7bf":
-    lastModified: "2026-11-09T17:46:12.849Z"
+    status: "completed"
+    startedAt: "2026-11-09T17:46:51.836Z"
+    completedAt: "2026-11-09T17:49:45.786Z"
+    endedAt: "2026-11-09T17:49:45.786Z"
+    activeIntervals: [{"end":"2026-11-09T17:49:45.786Z","start":"2026-11-09T17:46:51.836Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tests/setup-session-env.js drops git's local env vars (static list) and GIT_CONFIG_KEY_n/VALUE_n; unit case added; new llm-client test pins that listWorktrees honours safe.bareRepository=explicit; patch changeset."
+    lastModified: "2026-11-09T17:49:45.786Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

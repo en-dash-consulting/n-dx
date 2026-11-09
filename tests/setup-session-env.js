@@ -158,3 +158,35 @@ if (current !== gitConfigContent) {
 }
 
 process.env.GIT_CONFIG_GLOBAL = gitConfigPath;
+
+// Git's command-line config scope and repository location, as listed by
+// `git rev-parse --local-env-vars` (git 2.43), kept static so the setup spawns
+// nothing. They outrank the global file above, so a host value leaks into
+// every fixture and every CLI an e2e test spawns, and a location variable
+// makes fixture commands act on another repository.
+//
+// Found: the Claude desktop Terminal panel exports
+// GIT_CONFIG_PARAMETERS='safe.bareRepository=explicit' 'core.fsmonitor='.
+// `ndx work` runs launched there inherit it, git refuses to discover a bare
+// repository, and listWorktrees returns [] for one.
+const GIT_LOCAL_ENV_VARS = [
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CONFIG",
+  "GIT_CONFIG_PARAMETERS",
+  "GIT_CONFIG_COUNT",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_IMPLICIT_WORK_TREE",
+  "GIT_GRAFT_FILE",
+  "GIT_INDEX_FILE",
+  "GIT_NO_REPLACE_OBJECTS",
+  "GIT_REPLACE_REF_BASE",
+  "GIT_PREFIX",
+  "GIT_SHALLOW_FILE",
+  "GIT_COMMON_DIR",
+];
+for (const name of GIT_LOCAL_ENV_VARS) delete process.env[name];
+for (const name of Object.keys(process.env)) {
+  if (/^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(name)) delete process.env[name];
+}
