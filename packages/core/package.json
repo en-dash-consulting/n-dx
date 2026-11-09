@@ -52,6 +52,7 @@
     "ci.js",
     "web.js",
     "build-identity.mjs",
+    "source-build.js",
     "mcp-shim.js",
     "help.js",
     "gateway-rules.json",

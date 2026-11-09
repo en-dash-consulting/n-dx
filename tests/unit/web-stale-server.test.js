@@ -9,7 +9,8 @@
  * read from disk, the comparison with a running hub's, and the wording.
  *
  * @see packages/core/build-identity.mjs
- * @see packages/core/web.js — serverRefreshFix, noNonceNote, staleWebDistWarning, hubBuildMismatch, formatUnrecordedStatus
+ * @see packages/core/web.js — serverRefreshFix, noNonceNote, shouldRebuildForNonce, hubBuildMismatch, formatUnrecordedStatus
+ * @see tests/unit/source-build.test.js — the rebuild a lagging dist/ gets before anything is spawned
  * @see tests/e2e/cli-start-stale-hub.test.js — the same, driven through `ndx start` against an older hub
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -25,7 +26,7 @@ import {
   hubBuildMismatch,
   noNonceNote,
   serverRefreshFix,
-  staleWebDistWarning,
+  shouldRebuildForNonce,
 } from "../../packages/core/web.js";
 
 let root;
@@ -129,22 +130,15 @@ const published = { packageDir: "/n/node_modules/@n-dx/web", version: "1.2.3", s
 const here = hereServerCommands("start", false);
 
 describe("serverRefreshFix", () => {
-  it("leads with a rebuild of web and its dependencies when the dist/ on disk is stale — a restart alone respawns it", () => {
-    for (const server of [HUB_SERVER_COMMANDS, here]) {
-      const fix = serverRefreshFix(stale, server);
-      expect(fix).toMatch(/^run 'pnpm --filter "@n-dx\/web\.\.\." build' in /);
-      expect(fix).toContain(`'${server.stop}', then '${server.start}'`);
+  it("never tells a single-project server's user to run pnpm: a lagging dist/ was rebuilt before spawning", () => {
+    for (const web of [current, stale, watchBuilt]) {
+      const fix = serverRefreshFix(web, here);
+      expect(fix).not.toMatch(/pnpm/);
+      expect(fix).toContain("rebuilt");
     }
   });
 
-  it("restarts the hub when the build on disk is current, since a fresh hub runs it", () => {
-    for (const web of [current, watchBuilt, published]) {
-      expect(serverRefreshFix(web, HUB_SERVER_COMMANDS)).toBe("restart the hub: 'ndx hub stop', then 'ndx start'");
-    }
-  });
-
-  it("never offers a bare restart for a single-project server just spawned from that same build", () => {
-    expect(serverRefreshFix(current, here)).toMatch(/^run 'pnpm --filter/);
+  it("says reinstall for a published install, which has no source to rebuild", () => {
     expect(serverRefreshFix(published, here)).toBe("reinstall n-dx so @n-dx/web matches this ndx");
   });
 
@@ -152,7 +146,18 @@ describe("serverRefreshFix", () => {
     expect(hereServerCommands("start", false)).toMatchObject({ stop: "ndx start --here stop", start: "ndx start --here" });
     expect(hereServerCommands("start", true)).toMatchObject({ stop: "ndx start --preview stop", start: "ndx start --preview" });
     expect(hereServerCommands("web", false)).toMatchObject({ stop: "ndx web --here stop", start: "ndx web --here" });
-    expect(serverRefreshFix(stale, hereServerCommands("start", true))).toContain("'ndx start --preview stop', then 'ndx start --preview'");
+  });
+});
+
+describe("shouldRebuildForNonce", () => {
+  it("rebuilds and respawns once when a source-linked server just spawned has no nonce route", () => {
+    for (const status of [404, 405, 409]) expect(shouldRebuildForNonce(status, current, false)).toBe(true);
+    expect(shouldRebuildForNonce(404, current, true)).toBe(false);
+  });
+
+  it("does not for a published install, or for a failure that is not a missing route", () => {
+    expect(shouldRebuildForNonce(404, published, false)).toBe(false);
+    for (const status of [0, 401, 500]) expect(shouldRebuildForNonce(status, current, false)).toBe(false);
   });
 });
 
@@ -170,18 +175,6 @@ describe("noNonceNote", () => {
     for (const status of [0, 401, 500]) {
       expect(noNonceNote(status, "THE FIX")).toBe("  (could not get a sign-in link from the server; run 'ndx start' again)");
     }
-  });
-});
-
-describe("staleWebDistWarning", () => {
-  it("warns a source-linked install whose dist/ lags its source, naming the rebuild", () => {
-    const warning = staleWebDistWarning(stale, HUB_SERVER_COMMANDS);
-    expect(warning).toMatch(/^Warning: .*dist is older than its source/);
-    expect(warning).toContain(`pnpm --filter "@n-dx/web..." build`);
-  });
-
-  it("is silent for a current build, a watch build, and a published install", () => {
-    for (const web of [current, watchBuilt, published]) expect(staleWebDistWarning(web, HUB_SERVER_COMMANDS)).toBeNull();
   });
 });
 

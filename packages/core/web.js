@@ -60,6 +60,7 @@ import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 import { localConfigIsRepositoryConfig } from "./claude-integration.js";
 import { packageBuildIdentity } from "./build-identity.mjs";
+import { ensureSourceBuild } from "./source-build.js";
 
 /**
  * Core's own CLI, beside this file. Not `join(__dir, "cli.js")`: callers pass
@@ -1246,33 +1247,27 @@ export function hereServerCommands(commandName, isPreview) {
 }
 
 /**
- * The rebuild for a source-linked install: web and every workspace package it
- * depends on. Web alone type-checks against its dependencies' dist/ and runs
- * their dist/ at run time, so building only web fails or leaves them stale.
- */
-const WEB_REBUILD_COMMAND = `pnpm --filter "@n-dx/web..." build`;
-
-/**
  * The commands that bring a server back in line with this ndx. Pure, so the
  * wording is unit-tested.
  *
- * Restarting alone respawns whatever `dist/` is on disk, so when that is
- * itself older than its source (a source-linked install that was not rebuilt)
- * the fix starts with the rebuild — the advice this replaces, "restart the
- * server", could not work there.
+ * A source-linked `dist/` that lags its source is rebuilt before any server
+ * is spawned (source-build.js), so what is left is a server that is still
+ * older than this ndx: a hub kept running across a rebuild or upgrade, or a
+ * single-project server whose build is older even though it was just spawned.
+ * The second is rebuilt and respawned once by `ndx start` itself
+ * ({@link runWeb}); this names what remains when that did not help.
  *
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web  The web build this ndx spawns.
  * @param {ServerCommands} server  Which server, and how to stop and start it.
  * @returns {string}
  */
 export function serverRefreshFix(web, server) {
-  const restart = `'${server.stop}', then '${server.start}'`;
-  const rebuild = `run '${WEB_REBUILD_COMMAND}'${checkoutOf(web) ? ` in ${checkoutOf(web)}` : ""}`;
-  if (web.sourceLinked && web.lagging === true) return `${rebuild}, then ${restart}`;
-  if (server.kind === "hub") return `restart the hub: ${restart}`;
+  if (server.kind === "hub") return `restart the hub: '${server.stop}', then '${server.start}'`;
   // A single-project server was just spawned from the dist/ on disk, so a
   // restart would start the same build again.
-  return web.sourceLinked ? `${rebuild}, then ${restart}` : "reinstall n-dx so @n-dx/web matches this ndx";
+  return web.sourceLinked
+    ? `it was rebuilt from ${checkoutOf(web) ?? "its checkout"} and started again, and still cannot; send the token from ${authTokenPath()} as X-Ndx-Token instead`
+    : "reinstall n-dx so @n-dx/web matches this ndx";
 }
 
 /**
@@ -1295,27 +1290,18 @@ export function noNonceNote(status, fix) {
 }
 
 /**
- * The warning for a source-linked install whose `@n-dx/web` `dist/` is not a
- * build of its current source, or null when there is nothing to warn about.
- * Pure, so the wording is unit-tested.
+ * Whether a missing nonce from a single-project server this command just
+ * spawned is worth one forced rebuild and respawn: the route is missing (the
+ * build is older than this ndx), the install is source-linked (there is
+ * source to rebuild from), and this run has not already tried. Pure.
  *
- * Checked before the server is spawned or the hub is joined: a stale `dist/`
- * runs older code than this CLI, which surfaces later as routes the CLI
- * expects and the server lacks — first among them the landing nonce.
- *
- * Only a `dist/` that is `lagging` — last written before the newest source
- * edit — is warned about. A watch build (`pnpm dev`) never writes the build
- * stamp but keeps `dist/` current, and warning there on every start would
- * teach people to ignore the warning.
- *
+ * @param {number} status  What `POST /api/auth/nonce` answered.
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web
- * @param {ServerCommands} server
- * @returns {string | null}
+ * @param {boolean} alreadyRebuilt
+ * @returns {boolean}
  */
-export function staleWebDistWarning(web, server) {
-  if (!web.sourceLinked || web.lagging !== true) return null;
-  return `Warning: ${join(web.packageDir, "dist")} is older than its source, so the server runs older code than this ndx.\n` +
-    `  To fix: ${serverRefreshFix(web, server)}.`;
+export function shouldRebuildForNonce(status, web, alreadyRebuilt) {
+  return NONCE_ROUTE_MISSING.has(status) && web.sourceLinked && !alreadyRebuilt;
 }
 
 /**
@@ -2313,10 +2299,15 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   const authEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"], home);
   const { tokenFile, token } = resolveStartToken(authEnabled, home);
   // The web build this ndx would spawn. A source-linked install whose dist/
-  // lags its source starts a hub older than this CLI; say so before it does.
-  const web = packageBuildIdentity(resolve(__dir, tools.web));
-  const staleDist = staleWebDistWarning(web, HUB_SERVER_COMMANDS);
-  if (staleDist) console.error(staleDist);
+  // lags its source would start a hub older than this CLI, so it is rebuilt
+  // first.
+  const webEntry = resolve(__dir, tools.web);
+  const built = await ensureSourceBuild(webEntry, { checkLag: true });
+  if (!built.ok) {
+    console.error(`Error: ${built.message}`);
+    return 1;
+  }
+  const web = packageBuildIdentity(webEntry);
   try {
     hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
   } catch (err) {
@@ -2402,8 +2393,9 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
  * @param {Function} deps.exit               Shared exit request helper for synchronous command flow
  * @param {Function} deps.flushExit          Shared async exit helper for signal callbacks
  * @param {string} [deps.commandName="web"]  CLI command name for messaging ("start" or "web")
+ * @param {boolean} [deps.rebuiltForNonce]  Set on the one rerun after a forced rebuild ({@link shouldRebuildForNonce}).
  */
-export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web" }) {
+export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web", rebuiltForNonce = false }) {
   const absDir = resolve(dir);
 
   // Parse flags and detect subcommand
@@ -2612,12 +2604,16 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   if (flags.debug) serveArgs.push("--debug");
   else if (flags.verbose) serveArgs.push("--verbose");
 
-  // The web build about to be spawned; a source-linked dist/ that lags its
-  // source runs older code than this CLI.
-  const web = packageBuildIdentity(resolve(__dir, tools.web));
+  // The web build about to be spawned. A source-linked dist/ that lags its
+  // source would run older code than this CLI, so it is rebuilt first.
+  const webEntry = resolve(__dir, tools.web);
+  const built = await ensureSourceBuild(webEntry, { checkLag: true });
+  if (!built.ok) {
+    console.error(`Error: ${built.message}`);
+    return 1;
+  }
+  const web = packageBuildIdentity(webEntry);
   const hereServer = hereServerCommands(commandName, isPreview);
-  const staleDist = staleWebDistWarning(web, hereServer);
-  if (staleDist) console.error(staleDist);
 
   // --- Background mode ---
   if (isBackground) {
@@ -2682,6 +2678,19 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     const { nonce: hereNonce, status: hereNonceStatus } = hereToken
       ? await mintNonceFromSpawnedServer(actualPort, child.pid)
       : { nonce: null, status: 0 };
+    // A server just spawned from this checkout that has no nonce route is a
+    // build older than this ndx even though its files are not older than its
+    // source (a stamp that does not match, a watch build mid-flight). Rebuild
+    // it and start again, once; the second run stops this server first.
+    if (hereToken && !hereNonce && shouldRebuildForNonce(hereNonceStatus, web, rebuiltForNonce)) {
+      log(`The server built from ${join(web.packageDir, "dist")} is older than this ndx; rebuilding @n-dx/web and starting it again…`);
+      const rebuilt = await ensureSourceBuild(webEntry, { force: true });
+      if (!rebuilt.ok) {
+        console.error(`Error: ${rebuilt.message}`);
+        return 1;
+      }
+      return runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName, rebuiltForNonce: true });
+    }
     log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
     if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, hereServer)));
 

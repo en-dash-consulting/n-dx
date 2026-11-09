@@ -38,6 +38,7 @@ import { spawn, execFileSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { execFileSyncCli } from "./win-spawn.js";
+import { ensureSourceBuild } from "./source-build.js";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
@@ -489,20 +490,27 @@ function run(script, args, extraEnv = {}) {
 
   // Build-artifact guard: when the resolved script is a packages/*/dist/* path
   // (monorepo dev mode) and the file is missing, dist was wiped or never built.
-  // Surface an actionable error instead of letting Node throw MODULE_NOT_FOUND.
+  // A source-linked checkout rebuilds the package and carries on; an install
+  // with no source says it is incomplete, rather than letting Node throw
+  // MODULE_NOT_FOUND.
   if (
     scriptPath.startsWith(MONOREPO_ROOT) &&
     /[/\\]packages[/\\][^/\\]+[/\\]dist[/\\]/.test(scriptPath) &&
     !existsSync(scriptPath)
   ) {
-    const rel = scriptPath.slice(MONOREPO_ROOT.length + 1);
-    console.error(`${red("Error:")} Build artifact missing: ${rel}`);
-    console.error(
-      "Hint: Run 'pnpm install' (or 'pnpm build') from the repo root to rebuild package dist directories.",
-    );
-    return Promise.resolve(1);
+    return ensureSourceBuild(scriptPath).then((built) => {
+      if (built.ok) return spawnScript(scriptPath, args, extraEnv);
+      const rel = scriptPath.slice(MONOREPO_ROOT.length + 1);
+      console.error(`${red("Error:")} Build artifact missing: ${rel}`);
+      console.error(built.message);
+      return 1;
+    });
   }
+  return spawnScript(scriptPath, args, extraEnv);
+}
 
+/** Run one tool script as a tracked child with inherited stdio; resolves its exit code. */
+function spawnScript(scriptPath, args, extraEnv) {
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",

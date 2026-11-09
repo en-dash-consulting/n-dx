@@ -131,7 +131,7 @@ function newestMtime(dir, accept) {
  * @param {string} start
  * @returns {string | null}
  */
-function packageRootOf(start) {
+export function packageRootOf(start) {
   let dir = start;
   for (;;) {
     if (existsSync(join(dir, "package.json"))) return dir;
