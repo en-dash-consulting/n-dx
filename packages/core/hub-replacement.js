@@ -134,6 +134,32 @@ export function planHubReplacement({ reason, liveWork, force, port }) {
 }
 
 /**
+ * Why this user's hub, running in another authentication mode than this
+ * command asked for, is to be replaced. Pure.
+ *
+ * - An open hub, and this command wants the token: replaced with a token hub,
+ *   since joining it would serve this project unauthenticated.
+ * - A token hub, and this command asked for none: replaced with an open hub —
+ *   only ever because the operator asked (`--no-auth`, `web.auth=false`).
+ * - A hub holding another token than this user's file: replaced with one that
+ *   holds this one.
+ *
+ * @param {"open" | "token" | "mismatch"} state  What the hub is (`hubAuthState` in web.js).
+ * @param {"open" | "token"} wanted  What this command asked for.
+ * @param {string | null} tokenFile
+ * @returns {HubReplacementReason}
+ */
+export function hubAuthReason(state, wanted, tokenFile) {
+  if (state === "open") {
+    return { kind: "auth", wanted, text: "it runs without authentication, and this project requires the per-user token" };
+  }
+  if (state === "token" && wanted === "open") {
+    return { kind: "auth", wanted, text: "it requires the per-user token, and this command asked for no authentication" };
+  }
+  return { kind: "auth", wanted, text: `it was started with a different token than ${tokenFile ?? "this user's"}` };
+}
+
+/**
  * The line printed as a replacement starts. Pure.
  *
  * @param {HubReplacementReason} reason
@@ -147,7 +173,12 @@ export function hubReplacementNotice(reason, port, projects, interrupts) {
     : projects === 1 ? "Its project comes back on the same /p/<id>/ URL."
     : `Its ${projects} projects come back on the same /p/<id>/ URLs.`;
   const cut = interrupts ? ` This interrupts ${interrupts}, as ${REPLACE_HUB_FLAG} asked.` : "";
-  return `Replacing the n-dx hub on port ${port}: ${reason.text}. ${back}${cut}`;
+  // Turning the token off for every project on the hub is the operator's
+  // choice, never ndx's: say whose choice it was and what it means.
+  const open = reason.kind === "auth" && reason.wanted === "open"
+    ? " Because this command asked for no authentication (--no-auth, or web.auth=false), the new hub serves every project on it without the token."
+    : "";
+  return `Replacing the n-dx hub on port ${port}: ${reason.text}. ${back}${open}${cut}`;
 }
 
 /**

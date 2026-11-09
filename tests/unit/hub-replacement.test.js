@@ -21,6 +21,7 @@ import {
   deferredHubSignInFix,
   describeLiveWork,
   formatReplacementResult,
+  hubAuthReason,
   hubReplacementNotice,
   planHubReplacement,
 } from "../../packages/core/hub-replacement.js";
@@ -83,6 +84,36 @@ describe("hubReplacementNotice", () => {
     expect(hubReplacementNotice(reason, 4100, 1, null)).toContain("Its project comes back on the same /p/<id>/ URL.");
     expect(hubReplacementNotice(reason, 4100, 0, null)).toContain("It serves no projects yet.");
     expectNoManualRestart(text);
+  });
+});
+
+describe("hubAuthReason", () => {
+  it("replaces an open hub with a token hub for a command that wants the token", () => {
+    const reason = hubAuthReason("open", "token", "/u/.ndx/auth.token");
+    expect(reason).toMatchObject({ kind: "auth", wanted: "token" });
+    expect(reason.text).toContain("runs without authentication");
+    expect(hubReplacementNotice(reason, 4100, 2, null)).not.toContain("without the token");
+  });
+
+  it("replaces a token hub with an open one only because the command asked, and says so", () => {
+    const reason = hubAuthReason("token", "open", null);
+    expect(reason).toMatchObject({ kind: "auth", wanted: "open" });
+    expect(reason.text).toContain("asked for no authentication");
+    const notice = hubReplacementNotice(reason, 4100, 2, null);
+    expect(notice).toContain("Because this command asked for no authentication (--no-auth, or web.auth=false)");
+    expect(notice).toContain("serves every project on it without the token");
+    expectNoManualRestart(notice);
+  });
+
+  it("names the token file a hub with another token does not hold", () => {
+    expect(hubAuthReason("mismatch", "token", "/u/.ndx/auth.token").text).toContain("/u/.ndx/auth.token");
+  });
+
+  it("defers like a stale hub when work is live on it", () => {
+    const plan = planHubReplacement({ reason: hubAuthReason("open", "token", null), liveWork: busy, force: false, port: 4100 });
+    expect(plan.action).toBe("defer");
+    expect(plan.note).toContain(REPLACE_HUB_FLAG);
+    expectNoManualRestart(plan.note);
   });
 });
 

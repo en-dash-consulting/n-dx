@@ -65,6 +65,7 @@ import {
   countLiveHenchLocks,
   deferredHubSignInFix,
   formatReplacementResult,
+  hubAuthReason,
   hubReplacementNotice,
   planHubReplacement,
 } from "./hub-replacement.js";
@@ -1806,24 +1807,41 @@ export async function hubAuthState(port, probe = hubRequest, identify = identify
 
 /**
  * What to tell an operator whose hub does not match the mode this command
- * asked for. Pure, so the wording is unit-tested without a hub.
+ * asked for, when it cannot be replaced right now. Pure, so the wording is
+ * unit-tested without a hub.
+ *
+ * A mismatch with this user's own hub is resolved by replacing the hub in the
+ * requested mode ({@link replaceOrDeferHub}); this is what is said when that
+ * was deferred, because live work is on the hub, and this command cannot go
+ * ahead on the hub as it is. `deferred` is the deferral note, naming the work
+ * in the way, when the replacement happens and the flag that forces it.
+ *
+ * A port held by something that is not this user's hub is never touched.
+ *
+ * @param {"open" | "token" | "mismatch" | "foreign"} state  {@link hubAuthState}
+ * @param {"open" | "token"} wanted
+ * @param {number} port
+ * @param {string | null} tokenFile
+ * @param {string | null} [deferred]
+ * @returns {string}
  */
-export function hubAuthMismatchMessage(state, wanted, port, tokenFile) {
-  const stop = "Stop it first ('ndx hub stop'), then run this command again.";
-  if (state === "open" && wanted === "token") {
-    // The dangerous direction, and the reason this check exists: reusing the
-    // open hub would serve *this* project with no token at all.
-    return `The n-dx hub already running on port ${port} was started without authentication, so registering this project would serve it unauthenticated too.\n${stop}\nTo join the open hub as it is, pass --no-auth or set web.auth=false in .n-dx.local.json.`;
-  }
-  if (state === "token" && wanted === "open") {
-    return `The n-dx hub already running on port ${port} requires the per-user token, so --no-auth (or web.auth=false in .n-dx.local.json) cannot apply to it.\n${stop}`;
-  }
+export function hubAuthMismatchMessage(state, wanted, port, tokenFile, deferred = null) {
   if (state === "foreign") {
     // Not identified as this user's hub, so the token was never sent to it.
     return `Port ${port} is held by another process that is not this user's n-dx hub; nothing was sent to it.\n` +
       `Stop that process, or choose another hub port with --port=N or hub.port in ${join(hubHome(), HUB_CONFIG_FILE)}.`;
   }
-  return `The n-dx hub already running on port ${port} was started with a different token than ${tokenFile ?? "this user's"}.\n${stop}`;
+  const lead = deferred ?? `The n-dx hub on port ${port} was not replaced.`;
+  if (state === "open" && wanted === "token") {
+    // The dangerous direction, and the reason this check exists: reusing the
+    // open hub would serve *this* project with no token at all.
+    return `${lead}\nThis project was not registered: the hub on port ${port} runs without authentication and would serve it unauthenticated too. ` +
+      "To join it as it is, pass --no-auth or set web.auth=false in .n-dx.local.json.";
+  }
+  if (state === "token" && wanted === "open") {
+    return `${lead}\nUntil then, this project is served with the per-user token like the rest of that hub.`;
+  }
+  return `${lead}\nThis project was not registered: the hub on port ${port} does not accept the token in ${tokenFile ?? "this user's ndx home"}.`;
 }
 
 /**
@@ -1842,7 +1860,20 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, forc
   const wanted = tokenFile ? "token" : "open";
   const state = await hubAuthState(port, hubRequest, (p) => identifyOwnHub(p, home));
   if (state === "absent") return spawnHub(port, { tools, __dir, home, tokenFile });
-  if (state !== wanted) throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
+  if (state === "foreign") throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
+  if (state !== wanted) {
+    // This user's hub, in the other mode: replace it in the one this command
+    // asked for. A token hub becomes an open one only because this command
+    // asked for no token (--no-auth, web.auth=false), and the notice says so.
+    const result = await replaceOrDeferHub(port, hubAuthReason(state, wanted, tokenFile), { tools, __dir, home, tokenFile, force });
+    if (!result.deferred) return result;
+    // Deferred. A token hub can still serve this project, with the token; an
+    // open hub, or one holding another token, cannot.
+    if (state === "token" && wanted === "open") {
+      return { ...result, deferred: hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred) };
+    }
+    throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred));
+  }
 
   // A hub that kept running across an upgrade or rebuild serves older code
   // than this CLI expects — first among it, no landing-nonce route.
@@ -1917,7 +1948,7 @@ async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, 
     };
   }
   const projects = await readHubRegistry(home);
-  const liveWork = await gatherHubLiveWork(port, projects, { canAsk: reason.kind !== "auth" });
+  const liveWork = await gatherHubLiveWork(port, projects);
   const plan = planHubReplacement({ reason, liveWork, force, port });
   if (plan.action === "defer") return { spawned: false, pid: null, deferred: plan.note };
 
@@ -1950,16 +1981,16 @@ async function waitForPortFree(port, timeoutMs) {
  * dashboard run), runs the project's server reports as executing, and MCP
  * sessions open on it through the hub.
  *
- * The servers are only asked when the hub has been identified and accepts the
- * token this command holds (`canAsk`); a server too old to report MCP
- * sessions counts as having none.
+ * Only called once the hub has been identified as this user's own, so the
+ * token may go to it. A server that cannot answer — too old to report MCP
+ * sessions, or behind a hub that holds another token — counts as having
+ * none; hench's locks on disk still count.
  *
  * @param {number} port
  * @param {Record<string, { id: string, repoRoot: string, worktrees?: string[] }>} projects
- * @param {{ canAsk: boolean }} options
  * @returns {Promise<import("./hub-replacement.js").HubLiveWork>}
  */
-async function gatherHubLiveWork(port, projects, { canAsk }) {
+async function gatherHubLiveWork(port, projects) {
   const ask = (path) => hubRequest(port, "GET", path, undefined, PROBE_TIMEOUT_MS, { sendToken: true });
   const entries = await Promise.all(Object.values(projects).map(async (record) => {
     let locks = 0;
@@ -1972,15 +2003,13 @@ async function gatherHubLiveWork(port, projects, { canAsk }) {
     }
     let executions = 0;
     let sessions = 0;
-    if (canAsk) {
-      const base = `/p/${encodeURIComponent(record.id)}`;
-      const [ex, mcp] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/mcp/sessions`)]);
-      if (ex.status === 200 && Array.isArray(ex.body?.executions)) {
-        executions = ex.body.executions.filter((e) => e?.status === "starting" || e?.status === "running").length;
-      }
-      if (mcp.status === 200 && mcp.body && typeof mcp.body === "object") {
-        sessions = (Number(mcp.body.rex) || 0) + (Number(mcp.body.sourcevision) || 0);
-      }
+    const base = `/p/${encodeURIComponent(record.id)}`;
+    const [ex, mcp] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/mcp/sessions`)]);
+    if (ex.status === 200 && Array.isArray(ex.body?.executions)) {
+      executions = ex.body.executions.filter((e) => e?.status === "starting" || e?.status === "running").length;
+    }
+    if (mcp.status === 200 && mcp.body && typeof mcp.body === "object") {
+      sessions = (Number(mcp.body.rex) || 0) + (Number(mcp.body.sourcevision) || 0);
     }
     // A dashboard run holds a hench lock too: the larger count, not the sum.
     return { project: record.id, runs: Math.max(locks, executions), sessions };
