@@ -1,0 +1,14 @@
+---
+id: "96911f90-6e41-4fc3-91b5-ae1619c2fb3b"
+type: "task"
+title: "Refuse a Codex Sidecar session whose user Codex config selects a non-default model provider"
+slug: "refuse-a-codex-sidecar-session-whose"
+description: "Operator note. Review comment 2 on #1008 (Hal, 2026-11-09, spawn-policy.ts:165).\n\nProblem: `--ignore-user-config` skips the whole `$CODEX_HOME/config.toml` (default ~/.codex), so `model_provider`, the selected `profile`, and `[model_providers.*]` go too. n-dx supports a non-default provider on purpose: codexUserEnvKey (packages/llm-client/src/codex-user-config.ts) forwards that provider's `env_key` (e.g. AZURE_OPENAI_API_KEY) into the child env. Under the flag, Codex falls back to its built-in OpenAI provider and never reads that key, so an Azure-only user's Codex Sidecar turns all fail auth and may be shown as signed out.\n\nFix (refuse up front; forwarding the provider through `-c` is a separate later capture):\n- In codex-user-config.ts, add and export a reader for the provider the user config selects: the selected profile's `model_provider` (`profile = \"x\"` then `[profiles.x] model_provider`), else top-level `model_provider`, from the same CODEX_HOME resolution codexUserEnvKey uses. Undefined when the file is absent or names none. Reuse parseCodexConfigStrings; no new dependency.\n- When it returns a provider other than `openai`, refuse a Codex Sidecar session at create time (POST /api/sidecar/sessions, 400, no record) and at every turn (409, no spawn), in packages/web/src/server/routes-sidecar.ts beside the existing hub-scope refusal. The reason names the provider and the file, says that Codex Sidecar sessions skip the user's Codex config so the provider would not apply, and says what to do: use Claude for the Sidecar, or the default OpenAI provider. Claude sessions are unaffected.\n- A Codex config that cannot be read (not ENOENT/ENOTDIR) refuses too, naming the file.\n\nAdd patch changesets for @n-dx/llm-client and @n-dx/web (scoped names). Run the six static root policy tests (architecture-policy, domain-isolation, shell-spawn inventory, wall-clock inventory, layout-literal, obfuscated-code) before finishing."
+acceptanceCriteria:
+  - "With a user config selecting model_provider azure (top level, or through the selected profile), creating a Codex Sidecar session answers 400 with a reason naming the provider and the file, and a turn on an existing Codex session answers 409 without spawning"
+  - "With no user config, or model_provider openai, Codex Sidecar sessions are created and their turns spawn as before; Claude sessions are never refused for this"
+  - "Unit tests cover the provider reader: absent file, top-level provider, profile provider overriding top level, and an unreadable file"
+priority: "high"
+run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "hub-pr3"
+---
