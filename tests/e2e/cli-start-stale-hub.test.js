@@ -41,11 +41,13 @@ const TOKEN = "t".repeat(48);
 /**
  * A hub built before landing nonces and build identity. `busy` makes each
  * project's server report one open MCP session, which a replacement would cut.
+ * `extra` (JSON) is merged into its health answer: a current build that
+ * reports a fault is this same process with `{ build, faults }`.
  */
 const OLDER_HUB = `
 const { createServer } = require("node:http");
 const { writeFileSync } = require("node:fs");
-const [portFile, token, busy] = process.argv.slice(2);
+const [portFile, token, busy, extra] = process.argv.slice(2);
 const server = createServer((req, res) => {
   const reply = (status, body) => {
     res.writeHead(status, { "Content-Type": "application/json" });
@@ -56,7 +58,7 @@ const server = createServer((req, res) => {
   req.on("end", () => {
     const url = req.url.split("?")[0];
     if (req.method === "GET" && url === "/api/hub/health") {
-      return reply(200, { ok: true, pid: process.pid, port: server.address().port, startedAt: new Date().toISOString(), registryPath: "hub.json", projects: 2 });
+      return reply(200, { ok: true, pid: process.pid, port: server.address().port, startedAt: new Date().toISOString(), registryPath: "hub.json", projects: 2, ...JSON.parse(extra || "{}") });
     }
     if (req.method === "POST" && url === "/api/hub/projects") {
       return reply(201, { project: { id: "omega-app", status: { state: "healthy" } } });
@@ -101,11 +103,11 @@ function runStart(args, home) {
 }
 
 /** Start the older hub as its own process and record it as this home's hub. */
-async function startOlderHub(home, busy) {
+async function startOlderHub(home, busy, extra = {}) {
   const script = join(home, "older-hub.cjs");
   const portFile = join(home, "older-hub.port");
   writeFileSync(script, OLDER_HUB);
-  const child = spawn(process.execPath, [script, portFile, TOKEN, busy ? "busy" : "idle"], { stdio: "ignore", windowsHide: true });
+  const child = spawn(process.execPath, [script, portFile, TOKEN, busy ? "busy" : "idle", JSON.stringify(extra)], { stdio: "ignore", windowsHide: true });
   const deadline = Date.now() + 15_000;
   let port = null;
   while (port === null && Date.now() < deadline) {
@@ -240,6 +242,43 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       const pidFile = JSON.parse(readFileSync(join(fx.home, "hub.pid"), "utf-8"));
       expect(pidFile.port).toBe(older.port);
       expect(pidFile.pid).not.toBe(older.child.pid);
+      await expectProjectsServedAgain(older.port);
+    });
+  });
+
+  describe("a current build that reports a fault", () => {
+    let fx;
+    let older;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      // The build this ndx spawns, so only the fault can be the reason.
+      const webDir = join(import.meta.dirname, "../../packages/web");
+      const build = {
+        version: JSON.parse(readFileSync(join(webDir, "package.json"), "utf-8")).version,
+        sourceHash: JSON.parse(readFileSync(join(webDir, "dist", ".build-stamp.json"), "utf-8")).sourceHash,
+      };
+      older = await startOlderHub(fx.home, false, { build, faults: ["no-ndx-cli"] });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("is replaced by a hub given the n-dx CLI, without the user restarting anything", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(result.stderr).toContain(`Replacing the n-dx hub on port ${older.port}: it has no n-dx CLI to ask about extensions.`);
+      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expectNoManualRestart(result.stdout + result.stderr);
+      const health = await hubGet(older.port, "/api/hub/health");
+      expect(health.body.faults).toEqual([]);
       await expectProjectsServedAgain(older.port);
     });
   });

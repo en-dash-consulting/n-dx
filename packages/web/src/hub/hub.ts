@@ -21,8 +21,9 @@
 
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { existsSync, mkdirSync } from "node:fs";
-import { basename, isAbsolute } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
 import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
@@ -108,9 +109,12 @@ export interface HubOptions {
   /**
    * `@n-dx/core`'s `cli.js`, which the hub asks for each extension sidecar's
    * launch plan (`ndx extensions sidecar <name> --json`). Core's `web.js`
-   * passes it as `--ndx-cli`; without it every `/x/<name>/` answers 503.
+   * passes it as `--ndx-cli`; without it the hub looks for core beside its
+   * own package ({@link resolveNdxCli}), and with none every `/x/<name>/`
+   * answers 503 and `/api/hub/health` reports the fault. `null` means none,
+   * without looking.
    */
-  ndxCli?: string;
+  ndxCli?: string | null;
   /** Overrides for the {@link SidecarManager} (tests inject `plan`, timeouts and the clock). */
   sidecars?: Partial<SidecarManagerOptions>;
   /** How often idle sidecars are looked for. Default 30 s. */
@@ -257,6 +261,37 @@ export function resolveSelfBin(explicit: string | undefined): string {
   return "";
 }
 
+/** `@n-dx/web`'s own root: this module sits at `<pkg>/src/hub/` or `<pkg>/dist/hub/`. */
+const WEB_PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+
+/** Whether `dir` is the `@n-dx/core` package, by its own package.json. */
+function isNdxCorePackage(dir: string): boolean {
+  try {
+    const pkg: unknown = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+    return !!pkg && typeof pkg === "object" && (pkg as { name?: unknown }).name === "@n-dx/core";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The n-dx CLI the hub asks about extensions: the one it was given, or else
+ * `@n-dx/core`'s `cli.js` found beside this `@n-dx/web` — its sibling in a
+ * checkout (`packages/core`) or a flat install (`node_modules/@n-dx/core`),
+ * or the package this one is nested in. Found from the hub's own location,
+ * never from a request, like {@link resolveSelfBin}. "" when there is none,
+ * and for an explicit `null`.
+ */
+export function resolveNdxCli(explicit: string | null | undefined, webRoot: string = WEB_PACKAGE_ROOT): string {
+  if (explicit === null) return "";
+  if (explicit) return explicit;
+  for (const coreDir of [join(webRoot, "..", "core"), join(webRoot, "..", "..", "..")]) {
+    const cli = join(coreDir, "cli.js");
+    if (existsSync(cli) && isNdxCorePackage(coreDir)) return cli;
+  }
+  return "";
+}
+
 export class Hub {
   readonly hubHome: string;
   readonly registryPath: string;
@@ -267,8 +302,15 @@ export class Hub {
   readonly admission: AdmissionGate;
   /** Keys the per-user `config.json` got wrong, for {@link startHub} to report once. */
   readonly configProblems: HubConfigProblem[];
-  /** The n-dx binary projects created from the hub are registered with. */
-  readonly selfBin: string;
+  /**
+   * The n-dx binary every project server is spawned from. "" when none could
+   * be identified; {@link repairSelfBin} looks again.
+   */
+  selfBin: string;
+  /** The n-dx CLI asked about extensions; "" when there is none ({@link resolveNdxCli}). */
+  readonly ndxCli: string;
+  /** The explicit binary the hub was given, kept so {@link repairSelfBin} can look again. */
+  private readonly explicitSelfBin: string | undefined;
   /** The per-user token every request must present, or null when running without one. */
   readonly token: string | null;
   /**
@@ -308,9 +350,18 @@ export class Hub {
     this.keepAlive = options.keepAlive ?? config.keepAlive;
     this.token = options.tokenFile ? ensureAuthToken(options.tokenFile) : null;
     this.credentials = this.token ? new CredentialStore() : null;
+    this.explicitSelfBin = options.selfBin;
     this.selfBin = resolveSelfBin(options.selfBin);
+    this.ndxCli = resolveNdxCli(options.ndxCli);
     // `ndxBin` last: the binary is the hub's, whatever a caller's supervisor options say.
-    this.supervisorOptions = { log: this.log, tokenFile: options.tokenFile, token: this.token, ...options.supervisor, ndxBin: this.selfBin };
+    this.supervisorOptions = {
+      log: this.log,
+      tokenFile: options.tokenFile,
+      token: this.token,
+      ...options.supervisor,
+      ndxBin: this.selfBin,
+      ndxBinOf: () => (this.repairSelfBin() ? this.selfBin : ""),
+    };
     const { registry, healed } = loadRegistryHealing(this.registryPath);
     this.registry = registry;
     for (const record of Object.values(this.registry.projects)) {
@@ -331,7 +382,7 @@ export class Hub {
     });
     this.sessionHosts = new HubSessionHostPicker(this.hubHome);
     this.sidecars = new SidecarManager({
-      plan: options.ndxCli ? ndxCliPlanner(options.ndxCli, this.hubHome) : null,
+      plan: this.ndxCli ? ndxCliPlanner(this.ndxCli, this.hubHome) : null,
       memoryFloorBytes: this.admission.limits.memoryFloorBytes,
       freeMemory: () => this.admission.availableMemoryBytes(),
       log: this.log,
@@ -346,7 +397,33 @@ export class Hub {
       projects: () => this.listProjects(),
     });
     this.listExtensions = options.listExtensions
-      ?? (options.ndxCli ? ndxCliLister(options.ndxCli, this.hubHome) : async () => ({ ok: false, error: NO_NDX_CLI }));
+      ?? (this.ndxCli ? ndxCliLister(this.ndxCli, this.hubHome) : async () => ({ ok: false, error: NO_NDX_CLI }));
+  }
+
+  /**
+   * Have an n-dx binary to spawn project servers from, looking for the hub's
+   * own entry again when there was none — a `dist/` mid-rebuild when the hub
+   * started has its entry back once the build finishes. True when there is one.
+   */
+  repairSelfBin(): boolean {
+    if (this.selfBin) return true;
+    const found = resolveSelfBin(this.explicitSelfBin);
+    if (!found) return false;
+    this.selfBin = found;
+    this.log(`[hub] found its n-dx binary: ${found}`);
+    return true;
+  }
+
+  /**
+   * What this hub cannot do, for `/api/hub/health`: "no-ndx-bin" when it has no
+   * binary to start project servers from, "no-ndx-cli" when it has no CLI to
+   * ask about extensions. `ndx start` replaces a hub that reports either.
+   */
+  faults(): string[] {
+    const faults: string[] = [];
+    if (!this.repairSelfBin()) faults.push("no-ndx-bin");
+    if (!this.ndxCli) faults.push("no-ndx-cli");
+    return faults;
   }
 
   /** Dashboard-started runs in flight across every project that has a server. */
@@ -458,7 +535,7 @@ export class Hub {
       } else {
         this.replaceOnAttach.add(id);
         this.log(
-          `[hub] ${id} (${name}): ignoring recorded binary ${ndxBin}; its server is spawned from ${this.selfBin || "(none — restart the hub with `ndx start`)"}`,
+          `[hub] ${id} (${name}): ignoring recorded binary ${ndxBin}; its server is spawned from ${this.selfBin || "(none found yet: the hub looks again before each start)"}`,
         );
       }
     }
@@ -599,6 +676,7 @@ export class Hub {
 
   /** One health tick across every project. */
   async healthCheckAll(): Promise<void> {
+    this.repairSelfBin();
     await Promise.all(Array.from(this.supervisors.values()).map((sup) => sup.healthCheck()));
     this.persist();
   }

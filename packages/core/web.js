@@ -66,6 +66,7 @@ import {
   deferredHubSignInFix,
   formatReplacementResult,
   hubAuthReason,
+  hubFaultReason,
   hubReplacementNotice,
   planHubReplacement,
 } from "./hub-replacement.js";
@@ -1879,8 +1880,12 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, forc
   // than this CLI expects — first among it, no landing-nonce route.
   const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
   const mismatch = health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
-  if (!mismatch) return { spawned: false, pid: null };
-  return replaceOrDeferHub(port, { kind: "build", text: mismatch }, { tools, __dir, home, tokenFile, force });
+  if (mismatch) return replaceOrDeferHub(port, { kind: "build", text: mismatch }, { tools, __dir, home, tokenFile, force });
+  // A current hub that cannot do part of its job — no n-dx binary for project
+  // servers, no CLI for extensions — is replaced by one given both.
+  const fault = health.status === 200 ? hubFaultReason(health.body?.faults) : null;
+  if (fault) return replaceOrDeferHub(port, fault, { tools, __dir, home, tokenFile, force });
+  return { spawned: false, pid: null };
 }
 
 /**

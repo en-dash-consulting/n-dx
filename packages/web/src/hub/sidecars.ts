@@ -53,8 +53,13 @@ export const SIDECAR_SETTLE_MS = 250;
 export const SIDECAR_CRASH_LIMIT = 3;
 export const SIDECAR_CRASH_WINDOW_MS = 5 * 60_000;
 
-/** The refusal of a hub started without `--ndx-cli`, which cannot ask n-dx about extensions. */
-export const NO_NDX_CLI = "This hub was started without an n-dx CLI to ask about extensions. Restart it: ndx hub stop, then ndx start.";
+/**
+ * The refusal of a hub that has no n-dx CLI to ask about extensions: started
+ * without `--ndx-cli`, and none found beside its own package. It reports the
+ * fault on `/api/hub/health`, and the next `ndx start` replaces it with a
+ * hub that has one.
+ */
+export const NO_NDX_CLI = "This hub has no n-dx CLI to ask about extensions; the next `ndx start` replaces it with one that has.";
 
 /** An extension name, as the manifest validator allows it. Anything else is no sidecar. */
 const EXTENSION_NAME = /^[a-z0-9][a-z0-9-]*$/;

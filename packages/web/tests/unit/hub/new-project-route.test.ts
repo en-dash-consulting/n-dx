@@ -49,6 +49,7 @@ function stubHub(stub: StubHub): Hub {
     listeningPort: HUB_PORT,
     getProject: (id: string) => stub.projects.find((p) => p.id === id) ?? null,
     selfBin: stub.selfBin,
+    repairSelfBin: () => !!stub.selfBin,
     registerProject: vi.fn(async (input: RegisterProjectInput) => {
       stub.registered.push(input);
       const project = projectView({

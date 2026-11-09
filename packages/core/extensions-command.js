@@ -352,7 +352,7 @@ async function add(ctx, spec) {
     const { state, reason } = stateOf(d, ext, ctx.ndxVersion);
     ctx.out(`Added ${ext.packageName}@${ext.version ?? "?"} as '${label}' (${state}${reason ? `: ${reason}` : ""}).`);
     if (ext.source !== "user") ctx.out(`Note: the ${ext.source} copy at ${ext.dir} takes precedence over it.`);
-    if (state !== "enabled") await stopExtensionSidecar(d.home, ext.name);
+    if (state !== "enabled") reportSidecarStop(ctx, await stopExtensionSidecar(d.home, ext.name));
     if (state === "unapproved") ctx.out(`Approve it with 'ndx extensions enable ${label}'.`);
     else if (state !== "enabled") ctx.out("Run 'ndx extensions doctor' to see what to fix.");
   }
@@ -389,7 +389,7 @@ async function remove(ctx, name, purge) {
     return 1;
   }
   // The user copy won over another copy, which takes over now that it is gone.
-  if (ext?.source === "user") await stopExtensionSidecar(d.home, ext.name);
+  if (ext?.source === "user") reportSidecarStop(ctx, await stopExtensionSidecar(d.home, ext.name));
   const successor = ext?.source === "user" ? ext.shadowed.find((s) => s.source !== "user") : undefined;
   if (!ext || ext.source === "user") {
     updateExtensionsFile(d.home, (file) => {
@@ -436,6 +436,17 @@ function removalHint(ext, home) {
     case "global": return `Uninstall it globally (npm uninstall -g ${ext.packageName}), or disable it with 'ndx extensions disable ${stateKey(ext)}'.`;
     default: return `Remove ${ext.dir} from extensions.paths in ${join(home, "config.json")}.`;
   }
+}
+
+/**
+ * Print what the hub said about stopping a sidecar, when it did not confirm
+ * it. The command's own result stands either way.
+ *
+ * @param {Context} ctx
+ * @param {{ stopped: boolean, note?: string }} result
+ */
+function reportSidecarStop(ctx, result) {
+  if (result?.note) ctx.err(`Note: ${result.note}`);
 }
 
 // ── enable and disable ───────────────────────────────────────────────────────
@@ -490,7 +501,7 @@ async function enable(ctx, name, yes) {
       }
     }
   }
-  if (approve) await stopExtensionSidecar(d.home, ext.name);
+  if (approve) reportSidecarStop(ctx, await stopExtensionSidecar(d.home, ext.name));
   updateExtensionsFile(d.home, (file) => {
     if (wasDisabled) setDisabled(file, label, false);
     if (approve) recordApproval(file, ext, { projectDir: d.projectDir });
@@ -509,7 +520,7 @@ async function disable(ctx, name) {
   if (!ext) return notFound(ctx, "disable", name);
   const label = stateKey(ext);
   updateExtensionsFile(d.home, (file) => setDisabled(file, label, true));
-  await stopExtensionSidecar(d.home, ext.name);
+  reportSidecarStop(ctx, await stopExtensionSidecar(d.home, ext.name));
   ctx.out(`Disabled '${label}'. Its approval, config and state folder are kept; 'ndx extensions enable ${label}' turns it back on.`);
   return 0;
 }

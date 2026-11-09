@@ -160,6 +160,26 @@ export function hubAuthReason(state, wanted, tokenFile) {
 }
 
 /**
+ * Why a hub that reports faults on `/api/hub/health` is to be replaced, or
+ * null when it reports none (or predates the field). Pure.
+ *
+ * A hub with no n-dx binary cannot start project servers, and one with no
+ * n-dx CLI cannot serve extensions. The hub does what it can about either on
+ * its own (it looks for both beside its own package); what it still lacks,
+ * the hub `ndx start` spawns is given on its command line.
+ *
+ * @param {unknown} faults  The `faults` field of `/api/hub/health`.
+ * @returns {HubReplacementReason | null}
+ */
+export function hubFaultReason(faults) {
+  if (!Array.isArray(faults)) return null;
+  const parts = [];
+  if (faults.includes("no-ndx-bin")) parts.push("it cannot tell which n-dx binary to start project servers from");
+  if (faults.includes("no-ndx-cli")) parts.push("it has no n-dx CLI to ask about extensions");
+  return parts.length === 0 ? null : { kind: "fault", text: parts.join(", and ") };
+}
+
+/**
  * The line printed as a replacement starts. Pure.
  *
  * @param {HubReplacementReason} reason
