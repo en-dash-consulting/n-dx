@@ -21,7 +21,10 @@ describe("repo-trust.css", () => {
     expect(strip).toMatch(/max-height:\s*33vh/);
     expect(strip).toMatch(/max-height:\s*33dvh/);
     expect(strip).toMatch(/flex:\s*0 0 auto/);
-    expect(strip).toMatch(/overflow:\s*hidden/);
+    // Not `overflow: hidden`: on a short viewport the headline row alone can
+    // exceed the cap, and clipping it would put the buttons out of reach.
+    expect(strip).toMatch(/overflow-y:\s*auto/);
+    expect(strip).not.toMatch(/overflow:\s*hidden/);
   });
 
   it("keeps the headline row fixed and scrolls the details inside the strip", () => {

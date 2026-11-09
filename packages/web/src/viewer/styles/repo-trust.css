@@ -7,13 +7,15 @@
   font-size: var(--font-sm);
   color: var(--text);
   /* Never more than a third of the viewport: the page body keeps the rest.
-     The headline row stays put; only the details scroll (see __details). */
+     The headline row stays put; only the details scroll (see __details).
+     The strip itself scrolls only when the row alone outgrows the cap (a
+     short viewport), so the buttons are never clipped out of reach. */
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
   max-height: 33vh;
   max-height: 33dvh;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .repo-trust-strip__details {
