@@ -249,6 +249,10 @@
   font-weight: 500;
   font-size: 13px;
   flex: 1;
+  /* A file path has no space to break at: let the title shrink below its
+     content width and wrap anywhere, so the copy button stays in the row. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .next-step-copy {

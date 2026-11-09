@@ -746,10 +746,13 @@
 /* Width follows the block's size (flex-grow, set inline); the basis keeps a
  * one-unit block readable. The spec map also sets the basis inline from the
  * criteria count (area-spec-map.ts specBlockBasis), because a full wrapping
- * row leaves flex-grow almost no free space to share. */
+ * row leaves flex-grow almost no free space to share. The automatic minimum
+ * (min-width: auto) keeps a block at least as wide as its longest word, and
+ * max-width clamps that minimum to the row, so a label wraps between words. */
 .pam-block {
   flex-basis: 8rem;
-  min-width: 6rem;
+  min-width: auto;
+  max-width: 100%;
   min-height: 4rem;
   display: flex;
   flex-direction: column;
@@ -770,7 +773,9 @@
 .pam-block:hover { background: var(--bg-hover); }
 .pam-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.pam-label { font-weight: 600; overflow-wrap: anywhere; }
+/* break-word, not anywhere: a word moves whole to the next line and splits
+ * only when it is wider than the whole block. */
+.pam-label { font-weight: 600; overflow-wrap: break-word; }
 .pam-size { color: var(--text-muted); font-size: var(--font-sm); }
 .pam-size.pam-pending { color: var(--accent, var(--text)); font-weight: 600; }
 
@@ -798,8 +803,15 @@
   text-align: center;
 }
 
+/* The badge sits over the block's top edge; a badged block reserves that strip
+ * so the label starts below it, whatever the count's width. */
+.pam-block:has(> .pam-open),
+.pam-cell > .pam-block {
+  padding-top: calc(var(--space-1) * 2 + 1lh);
+}
+
 /* A block with a badge button: the wrapper is the flex item, the block fills it. */
-.pam-cell { position: relative; display: flex; min-width: 6rem; flex-basis: 8rem; }
+.pam-cell { position: relative; display: flex; min-width: auto; max-width: 100%; flex-basis: 8rem; }
 .pam-cell > .pam-block { flex: 1 1 auto; }
 .pam-open-button { border: 0; font-family: inherit; cursor: pointer; }
 .pam-open-button:hover { background: color-mix(in srgb, var(--accent) 80%, var(--text)); }

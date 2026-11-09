@@ -1,0 +1,14 @@
+---
+id: "65f61f71-2e28-4f13-bf00-34549bc5157d"
+type: "task"
+title: "Tasks rows and Tune shrink with the main column when the Sidecar drawer narrows it"
+slug: "tasks-rows-and-tune-shrink-with-the"
+description: "On Tasks (/p/<id>/prd) each .prd-node-row is display: flex, and its .prd-tag-list (flex-shrink: 0, flex-wrap: wrap) and .prd-node-actions (flex-shrink: 0, margin-left: auto) keep their full width, so with a 584 px main column they end at 611-708 px, past the column's right edge and under the drawer. Make the row's flex children able to shrink: min-width: 0 on the shrinking children (the title and the tag list), let .prd-tag-list shrink and wrap its tags (or clip / collapse the overflow to a \"+N\" chip, whichever fits the existing markup with least change), and keep .prd-node-actions fully inside the row at the right edge. Check the tree's other row children (status, badges, token badge, claim chip) for the same flex-shrink: 0 / min-width: auto pattern. Tune: content reached 885 px against a 584 px column; find which Tune element has a fixed or unshrinkable width (start in views/stage-pages.ts, views/outcomes-panel.ts, views/tooling-panel.ts and styles/stage-tiles.css) and apply the same treatment (min-width: 0 on grid/flex children, minmax(0, …) tracks, wrapping text). Operator notes: measured on the live dashboard at main 6560bedbf with a 1024 px viewport and a 440 px Sidecar drawer, so #main-content was 584 px wide. You cannot measure layout in this run; the operator re-measures in a real browser afterwards, so fix the CSS cause, not one page's numbers. Style only with tokens from packages/web/src/viewer/styles/tokens.css and keep both themes. Do not touch the Sidecar drawer's open/close logic (components/sidecar-drawer.ts close paths, --sidecar-w, the status dock's right offset): closing already gives the full width back. Do not edit .n-dx.json, packages/web/AGENTS.md or src/server/AGENTS.md; nothing turns on web.sidecar. Add rules where the existing selector lives rather than in a new stylesheet. Test the rule the way tests/unit/viewer/stage-tile-tree-fill.test.ts does (read the stylesheet and assert the declaration on the selector), and add a render test where markup changes. Run the touched viewer tests and the static root policy suites before finishing; add a @n-dx/web patch changeset."
+acceptanceCriteria:
+  - ".prd-node-row's shrinking children (title, .prd-tag-list) have min-width: 0 and .prd-tag-list may shrink (stylesheet test)"
+  - ".prd-node-actions stays inside the row on a narrow column (stylesheet or render test)"
+  - "The Tune element that overflowed has a shrinkable width (min-width: 0 or minmax(0, …)) (stylesheet test)"
+priority: "high"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "ndx-capture"
+---

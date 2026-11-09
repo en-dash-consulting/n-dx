@@ -635,7 +635,10 @@
 
 /* Node title */
 .prd-node-title {
-  flex: 1;
+  /* Basis auto, not flex: 1's 0%: on a row too narrow for everything the
+     title shrinks alongside .prd-tag-list instead of collapsing to nothing
+     while the tags keep their width. */
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -788,7 +791,10 @@
 .prd-tag-list {
   display: flex;
   gap: var(--space-1);
-  flex-shrink: 0;
+  /* Shrinks and wraps its tags with the row, so a column narrowed by the
+     Sidecar drawer never pushes the row's actions past its right edge. */
+  flex: 0 1 auto;
+  min-width: 0;
   flex-wrap: wrap;
 }
 

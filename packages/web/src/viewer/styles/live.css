@@ -7,6 +7,10 @@
 .live-container {
   max-width: 1200px;
   min-width: 0;
+  /* Centre in the free width: once #main-content outgrows the cap (wide
+     window, or the Sidecar drawer closed) the leftover space splits evenly
+     instead of sitting on the right as a gutter. */
+  margin-inline: auto;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */

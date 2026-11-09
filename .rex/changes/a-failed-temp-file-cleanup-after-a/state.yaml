@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "6697ab21-d3f1-427b-a8b0-059520d2f7da":
+    status: "completed"
+    startedAt: "2026-11-06T21:22:48.707Z"
+    completedAt: "2026-11-06T21:26:54.425Z"
+    endedAt: "2026-11-06T21:26:54.425Z"
+    activeIntervals: [{"end":"2026-11-06T21:26:54.425Z","start":"2026-11-06T21:22:48.707Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "createFilled's temp-file cleanup is best-effort: a failed removal strands the path for a later sweep instead of throwing after publication."
+    appliedAt: "2026-11-06T21:26:54.425Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-06T21:21:32.578Z"
+    lastModified: "2026-11-06T21:26:54.425Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
