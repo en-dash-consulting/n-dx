@@ -81,6 +81,14 @@ export interface QueueEntry {
   mode?: RunMode;
   /** Task count for `mode: "iterations"`. */
   iterations?: number;
+  /**
+   * Run settings to save on the task when its run starts (`{run, version}`,
+   * Start Working's one click on a task with none). Replayed as it came: the
+   * project server checks it before queuing (see `validate`) and saves it only
+   * when the replayed execute passes every gate, so a queued run that is
+   * dropped at its turn never leaves settings behind.
+   */
+  saveRun?: Record<string, unknown>;
   enqueuedAt: string;
 }
 
@@ -251,6 +259,7 @@ export class AdmissionQueue {
         ...(entry.options ? { options: entry.options } : {}),
         ...(entry.mode ? { mode: entry.mode } : {}),
         ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
+        ...(entry.saveRun ? { saveRun: entry.saveRun } : {}),
         enqueuedAt: queued.enqueuedAt,
       };
       return { position: existing + 1, added: false };

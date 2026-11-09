@@ -20,27 +20,37 @@
  *    `POST /api/hench/execute {taskId}`. The request carries no options, so
  *    nothing outranks the block: `ndx work` applies it (CLI flag > task's
  *    `run` > `hench.*` > `llm.*`).
- * 3. A task with none first gets one: `defaultsRunBlockOf` — the project
- *    defaults the modal would show — written with `PUT /api/hench/prep/:taskId`
- *    and the version the read reported, exactly as the modal's Save does. Then
- *    the execute. The settings the run used are now on the task, where the
- *    modal shows them as "saved on task" and they can be changed.
+ * 3. A task with none sends the same execute plus
+ *    `saveRun: {run, version}` — `defaultsRunBlockOf`, the project defaults
+ *    the modal would show, and the version the read reported. The client never
+ *    writes the block itself: the server saves it through the same path and
+ *    version check as the modal's Save (`PUT /api/hench/prep/:taskId`), and
+ *    only once every execute gate has passed (paused, already executing,
+ *    claimed by another worktree, blocked, not actionable, the slug-rule 412),
+ *    right before it spawns the run. So the settings the run used are on the
+ *    task afterwards, where the modal shows them as "saved on task" and they
+ *    can be changed, and a start the server refuses leaves the task's block
+ *    and the working tree exactly as they were. Behind the hub's queue the
+ *    `saveRun` waits with the queued request and is saved when the run
+ *    actually starts; a queued run dropped at its turn saves nothing.
  *
- * Nothing is saved when the read reports a refusal (a dirty tree, a PRD tree
- * this build would re-slug, …): the execute is posted as before, so the
- * server's own refusal is what the reader sees — including the 412 migration
- * offer below — and a task that never ran does not gain settings. Nor when the
- * server predates saving (the read carries no `savedVersion`): the run starts
- * as a plain execute.
+ * No `saveRun` is sent when the read reports a refusal (a dirty tree, a PRD
+ * tree this build would re-slug, …): some of those (a dirty tree) are refused
+ * only by the spawned run itself, after the server has answered, so the
+ * execute is posted bare and the refusal is what the reader sees — including
+ * the 412 migration offer below. Nor when the server predates saving (the
+ * read carries no `savedVersion`): the run starts as a plain execute.
  *
- * **When the save fails, nothing starts.** A run must not begin on settings
- * that were meant to be recorded on the task and were not, so the reason stays
- * on screen (it is not cleared after a few seconds like a transient refusal)
- * and the arrow is the way on. A 409 conflict means someone saved settings on
- * the task between the read and the write: the click does not start a run on
- * settings the reader has never seen, and says so — a second click finds the
- * saved block and runs with it. A failed read stops the same way, since without
- * it the click cannot tell whether the task carries settings.
+ * **When the settings cannot be saved, nothing starts.** A run must not begin
+ * on settings that were meant to be recorded on the task and were not. The
+ * server refuses a malformed or catalog-refused block with a 400 naming
+ * `saveRun`, and a version conflict — someone saved settings on the task
+ * between the read and the start — with a 409 `conflict: true`: the click does
+ * not start a run on settings the reader has never seen, and says so; a second
+ * click finds the saved block and runs with it. Both reasons stay on screen
+ * (not cleared after a few seconds like a transient refusal) and the arrow is
+ * the way on. A failed read stops the same way, since without it the click
+ * cannot tell whether the task carries settings.
  *
  * A hub that queues the run answers 202 `{queued, position, reason}`. That is
  * not a start: the button shows the position and the reason, and does not call
@@ -137,6 +147,13 @@ const TRANSIENT_ERROR_MS = 4000;
 
 type Reply = { ok: boolean; status: number; data: Record<string, unknown> };
 
+/** Settings the execute asks the server to save on the task once the start is accepted. */
+type SaveRun = { run: Record<string, unknown>; version: string };
+
+const CONFLICT_MESSAGE =
+  "Run settings were saved on this task by someone else just now, so nothing was started. " +
+  "Start again to run with them, or open them with the arrow.";
+
 export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo, liveHref, runModes = false }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,37 +205,29 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   );
 
   /**
-   * Make sure the task carries the settings this run will use: nothing to do
-   * when it has a saved block, else save the project defaults on it. Resolves
-   * null to go on, or the reason the run must not start.
+   * Read the task's run settings and decide what the execute carries: nothing
+   * extra when it has a saved block, else the project defaults as `saveRun`
+   * for the server to save once the start is accepted. Resolves `{stop}` with
+   * the reason the run must not start when the settings cannot be read.
    */
-  const ensureSavedSettings = useCallback(async (): Promise<string | null> => {
-    const path = `/api/hench/prep/${encodeURIComponent(taskId)}`;
+  const settingsToSave = useCallback(async (): Promise<{ stop: string } | { saveRun?: SaveRun }> => {
     try {
-      const read = await request(path);
+      const read = await request(`/api/hench/prep/${encodeURIComponent(taskId)}`);
       if (!read.ok) {
         const reason = (read.data.error as string) || `HTTP ${read.status}`;
-        return `Could not read this task's run settings, so nothing was started: ${reason}`;
+        return { stop: `Could not read this task's run settings, so nothing was started: ${reason}` };
       }
       const prep = read.data as unknown as PrepResponse;
       // A refused run gains no settings; the execute reports the refusal.
-      if ((prep.refusals ?? []).length > 0) return null;
+      if ((prep.refusals ?? []).length > 0) return {};
       // A server that cannot save reports no version; start as a plain execute.
-      if (prep.savedVersion === undefined) return null;
-      if (hasSavedRun(prep)) return null;
+      if (prep.savedVersion === undefined) return {};
+      if (hasSavedRun(prep)) return {};
       const block = defaultsRunBlockOf(prep);
-      if (!block) return null;
-      const saved = await request(path, { run: block, version: prep.savedVersion }, "PUT");
-      if (saved.ok) return null;
-      if (saved.status === 409 && saved.data.conflict === true) {
-        return "Run settings were saved on this task by someone else just now, so nothing was started. " +
-          "Start again to run with them, or open them with the arrow.";
-      }
-      const reason = (saved.data.error as string) || `HTTP ${saved.status}`;
-      return `Could not save the project defaults on this task, so nothing was started: ${reason}`;
+      return block ? { saveRun: { run: block, version: prep.savedVersion } } : {};
     } catch (err) {
       const reason = err instanceof Error ? err.message : "the request failed";
-      return `Could not prepare this task's run settings, so nothing was started: ${reason}`;
+      return { stop: `Could not read this task's run settings, so nothing was started: ${reason}` };
     }
   }, [request, taskId]);
 
@@ -231,20 +240,32 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     setQueued(null);
     setCanMigrate(false);
     try {
-      const stop = await ensureSavedSettings();
-      if (stop) {
+      const prepared = await settingsToSave();
+      if ("stop" in prepared) {
         // Stays until the next click: it says why nothing started.
-        setError(stop);
+        setError(prepared.stop);
         return;
       }
-      const { ok, status, data } = await execute(
-        mode === "single"
+      const { ok, status, data } = await execute({
+        ...(mode === "single"
           ? {}
           : mode === "iterations"
             ? { mode, iterations }
-            : { mode },
-      );
+            : { mode }),
+        ...(prepared.saveRun ? { saveRun: prepared.saveRun } : {}),
+      });
       if (!ok) {
+        // The settings this click meant to save were refused or overtaken, so
+        // nothing started. Said plainly, and kept on screen until the next click.
+        if (prepared.saveRun && status === 409 && data.conflict === true) {
+          setError(CONFLICT_MESSAGE);
+          return;
+        }
+        if (prepared.saveRun && status === 400 && String(data.key ?? "").startsWith("saveRun")) {
+          const reason = (data.error as string) || `HTTP ${status}`;
+          setError(`Could not save the project defaults on this task, so nothing was started: ${reason}`);
+          return;
+        }
         const message = (data.error as string) || `Failed (${status})`;
         // A refusal with a fix attached must stay on screen until it is acted
         // on. The auto-clear below is for transient failures; wiping a
@@ -279,7 +300,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     } finally {
       setLoading(false);
     }
-  }, [cancelClear, ensureSavedSettings, execute, onStarted, taskId, mode, iterations, liveHref, navigateTo]);
+  }, [cancelClear, settingsToSave, execute, onStarted, taskId, mode, iterations, liveHref, navigateTo]);
 
   const handleMigrate = useCallback(async (e: Event) => {
     e.stopPropagation();

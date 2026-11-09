@@ -456,7 +456,7 @@ describe("WorkspacesView", () => {
   it("starts a run in the card's worktree, not the viewer's", async () => {
     const { fetcher, calls } = makeFetcher({
       "/api/hench/execute": { runId: "exec-9", status: "started" },
-      // A task with no saved settings: the click saves the defaults first.
+      // A task with no saved settings: the click sends the defaults with the execute.
       "/api/hench/prep/next-1": prepFixture(),
     });
     // StartTaskButton is shared with other views and posts through the global
@@ -476,10 +476,10 @@ describe("WorkspacesView", () => {
       expect(start).toBeDefined();
       // The task is the one /api/rex/next named for *that* workspace.
       expect(start!.workspace).toBe("feature");
-      // The read and the save address that worktree too: its PRD gets the settings.
-      const save = calls.find((c) => c.url === "/api/hench/prep/next-1" && c.method === "PUT");
-      expect(save?.workspace).toBe("feature");
+      // The read addresses that worktree too, and the settings travel with the
+      // execute (saved by that worktree's server once the start is accepted).
       expect(calls.find((c) => c.url === "/api/hench/prep/next-1" && c.method === "GET")?.workspace).toBe("feature");
+      expect(calls.some((c) => c.method === "PUT")).toBe(false);
     } finally {
       globalThis.fetch = original;
     }

@@ -34,8 +34,10 @@
  * DELETE /api/hench/templates/:id         — delete a user-defined template
  * GET    /api/hench/prep/:taskId, POST …/preview, GET /api/hench/ready — see routes-hench-prep.ts
  * POST   /api/hench/execute               — trigger Hench run for a specific task
- *                                            ({ taskId, options? }; options per
- *                                            src/shared/run-options.ts)
+ *                                            ({ taskId, options?, saveRun? }; options per
+ *                                            src/shared/run-options.ts; saveRun {run, version}
+ *                                            is saved on the task after every gate passes,
+ *                                            via task-run-settings.ts)
  * POST   /api/hench/execute/check         — the same request's verdict without starting it
  *                                            (always 200: { ok } or { ok: false, status, error })
  * GET    /api/hench/execute/status         — get all active execution statuses
@@ -91,7 +93,7 @@ import {
 import { resolveActiveVendor } from "./routes-llm.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
-import type { ItemTokenTuple, ItemRunTokens } from "./rex-gateway.js";
+import type { ItemTokenTuple, ItemRunTokens, RunSettings } from "./rex-gateway.js";
 import {
   collectAllIds,
   aggregateItemTokenUsage,
@@ -133,6 +135,8 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
+import { checkSaveRunRequest, runConflictBody, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
+import type { SaveRunRequest } from "./task-run-settings.js";
 import { readDiagnosis, type RunDiagnosisSummary } from "./run-diagnosis.js";
 import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type QueuePlan, type RunOptions, type RunMode } from "../shared/index.js";
 
@@ -2059,6 +2063,12 @@ type ExecuteVerdict =
     mode: RunMode;
     /** Task count for `mode: "iterations"`, already range-checked. */
     iterations?: number;
+    /**
+     * Run settings to save on the task before it starts (`saveRun`), checked
+     * against the same validator and version as `PUT /api/hench/prep`. Saved
+     * by the spawn path only, after every gate above it has passed.
+     */
+    saveRun?: SaveRunRequest;
   };
 
 const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
@@ -2103,6 +2113,18 @@ async function judgeExecuteRequest(
   // as a single task — the drift this function's docblock exists to prevent.
   const checkedMode = checkRunMode(body);
   if (!checkedMode.ok) return refused(400, { error: checkedMode.error });
+
+  // Settings to save on the task when it starts (Start Working's one click on
+  // a task with none). Shape and values are checked here, as a PUT would check
+  // them, so a malformed block is a 400 before anything is read or written.
+  let saveRun: SaveRunRequest | undefined;
+  if (body.saveRun !== undefined) {
+    const checkedSave = await checkSaveRunRequest(ctx.projectDir, body.saveRun);
+    if (!checkedSave.ok) {
+      return refused(400, { error: checkedSave.error, ...(checkedSave.key ? { key: checkedSave.key } : {}) });
+    }
+    saveRun = checkedSave.request;
+  }
 
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
@@ -2229,6 +2251,16 @@ async function judgeExecuteRequest(
     }
   }
 
+  // Last gate: settings the request would save must still be saving over the
+  // block it read. Judged read-only here so `execute/check` (and the hub, before
+  // it queues) answers for it too; the save itself re-checks inside its PRD
+  // transaction, which is the check that cannot be raced.
+  if (saveRun) {
+    const current = (task.run as RunSettings | undefined) ?? null;
+    const currentVersion = savedRunVersion(current);
+    if (currentVersion !== saveRun.version) return refused(409, runConflictBody(current, currentVersion));
+  }
+
   return {
     kind: "runnable",
     taskId,
@@ -2237,6 +2269,7 @@ async function judgeExecuteRequest(
     options,
     mode: checkedMode.mode,
     ...(checkedMode.iterations !== undefined ? { iterations: checkedMode.iterations } : {}),
+    ...(saveRun ? { saveRun } : {}),
   };
 }
 
@@ -2424,7 +2457,18 @@ async function startExecution(
   // How many tasks this one request works through, judged above with the rest
   // of the request so `execute/check` answers for it too. Every mode starts on
   // this task; the modes that continue past it autoselect from there.
-  const { taskId, task, status, options, mode, iterations } = verdict;
+  const { taskId, task, status, options, mode, iterations, saveRun } = verdict;
+
+  // Every gate has passed, so this run starts (or fails to spawn). Only now are
+  // the request's settings written on the task — a refused start must leave
+  // the task's block and the working tree as they were. The spawned `ndx work`
+  // reads the task after this returns, so the run uses what was just saved.
+  // The task is still reserved (startingTasks), so no second start can slip in
+  // between the gates and the write.
+  if (saveRun) {
+    const written = await writeTaskRun(ctx, taskId, saveRun, broadcast);
+    if (!written.ok) return { kind: "answer", status: written.status, body: written.body };
+  }
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see

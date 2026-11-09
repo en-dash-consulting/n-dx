@@ -1093,12 +1093,14 @@ async function handleExecuteAdmission(
   let optionsValid = true;
   let mode: RunMode | undefined;
   let iterations: number | undefined;
+  let saveRun: Record<string, unknown> | undefined;
   try {
     const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
       taskId?: unknown;
       options?: unknown;
       mode?: unknown;
       iterations?: unknown;
+      saveRun?: unknown;
     };
     if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
     const checked = checkRunOptions(parsed.options);
@@ -1118,6 +1120,16 @@ async function handleExecuteAdmission(
     } else {
       // Forwarded, not queued — see the comment below the catch.
       optionsValid = false;
+    }
+    // Settings to save when the run starts. Only the shape is judged here; the
+    // project server checks the block (and its version) in `execute/check`
+    // before this queues it, and saves it only when the replay starts the run.
+    if (parsed.saveRun !== undefined) {
+      if (parsed.saveRun !== null && typeof parsed.saveRun === "object" && !Array.isArray(parsed.saveRun)) {
+        saveRun = parsed.saveRun as Record<string, unknown>;
+      } else {
+        optionsValid = false;
+      }
     }
   } catch {
     // not JSON — forward and let the server say so
@@ -1141,6 +1153,7 @@ async function handleExecuteAdmission(
     ...(options ? { options } : {}),
     ...(mode && mode !== "single" ? { mode } : {}),
     ...(iterations !== undefined ? { iterations } : {}),
+    ...(saveRun ? { saveRun } : {}),
   });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));

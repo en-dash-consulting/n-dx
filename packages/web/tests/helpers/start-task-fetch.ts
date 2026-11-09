@@ -23,7 +23,10 @@ export interface StartFetchOptions {
    * saved run block, so a test about the execute is not also about saving.
    */
   prep?: PrepResponse | StubReply;
-  /** `PUT /api/hench/prep/:taskId`. Defaults to a 200 save. */
+  /**
+   * `PUT /api/hench/prep/:taskId`. The one click never sends one (the server
+   * saves `saveRun` itself); answered and recorded so a test can assert that.
+   */
   save?: StubReply;
   /** `POST /api/hench/execute`, in order; the last answer repeats. Defaults to a 200 start. */
   execute?: StubReply | StubReply[];
@@ -80,7 +83,7 @@ export function stubStartFetch(options: StartFetchOptions = {}) {
     calls,
     /** The execute POSTs, in order. */
     executes: () => calls.filter((c) => c.url === "/api/hench/execute"),
-    /** The settings saves, in order. */
+    /** Client-side settings saves (PUTs), in order: none from the one click. */
     saves: () => calls.filter((c) => c.url.startsWith("/api/hench/prep/") && c.method === "PUT"),
   };
 }

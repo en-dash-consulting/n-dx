@@ -205,13 +205,14 @@ task panel) is a split button:
 
 - **The button** starts the run in one click (`POST /api/hench/execute`). A
   task with saved run settings runs with them — the request carries no
-  options, so the task's `run` block is what `ndx work` applies. A task with
-  none first has the project defaults the Prepare task modal would show saved
-  on it as its `run` block (`PUT /api/hench/prep/:taskId`, version `none`), so
-  the settings the run used are visible and editable on the task afterwards.
-  Unlike a Save, this block keeps fields equal to today's defaults: it records
-  what the run used. Settings a task cannot hold (`bypassPermissions`, the
-  launch-time options) stay with the project.
+  options, so the task's `run` block is what `ndx work` applies. For a task
+  with none, the execute also carries `saveRun: {run, version}` — the project
+  defaults the Prepare task modal would show, and the version the read
+  reported — and the server saves that block on the task as its `run` block,
+  so the settings the run used are visible and editable on the task
+  afterwards. Unlike a Save, this block keeps fields equal to today's
+  defaults: it records what the run used. Settings a task cannot hold
+  (`bypassPermissions`, the launch-time options) stay with the project.
 - **The ▾ arrow** opens the Prepare task modal, to change the settings for one
   run or save them on the task.
 
@@ -219,12 +220,29 @@ Where the button carries the run-mode picker (one task, a set number, until
 done), the picker governs the click and its label says so ("Start working ·
 until done"); it falls back to one task after each start.
 
-Nothing is saved when the run would be refused (the click then reports the
-server's refusal, including the slug-migration offer). If the save itself
-fails, or someone else saved settings on the task in between (409), no run
-starts and the reason stays on the button; a second click on a task that now
-carries settings runs with them. Like any save, it writes the PRD, so the run
-commits it first as a planning commit.
+**The save happens only when the run starts.** `POST /api/hench/execute`
+checks `saveRun` with the same validator as `PUT /api/hench/prep/:taskId`
+(a malformed or catalog-refused block is a 400 keyed `saveRun…`), runs every
+execute gate — the slug-rule 412, blocked or non-actionable status, paused
+executions (503), a run already executing or starting, a claim from another
+worktree, an in-progress run still holding the task — and only then writes
+the block, through the same save path and version check as the PUT, right
+before it spawns `ndx work`. A refused start leaves the task's `run` block and
+the working tree unchanged. When the read already reports a refusal (a dirty
+tree, the slug-rule 412) the click sends no `saveRun` at all, since a dirty
+tree is refused only by the spawned run.
+
+Behind the hub's queue, the `saveRun` waits in the queue entry and is
+replayed with the request, so it is saved when the queued run actually
+starts; a run dropped at its turn saves nothing. `execute/check`, which the
+hub asks before queuing, answers for a malformed `saveRun` and a version
+conflict too.
+
+If someone else saved settings on the task since the read, the start is
+refused with 409 `conflict: true` and nothing runs; the button says so and
+keeps the reason on screen, and a second click on the task, which now carries
+settings, runs with them. Like any save, it writes the PRD, so the run commits
+it first as a planning commit.
 
 ## Prepare task
 
