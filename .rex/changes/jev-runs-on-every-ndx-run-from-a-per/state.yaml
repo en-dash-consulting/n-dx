@@ -8,9 +8,6 @@ items:
     activeIntervals: [{"end":"2026-11-04T22:22:13.282Z","start":"2026-11-04T22:11:00.255Z"}]
     lastModified: "2026-11-04T22:22:13.282Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "054e2c9c-61a9-4ab8-9fb6-908f29fba024":
-    lastModified: "2026-11-04T22:33:30.428Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "076f5980-a069-4a02-acb0-7d93094c1722":
     status: "completed"
     startedAt: "2026-11-06T00:43:03.481Z"
@@ -145,10 +142,6 @@ items:
     resolutionDetail: "sourcevision test drives exported finalizeTokenUsage with a real failing node helper in a temp NDX_HOME; catches both jevAvailability() and check:true regressions."
     lastModified: "2026-11-04T23:06:46.952Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "68b2709d-174e-4ec2-bf3f-163fdda6115c":
-    status: "deferred"
-    lastModified: "2026-10-30T14:44:19.737Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6c539e7a-ae0b-4a82-955d-313f596add75":
     status: "completed"
     startedAt: "2026-11-04T18:32:45.746Z"
@@ -195,12 +188,18 @@ items:
     resolutionDetail: "Five #956 nits fixed with tests: landing setBusy(false) on credentialWarning; scrub report Claude-only and skips GitHub tokens; spawnCredentialsCli catches a refused spawn; non-terminal --import exits 1 on a differing key; terminal y replace tested via injected answer."
     lastModified: "2026-11-06T01:35:07.762Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "7ce15d95-320b-40e1-a256-28757ff37f89":
-    lastModified: "2026-11-04T20:36:23.972Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
+    status: "completed"
+    startedAt: "2026-11-07T02:13:09.852Z"
+    completedAt: "2026-11-07T02:13:09.852Z"
+    endedAt: "2026-11-07T02:13:09.852Z"
+    activeIntervals: [{"end":"2026-11-07T02:13:09.852Z","start":"2026-11-07T02:13:09.852Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "All 45 remaining tasks landed with N-DX-Item trailers (credential store PR 1, #942, merged 2026-11-03). Five open tasks and the deferred C10 moved to 350dbd5a so this change could close and add the Per-user credential store capability (2026-11-06 PRD audit, D5)."
+    appliedAt: "2026-11-07T02:13:09.852Z"
+    appliedAmendsHash: "7c41198fdba0640598b3e61583273fd28e18aec3ee7ba9cb373f0f6807fd7a2e"
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-06T00:17:41.019Z"
+    lastModified: "2026-11-07T02:13:09.852Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -290,9 +289,6 @@ items:
     resolutionDetail: "The guard resolves a security subcommand the way SecurityTool does (getopt hilp:qvR, then the first table entry the word is a prefix of, with case folded), so every abbreviation of find-generic-password is refused."
     lastModified: "2026-11-04T22:10:35.789Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "a10f7f31-5218-41df-bb48-9d02da2bbad0":
-    lastModified: "2026-11-04T22:14:40.008Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aba3a023-d594-4962-9d63-a0be5775bb20":
     status: "completed"
     startedAt: "2026-11-04T21:33:51.131Z"
@@ -339,9 +335,6 @@ items:
     resolutionDetail: "Stale-lock takeover in llm-client credential-store.ts now uses a per-lock O_EXCL guard file and removes the lock only if its identity (ino, mtime, content) is unchanged and it is still stale; a lock left empty is stale after 5 s."
     lastModified: "2026-11-04T20:25:34.641Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "bd53209a-99f9-4ad6-863d-7512e66a1c2e":
-    lastModified: "2026-11-04T22:33:38.733Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfee741f-343a-4a2c-b12f-50aa262811ef":
     status: "completed"
     startedAt: "2026-11-03T16:24:28.530Z"
@@ -351,9 +344,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option A: importLocalApiKeys skips vendors whose store entry is a helper, keeps the file key, prints one line naming vendor and file."
     lastModified: "2026-11-03T16:29:52.353Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "cb238ec9-5e06-4556-8fc7-2a0ef2d61d63":
-    lastModified: "2026-11-04T22:05:43.565Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "db3c0066-8696-45bd-a77a-1c518bfe0221":
     status: "completed"

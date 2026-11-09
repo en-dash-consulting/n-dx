@@ -1,6 +1,15 @@
 schema: "rex/v2"
 items:
   "26f7e15e-8036-4e90-9d6b-9300a2692d65":
+    status: "completed"
+    startedAt: "2026-11-07T02:11:53.049Z"
+    completedAt: "2026-11-07T02:11:53.049Z"
+    endedAt: "2026-11-07T02:11:53.049Z"
+    activeIntervals: [{"end":"2026-11-07T02:11:53.049Z","start":"2026-11-07T02:11:53.049Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in d84dbea30 (refresh the Analysis guide, guide.ts, 2026-10-29); reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    appliedAt: "2026-11-07T02:11:53.049Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-23T16:35:17.814Z"
+    lastModified: "2026-11-07T02:11:53.049Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

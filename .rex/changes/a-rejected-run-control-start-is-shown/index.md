@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "A unit test in packages/web/tests/unit/viewer/shell.test.ts stubs a 409 start and asserts the error is visible after the click"
 touches:
   - "1a326041-9ce2-490e-80ae-55fbdaf81543"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"28ab2232-830a-42b8-a80e-f2f4cf3902e7","run":"7d676695-7097-471c-9f9c-747cbc128fdc"}
 tags:

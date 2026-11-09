@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "An agent cannot use the same path to get a config write accepted"
 touches:
   - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
+fix: true
 priority: "medium"
 discoveredFrom: {"item":"bfb205e4-24e7-4d4e-b77a-ed3190d428e9"}
 tags:

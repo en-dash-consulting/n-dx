@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "The fix makes the test wait for the blur-triggered render (or isolates the state it shares), not loosen the assertion"
 touches:
   - "8230a96e-0108-494d-879b-4a76f7ee4360"
+fix: true
 priority: "medium"
 discoveredFrom: {"item":"52b2ecff-be44-4870-a115-d6a36489aed7","run":"f6661724-3a9e-411b-8842-f79b306fab30"}
 tags:

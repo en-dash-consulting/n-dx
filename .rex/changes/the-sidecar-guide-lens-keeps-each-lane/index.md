@@ -7,7 +7,7 @@ intent: "R2's review fixes (#930) made the queue planner mark lane.ownWorktree: 
 acceptanceCriteria:
   - "No Sidecar card starts a run in a checkout that already has a live run, and the Guide lens says which lanes need a worktree of their own"
 touches:
-  - "a6a5ac6a-ca47-435e-8749-91505acad43f"
+  - "1710be37-554f-47bf-a9e0-609a6ab90768"
 priority: "medium"
 source: "ndx-capture"
 ---

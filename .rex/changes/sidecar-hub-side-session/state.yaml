@@ -67,8 +67,17 @@ items:
     lastModified: "2026-11-03T01:40:48.029Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73f42fbb-cc9b-4c44-8798-06959e234fe2":
+    status: "completed"
+    startedAt: "2026-11-07T02:12:17.047Z"
+    completedAt: "2026-11-07T02:12:17.047Z"
+    endedAt: "2026-11-07T02:12:17.047Z"
+    activeIntervals: [{"end":"2026-11-07T02:12:17.047Z","start":"2026-11-07T02:12:17.047Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "All 15 tasks completed and landed with N-DX-Item trailers on main (Sidecar H1, merged with the Sidecar stack); the change itself was left pending. Reconciled in the 2026-11-06 PRD audit."
+    appliedAt: "2026-11-07T02:12:17.047Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
-    lastModified: "2026-11-04T19:54:07.024Z"
+    lastModified: "2026-11-07T02:15:59.355Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "771fdf69-d81a-483e-8108-7d1c1be810cb":
     status: "completed"
