@@ -20,7 +20,6 @@ import { join } from "node:path";
 import { BUILD_STAMP_FILE, isBuildCurrent, packageBuildIdentity, sourceHash } from "../../packages/core/build-identity.mjs";
 import { sourceHash as gateSourceHash } from "../../scripts/lib/stale-dist.mjs";
 import {
-  HUB_SERVER_COMMANDS,
   formatUnrecordedStatus,
   hereServerCommands,
   hubBuildMismatch,

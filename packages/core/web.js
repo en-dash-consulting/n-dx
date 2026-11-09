@@ -61,6 +61,13 @@ import { execFileSyncCli } from "./win-spawn.js";
 import { localConfigIsRepositoryConfig } from "./claude-integration.js";
 import { packageBuildIdentity } from "./build-identity.mjs";
 import { ensureSourceBuild } from "./source-build.js";
+import {
+  countLiveHenchLocks,
+  deferredHubSignInFix,
+  formatReplacementResult,
+  hubReplacementNotice,
+  planHubReplacement,
+} from "./hub-replacement.js";
 
 /**
  * Core's own CLI, beside this file. Not `join(__dir, "cli.js")`: callers pass
@@ -1229,9 +1236,6 @@ function checkoutOf(web) {
  * @property {string} start         The command that starts it again as the same kind of server.
  */
 
-/** @type {ServerCommands} */
-export const HUB_SERVER_COMMANDS = { kind: "hub", stop: "ndx hub stop", start: "ndx start" };
-
 /**
  * The single-project or preview server `ndx <commandName>` started, by the
  * commands that address it again. `--here` is always named: a bare `ndx start`
@@ -1262,7 +1266,7 @@ export function hereServerCommands(commandName, isPreview) {
  * @returns {string}
  */
 export function serverRefreshFix(web, server) {
-  if (server.kind === "hub") return `restart the hub: '${server.stop}', then '${server.start}'`;
+  // A hub older than this ndx is replaced (runHubMode), not refreshed by hand.
   // A single-project server was just spawned from the dist/ on disk, so a
   // restart would start the same build again.
   return web.sourceLinked
@@ -1823,22 +1827,38 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile) {
 }
 
 /**
- * Make sure a hub is answering on `port`, spawning one detached if not.
- * Same CLAUDECODE-stripping, detached, unref'd pattern as background mode.
+ * Make sure a hub that is the one this ndx would start is answering on
+ * `port`: spawn one when there is none, reuse one that matches, and replace
+ * one that does not ({@link replaceOrDeferHub}).
  *
  * A hub that is already up is only reused when its authentication matches what
  * this command asked for. First-writer-wins would otherwise decide the mode for
  * every later project: one `ndx start --no-auth` left the hub open, and the
  * next authenticated project silently joined it, token file and all.
+ *
+ * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
  */
-async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
+async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, force = false }) {
   const wanted = tokenFile ? "token" : "open";
   const state = await hubAuthState(port, hubRequest, (p) => identifyOwnHub(p, home));
-  if (state !== "absent") {
-    if (state === wanted) return { spawned: false, pid: null };
-    throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
-  }
+  if (state === "absent") return spawnHub(port, { tools, __dir, home, tokenFile });
+  if (state !== wanted) throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
 
+  // A hub that kept running across an upgrade or rebuild serves older code
+  // than this CLI expects — first among it, no landing-nonce route.
+  const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
+  const mismatch = health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
+  if (!mismatch) return { spawned: false, pid: null };
+  return replaceOrDeferHub(port, { kind: "build", text: mismatch }, { tools, __dir, home, tokenFile, force });
+}
+
+/**
+ * Spawn a hub on `port`, detached and unref'd, and wait for it to answer
+ * `/api/hub/health`. Same CLAUDECODE-stripping pattern as background mode.
+ *
+ * @returns {Promise<{ spawned: true, pid: number }>}
+ */
+async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
   const script = resolve(__dir, tools.web);
   const { CLAUDECODE: _cc, ...env } = process.env;
   // `--ndx-cli`: the hub asks this n-dx for each extension sidecar's launch
@@ -1869,6 +1889,154 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   // credentialed; say why, rather than reporting it as never started.
   const why = lastReason ? `: ${lastReason}` : "";
   throw new Error(`n-dx hub did not start on port ${port} within ${HUB_START_TIMEOUT_MS}ms${why}`);
+}
+
+/**
+ * Replace the running hub on `port` with the one this ndx starts, unless that
+ * would interrupt live work ({@link planHubReplacement}).
+ *
+ * Only a hub identified as this user's own ({@link identifyOwnHub}) is ever
+ * stopped: its pid comes from this user's ndx home and is the one listener on
+ * the port. Anything else is left running and reported.
+ *
+ * @param {number} port
+ * @param {import("./hub-replacement.js").HubReplacementReason} reason
+ */
+async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force }) {
+  const identified = await identifyOwnHub(port, home);
+  // Never this process or the one that started it, whatever the pid file
+  // says: stopping either would end this command with the hub half-replaced.
+  const own = identified.ok && (identified.pid === process.pid || identified.pid === process.ppid)
+    ? { ok: false, reason: `the recorded hub pid (${identified.pid}) is this ndx process or its parent` }
+    : identified;
+  if (!own.ok) {
+    return {
+      spawned: false,
+      pid: null,
+      deferred: `The n-dx hub on port ${port} needs replacing: ${reason.text}. It was left running because it could not be identified as this user's hub (${own.reason}).`,
+    };
+  }
+  const projects = await readHubRegistry(home);
+  const liveWork = await gatherHubLiveWork(port, projects, { canAsk: reason.kind !== "auth" });
+  const plan = planHubReplacement({ reason, liveWork, force, port });
+  if (plan.action === "defer") return { spawned: false, pid: null, deferred: plan.note };
+
+  console.error(hubReplacementNotice(reason, port, Object.keys(projects).length, plan.interrupts));
+  // SIGTERM first and a long grace, as `ndx hub stop` does: the hub's handler
+  // stops every project server before exiting. hub.json is kept, and the new
+  // hub brings each project back from it under the same id.
+  await terminateTreeByPid(own.pid, { forceKillTimeoutMs: HUB_STOP_GRACE_MS });
+  if (!(await waitForPortFree(port, HUB_STOP_GRACE_MS + 5_000))) {
+    throw new Error(`The old n-dx hub (PID ${own.pid}) did not release port ${port}; nothing was started in its place.`);
+  }
+  const spawned = await spawnHub(port, { tools, __dir, home, tokenFile });
+  const restored = await restoreHubProjects(port, projects, home);
+  return { ...spawned, restored };
+}
+
+/** Wait until nothing listens on `port`; false when it is still held after `timeoutMs`. */
+async function waitForPortFree(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (await isPortInUse(port)) {
+    if (Date.now() >= deadline) return false;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return true;
+}
+
+/**
+ * Work a hub restart would interrupt: hench runs holding a lock in each
+ * registered project (an `ndx work` in a terminal holds one as much as a
+ * dashboard run), runs the project's server reports as executing, and MCP
+ * sessions open on it through the hub.
+ *
+ * The servers are only asked when the hub has been identified and accepts the
+ * token this command holds (`canAsk`); a server too old to report MCP
+ * sessions counts as having none.
+ *
+ * @param {number} port
+ * @param {Record<string, { id: string, repoRoot: string, worktrees?: string[] }>} projects
+ * @param {{ canAsk: boolean }} options
+ * @returns {Promise<import("./hub-replacement.js").HubLiveWork>}
+ */
+async function gatherHubLiveWork(port, projects, { canAsk }) {
+  const ask = (path) => hubRequest(port, "GET", path, undefined, PROBE_TIMEOUT_MS, { sendToken: true });
+  const entries = await Promise.all(Object.values(projects).map(async (record) => {
+    let locks = 0;
+    for (const dir of new Set([record.repoRoot, ...(record.worktrees ?? [])])) {
+      try {
+        locks += countLiveHenchLocks(resolveLayout(dir).henchDir);
+      } catch {
+        // A worktree that is gone holds no run.
+      }
+    }
+    let executions = 0;
+    let sessions = 0;
+    if (canAsk) {
+      const base = `/p/${encodeURIComponent(record.id)}`;
+      const [ex, mcp] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/mcp/sessions`)]);
+      if (ex.status === 200 && Array.isArray(ex.body?.executions)) {
+        executions = ex.body.executions.filter((e) => e?.status === "starting" || e?.status === "running").length;
+      }
+      if (mcp.status === 200 && mcp.body && typeof mcp.body === "object") {
+        sessions = (Number(mcp.body.rex) || 0) + (Number(mcp.body.sourcevision) || 0);
+      }
+    }
+    // A dashboard run holds a hench lock too: the larger count, not the sum.
+    return { project: record.id, runs: Math.max(locks, executions), sessions };
+  }));
+  entries.sort((x, y) => x.project.localeCompare(y.project));
+  return {
+    runs: entries.map((e) => ({ project: e.project, count: e.runs })),
+    mcpSessions: entries.map((e) => ({ project: e.project, count: e.sessions })),
+  };
+}
+
+/**
+ * Bring every project the old hub served back on the new one, under the same
+ * id and so the same `/p/<id>/` URL. The new hub re-attaches them from
+ * `hub.json` on its own; any it does not list, or lists as stopped, is
+ * registered again from the record taken before the old hub was stopped.
+ * Waits until each is healthy, or the registration timeout runs out.
+ *
+ * @param {number} port
+ * @param {Record<string, { id: string, name?: string, repoRoot: string, worktrees?: string[] }>} projects
+ * @param {string} home
+ */
+async function restoreHubProjects(port, projects, home) {
+  const ids = Object.keys(projects);
+  const deadline = Date.now() + HUB_REGISTER_TIMEOUT_MS;
+  const registered = new Set();
+  let listed = new Map();
+  for (;;) {
+    const res = await credentialedHubRequest(port, "GET", "/api/hub/projects", undefined, PROBE_TIMEOUT_MS, { home });
+    listed = new Map((Array.isArray(res.body?.projects) ? res.body.projects : []).map((p) => [p.id, p]));
+    const absent = ids.filter((id) => !registered.has(id) && (!listed.has(id) || listed.get(id).status?.state === "stopped"));
+    await Promise.all(absent.map(async (id) => {
+      registered.add(id);
+      const record = projects[id];
+      for (const worktree of new Set([record.repoRoot, ...(record.worktrees ?? [])])) {
+        await credentialedHubRequest(
+          port,
+          "POST",
+          "/api/hub/projects",
+          { id, name: record.name, repoRoot: record.repoRoot, worktree },
+          HUB_REGISTER_TIMEOUT_MS,
+          { home },
+        );
+      }
+    }));
+    if (absent.length > 0) continue;
+    const pending = ids.filter((id) => listed.get(id)?.status?.state !== "healthy");
+    if (pending.length === 0 || Date.now() >= deadline) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const healthy = ids.filter((id) => listed.get(id)?.status?.state === "healthy").sort();
+  const unhealthy = ids
+    .filter((id) => listed.get(id)?.status?.state !== "healthy")
+    .sort()
+    .map((id) => ({ id, state: listed.get(id)?.status?.state ?? "not registered", lastError: listed.get(id)?.status?.lastError ?? null }));
+  return { healthy, unhealthy };
 }
 
 /**
@@ -2309,12 +2477,14 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   }
   const web = packageBuildIdentity(webEntry);
   try {
-    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
+    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile, web, force: !!flags["replace-hub"] });
   } catch (err) {
     console.error(err.message);
     return 1;
   }
+  if (hub.deferred) console.error(`Note: ${hub.deferred}`);
   if (hub.spawned) log(`n-dx hub started on http://127.0.0.1:${hubPort} (PID ${hub.pid}).`);
+  if (hub.restored) for (const line of formatReplacementResult(hub.restored, hubPort)) log(line);
 
   // `ndxBin` is still sent for older hubs; a current hub ignores it and
   // spawns its own CLI entry point.
@@ -2340,11 +2510,6 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // the pid file lets stop/status/refresh recognise a hub registration.
   const health = await credentialedHubRequest(hubPort, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
   const hubPid = typeof health.body?.pid === "number" ? health.body.pid : (hub.pid ?? process.pid);
-  // A hub that kept running across an upgrade or rebuild serves older code
-  // than this CLI expects. Only a reused hub can differ; one just spawned is
-  // the build on disk, which the stale-dist check above already judged.
-  const mismatch = !hub.spawned && health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
-  if (mismatch) console.error(`Warning: ${mismatch}.\n  To fix: ${serverRefreshFix(web, HUB_SERVER_COMMANDS)}.`);
   try {
     await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
   } catch {
@@ -2361,7 +2526,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
   log(`  URL: ${dashboardUrl}`);
-  if (token && !nonce) log(noNonceNote(nonceStatus, serverRefreshFix(web, HUB_SERVER_COMMANDS)));
+  if (token && !nonce) log(noNonceNote(nonceStatus, hub.deferred ? deferredHubSignInFix() : "this ndx could not replace it"));
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");

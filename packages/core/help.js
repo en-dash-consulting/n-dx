@@ -1148,6 +1148,15 @@ const ORCHESTRATOR_HELP_DEFS = {
           "hub.keepAlive to true. 'ndx hub stop' stops the hub and every project.",
       },
       {
+        title: "An older hub",
+        content:
+          "A hub keeps running across rebuilds and upgrades. When the one on the port\n" +
+          "is another build than this ndx starts, 'ndx start' replaces it on the same\n" +
+          "port and home, and every project it served comes back on its own /p/<id>/\n" +
+          "URL. If an agent run or an MCP session is live on it, the replacement waits\n" +
+          "for the next 'ndx start' after that work ends; --replace-hub does it now.",
+      },
+      {
         title: "Port handling (--here)",
         content:
           "Starting again for the same directory restarts that server on the same port.\n" +
@@ -1192,6 +1201,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--open", description: "Open the project URL in the browser (through an owner-only sign-in page in the ndx home, so the one-time link never appears in a process list)" },
       { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
       { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
+      { flag: "--replace-hub", description: "Replace a hub that is another build than this ndx now, even while an agent run or MCP session is live on it" },
       { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.local.json; the tracked .n-dx.json cannot turn it off). Loopback is shared by every account on the host; the token is what keeps another account out" },
     ],
     examples: [
