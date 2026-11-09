@@ -44,6 +44,21 @@ export interface RepoTrustNotice {
   detail: string;
   warnings: string[];
   infos: string[];
+  /** Sources for the Details list, capped at MAX_LISTED_SOURCES. */
+  sources: string[];
+  /** Sources beyond the Details cap. */
+  moreSources: number;
+}
+
+/** Sources named in the always-visible line; the rest become "+N more". */
+const MAX_NAMED_SOURCES = 3;
+/** Longest source name printed in the always-visible line. */
+const MAX_SOURCE_NAME = 60;
+/** Sources listed under Details before "+N more". */
+const MAX_LISTED_SOURCES = 50;
+
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 /**
@@ -58,11 +73,21 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
   const headline = view.state === "changed"
     ? "This repository's execution config changed since you trusted it"
     : "This repository's execution config is not trusted";
-  const sources = view.sources.length ? ` (${view.sources.join(", ")})` : "";
+  const named = view.sources.slice(0, MAX_NAMED_SOURCES).map((p) => clip(p, MAX_SOURCE_NAME));
+  const rest = view.sources.length - named.length;
+  const list = rest > 0 ? [...named, `+${rest} more`] : named;
+  const sources = list.length ? ` (${list.join(", ")})` : "";
   const detail =
     `${n} finding${n === 1 ? "" : "s"}${sources}. Until trusted, agent runs use the default guard, `
     + "bypassPermissions is lowered to acceptEdits, and verify_criteria does not run the repository's test command.";
-  return { headline, detail, warnings, infos };
+  return {
+    headline,
+    detail,
+    warnings,
+    infos,
+    sources: view.sources.slice(0, MAX_LISTED_SOURCES),
+    moreSources: Math.max(0, view.sources.length - MAX_LISTED_SOURCES),
+  };
 }
 
 export interface RepoTrustStripProps {
@@ -133,6 +158,15 @@ export function RepoTrustStrip({ fetchImpl, initial }: RepoTrustStripProps = {})
       ? h("ul", { class: "repo-trust-strip__list" },
           ...notice.warnings.map((m) => h("li", { class: "repo-trust-strip__warning" }, m)),
           ...notice.infos.map((m) => h("li", { class: "repo-trust-strip__info" }, m)),
+        )
+      : null,
+    open && notice.sources.length
+      ? h("div", { class: "repo-trust-strip__sources" },
+          "Read from:",
+          h("ul", null,
+            ...notice.sources.map((p) => h("li", { class: "repo-trust-strip__source" }, p)),
+            notice.moreSources > 0 ? h("li", { class: "repo-trust-strip__source" }, `+${notice.moreSources} more`) : null,
+          ),
         )
       : null,
     error ? h("div", { class: "repo-trust-strip__error", role: "status" }, error) : null,

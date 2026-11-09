@@ -30,6 +30,15 @@ describe("buildTrustNotice", () => {
     expect(notice.infos).toEqual(["Defines the test command n-dx runs for verification: pnpm test"]);
   });
 
+  it("keeps the visible text short with 300 PRD sources", () => {
+    const sources = [".n-dx.json", ".hench/config.json", ...Array.from({ length: 300 }, (_, i) => `.rex/changes/some-long-change-slug-${i}/task-${i}.md`)];
+    const notice = buildTrustNotice({ ...UNTRUSTED, sources })!;
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+    expect(notice.detail).toContain("+299 more");
+    expect(notice.sources).toHaveLength(50);
+    expect(notice.moreSources).toBe(252);
+  });
+
   it("says changed when the record is for another digest", () => {
     expect(buildTrustNotice({ ...UNTRUSTED, state: "changed" })!.headline).toContain("changed since you trusted it");
   });
@@ -61,6 +70,16 @@ describe("RepoTrustStrip", () => {
 
     act(() => { Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "Not now")!.click(); });
     expect(root.querySelector(".repo-trust-strip")).toBeNull();
+  });
+
+  it("lists sources only once Details is open", () => {
+    const sources = Array.from({ length: 300 }, (_, i) => `.rex/prd-item-${i}.md`);
+    const root = mount({ ...UNTRUSTED, sources });
+    expect(root.querySelector(".repo-trust-strip__source")).toBeNull();
+    expect(root.textContent).not.toContain("prd-item-100.md");
+    act(() => { Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "Details")!.click(); });
+    expect(root.querySelectorAll(".repo-trust-strip__source")).toHaveLength(51);
+    expect(root.textContent).toContain("+250 more");
   });
 
   it("posts to accept and disappears when the server reports trusted", async () => {
