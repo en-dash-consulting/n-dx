@@ -222,6 +222,16 @@ export function detectCommands(projectDir: string): DetectedCommand[] {
   return found.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
 }
 
+// CSI covers colours and cursor moves; OSC (window titles, hyperlinks) ends
+// at BEL or ST; the last branch is a two-byte escape such as a cursor save
+// (ESC 7) or a reset (ESC c).
+const ANSI_ESCAPE = /\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[0-~])/g;
+
+/** Text without ANSI escape sequences. */
+export function stripAnsi(text: string): string {
+  return text.replace(ANSI_ESCAPE, "");
+}
+
 /**
  * The first localhost URL a process advertises in its output.
  *
@@ -229,9 +239,13 @@ export function detectCommands(projectDir: string): DetectedCommand[] {
  * port is read from what the process actually said rather than assumed.
  * A wildcard bind is reported as localhost, which is what a browser on this
  * machine can actually open.
+ *
+ * Colour codes are stripped first: Vite bolds the port
+ * (`localhost:\x1b[1m5173\x1b[22m/`), which would otherwise break the match,
+ * and a reset after the URL would otherwise be read as part of its path.
  */
 export function findLocalUrl(output: string): string | null {
-  const match = output.match(
+  const match = stripAnsi(output).match(
     /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::\]|\[::1\]):(\d{2,5})(\/[^\s"'`]*)?/i,
   );
   if (!match) return null;

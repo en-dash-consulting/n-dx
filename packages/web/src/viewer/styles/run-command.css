@@ -92,17 +92,6 @@
   }
 }
 
-.runcmd-link {
-  font-size: 0.72rem;
-  color: var(--accent);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.runcmd-link:hover {
-  text-decoration: underline;
-}
-
 .runcmd-menu {
   position: absolute;
   top: calc(100% + 0.4rem);
@@ -170,14 +159,16 @@
   flex: none;
 }
 
+/* Open app on the left, Run or Stop on the right. */
 .runcmd-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 0.4rem;
 }
 
 .runcmd-start,
 .runcmd-stop {
+  margin-left: auto;
   padding: 0.3rem 0.8rem;
   border: none;
   border-radius: 5px;
@@ -190,6 +181,21 @@
 .runcmd-start { background: var(--accent); }
 .runcmd-stop { background: var(--red); }
 
+.runcmd-open {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.runcmd-open:hover {
+  background: var(--accent-subtle);
+}
+
 .runcmd-start:disabled {
   opacity: 0.6;
   cursor: default;
@@ -201,10 +207,33 @@
   color: var(--red);
 }
 
+.runcmd-output-panel {
+  margin-top: 0.5rem;
+}
+
+.runcmd-output-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.runcmd-output-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.runcmd-output-toggle:hover {
+  text-decoration: underline;
+}
+
 .runcmd-output {
   margin: 0;
   padding: 0.4rem;
-  max-height: 12rem;
   overflow: auto;
   border-radius: 5px;
   background: var(--bg);
@@ -214,6 +243,35 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.runcmd-output--expanded {
+  max-height: 16rem;
+}
+
+/* Terminal colours, mapped onto theme tokens so both themes stay legible.
+   Bright variants (8-15) share their base colour. */
+.ansi-fg-0, .ansi-fg-8 { color: var(--text-muted); }
+.ansi-fg-1, .ansi-fg-9 { color: var(--red); }
+.ansi-fg-2, .ansi-fg-10 { color: var(--green); }
+.ansi-fg-3, .ansi-fg-11 { color: var(--orange); }
+.ansi-fg-4, .ansi-fg-12,
+.ansi-fg-5, .ansi-fg-13 { color: var(--purple); }
+.ansi-fg-6, .ansi-fg-14 { color: var(--accent); }
+.ansi-fg-7, .ansi-fg-15 { color: var(--text); }
+
+.ansi-bg-0, .ansi-bg-8 { background: color-mix(in srgb, var(--text-muted) 20%, transparent); }
+.ansi-bg-1, .ansi-bg-9 { background: color-mix(in srgb, var(--red) 20%, transparent); }
+.ansi-bg-2, .ansi-bg-10 { background: color-mix(in srgb, var(--green) 20%, transparent); }
+.ansi-bg-3, .ansi-bg-11 { background: color-mix(in srgb, var(--orange) 20%, transparent); }
+.ansi-bg-4, .ansi-bg-12,
+.ansi-bg-5, .ansi-bg-13 { background: color-mix(in srgb, var(--purple) 20%, transparent); }
+.ansi-bg-6, .ansi-bg-14 { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.ansi-bg-7, .ansi-bg-15 { background: color-mix(in srgb, var(--text) 15%, transparent); }
+
+.ansi-bold { font-weight: 700; }
+.ansi-dim { opacity: 0.7; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
 
 /* Narrow screens: the control keeps its glyph and drops its label, like search. */
 @media (max-width: 960px) {
