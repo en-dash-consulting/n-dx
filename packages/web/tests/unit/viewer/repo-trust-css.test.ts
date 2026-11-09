@@ -18,8 +18,10 @@ function rule(selector: string): string {
 describe("repo-trust.css", () => {
   it("caps the strip at a third of the viewport and keeps it from shrinking", () => {
     const strip = rule(".repo-trust-strip");
-    expect(strip).toMatch(/max-height:\s*calc\(100vh \/ 3 - var\(--topnav-h\) - var\(--bottombar-h\)\)/);
-    expect(strip).toMatch(/max-height:\s*calc\(100dvh \/ 3 - var\(--topnav-h\) - var\(--bottombar-h\)\)/);
+    // A floor, so a viewport where the third minus the chrome reaches zero
+    // still leaves a scroll box tall enough to reach the buttons.
+    expect(strip).toMatch(/max-height:\s*max\(5rem, calc\(100vh \/ 3 - var\(--topnav-h\) - var\(--bottombar-h\)\)\)/);
+    expect(strip).toMatch(/max-height:\s*max\(5rem, calc\(100dvh \/ 3 - var\(--topnav-h\) - var\(--bottombar-h\)\)\)/);
     expect(strip).toMatch(/flex:\s*0 0 auto/);
     // Not `overflow: hidden`: on a short viewport the headline row alone can
     // exceed the cap, and clipping it would put the buttons out of reach.

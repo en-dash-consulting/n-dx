@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "bd4a73db-cd62-4fb6-a85b-6e6d3fd91347":
-    lastModified: "2026-11-09T16:36:34.256Z"
+    status: "completed"
+    startedAt: "2026-11-09T16:36:51.923Z"
+    completedAt: "2026-11-09T16:39:20.627Z"
+    endedAt: "2026-11-09T16:39:20.627Z"
+    activeIntervals: [{"end":"2026-11-09T16:39:20.627Z","start":"2026-11-09T16:36:51.923Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Strip capped at 100dvh/3 minus nav and bottom bar; restrictions sentence moved under Details; visible text budget tightened (hard cap 260). Browser check at 1024x768 and 1440x900 not run."
+    lastModified: "2026-11-09T16:39:20.627Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d3657f85-88f5-4f70-8948-56603a44ffe3":
+    status: "completed"
+    startedAt: "2026-11-09T16:39:20.627Z"
+    completedAt: "2026-11-09T16:39:20.627Z"
+    endedAt: "2026-11-09T16:39:20.627Z"
+    activeIntervals: [{"end":"2026-11-09T16:39:20.627Z","start":"2026-11-09T16:39:20.627Z"}]
+    appliedAt: "2026-11-09T16:39:20.627Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-09T16:36:23.816Z"
-    lastModified: "2026-11-09T16:36:31.304Z"
+    lastModified: "2026-11-09T16:39:20.627Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
