@@ -10,6 +10,7 @@ acceptanceCriteria:
   - "Change-selection ordering tests still pass unchanged"
 touches:
   - "ab9eeda9-2419-4ef0-bff4-4c20251758aa"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"9156347e-7193-4d2e-9108-635e9e3705ad","run":"4613b163-3ea2-4ee1-b7bb-e61f1ec0552e"}
 tags:

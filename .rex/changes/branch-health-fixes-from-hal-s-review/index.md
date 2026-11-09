@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "GET /api/branch-health keeps its response shape; nothing runs a fix or writes to a worktree"
 touches:
   - "81e855bf-c278-46b7-924f-d5a3c4227b22"
+fix: true
 priority: "medium"
 discoveredFrom: {"item":"477c02f8-fba6-46ea-93ef-19fbf9293954"}
 source: "pr-review"

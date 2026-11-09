@@ -1,7 +1,15 @@
 schema: "rex/v2"
 items:
   "7a64e00f-8aea-4687-9f4f-b17795f95282":
+    status: "completed"
+    startedAt: "2026-11-07T02:11:11.623Z"
+    completedAt: "2026-11-07T02:11:11.623Z"
+    endedAt: "2026-11-07T02:11:11.623Z"
+    activeIntervals: [{"end":"2026-11-07T02:11:11.623Z","start":"2026-11-07T02:11:11.623Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in c772b48de (shared tracked-local classifier applied to ndx ci advice, 2026-10-29) and 0dfc6c6ae; reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    appliedAt: "2026-11-07T02:11:11.623Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    needsPlacement: false
-    lastModified: "2026-10-28T21:02:24.707Z"
+    lastModified: "2026-11-07T02:11:11.623Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

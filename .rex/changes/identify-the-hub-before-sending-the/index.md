@@ -10,6 +10,7 @@ acceptanceCriteria:
   - "An integration test runs a 401-answering stub on the hub port and asserts it never receives the token header while ndx start, status and stop are run against it"
 touches:
   - "e96db771-5ed0-4ba8-a70b-74a30f462f65"
+  - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
 priority: "high"
 source: "ndx-capture"
 ---

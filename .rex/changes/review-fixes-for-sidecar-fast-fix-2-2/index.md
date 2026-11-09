@@ -7,7 +7,8 @@ intent: "Review comments on #990 (2026-11-06), both confirmed against the code."
 acceptanceCriteria:
   - "Every review comment it lists is fixed and answered"
 touches:
-  - "89ecd7f3-ca6a-4833-90a4-7bc7b1017e94"
+  - "1710be37-554f-47bf-a9e0-609a6ab90768"
+fix: true
 priority: "high"
 source: "ndx-capture"
 ---

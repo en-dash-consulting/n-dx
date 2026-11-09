@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "a77e4f59-f13b-4575-96da-0ba971eb68f6":
+    status: "completed"
+    startedAt: "2026-11-07T02:10:48.335Z"
+    completedAt: "2026-11-07T02:10:48.335Z"
+    endedAt: "2026-11-07T02:10:48.335Z"
+    activeIntervals: [{"end":"2026-11-07T02:10:48.335Z","start":"2026-11-07T02:10:48.335Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Delivered by #932 (merged 2026-11-03): one-time landing nonces and origin-scoped browser sessions. Reconciled in the 2026-11-06 PRD audit."
+    appliedAt: "2026-11-07T02:10:48.335Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-07T02:10:48.335Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

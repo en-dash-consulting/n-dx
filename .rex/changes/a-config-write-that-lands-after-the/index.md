@@ -11,6 +11,7 @@ acceptanceCriteria:
   - "Test: a detached child that writes .n-dx.local.json after the run ends is caught at the next start; the test fails on the code before the fix"
 touches:
   - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
+fix: true
 priority: "high"
 discoveredFrom: {"item":"bfb205e4-24e7-4d4e-b77a-ed3190d428e9","run":"c351e166-fe00-4977-8fff-ea73ab6978b7"}
 tags:

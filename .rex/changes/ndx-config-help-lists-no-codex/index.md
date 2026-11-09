@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "A test fails when a NDX_*_PREFLIGHT_* code emitted by packages/core/config.js is missing from ndx config --help"
 touches:
   - "8eaa2e3d-abe4-42aa-89c9-226e9877f2b6"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"e97d3394-f0a1-4199-935f-7c7ca4636a87","run":"d9594daf-f4b8-4586-acc0-fb6fc070b8eb"}
 tags:
