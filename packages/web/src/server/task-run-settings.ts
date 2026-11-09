@@ -15,7 +15,9 @@
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { resolveReviewModel } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { readConfigSnapshot, resolveEffectiveAgentConfigFrom } from "./effective-agent-config.js";
 import { resolveActiveVendor, validateCatalogModel } from "./routes-llm.js";
 import { validateProviderForVendor } from "./hench-config-fields.js";
 import { refreshPRDCache } from "./prd-io.js";
@@ -71,10 +73,48 @@ function canonicalJson(value: unknown): string {
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
 }
 
+/** The model each catalog-checked key would run for `vendor` with no task block and no flag. */
+type ProjectDefaultModels = Partial<Record<"models" | "reviewModels", string>>;
+
+/**
+ * The agent and reviewer models `ndx work` runs for `vendor` when the task
+ * carries nothing: the agent model through web's twin of hench's resolution
+ * (`hench.models.<vendor>`, then `llm.*`), the reviewer through llm-client's
+ * `resolveReviewModel`, which is the call hench makes. A config that fails to
+ * resolve yields nothing, so every pin is checked against the catalog as usual.
+ */
+function projectDefaultModels(projectDir: string, vendor: string): ProjectDefaultModels {
+  try {
+    const { effective, llmConfig } = resolveEffectiveAgentConfigFrom(readConfigSnapshot(projectDir));
+    if (effective.vendor !== vendor) return {};
+    return {
+      models: effective.model,
+      reviewModels: resolveReviewModel(effective.vendor, llmConfig, undefined),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** How {@link checkSavedRun} treats the active vendor's model pins. */
+export interface CheckSavedRunOptions {
+  /**
+   * Accept a pin equal to the model `ndx work` would run anyway without
+   * asking the catalog. For an execute's `saveRun`: Start Working records the
+   * project's own resolved model, which `ndx work` runs whether or not the
+   * built-in list or the vendor's live listing (none for Google, none offline)
+   * knows it, so a catalog miss there would block a start the terminal makes.
+   * The modal's Save keeps the full check: it omits a field equal to its
+   * default, so a pin it sends is a choice.
+   */
+  trustProjectDefaults?: boolean;
+}
+
 /** The request's `run` value, checked against both allow-lists, or the 400 to answer with. */
 export async function checkSavedRun(
   projectDir: string,
   input: unknown,
+  { trustProjectDefaults = false }: CheckSavedRunOptions = {},
 ): Promise<{ ok: true; run: RunSettings | undefined } | { ok: false; key?: string; error: string }> {
   if (input === undefined) return { ok: false, error: 'Body must carry "run" (an object, or null to clear)' };
   // `null` and `{}` both mean "no saved settings"; rex writes neither.
@@ -108,12 +148,14 @@ export async function checkSavedRun(
   // today — and `ndx work` already skips a pin its vendor cannot run, with a
   // warning naming the task.
   const vendor = resolveActiveVendor(projectDir);
+  const defaults = trustProjectDefaults && vendor ? projectDefaultModels(projectDir, vendor) : {};
   for (const [key, models] of [
     ["models", value.models],
     ["reviewModels", value.reviewModels],
   ] as const) {
     const model = vendor ? (models as Record<string, string> | undefined)?.[vendor] : undefined;
     if (model === undefined) continue;
+    if (defaults[key] !== undefined && model === defaults[key]) continue;
     const error = await validateCatalogModel(projectDir, vendor, model);
     if (error) return { ok: false, key, error: `Run setting "${key}.${vendor}": ${error}` };
   }
@@ -151,7 +193,7 @@ export async function checkSaveRunRequest(
   if (record["run"] === null || typeof record["run"] !== "object" || Array.isArray(record["run"])) {
     return { ok: false, key: "saveRun.run", error: '"saveRun.run" must be an object' };
   }
-  const checked = await checkSavedRun(projectDir, record["run"]);
+  const checked = await checkSavedRun(projectDir, record["run"], { trustProjectDefaults: true });
   // Keys are named under `saveRun.run` so a caller can tell "the settings to
   // save were refused" from a refusal of the start itself.
   if (!checked.ok) {

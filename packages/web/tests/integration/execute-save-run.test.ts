@@ -251,6 +251,29 @@ describe("POST /api/hench/execute with saveRun", () => {
     expect(treeHash()).toBe(before);
   });
 
+  it("saves a pin of the project's own model even when the catalog does not list it", async () => {
+    // A configured model newer than the built-in list (and with no live
+    // listing to fall back on) is what `ndx work` runs anyway, so recording it
+    // must not block the start the terminal would make.
+    const unlisted = "claude-unlisted-9-9";
+    const reviewer = "claude-unlisted-reviewer-9";
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude", claude: { model: unlisted, reviewModel: reviewer } } }));
+    const run = { ...BLOCK, models: { claude: unlisted }, reviewMode: "self", reviewModels: { claude: reviewer } };
+
+    const res = await execute({ taskId: "task-1", saveRun: { run, version: "none" } });
+
+    expect(res.status, JSON.stringify(await res.clone().json())).toBe(202);
+    expect(await storedRun()).toEqual(run);
+  });
+
+  it("still refuses a pin that is not the project's model and not the vendor's", async () => {
+    const res = await execute({ taskId: "task-1", saveRun: { run: { ...BLOCK, models: { claude: "gpt-5" } }, version: "none" } });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).key).toBe("saveRun.run.models");
+    expect(mocks.spawnManaged).not.toHaveBeenCalled();
+  });
+
   it("starts a task with saved settings as before when no saveRun is sent", async () => {
     await seed({ tier: "heavy" });
 
