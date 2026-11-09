@@ -9,7 +9,8 @@
  *
  * - an open hub, for a command that wants the token, becomes a token hub;
  * - a token hub becomes an open one only for a command that asked for no
- *   token (`--no-auth`), and the notice says that was the operator's choice;
+ *   token (`--no-auth`) and passed `--replace-hub`, and the notice says that
+ *   was the operator's choice; `--no-auth` alone joins it with the token;
  * - with an agent run live on the hub, the replacement is deferred, the
  *   project is not registered on an open hub, and `--replace-hub` forces it.
  *
@@ -140,13 +141,30 @@ describe("ndx start — a hub in the other authentication mode (e2e)", { timeout
     expect(await states()).toMatchObject({ "alpha-app": "healthy", "beta-app": "healthy" });
   });
 
-  it("a token hub is replaced by an open one only because --no-auth asked, and the notice says so", async () => {
+  it("one --no-auth joins the token hub as it is, served with the token, and opens nobody else's project", async () => {
     if (!canBindPorts) return;
     const tokenPid = hubPid();
     const result = await runStart(["--no-auth", beta]);
     expect(result.code, result.stderr + result.stdout).toBe(0);
+    expect(result.stderr).toContain(`The n-dx hub on port ${port} requires the per-user token, so this project is served with it`);
+    expect(result.stderr).toContain("--replace-hub");
+    expect(result.stderr).not.toContain("Replacing the n-dx hub");
+    // Signed in with the token the hub requires.
+    expect(result.stdout).toContain("ndx_nonce=");
+    expectNoManualRestart(result.stdout + result.stderr);
+
+    expect(hubPid()).toBe(tokenPid);
+    expect((await get("/api/hub/health", false)).status).toBe(401);
+    expect(await states()).toMatchObject({ "alpha-app": "healthy", "beta-app": "healthy" });
+  });
+
+  it("a token hub is replaced by an open one only because --no-auth and --replace-hub asked, and the notice says so", async () => {
+    if (!canBindPorts) return;
+    const tokenPid = hubPid();
+    const result = await runStart(["--no-auth", "--replace-hub", beta]);
+    expect(result.code, result.stderr + result.stdout).toBe(0);
     expect(result.stderr).toContain("it requires the per-user token, and this command asked for no authentication");
-    expect(result.stderr).toContain("Because this command asked for no authentication (--no-auth, or web.auth=false), the new hub serves every project on it without the token.");
+    expect(result.stderr).toContain("Because this command asked for no authentication (--no-auth, or web.auth=false) and passed --replace-hub, the new hub serves every project on it without the token.");
     expect(await waitForPidExit(tokenPid, 15_000)).toBe(true);
     expectNoManualRestart(result.stdout + result.stderr);
 

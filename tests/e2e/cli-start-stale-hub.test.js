@@ -68,6 +68,9 @@ const server = createServer((req, res) => {
     if (req.method === "GET" && /^\\/p\\/[^/]+\\/api\\/hench\\/execute\\/status$/.test(url)) return reply(200, { executions: [] });
     const liveWork = /^\\/p\\/([^/]+)\\/api\\/live-work$/.exec(url);
     if (req.method === "GET" && liveWork) {
+      // \`extra.liveWorkStatus[id]\`: that project's server answers with this error status instead.
+      const failed = (JSON.parse(extra || "{}").liveWorkStatus || {})[liveWork[1]];
+      if (failed) return reply(failed, { error: "Internal error" });
       // \`busy\`: one MCP session per project. \`extra.turns[id]\`: Sidecar turns in that project's server.
       const turns = (JSON.parse(extra || "{}").turns || {})[liveWork[1]] || { worktree: 0, hub: 0 };
       if (busy !== "busy" && !JSON.parse(extra || "{}").turns) return reply(404, { error: "Not found" });
@@ -454,6 +457,67 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.code, result.stderr + result.stdout).toBe(0);
       expect(result.stderr).toContain("would interrupt 1 Sidecar turn in progress (beta-app) and a turn in progress in the hub's Sidecar");
       expect(result.stderr).toContain("--replace-hub");
+      expect(alive(older.child.pid)).toBe(true);
+      expectNoManualRestart(result.stdout + result.stderr);
+    });
+  });
+
+  describe("with a project whose live work cannot be read", () => {
+    let fx;
+    let older;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      // beta-app's server answers its live-work probe with a 500: "could not tell", not "idle".
+      older = await startOlderHub(fx.home, false, { liveWorkStatus: { "beta-app": 500 } });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("defers, naming the project it could not check and the one flag", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(result.stderr).toContain("Whether it would interrupt work in project (beta-app) could not be checked, so it keeps running for now.");
+      expect(result.stderr).toContain("--replace-hub");
+      expect(alive(older.child.pid)).toBe(true);
+      expectNoManualRestart(result.stdout + result.stderr);
+    });
+  });
+
+  describe("when the hub on the port is no longer the one that was judged", () => {
+    let fx;
+    let older;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      // Its health answer names another pid than hub.pid records: as if another
+      // ndx start had replaced the judged hub before this one acted.
+      older = await startOlderHub(fx.home, false, { pid: 2 ** 30 });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("stops nothing, judges again, and joins the hub that is there", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(result.stderr).not.toContain("Replacing the n-dx hub");
+      expect(result.stderr).toContain(`The n-dx hub on port ${older.port} was replaced by another ndx start while this one was checking it`);
       expect(alive(older.child.pid)).toBe(true);
       expectNoManualRestart(result.stdout + result.stderr);
     });

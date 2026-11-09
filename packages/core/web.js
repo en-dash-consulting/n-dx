@@ -67,8 +67,12 @@ import {
   formatReplacementResult,
   hubAuthReason,
   hubFaultReason,
+  changedHubNote,
   hubReplacementNotice,
+  keptTokenHubNote,
+  liveWorkAnswer,
   planHubReplacement,
+  spawnReplacementHub,
 } from "./hub-replacement.js";
 
 /**
@@ -1912,13 +1916,28 @@ async function hubIsHealthy(port, home) {
  * "foreign" and gets no credentialed request.
  */
 export async function hubAuthState(port, probe = hubRequest, identify = identifyOwnHub) {
+  return (await hubAuthProbe(port, probe, identify)).state;
+}
+
+/**
+ * {@link hubAuthState}, with the pid of the hub that was judged: the one its
+ * health answer reports, or, when it holds another token, the one identified
+ * as this user's hub. A replacement acts only while that hub is still the one
+ * on the port ({@link replaceOrDeferHub}).
+ *
+ * @returns {Promise<{ state: "absent" | "open" | "token" | "mismatch" | "foreign", pid: number | null }>}
+ */
+export async function hubAuthProbe(port, probe = hubRequest, identify = identifyOwnHub) {
+  const pidOf = (n) => (Number.isInteger(n) ? n : null);
   const anonymous = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: false });
-  if (anonymous.status === 200 && anonymous.body?.ok === true) return "open";
-  if (anonymous.status !== 401) return "absent";
+  if (anonymous.status === 200 && anonymous.body?.ok === true) return { state: "open", pid: pidOf(anonymous.body.pid) };
+  if (anonymous.status !== 401) return { state: "absent", pid: null };
   const own = await identify(port);
-  if (!own.ok) return "foreign";
+  if (!own.ok) return { state: "foreign", pid: null };
   const credentialed = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
-  return credentialed.status === 200 && credentialed.body?.ok === true ? "token" : "mismatch";
+  return credentialed.status === 200 && credentialed.body?.ok === true
+    ? { state: "token", pid: pidOf(credentialed.body.pid) }
+    : { state: "mismatch", pid: pidOf(own.pid) };
 }
 
 /**
@@ -1970,23 +1989,44 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile, deferred 
  * every later project: one `ndx start --no-auth` left the hub open, and the
  * next authenticated project silently joined it, token file and all.
  *
- * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, note?: string, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
+ * A token hub is kept for a command that asked for no token unless it also
+ * passed `--replace-hub`: one project's `--no-auth`, or its local
+ * `web.auth=false`, does not open the hub for every project on it. That
+ * project is served with the token (`servedWithToken`), and `authNote` says so.
+ *
+ * Each replacement acts only while the hub judged is still the one on the
+ * port; when another `ndx start` replaced it meanwhile, the hub now there is
+ * judged again, once ({@link replaceOrDeferHub}).
+ *
+ * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, note?: string, authNote?: string, servedWithToken?: boolean, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
  */
-async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, force = false, rebuildFailed = false }) {
+async function ensureHub(port, options, attempt = 0) {
+  const { tools, __dir, home, web, force = false, rebuildFailed = false } = options;
+  let tokenFile = options.tokenFile ?? null;
   const wanted = tokenFile ? "token" : "open";
-  const state = await hubAuthState(port, hubRequest, (p) => identifyOwnHub(p, home));
+  const { state, pid: authPid } = await hubAuthProbe(port, hubRequest, (p) => identifyOwnHub(p, home));
   if (state === "absent") return spawnHub(port, { tools, __dir, home, tokenFile });
   if (state === "foreign") throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
-  if (state !== wanted) {
+  // The hub judged was replaced by another ndx start before this one acted: judge the one there now.
+  const rejudge = () => (attempt < 1 ? ensureHub(port, options, attempt + 1) : { spawned: false, pid: null, note: changedHubNote(port) });
+
+  // A token hub, and this command asked for none, without --replace-hub: it
+  // stays a token hub, and any replacement for another reason keeps the token.
+  const keepToken = state === "token" && wanted === "open" && !force;
+  if (keepToken) tokenFile = authTokenPath(home);
+  const kept = keepToken ? { servedWithToken: true, authNote: keptTokenHubNote(port) } : {};
+  if (state !== wanted && !keepToken) {
     // This user's hub, in the other mode: replace it in the one this command
     // asked for. A token hub becomes an open one only because this command
-    // asked for no token (--no-auth, web.auth=false), and the notice says so.
-    const result = await replaceOrDeferHub(port, hubAuthReason(state, wanted, tokenFile), { tools, __dir, home, tokenFile, force });
+    // asked for no token (--no-auth, web.auth=false) and passed --replace-hub,
+    // and the notice says so.
+    const result = await replaceOrDeferHub(port, hubAuthReason(state, wanted, tokenFile), { tools, __dir, home, tokenFile, force, judgedPid: authPid });
+    if (result.changed) return rejudge();
     if (!result.deferred) return result;
     // Deferred. A token hub can still serve this project, with the token; an
     // open hub, or one holding another token, cannot.
     if (state === "token" && wanted === "open") {
-      return { ...result, deferred: hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred) };
+      return { ...result, servedWithToken: true, deferred: hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred) };
     }
     throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred));
   }
@@ -1994,15 +2034,20 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, forc
   // A hub that kept running across an upgrade or rebuild serves older code
   // than this CLI expects — first among it, no landing-nonce route.
   const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
+  const judgedPid = health.status === 200 && Number.isInteger(health.body?.pid) ? health.body.pid : null;
+  const replace = async (reason) => {
+    const result = await replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force, judgedPid });
+    return result.changed ? rejudge() : { ...result, ...kept };
+  };
   const judged = afterRebuild(health.status === 200 ? judgeHubBuild(health.body?.build, web) : { action: "keep" }, rebuildFailed);
-  if (judged.action === "replace") return replaceOrDeferHub(port, { kind: "build", text: judged.text }, { tools, __dir, home, tokenFile, force });
+  if (judged.action === "replace") return replace({ kind: "build", text: judged.text });
   // Newer, or another checkout's: it keeps serving, and the note says why.
-  const kept = judged.action === "leave" ? { note: judged.note } : {};
+  const left = judged.action === "leave" ? { note: judged.note } : {};
   // A current hub that cannot do part of its job — no n-dx binary for project
   // servers, no CLI for extensions — is replaced by one given both.
   const fault = health.status === 200 ? hubFaultReason(health.body?.faults) : null;
-  if (fault) return replaceOrDeferHub(port, fault, { tools, __dir, home, tokenFile, force });
-  return { spawned: false, pid: null, ...kept };
+  if (fault) return replace(fault);
+  return { spawned: false, pid: null, ...left, ...kept };
 }
 
 /**
@@ -2058,11 +2103,18 @@ async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
  * stopped: its pid comes from this user's ndx home and is the one listener on
  * the port. Anything else is left running and reported.
  *
+ * `judgedPid` is the pid of the hub the decision was made about. When the hub
+ * on the port is now another one — a concurrent `ndx start` replaced it
+ * first — nothing is stopped, and `{ changed: true }` asks the caller to
+ * judge the hub that is there now. Without this the second command would stop
+ * the hub the first had just started, and every project would go down twice.
+ *
  * @param {number} port
  * @param {import("./hub-replacement.js").HubReplacementReason} reason
  */
-async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force }) {
+async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force, judgedPid = null }) {
   const identified = await identifyOwnHub(port, home);
+  if (identified.ok && judgedPid !== null && identified.pid !== judgedPid) return { spawned: false, pid: null, changed: true };
   // Never this process or the one that started it, whatever the pid file
   // says: stopping either would end this command with the hub half-replaced.
   const own = identified.ok && (identified.pid === process.pid || identified.pid === process.ppid)
@@ -2095,7 +2147,11 @@ async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, 
     throw new Error(`The old n-dx hub (PID ${own.pid}) did not release port ${port}; nothing was started in its place.`);
   }
   // Another ndx start replaced the same old hub first: its hub is this one's too.
-  const spawned = freed === "replaced" ? joinedHub(port) : await spawnHub(port, { tools, __dir, home, tokenFile });
+  // Every project is down until the new hub answers: a failed start is tried
+  // once more, and a second failure says the next ndx start brings them back.
+  const spawned = freed === "replaced"
+    ? joinedHub(port)
+    : await spawnReplacementHub(() => spawnHub(port, { tools, __dir, home, tokenFile }), { port, projects: Object.keys(projects).length });
   const restored = await restoreHubProjects(port, projects, home);
   return { ...spawned, restored };
 }
@@ -2141,9 +2197,11 @@ async function waitForPortFreeOrNewHub(port, oldPid, home, timeoutMs) {
  * and Sidecar turns in progress, the hub-scope session's included.
  *
  * Only called once the hub has been identified as this user's own, so the
- * token may go to it. A server that cannot answer — too old to report MCP
- * sessions, or behind a hub that holds another token — counts as having
- * none; hench's locks on disk still count.
+ * token may go to it. A server too old to have the route (404), or a project
+ * with no running server, has none; any other failed answer — a timeout, a
+ * 5xx, a 401 from a hub holding another token — means it could not be told,
+ * and the project is listed in `unchecked`, which defers the replacement
+ * ({@link liveWorkAnswer}). hench's locks on disk count either way.
  *
  * @param {number} port
  * @param {Record<string, { id: string, repoRoot: string, worktrees?: string[] }>} projects
@@ -2166,19 +2224,22 @@ async function gatherHubLiveWork(port, projects) {
     let hubTurns = 0;
     const base = `/p/${encodeURIComponent(record.id)}`;
     const [ex, live] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/live-work`)]);
-    if (ex.status === 200 && Array.isArray(ex.body?.executions)) {
+    const exAnswer = liveWorkAnswer(ex);
+    const liveAnswer = liveWorkAnswer(live);
+    if (exAnswer === "known" && Array.isArray(ex.body?.executions)) {
       executions = ex.body.executions.filter((e) => e?.status === "starting" || e?.status === "running").length;
     }
     // `/api/live-work`: MCP sessions, and Sidecar turns — the project's own,
     // and the hub-scope session's when this server hosts it.
-    if (live.status === 200 && live.body && typeof live.body === "object") {
+    if (liveAnswer === "known") {
       const count = (n) => (Number.isFinite(Number(n)) ? Math.max(0, Number(n)) : 0);
       sessions = count(live.body.mcpSessions?.rex) + count(live.body.mcpSessions?.sourcevision);
       turns = count(live.body.sidecarTurns?.worktree);
       hubTurns = count(live.body.sidecarTurns?.hub);
     }
     // A dashboard run holds a hench lock too: the larger count, not the sum.
-    return { project: record.id, runs: Math.max(locks, executions), sessions, turns, hubTurns };
+    const unchecked = exAnswer === "unknown" || liveAnswer === "unknown";
+    return { project: record.id, runs: Math.max(locks, executions), sessions, turns, hubTurns, unchecked };
   }));
   entries.sort((x, y) => x.project.localeCompare(y.project));
   return {
@@ -2186,6 +2247,7 @@ async function gatherHubLiveWork(port, projects) {
     mcpSessions: entries.map((e) => ({ project: e.project, count: e.sessions })),
     sidecarTurns: entries.map((e) => ({ project: e.project, count: e.turns })),
     hubSidecarTurns: entries.reduce((n, e) => n + e.hubTurns, 0),
+    unchecked: entries.filter((e) => e.unchecked).map((e) => e.project),
   };
 }
 
@@ -2665,7 +2727,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // The token is created before the hub so this process and the hub agree on
   // it from the first probe; an existing file is reused, never rotated.
   const authEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"], home);
-  const { tokenFile, token } = resolveStartToken(authEnabled, home);
+  let { tokenFile, token } = resolveStartToken(authEnabled, home);
   // The web build this ndx would spawn. A source-linked install whose dist/
   // lags its source would start a hub older than this CLI, so it is rebuilt
   // first.
@@ -2688,6 +2750,10 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   }
   if (hub.deferred) console.error(`Note: ${hub.deferred}`);
   if (hub.note) console.error(`Note: ${hub.note}`);
+  if (hub.authNote) console.error(`Note: ${hub.authNote}`);
+  // Served by a token hub although this command asked for none: sign in, and
+  // name MCP's header, with the token that hub requires.
+  if (hub.servedWithToken && !token) ({ tokenFile, token } = resolveStartToken(true, home));
   if (hub.spawned) log(`n-dx hub started on http://127.0.0.1:${hubPort} (PID ${hub.pid}).`);
   if (hub.restored) for (const line of formatReplacementResult(hub.restored, hubPort)) log(line);
 

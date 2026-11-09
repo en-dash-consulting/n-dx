@@ -14,6 +14,7 @@ import {
   deriveProjectId,
   ensureAuthTokenFile,
   hubAuthMismatchMessage,
+  hubAuthProbe,
   hubAuthState,
   hubDashboardUrl,
   judgeHubIdentity,
@@ -206,6 +207,15 @@ describe("hubAuthState", () => {
     expect(await hubAuthState(3117, probe(unreachable, unreachable), own)).toBe("absent");
     // A 200 that is not the health payload is not a hub either.
     expect(await hubAuthState(3117, probe({ status: 200, body: null }, ok), own)).toBe("absent");
+  });
+
+  it("reports the pid of the hub it judged, so a replacement stops only that hub", async () => {
+    const health = (pid) => ({ status: 200, body: { ok: true, pid } });
+    expect(await hubAuthProbe(3117, probe(health(11), ok), own)).toEqual({ state: "open", pid: 11 });
+    expect(await hubAuthProbe(3117, probe(unauthorized, health(12)), own)).toEqual({ state: "token", pid: 12 });
+    // Holding another token, its health cannot be read: the pid identified as this user's hub.
+    expect(await hubAuthProbe(3117, probe(unauthorized, unauthorized), own)).toEqual({ state: "mismatch", pid: 4242 });
+    expect(await hubAuthProbe(3117, probe(ok, ok), own)).toEqual({ state: "open", pid: null });
   });
 });
 

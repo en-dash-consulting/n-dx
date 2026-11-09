@@ -17,13 +17,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   REPLACE_HUB_FLAG,
+  changedHubNote,
   countLiveHenchLocks,
   deferredHubSignInFix,
   describeLiveWork,
   formatReplacementResult,
   hubAuthReason,
   hubReplacementNotice,
+  keptTokenHubNote,
+  liveWorkAnswer,
   planHubReplacement,
+  spawnReplacementHub,
 } from "../../packages/core/hub-replacement.js";
 
 const reason = { kind: "build", text: "the running n-dx hub predates this ndx (it reports no build identity)" };
@@ -86,6 +90,39 @@ describe("planHubReplacement", () => {
   });
 });
 
+describe("liveWorkAnswer", () => {
+  it("reads a 200, counts a pre-route 404 or a project with no server as none, and anything else as unknown", () => {
+    expect(liveWorkAnswer({ status: 200, body: { mcpSessions: {} } })).toBe("known");
+    expect(liveWorkAnswer({ status: 404, body: { error: "Not found" } })).toBe("none");
+    expect(liveWorkAnswer({ status: 503, body: { error: 'Project "alpha" has no running server', status: { state: "stopped" } } })).toBe("none");
+    // Could not tell: a timeout or unreachable server, a 5xx, a 401, a 200 with no body.
+    for (const res of [{ status: 0, body: null }, { status: 500, body: {} }, { status: 502, body: null }, { status: 503, body: { error: "busy" } }, { status: 401, body: { error: "Unauthorized" } }, { status: 200, body: null }]) {
+      expect(liveWorkAnswer(res), JSON.stringify(res)).toBe("unknown");
+    }
+  });
+});
+
+describe("planHubReplacement with projects it could not check", () => {
+  it("defers when a project's live work could not be read, and names it", () => {
+    const plan = planHubReplacement({ reason, liveWork: { ...idle, unchecked: ["beta"] }, force: false, port: 4100 });
+    expect(plan.action).toBe("defer");
+    expect(plan.note).toContain("Whether it would interrupt work in project (beta) could not be checked, so it keeps running for now.");
+    expect(plan.note).toContain("The next 'ndx start' checks again");
+    expect(plan.note).toContain(REPLACE_HUB_FLAG);
+    expectNoManualRestart(plan.note);
+  });
+
+  it("names both the live work and the projects it could not check", () => {
+    const plan = planHubReplacement({ reason, liveWork: { ...busy, unchecked: ["delta", "eps"] }, force: false, port: 4100 });
+    expect(plan.note).toContain("Replacing it now would interrupt 1 agent run (alpha) and 3 open MCP sessions (beta, gamma), and whether it would interrupt work in 2 projects (delta, eps) could not be checked");
+    expect(plan.note).toContain("after that work ends");
+  });
+
+  it("replaces anyway when forced", () => {
+    expect(planHubReplacement({ reason, liveWork: { ...idle, unchecked: ["beta"] }, force: true, port: 4100 })).toEqual({ action: "replace", interrupts: null });
+  });
+});
+
 describe("hubReplacementNotice", () => {
   it("says the projects come back on the same URLs", () => {
     const text = hubReplacementNotice(reason, 4100, 25, null);
@@ -109,7 +146,7 @@ describe("hubAuthReason", () => {
     expect(reason).toMatchObject({ kind: "auth", wanted: "open" });
     expect(reason.text).toContain("asked for no authentication");
     const notice = hubReplacementNotice(reason, 4100, 2, null);
-    expect(notice).toContain("Because this command asked for no authentication (--no-auth, or web.auth=false)");
+    expect(notice).toContain(`Because this command asked for no authentication (--no-auth, or web.auth=false) and passed ${REPLACE_HUB_FLAG}`);
     expect(notice).toContain("serves every project on it without the token");
     expectNoManualRestart(notice);
   });
@@ -167,5 +204,51 @@ describe("countLiveHenchLocks", () => {
 
   it("is zero with no locks directory", () => {
     expect(countLiveHenchLocks(join(dir, "nowhere"))).toBe(0);
+  });
+});
+
+describe("keptTokenHubNote", () => {
+  it("says the project is served with the token, and that opening the hub for everyone takes --replace-hub", () => {
+    const note = keptTokenHubNote(4100);
+    expect(note).toContain("port 4100");
+    expect(note).toContain("served with it like every other project on that hub");
+    expect(note).toContain(REPLACE_HUB_FLAG);
+    expectNoManualRestart(note);
+  });
+});
+
+describe("changedHubNote", () => {
+  it("joins the hub another ndx start put there, without advice to stop anything", () => {
+    const note = changedHubNote(4100);
+    expect(note).toContain("port 4100");
+    expect(note).toContain("joins that hub");
+    expectNoManualRestart(note);
+  });
+});
+
+describe("spawnReplacementHub", () => {
+  it("tries a failed start once more", async () => {
+    let calls = 0;
+    const spawned = await spawnReplacementHub(async () => {
+      calls++;
+      if (calls === 1) throw new Error("n-dx hub did not start on port 4100 within 15000ms");
+      return { spawned: true, pid: 7 };
+    }, { port: 4100, projects: 2 });
+    expect(spawned).toEqual({ spawned: true, pid: 7 });
+    expect(calls).toBe(2);
+  });
+
+  it("after a second failure, says nothing serves the port and the next ndx start brings every project back", async () => {
+    let calls = 0;
+    const failing = async () => {
+      calls++;
+      throw new Error("n-dx hub did not start on port 4100 within 15000ms");
+    };
+    const error = await spawnReplacementHub(failing, { port: 4100, projects: 3 }).catch((e) => e);
+    expect(calls).toBe(2);
+    expect(error.message).toContain("n-dx hub did not start on port 4100");
+    expect(error.message).toContain("nothing serves that port now");
+    expect(error.message).toContain("hub.json still lists all 3 of its projects, and the next 'ndx start' brings every one back on its own /p/<id>/ URL.");
+    expectNoManualRestart(error.message);
   });
 });
