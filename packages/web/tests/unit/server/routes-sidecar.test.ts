@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -19,7 +19,6 @@ import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
-  CODEX_SIDECAR_UNAVAILABLE,
   createAnnouncingBroker,
   handleSidecarRoute,
   readWorktreeBranchHealth,
@@ -151,6 +150,9 @@ function newRegistry(): SidecarSessionRegistry {
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "routes-sidecar-"));
+  // Never the developer's own ~/.codex: its model_provider would refuse every Codex session.
+  savedCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = join(root, "codex-home");
   ctx = { projectDir: root, svDir: join(root, ".sourcevision"), rexDir: join(root, ".rex"), dev: false };
   messages = [];
   waiters = [];
@@ -164,7 +166,19 @@ beforeEach(async () => {
 afterEach(async () => {
   await server.close();
   await removeTestDir(root);
+  if (savedCodexHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = savedCodexHome;
 });
+
+let savedCodexHome: string | undefined;
+
+/** Write the user Codex config the routes read through `CODEX_HOME`. */
+function writeUserCodexConfig(text: string): string {
+  const dir = process.env.CODEX_HOME as string;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.toml"), text);
+  return join(dir, "config.toml");
+}
 
 function api(path: string, init?: { method?: string; body?: unknown }): Promise<Response> {
   return fetch(`${server.baseUrl}/api/sidecar/sessions${path}`, {
@@ -280,13 +294,40 @@ describe("sessions", () => {
     expect((await api(`/${id}`, { method: "PATCH", body: { name: "Done" } })).status).toBe(200);
     });
 
-  // #901 F1: `codex exec resume` drops the read-only sandbox, so Codex is refused until 31307b89.
-  it("refuses a Codex session without writing a record", async () => {
+  it("creates a Codex session", async () => {
     const res = await api("", { method: "POST", body: { vendor: "codex", name: "Plan" } });
+    expect(res.status).toBe(201);
+    expect((await res.json()).session).toMatchObject({ vendor: "codex", worktree: root });
+    expect(registry.list({ worktree: root })).toHaveLength(1);
+  });
+
+  it("creates a Codex session when the user Codex config selects openai", async () => {
+    writeUserCodexConfig(`model_provider = "openai"\n`);
+    expect((await api("", { method: "POST", body: { vendor: "codex" } })).status).toBe(201);
+  });
+
+  it.each([
+    ["top level", `model_provider = "azure"\n`],
+    ["selected profile", `model_provider = "openai"\nprofile = "az"\n\n[profiles.az]\nmodel_provider = "azure"\n`],
+  ])("refuses a Codex session, recording none, when the user Codex config selects another provider (%s)", async (_where, text) => {
+    const file = writeUserCodexConfig(text);
+    const res = await api("", { method: "POST", body: { vendor: "codex" } });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
-    expect(registry.list({ worktree: root })).toEqual([]);
-    expect((await (await api("")).json()).sessions).toEqual([]);
+    const { error } = await res.json();
+    expect(error).toContain(`"azure"`);
+    expect(error).toContain(file);
+    expect(error).toContain("Use Claude for the Sidecar");
+    expect(registry.list()).toHaveLength(0);
+    expect((await api("", { method: "POST", body: { vendor: "claude" } })).status).toBe(201);
+  });
+
+  it("refuses a Codex session, naming the file, when the user Codex config cannot be read", async () => {
+    const file = join(process.env.CODEX_HOME as string, "config.toml");
+    mkdirSync(file, { recursive: true });
+    const res = await api("", { method: "POST", body: { vendor: "codex" } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(file);
+    expect(registry.list()).toHaveLength(0);
   });
 
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
@@ -472,13 +513,46 @@ describe("turns", () => {
     await turnClosed(id);
   });
 
-  it("refuses a turn on a Codex session already in the index rather than resuming it", async () => {
+  it("runs a turn on a Codex session", async () => {
+    mkdirSync(join(root, ".git"));
+    const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
+    const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
+    expect(res.status).toBe(202);
+    await turnClosed(id);
+    expect(spawns).toBe(1);
+  });
+
+  it("refuses a Codex turn, naming the file, when the project Codex config cannot be read with confidence", async () => {
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".codex"));
+    writeFileSync(join(root, ".codex", "config.toml"), "[mcp_servers.rex\ncommand = \"ndx\"\n");
     const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
     const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe(CODEX_SIDECAR_UNAVAILABLE);
+    expect((await res.json()).error).toContain(join(root, ".codex", "config.toml"));
     expect(spawns).toBe(0);
     expect(registry.get(id)?.cursor).toBe(0);
+  });
+
+  it("refuses a Codex turn without spawning when the user Codex config selects another provider", async () => {
+    mkdirSync(join(root, ".git"));
+    const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
+    const file = writeUserCodexConfig(`model_provider = "azure"\n`);
+    const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
+    expect(res.status).toBe(409);
+    const { error } = await res.json();
+    expect(error).toContain(`"azure"`);
+    expect(error).toContain(file);
+    expect(spawns).toBe(0);
+    expect(registry.get(id)?.cursor).toBe(0);
+  });
+
+  it("runs a Claude turn whatever provider the user Codex config selects", async () => {
+    writeUserCodexConfig(`model_provider = "azure"\n`);
+    const id = await createSession();
+    expect((await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } })).status).toBe(202);
+    await turnClosed(id);
+    expect(spawns).toBe(1);
   });
 
   it("refuses a turn on an ended session", async () => {

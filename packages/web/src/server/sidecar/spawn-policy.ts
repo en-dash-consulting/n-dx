@@ -19,12 +19,47 @@
  * call held 65 s returns normally. Not yet verified: a card held for many
  * minutes on the Streamable HTTP transport.
  *
- * **Codex.** A read-only sandbox that never asks for approval — on the first
- * turn only. `codex exec resume` takes sandbox and approval policy from the
- * invocation's config, not the thread, and the resume argv carries no policy
- * flags, so a resumed turn runs under the user's `~/.codex/config.toml`. The
- * routes refuse Codex sessions until resume re-applies this policy (PRD item
- * 31307b89).
+ * **Codex.** A read-only sandbox that never asks for approval, on every
+ * turn: a fresh `codex exec` takes `--sandbox read-only`, and a resumed one
+ * re-applies the same policy as `-c sandbox_mode=` / `-c approval_policy=`
+ * overrides, because the thread does not keep its starting policy and
+ * `exec resume` rejects `--sandbox`. Every turn, fresh and resumed, also
+ * carries ({@link sidecarCodexSpawn}):
+ * - `--ignore-user-config`: `$CODEX_HOME/config.toml` is skipped, so none of
+ *   the user's MCP servers loads (a `-c mcp_servers…` override merges with
+ *   them and never replaces them). Auth still comes from `CODEX_HOME`. On
+ *   codex-cli 0.166.0 it skips the project `.codex/config.toml` too: project
+ *   config loads only for a project the user config trusts.
+ * - `features.apps=false` (the Apps MCP integration loads even without the
+ *   user config) and `features.shell_snapshot=false` (a snapshot would write
+ *   the env-backed header values under `CODEX_HOME/shell_snapshots/`).
+ * - the broker as `mcp_servers.ndx-sidecar`: its url, `required`, a 30 s
+ *   startup timeout, and a tool timeout of the session's idle window, since a
+ *   card waits on the operator for as long as the session can be resumed.
+ *   Its headers travel as `env_http_headers`, each mapped to a variable set
+ *   only in the Codex child's environment and blanked in every command the
+ *   agent runs, so the broker credential is in neither argv (which is
+ *   logged) nor an MCP config file. With no endpoint, no broker flag.
+ * - for every server a repository's own `.codex/config.toml` declares, from
+ *   the session's checkout up to the repository root, re-read for each turn
+ *   ({@link sidecarCodexProjectFlags}): `-c mcp_servers.<name>.enabled=false`
+ *   plus a placeholder for the transport the file gives it
+ *   (`command="ndx-sidecar-disabled"` or
+ *   `url="http://127.0.0.1:9/ndx-sidecar-disabled"`). 0.166.0 does not load
+ *   that file under `--ignore-user-config`, and `enabled=false` alone then
+ *   builds an entry with no transport, which fails config loading;
+ *   0.164.0-alpha.11.1 is unverified. The placeholder entries hold either
+ *   way: over a loaded file they replace one key and `enabled=false` keeps the
+ *   server off; alone they are complete, disabled entries. A file that exists
+ *   but cannot be read with confidence, a server name that is not a bare key,
+ *   or a server with neither or both transports refuses the turn before
+ *   anything is spawned.
+ * - a backstop in the session registry: a turn whose events show a tool use
+ *   on any MCP server but the broker is stopped
+ *   ({@link strayMcpServer}).
+ * - `--ignore-user-config` drops the user's `model_provider` too, so a user
+ *   config selecting any provider but `openai` refuses the session at create
+ *   and before every turn ({@link codexUserProviderRefusal}).
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
@@ -35,8 +70,8 @@
 
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { compileCodexPolicyFlags } from "@n-dx/llm-client";
-import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy } from "@n-dx/llm-client";
+import { CodexProjectConfigError, codexProjectMcpDisableFlags, codexUserConfigPath, codexUserModelProvider, compileCodexPolicyFlags } from "@n-dx/llm-client";
+import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy, RuntimeEvent } from "@n-dx/llm-client";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -54,6 +89,26 @@ export function hubVendorRefusal(vendor: string): string | null {
     return "A hub session cannot run on Codex: its read-only sandbox can still read repositories, and the hub session works from the hub snapshot alone";
   }
   return `A hub session runs on Claude only, not "${vendor}"`;
+}
+
+/**
+ * Why a Codex Sidecar session cannot run under the user's Codex config, or
+ * null when it can. A turn runs with `--ignore-user-config`, so a
+ * `model_provider` the config selects (top level or through the selected
+ * profile) would not apply: Codex would fall back to `openai` and never read
+ * that provider's key. Checked at create and before every turn; the config
+ * may change between them.
+ */
+export function codexUserProviderRefusal(env: NodeJS.ProcessEnv = process.env): string | null {
+  const file = codexUserConfigPath(env);
+  let provider: string | undefined;
+  try {
+    provider = codexUserModelProvider(env);
+  } catch (error) {
+    return `A Codex Sidecar session cannot start: ${file} could not be read (${error instanceof Error ? error.message : String(error)}), so its model provider is unknown. Fix the file, or use Claude for the Sidecar.`;
+  }
+  if (provider === undefined || provider === "openai") return null;
+  return `A Codex Sidecar session cannot start: ${file} selects model provider ${JSON.stringify(provider)}, but Codex Sidecar sessions skip the user's Codex config, so that provider would not apply. Use Claude for the Sidecar, or the default OpenAI provider.`;
 }
 
 /** Codex: read-only, never asks, no network, no writable root, no command or file tool beyond reads. */
@@ -96,10 +151,122 @@ export function writeBrokerMcpConfig(dir: string, sessionId: string, endpoint?: 
   return path;
 }
 
-/** The vendor flags every Sidecar turn runs with; a hub-scope session gets no built-in tool. */
+/** How long the broker may take to start answering a Codex session, in seconds. */
+export const SIDECAR_CODEX_STARTUP_TIMEOUT_SEC = 30;
+
+/**
+ * The environment variable that carries broker header `header` to a Codex
+ * session: `x-ndx-sidecar-key` → `NDX_SIDECAR_HEADER_X_NDX_SIDECAR_KEY`.
+ */
+export function brokerHeaderEnvName(header: string): string {
+  return `NDX_SIDECAR_HEADER_${header.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+}
+
+/** What a Codex Sidecar turn adds to its spawn: flags, and the variables only its child environment carries. */
+export interface SidecarCodexSpawn {
+  codex: CodexTurnFlags;
+  /** The broker header values, by {@link brokerHeaderEnvName}; empty without an endpoint. */
+  env: Record<string, string>;
+}
+
+/**
+ * The flags that turn off every MCP server the project Codex config for `cwd`
+ * declares, except the broker.
+ *
+ * @throws Error naming the file when a project config exists but cannot be
+ *   read with confidence: the turn must not start.
+ */
+export function sidecarCodexProjectFlags(cwd: string): string[] {
+  try {
+    return codexProjectMcpDisableFlags(cwd, [SIDECAR_BROKER_NAME]);
+  } catch (error) {
+    if (!(error instanceof CodexProjectConfigError)) throw error;
+    throw new Error(`A Codex Sidecar turn cannot start: it could not keep this repository's MCP servers out. ${error.message}`);
+  }
+}
+
+/**
+ * A Codex Sidecar turn's flags, fresh and resumed, and the broker header
+ * variables its child environment carries.
+ *
+ * @param idleMs The session's idle window. Codex fails a tool call that
+ *   outlasts `tool_timeout_sec` (60 s by default), and a broker call waits on
+ *   its card until the operator decides or the turn stops, so a call may wait
+ *   as long as the session can be resumed.
+ * @param cwd The session's checkout, where each turn reads the project Codex
+ *   config ({@link sidecarCodexProjectFlags}).
+ */
+export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, idleMs: number, cwd: string): SidecarCodexSpawn {
+  const configFlags = [
+    "--ignore-user-config",
+    "-c", "features.apps=false",
+    "-c", "features.shell_snapshot=false",
+  ];
+  const env: Record<string, string> = {};
+  if (endpoint) {
+    const headerVars: string[] = [];
+    for (const [header, value] of Object.entries(endpoint.headers)) {
+      const name = brokerHeaderEnvName(header);
+      if (name in env) throw new Error(`Broker headers ${JSON.stringify(header)} and another map to one variable, ${name}`);
+      env[name] = value;
+      headerVars.push(`${tomlString(header)}=${tomlString(name)}`);
+    }
+    const server = `mcp_servers.${SIDECAR_BROKER_NAME}`;
+    configFlags.push(
+      "-c", `${server}.url=${tomlString(endpoint.url)}`,
+      "-c", `${server}.required=true`,
+      "-c", `${server}.startup_timeout_sec=${SIDECAR_CODEX_STARTUP_TIMEOUT_SEC}`,
+      "-c", `${server}.tool_timeout_sec=${Math.max(1, Math.ceil(idleMs / 1000))}`,
+      "-c", `${server}.env_http_headers={${headerVars.join(", ")}}`,
+    );
+  }
+  return {
+    codex: {
+      policyFlags: compileCodexPolicyFlags(SIDECAR_CODEX_POLICY),
+      resumePolicyFlags: compileCodexPolicyFlags(SIDECAR_CODEX_POLICY, { resume: true }),
+      configFlags,
+      turnConfigFlags: () => sidecarCodexProjectFlags(cwd),
+      hiddenEnv: Object.keys(env),
+    },
+    env,
+  };
+}
+
+/**
+ * The MCP server a tool use or result names, when it is not the broker:
+ * `mcp__<server>__<tool>`, as both vendors' parsers name an MCP call (a Codex
+ * `mcp_tool_call` item from its own `server` field). Undefined for the
+ * broker, a built-in tool and any other event.
+ *
+ * The spawn flags keep every other server off; this is the backstop for a
+ * server they missed, so a turn that reaches one is stopped.
+ */
+export function strayMcpServer(event: RuntimeEvent): string | undefined {
+  const tool = event.type === "tool_use" ? event.toolCall?.tool : event.type === "tool_result" ? event.toolResult?.tool : undefined;
+  if (!tool?.startsWith("mcp__") || tool.startsWith(`mcp__${SIDECAR_BROKER_NAME}__`)) return undefined;
+  const rest = tool.slice("mcp__".length);
+  const end = rest.indexOf("__");
+  return end > 0 ? rest.slice(0, end) : rest;
+}
+
+/** Why a turn that reached MCP server `server` was stopped, as the operator reads it. */
+export function strayMcpStopReason(server: string): string {
+  return `Stopped this turn: the agent used MCP server ${JSON.stringify(server)}, but a Sidecar session may reach only ${SIDECAR_BROKER_NAME}. Check the repository's .codex/config.toml for a server n-dx did not turn off.`;
+}
+
+/** A TOML basic string. JSON's escapes are a subset of TOML's for a basic string. */
+function tomlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+/**
+ * The vendor flags every Sidecar turn runs with; a hub-scope session gets no
+ * built-in tool. `codex` is {@link sidecarCodexSpawn}'s flags.
+ */
 export function sidecarSpawnFlags(
   mcpConfigPath: string,
-  scope: SidecarScope = "worktree",
+  scope: SidecarScope,
+  codex: CodexTurnFlags,
 ): { claude: ClaudeTurnFlags; codex: CodexTurnFlags } {
   return {
     claude: {
@@ -108,8 +275,6 @@ export function sidecarSpawnFlags(
       mcpConfigPath,
       allowedTools: [`mcp__${SIDECAR_BROKER_NAME}`],
     },
-    codex: {
-      policyFlags: compileCodexPolicyFlags(SIDECAR_CODEX_POLICY),
-    },
+    codex,
   };
 }

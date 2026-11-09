@@ -175,15 +175,24 @@ export function mapApprovalToCodexFlag(policy: ApprovalPolicy): CodexApprovalPol
  * Every result ends with {@link codexShellEnvFlags}, which keeps the Codex
  * credentials out of the commands the agent runs.
  *
- * `codex exec resume` accepts neither `--sandbox` nor an approval flag —
- * policy belongs to the thread being resumed — so `{ resume: true }` returns
- * only the shell-environment overrides. Config is loaded per process, so a
- * resumed run needs them as much as a fresh one.
+ * `codex exec resume` rejects `--sandbox` and the bypass flag, yet a resumed
+ * thread does not keep its starting policy: resume reads sandbox and approval
+ * from the invocation's config, so without overrides the user's
+ * `~/.codex/config.toml` decides. `{ resume: true }` therefore states both
+ * halves as `-c` overrides, `sandbox_mode="<mode>"` and
+ * `approval_policy="<value>"`, for every policy (`danger-full-access + never`
+ * included: no bypass flag on resume), then the shell-environment overrides.
+ * Verified on codex-cli 0.164.0-alpha.11.1: a thread started workspace-write
+ * and resumed with `sandbox_mode="read-only"` recorded read-only, and a write
+ * on the resumed turn was denied.
  *
  * @example
  * ```ts
  * compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)
  * // → ["--sandbox", "workspace-write", "-c", "approval_policy=never",
+ * //    "-c", "shell_environment_policy.set.OPENAI_API_KEY=''", …]
+ * compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true })
+ * // → ["-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"',
  * //    "-c", "shell_environment_policy.set.OPENAI_API_KEY=''", …]
  * ```
  */
@@ -191,7 +200,15 @@ export function compileCodexPolicyFlags(
   policy: ExecutionPolicy,
   options: { resume?: boolean } = {},
 ): string[] {
-  if (options.resume) return codexShellEnvFlags();
+  if (options.resume) {
+    return [
+      "-c",
+      `sandbox_mode="${mapSandboxToCodexFlag(policy.sandbox)}"`,
+      "-c",
+      `approval_policy="${mapApprovalToCodexFlag(policy.approvals)}"`,
+      ...codexShellEnvFlags(),
+    ];
+  }
   if (policy.approvals === "never" && policy.sandbox === "danger-full-access") {
     return ["--dangerously-bypass-approvals-and-sandbox", ...codexShellEnvFlags()];
   }
@@ -228,13 +245,28 @@ export const CODEX_AGENT_HIDDEN_ENV = ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX
  * that one entry and leaves the user's other `set` entries alone. `''` is a
  * TOML literal string, which needs no quoting on any platform.
  *
+ * `extraHidden` blanks more names the same way: variables a caller sets in
+ * the Codex child's own environment for Codex itself to read (the Sidecar's
+ * broker header variables). Each must be a bare TOML key; any other name
+ * throws rather than reach argv as a malformed path.
+ *
  * Every `codex exec` n-dx spawns carries these: the provider and hench's
  * adapter through {@link compileCodexPolicyFlags}, core's reviewer and auth
  * check through `loadCodexShellEnvFlags` in its config module.
  */
-export function codexShellEnvFlags(): string[] {
-  return CODEX_AGENT_HIDDEN_ENV.flatMap((name) => ["-c", `shell_environment_policy.set.${name}=''`]);
+export function codexShellEnvFlags(extraHidden: readonly string[] = []): string[] {
+  const builtIn: readonly string[] = CODEX_AGENT_HIDDEN_ENV;
+  const names = [...builtIn, ...extraHidden.filter((name, i) => !builtIn.includes(name) && extraHidden.indexOf(name) === i)];
+  return names.flatMap((name) => {
+    if (!ENV_NAME_RE.test(name)) {
+      throw new Error(`Cannot blank ${JSON.stringify(name)} in Codex's commands: not an environment variable name`);
+    }
+    return ["-c", `shell_environment_policy.set.${name}=''`];
+  });
 }
+
+/** A portable environment variable name, which is also a bare TOML key. */
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function isDebugEnabled(): boolean {
   const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;

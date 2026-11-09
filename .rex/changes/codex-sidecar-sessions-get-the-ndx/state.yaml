@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "0b3b3a8c-f6d7-44ec-b289-8c6a2e57205c":
+    status: "completed"
+    startedAt: "2026-11-07T01:53:38.853Z"
+    completedAt: "2026-11-07T02:02:56.692Z"
+    endedAt: "2026-11-07T02:02:56.692Z"
+    activeIntervals: [{"end":"2026-11-07T02:02:56.692Z","start":"2026-11-07T01:53:38.853Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Codex refusal removed at create and turn; each Codex turn re-reads project .codex/config.toml files and disables their MCP servers except ndx-sidecar; unreadable config refuses the turn (409 at the route, throw before spawn in the session)."
+    lastModified: "2026-11-07T02:02:56.692Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "31307b89-23f6-452a-bd9d-b765e4c23901":
+    status: "completed"
+    startedAt: "2026-11-07T01:43:22.914Z"
+    completedAt: "2026-11-07T01:53:29.659Z"
+    endedAt: "2026-11-07T01:53:29.659Z"
+    activeIntervals: [{"end":"2026-11-07T01:53:29.659Z","start":"2026-11-07T01:43:22.914Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Resume re-applies Codex policy via -c overrides (llm-client, hench); Sidecar Codex turns carry --ignore-user-config, features off, and the ndx-sidecar broker via -c flags with headers in child env only."
+    lastModified: "2026-11-07T01:53:29.659Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "84d07c33-0fb2-4a54-9e9b-88acd0abd9cb":
+    status: "completed"
+    startedAt: "2026-11-07T02:02:56.692Z"
+    completedAt: "2026-11-07T02:02:56.692Z"
+    endedAt: "2026-11-07T02:02:56.692Z"
+    activeIntervals: [{"end":"2026-11-07T02:02:56.692Z","start":"2026-11-07T02:02:56.692Z"}]
+    appliedAt: "2026-11-07T02:02:56.692Z"
+    appliedAmendsHash: "6a5b34c537f4f893a6a98bb3372d0aad3c5202e68b7e281a7d8106f3af439c72"
+    createdAt: "2026-11-07T01:37:00.640Z"
+    lastModified: "2026-11-07T02:02:56.692Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f7893c86-bb20-487e-bb38-3863d250f8a1":
+    status: "completed"
+    startedAt: "2026-11-07T01:39:36.242Z"
+    completedAt: "2026-11-07T01:43:13.956Z"
+    endedAt: "2026-11-07T01:43:13.956Z"
+    activeIntervals: [{"end":"2026-11-07T01:43:13.956Z","start":"2026-11-07T01:39:36.242Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "parseCodexJsonLine maps mcp_tool_call started/completed to tool_use/tool_result named mcp__<server>__<tool>; isError from status only; tests from verbatim codex-cli 0.164.0-alpha.11.1 lines."
+    lastModified: "2026-11-07T01:43:13.956Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

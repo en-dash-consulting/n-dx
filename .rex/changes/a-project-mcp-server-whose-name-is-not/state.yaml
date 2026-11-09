@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "56befbd4-e797-4826-8284-87e789c4405c":
+    status: "completed"
+    startedAt: "2026-11-07T02:03:56.358Z"
+    completedAt: "2026-11-07T02:06:20.645Z"
+    endedAt: "2026-11-07T02:06:20.645Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:20.645Z","start":"2026-11-07T02:03:56.358Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "codexProjectMcpDisableFlags throws CodexProjectConfigError naming file and server for any non-kept non-bare server name; no quoted -c path emitted. Unit (llm-client) and spawn-policy (web) tests for \"a.b\" and \"my server\"."
+    appliedAt: "2026-11-07T02:06:20.645Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-07T02:01:51.999Z"
+    lastModified: "2026-11-07T02:06:20.645Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

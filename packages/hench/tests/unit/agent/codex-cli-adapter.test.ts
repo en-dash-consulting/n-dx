@@ -1001,17 +1001,20 @@ describe("codexCliAdapter session resume", () => {
     expect(config.args[config.args.length - 1]).toBe("-");
   });
 
-  it("omits sandbox and approval flags on resume — the subcommand rejects them", () => {
+  it("re-applies the policy on resume as -c overrides, never the flags the subcommand rejects", () => {
     const config = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {
       resumeSessionId: "01a05958-2931-73f1-9aba-38fa915bb8df",
     });
 
     // `codex exec resume` has no -s/--sandbox or --approve-for-me; passing
-    // either aborts the spawn on argument parsing.
+    // either aborts the spawn on argument parsing. A resumed thread does not
+    // keep its starting policy, so the policy rides on `-c` overrides.
     expect(config.args).not.toContain("--sandbox");
     expect(config.args).not.toContain("-s");
     expect(config.args).not.toContain("--approve-for-me");
     expect(config.args).not.toContain("--full-auto");
+    expect(config.args).toEqual(expect.arrayContaining(compileCodexPolicyFlags(STANDARD_POLICY, { resume: true })));
+    expect(config.args.join(" ")).toContain('-c sandbox_mode="workspace-write" -c approval_policy="never"');
   });
 
   it("never uses --last, which would hijack a concurrent codex run", () => {
