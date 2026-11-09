@@ -45,13 +45,46 @@ function deliveries(tree: V2Tree): Record<string, unknown> {
   return out;
 }
 
+describe("planAssignToBranch: units selection cannot pick", () => {
+  const withInbox = (product: unknown[]): V2Tree => {
+    const tree = fixture();
+    (tree as unknown as { product: unknown[] }).product = product;
+    (tree.changes as unknown[]).push(node("loose", { type: "change", status: "pending", needsPlacement: true, children: [task("t-loose")] }));
+    return tree;
+  };
+
+  it("refuses a change awaiting placement in the Inbox, and a task inside one, saying to place it first", () => {
+    for (const ref of ["loose", "t-loose"]) {
+      expect(() => planAssignToBranch(withInbox(fixture().product), [ref], "feat/x")).toThrow(
+        `Change "loose" (loose) is in the Inbox awaiting placement, and selection never picks it: place it first ('rex change place loose' or MCP place_change), then assign it`,
+      );
+    }
+  });
+
+  it("accepts an Inbox change on a product layer with nothing to place it on", () => {
+    expect(planAssignToBranch(withInbox([]), ["loose"], "feat/x").report.assigned).toEqual(["t-loose"]);
+  });
+
+  it("warns, without refusing, when a unit waits on an unfinished item outside the set", () => {
+    const tree = fixture();
+    const pay = tree.changes[0] as unknown as { children: Record<string, unknown>[] };
+    pay.children[0].blockedBy = ["t-outer", "t-done", "t-progress", "gone"];
+    const plan = planAssignToBranch(tree, ["t-pending", "t-progress"], "feat/x");
+    expect(plan.report.assigned).toEqual(["t-pending", "t-progress"]);
+    expect(plan.report.warnings).toEqual([
+      `"t-pending" (t-pending) is blocked by "t-outer" (t-outer) (pending), which is not in this branch's work set: it cannot be picked until that is done or assigned here`,
+      `"t-pending" (t-pending) is blocked by "gone", which names nothing in the PRD: it cannot be picked until that ref is removed`,
+    ]);
+  });
+});
+
 describe("planAssignToBranch", () => {
   it("assigning a change writes every open task under it, never completed, deferred or deleted ones, nor the change", () => {
     const tree = fixture();
     const before = structuredClone(tree);
     const plan = planAssignToBranch(tree, ["pay"], "feat/pay");
 
-    expect(plan.report).toEqual({ branch: "feat/pay", assigned: ["t-pending", "t-progress", "t-failing"], moved: [], unchanged: [] });
+    expect(plan.report).toEqual({ branch: "feat/pay", assigned: ["t-pending", "t-progress", "t-failing"], moved: [], unchanged: [], warnings: [] });
     expect(plan.changed).toBe(true);
     const on = { branch: "feat/pay" };
     expect(deliveries(plan.tree)).toEqual({ "t-pending": on, "t-progress": on, "t-failing": on });
@@ -95,7 +128,7 @@ describe("planAssignToBranch", () => {
     const tree = planAssignToBranch(fixture(), ["pay"], "feat/pay").tree;
     const plan = planAssignToBranch(tree, ["pay"], "feat/pay");
     expect(plan.changed).toBe(false);
-    expect(plan.report).toEqual({ branch: "feat/pay", assigned: [], moved: [], unchanged: ["t-pending", "t-progress", "t-failing"] });
+    expect(plan.report).toEqual({ branch: "feat/pay", assigned: [], moved: [], unchanged: ["t-pending", "t-progress", "t-failing"], warnings: [] });
     expect(plan.tree).toEqual(tree);
   });
 

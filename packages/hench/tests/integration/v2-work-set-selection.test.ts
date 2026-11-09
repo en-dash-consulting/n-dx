@@ -27,6 +27,7 @@ import { cmdRun, peekNextTaskPriority, refuseEpicFlagsOnV2 } from "../../src/cli
 import { cmdPlanQueue } from "../../src/cli/commands/plan-queue.js";
 import type { QueuePlan } from "../../src/queue/plan-queue.js";
 import { DEFAULT_HENCH_CONFIG } from "../../src/schema/v1.js";
+import { TaskClaims } from "../../src/process/task-claims.js";
 import { RM_RETRY } from "../helpers/index.js";
 
 const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
@@ -82,6 +83,14 @@ async function assignDocsAndCheckout(): Promise<void> {
   );
   git("add", "-A");
   git("commit", "-q", "-m", "assign docs");
+}
+
+/** Make DOCS_ID wait on WIRE_ID, which is not in the work set. */
+async function blockDocsOnWire(): Promise<void> {
+  await writeFile(
+    join(rexDir, "changes", "add-apple-pay", "write-the-docs.md"),
+    `---\nid: "${DOCS_ID}"\ntype: "task"\ntitle: "Write the docs"\nslug: "write-the-docs"\npriority: "low"\nblockedBy:\n  - "${WIRE_ID}"\n---\n`,
+  );
 }
 
 beforeEach(async () => {
@@ -178,6 +187,27 @@ describe("on a branch with a work set", () => {
     expect(await pick()).toBe(WIRE_ID);
   });
 
+  it("a set whose task waits on one outside it is blocked, naming the blocker, not finished", async () => {
+    await blockDocsOnWire();
+    const blocked = pick({ workSetDir: root });
+    await expect(blocked).rejects.toMatchObject({ name: "WorkSetExhaustedError", blocked: true });
+    await expect(blocked).rejects.toThrow(
+      "Nothing in this branch's work set can be picked: its 1 open task is blocked; --any picks outside it\n" +
+        `  ${DOCS_ID} "Write the docs" [pending]: blocked by "Wire the button" (${WIRE_ID}) (pending, outside this branch's work set)`,
+    );
+    expect(await pick()).toBe(WIRE_ID);
+  });
+
+  it("a set whose task another worktree holds is blocked, naming the holder", async () => {
+    const claims = TaskClaims.forProject(root);
+    await claims.store.claim(DOCS_ID, { worktreeRoot: "/elsewhere", pid: process.pid });
+    const s = await store();
+    const tree = (await loadV2Tree(s))!;
+    const blocked = selectTaskEntry((await s.loadDocument()).items, { tree, workSetDir: root, claims });
+    await expect(blocked).rejects.toMatchObject({ blocked: true });
+    await expect(blocked).rejects.toThrow(`"Write the docs" [pending]: claimed by another worktree: /elsewhere`);
+  });
+
   it("an empty set empties the menu", async () => {
     const s = await store();
     await s.updateItem(DOCS_ID, { status: "completed" });
@@ -246,6 +276,22 @@ describe("on a branch with a work set", () => {
       const out = await dryRun({ loop: "true" });
       expect(out).toContain(`${WORK_SET_FINISHED} — loop finished after 0 task(s).`);
       expect(out).not.toContain("All tasks complete");
+    });
+
+    it("--loop on a blocked set names why and stops without success", async () => {
+      await blockDocsOnWire();
+      git("add", "-A");
+      git("commit", "-q", "-m", "docs wait on wire");
+      try {
+        const out = await dryRun({ loop: "true" });
+        expect(out).toContain("Nothing in this branch's work set can be picked: its 1 open task is blocked; --any picks outside it");
+        expect(out).toContain(`"Write the docs" [pending]: blocked by "Wire the button" (${WIRE_ID})`);
+        expect(out).toContain("Loop stopped after 0 task(s).");
+        expect(out).not.toContain("loop finished");
+        expect(process.exitCode).toBe(1);
+      } finally {
+        process.exitCode = undefined;
+      }
     });
 
     it("--auto on a spent set fails with the work-set message", async () => {

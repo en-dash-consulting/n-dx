@@ -17,7 +17,7 @@ import { listWorktrees, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { loadConfig } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
-import { branchWorkSet, loadV2Tree, workSetEndMessage } from "../../agent/planning/work-selection.js";
+import { branchWorkSet, loadV2Tree, workSetBlocked, workSetEndMessage } from "../../agent/planning/work-selection.js";
 import { resolveProjectCliName } from "../../agent/planning/cli-identity.js";
 import { TaskClaims } from "../../process/task-claims.js";
 import { countActiveLocksReadOnly } from "../../process/limiter.js";
@@ -199,7 +199,7 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
   // holds is not ready, and offering it would start a second run of it.
   const claimed = await TaskClaims.forProject(dir, { readOnly: true }).liveClaims();
   // On a branch with a work set only its tasks are planned, as `ndx work` picks; --any plans outside it.
-  const workSet = branchWorkSet(tree, flags.any === "true" ? undefined : dir);
+  const workSet = branchWorkSet(tree, flags.any === "true" ? undefined : dir, { claims: claimed });
   const { tasks, changes } = queueInputFromTree(tree, {
     excludeIds: new Set(claimed.keys()),
     ...(workSet ? { workSet: new Set(workSet.ids) } : {}),
@@ -220,7 +220,9 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
     return;
   }
   if (workSet && tasks.length === 0) {
+    // Finished is a clean end; open units none of which can be picked are not.
     output(workSetEndMessage(workSet));
+    if (workSetBlocked(workSet)) process.exitCode = 1;
     return;
   }
   for (const line of formatPlan(plan)) output(line);

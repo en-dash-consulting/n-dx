@@ -23,8 +23,10 @@
  *   change it inherits from, unless the caller passes `move`, which gives the
  *   unit its own `delivery` and, for a named change, also moves the change's
  *   own `delivery` so tasks it gains later follow it; one already on this
- *   branch is left alone. A
- *   refusal throws {@link WorkSetError} before anything is changed.
+ *   branch is left alone. A unit under a change awaiting placement in the
+ *   Inbox (`awaitsPlacement`) is refused: selection never picks it. A unit
+ *   blocked by an unfinished item outside the set is assigned, with a warning
+ *   naming it. A refusal throws {@link WorkSetError} before anything is changed.
  * - **Unassign.** Removes `delivery` from the named task, or from a change and
  *   every live node under it, whatever its status, so the units inheriting
  *   from the change drop out with it. A named task that only inherits keeps
@@ -40,7 +42,9 @@
  *   `get_next_task`, `rex next` and `ndx work` narrow selection to unless
  *   asked for `any`. {@link branchWorkState} is the same read for a branch
  *   with no set, for `rex branch show` and the earlier-use line. A set whose
- *   units are all done is finished, and still narrows selection.
+ *   units are all done is finished, and still narrows selection. A set with
+ *   open units none of which can be picked is blocked, not finished: readers
+ *   name each unit with `unpickableUnits`' reasons ({@link workSetBlockedLines}).
  *
  * The plan functions are pure: they return a new tree and write nothing.
  * {@link assignToBranch} and {@link unassignFromBranch} run them inside
@@ -52,13 +56,13 @@
 
 import { isAbsolute, join, relative, sep } from "node:path";
 import { DeliverySchema, type ItemState } from "../schema/v2.js";
-import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { awaitsPlacement, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { currentWorkSetBranch, readStateFilesAt, workSetForkPoint } from "../store/branch-naming.js";
 import { resolveRexPaths } from "../store/paths.js";
 import { CHANGES_DIRNAME } from "../store/prd-model-reader.js";
 import { parseStateYaml } from "../store/state-writer.js";
 import { withPrdModelTransaction } from "../store/prd-model-transaction.js";
-import { changeWorkShape, isActionableStatus } from "./change-selection.js";
+import { changeWorkShape, isActionableStatus, type UnpickableUnit } from "./change-selection.js";
 
 /** A refused assignment or an unusable ref or branch. Nothing was changed. */
 export class WorkSetError extends Error {
@@ -81,6 +85,8 @@ export interface AssignReport {
   moved: Array<{ id: string; from: string }>;
   /** Units already on this branch. */
   unchanged: string[];
+  /** Named units blocked by an unfinished item outside the set, each naming it: assigned, but not pickable yet. */
+  warnings: string[];
 }
 
 export interface UnassignReport {
@@ -141,8 +147,22 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
     } else problems.push(`${label(node)} is a ${node.type}: a work set holds changes and tasks`);
   }
 
+  // A change held in the Inbox is never selected, so a set holding it could not be worked.
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  const inbox = new Set<RuleNode>();
+  for (const unit of units) {
+    const enclosing = (n: RuleNode): RuleNode | undefined => (parentOf.get(n)?.type === "change" ? parentOf.get(n) : undefined);
+    for (let at: RuleNode | undefined = unit; at; at = enclosing(at)) if (awaitsPlacement(index, at)) inbox.add(at);
+  }
+  for (const change of inbox) {
+    problems.push(
+      `Change ${label(change)} is in the Inbox awaiting placement, and selection never picks it: place it first ` +
+        `('rex change place ${change.displayId ?? change.id}' or MCP place_change), then assign it`,
+    );
+  }
+
   const deliveryOf = deliveryResolver(index);
-  const report: AssignReport = { branch, assigned: [], moved: [], unchanged: [] };
+  const report: AssignReport = { branch, assigned: [], moved: [], unchanged: [], warnings: [] };
   for (const unit of units) {
     const current = deliveryOf(unit);
     const from = current?.branch;
@@ -168,6 +188,20 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
   }
   const assigned = new Set(report.assigned);
   for (const node of [...units, ...retarget]) if (assigned.has(node.id)) node.delivery = { ...node.delivery, branch };
+
+  // Assigned, but not pickable until a blocker outside the set is done.
+  const inSet = new Set(readWorkSet(tree, branch).ids);
+  for (const unit of units) {
+    for (const ref of unit.blockedBy ?? []) {
+      const blocker = index.resolve(ref);
+      if (blocker?.status === "completed" || (blocker && inSet.has(blocker.id))) continue;
+      report.warnings.push(
+        blocker
+          ? `${label(unit)} is blocked by ${label(blocker)} (${blocker.status ?? "pending"}), which is not in this branch's work set: it cannot be picked until that is done or assigned here`
+          : `${label(unit)} is blocked by "${ref}", which names nothing in the PRD: it cannot be picked until that ref is removed`,
+      );
+    }
+  }
   return { tree, report, changed: assigned.size > 0 };
 }
 
@@ -344,6 +378,24 @@ export function earlierUseOf(state: WorkSet | null): EarlierUse | null {
 /** Said when a branch's work set has no open unit left: every one is done. */
 export function workSetFinishedMessage(anyHint: string): string {
   return `This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and ${anyHint} picks outside it`;
+}
+
+/**
+ * Said when a branch's work set has open units and none can be picked: a
+ * header naming `anyHint`, then one line per unit with its reasons
+ * (`unpickableUnits`). Not finished, so not a success.
+ */
+export function workSetBlockedLines(blocked: readonly UnpickableUnit[], anyHint: string): string[] {
+  const n = blocked.length;
+  return [
+    `Nothing in this branch's work set can be picked: ${n === 1 ? "its 1 open task is" : `its ${n} open tasks are`} blocked; ${anyHint} picks outside it`,
+    ...blocked.map(blockedUnitLine),
+  ];
+}
+
+/** One unit of a blocked work set: label, status and every reason. */
+export function blockedUnitLine(unit: UnpickableUnit): string {
+  return `  ${unit.displayId ?? unit.id} "${unit.title}" [${unit.status}]: ${unit.reasons.join("; ")}`;
 }
 
 /** `ids` as output names them, in the order given; an id the tree does not hold is skipped. */

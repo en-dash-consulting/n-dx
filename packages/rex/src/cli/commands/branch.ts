@@ -12,7 +12,8 @@
  * @module rex/cli/commands/branch
  */
 
-import { result } from "@n-dx/llm-client";
+import { result, warn } from "@n-dx/llm-client";
+import { unpickableUnits } from "../../core/change-selection.js";
 import {
   assignToBranch,
   branchWorkState,
@@ -26,7 +27,8 @@ import {
   workSetFinishedMessage,
   type UnitInfo,
 } from "../../core/work-set.js";
-import { resolveRexPaths } from "../../store/index.js";
+import { openClaimsStore, resolveClaimHolder, resolveRexPaths } from "../../store/index.js";
+import { collectForeignClaims } from "../mcp-tools/index.js";
 import { loadPrdModel } from "../../store/prd-model-reader.js";
 import { CLIError } from "../errors.js";
 import { nodeLabel, requireV2 } from "./v2-cli.js";
@@ -78,7 +80,14 @@ export async function cmdBranch(
 async function show(dir: string, rexDir: string, branch: string, json: boolean): Promise<void> {
   const tree = (await loadPrdModel(rexDir)).tree;
   const state = branchWorkState(tree, dir, branch) ?? { branch, ids: [], hasAssignments: false, earlier: [] };
-  const groups = groupWorkSet(tree, state.ids);
+  // Each open unit selection cannot pick, with why (claims as `rex next` reads them).
+  const { skipped } = await collectForeignClaims({ store: openClaimsStore(dir), worktreeRoot: resolveClaimHolder(dir).worktreeRoot });
+  const claims = new Map(skipped.map((c) => [c.taskId, c]));
+  const unpickable = new Map(unpickableUnits(tree, state.ids, { claims }).map((u) => [u.id, u.reasons]));
+  const groups = groupWorkSet(tree, state.ids).map((g) => ({
+    ...g,
+    units: g.units.map((u) => (unpickable.has(u.id) ? { ...u, cannotPick: unpickable.get(u.id) } : u)),
+  }));
   const finished = state.hasAssignments && state.ids.length === 0;
   const earlierUse = earlierUseOf(state);
   if (json) {
@@ -90,7 +99,10 @@ async function show(dir: string, rexDir: string, branch: string, json: boolean):
     result(`Work set of ${branch}:`);
     for (const { change, units } of groups) {
       result(`\n${nodeLabel(change)}  ${change.title}`);
-      for (const u of units) result(`  ${unitLine(u)}  [${u.status}]`);
+      for (const u of units) {
+        const why = "cannotPick" in u && u.cannotPick ? `  cannot be picked: ${u.cannotPick.join("; ")}` : "";
+        result(`  ${unitLine(u)}  [${u.status}]${why}`);
+      }
     }
   }
   if (earlierUse) result(`${state.hasAssignments && !finished ? "\n" : ""}${earlierUse.message}.`);
@@ -102,11 +114,13 @@ async function add(rexDir: string, branch: string, refs: string[], move: boolean
   const from = new Map(report.moved.map((m) => [m.id, m.from]));
   const written = describeUnits(tree, report.assigned).map((u) => ({ ...u, ...(from.has(u.id) ? { movedFrom: from.get(u.id) } : {}) }));
   const unchanged = describeUnits(tree, report.unchanged);
-  if (json) return result(JSON.stringify({ branch, assigned: written, unchanged }, null, 2));
+  const warnings = report.warnings.length > 0 ? { warnings: report.warnings } : {};
+  if (json) return result(JSON.stringify({ branch, assigned: written, unchanged, ...warnings }, null, 2));
   for (const u of written) {
     result(`Added to ${branch}: ${unitLine(u)}${u.movedFrom ? ` (moved from ${u.movedFrom})` : ""}`);
   }
   for (const u of unchanged) result(`Already on ${branch}: ${unitLine(u)}`);
+  for (const w of report.warnings) warn(`Warning: ${w}.`);
 }
 
 async function remove(rexDir: string, branch: string, refs: string[], json: boolean): Promise<void> {

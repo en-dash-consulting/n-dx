@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
-import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
-import { workSetFinishedMessage, type EarlierUse, type WorkSet } from "../../core/work-set.js";
+import { completedWorkIds, findNextWorkTask, type SelectedWorkSet } from "../../core/change-next-task.js";
+import { workSetBlockedLines, workSetFinishedMessage, type EarlierUse } from "../../core/work-set.js";
 import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import type { ChangeLayerStore } from "../../store/change-layer-store.js";
 import { collectForeignClaims, type ClaimsContext, type SkippedClaim } from "./claims.js";
@@ -69,6 +69,8 @@ export async function handleGetNextTask(
  * and adds `item.type`, `item.displayId` (and the item's other v2 fields),
  * `parentChain[].type` and `changeId`, the change the unit belongs to. When
  * selection was narrowed to a work set, `workSetBranch` names its branch.
+ * When that set has open units and none can be picked, `blocked` lists each
+ * with its reasons and `message` says so; it is not the finished message.
  */
 async function handleGetNextV2Work(
   store: ChangeLayerStore,
@@ -77,10 +79,10 @@ async function handleGetNextV2Work(
   projectDir: string | undefined,
 ): Promise<McpResult> {
   const tree = await store.loadTree();
-  const { excludeIds, skipped } = await collectForeignClaims(claims);
+  const { skipped } = await collectForeignClaims(claims);
   const completed = completedWorkIds(tree);
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
-  const select = { excludeIds, tags: args?.tags };
+  const select = { claims: new Map(skipped.map((c) => [c.taskId, c])), tags: args?.tags };
   const { task: next, workSet, earlierUse } = projectDir
     ? findNextWorkTask(tree, { ...select, workspace: projectDir, any: args?.any === true })
     : { task: findNextWorkTask(tree, select), workSet: null, earlierUse: null };
@@ -108,23 +110,25 @@ async function handleGetNextV2Work(
 function noneLeft(
   skippedClaimed: SkippedClaim[],
   workSetField: { workSetBranch?: string; earlierUse?: EarlierUse } = {},
-  workSet: WorkSet | null = null,
+  workSet: SelectedWorkSet | null = null,
 ): McpResult {
-  const message = workSet
-    ? workSet.ids.length === 0 ? workSetFinishedMessage("any: true") : WORK_SET_EXHAUSTED_MCP
-    : skippedClaimed.length > 0
-      ? `No actionable tasks remaining that are not claimed by another worktree (${skippedClaimed.length} claimed elsewhere)`
-      : "No actionable tasks remaining";
+  // A set with open units none of which can be picked is not finished: each unit is named with why.
+  const blocked = workSet && workSet.blocked.length > 0 ? workSet.blocked : null;
+  const message = blocked
+    ? workSetBlockedLines(blocked, "any: true").join("\n")
+    : workSet
+      ? workSetFinishedMessage("any: true")
+      : skippedClaimed.length > 0
+        ? `No actionable tasks remaining that are not claimed by another worktree (${skippedClaimed.length} claimed elsewhere)`
+        : "No actionable tasks remaining";
   return textResult(JSON.stringify({
     next: null,
     message,
     ...workSetField,
+    ...(blocked ? { blocked } : {}),
     ...(skippedClaimed.length > 0 ? { skippedClaimed } : {}),
   }));
 }
-
-/** `rex next`'s `WORK_SET_EXHAUSTED`, naming the tool's argument instead of the flag. */
-const WORK_SET_EXHAUSTED_MCP = "Nothing left in this branch's work set; any: true picks outside it";
 
 export const getNextTaskTool = defineTool({
   name: "get_next_task",

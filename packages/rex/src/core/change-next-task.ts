@@ -12,7 +12,7 @@
 import type { PRDItem, Priority } from "../schema/index.js";
 import { PRIORITY_ORDER } from "../schema/v1.js";
 import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { findActionableWork, type WorkUnit } from "./change-selection.js";
+import { findActionableWork, unpickableUnits, type UnpickableUnit, type WorkUnit } from "./change-selection.js";
 import { changeLayerItems } from "./layer-projection.js";
 import type { SelectionExplanation } from "./next-task.js";
 import { findItem } from "./tree.js";
@@ -25,6 +25,10 @@ export interface NextWorkOptions {
   tags?: readonly string[];
   /** Only units in this branch work set, as {@link findActionableWork} reads it. */
   workSet?: ReadonlySet<string>;
+  /** Only units this identity is assigned, directly or through the change (`--mine`). */
+  assignee?: string;
+  /** Units another worktree holds, by id: passed over like `excludeIds`, and named as claimed when a work set is blocked. */
+  claims?: ReadonlyMap<string, { worktreeRoot: string }>;
 }
 
 /**
@@ -42,10 +46,23 @@ export interface WorkspaceNextWorkOptions extends NextWorkOptions {
 export interface WorkspaceNextWork {
   /** The unit to run next; `null` when none is actionable (inside the work set, when there is one). */
   task: NextWorkTask | null;
-  /** The work set selection was narrowed to; null when it was not narrowed. An empty `ids` is a finished set. */
-  workSet: WorkSet | null;
+  /**
+   * The work set selection was narrowed to; null when it was not narrowed. An
+   * empty `ids` is a finished set; a non-empty `blocked` is a set with open
+   * units none of which can be picked.
+   */
+  workSet: SelectedWorkSet | null;
   /** Units on the branch from an earlier branch of its name, not in the set; null when none, or under `any`. */
   earlierUse: EarlierUse | null;
+}
+
+/** A work set as selection used it. */
+export interface SelectedWorkSet extends WorkSet {
+  /**
+   * When nothing was picked and `ids` is not empty: each open unit with why it
+   * cannot be picked ({@link unpickableUnits}). Empty otherwise.
+   */
+  blocked: UnpickableUnit[];
 }
 
 export interface NextWorkTask {
@@ -71,13 +88,15 @@ export function findNextWorkTask(
 ): NextWorkTask | WorkspaceNextWork | null {
   if (!("workspace" in options) || typeof options.workspace !== "string") return selectNext(tree, options);
   const state = options.any ? null : branchWorkState(tree, options.workspace);
-  const workSet = state?.hasAssignments ? state : null;
-  const task = selectNext(tree, workSet ? { ...options, workSet: new Set(workSet.ids) } : options);
-  return { task, workSet, earlierUse: earlierUseOf(state) };
+  const set = state?.hasAssignments ? state : null;
+  const task = selectNext(tree, set ? { ...options, workSet: new Set(set.ids) } : options);
+  const blocked = set && !task && set.ids.length > 0 ? unpickableUnits(tree, set.ids, options) : [];
+  return { task, workSet: set ? { ...set, blocked } : null, earlierUse: earlierUseOf(state) };
 }
 
 function selectNext(tree: V2Tree, options: NextWorkOptions): NextWorkTask | null {
-  const actionable = findActionableWork(tree, { excludeIds: options.excludeIds, workSet: options.workSet });
+  const excludeIds = options.claims?.size ? new Set([...(options.excludeIds ?? []), ...options.claims.keys()]) : options.excludeIds;
+  const actionable = findActionableWork(tree, { excludeIds, workSet: options.workSet, assignee: options.assignee });
   const tags = options.tags ?? [];
   const unit = actionable.find((u) => tags.length === 0 || (u.node.tags ?? []).some((t) => tags.includes(t)));
   if (!unit) return null;

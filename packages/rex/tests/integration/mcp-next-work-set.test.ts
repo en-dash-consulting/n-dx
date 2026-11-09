@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createRexMcpServer } from "../../src/cli/mcp.js";
+import { openClaimsStore } from "../../src/store/index.js";
 import { FIXTURE_CHANGE, FIXTURE_TASK, copyV2Fixture } from "../helpers/v2-fixture.js";
 
 /** A second, low-priority task in the fixture change: picked only through a work set. */
@@ -48,6 +49,14 @@ afterEach(async () => {
   await close();
   await rm(tmp, { recursive: true, force: true });
 });
+
+/** Make LOW_TASK wait on FIXTURE_TASK, which stays off the work set. */
+async function blockLowTaskOnFixtureTask(root: string): Promise<void> {
+  await writeFile(
+    join(root, ".rex", "changes", "add-apple-pay", "polish-the-sheet.md"),
+    `---\nid: "${LOW_TASK}"\ntype: "task"\ntitle: "Polish the sheet"\nslug: "polish-the-sheet"\npriority: "low"\nblockedBy:\n  - "${FIXTURE_TASK}"\n---\n`,
+  );
+}
 
 async function call(name: string, args: Record<string, unknown> = {}) {
   const result = (await client.callTool({ name, arguments: args })) as { content: { text: string }[]; isError?: boolean };
@@ -111,6 +120,46 @@ describe("get_next_task with a branch work set", () => {
     const spent = await call("get_next_task");
     expect(spent.next).toBeNull();
     expect(spent.workSetBranch).toBe("feat/split");
+  });
+
+  it("a set whose task is blocked by one outside it names the blocker and is not finished", async () => {
+    await blockLowTaskOnFixtureTask(tmp);
+    git("checkout", "-q", "-b", "feat/polish");
+    const assigned = await call("assign_to_branch", { ids: [LOW_TASK] });
+    expect(assigned.assigned.map((u: { id: string }) => u.id)).toEqual([LOW_TASK]);
+    expect(assigned.warnings).toEqual([
+      `"Polish the sheet" (${LOW_TASK}) is blocked by "Wire the button" (${FIXTURE_TASK}) (pending), which is not in this branch's work set: it cannot be picked until that is done or assigned here`,
+    ]);
+
+    const blocked = await call("get_next_task");
+    expect(blocked.next).toBeNull();
+    expect(blocked.workSetBranch).toBe("feat/polish");
+    expect(blocked.blocked).toEqual([
+      expect.objectContaining({ id: LOW_TASK, reasons: [`blocked by "Wire the button" (${FIXTURE_TASK}) (pending, outside this branch's work set)`] }),
+    ]);
+    expect(blocked.message).toContain("Nothing in this branch's work set can be picked: its 1 open task is blocked; any: true picks outside it");
+    expect(blocked.message).toContain(`"Polish the sheet" [pending]: blocked by "Wire the button"`);
+    expect(blocked.message).not.toContain("finished");
+  });
+
+  it("a set whose only task another worktree holds names the holder", async () => {
+    git("checkout", "-q", "-b", "feat/polish");
+    await call("assign_to_branch", { ids: [LOW_TASK] });
+    await openClaimsStore(tmp).claim(LOW_TASK, { worktreeRoot: "/elsewhere", pid: process.pid });
+
+    const blocked = await call("get_next_task");
+    expect(blocked.next).toBeNull();
+    expect(blocked.blocked).toEqual([expect.objectContaining({ id: LOW_TASK, reasons: ["claimed by another worktree: /elsewhere"] })]);
+    expect(blocked.skippedClaimed).toEqual([expect.objectContaining({ taskId: LOW_TASK, worktreeRoot: "/elsewhere" })]);
+  });
+
+  it("assign_to_branch refuses a change awaiting placement in the Inbox", async () => {
+    const inbox = (await call("add_item", { type: "change", title: "Loose idea" })).id;
+    git("checkout", "-q", "-b", "feat/loose");
+    const refused = (await client.callTool({ name: "assign_to_branch", arguments: { ids: [inbox] } })) as { content: { text: string }[]; isError?: boolean };
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0].text).toContain(`is in the Inbox awaiting placement, and selection never picks it: place it first`);
+    expect((await call("get_next_task")).workSetBranch).toBeUndefined();
   });
 
   it("a branch cut again under a merged branch's name has no work set, and names the earlier branch's tasks", async () => {

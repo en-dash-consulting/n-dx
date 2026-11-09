@@ -319,7 +319,8 @@ export interface SelectTaskOptions {
  *
  * @throws {Error} "No actionable tasks found in PRD" / "... in epic" when
  *   selection comes up empty — the sentinel `--loop` reads as "done" — or
- *   {@link WorkSetExhaustedError} when the branch's work set has nothing left.
+ *   {@link WorkSetExhaustedError} when nothing in the branch's work set can be
+ *   picked: finished, or (`blocked`) open units named with why.
  */
 export async function selectTaskEntry(
   rawItems: PRDItem[],
@@ -372,13 +373,13 @@ export async function selectTaskEntry(
   const skipIds = excludeIds ? new Set([...completedIds, ...excludeIds]) : completedIds;
   // Tasks other worktrees hold are passed over — not folded into skipIds,
   // which would make their parents look finished.
-  const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
+  const claimedElsewhere = new Map<string, { worktreeRoot: string }>(claims ? await claims.foreignClaims() : []);
 
   for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
     // rex's collectActionable reads `skipIds` only as "done" for dependency
     // checks, so an excluded (stuck) task is still a candidate unless it is
     // also named here — the v2 branch below already passes both.
-    const passOver = new Set<string>([...claimedElsewhere, ...(excludeIds ?? [])]);
+    const passOver = new Set<string>([...claimedElsewhere.keys(), ...(excludeIds ?? [])]);
     const selectOptions = {
       ...(tags?.length ? { tags } : {}),
       ...(assignee ? { assignee } : {}),
@@ -386,9 +387,11 @@ export async function selectTaskEntry(
     };
     let candidate: TreeEntry | null;
     if (tree) {
-      // rex's selector narrows to the checkout's branch work set and returns it.
+      // rex's selector narrows to the checkout's branch work set and returns
+      // it, with why each open unit cannot be picked when none was.
       const { entry, workSet } = nextV2Selection(tree, {
-        excludeIds: new Set([...(excludeIds ?? []), ...claimedElsewhere]),
+        ...(excludeIds?.size ? { excludeIds } : {}),
+        claims: claimedElsewhere,
         ...(tags?.length ? { tags } : {}),
         ...(assignee ? { assignee } : {}),
         ...(options.workSetDir ? { workspace: options.workSetDir } : {}),
@@ -413,7 +416,7 @@ export async function selectTaskEntry(
     if (!claims) return candidate;
     const refusedBy = await claims.claim(candidate.item.id);
     if (!refusedBy) return candidate;
-    claimedElsewhere.add(candidate.item.id);
+    claimedElsewhere.set(candidate.item.id, refusedBy);
   }
   throw new Error(
     `Could not claim a task after ${MAX_CLAIM_ATTEMPTS} attempts — each candidate was claimed by another worktree first.`,

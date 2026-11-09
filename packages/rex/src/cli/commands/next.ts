@@ -6,7 +6,7 @@ import type { SkippedClaim } from "../mcp-tools/claims.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection, type SelectionExplanation } from "../../core/next-task.js";
 import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
-import { workSetFinishedMessage, type EarlierUse } from "../../core/work-set.js";
+import { workSetBlockedLines, workSetFinishedMessage, type EarlierUse } from "../../core/work-set.js";
 
 import { info, result } from "../output.js";
 import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
@@ -59,15 +59,17 @@ export async function cmdNext(
  *
  * On a branch with a work set (`findNextWorkTask`'s, by `currentWorkSet`'s
  * rule) only its units are picked unless `--any`; JSON then adds
- * `workSetBranch`. A finished set says so. Units from an earlier branch of
+ * `workSetBranch`. A finished set says so. A set whose open units cannot be
+ * picked names each with why (JSON `blocked`) and exits 1. Units from an earlier branch of
  * the same name are named in a line, and in JSON as `earlierUse`.
  */
 async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<string, string>): Promise<void> {
   const tree = await store.loadTree();
-  const { excludeIds, skipped } = await foreignClaims(dir);
+  const { skipped } = await foreignClaims(dir);
   const completed = completedWorkIds(tree);
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
-  const { task: next, workSet, earlierUse } = findNextWorkTask(tree, { excludeIds, workspace: dir, any: flags.any === "true" });
+  const claims = new Map(skipped.map((c) => [c.taskId, c]));
+  const { task: next, workSet, earlierUse } = findNextWorkTask(tree, { claims, workspace: dir, any: flags.any === "true" });
   if (!next && tree.changes.length === 0 && flags.format !== "json") {
     result("No changes in PRD. Run: rex add --title=\"...\" " + dir);
     return;
@@ -79,21 +81,22 @@ async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<st
   const json = flags.format === "json";
   if (earlierUse && !json) result(earlierUse.message);
   if (!next && workSet) {
-    const message = workSet.ids.length === 0 ? workSetFinishedMessage("--any") : WORK_SET_EXHAUSTED;
+    // Open units none of which can be picked: not finished, so not a success.
+    const blocked = workSet.blocked.length > 0;
+    if (blocked) process.exitCode = 1;
+    const lines = blocked ? workSetBlockedLines(workSet.blocked, "--any") : [workSetFinishedMessage("--any")];
     if (json) {
-      result(JSON.stringify({ item: null, ...workSetFields, message, skippedClaimed }, null, 2));
+      const blockedField = blocked ? { blocked: workSet.blocked } : {};
+      result(JSON.stringify({ item: null, ...workSetFields, message: lines[0], ...blockedField, skippedClaimed }, null, 2));
       return;
     }
-    result(message);
-    printSkippedClaims(skippedClaimed, flags.verbose === "true");
+    for (const line of lines) result(line);
+    if (!blocked) printSkippedClaims(skippedClaimed, flags.verbose === "true");
     return;
   }
   if (!next) return printNoneLeft(skippedClaimed, flags, earlierUse ? { earlierUse } : {});
   printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id, ...workSetFields }, true);
 }
-
-/** Said when the branch's work set has open units and none can be picked. */
-const WORK_SET_EXHAUSTED = "Nothing left in this branch's work set; --any picks outside it";
 
 /**
  * Tasks another worktree holds a live claim on are passed over, not treated

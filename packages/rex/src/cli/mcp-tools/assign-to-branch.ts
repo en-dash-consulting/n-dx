@@ -46,7 +46,8 @@ export async function handleAssignToBranch(projectDir: string, rexDir: string, a
     const { tree } = await loadPrdModel(rexDir);
     const from = new Map(report.moved.map((m) => [m.id, m.from]));
     const assigned = describeUnits(tree, report.assigned).map((u) => (from.has(u.id) ? { ...u, movedFrom: from.get(u.id) } : u));
-    return textResult(JSON.stringify({ branch, assigned, unchanged: describeUnits(tree, report.unchanged) }));
+    const warnings = report.warnings.length > 0 ? { warnings: report.warnings } : {};
+    return textResult(JSON.stringify({ branch, assigned, unchanged: describeUnits(tree, report.unchanged), ...warnings }));
   } catch (err) {
     if (err instanceof WorkSetError) return textResult(err.message, true);
     return textResult(`Error: ${(err as Error).message}`, true);
@@ -59,9 +60,12 @@ export const assignToBranchTool = defineTool({
     "Add changes and tasks to the current git branch's work set, or take them off with remove (v2 PRD). The work set is the tasks " +
     "assigned to the branch, recorded as delivery: { branch } in state.yaml; a task sits on at most one branch. A change id " +
     "assigns its open tasks (a change with no tasks counts as one task, and its branch covers the tasks it is later split into, " +
-    "unless a task has its own). A task already on another branch is refused, naming it, unless move is true. Removing a change " +
+    "unless a task has its own). A task already on another branch is refused, naming it, unless move is true. A change in the " +
+    "Inbox awaiting placement is refused: place it first. A task blocked by an unfinished item outside the set is assigned " +
+    "with a warning naming it. Removing a change " +
     "takes off the tasks that inherit from it; a task that only inherits is listed under inherited with its change, unchanged. Acts on the checked-out branch of the session's workspace; refused on the default branch and on a " +
-    "detached HEAD. Writes the PRD; commits nothing. Returns what was written (id, title, status; movedFrom for a moved task).",
+    "detached HEAD. Writes the PRD; commits nothing. Returns what was written (id, title, status; movedFrom for a moved task), " +
+    "and warnings when there are any.",
   schema: {
     ids: z.array(z.string()).describe("Change or task ids, display ids (e.g. CH-12) or aliases"),
     remove: z.boolean().optional().describe("Take the named tasks off this branch's work set instead of adding them"),

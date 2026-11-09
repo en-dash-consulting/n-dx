@@ -31,7 +31,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, nextV2Selection, v2RefPriority, V2_HAS_NO_EPICS, workSetEndMessage, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, nextV2Selection, v2RefPriority, V2_HAS_NO_EPICS, workSetBlocked, workSetEndMessage, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -1157,10 +1157,12 @@ async function selectTask(
 
   if (tasks.length === 0) {
     const tree = await loadV2Tree(store);
-    const workSet = tree ? branchWorkSet(tree, workSetDir) : null;
+    const foreign = await claims.foreignClaims();
+    const workSet = tree ? branchWorkSet(tree, workSetDir, { claims: foreign, ...(assignee ? { assignee } : {}) }) : null;
     if (workSet) {
+      // Finished is a clean end; open units none of which can be picked are not.
       output(workSetEndMessage(workSet));
-      process.exit(0);
+      process.exit(workSetBlocked(workSet) ? 1 : 0);
     }
   }
 
@@ -2913,7 +2915,12 @@ async function runLoop(
       } catch (err) {
         if (isNoTasksError(err)) {
           const scope = epicId ? " in epic" : "";
-          if (err instanceof WorkSetExhaustedError) {
+          if (err instanceof WorkSetExhaustedError && err.blocked) {
+            // Open units none of which can be picked: the set is not done, so
+            // the loop stops without reporting success.
+            info(`\n${err.message}\nLoop stopped after ${completed - 1} task(s).`);
+            process.exitCode = 1;
+          } else if (err instanceof WorkSetExhaustedError) {
             // Not "All tasks complete": the loop ran out of this branch's
             // tasks, which says nothing about the rest of the PRD.
             info(`\n${err.message} — loop finished after ${completed - 1} task(s).`);

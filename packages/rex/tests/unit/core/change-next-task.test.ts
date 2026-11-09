@@ -98,7 +98,7 @@ describe("findNextWorkTask with a workspace", () => {
     const done = tree(change("urgent"), change("mine", { status: "completed", delivery: { branch: "feature/x" } }));
     expect(findNextWorkTask(done, { workspace: dir })).toEqual({
       task: null,
-      workSet: { branch: "feature/x", ids: [], hasAssignments: true, earlier: [] },
+      workSet: { branch: "feature/x", ids: [], hasAssignments: true, earlier: [], blocked: [] },
       earlierUse: null,
     });
   });
