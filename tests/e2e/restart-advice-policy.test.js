@@ -38,7 +38,7 @@ const SCANNED = [
 /** Advice this policy forbids, each with what it is. */
 export const FORBIDDEN = [
   { name: "ndx hub stop", pattern: /\bndx hub stop\b/ },
-  { name: "pnpm build / install", pattern: /\bpnpm\s+(?:(?:--filter|-F)[\s=]+\S+\s+|-r\s+|--recursive\s+|run\s+)*(?:build|install|i)\b/ },
+  { name: "pnpm build / install", pattern: /\bpnpm\s+(?:(?:--filter|-F)(?:\s*=\s*|\s+)\S+\s+|-r\s+|--recursive\s+|run\s+)*(?:build|install|i)\b/ },
   { name: "restart the hub or server", pattern: /(?<!without )\brestart(?:ing)?\s+(?:it\b|the hub\b|the server\b|the dashboard\b|n-dx\b|ndx\b|your server\b)/i },
   { name: "stop, then ndx start", pattern: /\bthen\s+['"`]?ndx start\b/ },
 ];
