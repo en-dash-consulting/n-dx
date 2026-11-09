@@ -14,6 +14,7 @@ import {
   detectCommands,
   detectPackageManager,
   findLocalUrl,
+  stripAnsi,
 } from "../../../src/server/run-command-detect.js";
 
 describe("run command detection", () => {
@@ -169,7 +170,23 @@ describe("findLocalUrl", () => {
     expect(findLocalUrl("compiled successfully in 412ms")).toBeNull();
   });
 
+  it("reads a port the dev server printed in bold (Vite)", () => {
+    const vite = "  \x1b[32m➜\x1b[39m  \x1b[1mLocal\x1b[22m:   \x1b[36mhttp://localhost:\x1b[1m5173\x1b[22m/\x1b[39m\n";
+    expect(findLocalUrl(vite)).toBe("http://localhost:5173/");
+  });
+
+  it("does not read a colour reset after the URL as part of its path", () => {
+    expect(findLocalUrl("ready on \x1b[4mhttp://localhost:3000/app\x1b[24m\n")).toBe("http://localhost:3000/app");
+  });
+
   it("ignores a remote URL", () => {
     expect(findLocalUrl("see https://example.com:8080/docs")).toBeNull();
+  });
+});
+
+describe("stripAnsi", () => {
+  it("removes colour, cursor and title sequences and keeps the text", () => {
+    const text = "\x1b]0;vite\x07\x1b[2K\x1b[1G\x1b[31merror\x1b[0m done\x1bc";
+    expect(stripAnsi(text)).toBe("error done");
   });
 });

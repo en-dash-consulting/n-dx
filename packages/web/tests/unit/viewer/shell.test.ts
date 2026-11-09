@@ -296,6 +296,44 @@ describe("TopNav", () => {
     expect(btn.title).toContain(text);
   });
 
+  it("offers the served app as an Open app button opposite Stop, with the log collapsed", async () => {
+    const fallback = globalThis.fetch;
+    const output = [
+      "\x1b[2m> demo@1.0.0 dev\x1b[22m",
+      "",
+      "  \x1b[32m\x1b[1mVITE\x1b[22m v6.0.0\x1b[39m  ready in 210 ms",
+      "  \x1b[32m➜\x1b[39m  \x1b[1mLocal\x1b[22m:   \x1b[36mhttp://localhost:\x1b[1m5173\x1b[22m/\x1b[39m",
+      "  \x1b[2m➜  press h + enter to show help\x1b[22m",
+      "",
+    ].join("\n");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          status: { running: true, label: "npm run dev", output, url: "http://localhost:5173/", exitCode: null, error: null, stopped: false },
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    // The link lives in the menu, not beside the nav button.
+    expect(root.querySelector(".runcmd-open")).toBeNull();
+    act(() => { root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!.click(); });
+
+    const actions = root.querySelector(".runcmd-actions")!;
+    const open = actions.firstElementChild as HTMLAnchorElement;
+    expect(open.classList.contains("runcmd-open")).toBe(true);
+    expect(open.getAttribute("href")).toBe("http://localhost:5173/");
+    expect(open.target).toBe("_blank");
+    expect(actions.lastElementChild?.classList.contains("runcmd-stop")).toBe(true);
+
+    const pre = root.querySelector(".runcmd-output")!;
+    expect(pre.textContent).not.toContain("\x1b");
+    expect(pre.querySelectorAll(".runcmd-line")).toHaveLength(3);
+    expect(pre.textContent).toContain("Local:   http://localhost:5173/");
+    expect(pre.querySelector(".ansi-fg-6")).not.toBeNull();
+  });
+
   it("keeps the run-project control, disabled, in a static export", async () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
     await mount(nav("home"));
