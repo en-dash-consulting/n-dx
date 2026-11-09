@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "99e076e5-3c23-4243-b897-2a640d8e41a7":
+    status: "completed"
+    startedAt: "2026-11-07T02:11:31.722Z"
+    completedAt: "2026-11-07T02:11:31.722Z"
+    endedAt: "2026-11-07T02:11:31.722Z"
+    activeIntervals: [{"end":"2026-11-07T02:11:31.722Z","start":"2026-11-07T02:11:31.722Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in d84dbea30 (v2 Live selection, routes-live.ts, 2026-10-29); reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    appliedAt: "2026-11-07T02:11:31.722Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-07T02:11:31.722Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

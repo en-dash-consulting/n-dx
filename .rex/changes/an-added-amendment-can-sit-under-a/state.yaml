@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "040994fb-5eba-406b-8341-91c8c23b79c8":
+    status: "deferred"
+    createdAt: "2026-11-07T02:15:57.806Z"
+    lastModified: "2026-11-07T02:16:21.665Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a55c7225-d9fc-451b-9b52-d48773e0f0fb":
+    status: "deferred"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-11-07T02:16:14.862Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

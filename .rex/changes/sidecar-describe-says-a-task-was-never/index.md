@@ -8,7 +8,8 @@ acceptanceCriteria:
   - "createPacketSources(ctx).runs(taskId) returns the task's runs from every target spawned.runTargets() lists, newest first (unit test with a sibling worktree's run)"
   - "The Describe packet lists a sibling worktree's run with its worktree named instead of 'No run of this task is recorded.' (test)"
 touches:
-  - "a6a5ac6a-ca47-435e-8749-91505acad43f"
+  - "1710be37-554f-47bf-a9e0-609a6ab90768"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"8cb5a7fc-a5c6-4744-b317-6b7b941b2e4c","run":"a41015c2-7aba-498b-aa56-ca26d64b78d9"}
 tags:

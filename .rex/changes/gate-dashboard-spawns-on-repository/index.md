@@ -10,7 +10,7 @@ acceptanceCriteria:
   - "Side-effect GET routes (commands manifest, auth, init preflight, LLM catalog and local-status, ndx-config) call isForeignSiteRequest, and /api/commands/auth becomes a POST"
   - "/data/* serves only the known data-file set as JSON or plain text with X-Content-Type-Options: nosniff and is realpath-confined inside .sourcevision; X-Frame-Options: DENY and a CSP are set on every response; the hub proxy forwards an untrusted Origin unchanged"
 touches:
-  - "6f8afa48-7f03-4faa-82de-81af5c7db69e"
+  - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
 priority: "high"
 source: "ndx-capture"
 blockedBy:

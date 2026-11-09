@@ -12,6 +12,7 @@ acceptanceCriteria:
   - "A write through a symlink that resolves outside the project is refused as an escape"
 touches:
   - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
+fix: true
 priority: "high"
 discoveredFrom: {"item":"82468601-c666-4943-a9ac-b11bb0149372"}
 tags:

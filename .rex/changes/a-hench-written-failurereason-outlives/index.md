@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "A failureReason written by a person or by the agent is not cleared on completion (tested)"
 touches:
   - "3415b5f0-3496-4813-8cc9-9f571044d49c"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"112f9a0f-f3f3-4024-86f8-aa01ebaba3a1","run":"c9e3a8a7-086b-4581-ab4c-aeb5504c2ef5"}
 tags:

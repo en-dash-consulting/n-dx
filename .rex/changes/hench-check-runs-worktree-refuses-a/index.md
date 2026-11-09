@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "A check-runs test passes a differently cased worktree path and asserts the narrowed audit; it skips on a case-sensitive filesystem and fails against the current realpathSync canonical()"
 touches:
   - "00db9d79-324d-4b64-acb7-e65deaa43b06"
+fix: true
 priority: "low"
 tags:
   - "ndx-adversarial-review"

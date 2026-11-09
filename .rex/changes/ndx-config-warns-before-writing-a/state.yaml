@@ -1,7 +1,15 @@
 schema: "rex/v2"
 items:
   "82c94fef-c163-464a-92bd-e081fc92c852":
+    status: "completed"
+    startedAt: "2026-11-07T02:11:14.930Z"
+    completedAt: "2026-11-07T02:11:14.930Z"
+    endedAt: "2026-11-07T02:11:14.930Z"
+    activeIntervals: [{"end":"2026-11-07T02:11:14.930Z","start":"2026-11-07T02:11:14.930Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in c772b48de (tracked-local classifier applied to config writes, 2026-10-29) and 0dfc6c6ae; reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    appliedAt: "2026-11-07T02:11:14.930Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    needsPlacement: false
-    lastModified: "2026-10-28T14:36:14.582Z"
+    lastModified: "2026-11-07T02:11:14.930Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

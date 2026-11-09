@@ -8,7 +8,8 @@ acceptanceCriteria:
   - "The first GET /api/rex/prd routed to a not-yet-created worktree workspace answers 200 with that worktree's PRD, with no .rex/.cache/prd.json in the worktree beforehand"
   - "A web integration test drives that first request through the workspace dispatcher and fails on the current fire-and-forget setup"
 touches:
-  - "16015ed9-d730-417e-a5ca-22c073a934b6"
+  - "e96db771-5ed0-4ba8-a70b-74a30f462f65"
+fix: true
 priority: "medium"
 tags:
   - "ndx-adversarial-review"

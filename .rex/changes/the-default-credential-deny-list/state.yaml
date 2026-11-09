@@ -1,7 +1,15 @@
 schema: "rex/v2"
 items:
   "079c13ae-3179-49bd-a4cc-783a29b8ef6d":
+    status: "completed"
+    startedAt: "2026-11-07T02:11:24.708Z"
+    completedAt: "2026-11-07T02:11:24.708Z"
+    endedAt: "2026-11-07T02:11:24.708Z"
+    activeIntervals: [{"end":"2026-11-07T02:11:24.708Z","start":"2026-11-07T02:11:24.708Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in c772b48de (broadened child credential filtering, 2026-10-29); reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    appliedAt: "2026-11-07T02:11:24.708Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    needsPlacement: false
-    lastModified: "2026-10-28T14:35:44.142Z"
+    lastModified: "2026-11-07T02:11:24.708Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
