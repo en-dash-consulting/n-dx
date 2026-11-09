@@ -164,6 +164,14 @@ describe("a work set and an earlier branch of the same name", () => {
     expectAdopted();
   });
 
+  it("removing the earlier task and adding it again also puts it in this branch's set", async () => {
+    await init("main");
+    leaveOpenMergeAndReuse();
+    rex("branch", "remove", LOW_TASK);
+    expect(rex("branch", "add", LOW_TASK)).toContain("Added to feat/x");
+    expectAdopted();
+  });
+
   it("MCP assign_to_branch adopts it the same way", async () => {
     await init("main");
     leaveOpenMergeAndReuse();

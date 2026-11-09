@@ -215,6 +215,19 @@ describe("planAssignToBranch: units an earlier branch of the name left", () => {
     expect(deliveries(plan.tree)).toMatchObject({ solo: { branch: "feat/solo", since: "fork1" } });
   });
 
+  it("writes since for a unit whose own fork-point row named the branch, even after it was taken off or moved", () => {
+    // Removed since: no delivery now, but its fork-point row is earlier.
+    expect(deliveries(planAssignToBranch(fixture(), ["t-pending"], "feat/x", { earlier: earlier("t-pending") }).tree)).toEqual({
+      "t-pending": { branch: "feat/x", since: "fork1" },
+    });
+    // Moved to another branch and back.
+    const tree = fixture();
+    (tree.changes[0].children![0] as { delivery?: unknown }).delivery = { branch: "feat/other" };
+    expect(deliveries(planAssignToBranch(tree, ["t-pending"], "feat/x", { move: true, earlier: earlier("t-pending") }).tree)).toEqual({
+      "t-pending": { branch: "feat/x", since: "fork1" },
+    });
+  });
+
   it("a move drops a since left from an earlier adoption", () => {
     const tree = fixture();
     (tree.changes[1] as { delivery?: unknown }).delivery = { branch: "feat/old", since: "fork0" };

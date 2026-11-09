@@ -187,6 +187,8 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
       adopt.add(unit);
       current = undefined;
     }
+    // Its own row named the branch at the fork point (since removed or moved): a plain `{ branch }` would match it again.
+    if (earlier?.ids.has(unit.id)) adopt.add(unit);
     const from = current?.branch;
     if (from === branch) report.unchanged.push(unit.id);
     else if (current !== undefined && !options.move) {
@@ -209,6 +211,7 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
       adopt.add(owner);
     } else if (options.move) report.moved.push({ id: owner.id, from });
     else continue;
+    if (earlier?.ids.has(owner.id)) adopt.add(owner);
     retarget.push(owner);
     report.assigned.push(owner.id);
   }
