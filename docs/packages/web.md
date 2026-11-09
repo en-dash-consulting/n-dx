@@ -197,11 +197,41 @@ On Tune, the run classifier's verdict chip on a failed run shows whether or not 
 
 **Without the Sidecar.** Everything above is hidden. Plan keeps Preview, Draft with the model and the placement panel; Specs to tighten still links to the filtered list; the Tune tiles keep working.
 
+## Start Working
+
+The Start Working / Start Task button (the Rex Dashboard's Up Next card, the
+Hench Runs empty state, the Live idle card, each Workspaces card and the PRD
+task panel) is a split button:
+
+- **The button** starts the run in one click (`POST /api/hench/execute`). A
+  task with saved run settings runs with them — the request carries no
+  options, so the task's `run` block is what `ndx work` applies. A task with
+  none first has the project defaults the Prepare task modal would show saved
+  on it as its `run` block (`PUT /api/hench/prep/:taskId`, version `none`), so
+  the settings the run used are visible and editable on the task afterwards.
+  Unlike a Save, this block keeps fields equal to today's defaults: it records
+  what the run used. Settings a task cannot hold (`bypassPermissions`, the
+  launch-time options) stay with the project.
+- **The ▾ arrow** opens the Prepare task modal, to change the settings for one
+  run or save them on the task.
+
+Where the button carries the run-mode picker (one task, a set number, until
+done), the picker governs the click and its label says so ("Start working ·
+until done"); it falls back to one task after each start.
+
+Nothing is saved when the run would be refused (the click then reports the
+server's refusal, including the slug-migration offer). If the save itself
+fails, or someone else saved settings on the task in between (409), no run
+starts and the reason stays on the button; a second click on a task that now
+carries settings runs with them. Like any save, it writes the PRD, so the run
+commits it first as a planning commit.
+
 ## Prepare task
 
 The Prepare task modal shows every per-task `ndx work` option before a run
 starts: hench's resolved value for each, the key that supplied it, the
 refusals a run would hit, the equivalent terminal command and a brief preview.
+Start Working's ▾ arrow opens it.
 
 A change can be for this run or for the task, and the two are separate buttons:
 

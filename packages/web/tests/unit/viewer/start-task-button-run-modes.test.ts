@@ -9,11 +9,10 @@
  * preference: leaving it on "until done" would turn the next, unrelated click
  * into a queue-long run the operator did not choose.
  *
- * Since the Prepare task modal landed, Start Task is a split button: the
- * primary opens the modal for one task, and the caret's menu holds Start now.
- * The picker rides with Start now — the modal configures one run of one task
- * and prints the command line for it, while the mode says how many tasks the
- * click works through.
+ * Start Task is a split button: the primary click is the one-click run, and
+ * the arrow opens the Prepare task modal. The picker rides with the primary
+ * click — the modal configures one run of one task and prints the command line
+ * for it, while the mode says how many tasks the click works through.
  *
  * @see packages/web/src/viewer/components/start-task-button.ts
  * @see packages/web/src/shared/run-options.ts — the RunMode contract all three
@@ -26,6 +25,7 @@ import { act } from "preact/test-utils";
 import { StartTaskButton } from "../../../src/viewer/components/start-task-button.js";
 import { MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "../../../src/shared/index.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
+import { stubStartFetch } from "../../helpers/start-task-fetch.js";
 
 let root: HTMLDivElement | undefined;
 
@@ -35,30 +35,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/**
- * Stub a successful execute POST and return the spy.
- *
- * The parameters are declared even though the body ignores them: `vi.fn` takes
- * the call-argument tuple from the implementation's signature, so a zero-arg
- * stub records calls as `[]` and {@link bodyOf} has no `[1]` to read.
- */
+/** Stub a successful start for a task carrying saved settings, and return the recorder. */
 function stubOk() {
-  const spy = vi.fn(async (_url: string, _init?: RequestInit) => ({
-    ok: true,
-    status: 202,
-    json: async () => ({ runId: "r1" }),
-  }));
-  vi.stubGlobal("fetch", spy);
-  return spy;
+  return stubStartFetch({ execute: { status: 202, body: { runId: "r1" } } });
 }
 
 /** The JSON body of the Nth execute POST. */
-function bodyOf(spy: ReturnType<typeof stubOk>, call = 0): Record<string, unknown> {
-  const body = spy.mock.calls[call]?.[1]?.body;
-  if (typeof body !== "string") {
-    throw new Error(`execute call ${call} had no JSON body`);
-  }
-  return JSON.parse(body) as Record<string, unknown>;
+function bodyOf(stub: ReturnType<typeof stubOk>, call = 0): Record<string, unknown> {
+  const body = stub.executes()[call]?.body;
+  if (!body) throw new Error(`execute call ${call} had no JSON body`);
+  return body;
 }
 
 function render(props: Record<string, unknown> = {}) {
@@ -74,23 +60,12 @@ async function setMode(value: string): Promise<void> {
   });
 }
 
-/** The caret's menu item, with the menu opened if it is not already. */
-async function openStartNow(): Promise<HTMLButtonElement> {
-  if (!root!.querySelector(".ready-menu")) {
-    await act(async () => {
-      root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
-    });
-  }
-  return root!.querySelector<HTMLButtonElement>(".ready-menu [role='menuitem']")!;
-}
+const primary = () => root!.querySelector<HTMLButtonElement>(".start-task-primary")!;
 
-/** Start now — the one-click run the picker qualifies. */
+/** The primary click — the one-click run the picker qualifies. */
 async function clickStart(): Promise<void> {
-  const item = await openStartNow();
-  await act(async () => {
-    item.click();
-    await new Promise((r) => setTimeout(r, 0));
-  });
+  await act(async () => { primary().click(); });
+  for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 }
 
 describe("StartTaskButton run modes", () => {
@@ -100,22 +75,22 @@ describe("StartTaskButton run modes", () => {
   });
 
   it("sends no mode at all for a single run, so old and new clients agree", async () => {
-    const spy = stubOk();
+    const stub = stubOk();
     render({ runModes: true });
     await clickStart();
-    expect(bodyOf(spy)).toEqual({ taskId: "t-1" });
+    expect(bodyOf(stub)).toEqual({ taskId: "t-1" });
   });
 
   it("sends mode=loop when the operator picks until-done", async () => {
-    const spy = stubOk();
+    const stub = stubOk();
     render({ runModes: true });
     await setMode("loop");
     await clickStart();
-    expect(bodyOf(spy)).toEqual({ taskId: "t-1", mode: "loop" });
+    expect(bodyOf(stub)).toEqual({ taskId: "t-1", mode: "loop" });
   });
 
   it("sends mode=iterations with the chosen count", async () => {
-    const spy = stubOk();
+    const stub = stubOk();
     render({ runModes: true });
     await setMode("iterations");
     const input = root!.querySelector<HTMLInputElement>(".start-task-iterations")!;
@@ -124,13 +99,13 @@ describe("StartTaskButton run modes", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await clickStart();
-    expect(bodyOf(spy)).toEqual({ taskId: "t-1", mode: "iterations", iterations: 7 });
+    expect(bodyOf(stub)).toEqual({ taskId: "t-1", mode: "iterations", iterations: 7 });
   });
 
   it("clamps the count to what the server will accept", async () => {
     // The route answers 400 outside 2..MAX. Clamping in the input stops the
     // operator at the boundary instead of after a failed click.
-    const spy = stubOk();
+    const stub = stubOk();
     render({ runModes: true });
     await setMode("iterations");
     const input = root!.querySelector<HTMLInputElement>(".start-task-iterations")!;
@@ -144,56 +119,55 @@ describe("StartTaskButton run modes", () => {
         input.dispatchEvent(new Event("input", { bubbles: true }));
       });
       await clickStart();
-      expect(bodyOf(spy, spy.mock.calls.length - 1).iterations, typed).toBe(expected);
+      expect(bodyOf(stub, stub.executes().length - 1).iterations, typed).toBe(expected);
       await setMode("iterations");
     }
   });
 
-  it("says on Start now how much work the click starts", async () => {
+  it("says on the primary button how much work the click starts", async () => {
     render({ runModes: true, label: "Start working" });
-    expect((await openStartNow()).textContent).toBe("Start now");
+    expect(primary().textContent).toBe("Start working");
 
     await setMode("loop");
     // A picker that only changed hidden behaviour is how someone launches a
     // queue-long run believing they started one task.
-    expect((await openStartNow()).textContent).toContain("until done");
-    expect((await openStartNow()).getAttribute("aria-label")).toContain("until the queue is empty");
+    expect(primary().textContent).toBe("Start working · until done");
+    expect(primary().getAttribute("aria-label")).toContain("until the queue is empty");
 
     await setMode("iterations");
-    expect((await openStartNow()).textContent).toContain("3 tasks");
+    expect(primary().textContent).toContain("3 tasks");
+    expect(primary().getAttribute("aria-label")).toContain("3 tasks in a row");
   });
 
-  it("leaves the modal's own button alone, because the modal is one task", async () => {
-    // The primary opens Prepare task, which resolves and prints the command
-    // line for a single run. A mode on that label would describe a run the
-    // modal does not start.
+  it("leaves the arrow to the modal, which configures one task whatever the mode", async () => {
+    const stub = stubOk();
     render({ runModes: true, label: "Start working" });
-    const primary = root!.querySelector<HTMLButtonElement>(".start-task-primary")!;
-    expect(primary.textContent).toBe("Start working");
-
     await setMode("loop");
-    expect(primary.textContent).toBe("Start working");
+
+    await act(async () => { root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click(); });
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(stub.executes()).toHaveLength(0);
+    // The selection is untouched: nothing started.
+    expect(root!.querySelector<HTMLSelectElement>(".start-task-mode-select")!.value).toBe("loop");
   });
 
   it("falls back to one task after a run starts", async () => {
-    const spy = stubOk();
+    const stub = stubOk();
     render({ runModes: true });
     await setMode("loop");
     await clickStart();
-    expect(bodyOf(spy, 0).mode).toBe("loop");
+    expect(bodyOf(stub, 0).mode).toBe("loop");
+    expect(root!.querySelector<HTMLSelectElement>(".start-task-mode-select")!.value).toBe("single");
 
     await clickStart();
-    expect(bodyOf(spy, 1)).toEqual({ taskId: "t-1" });
+    expect(bodyOf(stub, 1)).toEqual({ taskId: "t-1" });
   });
 
   it("keeps the selection when the server refuses, so it can be retried", async () => {
     // The opposite of the reset above: nothing started, so the operator's
     // choice is still the one they are acting on.
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: false,
-      status: 409,
-      json: async () => ({ error: "Task is already being executed" }),
-    })));
+    stubStartFetch({ execute: { status: 409, body: { error: "Task is already being executed" } } });
     render({ runModes: true });
     await setMode("loop");
     await clickStart();

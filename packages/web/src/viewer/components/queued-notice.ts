@@ -5,7 +5,7 @@
  * (`useHubQueue`): the position follows the queue, leaving the queue means the
  * run was admitted, and a `dropped` record means the run's server refused it at
  * its turn. Shared by every surface that can start a run, so they all say the
- * same thing: the Prepare task modal, the Start button's "Start now" and the
+ * same thing: the Prepare task modal, the Start button's one click and the
  * Ready to run list.
  */
 

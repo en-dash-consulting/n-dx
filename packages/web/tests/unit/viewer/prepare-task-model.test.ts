@@ -13,6 +13,8 @@ import {
   commandWords,
   CONTEXT_FILE_PLACEHOLDER,
   defaultsOf,
+  defaultsRunBlockOf,
+  hasSavedRun,
   fallbackOf,
   isChanged,
   isSavedOnTask,
@@ -480,5 +482,89 @@ describe("settings saved on the task", () => {
 
       expect(runOptionsOf(d, { fresh: false, allowDirty: false })).toEqual({});
     });
+  });
+});
+
+describe("defaultsRunBlockOf — what Start Working saves on a task with none", () => {
+  it("writes down every setting the modal shows that a task can hold", () => {
+    // Unlike a Save, a field equal to its project default is kept: the click
+    // records what this run is about to use, so it is visible on the task.
+    expect(defaultsRunBlockOf(prepFixture())).toEqual({
+      models: { claude: "claude-sonnet" },
+      provider: "api",
+      permissionMode: "acceptEdits",
+      reviewMode: "off",
+      skipTestGate: false,
+      maxTurns: 50,
+      tokenBudget: 0,
+    });
+  });
+
+  it("leaves out what a saved block cannot hold or a CLI run ignores", () => {
+    const base = prepFixture().resolved;
+    const block = defaultsRunBlockOf(prepFixture({
+      resolved: {
+        ...base,
+        provider: { value: "cli", source: "built-in" },
+        // rex refuses this mode on an item; the run finds it in hench config anyway.
+        permissionMode: { value: "bypassPermissions", source: "hench.permissionMode" },
+        maxTurns: { value: 900, source: "hench.maxTurns" },
+        fresh: { value: true, source: "cli-flag" },
+        allowDirty: { value: true, source: "cli-flag" },
+      },
+    }))!;
+
+    expect(block).not.toHaveProperty("permissionMode");
+    expect(block).not.toHaveProperty("maxTurns");
+    expect(block).not.toHaveProperty("fresh");
+    expect(block).not.toHaveProperty("allowDirty");
+    expect(block).not.toHaveProperty("requireUnblocked");
+    expect(block.provider).toBe("cli");
+  });
+
+  it("pins a self reviewer under the executor's vendor", () => {
+    const base = prepFixture().resolved;
+    const block = defaultsRunBlockOf(prepFixture({
+      resolved: {
+        ...base,
+        review: { value: true, source: "hench.review.mode" },
+        reviewMode: { value: "self", source: "hench.review.mode" },
+      },
+    }))!;
+
+    expect(block).toMatchObject({ reviewMode: "self", reviewModels: { claude: "claude-sonnet" }, reviewOptional: false });
+    expect(block).not.toHaveProperty("reviewVendor");
+  });
+
+  it("pins a pair reviewer under the reviewer's own vendor, as hench reads it", () => {
+    const base = prepFixture().resolved;
+    const block = defaultsRunBlockOf(prepFixture({
+      resolved: {
+        ...base,
+        review: { value: true, source: "hench.review.mode" },
+        reviewMode: { value: "pair", source: "hench.review.mode" },
+        reviewVendor: { value: "codex", source: "hench.review.vendor" },
+        reviewModel: { value: "gpt-5.5", source: "built-in", vendorDefault: "gpt-5.5" },
+      },
+    }))!;
+
+    expect(block).toMatchObject({ reviewMode: "pair", reviewVendor: "codex", reviewModels: { codex: "gpt-5.5" } });
+  });
+
+  it("drops reviewer settings when no review runs", () => {
+    const block = defaultsRunBlockOf(prepFixture())!;
+    expect(block).not.toHaveProperty("reviewModels");
+    expect(block).not.toHaveProperty("reviewOptional");
+    expect(block).not.toHaveProperty("reviewVendor");
+  });
+});
+
+describe("hasSavedRun", () => {
+  it("reads a saved block or a version other than none as settings on the task", () => {
+    expect(hasSavedRun(prepFixture())).toBe(false);
+    expect(hasSavedRun(prepFixture({ saved: { tier: "heavy" }, savedVersion: "a1b2" }))).toBe(true);
+    // A hench that predates `saved` still reports the version.
+    expect(hasSavedRun(prepFixture({ saved: undefined, savedVersion: "a1b2" }))).toBe(true);
+    expect(hasSavedRun(prepFixture({ saved: undefined, savedVersion: undefined }))).toBe(false);
   });
 });
