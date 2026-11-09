@@ -382,6 +382,51 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
     }
   });
 
+  describe("two ndx start at once, both finding the older hub", () => {
+    let fx;
+    let older;
+    let second;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      second = await makeRepo(fx.root, "delta-app", "Delta App");
+      older = await startOlderHub(fx.home, false);
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("both succeed: one replaces it, the other joins the new hub instead of failing on the port", async () => {
+      if (!canBindPorts) return;
+      const [a, b] = await Promise.all([
+        runStart([`--port=${older.port}`, fx.omega], fx.home),
+        runStart([`--port=${older.port}`, second], fx.home),
+      ]);
+      for (const result of [a, b]) {
+        expect(result.code, result.stderr + result.stdout).toBe(0);
+        expect(result.stderr).not.toContain("did not release port");
+        expect(result.stdout).toContain("ndx_nonce=");
+        expectNoManualRestart(result.stdout + result.stderr);
+      }
+      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      // Exactly one of them started the new hub; the other joined it (or, arriving
+      // after the replacement, found a current hub to register with).
+      const both = a.stdout + a.stderr + b.stdout + b.stderr;
+      expect(both.match(/n-dx hub started on/g) ?? []).toHaveLength(1);
+      // One hub answers, holding every project.
+      const pidFile = JSON.parse(readFileSync(join(fx.home, "hub.pid"), "utf-8"));
+      expect(pidFile.port).toBe(older.port);
+      const states = Object.fromEntries((await hubGet(older.port, "/api/hub/projects")).body.projects.map((p) => [p.id, p.status.state]));
+      expect(states).toMatchObject({ "alpha-app": "healthy", "beta-app": "healthy", "omega-app": "healthy", "delta-app": "healthy" });
+    });
+  });
+
   describe("with Sidecar turns in flight on it", () => {
     let fx;
     let older;

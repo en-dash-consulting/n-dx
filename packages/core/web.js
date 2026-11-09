@@ -2033,7 +2033,13 @@ async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
   let lastReason = null;
   while (Date.now() < deadline) {
     const healthy = await hubIsHealthy(port, home);
-    if (healthy.ok) return { spawned: true, pid: child.pid };
+    if (healthy.ok) {
+      // Two commands that both found the port free both spawn; the second's
+      // hub cannot bind, and the hub answering is the first's. Join it.
+      const own = await identifyOwnHub(port, home);
+      if (own.ok && own.pid !== child.pid) return joinedHub(port);
+      return { spawned: true, pid: child.pid };
+    }
     lastReason = healthy.reason ?? lastReason;
     if (!isProcessRunning(child.pid)) break;
     await new Promise((r) => setTimeout(r, 200));
@@ -2083,23 +2089,48 @@ async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, 
   // stops every project server before exiting. hub.json is kept, and the new
   // hub brings each project back from it under the same id.
   await terminateTreeByPid(own.pid, { forceKillTimeoutMs: HUB_STOP_GRACE_MS });
-  if (!(await waitForPortFree(port, HUB_STOP_GRACE_MS + 5_000))) {
+  const freed = await waitForPortFreeOrNewHub(port, own.pid, home, HUB_STOP_GRACE_MS + 5_000);
+  if (freed === "held") {
     await discardSessionHandover(home);
     throw new Error(`The old n-dx hub (PID ${own.pid}) did not release port ${port}; nothing was started in its place.`);
   }
-  const spawned = await spawnHub(port, { tools, __dir, home, tokenFile });
+  // Another ndx start replaced the same old hub first: its hub is this one's too.
+  const spawned = freed === "replaced" ? joinedHub(port) : await spawnHub(port, { tools, __dir, home, tokenFile });
   const restored = await restoreHubProjects(port, projects, home);
   return { ...spawned, restored };
 }
 
-/** Wait until nothing listens on `port`; false when it is still held after `timeoutMs`. */
-async function waitForPortFree(port, timeoutMs) {
+/** What a command that found its replacement already done reports: no spawn of its own, and a note. */
+function joinedHub(port) {
+  return { spawned: false, pid: null, note: `Another ndx start replaced the n-dx hub on port ${port} at the same time; this one joins that hub.` };
+}
+
+/**
+ * Wait for the old hub's port after stopping it: "free" once nothing listens,
+ * "replaced" once this user's hub — another one than `oldPid` — answers there
+ * (a concurrent `ndx start` replaced the same hub first), "held" when
+ * neither happened within `timeoutMs`.
+ *
+ * @param {number} port
+ * @param {number} oldPid
+ * @param {string} home
+ * @param {number} timeoutMs
+ * @returns {Promise<"free" | "replaced" | "held">}
+ */
+async function waitForPortFreeOrNewHub(port, oldPid, home, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  while (await isPortInUse(port)) {
-    if (Date.now() >= deadline) return false;
+  let nextIdentify = 0;
+  for (;;) {
+    if (!(await isPortInUse(port))) return "free";
+    // Identifying asks the process table, so not on every poll.
+    if (Date.now() >= nextIdentify) {
+      nextIdentify = Date.now() + 1_000;
+      const own = await identifyOwnHub(port, home);
+      if (own.ok && own.pid !== oldPid && (await hubIsHealthy(port, home)).ok) return "replaced";
+    }
+    if (Date.now() >= deadline) return "held";
     await new Promise((r) => setTimeout(r, 200));
   }
-  return true;
 }
 
 /**

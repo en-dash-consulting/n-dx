@@ -17,3 +17,5 @@ Hub-side faults no longer end in restart advice. A hub started without `--ndx-cl
 When the automatic rebuild of a `dist/` that is there but lags its source fails, or another process still holds the rebuild after the wait, `ndx start` warns with the build's output and goes on with the existing build, leaving an older hub serving; only a missing build is fatal.
 
 When `ndx start` replaces the hub, signed-in dashboard tabs stay signed in: the old hub hands its live sessions (as digests, in an owner-only file the new hub deletes on reading) to the new one. `ndx hub stop` still signs every tab out. `@n-dx/llm-client` exports `writeOwnerOnlyFile`.
+
+Two `ndx start` that replace the same older hub at once both succeed: the second joins the hub the first started instead of failing on the port.
