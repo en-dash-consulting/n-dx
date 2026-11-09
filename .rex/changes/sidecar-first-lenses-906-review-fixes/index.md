@@ -8,7 +8,8 @@ acceptanceCriteria:
   - "Every task below is complete"
   - "web.sidecar stays off by default"
 touches:
-  - "a6a5ac6a-ca47-435e-8749-91505acad43f"
+  - "1710be37-554f-47bf-a9e0-609a6ab90768"
+fix: true
 priority: "high"
 discoveredFrom: {"item":"b1ee136b-d88d-4f2f-848d-70db805df38b"}
 source: "ndx-adversarial-review"

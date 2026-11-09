@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "The task below is completed"
 touches:
   - "81e855bf-c278-46b7-924f-d5a3c4227b22"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"477c02f8-fba6-46ea-93ef-19fbf9293954"}
 ---

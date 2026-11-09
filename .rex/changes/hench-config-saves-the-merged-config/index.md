@@ -10,6 +10,7 @@ acceptanceCriteria:
   - "Each test fails on the code before the fix"
 touches:
   - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"ac6b536a-c462-40a2-b5c1-bd2d425ab8a9","run":"5178c0a5-f0ba-44d4-a25b-d26ccc6e8a15"}
 tags:

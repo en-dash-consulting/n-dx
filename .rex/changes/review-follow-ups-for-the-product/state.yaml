@@ -112,17 +112,9 @@ items:
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-16T21:39:58.907Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "4fd16cf1-6586-4904-b86b-20b014162859":
-    assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-17T01:16:39.125Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "51a8aed3-0098-43e1-9f84-87c080ababdd":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-13T19:52:36.022Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
-  "5d63a742-9729-495e-8a3d-ee541fd0fe25":
-    assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-16T23:20:18.046Z"
+    lastModified: "2026-11-07T02:16:14.862Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fd641c6-0cab-493b-a934-be788ae4463f":
     status: "cancelled"
@@ -228,11 +220,6 @@ items:
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-16T22:13:33.052Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "a55c7225-d9fc-451b-9b52-d48773e0f0fb":
-    status: "deferred"
-    assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-09T14:52:34.967Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "b1f05a4d-4947-4a7c-b2b5-e3bbed289b76":
     status: "completed"
     startedAt: "2026-10-28T01:41:55.788Z"
@@ -353,10 +340,6 @@ items:
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-28T00:08:31.551Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
-  "f7af456c-cc9d-4464-ac95-cb04572405db":
-    assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-13T19:52:30.050Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "fabfa3a2-9ef6-4f3e-a6f7-80c2223c8657":
     status: "completed"
     startedAt: "2026-10-16T05:05:12.165Z"

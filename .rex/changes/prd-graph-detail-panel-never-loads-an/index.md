@@ -11,6 +11,7 @@ acceptanceCriteria:
   - "/api/prd-origin rejects a path outside the rex directory"
 touches:
   - "a32f8a34-2c34-4ea1-9652-d85d0ba4e8d2"
+fix: true
 priority: "medium"
 discoveredFrom: {"item":"637d5b5b-b14e-441d-aa14-3c8944fec4fa","run":"12a5a8f6-e62b-407a-9659-55b883768b75"}
 tags:

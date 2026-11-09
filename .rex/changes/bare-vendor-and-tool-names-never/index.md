@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "Test (resolution unit test, runnable on any platform): the resolver skips the project directory and relative PATH entries"
 touches:
   - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
+fix: true
 priority: "low"
 discoveredFrom: {"item":"82468601-c666-4943-a9ac-b11bb0149372"}
 tags:

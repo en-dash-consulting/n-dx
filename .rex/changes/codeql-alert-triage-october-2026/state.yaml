@@ -1,0 +1,92 @@
+schema: "rex/v2"
+items:
+  "244a15f7-aa19-469a-870b-f250e48063ac":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:39.705Z"
+    completedAt: "2026-11-07T02:06:39.705Z"
+    endedAt: "2026-11-07T02:06:39.705Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:39.705Z","start":"2026-11-07T02:06:39.705Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in 92161a4b7 and fc61fcb9f (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:39.705Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "268f39f3-dbd5-4397-9774-f1e0f6ffa0ec":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:12.298Z"
+    completedAt: "2026-11-07T02:06:12.298Z"
+    endedAt: "2026-11-07T02:06:12.298Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:12.298Z","start":"2026-11-07T02:06:12.298Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in 7c12c182e and 7127b2508 (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:12.298Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3983fd13-776b-4a52-b409-507b317cc847":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:32.644Z"
+    completedAt: "2026-11-07T02:06:32.644Z"
+    endedAt: "2026-11-07T02:06:32.644Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:32.644Z","start":"2026-11-07T02:06:32.644Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in 8ead882b2 and 41d953963 (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:32.644Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5ce96100-3aa2-49ee-881d-32128dc9cb39":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:25.069Z"
+    completedAt: "2026-11-07T02:06:25.069Z"
+    endedAt: "2026-11-07T02:06:25.069Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:25.069Z","start":"2026-11-07T02:06:25.069Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in 4ce8d35c2 and 740b1ad61 (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:25.069Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "86b6f51a-6a97-4c60-803c-87eb1f8e3dcf":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:09.096Z"
+    completedAt: "2026-11-07T02:06:09.096Z"
+    endedAt: "2026-11-07T02:06:09.096Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:09.096Z","start":"2026-11-07T02:06:09.096Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in aa7886f0b and d17da2665 (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:09.096Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "98fe5cc3-1d8a-47dc-846b-90a756868693":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:39.705Z"
+    completedAt: "2026-11-07T02:06:39.705Z"
+    endedAt: "2026-11-07T02:06:39.705Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:39.705Z","start":"2026-11-07T02:06:39.705Z"}]
+    appliedAt: "2026-11-07T02:06:39.705Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-07T02:06:39.705Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c9d90073-ef5d-455f-b30d-cc2e6efebcfa":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:29.023Z"
+    completedAt: "2026-11-07T02:06:29.023Z"
+    endedAt: "2026-11-07T02:06:29.023Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:29.023Z","start":"2026-11-07T02:06:29.023Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in 2471bd726 and 98914d8ef (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:29.023Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d5c544d1-8ba7-4ef2-93e8-cfc0c45d2e43":
+    status: "completed"
+    startedAt: "2026-11-07T02:06:18.273Z"
+    completedAt: "2026-11-07T02:06:18.273Z"
+    endedAt: "2026-11-07T02:06:18.273Z"
+    activeIntervals: [{"end":"2026-11-07T02:06:18.273Z","start":"2026-11-07T02:06:18.273Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in b6a62314c (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:06:18.273Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f35328ee-9eed-4f9b-a6db-1ca57be41689":
+    status: "completed"
+    startedAt: "2026-11-07T02:05:55.339Z"
+    completedAt: "2026-11-07T02:05:55.339Z"
+    endedAt: "2026-11-07T02:05:55.339Z"
+    activeIntervals: [{"end":"2026-11-07T02:05:55.339Z","start":"2026-11-07T02:05:55.339Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Landed on main in 4443ec08e and 430f5d109 (CodeQL stack, 2026-10-21); status reconciled in the 2026-11-06 PRD audit from N-DX-Item trailers."
+    lastModified: "2026-11-07T02:05:55.339Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
