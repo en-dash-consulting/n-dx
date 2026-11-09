@@ -134,20 +134,22 @@ describe("hub session hand-over", () => {
     const sessions = new CredentialStore({ sha256: (v) => v }).exportSessions();
     expect(sessions).toEqual([]);
     const file = join(home, SESSION_HANDOVER_FILE);
-    const cases: Array<[string, () => void]> = [
-      ["stale", () => writeSessionHandover({ home, port, token: token(), now: () => Date.now() - SESSION_HANDOVER_MAX_AGE_MS - 1_000 }, [])],
-      ["other port", () => writeSessionHandover({ home, port: port + 1, token: token() }, [])],
-      ["other home", () => writeSessionHandover({ home: join(dir, "other-home"), port, token: token() }, [])],
-      ["other token", () => writeSessionHandover({ home, port, token: "x".repeat(43) }, [])],
+    // Each case is refused by the check it names, not an earlier one: every
+    // file is owner-only, as a real hand-over is.
+    const cases: Array<[string, () => void, string]> = [
+      ["stale", () => writeSessionHandover({ home, port, token: token(), now: () => Date.now() - SESSION_HANDOVER_MAX_AGE_MS - 1_000 }, []), "it is too old"],
+      ["other port", () => writeSessionHandover({ home, port: port + 1, token: token() }, []), "it was written for another port"],
+      ["other home", () => writeSessionHandover({ home: join(dir, "other-home"), port, token: token() }, []), "it was written for another ndx home"],
+      ["other token", () => writeSessionHandover({ home, port, token: "x".repeat(43) }, []), "it was written under another token"],
     ];
-    for (const [name, write] of cases) {
+    for (const [name, write, reason] of cases) {
       write();
       if (name === "other home") {
-        // Written into the other home: move it where this hub looks.
-        writeFileSync(file, readFileSync(join(dir, "other-home", SESSION_HANDOVER_FILE)));
+        // Written into the other home: copy it, owner-only, where this hub looks.
+        writeFileSync(file, readFileSync(join(dir, "other-home", SESSION_HANDOVER_FILE)), { mode: 0o600 });
       }
       const taken = takeSessionHandover({ home, port, token: token() });
-      expect(taken.taken, name).toBe(false);
+      expect(taken, name).toEqual({ taken: false, reason });
       expect(existsSync(file), name).toBe(false);
     }
 
