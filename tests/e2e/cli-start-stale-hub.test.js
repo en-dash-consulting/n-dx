@@ -67,6 +67,8 @@ const server = createServer((req, res) => {
     if (req.method === "GET" && /^\\/p\\/[^/]+\\/api\\/mcp\\/sessions$/.test(url)) {
       return busy === "busy" ? reply(200, { rex: 1, sourcevision: 0 }) : reply(404, { error: "Not found" });
     }
+    // A newer hub has the nonce route; an older one proxies the request and gets 409.
+    if (req.method === "POST" && url === "/api/auth/nonce" && JSON.parse(extra || "{}").nonce) return reply(200, { nonce: "n0nce", expiresAt: Date.now() + 60000 });
     // The root request reached the project proxy, which cannot pick one of two.
     return reply(409, { error: "Several projects are registered; address one as /p/<id>/…" });
   });
@@ -246,6 +248,69 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(pidFile.port).toBe(older.port);
       expect(pidFile.pid).not.toBe(older.child.pid);
       await expectProjectsServedAgain(older.port);
+    });
+  });
+
+  // The build this ndx would spawn, as its web package and stamp describe it.
+  const webDir = join(import.meta.dirname, "../../packages/web");
+  const ownBuild = () => ({
+    version: JSON.parse(readFileSync(join(webDir, "package.json"), "utf-8")).version,
+    sourceHash: JSON.parse(readFileSync(join(webDir, "dist", ".build-stamp.json"), "utf-8")).sourceHash,
+  });
+
+  describe.each([
+    {
+      name: "newer than this ndx",
+      build: () => ({ ...ownBuild(), version: "999.0.0", packageRoot: webDir }),
+      replaced: false,
+      says: /The running n-dx hub is @n-dx\/web 999\.0\.0, newer than this ndx's [^;]+; it keeps serving\./,
+    },
+    {
+      name: "from another checkout, same version, other source",
+      build: () => ({ ...ownBuild(), sourceHash: "f".repeat(64), packageRoot: join(webDir, "..", "..", "..", "other-checkout", "packages", "web") }),
+      replaced: false,
+      says: /started from another checkout's @n-dx\/web \(.*other-checkout.*\), not this ndx's; it keeps serving\./,
+    },
+    {
+      name: "an earlier build of this same checkout",
+      build: () => ({ ...ownBuild(), sourceHash: "f".repeat(64), packageRoot: webDir }),
+      replaced: true,
+      says: /Replacing the n-dx hub on port \d+: the running n-dx hub was started from an earlier build of this checkout's @n-dx\/web/,
+    },
+  ])("a hub $name", ({ build, replaced, says }) => {
+    let fx;
+    let other;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      other = await startOlderHub(fx.home, false, { build: build(), nonce: true });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (other?.child && alive(other.child.pid)) other.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it(replaced ? "is replaced" : "is left serving, with a one-line note and no instruction", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${other.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(result.stderr).toMatch(says);
+      expectNoManualRestart(result.stdout + result.stderr);
+      if (replaced) {
+        expect(await waitForPidExit(other.child.pid, 15_000)).toBe(true);
+        await expectProjectsServedAgain(other.port);
+      } else {
+        expect(alive(other.child.pid)).toBe(true);
+        const notes = result.stderr.split(/\r?\n/).filter((line) => line.startsWith("Note: "));
+        expect(notes).toHaveLength(1);
+        expect(notes[0]).not.toMatch(/ndx start|ndx hub stop|restart|pnpm|--replace-hub/i);
+        expect(result.stderr).not.toContain("Replacing");
+      }
     });
   });
 

@@ -9,7 +9,7 @@
  * read from disk, the comparison with a running hub's, and the wording.
  *
  * @see packages/core/build-identity.mjs
- * @see packages/core/web.js — serverRefreshFix, noNonceNote, shouldRebuildForNonce, hubBuildMismatch, formatUnrecordedStatus
+ * @see packages/core/web.js — serverRefreshFix, noNonceNote, shouldRebuildForNonce, judgeHubBuild, formatUnrecordedStatus
  * @see tests/unit/source-build.test.js — the rebuild a lagging dist/ gets before anything is spawned
  * @see tests/e2e/cli-start-stale-hub.test.js — the same, driven through `ndx start` against an older hub
  */
@@ -22,7 +22,8 @@ import { sourceHash as gateSourceHash } from "../../scripts/lib/stale-dist.mjs";
 import {
   formatUnrecordedStatus,
   hereServerCommands,
-  hubBuildMismatch,
+  compareVersions,
+  judgeHubBuild,
   noNonceNote,
   serverRefreshFix,
   shouldRebuildForNonce,
@@ -177,19 +178,63 @@ describe("noNonceNote", () => {
   });
 });
 
-describe("hubBuildMismatch", () => {
-  it("names a hub that reports no build identity as predating this ndx", () => {
-    expect(hubBuildMismatch(undefined, current)).toMatch(/predates this ndx/);
+describe("compareVersions", () => {
+  it("orders major, minor, patch and prereleases as semver does", () => {
+    expect(compareVersions("0.10.2", "0.10.3")).toBeLessThan(0);
+    expect(compareVersions("0.11.0", "0.10.9")).toBeGreaterThan(0);
+    expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
+    expect(compareVersions("1.0.0-rc.1", "1.0.0")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-alpha.2", "1.0.0-alpha.10")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-alpha", "1.0.0-alpha.1")).toBeLessThan(0);
+    expect(compareVersions("workspace", "1.0.0")).toBeNull();
+  });
+});
+
+describe("judgeHubBuild", () => {
+  const sameDir = (a, b) => a === b;
+  const here = current.packageDir;
+
+  it("replaces a hub that reports no build identity: it predates this ndx", () => {
+    expect(judgeHubBuild(undefined, current, sameDir)).toMatchObject({ action: "replace", text: expect.stringMatching(/predates this ndx/) });
   });
 
-  it("names a version or build that differs from what this ndx would start", () => {
-    expect(hubBuildMismatch({ version: "1.2.2", sourceHash: current.sourceHash }, current)).toMatch(/1\.2\.2.*1\.2\.3/);
-    expect(hubBuildMismatch({ version: "1.2.3", sourceHash: "b".repeat(64) }, current)).toMatch(/another build/);
+  it("replaces a hub of an older version", () => {
+    const judged = judgeHubBuild({ version: "1.2.2", sourceHash: current.sourceHash, packageRoot: "/elsewhere" }, current, sameDir);
+    expect(judged).toMatchObject({ action: "replace", text: expect.stringMatching(/1\.2\.2, older than the 1\.2\.3/) });
   });
 
-  it("accepts the same build, and does not compare hashes a published install does not have", () => {
-    expect(hubBuildMismatch({ version: "1.2.3", sourceHash: current.sourceHash }, current)).toBeNull();
-    expect(hubBuildMismatch({ version: "1.2.3", sourceHash: null }, published)).toBeNull();
+  it("never replaces a hub newer than this ndx: that would downgrade it", () => {
+    for (const build of [{ version: "1.2.4", sourceHash: null }, { version: "1.3.0", sourceHash: "b".repeat(64), packageRoot: here }]) {
+      const judged = judgeHubBuild(build, current, sameDir);
+      expect(judged.action).toBe("leave");
+      expect(judged.note).toMatch(/newer than this ndx's 1\.2\.3; it keeps serving\.$/);
+    }
+  });
+
+  it("replaces an equal version with another source hash only when the hub runs from this same checkout", () => {
+    const rebuilt = judgeHubBuild({ version: "1.2.3", sourceHash: "b".repeat(64), packageRoot: here }, current, sameDir);
+    expect(rebuilt).toMatchObject({ action: "replace", text: expect.stringMatching(/earlier build of this checkout/) });
+
+    const other = judgeHubBuild({ version: "1.2.3", sourceHash: "b".repeat(64), packageRoot: "/other/packages/web" }, current, sameDir);
+    expect(other).toEqual({ action: "leave", note: "The running n-dx hub was started from another checkout's @n-dx/web (/other/packages/web), not this ndx's; it keeps serving." });
+
+    // A hub too old to name its checkout is not assumed to be this one.
+    expect(judgeHubBuild({ version: "1.2.3", sourceHash: "b".repeat(64) }, current, sameDir).action).toBe("leave");
+  });
+
+  it("keeps the same build, and does not compare hashes a published install does not have", () => {
+    expect(judgeHubBuild({ version: "1.2.3", sourceHash: current.sourceHash, packageRoot: here }, current, sameDir)).toEqual({ action: "keep" });
+    expect(judgeHubBuild({ version: "1.2.3", sourceHash: null }, published, sameDir)).toEqual({ action: "keep" });
+  });
+
+  it("leaves a hub whose version cannot be ordered, and never prescribes anything", () => {
+    const judged = judgeHubBuild({ version: "not-a-version", sourceHash: null }, current, sameDir);
+    expect(judged.action).toBe("leave");
+    for (const build of [{ version: "1.2.4" }, { version: "1.2.3", sourceHash: "b".repeat(64), packageRoot: "/x" }, { version: "nope" }]) {
+      const note = judgeHubBuild(build, current, sameDir).note;
+      expect(note.split("\n")).toHaveLength(1);
+      expect(note).not.toMatch(/ndx hub stop|ndx start|restart|pnpm/i);
+    }
   });
 });
 

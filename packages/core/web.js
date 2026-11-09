@@ -1311,32 +1311,107 @@ export function shouldRebuildForNonce(status, web, alreadyRebuilt) {
 }
 
 /**
- * Why the running hub is not the build this ndx would start, or null when it
- * is (or when there is nothing to compare). Pure, so it is unit-tested.
+ * Order two package versions, `major.minor.patch[-prerelease]`: negative when
+ * `a` is older, positive when newer, 0 when equal, null when either cannot be
+ * read. A prerelease sorts before its release; prerelease identifiers compare
+ * numerically when both are numbers, as text otherwise (semver's rule). Pure.
  *
- * `build` is `/api/hub/health`'s `build` field: `{ version, sourceHash }`. A
- * hub without one predates the field, and so this ndx. A version or source
- * hash that differs from the web package this ndx spawns means the hub was
- * started from another build and kept running across an upgrade or rebuild.
- * A hash is compared only when both sides have one; a published install
- * ships no build stamp.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number | null}
+ */
+export function compareVersions(a, b) {
+  const parse = (v) => {
+    const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(String(v).trim());
+    return m ? { core: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ? m[4].split(".") : [] } : null;
+  };
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return null;
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] - y.core[i];
+  if (x.pre.length === 0 || y.pre.length === 0) return y.pre.length - x.pre.length;
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const p = x.pre[i];
+    const q = y.pre[i];
+    if (p === undefined) return -1;
+    if (q === undefined) return 1;
+    if (p === q) continue;
+    const pn = /^\d+$/.test(p);
+    const qn = /^\d+$/.test(q);
+    if (pn && qn) return Number(p) - Number(q);
+    if (pn !== qn) return pn ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * One spelling of a directory, for telling whether two paths are the same
+ * checkout: symlinks resolved, and case folded where the filesystem folds it.
+ *
+ * @param {string} dir
+ * @returns {string}
+ */
+export function canonicalDir(dir) {
+  let real = resolve(dir);
+  try {
+    real = realpathSync.native(real);
+  } catch {
+    // Gone or unreadable: compared as given.
+  }
+  return process.platform === "win32" || process.platform === "darwin" ? real.toLowerCase() : real;
+}
+
+/**
+ * What to do about the running hub's build, given the `@n-dx/web` this ndx
+ * would start. Pure, so every branch is unit-tested.
+ *
+ * `build` is `/api/hub/health`'s `build` field: `{ version, sourceHash,
+ * packageRoot }`. The hub is replaced only when it is older than this ndx:
+ *
+ * - no build identity at all — it predates the field, and so this ndx;
+ * - an older `@n-dx/web` version;
+ * - the same version from a different build *of this same checkout*
+ *   (`packageRoot` is this ndx's own web package) — a rebuild since the hub
+ *   started.
+ *
+ * A newer hub is never replaced: that would downgrade it. A hub started from
+ * another checkout, or one too old to say which, is not either: two
+ * source-linked checkouts would otherwise take turns replacing each other,
+ * restarting every project server each time. Those get a note that says why
+ * the hub keeps serving, and asks nothing of the operator.
  *
  * @param {unknown} build
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web
- * @returns {string | null}
+ * @param {(a: string, b: string) => boolean} [sameDir]  Whether two package roots are one directory.
+ * @returns {{ action: "keep" } | { action: "replace", text: string } | { action: "leave", note: string }}
  */
-export function hubBuildMismatch(build, web) {
+export function judgeHubBuild(build, web, sameDir = (a, b) => canonicalDir(a) === canonicalDir(b)) {
   if (!build || typeof build !== "object") {
-    return "the running n-dx hub predates this ndx (it reports no build identity)";
+    return { action: "replace", text: "the running n-dx hub predates this ndx (it reports no build identity)" };
   }
-  const { version, sourceHash } = /** @type {{ version?: unknown, sourceHash?: unknown }} */ (build);
+  const { version, sourceHash, packageRoot } = /** @type {{ version?: unknown, sourceHash?: unknown, packageRoot?: unknown }} */ (build);
   if (typeof version === "string" && web.version && version !== web.version) {
-    return `the running n-dx hub is @n-dx/web ${version}, and this ndx starts ${web.version}`;
+    const order = compareVersions(version, web.version);
+    if (order === null) {
+      return { action: "leave", note: `The running n-dx hub is @n-dx/web ${version}, which this ndx (${web.version}) cannot order against its own; it keeps serving.` };
+    }
+    if (order < 0) {
+      return { action: "replace", text: `the running n-dx hub is @n-dx/web ${version}, older than the ${web.version} this ndx starts` };
+    }
+    if (order > 0) {
+      return { action: "leave", note: `The running n-dx hub is @n-dx/web ${version}, newer than this ndx's ${web.version}; it keeps serving.` };
+    }
   }
   if (typeof sourceHash === "string" && web.sourceHash && sourceHash !== web.sourceHash) {
-    return `the running n-dx hub was started from another build of @n-dx/web (${sourceHash.slice(0, 12)}; on disk now: ${web.sourceHash.slice(0, 12)})`;
+    const builds = `(${sourceHash.slice(0, 12)}; on disk now: ${web.sourceHash.slice(0, 12)})`;
+    if (typeof packageRoot === "string" && web.packageDir && sameDir(packageRoot, web.packageDir)) {
+      return { action: "replace", text: `the running n-dx hub was started from an earlier build of this checkout's @n-dx/web ${builds}` };
+    }
+    const where = typeof packageRoot === "string" ? `another checkout's @n-dx/web (${packageRoot})` : "a build of @n-dx/web that does not say which checkout it came from";
+    return { action: "leave", note: `The running n-dx hub was started from ${where}, not this ndx's; it keeps serving.` };
   }
-  return null;
+  return { action: "keep" };
 }
 
 /**
@@ -1855,7 +1930,7 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile, deferred 
  * every later project: one `ndx start --no-auth` left the hub open, and the
  * next authenticated project silently joined it, token file and all.
  *
- * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
+ * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, note?: string, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
  */
 async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, force = false }) {
   const wanted = tokenFile ? "token" : "open";
@@ -1879,13 +1954,15 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, forc
   // A hub that kept running across an upgrade or rebuild serves older code
   // than this CLI expects — first among it, no landing-nonce route.
   const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
-  const mismatch = health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
-  if (mismatch) return replaceOrDeferHub(port, { kind: "build", text: mismatch }, { tools, __dir, home, tokenFile, force });
+  const judged = health.status === 200 ? judgeHubBuild(health.body?.build, web) : { action: "keep" };
+  if (judged.action === "replace") return replaceOrDeferHub(port, { kind: "build", text: judged.text }, { tools, __dir, home, tokenFile, force });
+  // Newer, or another checkout's: it keeps serving, and the note says why.
+  const kept = judged.action === "leave" ? { note: judged.note } : {};
   // A current hub that cannot do part of its job — no n-dx binary for project
   // servers, no CLI for extensions — is replaced by one given both.
   const fault = health.status === 200 ? hubFaultReason(health.body?.faults) : null;
   if (fault) return replaceOrDeferHub(port, fault, { tools, __dir, home, tokenFile, force });
-  return { spawned: false, pid: null };
+  return { spawned: false, pid: null, ...kept };
 }
 
 /**
@@ -2519,6 +2596,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
     return 1;
   }
   if (hub.deferred) console.error(`Note: ${hub.deferred}`);
+  if (hub.note) console.error(`Note: ${hub.note}`);
   if (hub.spawned) log(`n-dx hub started on http://127.0.0.1:${hubPort} (PID ${hub.pid}).`);
   if (hub.restored) for (const line of formatReplacementResult(hub.restored, hubPort)) log(line);
 

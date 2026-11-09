@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { connect } from "node:net";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -240,5 +240,7 @@ describe("hub with a per-user token", () => {
     // hub stopped finding it — and ndx start would skip the hash comparison.
     const stamp = JSON.parse(readFileSync(join(WEB_PKG, "dist", ".build-stamp.json"), "utf-8"));
     expect(health.build.sourceHash).toBe(stamp.sourceHash);
+    // Which checkout it runs from, so ndx start replaces only its own checkout's older build.
+    expect(realpathSync.native(health.build.packageRoot)).toBe(realpathSync.native(WEB_PKG));
   });
 });

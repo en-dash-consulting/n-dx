@@ -2,7 +2,7 @@
  * `/api/hub/*` — the hub's own API, distinct from any project server's.
  *
  *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count,
- *                                     the build it runs (version, build-stamp hash),
+ *                                     the build it runs (version, build-stamp hash, package root),
  *                                     and `faults`: what it cannot do ("no-ndx-bin", "no-ndx-cli")
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
