@@ -2505,7 +2505,9 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // first.
   const webEntry = resolve(__dir, tools.web);
   const built = await ensureSourceBuild(webEntry, { checkLag: true });
-  if (!built.ok) {
+  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
+  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
+  else if (!built.ok) {
     console.error(`Error: ${built.message}`);
     return 1;
   }
@@ -2807,7 +2809,9 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // source would run older code than this CLI, so it is rebuilt first.
   const webEntry = resolve(__dir, tools.web);
   const built = await ensureSourceBuild(webEntry, { checkLag: true });
-  if (!built.ok) {
+  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
+  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
+  else if (!built.ok) {
     console.error(`Error: ${built.message}`);
     return 1;
   }

@@ -280,7 +280,7 @@ export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_W
  * @param {(entry: string, options: { checkLag?: boolean }) => BuildFacts} [options.facts]
  * @param {typeof runRebuild} [options.rebuild]
  * @param {typeof acquireRebuildLock} [options.lock]
- * @returns {Promise<{ ok: true, rebuilt: boolean } | { ok: false, message: string }>}
+ * @returns {Promise<{ ok: true, rebuilt: boolean } | { ok: false, message: string, reinstall?: boolean }>}
  */
 export async function ensureSourceBuild(entry, {
   checkLag = false,
@@ -298,7 +298,7 @@ export async function ensureSourceBuild(entry, {
   };
   let need = judge();
   if (need.action === "none") return { ok: true, rebuilt: false };
-  if (need.action === "reinstall") return { ok: false, message: reinstallMessage(need, entry) };
+  if (need.action === "reinstall") return { ok: false, reinstall: true, message: reinstallMessage(need, entry) };
 
   const release = await lock(need.checkoutRoot, {
     onWait: () => err(`Waiting for another n-dx process to finish rebuilding ${need.name}…`),
@@ -310,7 +310,7 @@ export async function ensureSourceBuild(entry, {
     // The build waited on may have been this one.
     if (!force) need = judge();
     if (need.action === "none") return { ok: true, rebuilt: false };
-    if (need.action === "reinstall") return { ok: false, message: reinstallMessage(need, entry) };
+    if (need.action === "reinstall") return { ok: false, reinstall: true, message: reinstallMessage(need, entry) };
     err(rebuildNotice(need));
     const started = Date.now();
     const result = rebuild(need);

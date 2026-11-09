@@ -71,7 +71,10 @@ const server = createServer((req, res) => {
     return reply(409, { error: "Several projects are registered; address one as /p/<id>/…" });
   });
 });
-server.listen(0, "127.0.0.1", () => writeFileSync(portFile, String(server.address().port)));
+server.listen(0, "127.0.0.1", () => {
+  writeFileSync(portFile, String(server.address().port));
+  process.stdout.write(server.address().port + "\\n");
+});
 `;
 
 function git(cwd, ...args) {
@@ -107,16 +110,16 @@ async function startOlderHub(home, busy, extra = {}) {
   const script = join(home, "older-hub.cjs");
   const portFile = join(home, "older-hub.port");
   writeFileSync(script, OLDER_HUB);
-  const child = spawn(process.execPath, [script, portFile, TOKEN, busy ? "busy" : "idle", JSON.stringify(extra)], { stdio: "ignore", windowsHide: true });
-  const deadline = Date.now() + 15_000;
-  let port = null;
-  while (port === null && Date.now() < deadline) {
-    try {
-      port = Number(readFileSync(portFile, "utf-8")) || null;
-    } catch {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-  }
+  const child = spawn(process.execPath, [script, portFile, TOKEN, busy ? "busy" : "idle", JSON.stringify(extra)], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+  // It prints its port once listening: wait for that line, or for its exit.
+  const port = await new Promise((resolvePromise) => {
+    let out = "";
+    child.stdout.on("data", (chunk) => {
+      out += chunk;
+      if (out.includes("\n")) resolvePromise(Number(out.trim()) || null);
+    });
+    child.once("exit", () => resolvePromise(null));
+  });
   if (!port) throw new Error("the older hub did not start");
   writeFileSync(join(home, "hub.pid"), JSON.stringify({ pid: child.pid, port }));
   return { child, port };
