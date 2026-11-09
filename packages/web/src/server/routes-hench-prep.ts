@@ -11,9 +11,11 @@
  *                                         a later phase)
  * POST /api/hench/prep/:taskId/preview  — body `{options}`; `ndx work --task=<id> --dry-run
  *                                         <flags>`'s output as `{brief}`
- * GET  /api/hench/ready?limit=N        — the next N tasks in the order `ndx work --auto` would
- *                                         pick them (default 10, max 50), each with whether it
- *                                         carries saved run settings
+ * GET  /api/hench/ready?limit=N&offset=M — a page of every actionable task in the order `ndx work
+ *                                         --auto` would pick them (default 10, max 50 a page), with
+ *                                         the `total`, each row's change and whether it carries
+ *                                         saved run settings. A v2 tree is selected with rex's v2
+ *                                         selector, as hench does
  * PUT  /api/hench/prep/:taskId          — body `{run, version}`; saves (or clears) the task's
  *                                         own run settings, which `ndx work` then applies
  *
@@ -47,18 +49,20 @@ import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { validateProviderForVendor } from "./hench-config-fields.js";
 import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
-import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
+import { isV2Tree, loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import {
   collectCompletedIds,
   findItem,
   findActionableTasks,
+  findActionableWork,
   openClaimsStore,
   resolveClaimHolder,
   resolveStore,
   updateInTree,
   validateRunSettings,
+  walkTree,
 } from "./rex-gateway.js";
-import type { RunSettings } from "./rex-gateway.js";
+import type { PRDItem, RunSettings, V2Tree } from "./rex-gateway.js";
 import { isWorkItemType, itemTypeOf } from "../shared/index.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import {
@@ -121,6 +125,8 @@ export interface ReadyTask {
   itemType: string;
   /** Ancestor titles, root first. */
   parentChain: string[];
+  /** The change the task belongs to (a task-less change is its own); on v1, the nearest ancestor. */
+  change: { id: string; title: string } | null;
   criteriaCount: number;
   tags: string[];
   /** In progress with no live run: `ndx work` would pick it up where it stopped. */
@@ -686,6 +692,56 @@ function readyLimit(url: string): number {
   return Math.min(READY_MAX_LIMIT, Math.max(1, n));
 }
 
+/**
+ * `all=1` asks for every row in one reply. Each request re-reads the claims
+ * store and every run record and reselects, so a client that wants the whole
+ * list pays for one pass, not one per {@link READY_MAX_LIMIT} rows.
+ */
+function readyAll(url: string): boolean {
+  return new URL(url, "http://localhost").searchParams.get("all") === "1";
+}
+
+/** The `offset` query parameter: a whole number from 0, else 0. */
+function readyOffset(url: string): number {
+  const raw = new URL(url, "http://localhost").searchParams.get("offset");
+  const n = raw === null || raw.trim() === "" ? NaN : Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/** An actionable task with the change it belongs to. */
+interface ReadyPick {
+  item: PRDItem;
+  parents: PRDItem[];
+  change: ReadyTask["change"];
+}
+
+/**
+ * Every actionable task, best first. A v2 tree is selected with rex's v2
+ * selector (Inbox changes never list, a task-less change is one runnable unit,
+ * a change with tasks lists its tasks), a v1 tree with the v1 selector. One
+ * selection pass and one walk of the projection, never a lookup per row.
+ */
+function pickReady(
+  rexDir: string,
+  doc: NonNullable<ReturnType<typeof loadPRDSync>>,
+  excludeIds: ReadonlySet<string>,
+  completedIds: Set<string>,
+): ReadyPick[] {
+  if (isV2Tree(rexDir)) {
+    const tree: V2Tree = { product: doc.product ?? [], changes: doc.items as unknown as V2Tree["changes"] };
+    const byId = new Map<string, { item: PRDItem; parents: PRDItem[] }>();
+    for (const entry of walkTree(doc.items)) byId.set(entry.item.id, entry);
+    return findActionableWork(tree, { excludeIds }).flatMap((unit) => {
+      const entry = byId.get(unit.node.id);
+      return entry ? [{ ...entry, change: { id: unit.change.id, title: unit.change.title } }] : [];
+    });
+  }
+  return findActionableTasks(doc.items, completedIds, Number.MAX_SAFE_INTEGER, { excludeIds }).map(({ item, parents }) => {
+    const parent = parents[parents.length - 1];
+    return { item, parents, change: parent ? { id: parent.id, title: parent.title } : null };
+  });
+}
+
 /** GET /api/hench/ready */
 async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
   const doc = loadPRDSync(ctx.rexDir);
@@ -693,7 +749,9 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     errorResponse(res, 404, "No PRD data found");
     return true;
   }
-  const limit = readyLimit(req.url ?? READY_PATH);
+  const all = readyAll(req.url ?? READY_PATH);
+  const limit = all ? Number.POSITIVE_INFINITY : readyLimit(req.url ?? READY_PATH);
+  const offset = all ? 0 : readyOffset(req.url ?? READY_PATH);
   const holder = resolveClaimHolder(ctx.projectDir);
   const foreign = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
   const liveTaskIds = new Set((await collectHeldRuns(ctx)).map((run) => run.taskId));
@@ -708,10 +766,8 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
   // The order `ndx work --auto` picks in, in one selection pass. Asking for the
   // next task once per row rebuilt the comparator each time and froze the
   // request thread for seconds. Tasks another worktree holds are excluded.
-  const picked = findActionableTasks(doc.items, completedIds, limit, {
-    excludeIds: new Set([...foreign.keys(), ...stuckIds]),
-  });
-  const tasks: ReadyTask[] = picked.map(({ item, parents }) => {
+  const picked = pickReady(ctx.rexDir, doc, new Set([...foreign.keys(), ...stuckIds]), completedIds);
+  const tasks: ReadyTask[] = picked.slice(offset, offset + limit).map(({ item, parents, change }) => {
     const liveRun = liveTaskIds.has(item.id);
     return {
       id: item.id,
@@ -720,6 +776,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       priority: item.priority ?? null,
       itemType: itemTypeOf(item),
       parentChain: parents.map((p) => p.title),
+      change,
       criteriaCount: item.acceptanceCriteria?.length ?? 0,
       tags: item.tags ?? [],
       resume: item.status === "in_progress" && !liveRun,
@@ -728,7 +785,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     };
   });
   // `dir` is what execute passes `ndx work`, so a copied command matches the run.
-  jsonResponse(res, 200, { tasks, limit, dir: ctx.projectDir });
+  jsonResponse(res, 200, { tasks, limit: all ? picked.length : limit, offset, total: picked.length, dir: ctx.projectDir });
   return true;
 }
 

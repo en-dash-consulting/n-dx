@@ -32,8 +32,14 @@ vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../src/server/stuck-tasks.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/server/stuck-tasks.js")>();
+  return { ...actual, loadStuckTaskIds: vi.fn(actual.loadStuckTaskIds) };
+});
+
 import { TIER_MODELS } from "@n-dx/llm-client";
 import { collectCompletedIds, findActionableTasks, findNextTask } from "../../../src/server/rex-gateway.js";
+import { loadStuckTaskIds } from "../../../src/server/stuck-tasks.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
 import {
@@ -664,7 +670,7 @@ describe("hench prep routes", () => {
       return { id, title: `Task ${id}`, status: "pending", level: "task", priority: "medium", ...extra };
     }
 
-    async function ready(port: number, query = ""): Promise<{ tasks: Array<Record<string, unknown>>; limit: number; dir: string }> {
+    async function ready(port: number, query = ""): Promise<{ tasks: Array<Record<string, unknown>>; limit: number; total: number; dir: string }> {
       const res = await fetch(`http://127.0.0.1:${port}/api/hench/ready${query}`);
       expect(res.status).toBe(200);
       return res.json();
@@ -696,6 +702,7 @@ describe("hench prep routes", () => {
         priority: "critical",
         itemType: "task",
         parentChain: ["The epic", "The feature"],
+        change: { id: "feat", title: "The feature" },
         criteriaCount: 2,
         tags: ["web", "prep"],
         resume: false,
@@ -767,6 +774,60 @@ describe("hench prep routes", () => {
       // items); counting calls pins the regression without a clock.
       expect(findActionableTasks).toHaveBeenCalledTimes(1);
       expect(findNextTask).not.toHaveBeenCalled();
+    });
+
+    it("pages through every actionable task, low priority included, and reports the total", async () => {
+      await writeTasks(ctx, Array.from({ length: 120 }, (_, i) => task(`t${String(i).padStart(3, "0")}`, { priority: i % 2 ? "low" : "high" })));
+      const port = await open(ctx);
+      const ids: unknown[] = [];
+      let total = 0;
+      for (let offset = 0; offset < 120; offset += 50) {
+        const page = await ready(port, `?limit=50&offset=${offset}`);
+        total = page.total;
+        ids.push(...page.tasks.map((t) => t.id));
+      }
+      expect(total).toBe(120);
+      expect(new Set(ids).size).toBe(120);
+      expect((await ready(port, "?offset=-3&limit=2")).tasks).toHaveLength(2);
+      expect((await ready(port, "?offset=500")).tasks).toEqual([]);
+    });
+
+    it("?all=1 returns every actionable task from one selection and one runs scan", async () => {
+      await writeTasks(ctx, Array.from({ length: 3000 }, (_, i) => task(`t${String(i).padStart(4, "0")}`, { priority: i % 2 ? "low" : "high" })));
+      const port = await open(ctx);
+      vi.mocked(findActionableTasks).mockClear();
+      vi.mocked(loadStuckTaskIds).mockClear();
+      const { tasks, total } = await ready(port, "?all=1");
+      expect(tasks).toHaveLength(3000);
+      expect(total).toBe(3000);
+      expect(new Set(tasks.map((t) => t.id)).size).toBe(3000);
+      expect(findActionableTasks).toHaveBeenCalledTimes(1);
+      expect(loadStuckTaskIds).toHaveBeenCalledTimes(1);
+    });
+
+    it("on a v2 tree lists with rex's v2 selector: no Inbox change, a task-less change as one unit, a change's tasks", async () => {
+      await mkdir(join(ctx.rexDir, "product"), { recursive: true });
+      const change = (id: string, extra: Record<string, unknown> = {}) =>
+        ({ id, title: `Change ${id}`, type: "change", status: "pending", priority: "medium", ...extra });
+      const subtask = (id: string, extra: Record<string, unknown> = {}) =>
+        ({ id, title: `Task ${id}`, type: "task", status: "pending", ...extra });
+      await writeFile(join(ctx.rexDir, ".cache", "prd.json"), JSON.stringify({
+        schema: "rex/v1",
+        title: "v2",
+        product: [{ id: "cap", type: "capability", title: "Cap", status: "pending" }],
+        items: [
+          change("inbox", { needsPlacement: true }),
+          change("bare", { priority: "low" }),
+          change("split", { children: [subtask("s1", { priority: "low" }), subtask("s2", { priority: "high" })] }),
+        ],
+      }));
+      const port = await open(ctx);
+      const { tasks, total } = await ready(port, "?limit=50");
+      expect(tasks.map((t) => t.id).sort()).toEqual(["bare", "s1", "s2"]);
+      expect(total).toBe(3);
+      const byId = Object.fromEntries(tasks.map((t) => [t.id as string, t]));
+      expect(byId["s1"]!.change).toEqual({ id: "split", title: "Change split" });
+      expect(byId["bare"]!.change).toEqual({ id: "bare", title: "Change bare" });
     });
 
     it("honours ?limit=N, defaults to 10 and clamps to 1..50", async () => {

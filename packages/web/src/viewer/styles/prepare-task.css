@@ -242,6 +242,28 @@
 .prep-conflict-text { margin: 0 0 var(--space-2); color: var(--text-muted); }
 .prep-conflict-actions { display: flex; gap: var(--space-2); }
 
+.ready-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.ready-search { flex: 1; min-width: 12rem; }
+.ready-search, .ready-filter {
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+}
+.ready-filter { max-width: 14rem; }
+.ready-clear, .ready-more {
+  all: unset;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: var(--font-sm);
+}
+.ready-clear:hover, .ready-clear:focus-visible, .ready-more:hover, .ready-more:focus-visible { text-decoration: underline; }
+.ready-more { display: block; margin-top: var(--space-2); }
+.ready-count { color: var(--text-muted); font-size: var(--font-sm); }
+.ready-change { color: var(--text-dim); }
+
 .ready-saved-dot {
   margin-left: var(--space-1);
   color: var(--accent);
