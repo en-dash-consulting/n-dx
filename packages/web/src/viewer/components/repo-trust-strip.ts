@@ -32,6 +32,10 @@ export interface RepoTrustView {
   restricted: boolean;
   findings: RepoTrustFindingView[];
   sources: string[];
+  /** PRD items with a saved run block. Absent from an older server. */
+  prdRunBlocks?: number;
+  /** The `sources` entry that holds those blocks. Absent from an older server. */
+  prdRunBlocksPath?: string | null;
   inventory?: {
     prd: { items: number; epics: number } | null;
     analysis: { analyzedAt: string | null; version: string | null } | null;
@@ -42,8 +46,31 @@ export interface RepoTrustView {
 export interface RepoTrustNotice {
   headline: string;
   detail: string;
+  /** What is restricted until trusted; shown first under Details, not in the visible line. */
+  restrictions: string;
   warnings: string[];
   infos: string[];
+  /** Sources for the Details list, capped at MAX_LISTED_SOURCES. */
+  sources: string[];
+  /** Sources beyond the Details cap. */
+  moreSources: number;
+}
+
+/** Sources named in the always-visible line; the rest become "+N more". */
+const MAX_NAMED_SOURCES = 3;
+/** Longest source name printed in the always-visible line. */
+const MAX_SOURCE_NAME = 40;
+/** Total characters of source names in the always-visible line. */
+const MAX_NAMED_CHARS = 100;
+/** The restrictions sentence, shown first under Details. */
+const RESTRICTIONS =
+  "Until trusted, agent runs use the default guard, bypassPermissions is lowered to acceptEdits, "
+  + "and verify_criteria does not run the repository's test command.";
+/** Sources listed under Details before "+N more". */
+const MAX_LISTED_SOURCES = 50;
+
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 /**
@@ -58,11 +85,37 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
   const headline = view.state === "changed"
     ? "This repository's execution config changed since you trusted it"
     : "This repository's execution config is not trusted";
-  const sources = view.sources.length ? ` (${view.sources.join(", ")})` : "";
+  // The PRD count has its own phrase, so the PRD directory is not also named.
+  const prdCount = view.prdRunBlocks ?? 0;
+  const prdItems = `${prdCount} PRD item${prdCount === 1 ? "" : "s"} with saved run settings`;
+  const prdPhrase = prdCount > 0 ? ` and ${prdItems}` : "";
+  const prdPath = prdCount > 0 ? view.prdRunBlocksPath ?? null : null;
+  const nameable = prdPath === null ? view.sources : view.sources.filter((s) => s !== prdPath);
+  const listed = view.sources.map((s) => (prdPath !== null && s === prdPath ? `${s} (${prdItems})` : s));
+  // The phrase shares the line's budget, so the visible text stays under its cap.
+  const budget = MAX_NAMED_CHARS - prdPhrase.length;
+  const named: string[] = [];
+  let namedChars = 0;
+  for (const source of nameable.slice(0, MAX_NAMED_SOURCES)) {
+    const name = clip(source, MAX_SOURCE_NAME);
+    if (named.length > 0 && namedChars + name.length > budget) break;
+    named.push(name);
+    namedChars += name.length;
+  }
+  const rest = nameable.length - named.length;
+  const list = rest > 0 ? [...named, `+${rest} more`] : named;
+  const sources = list.length ? ` (${list.join(", ")})` : "";
   const detail =
-    `${n} finding${n === 1 ? "" : "s"}${sources}. Until trusted, agent runs use the default guard, `
-    + "bypassPermissions is lowered to acceptEdits, and verify_criteria does not run the repository's test command.";
-  return { headline, detail, warnings, infos };
+    `${n} finding${n === 1 ? "" : "s"}${sources}${prdPhrase}. Agent runs are restricted until trusted.`;
+  return {
+    headline,
+    detail,
+    restrictions: RESTRICTIONS,
+    warnings,
+    infos,
+    sources: listed.slice(0, MAX_LISTED_SOURCES),
+    moreSources: Math.max(0, view.sources.length - MAX_LISTED_SOURCES),
+  };
 }
 
 export interface RepoTrustStripProps {
@@ -130,9 +183,21 @@ export function RepoTrustStrip({ fetchImpl, initial }: RepoTrustStripProps = {})
       ),
     ),
     open
-      ? h("ul", { class: "repo-trust-strip__list" },
-          ...notice.warnings.map((m) => h("li", { class: "repo-trust-strip__warning" }, m)),
-          ...notice.infos.map((m) => h("li", { class: "repo-trust-strip__info" }, m)),
+      ? h("div", { class: "repo-trust-strip__details" },
+          h("p", { class: "repo-trust-strip__restrictions" }, notice.restrictions),
+          h("ul", { class: "repo-trust-strip__list" },
+            ...notice.warnings.map((m) => h("li", { class: "repo-trust-strip__warning" }, m)),
+            ...notice.infos.map((m) => h("li", { class: "repo-trust-strip__info" }, m)),
+          ),
+          notice.sources.length
+            ? h("div", { class: "repo-trust-strip__sources" },
+                "Read from:",
+                h("ul", null,
+                  ...notice.sources.map((p) => h("li", { class: "repo-trust-strip__source" }, p)),
+                  notice.moreSources > 0 ? h("li", { class: "repo-trust-strip__source" }, `+${notice.moreSources} more`) : null,
+                ),
+              )
+            : null,
         )
       : null,
     error ? h("div", { class: "repo-trust-strip__error", role: "status" }, error) : null,

