@@ -119,7 +119,7 @@ describe("views moved into Tune", () => {
 
   it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped, Outcomes by tier and Your tooling", () => {
     const tiles = STAGES.tune.tiles!;
-    expect(tiles.map(tileTitle)).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
+    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
     expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], [], []]);
     expect(tiles[0]).toMatchObject({ cols: 8, rows: 2 });
     // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.

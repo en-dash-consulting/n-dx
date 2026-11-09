@@ -384,6 +384,27 @@ describe("start_work", () => {
     await client.close();
   });
 
+  it("names the task's change on the work card", async () => {
+    writeFileSync(join(root, ".rex", ".cache", "prd.json"), JSON.stringify({
+      schema: "rex/v1",
+      title: "carry out",
+      items: [{
+        id: "change-1", type: "change", title: "Ship it", status: "pending",
+        children: [{ id: "task-1", type: "task", title: "Carry it out", status: "pending" }],
+      }],
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const { cardId } = await cardAnnounced("pending");
+
+    const [card] = broker.cards(SESSION) as SidecarCard[];
+    expect(card.rowText).toBe("Carry it out · in Ship it");
+
+    await decide(cardId, { decision: "approve" });
+    await call;
+    await client.close();
+  });
+
   it("reports the execute route's refusal and starts nothing", async () => {
     const client = await brokerClient();
     const call = client.callTool({ name: "start_work", arguments: { taskId: "missing" } });
@@ -780,7 +801,7 @@ describe("propose_run_plan", () => {
     const result = await call;
     expect(result.isError).toBeFalsy();
     const text = resultText(result);
-    expect(text).toContain("The operator chose lane 1 (change change-a). Nothing has started. Call start_work for its first task only: task-1 Carry it out (`ndx work --task=task-1 --auto .`).");
+    expect(text).toContain("The operator chose track 1 (change change-a). Nothing has started. Call start_work for its first task only: task-1 Carry it out (`ndx work --task=task-1 --auto .`).");
     expect(text).toContain("Its other tasks wait, in order: task-2 And this: ndx work --task=task-2 --auto .");
     expect(text).toContain("raise the next start_work card in a later turn");
     expect(text).not.toContain("task-3");
@@ -879,7 +900,7 @@ describe("propose_run_plan", () => {
     const client = await brokerClient();
     const result = await client.callTool({ name: "propose_run_plan", arguments: {} });
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toBe("No card was raised: the planner has no lane (Nothing is ready.). Nothing started.");
+    expect(resultText(result)).toBe("No card was raised: the planner has no track (Nothing is ready.). Nothing started.");
     expect(broker.cards(SESSION)).toEqual([]);
     await client.close();
   });

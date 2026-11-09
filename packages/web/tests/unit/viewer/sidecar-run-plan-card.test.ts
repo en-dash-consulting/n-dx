@@ -80,11 +80,11 @@ describe("the run-plan card", () => {
   it("lists each lane with every task's exact command, the reasons and the active runs against the limit", async () => {
     const { el } = await draw(planCard());
     expect(el.querySelector(".sidecar-card-kind")?.textContent).toBe("Run plan");
-    expect(el.querySelector(".sidecar-card-title")?.textContent).toBe("2 lanes");
+    expect(el.querySelector(".sidecar-card-title")?.textContent).toBe("2 tracks");
     expect(el.querySelector(".sidecar-run-plan-active")?.textContent).toBe("Active runs: 1 of 3");
     const lanes = el.querySelectorAll(".sidecar-run-plan-lane");
     expect(lanes).toHaveLength(2);
-    expect(lanes[0].querySelector(".sidecar-run-plan-lane-title")?.textContent).toBe("Lane 1 · change ch1");
+    expect(lanes[0].querySelector(".sidecar-run-plan-lane-title")?.textContent).toBe("Track 1 · change ch1");
     expect([...lanes[0].querySelectorAll(".sidecar-run-plan-command")].map((c) => c.textContent)).toEqual([
       "ndx work --task=t1 --auto .",
       "ndx work --task=t2 --auto .",

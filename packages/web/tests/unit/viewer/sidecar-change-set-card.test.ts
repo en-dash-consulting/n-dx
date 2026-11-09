@@ -62,6 +62,11 @@ afterEach(async () => {
 });
 
 describe("the change-set card", () => {
+  it("is labelled PRD edits, not Change set", async () => {
+    const { el } = await draw(changeSetCard(V1));
+    expect(el.querySelector(".sidecar-card-kind")?.textContent).toBe("PRD edits");
+  });
+
   it("draws each item with its type, parent and fields, editable while it waits", async () => {
     const { el } = await draw(changeSetCard(V1));
     const items = el.querySelectorAll(".sidecar-change-set-item");

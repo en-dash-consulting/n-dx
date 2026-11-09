@@ -15,7 +15,8 @@
 import {h} from "preact";import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import type { NavigateTo } from "../api.js";
-import { itemTypeEmoji } from "../external.js";
+import { itemTypeEmoji, itemTypeLabel } from "../external.js";
+import { usePrdLayout } from "../hooks/index.js";
 
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -52,12 +53,13 @@ export interface SearchOverlayProps {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const LEVEL_OPTIONS = [
-  { value: "epic", label: "Epic" },
-  { value: "feature", label: "Feature" },
-  { value: "task", label: "Task" },
-  { value: "subtask", label: "Subtask" },
-] as const;
+/** The type filter's choices: v1 words on a v1 tree, change/task/subtask on v2. */
+const V1_LEVELS = ["epic", "feature", "task", "subtask"] as const;
+const V2_LEVELS = ["change", "task", "subtask"] as const;
+
+function levelOptions(layout: "v1" | "v2"): Array<{ value: string; label: string }> {
+  return (layout === "v2" ? V2_LEVELS : V1_LEVELS).map((value) => ({ value, label: itemTypeLabel(value) }));
+}
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
@@ -232,6 +234,7 @@ function extractQueryTerms(query: string): string[] {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function SearchOverlay({ visible, onClose, navigateTo }: SearchOverlayProps) {
+  const layout = usePrdLayout(visible);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -465,7 +468,7 @@ export function SearchOverlay({ visible, onClose, navigateTo }: SearchOverlayPro
       filtersExpanded
         ? h("div", { id: "search-filters", class: "search-overlay-filters", role: "group", "aria-label": "Search filters" },
             // Type filters
-            renderFilterGroup("Type", "levels", LEVEL_OPTIONS, filters.levels, toggleFilter),
+            renderFilterGroup("Type", "levels", levelOptions(layout), filters.levels, toggleFilter),
             // Status filters
             renderFilterGroup("Status", "statuses", STATUS_OPTIONS, filters.statuses, toggleFilter),
             // Priority filters

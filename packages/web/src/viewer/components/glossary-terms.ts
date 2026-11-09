@@ -63,6 +63,31 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
       "The levels of the PRD hierarchy: an epic groups features, a feature groups tasks, and a task is the unit of work an agent picks up — a task can be broken down further into subtasks.",
   },
   {
+    term: "Change",
+    definition:
+      "What should be different when the work is done. A change holds the tasks that make it, and a change with no tasks runs as one task.",
+  },
+  {
+    term: "Task",
+    definition:
+      "One step the agent runs to make a change. A task always sits inside its change and can be broken down into subtasks.",
+  },
+  {
+    term: "Subtask",
+    definition:
+      "A smaller step inside a task. The agent works through a task's subtasks as part of running the task.",
+  },
+  {
+    term: "Inbox",
+    definition:
+      "Changes with no place on the product map yet. The agent skips their tasks until each change is placed.",
+  },
+  {
+    term: "Runs as one task",
+    definition:
+      "A change with no tasks of its own. It is started like a task and the agent runs it as a single unit.",
+  },
+  {
     term: "worktree anchor",
     definition:
       "The primary git worktree a project was registered from. Every other worktree's PRD and progress are shown as a difference against it.",

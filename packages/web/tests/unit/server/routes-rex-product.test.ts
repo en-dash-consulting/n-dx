@@ -276,6 +276,15 @@ describe("v2 product reads", () => {
     });
   });
 
+  it("GET /changes marks a change runsAsOneTask only once it has no tasks", async () => {
+    const before = (await get("changes")).body.changes[0] as ChangeRowWire;
+    expect(before).not.toHaveProperty("runsAsOneTask");
+
+    rmSync(join(rexDir, "changes", "add-apple-pay", "wire-the-button.md"));
+    const after = (await get("changes")).body.changes[0] as ChangeRowWire;
+    expect(after).toMatchObject({ taskCount: 0, runsAsOneTask: true });
+  });
+
   it("GET /changes names no area on applied history", async () => {
     applyChange();
     const rows = (await get("changes")).body.changes as ChangeRow[];

@@ -63,7 +63,8 @@ import {
   walkTree,
 } from "./rex-gateway.js";
 import type { PRDItem, RunSettings, V2Tree } from "./rex-gateway.js";
-import { isWorkItemType, itemTypeOf } from "../shared/index.js";
+import { itemTypeOf } from "../shared/index.js";
+import { isRunnableUnit } from "./runnable-units.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import {
   HUB_ADMISSION_HEADER,
@@ -407,7 +408,7 @@ async function handleSave(
 
   let conflict: { saved: RunSettings | null; version: string } | null = null;
   let missing = false;
-  let notAWorkItem = false;
+  let notAWorkItem: "change" | "other" | null = null;
   let updatedDoc;
   try {
     const store = await resolveStore(ctx.rexDir);
@@ -420,8 +421,10 @@ async function handleSave(
         missing = true;
         return doc;
       }
-      if (!isWorkItemType(itemTypeOf(entry.item))) {
-        notAWorkItem = true;
+      // A task-less change is the unit `ndx work` runs, so it carries its own;
+      // a change with tasks, or one holding a change, is worked through them.
+      if (!isRunnableUnit(entry.item)) {
+        notAWorkItem = itemTypeOf(entry.item) === "change" ? "change" : "other";
         return doc;
       }
       const current = entry.item.run as RunSettings | undefined;
@@ -444,6 +447,10 @@ async function handleSave(
 
   if (missing) {
     errorResponse(res, 404, `Task "${taskId}" not found`);
+    return true;
+  }
+  if (notAWorkItem === "change") {
+    errorResponse(res, 400, `Change "${taskId}" does not run as one task: ndx work runs its tasks, so set run settings on them`);
     return true;
   }
   if (notAWorkItem) {
