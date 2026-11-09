@@ -54,6 +54,8 @@ export interface RepoTrustNotice {
 const MAX_NAMED_SOURCES = 3;
 /** Longest source name printed in the always-visible line. */
 const MAX_SOURCE_NAME = 60;
+/** Total characters of source names in the always-visible line. */
+const MAX_NAMED_CHARS = 140;
 /** Sources listed under Details before "+N more". */
 const MAX_LISTED_SOURCES = 50;
 
@@ -73,7 +75,14 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
   const headline = view.state === "changed"
     ? "This repository's execution config changed since you trusted it"
     : "This repository's execution config is not trusted";
-  const named = view.sources.slice(0, MAX_NAMED_SOURCES).map((p) => clip(p, MAX_SOURCE_NAME));
+  const named: string[] = [];
+  let namedChars = 0;
+  for (const source of view.sources.slice(0, MAX_NAMED_SOURCES)) {
+    const name = clip(source, MAX_SOURCE_NAME);
+    if (named.length > 0 && namedChars + name.length > MAX_NAMED_CHARS) break;
+    named.push(name);
+    namedChars += name.length;
+  }
   const rest = view.sources.length - named.length;
   const list = rest > 0 ? [...named, `+${rest} more`] : named;
   const sources = list.length ? ` (${list.join(", ")})` : "";

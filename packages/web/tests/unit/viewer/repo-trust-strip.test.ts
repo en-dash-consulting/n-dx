@@ -39,6 +39,16 @@ describe("buildTrustNotice", () => {
     expect(notice.moreSources).toBe(252);
   });
 
+  it("keeps the visible text under the cap with long source names and many findings", () => {
+    const sources = Array.from({ length: 9999 }, (_, i) => `${"very-long-directory-name/".repeat(5)}item-${i}.md`);
+    const finding = UNTRUSTED.findings[0]!;
+    const findings = Array.from({ length: 99 }, () => finding);
+    const notice = buildTrustNotice({ ...UNTRUSTED, state: "changed", sources, findings })!;
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+    expect(notice.detail).toContain("99 findings");
+    expect(notice.detail).toMatch(/\+\d+ more\)/);
+  });
+
   it("says changed when the record is for another digest", () => {
     expect(buildTrustNotice({ ...UNTRUSTED, state: "changed" })!.headline).toContain("changed since you trusted it");
   });
