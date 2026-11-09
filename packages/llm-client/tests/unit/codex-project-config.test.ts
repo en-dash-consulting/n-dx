@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   CodexProjectConfigError,
+  CODEX_DISABLED_MCP_URL,
   codexConfigMcpServerNames,
+  codexConfigMcpServers,
   codexProjectConfigPaths,
   codexProjectMcpDisableFlags,
 } from "../../src/codex-project-config.js";
@@ -44,6 +46,31 @@ describe("codexConfigMcpServerNames", () => {
     expect(codexConfigMcpServerNames(text)).toEqual(["a", "b c", "d", "e"]);
     expect(codexConfigMcpServerNames('mcp_servers.f.command = "x"\nmcp_servers = { g = { url = "u" }, "h.i" = {} }'))
       .toEqual(["f", "g", "h.i"]);
+  });
+
+  it("reports each server's transport keys in all three forms, ignoring nested tables", () => {
+    const text = [
+      "[mcp_servers.a]",
+      'command = "x"',
+      "[mcp_servers.a.env]",
+      'url = "not a transport"',
+      "[mcp_servers]",
+      'b = { url = "u", env = { command = "nested" } }',
+      'c.command = "y"',
+      'c.url = "z"',
+      "[other]",
+      'mcp_servers.d.command = "profile-scoped, ignored"',
+    ].join("\n");
+    expect(codexConfigMcpServers(text)).toEqual([
+      { name: "a", transports: ["command"] },
+      { name: "b", transports: ["url"] },
+      { name: "c", transports: ["command", "url"] },
+    ]);
+    expect(codexConfigMcpServers('mcp_servers = { e = { command = "x" }, f = { args = [] } }\nmcp_servers.g.url = "u"')).toEqual([
+      { name: "e", transports: ["command"] },
+      { name: "f", transports: [] },
+      { name: "g", transports: ["url"] },
+    ]);
   });
 
   it("skips strings that only look like declarations", () => {
@@ -98,14 +125,60 @@ describe("project config files", () => {
     ]);
   });
 
-  it("disables every declared server but the kept ones", () => {
+  it("disables every declared server but the kept ones, each with its transport's placeholder", () => {
     writeConfig(join(root, "repo"), '[mcp_servers.rex]\ncommand = "ndx"\n[mcp_servers.sourcevision]\ncommand = "ndx"\n[mcp_servers.ndx-sidecar]\nurl = "u"\n');
-    writeConfig(join(root, "repo", "pkg"), '[mcp_servers.my_server]\ncommand = "x"\n[mcp_servers.rex]\ncommand = "y"\n');
+    writeConfig(join(root, "repo", "pkg"), '[mcp_servers.my_server]\nurl = "https://x"\n[mcp_servers.rex]\ncommand = "y"\n');
     writeConfig(root, '[mcp_servers.outside]\ncommand = "z"\n');
     expect(codexProjectMcpDisableFlags(join(root, "repo", "pkg", "src"), ["ndx-sidecar"])).toEqual([
       "-c", "mcp_servers.my_server.enabled=false",
+      "-c", `mcp_servers.my_server.url="${CODEX_DISABLED_MCP_URL}"`,
       "-c", "mcp_servers.rex.enabled=false",
+      "-c", 'mcp_servers.rex.command="ndx-sidecar-disabled"',
       "-c", "mcp_servers.sourcevision.enabled=false",
+      "-c", 'mcp_servers.sourcevision.command="ndx-sidecar-disabled"',
+    ]);
+    expect(CODEX_DISABLED_MCP_URL).toBe("http://127.0.0.1:9/ndx-sidecar-disabled");
+  });
+
+  // codex-cli 0.166.0 does not load the project file under --ignore-user-config,
+  // so the entry Codex builds is the overrides alone: each must be valid by itself.
+  it("gives each server, from the overrides alone, exactly one transport and enabled=false", () => {
+    writeConfig(join(root, "repo"), [
+      'mcp_servers.sourcevision.command = "ndx"',
+      "[mcp_servers.rex]", 'command = "ndx"', 'args = ["rex", "mcp", "."]',
+      "[mcp_servers.remote]", 'url = "https://example.test/mcp"',
+      "[mcp_servers.ndx-sidecar]", 'url = "u"',
+    ].join("\n"));
+    const flags = codexProjectMcpDisableFlags(join(root, "repo"), ["ndx-sidecar"]);
+    const values = flags.filter((_, i) => i % 2 === 1);
+    expect(flags.filter((_, i) => i % 2 === 0).every((flag) => flag === "-c")).toBe(true);
+    // Each -c value is a TOML `key=value` line; together they are the config Codex builds without the file.
+    const overrides = codexConfigMcpServers(values.join("\n"));
+    expect(overrides.map((server) => server.name)).toEqual(["sourcevision", "rex", "remote"]);
+    for (const server of overrides) {
+      expect(server.transports).toHaveLength(1);
+      expect(values).toContain(`mcp_servers.${server.name}.enabled=false`);
+    }
+    expect(overrides.find((server) => server.name === "remote")?.transports).toEqual(["url"]);
+  });
+
+  it.each([
+    ["neither command nor url", '[mcp_servers.half]\nargs = ["x"]\n'],
+    ["both command and url", '[mcp_servers.half]\ncommand = "x"\nurl = "https://x"\n'],
+  ])("refuses a server that declares %s, naming the file and the server", (found, text) => {
+    const file = writeConfig(join(root, "repo"), text);
+    const call = () => codexProjectMcpDisableFlags(join(root, "repo"), ["ndx-sidecar"]);
+    expect(call).toThrow(CodexProjectConfigError);
+    expect(call).toThrow(file);
+    expect(call).toThrow(`"half" with ${found}`);
+  });
+
+  it("counts a transport set in another layer of the project config", () => {
+    writeConfig(join(root, "repo"), '[mcp_servers.rex]\ncommand = "ndx"\n');
+    writeConfig(join(root, "repo", "pkg"), '[mcp_servers.rex]\nargs = ["rex"]\n');
+    expect(codexProjectMcpDisableFlags(join(root, "repo", "pkg"))).toEqual([
+      "-c", "mcp_servers.rex.enabled=false",
+      "-c", 'mcp_servers.rex.command="ndx-sidecar-disabled"',
     ]);
   });
 

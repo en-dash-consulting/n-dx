@@ -51,7 +51,15 @@ import { renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
-import { hubVendorRefusal, sidecarCodexSpawn, sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
+import {
+  hubVendorRefusal,
+  sidecarCodexSpawn,
+  sidecarSpawnFlags,
+  strayMcpServer,
+  strayMcpStopReason,
+  writeBrokerMcpConfig,
+  type SidecarBrokerEndpoint,
+} from "./spawn-policy.js";
 
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
@@ -264,6 +272,13 @@ export interface HubSidecarRegistryOptions extends WorktreeSidecarRegistryOption
 export function createHubSidecarRegistry(opts: HubSidecarRegistryOptions): SidecarSessionRegistry {
   const { broker, dir, hostProjectDir, ...rest } = opts;
   return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir, rest.ttlMs) });
+}
+
+/** Stops a turn that reaches an MCP server other than the broker; see `SidecarSessionRegistry.mcpGuard`. */
+interface McpGuard {
+  observe(event: RuntimeEvent): void;
+  /** The result as the operator should see it: failed with the reason once the guard has fired. */
+  settle(result: SessionTurnResult): SessionTurnResult;
 }
 
 /** An open vendor session, and where its running turn's events go. */
@@ -523,14 +538,16 @@ export class SidecarSessionRegistry {
 
       // The context the turn ended with: what its last call sent in.
       let ended = 0;
+      const guard = this.mcpGuard(record, append);
       live.sink = (event) => {
         if (event.type === "token_usage" && event.tokenUsage) ended = contextTokens(event.tokenUsage);
         append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
+        guard.observe(event);
       };
       const before = record.tokens;
       // The session as the turn ran: a lens changed mid-turn applies to the next one.
       const ranAs = { ...record };
-      const result = await live.session.sendTurn(vendorPrompt);
+      let result = guard.settle(await live.session.sendTurn(vendorPrompt));
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
       if (result.sessionId) record.resumeId = result.sessionId;
@@ -538,7 +555,10 @@ export class SidecarSessionRegistry {
       delivered = result.status === "completed";
       if (context && result.status === "completed") {
         const ceiling = context.ceiling(record);
-        if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
+        if (ended > ceiling) {
+          await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append, guard);
+          result = guard.settle(result);
+        }
       }
       this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
       return result;
@@ -564,12 +584,51 @@ export class SidecarSessionRegistry {
     live: LiveSession,
     measured: { contextTokens: number; ceiling: number },
     append: (frame: SidecarFrame) => void,
+    guard: McpGuard,
   ): Promise<void> {
     record.refresh = measured;
     this.persist();
-    live.sink = (event) => append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
+    live.sink = (event) => {
+      append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
+      guard.observe(event);
+    };
     const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
+  }
+
+  /**
+   * The backstop behind the spawn flags: at the first tool use or result on
+   * an MCP server other than the broker, stop the running turn as the Stop
+   * control does. Once it has fired, {@link McpGuard.settle} appends a
+   * failure event with the reason to the transcript (once) and fails the
+   * result with it, so the drawer shows why the turn ended.
+   */
+  private mcpGuard(record: SidecarSessionRecord, append: (frame: SidecarFrame) => void): McpGuard {
+    let stray: { reason: string; vendor: RuntimeEvent["vendor"] } | undefined;
+    let recorded = false;
+    return {
+      observe: (event) => {
+        if (stray) return;
+        const server = strayMcpServer(event);
+        if (!server) return;
+        stray = { reason: strayMcpStopReason(server), vendor: event.vendor };
+        this.interrupt(record.id).catch((error: unknown) => {
+          console.error(`[sidecar] could not stop session ${record.id} after it reached MCP server ${server}: ${(error as Error).message}`);
+        });
+      },
+      settle: (result) => {
+        if (!stray) return result;
+        if (!recorded) {
+          recorded = true;
+          const at = this.iso();
+          append({
+            seq: record.cursor + 1, at, type: "event",
+            event: { type: "failure", vendor: stray.vendor, turn: result.turn, timestamp: at, failure: { category: "unknown", message: stray.reason } },
+          });
+        }
+        return { ...result, status: "failed", error: stray.reason };
+      },
+    };
   }
 
   /**

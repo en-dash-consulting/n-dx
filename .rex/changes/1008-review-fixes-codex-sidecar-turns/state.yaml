@@ -5,7 +5,14 @@ items:
     lastModified: "2026-11-09T18:29:25.735Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8d2ff447-281c-4255-8634-f2cce8bcd6cf":
-    lastModified: "2026-11-09T18:29:30.636Z"
+    status: "completed"
+    startedAt: "2026-11-09T18:35:52.440Z"
+    completedAt: "2026-11-09T18:44:54.160Z"
+    endedAt: "2026-11-09T18:44:54.160Z"
+    activeIntervals: [{"end":"2026-11-09T18:44:54.160Z","start":"2026-11-09T18:35:52.440Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Project MCP servers get enabled=false plus a command/url placeholder; neither/both transports refuses; session registry stops a turn reaching a non-broker MCP server and records the reason."
+    lastModified: "2026-11-09T18:44:54.160Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96911f90-6e41-4fc3-91b5-ae1619c2fb3b":
     lastModified: "2026-11-09T18:29:33.373Z"

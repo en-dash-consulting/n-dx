@@ -27,7 +27,9 @@
  * carries ({@link sidecarCodexSpawn}):
  * - `--ignore-user-config`: `$CODEX_HOME/config.toml` is skipped, so none of
  *   the user's MCP servers loads (a `-c mcp_servers…` override merges with
- *   them and never replaces them). Auth still comes from `CODEX_HOME`.
+ *   them and never replaces them). Auth still comes from `CODEX_HOME`. On
+ *   codex-cli 0.166.0 it skips the project `.codex/config.toml` too: project
+ *   config loads only for a project the user config trusts.
  * - `features.apps=false` (the Apps MCP integration loads even without the
  *   user config) and `features.shell_snapshot=false` (a snapshot would write
  *   the env-backed header values under `CODEX_HOME/shell_snapshots/`).
@@ -38,12 +40,23 @@
  *   only in the Codex child's environment and blanked in every command the
  *   agent runs, so the broker credential is in neither argv (which is
  *   logged) nor an MCP config file. With no endpoint, no broker flag.
- * - `-c mcp_servers.<name>.enabled=false` for every server a repository's own
- *   `.codex/config.toml` declares, from the session's checkout up to the
- *   repository root, re-read for each turn ({@link sidecarCodexProjectFlags}):
- *   `--ignore-user-config` does not skip project config. A file that exists
- *   but cannot be read with confidence refuses the turn before anything is
- *   spawned.
+ * - for every server a repository's own `.codex/config.toml` declares, from
+ *   the session's checkout up to the repository root, re-read for each turn
+ *   ({@link sidecarCodexProjectFlags}): `-c mcp_servers.<name>.enabled=false`
+ *   plus a placeholder for the transport the file gives it
+ *   (`command="ndx-sidecar-disabled"` or
+ *   `url="http://127.0.0.1:9/ndx-sidecar-disabled"`). 0.166.0 does not load
+ *   that file under `--ignore-user-config`, and `enabled=false` alone then
+ *   builds an entry with no transport, which fails config loading;
+ *   0.164.0-alpha.11.1 is unverified. The placeholder entries hold either
+ *   way: over a loaded file they replace one key and `enabled=false` keeps the
+ *   server off; alone they are complete, disabled entries. A file that exists
+ *   but cannot be read with confidence, a server name that is not a bare key,
+ *   or a server with neither or both transports refuses the turn before
+ *   anything is spawned.
+ * - a backstop in the session registry: a turn whose events show a tool use
+ *   on any MCP server but the broker is stopped
+ *   ({@link strayMcpServer}).
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
@@ -55,7 +68,7 @@
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CodexProjectConfigError, codexProjectMcpDisableFlags, compileCodexPolicyFlags } from "@n-dx/llm-client";
-import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy } from "@n-dx/llm-client";
+import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy, RuntimeEvent } from "@n-dx/llm-client";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -194,6 +207,28 @@ export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, i
     },
     env,
   };
+}
+
+/**
+ * The MCP server a tool use or result names, when it is not the broker:
+ * `mcp__<server>__<tool>`, as both vendors' parsers name an MCP call (a Codex
+ * `mcp_tool_call` item from its own `server` field). Undefined for the
+ * broker, a built-in tool and any other event.
+ *
+ * The spawn flags keep every other server off; this is the backstop for a
+ * server they missed, so a turn that reaches one is stopped.
+ */
+export function strayMcpServer(event: RuntimeEvent): string | undefined {
+  const tool = event.type === "tool_use" ? event.toolCall?.tool : event.type === "tool_result" ? event.toolResult?.tool : undefined;
+  if (!tool?.startsWith("mcp__") || tool.startsWith(`mcp__${SIDECAR_BROKER_NAME}__`)) return undefined;
+  const rest = tool.slice("mcp__".length);
+  const end = rest.indexOf("__");
+  return end > 0 ? rest.slice(0, end) : rest;
+}
+
+/** Why a turn that reached MCP server `server` was stopped, as the operator reads it. */
+export function strayMcpStopReason(server: string): string {
+  return `Stopped this turn: the agent used MCP server ${JSON.stringify(server)}, but a Sidecar session may reach only ${SIDECAR_BROKER_NAME}. Check the repository's .codex/config.toml for a server n-dx did not turn off.`;
 }
 
 /** A TOML basic string. JSON's escapes are a subset of TOML's for a basic string. */

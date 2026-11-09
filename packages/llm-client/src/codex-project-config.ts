@@ -2,12 +2,16 @@
  * The MCP servers a repository's own Codex config declares, and the `-c`
  * flags that turn them off.
  *
- * `codex exec --ignore-user-config` skips only `$CODEX_HOME/config.toml`. A
- * repository's `.codex/config.toml` (`ndx init` writes one with rex and
- * sourcevision stdio servers) may still load as project config, in the
- * working directory or any directory above it up to the repository root. A
- * caller that must run Codex with no MCP server but its own reads every such
- * file and disables each server it names.
+ * A repository's `.codex/config.toml` (`ndx init` writes one with rex and
+ * sourcevision stdio servers) may load as project config, from the working
+ * directory or any directory above it up to the repository root. Whether it
+ * loads under `codex exec --ignore-user-config` depends on the build:
+ * codex-cli 0.166.0 skips it (a project's config is honoured only when the
+ * user config trusts the project, and that flag skips the user config);
+ * 0.164.0-alpha.11.1 is unverified. A caller that must run Codex with no MCP
+ * server but its own reads every such file and overrides each server it
+ * names with a complete, disabled entry ({@link codexProjectMcpDisableFlags}),
+ * which is valid either way.
  *
  * Fail closed. {@link codexConfigMcpServerNames} parses the whole file with a
  * strict TOML subset: anything it cannot parse — a malformed header, an
@@ -41,9 +45,23 @@ const BARE_KEY_CHAR = /[A-Za-z0-9_-]/;
 /** Numbers, booleans, dates and times: whatever is left once strings, arrays and tables are excluded. */
 const SCALAR_CHAR = /[A-Za-z0-9_+\-.:]/;
 
-/** What a value contributes to server names: an inline table's entry keys. */
+/** What a value contributes to server names: an inline table's key paths, nested tables flattened. */
 interface ScannedValue {
   tableKeys?: string[][];
+}
+
+/** The keys that give a Codex MCP server its transport: stdio (`command`) or Streamable HTTP (`url`). */
+export type CodexMcpTransportKey = "command" | "url";
+
+/** An MCP server a Codex config declares, with the transport keys its entry sets. */
+export interface CodexMcpServerDeclaration {
+  name: string;
+  /** `command`, `url`, both or neither, in order of first mention. */
+  transports: CodexMcpTransportKey[];
+}
+
+function isTransportKey(key: string | undefined): key is CodexMcpTransportKey {
+  return key === "command" || key === "url";
 }
 
 class Scanner {
@@ -53,16 +71,21 @@ class Scanner {
     if (s.startsWith("﻿")) this.i = 1;
   }
 
-  /** Every top-level `mcp_servers` server name, in order of first mention. */
-  serverNames(): string[] {
-    const names: string[] = [];
-    const add = (name: string) => {
-      if (!names.includes(name)) names.push(name);
+  /** Every top-level `mcp_servers` server, in order of first mention, with its transport keys. */
+  servers(): CodexMcpServerDeclaration[] {
+    const servers: CodexMcpServerDeclaration[] = [];
+    /** A full key path from the document root, as a header, an assignment or an inline table entry sets it. */
+    const note = (path: string[]) => {
+      if (path[0] !== "mcp_servers" || path.length < 2) return;
+      let server = servers.find((s) => s.name === path[1]);
+      if (!server) servers.push(server = { name: path[1], transports: [] });
+      const key = path[2];
+      if (path.length === 3 && isTransportKey(key) && !server.transports.includes(key)) server.transports.push(key);
     };
     let table: string[] = [];
     for (;;) {
       this.skipBlank();
-      if (this.eof()) return names;
+      if (this.eof()) return servers;
       if (this.peek() === "[") {
         const arrayTable = this.peek(1) === "[";
         this.i += arrayTable ? 2 : 1;
@@ -71,7 +94,7 @@ class Scanner {
         this.expect(arrayTable ? "]]" : "]");
         this.endOfLine();
         if (table[0] === "mcp_servers") {
-          if (table.length >= 2) add(table[1]);
+          if (table.length >= 2) note(table);
           else if (arrayTable) this.fail("[[mcp_servers]] declares no server name");
         }
         continue;
@@ -82,9 +105,9 @@ class Scanner {
       const value = this.value();
       this.endOfLine();
       if (path[0] !== "mcp_servers") continue;
-      if (path.length >= 2) add(path[1]);
-      else if (value.tableKeys) value.tableKeys.forEach((key) => add(key[0]));
-      else this.fail("mcp_servers is assigned something other than a table");
+      if (path.length === 1 && !value.tableKeys) this.fail("mcp_servers is assigned something other than a table");
+      note(path);
+      value.tableKeys?.forEach((key) => note([...path, ...key]));
     }
   }
 
@@ -141,17 +164,21 @@ class Scanner {
     this.i++;
   }
 
-  /** The inline table's entry keys. Newlines inside are accepted (TOML 1.1). */
+  /**
+   * The inline table's key paths: each entry's key, then each key path of a
+   * nested inline table under it. Newlines inside are accepted (TOML 1.1).
+   */
   private inlineTable(): string[][] {
     this.i++;
     const keys: string[][] = [];
     for (;;) {
       this.skipBlank();
       if (this.peek() === "}") break;
-      keys.push(this.key());
+      const key = this.key();
+      keys.push(key);
       this.expect("=");
       this.skipInline();
-      this.value();
+      this.value().tableKeys?.forEach((sub) => keys.push([...key, ...sub]));
       this.skipBlank();
       if (this.peek() === ",") {
         this.i++;
@@ -275,7 +302,17 @@ class Scanner {
  * @throws Error when any part of the text is outside the subset this reads.
  */
 export function codexConfigMcpServerNames(text: string): string[] {
-  return new Scanner(text).serverNames();
+  return codexConfigMcpServers(text).map((server) => server.name);
+}
+
+/**
+ * {@link codexConfigMcpServerNames}, each with the transport keys its entry
+ * sets directly (`mcp_servers.<name>.command` / `.url`), in all three forms.
+ *
+ * @throws Error when any part of the text is outside the subset this reads.
+ */
+export function codexConfigMcpServers(text: string): CodexMcpServerDeclaration[] {
+  return new Scanner(text).servers();
 }
 
 /**
@@ -307,9 +344,14 @@ export function codexProjectMcpServerNames(cwd: string): string[] {
   return projectMcpServers(cwd).map((server) => server.name);
 }
 
-/** {@link codexProjectMcpServerNames}, each with the first file that declares it. */
-function projectMcpServers(cwd: string): { name: string; file: string }[] {
-  const servers: { name: string; file: string }[] = [];
+/** A project MCP server: the first file that declares it, and its transport keys across every file. */
+interface ProjectMcpServer extends CodexMcpServerDeclaration {
+  file: string;
+}
+
+/** {@link codexProjectMcpServerNames}, each with the first file that declares it and its transports. */
+function projectMcpServers(cwd: string): ProjectMcpServer[] {
+  const servers: ProjectMcpServer[] = [];
   for (const file of codexProjectConfigPaths(cwd)) {
     let text: string;
     try {
@@ -319,29 +361,55 @@ function projectMcpServers(cwd: string): { name: string; file: string }[] {
       if (code === "ENOENT" || code === "ENOTDIR") continue;
       throw new CodexProjectConfigError(file, `cannot be read (${code ?? (error as Error).message})`);
     }
-    let found: string[];
+    let found: CodexMcpServerDeclaration[];
     try {
-      found = codexConfigMcpServerNames(text);
+      found = codexConfigMcpServers(text);
     } catch (error) {
       if (!(error instanceof TomlSubsetError)) throw error;
       throw new CodexProjectConfigError(file, `its MCP servers cannot be read with confidence (${error.message})`);
     }
-    for (const name of found) if (!servers.some((server) => server.name === name)) servers.push({ name, file });
+    for (const { name, transports } of found) {
+      // Codex merges the layers key by key, so a server's entry carries every transport any layer sets.
+      const server = servers.find((s) => s.name === name);
+      if (!server) servers.push({ name, file, transports: [...transports] });
+      else for (const key of transports) if (!server.transports.includes(key)) server.transports.push(key);
+    }
   }
   return servers;
 }
 
+/** The command a disabled stdio server is given; never run, since the entry is disabled. */
+export const CODEX_DISABLED_MCP_COMMAND = "ndx-sidecar-disabled";
+
+/** The url a disabled Streamable HTTP server is given: the discard port on loopback, never contacted. */
+export const CODEX_DISABLED_MCP_URL = "http://127.0.0.1:9/ndx-sidecar-disabled";
+
 /**
- * `-c mcp_servers.<name>.enabled=false` for every project MCP server `cwd`
- * would load, except those in `keep`.
+ * The `-c` overrides that keep every project MCP server `cwd` would load off,
+ * except those in `keep`: for each, `enabled=false` and a placeholder for the
+ * transport its project entry declares — `command="ndx-sidecar-disabled"`
+ * for a stdio server, `url="http://127.0.0.1:9/ndx-sidecar-disabled"` for a
+ * Streamable HTTP one.
  *
- * Only a bare TOML key (`[A-Za-z0-9_-]+`) is emitted. Whether codex's `-c`
- * parser honours a quoted path segment is unverified on the real CLI: if it
- * splits on `.`, `mcp_servers."a.b"` misses the server and leaves it enabled.
- * So a name that is not a bare key refuses rather than being quoted.
+ * Each override is a complete, valid, disabled entry, so it holds whether or
+ * not Codex loaded the project file. codex-cli 0.166.0 does not load it under
+ * `--ignore-user-config`, and there `enabled=false` alone builds an entry with
+ * no transport, which fails config loading (`invalid transport in
+ * mcp_servers.<name>`); 0.164.0-alpha.11.1 is unverified. If the file did
+ * load, the placeholder replaces that one key and `enabled=false` keeps the
+ * server off; if it did not, the entry built from the overrides alone has
+ * exactly one transport and is disabled.
+ *
+ * Fails closed. A server whose project entry declares neither `command` nor
+ * `url`, or both, refuses: no one placeholder is valid for it. Only a bare
+ * TOML key (`[A-Za-z0-9_-]+`) is emitted. Whether codex's `-c` parser honours
+ * a quoted path segment is unverified on the real CLI: if it splits on `.`,
+ * `mcp_servers."a.b"` misses the server and leaves it enabled. So a name that
+ * is not a bare key refuses rather than being quoted.
  *
  * @throws CodexProjectConfigError as {@link codexProjectMcpServerNames}, and
- *   naming the file and the server when a server to disable is not a bare key.
+ *   naming the file and the server when a server to disable is not a bare key
+ *   or does not declare exactly one transport.
  */
 export function codexProjectMcpDisableFlags(cwd: string, keep: readonly string[] = []): string[] {
   const servers = projectMcpServers(cwd).filter((server) => !keep.includes(server.name));
@@ -352,5 +420,19 @@ export function codexProjectMcpDisableFlags(cwd: string, keep: readonly string[]
       `declares MCP server ${JSON.stringify(unaddressable.name)}, whose name is not a bare TOML key ([A-Za-z0-9_-]), so a -c override cannot be trusted to disable it`,
     );
   }
-  return servers.flatMap((server) => ["-c", `mcp_servers.${server.name}.enabled=false`]);
+  const ambiguous = servers.find((server) => server.transports.length !== 1);
+  if (ambiguous) {
+    const found = ambiguous.transports.length === 0 ? "neither command nor url" : "both command and url";
+    throw new CodexProjectConfigError(
+      ambiguous.file,
+      `declares MCP server ${JSON.stringify(ambiguous.name)} with ${found}, so no disabled entry with exactly one transport can stand in for it`,
+    );
+  }
+  return servers.flatMap((server) => {
+    const prefix = `mcp_servers.${server.name}`;
+    const placeholder = server.transports[0] === "command"
+      ? `${prefix}.command=${JSON.stringify(CODEX_DISABLED_MCP_COMMAND)}`
+      : `${prefix}.url=${JSON.stringify(CODEX_DISABLED_MCP_URL)}`;
+    return ["-c", `${prefix}.enabled=false`, "-c", placeholder];
+  });
 }
