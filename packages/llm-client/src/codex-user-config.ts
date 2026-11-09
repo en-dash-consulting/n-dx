@@ -91,27 +91,56 @@ export function parseCodexConfigStrings(text: string): Map<string, string> {
   return values;
 }
 
+/** The user's Codex config file: `$CODEX_HOME/config.toml`, `CODEX_HOME` defaulting to `~/.codex`. */
+export function codexUserConfigPath(env: NodeJS.ProcessEnv, home: string = homedir()): string {
+  return join(env.CODEX_HOME || join(home, ".codex"), "config.toml");
+}
+
+/**
+ * The string values of the user's Codex config, or undefined when there is
+ * none: the ordinary case, in which Codex uses its built-in OpenAI provider.
+ *
+ * @throws the read error when the file exists but cannot be read.
+ */
+function readCodexUserConfig(env: NodeJS.ProcessEnv, home: string): Map<string, string> | undefined {
+  let text: string;
+  try {
+    text = readFileSync(codexUserConfigPath(env, home), "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return undefined;
+    throw error;
+  }
+  return parseCodexConfigStrings(text);
+}
+
+/** The provider `values` selects: the selected profile's `model_provider`, else the top-level one. */
+function selectedProvider(values: Map<string, string>): string | undefined {
+  const get = (...path: string[]) => values.get(JSON.stringify(path));
+  const profile = get("profile");
+  return (profile !== undefined ? get("profiles", profile, "model_provider") : undefined) ?? get("model_provider");
+}
+
+/**
+ * The model provider the user's Codex config selects, or undefined when the
+ * config is absent or names none (Codex then uses `openai`).
+ *
+ * @throws the read error when the config exists but cannot be read.
+ */
+export function codexUserModelProvider(env: NodeJS.ProcessEnv, home: string = homedir()): string | undefined {
+  const values = readCodexUserConfig(env, home);
+  return values && selectedProvider(values);
+}
+
 /**
  * `env_key` of the model provider the user's Codex config selects, or
  * undefined when the config is absent, selects no provider table, or names
  * something that is not an exact variable name.
  */
 export function codexUserEnvKey(env: NodeJS.ProcessEnv, home: string = homedir()): string | undefined {
-  const dir = env.CODEX_HOME || join(home, ".codex");
-  let text: string;
-  try {
-    text = readFileSync(join(dir, "config.toml"), "utf8");
-  } catch (error) {
-    // No config is the ordinary case: Codex then uses its built-in OpenAI provider.
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return undefined;
-    throw error;
-  }
-  const values = parseCodexConfigStrings(text);
-  const get = (...path: string[]) => values.get(JSON.stringify(path));
-  const profile = get("profile");
-  const provider = (profile !== undefined ? get("profiles", profile, "model_provider") : undefined) ?? get("model_provider");
+  const values = readCodexUserConfig(env, home);
+  const provider = values && selectedProvider(values);
   if (provider === undefined) return undefined;
-  const envKey = get("model_providers", provider, "env_key");
+  const envKey = values?.get(JSON.stringify(["model_providers", provider, "env_key"]));
   return envKey !== undefined && ENV_NAME.test(envKey) ? envKey : undefined;
 }

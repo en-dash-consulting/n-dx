@@ -57,6 +57,9 @@
  * - a backstop in the session registry: a turn whose events show a tool use
  *   on any MCP server but the broker is stopped
  *   ({@link strayMcpServer}).
+ * - `--ignore-user-config` drops the user's `model_provider` too, so a user
+ *   config selecting any provider but `openai` refuses the session at create
+ *   and before every turn ({@link codexUserProviderRefusal}).
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
@@ -67,7 +70,7 @@
 
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { CodexProjectConfigError, codexProjectMcpDisableFlags, compileCodexPolicyFlags } from "@n-dx/llm-client";
+import { CodexProjectConfigError, codexProjectMcpDisableFlags, codexUserConfigPath, codexUserModelProvider, compileCodexPolicyFlags } from "@n-dx/llm-client";
 import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy, RuntimeEvent } from "@n-dx/llm-client";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
@@ -86,6 +89,26 @@ export function hubVendorRefusal(vendor: string): string | null {
     return "A hub session cannot run on Codex: its read-only sandbox can still read repositories, and the hub session works from the hub snapshot alone";
   }
   return `A hub session runs on Claude only, not "${vendor}"`;
+}
+
+/**
+ * Why a Codex Sidecar session cannot run under the user's Codex config, or
+ * null when it can. A turn runs with `--ignore-user-config`, so a
+ * `model_provider` the config selects (top level or through the selected
+ * profile) would not apply: Codex would fall back to `openai` and never read
+ * that provider's key. Checked at create and before every turn; the config
+ * may change between them.
+ */
+export function codexUserProviderRefusal(env: NodeJS.ProcessEnv = process.env): string | null {
+  const file = codexUserConfigPath(env);
+  let provider: string | undefined;
+  try {
+    provider = codexUserModelProvider(env);
+  } catch (error) {
+    return `A Codex Sidecar session cannot start: ${file} could not be read (${error instanceof Error ? error.message : String(error)}), so its model provider is unknown. Fix the file, or use Claude for the Sidecar.`;
+  }
+  if (provider === undefined || provider === "openai") return null;
+  return `A Codex Sidecar session cannot start: ${file} selects model provider ${JSON.stringify(provider)}, but Codex Sidecar sessions skip the user's Codex config, so that provider would not apply. Use Claude for the Sidecar, or the default OpenAI provider.`;
 }
 
 /** Codex: read-only, never asks, no network, no writable root, no command or file tool beyond reads. */
