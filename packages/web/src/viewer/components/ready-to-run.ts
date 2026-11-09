@@ -89,6 +89,10 @@ export interface ReadyToRunProps {
   onOpenLive: (taskId: string) => void;
   /** Open the PRD, for the empty state's link. */
   onOpenPrd: () => void;
+  /** Bump to reload the list (the work set changed under it). */
+  reloadKey?: number;
+  /** Shown instead of "Nothing ready to run" when the list is empty: the branch's work set has nothing left. */
+  emptyNote?: string;
 }
 
 const STATUS_ICON: Record<string, { icon: string; label: string }> = {
@@ -96,7 +100,7 @@ const STATUS_ICON: Record<string, { icon: string; label: string }> = {
   in_progress: { icon: "◐", label: "In progress" },
 };
 
-export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps) {
+export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, reloadKey = 0, emptyNote }: ReadyToRunProps) {
   const [tasks, setTasks] = useState<ReadyTask[] | null>(null);
   const [dir, setDir] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +147,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, reloadKey]);
   useEffect(() => { if (needAll) void load(); }, [needAll, load]);
   useHenchRunsLiveRefresh(load);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
@@ -252,8 +256,8 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
     ? h("p", { class: "ready-empty" }, "Loading…")
     : tasks.length === 0
       ? h("p", { class: "ready-empty" },
-          error ?? "Nothing ready to run. ",
-          error ? null : h("a", {
+          error ?? emptyNote ?? "Nothing ready to run. ",
+          error || emptyNote ? null : h("a", {
             href: appUrl("/prd"),
             onClick: (e: MouseEvent) => { e.preventDefault(); onOpenPrd(); },
           }, "Open the PRD"),

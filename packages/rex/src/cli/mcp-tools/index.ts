@@ -45,3 +45,4 @@ export { handleGetProduct } from "./get-product.js";
 export { handleGetCapability } from "./get-capability.js";
 export { handlePlaceChange } from "./place-change.js";
 export { handleApplyChange } from "./apply-change.js";
+export { handleAssignToBranch } from "./assign-to-branch.js";

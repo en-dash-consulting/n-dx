@@ -650,7 +650,7 @@ export { createRexMcpServer } from "./cli/mcp.js";
 
 // ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
 
-export { handleEditItem, handleUpdateTaskStatus } from "./cli/mcp-tools/index.js";
+export { handleAssignToBranch, handleEditItem, handleUpdateTaskStatus } from "./cli/mcp-tools/index.js";
 
 // The status rule `update_task_status` applies without `force`.
 export { validateTransition } from "./core/transitions.js";

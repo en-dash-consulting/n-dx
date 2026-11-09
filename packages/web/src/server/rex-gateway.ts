@@ -134,7 +134,6 @@ export type { TreeEntry, TreeStats } from "@n-dx/rex";
 // above for other callers; prd-delta.ts reaches the diff itself through here
 // so the dashboard and the CLI cannot disagree about the same two trees.
 export { diffTrees } from "@n-dx/rex";
-export type { TreeDiff } from "@n-dx/rex";
 
 // ---- Rex task selection -----------------------------------------------------
 export { findNextTask, findActionableTasks, collectCompletedIds } from "@n-dx/rex";
@@ -197,12 +196,14 @@ export type { ReshapeProposal } from "@n-dx/rex";
 // ---- Rex MCP tool handlers (direct invocation) -----------------------------
 // The Sidecar's item-edit and status cards write through the handlers MCP edit_item
 // and update_task_status run; validateTransition is the rule update_task_status
-// applies, which the status card quotes before approval.
-export { handleEditItem, handleUpdateTaskStatus, validateTransition } from "@n-dx/rex";
+// applies, which the status card quotes before approval. `handleAssignToBranch` is
+// assign_to_branch: the Work page's Add and Remove write the branch work set through
+// it. `currentWorkSetBranch` names the checked-out branch (null on the default
+// branch or a detached HEAD).
+export { handleAssignToBranch, handleEditItem, handleUpdateTaskStatus, validateTransition, currentWorkSetBranch } from "@n-dx/rex";
 
 // ---- Rex PRD tree backup snapshots (undo for reorganize/prune/reshape/fix) --
 export { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "@n-dx/rex";
-export type { BackupSnapshot } from "@n-dx/rex";
 
 // ---- Saved run settings -----------------------------------------------------
 // The `run` block a task carries. `PUT /api/hench/prep/:taskId` saves it, and

@@ -55,6 +55,7 @@ import {
   findItem,
   findActionableTasks,
   findActionableWork,
+  findNextWorkTask,
   openClaimsStore,
   resolveClaimHolder,
   resolveStore,
@@ -727,8 +728,11 @@ interface ReadyPick {
  * selector (Inbox changes never list, a task-less change is one runnable unit,
  * a change with tasks lists its tasks), a v1 tree with the v1 selector. One
  * selection pass and one walk of the projection, never a lookup per row.
+ * On a branch that has a work set the v2 list is narrowed to it, as `ndx work`
+ * narrows its pick; on the default branch and an unassigned branch it is not.
  */
 function pickReady(
+  projectDir: string,
   rexDir: string,
   doc: NonNullable<ReturnType<typeof loadPRDSync>>,
   excludeIds: ReadonlySet<string>,
@@ -738,7 +742,8 @@ function pickReady(
     const tree: V2Tree = { product: doc.product ?? [], changes: doc.items as unknown as V2Tree["changes"] };
     const byId = new Map<string, { item: PRDItem; parents: PRDItem[] }>();
     for (const entry of walkTree(doc.items)) byId.set(entry.item.id, entry);
-    return findActionableWork(tree, { excludeIds }).flatMap((unit) => {
+    const { workSet } = findNextWorkTask(tree, { workspace: projectDir, excludeIds });
+    return findActionableWork(tree, { excludeIds, ...(workSet ? { workSet: new Set(workSet.ids) } : {}) }).flatMap((unit) => {
       const entry = byId.get(unit.node.id);
       return entry ? [{ ...entry, change: { id: unit.change.id, title: unit.change.title } }] : [];
     });
@@ -773,7 +778,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
   // The order `ndx work --auto` picks in, in one selection pass. Asking for the
   // next task once per row rebuilt the comparator each time and froze the
   // request thread for seconds. Tasks another worktree holds are excluded.
-  const picked = pickReady(ctx.rexDir, doc, new Set([...foreign.keys(), ...stuckIds]), completedIds);
+  const picked = pickReady(ctx.projectDir, ctx.rexDir, doc, new Set([...foreign.keys(), ...stuckIds]), completedIds);
   const tasks: ReadyTask[] = picked.slice(offset, offset + limit).map(({ item, parents, change }) => {
     const liveRun = liveTaskIds.has(item.id);
     return {

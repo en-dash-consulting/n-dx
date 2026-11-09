@@ -540,7 +540,7 @@ const tasksOf = (change: ChangeRuleNode): RuleNode[] =>
  * open changes and rex's next pick. `excludeIds` are units another worktree
  * has claimed, passed over as `ndx work` passes over them.
  */
-export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set()): ChangeSummaryWire {
+export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set(), workspace?: string): ChangeSummaryWire {
   const index = indexTree(tree);
   const stages: Record<OpenChangeStageWire, number> = { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 };
   const open: GlanceChangeWire[] = [];
@@ -570,7 +570,8 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
     });
   }
 
-  const pick = findNextWorkTask(tree, { excludeIds });
+  // With a workspace the pick is narrowed to its branch's work set, as `ndx work` narrows it.
+  const pick = workspace === undefined ? findNextWorkTask(tree, { excludeIds }) : findNextWorkTask(tree, { excludeIds, workspace }).task;
   const next: NextPickWire | null = pick
     ? {
       id: pick.unit.node.id,
@@ -926,7 +927,7 @@ export function routeProductReads(
     } else if (path === "changes/summary") {
       const holder = resolveClaimHolder(ctx.projectDir);
       const claimed = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
-      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys())) });
+      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys()), ctx.projectDir) });
     } else if (areaRef) {
       const area = buildAreaDetail(model.tree, areaRef);
       if (area) jsonResponse(res, 200, { layout: "v2", area });
