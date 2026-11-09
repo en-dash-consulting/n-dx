@@ -83,6 +83,17 @@ interface RunJobSlot {
   stopRequested: boolean;
 }
 
+/**
+ * Add a chunk to the kept output, dropping the oldest text past `max`. The
+ * cut lands on a line start: mid-line it could split a colour code and leave
+ * its tail to be shown as text.
+ */
+export function appendOutput(kept: string, chunk: string, max = MAX_OUTPUT_BYTES): string {
+  const combined = kept + chunk;
+  if (combined.length <= max) return combined;
+  return combined.slice(-max).replace(/^[^\n]*\n/, "");
+}
+
 function emptyStatus(): RunCommandStatus {
   return {
     running: false,
@@ -201,7 +212,7 @@ async function handleStart(
   });
 
   const append = (chunk: string): void => {
-    status.output = (status.output + chunk).slice(-MAX_OUTPUT_BYTES);
+    status.output = appendOutput(status.output, chunk);
     // Look for the served URL only until one is found: a later line echoing
     // a different port should not move a link the user may already have open.
     if (!status.url) status.url = findLocalUrl(status.output);

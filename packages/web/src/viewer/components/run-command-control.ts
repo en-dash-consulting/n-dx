@@ -1,6 +1,7 @@
 /**
  * "Found run command" — start the project's dev server or a build from the
- * dashboard, and open it when it serves on localhost.
+ * dashboard, and open it when it serves on localhost: an Open app button sits
+ * at the foot of the dropdown, opposite Stop.
  *
  * Sits in the top nav beside search, and is always there so it can be found
  * in the same place on every project. It is disabled until the server reports
@@ -13,10 +14,11 @@
  * enough to turn a build tool into arbitrary execution, so the server accepts
  * only an id. See `server/routes-run-commands.ts`.
  */
-import { h, Fragment } from "preact";
+import { h } from "preact";
 import { useState, useCallback } from "preact/hooks";
 
 import { useRunCommands, type DetectedCommand } from "../hooks/index.js";
+import { RunOutput } from "./run-output.js";
 
 function kindLabel(kind: "run" | "build"): string {
   return kind === "run" ? "run" : "build";
@@ -108,17 +110,6 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
       h("span", { class: "runcmd-caret", "aria-hidden": "true" }, "▼"),
     ),
 
-    // A served URL is the point of the whole control, so it sits outside the
-    // dropdown where it is reachable without opening anything.
-    status?.url
-      ? h("a", {
-          class: "runcmd-link",
-          href: status.url,
-          target: "_blank",
-          rel: "noreferrer noopener",
-        }, status.url.replace(/^https?:\/\//, ""))
-      : null,
-
     open
       ? h("div", { class: "runcmd-menu", role: "menu" },
           h("div", { class: "runcmd-menu-title" }, "Run or build"),
@@ -138,6 +129,18 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
           ),
 
           h("div", { class: "runcmd-actions" },
+            // The app the command serves, opposite Stop: the URL is the port
+            // the process announced, never an assumed default. Once the
+            // process ends nothing is served, so the button goes with it.
+            running && status?.url
+              ? h("a", {
+                  class: "runcmd-open",
+                  href: status.url,
+                  target: "_blank",
+                  rel: "noreferrer noopener",
+                  title: `Open ${status.url} in a new tab`,
+                }, "Open app ↗")
+              : null,
             running
               ? h("button", {
                   type: "button",
@@ -154,12 +157,7 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
 
           error ? h("div", { class: "runcmd-error", role: "alert" }, error) : null,
 
-          status?.output
-            ? h(Fragment, null,
-                h("div", { class: "runcmd-menu-title" }, "Output"),
-                h("pre", { class: "runcmd-output" }, status.output.slice(-2000)),
-              )
-            : null,
+          status?.output ? h(RunOutput, { output: status.output }) : null,
         )
       : null,
   );
