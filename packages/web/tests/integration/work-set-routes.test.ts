@@ -88,14 +88,14 @@ describe("branch work set routes", () => {
 
   describe("GET /api/rex/work-set", () => {
     it("reports no work set on the default branch and on a detached HEAD", async () => {
-      expect(await workSet()).toEqual({ branch: null, workSet: false, groups: [] });
+      expect(await workSet()).toEqual({ branch: null, workSet: false, groups: [], others: [] });
       git(root, "checkout", "--quiet", "--detach");
-      expect(await workSet()).toEqual({ branch: null, workSet: false, groups: [] });
+      expect(await workSet()).toEqual({ branch: null, workSet: false, groups: [], others: [] });
     });
 
     it("names the branch but reports no work set when nothing is assigned to it", async () => {
       git(root, "checkout", "--quiet", "-b", "feat/x");
-      expect(await workSet()).toEqual({ branch: "feat/x", workSet: false, groups: [] });
+      expect(await workSet()).toEqual({ branch: "feat/x", workSet: false, groups: [], others: [] });
     });
 
     it("groups the open units by change and marks the one that inherits its branch", async () => {
@@ -121,6 +121,8 @@ describe("branch work set routes", () => {
       expect(await added.json()).toMatchObject({ branch: "feat/x", assigned: [{ id: LOW, title: "Polish the sheet" }], unchanged: [] });
       expect(frames).toContainEqual(expect.objectContaining({ type: "rex:prd-changed" }));
       expect((await workSet()).groups[0]!.units).toMatchObject([{ id: LOW, inherited: false }]);
+      // The change's other open task is listed as not on the branch.
+      expect((await workSet()).others.flatMap((g) => g.units.map((u) => u.id))).toContain(TASK);
 
       const removed = await post("remove", { ids: [LOW] });
       expect(removed.status).toBe(200);

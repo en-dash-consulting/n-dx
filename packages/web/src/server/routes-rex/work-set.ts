@@ -31,6 +31,7 @@ import { refreshPRDCache } from "../prd-io.js";
 import { repositoryRunSlotUsage } from "../routes-hench.js";
 import {
   currentWorkSetBranch,
+  changeWorkShape,
   findNextWorkTask,
   handleAssignToBranch,
   indexTree,
@@ -59,7 +60,10 @@ export interface WorkSetGroupWire {
 export interface WorkSetWire {
   branch: string | null;
   workSet: boolean;
+  /** The open units on the branch, by change. */
   groups: WorkSetGroupWire[];
+  /** The open units not on the branch (on another branch or none), by change. */
+  others: WorkSetGroupWire[];
 }
 
 export type WorkSetRefusalCode = "V1_LAYOUT" | "NO_WORK_SET_BRANCH" | "RUN_LIVE" | "ON_ANOTHER_BRANCH" | "WORK_SET_REFUSED";
@@ -89,7 +93,7 @@ export function routeWorkSet(
 
 async function handleRead(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
   const branch = currentWorkSetBranch(ctx.projectDir);
-  const none: WorkSetWire = { branch, workSet: false, groups: [] };
+  const none: WorkSetWire = { branch, workSet: false, groups: [], others: [] };
   if (branch === null || (await prdLayout(ctx.rexDir)) !== "v2") {
     jsonResponse(res, 200, none);
     return true;
@@ -97,18 +101,39 @@ async function handleRead(res: ServerResponse, ctx: ServerContext): Promise<bool
   try {
     const { tree } = await loadPrdModel(ctx.rexDir);
     const { workSet } = findNextWorkTask(tree, { workspace: ctx.projectDir });
-    jsonResponse(res, 200, workSet ? { branch: workSet.branch, workSet: true, groups: groupUnits(tree, new Set(workSet.ids)) } : none);
+    if (!workSet) {
+      jsonResponse(res, 200, none);
+    } else {
+      const ids = new Set(workSet.ids);
+      const reply: WorkSetWire = {
+        branch: workSet.branch,
+        workSet: true,
+        groups: groupUnits(tree, (n) => ids.has(n.id)),
+        others: groupUnits(tree, (n) => !ids.has(n.id) && isOpenUnit(n)),
+      };
+      jsonResponse(res, 200, reply);
+    }
   } catch (err) {
     jsonResponse(res, 500, { error: errorMessage(err) });
   }
   return true;
 }
 
-/** The units in `ids` grouped by their change, in tree order; a task-less change is its own only unit. */
-function groupUnits(tree: V2Tree, ids: ReadonlySet<string>): WorkSetGroupWire[] {
+type TreeNode = V2Tree["changes"][number];
+
+const OPEN_STATUSES: ReadonlySet<string> = new Set(["pending", "in_progress", "failing"]);
+
+/** A task, or a task-less change, that is pending, in progress or failing: what a work set can hold. */
+function isOpenUnit(node: TreeNode): boolean {
+  if (!OPEN_STATUSES.has(node.status ?? "pending")) return false;
+  return node.type === "task" || (node.type === "change" && changeWorkShape(node) === "unit");
+}
+
+/** The units `include` accepts, grouped by their change in tree order; a task-less change is its own only unit. */
+function groupUnits(tree: V2Tree, include: (node: TreeNode) => boolean): WorkSetGroupWire[] {
   const groups = new Map<string, WorkSetGroupWire>();
   for (const { node, parent } of indexTree(tree).entries) {
-    if (!ids.has(node.id)) continue;
+    if (!include(node)) continue;
     const owner = node.type === "task" && parent ? parent : node;
     let group = groups.get(owner.id);
     if (!group) {

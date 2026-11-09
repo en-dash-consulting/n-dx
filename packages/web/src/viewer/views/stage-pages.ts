@@ -30,7 +30,7 @@ import {
   type StageTab,
   type StageTile,
 } from "./stages.js";
-import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
+import { ProductLogoPng, WorkQueue, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
@@ -226,7 +226,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
     ),
     // Starting a run is the Work stage's job; the list sits above its sections.
     stage === "work" && !deployed
-      ? h(ReadyToRun, {
+      ? h(WorkQueue, {
           onPrepare: (taskId: string) => navigateTo("work", { taskId }),
           onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
           onOpenPrd: () => navigateTo("prd"),

@@ -216,6 +216,22 @@
 .ready-toast { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .ready-toast-error { border-color: var(--red); }
 
+/* ── Work set: "On this branch" and "Not on a branch" (Work page) ── */
+.work-set { margin-bottom: var(--space-5); }
+.work-set-section + .work-set-section { margin-top: var(--space-4); }
+.work-set-branch { font-size: var(--font-sm); color: var(--text-muted); }
+.work-set-group { border: 1px solid var(--border); border-radius: var(--radius-md); }
+.work-set-group + .work-set-group { margin-top: var(--space-2); }
+.work-set-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); }
+.work-set-change { background: var(--bg-hover); }
+.work-set-change-title { flex: 1; min-width: 0; margin: 0; font-size: var(--font-md); overflow-wrap: anywhere; }
+.work-set-list { list-style: none; margin: 0; padding: 0; }
+.work-set-unit { border-top: 1px solid var(--border); }
+.work-set-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.work-set-via { color: var(--text-muted); font-size: var(--font-sm); }
+.work-set-btn { flex: none; }
+.work-set-message { margin-top: var(--space-2); }
+
 @media (max-width: 600px) {
   .prep-field { grid-template-columns: minmax(0, 1fr); }
   .prep-field-meta { grid-column: 1; }
