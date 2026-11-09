@@ -79,7 +79,8 @@
           "verify_criteria",
           "reorganize",
           "place_change",
-          "apply_change"
+          "apply_change",
+          "assign_to_branch"
         ]
       }
     },

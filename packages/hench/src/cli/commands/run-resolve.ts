@@ -32,7 +32,7 @@ import { excludeHenchRuntimeArtifacts, formatPorcelainPath, splitPlanningPaths }
 import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/shared.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
-import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";
+import { branchWork, changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
@@ -162,6 +162,19 @@ export interface RunResolution {
     planningCommit: string[];
   };
   /**
+   * The checked-out branch's work set: its branch and open unit ids, the
+   * units autoselection picks from; `null` on the default branch, a detached
+   * HEAD, a branch with no assignment, a v1 tree or under `--any`. `--task`
+   * bypasses it, so it never refuses the resolved run.
+   */
+  workSet: { branch: string; ids: string[] } | null;
+  /**
+   * Units on the checked-out branch an earlier branch of its name left
+   * (merged before this one was cut): not in `workSet`, as `rex branch show`
+   * and `rex next` report them; `null` when there are none or under `--any`.
+   */
+  earlierUse: { branch: string; ids: string[]; message: string } | null;
+  /**
    * The task's `run` block as stored, once rex's validator has accepted it;
    * `null` when the task carries none or when the block was ignored (a
    * `saved-settings-ignored` warning says which). The dashboard reads this to
@@ -216,6 +229,7 @@ export interface RunResolution {
  */
 const PASSTHROUGH_FLAGS: ReadonlyArray<{ flag: string; type: "boolean" | "string" }> = [
   { flag: "mine", type: "boolean" },
+  { flag: "any", type: "boolean" },
   { flag: "priority", type: "string" },
   { flag: "context-file", type: "string" },
 ];
@@ -313,6 +327,9 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     const resetIds = new Set(collectResettableTasks(prdItems, assignee).map((t) => t.id));
     if (resetIds.size > 0) v2Tree = readTreeAsReset(v2Tree, resetIds);
   }
+  const branchWorkRead = v2Tree ? branchWork(v2Tree, flags.any === "true" ? undefined : dir) : { workSet: null, earlierUse: null };
+  const workSet = branchWorkRead.workSet ? { branch: branchWorkRead.workSet.branch, ids: [...branchWorkRead.workSet.ids] } : null;
+  const earlierUse = branchWorkRead.earlierUse ? { ...branchWorkRead.earlierUse, ids: [...branchWorkRead.earlierUse.ids] } : null;
   const claims = TaskClaims.forProject(dir, { readOnly: true });
   // A change with open tasks reports the task a run would pick, passing over
   // the ones other worktrees hold, as the run does.
@@ -544,6 +561,8 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       dirty,
       planningCommit,
     },
+    workSet,
+    earlierUse,
     saved: settings.saved ?? null,
     resolved,
     review: { rounds: settings.reviewRounds },

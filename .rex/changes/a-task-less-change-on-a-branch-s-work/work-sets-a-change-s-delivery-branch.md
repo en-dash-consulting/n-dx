@@ -1,0 +1,14 @@
+---
+id: "bf6bfa6a-c7a1-4d8f-80df-7b141f4fc47d"
+type: "task"
+title: "Work sets: a change's `delivery.branch` covers its open tasks that have no branch of their own"
+slug: "work-sets-a-change-s-delivery-branch"
+description: "Replaces Inbox change 84d82d83 (adversarial review of task 7567a708, run 365a9413; should-fix, medium). Ryan decided 2026-11-07: inheritance, not push-down. Today `assignToBranch` on a task-less change writes `delivery: { branch }` on the change's own row (packages/rex/src/core/work-set.ts). When that change later gains tasks (hench splits it with add_item, or a person adds one), its shape becomes 'tasks', readWorkSet skips it, and the new tasks carry no `delivery`, so the branch reads as having a work set with nothing in it and `ndx work` / `get_next_task` pick nothing there. Make a change's own `delivery.branch` cover every open task under it (pending, in_progress, failing) that has no `delivery` of its own; a task's own `delivery` overrides the change's. Every reader uses the one rule: readWorkSet and so the selector, `rex next`, `get_next_task`, `ndx work`, and `rex branch show`. The assign refusal consults the enclosing change too: assigning such a task to a different branch without `move` is refused naming the inherited branch; with `move` the task gets its own `delivery`. `rex branch remove <change>` removes the change's own `delivery` and every task `delivery` equal to it, so the inherited ones drop out; `rex branch remove <task>` on a task that only inherits writes nothing and says it inherits from its change (name the change). Mirror how change-selection already lets a claim on a task-less change cover the task it later splits into. Operator notes: scope is P2-1 only. No dashboard UI, no work-sets.json mirror, no cross-worktree refusal. hench reaches rex only through packages/hench/src/prd/rex-gateway.ts. PRD writes go through withPrdModelTransaction. Run the static root policy suites before finishing (tests/e2e/architecture-policy, domain-isolation, shell-spawn inventory, wall-clock inventory, layout-literal, obfuscated-code) and tests/integration/cross-package-contracts.test.js. Add or update a patch changeset (scoped name) for every package you touch, and keep .changeset/work-sets-soft-freeze-note.md accurate. Do not write under .claude/."
+acceptanceCriteria:
+  - "A task-less change assigned to a branch, then split into tasks, still has those tasks picked on that branch (core and selection tests, and a get_next_task test)"
+  - "A task with its own `delivery.branch` overrides the change's (tests)"
+  - "`rex branch remove <change>` drops the inherited tasks from the set, and `rex branch show` lists inherited tasks (CLI tests)"
+priority: "high"
+run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "ndx-capture"
+---

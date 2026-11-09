@@ -161,6 +161,7 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | `get_capability` | v2: one capability or constraint with its capability criteria and the changes on it |
 | `place_change` | v2: a change's placement shortlist, record a placement (`touches` or `amends`), or `propose` a new capability or constraint |
 | `apply_change` | v2: apply a change's amendments to the product layer, as a steward |
+| `assign_to_branch` | v2: add changes and tasks to the current branch's work set, or remove them |
 | `get_prd_status` | PRD title and stats. v2: change counts, Inbox count, product status per area, changes per release. v1: per-epic stats |
 | `get_next_task` | Next actionable task based on priority and dependencies (skips tasks claimed by another worktree) |
 | `claim_task` | Hold a task for this worktree so other worktrees skip it |

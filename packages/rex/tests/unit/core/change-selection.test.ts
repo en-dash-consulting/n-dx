@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { addTask } from "../../../src/core/change-completion.js";
-import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, openChangeTasks, resolveWorkById } from "../../../src/core/change-selection.js";
+import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, openChangeTasks, resolveWorkById, unpickableUnits } from "../../../src/core/change-selection.js";
+import { planAssignToBranch, readWorkSet } from "../../../src/core/work-set.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -26,6 +27,53 @@ describe("findNextWork", () => {
 
   it("returns null when nothing is actionable", () => {
     expect(findNextWork(tree())).toBeNull();
+  });
+});
+
+describe("unpickableUnits", () => {
+  const reasons = (t: V2Tree, set: string[], options = {}) =>
+    Object.fromEntries(unpickableUnits(t, set, options).map((u) => [u.id, u.reasons]));
+
+  it("leaves out units selection can pick and ids the tree does not hold", () => {
+    expect(unpickableUnits(tree(change("c", { children: [task("t")] })), ["t", "missing"])).toEqual([]);
+  });
+
+  it("names a dependency, marking one outside the set", () => {
+    const t = tree(change("c", { children: [task("a", { blockedBy: ["b", "x"] }), task("b", { blockedBy: ["x"] }), task("x")] }));
+    expect(reasons(t, ["a", "b"])).toEqual({
+      a: [`blocked by "b" (b) (pending)`, `blocked by "x" (x) (pending, outside this branch's work set)`],
+      b: [`blocked by "x" (x) (pending, outside this branch's work set)`],
+    });
+  });
+
+  it("names a claim, on the unit or its change, with the holder; and other exclusions", () => {
+    const t = tree(change("c", { children: [task("a"), task("b")] }));
+    const claims = new Map([["c", { worktreeRoot: "/wt" }]]);
+    expect(reasons(t, ["a"], { claims })).toEqual({ a: [`its change "c" (c) is claimed by another worktree: /wt`] });
+    expect(reasons(t, ["a"], { excludeIds: new Set(["a"]) })).toEqual({ a: ["excluded from this selection"] });
+    // A task-less change is its own unit: its claim is named once.
+    expect(reasons(tree(change("solo")), ["solo"], { claims: new Map([["solo", { worktreeRoot: "/wt" }]]) }))
+      .toEqual({ solo: ["claimed by another worktree: /wt"] });
+  });
+
+  it("names a change awaiting placement, and a change that is not workable", () => {
+    const inbox = tree(change("c", { needsPlacement: true, children: [task("a")] }), change("solo", { needsPlacement: true }));
+    expect(reasons(inbox, ["a", "solo"])).toEqual({
+      a: [`its change "c" (c) is awaiting placement in the Inbox; place it first`],
+      solo: ["awaiting placement in the Inbox; place it first"],
+    });
+    const parked = tree(change("c", { status: "deferred", children: [task("a")] }), change("d", { blockedBy: ["c"], children: [task("b")] }));
+    expect(reasons(parked, ["a", "b"])).toEqual({
+      a: [`its change "c" (c) is deferred`],
+      b: [`its change "d" (d) is blocked by "c" (c) (deferred, outside this branch's work set)`],
+    });
+  });
+
+  it("names the --ready-only, --mine and tag filters", () => {
+    const t = tree(change("c", { children: [task("a", { assignee: "kim", tags: ["ui"] })] }));
+    expect(reasons(t, ["a"], { readyOnly: true, assignee: "lee", tags: ["api", "db"] })).toEqual({
+      a: ["not marked ready", "not assigned to lee", "has none of the tags api, db"],
+    });
   });
 });
 
@@ -245,6 +293,44 @@ describe("an excluded change covers the work inside it", () => {
     expect(enclosingChangeIds(t, "t")).toEqual(["inner", "outer"]);
     expect(enclosingChangeIds(t, "outer")).toEqual([]);
     expect(enclosingChangeIds(t, "nope")).toEqual([]);
+  });
+});
+
+describe("workSet", () => {
+  const t = tree(change("c", { children: [task("in"), task("out")] }), change("solo"), change("other"));
+
+  it("selects only units whose id is in the set", () => {
+    expect(ids(t, { workSet: new Set(["in"]) })).toEqual(["in"]);
+  });
+
+  it("passes over units outside the set, and a change id does not stand for its tasks", () => {
+    expect(ids(t, { workSet: new Set(["c"]) })).toEqual([]);
+  });
+
+  it("yields no candidates for an empty set", () => {
+    expect(ids(t, { workSet: new Set() })).toEqual([]);
+    expect(findNextWork(t, { workSet: new Set() })).toBeNull();
+  });
+
+  it("selects a task-less change by its own id", () => {
+    expect(findNextWork(t, { workSet: new Set(["solo"]) })).toMatchObject({ kind: "change", node: { id: "solo" } });
+  });
+
+  it("filters nothing when no workSet is given", () => {
+    expect(ids(t)).toEqual(["in", "out", "solo", "other"]);
+  });
+
+  it("keeps claims working inside the set", () => {
+    expect(ids(t, { workSet: new Set(["in", "solo"]), excludeIds: new Set(["in"]) })).toEqual(["solo"]);
+  });
+
+  it("selects the tasks a task-less change on the branch is split into, but not one with its own branch", () => {
+    let split = planAssignToBranch(tree(change("solo"), change("other")), ["solo"], "feat/solo").tree;
+    split = addTask(split, "solo", task("t1", { status: "pending" }), new Date(0)).tree;
+    split = addTask(split, "solo", task("t2", { status: "pending", delivery: { branch: "feat/elsewhere" } }), new Date(0)).tree;
+    const workSet = new Set(readWorkSet(split, "feat/solo").ids);
+    expect(ids(split, { workSet })).toEqual(["t1"]);
+    expect(findNextWork(split, { workSet })).toMatchObject({ kind: "task", node: { id: "t1" }, change: { id: "solo" } });
   });
 });
 

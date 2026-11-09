@@ -3,7 +3,8 @@
  * selects, answered in the v1 shape (`item`, `parents`, `explanation`) so
  * callers written for v1 read it unchanged. The item is the unit as
  * `changeLayerItems` projects it, so it also carries its v2 fields (`type`,
- * `displayId`, …). Pure; the v1 counterpart is `core/next-task.ts`.
+ * `displayId`, …). Pure, except that a `workspace` reads its checked-out
+ * branch; the v1 counterpart is `core/next-task.ts`.
  *
  * @module rex/core/change-next-task
  */
@@ -11,16 +12,57 @@
 import type { PRDItem, Priority } from "../schema/index.js";
 import { PRIORITY_ORDER } from "../schema/v1.js";
 import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { findActionableWork, type WorkUnit } from "./change-selection.js";
+import { findActionableWork, unpickableUnits, type UnpickableUnit, type WorkUnit } from "./change-selection.js";
 import { changeLayerItems } from "./layer-projection.js";
 import type { SelectionExplanation } from "./next-task.js";
 import { findItem } from "./tree.js";
+import { branchWorkState, earlierUseOf, type EarlierUse, type WorkSet } from "./work-set.js";
 
 export interface NextWorkOptions {
   /** Ids to pass over: units another worktree has claimed. */
   excludeIds?: ReadonlySet<string>;
   /** Only units carrying at least one of these tags (the unit's own, as on v1). */
   tags?: readonly string[];
+  /** Only units in this branch work set, as {@link findActionableWork} reads it. */
+  workSet?: ReadonlySet<string>;
+  /** Only units this identity is assigned, directly or through the change (`--mine`). */
+  assignee?: string;
+  /** Units another worktree holds, by id: passed over like `excludeIds`, and named as claimed when a work set is blocked. */
+  claims?: ReadonlyMap<string, { worktreeRoot: string }>;
+}
+
+/**
+ * {@link NextWorkOptions} for a checkout: selection works out the branch work
+ * set itself, by {@link branchWorkState}'s rule, and returns it with the unit.
+ */
+export interface WorkspaceNextWorkOptions extends NextWorkOptions {
+  /** The checkout whose branch work set narrows selection; it replaces `workSet` when the branch has one. */
+  workspace: string;
+  /** Do not narrow to the work set (`--any`); `workSet` in the result is null. */
+  any?: boolean;
+}
+
+/** {@link findNextWorkTask}'s answer for a workspace. */
+export interface WorkspaceNextWork {
+  /** The unit to run next; `null` when none is actionable (inside the work set, when there is one). */
+  task: NextWorkTask | null;
+  /**
+   * The work set selection was narrowed to; null when it was not narrowed. An
+   * empty `ids` is a finished set; a non-empty `blocked` is a set with open
+   * units none of which can be picked.
+   */
+  workSet: SelectedWorkSet | null;
+  /** Units on the branch from an earlier branch of its name, not in the set; null when none, or under `any`. */
+  earlierUse: EarlierUse | null;
+}
+
+/** A work set as selection used it. */
+export interface SelectedWorkSet extends WorkSet {
+  /**
+   * When nothing was picked and `ids` is not empty: each open unit with why it
+   * cannot be picked ({@link unpickableUnits}). Empty otherwise.
+   */
+  blocked: UnpickableUnit[];
 }
 
 export interface NextWorkTask {
@@ -32,9 +74,29 @@ export interface NextWorkTask {
   explanation: SelectionExplanation;
 }
 
-/** The unit autonomous selection runs next, in `get_next_task`'s v1 shape; `null` when none is actionable. */
-export function findNextWorkTask(tree: V2Tree, options: NextWorkOptions = {}): NextWorkTask | null {
-  const actionable = findActionableWork(tree, { excludeIds: options.excludeIds });
+/**
+ * The unit autonomous selection runs next, in `get_next_task`'s v1 shape;
+ * `null` when none is actionable. Given a `workspace`, the answer is
+ * {@link WorkspaceNextWork}: selection narrowed to that checkout's branch work
+ * set (unless `any`), with the set it used.
+ */
+export function findNextWorkTask(tree: V2Tree, options: WorkspaceNextWorkOptions): WorkspaceNextWork;
+export function findNextWorkTask(tree: V2Tree, options?: NextWorkOptions): NextWorkTask | null;
+export function findNextWorkTask(
+  tree: V2Tree,
+  options: NextWorkOptions | WorkspaceNextWorkOptions = {},
+): NextWorkTask | WorkspaceNextWork | null {
+  if (!("workspace" in options) || typeof options.workspace !== "string") return selectNext(tree, options);
+  const state = options.any ? null : branchWorkState(tree, options.workspace);
+  const set = state?.hasAssignments ? state : null;
+  const task = selectNext(tree, set ? { ...options, workSet: new Set(set.ids) } : options);
+  const blocked = set && !task && set.ids.length > 0 ? unpickableUnits(tree, set.ids, options) : [];
+  return { task, workSet: set ? { ...set, blocked } : null, earlierUse: earlierUseOf(state) };
+}
+
+function selectNext(tree: V2Tree, options: NextWorkOptions): NextWorkTask | null {
+  const excludeIds = options.claims?.size ? new Set([...(options.excludeIds ?? []), ...options.claims.keys()]) : options.excludeIds;
+  const actionable = findActionableWork(tree, { excludeIds, workSet: options.workSet, assignee: options.assignee });
   const tags = options.tags ?? [];
   const unit = actionable.find((u) => tags.length === 0 || (u.node.tags ?? []).some((t) => tags.includes(t)));
   if (!unit) return null;

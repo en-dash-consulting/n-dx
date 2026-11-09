@@ -96,13 +96,14 @@ Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/p
 | `get_capability` | One capability or constraint: statement, capability criteria, parent chain, status, health, and the changes that amend or touch it. v2 only |
 | `place_change` | Without a target, the shortlist of capabilities and constraints a change could amend or touch; with one, record it (`touches` or `amends`; an applied change takes `touches` only, since its amendments already reached the map); with `propose` (`type`, `under`, `title`) instead, record a new capability or constraint when nothing fits. v2 only |
 | `apply_change` | Apply a change's amendments to the product layer, as a steward. Refused whole, listing every problem, when an amendment does not fit. v2 only |
+| `assign_to_branch` | Add changes and tasks to the current branch's work set, or take them off with `remove` (`move` takes tasks from another branch). Refused on the default branch and a detached HEAD. v2 only |
 
 ### Work items
 
 | Tool | Description |
 |------|-------------|
 | `get_prd_status` | PRD overview. v2: change counts, the Inbox count, product status per area and change counts per release. v1: the item tree with completion stats |
-| `get_next_task` | Next actionable task (skips tasks another worktree has claimed) |
+| `get_next_task` | Next actionable task (skips tasks another worktree has claimed). On a branch with a work set, picks only from it; `any: true` picks outside it |
 | `claim_task` | Hold a task for this worktree |
 | `release_task` | Give back a claim |
 | `add_item` | Add an item. v2: pass `type` (`change`, the default, lands in the Inbox; `task` or `subtask` with `parentId`), and optionally `amends` or `touches`. v1: pass `level`. `acceptanceCriteria` is the item's "done when". Optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins |

@@ -31,7 +31,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, nextV2Selection, v2RefPriority, V2_HAS_NO_EPICS, workSetBlocked, workSetEndMessage, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -1037,6 +1037,8 @@ export async function peekNextTaskPriority(
   epicId?: string,
   tags?: string[],
   assignee?: string,
+  /** The checkout whose branch work set narrows autoselection; absent under `--any`. */
+  workSetDir?: string,
 ): Promise<TaskPriority> {
   const doc = await store.loadDocument();
   const tree = await loadV2Tree(store);
@@ -1068,10 +1070,11 @@ export async function peekNextTaskPriority(
 
   if (tree) {
     // The same selection runOne makes on a v2 tree (no epic level to scope to).
-    const next = nextV2Entry(tree, {
+    const { entry: next } = nextV2Selection(tree, {
       ...(excludeTaskIds ? { excludeIds: excludeTaskIds } : {}),
       ...(tags?.length ? { tags } : {}),
       ...(assignee ? { assignee } : {}),
+      ...(workSetDir ? { workspace: workSetDir } : {}),
     });
     if (next) {
       return resolveSchedulingPriority({
@@ -1141,13 +1144,27 @@ async function selectTask(
   rexDir: string,
   epicId?: string,
   assignee?: string,
+  /** The checkout whose branch work set narrows the menu; absent under `--any`. */
+  workSetDir?: string,
 ): Promise<string> {
   const store = await resolveStore(rexDir);
   // Tasks another worktree is working on are left off the menu.
   const claims = TaskClaims.forProject(dir);
   // `assignee` is --mine: the menu is the attended path's whole selection, so
-  // an unfiltered menu here is the flag silently doing nothing.
-  let tasks = await getActionableTasks(store, undefined, claims, assignee);
+  // an unfiltered menu here is the flag silently doing nothing. The branch's
+  // work set narrows it for the same reason.
+  let tasks = await getActionableTasks(store, undefined, claims, assignee, workSetDir);
+
+  if (tasks.length === 0) {
+    const tree = await loadV2Tree(store);
+    const foreign = await claims.foreignClaims();
+    const workSet = tree ? branchWorkSet(tree, workSetDir, { claims: foreign, ...(assignee ? { assignee } : {}) }) : null;
+    if (workSet) {
+      // Finished is a clean end; open units none of which can be picked are not.
+      output(workSetEndMessage(workSet));
+      process.exit(workSetBlocked(workSet) ? 1 : 0);
+    }
+  }
 
   // Filter to tasks within the specified epic if provided
   if (epicId) {
@@ -1569,6 +1586,7 @@ async function runOne(
     ...(epicId ? { epicId } : {}),
     ...(tags ? { tags } : {}),
     ...(assignee ? { assignee } : {}),
+    ...withWorkSetDir(dir, settingsCtx?.flags),
     ...(wouldResetIds ? { wouldResetIds } : {}),
     // A queue-plan lane step: refuse the explicit task while a blocker is open,
     // so `&&` stops even when the step before exited 0 without completing.
@@ -1839,8 +1857,19 @@ export async function refuseEpicFlagsOnV2(
 
 const NO_TASKS_MSG = "No actionable tasks found in PRD";
 
+/** An empty selection: nothing actionable, or nothing left in the branch's work set. */
 function isNoTasksError(err: unknown): boolean {
-  return err instanceof Error && err.message.includes(NO_TASKS_MSG);
+  return err instanceof WorkSetExhaustedError || (err instanceof Error && err.message.includes(NO_TASKS_MSG));
+}
+
+/**
+ * The checkout whose branch work set narrows autoselection (the `workspace`
+ * rex's `findNextWorkTask` works the set out from), as a selection option: none under `--any`. Selection
+ * there is unchanged on the default branch, a detached HEAD and a branch with
+ * no assignment, which have no work set.
+ */
+function withWorkSetDir(dir: string, flags: Record<string, string> | undefined): { workSetDir?: string } {
+  return flags?.any === "true" ? {} : { workSetDir: dir };
 }
 
 // ---------------------------------------------------------------------------
@@ -2478,7 +2507,7 @@ export async function cmdRun(
     // Task selection: --task > interactive (TTY) > autoselect
     // In loop mode, always autoselect (skip interactive)
     if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
-      taskId = await selectTask(dir, rexDir, epicId, assignee);
+      taskId = await selectTask(dir, rexDir, epicId, assignee, withWorkSetDir(dir, flags).workSetDir);
     }
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
@@ -2817,6 +2846,7 @@ async function runLoop(
           const store = await resolveStore(rexDir);
           schedulingPriority = await peekNextTaskPriority(
             store, effectiveTaskId, priorityOverride, combinedExcludedIds, epicId, tags, assignee,
+            withWorkSetDir(dir, settingsCtx?.flags).workSetDir,
           );
           await queue.acquire(effectiveTaskId ?? "auto", schedulingPriority);
         }
@@ -2885,7 +2915,16 @@ async function runLoop(
       } catch (err) {
         if (isNoTasksError(err)) {
           const scope = epicId ? " in epic" : "";
-          if (tags?.length) {
+          if (err instanceof WorkSetExhaustedError && err.blocked) {
+            // Open units none of which can be picked: the set is not done, so
+            // the loop stops without reporting success.
+            info(`\n${err.message}\nLoop stopped after ${completed - 1} task(s).`);
+            process.exitCode = 1;
+          } else if (err instanceof WorkSetExhaustedError) {
+            // Not "All tasks complete": the loop ran out of this branch's
+            // tasks, which says nothing about the rest of the PRD.
+            info(`\n${err.message} — loop finished after ${completed - 1} task(s).`);
+          } else if (tags?.length) {
             printTagFilterCompletionSummary(tags, taggedCompletedItems, completed - 1);
           } else if (assignee) {
             // Not "All tasks complete": under --mine the loop ran out of *this

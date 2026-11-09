@@ -524,6 +524,8 @@ describe("web → rex gateway contract", () => {
     "isAppliedChange",
     "specHash",
     "nodeSpec",
+    // Ready to run shows a change with no tasks as one task
+    "changeWorkShape",
     // trailer-commit evidence — the commits and files a Sidecar lens packet quotes
     "loadTrailerCommits",
     "loadCommitFiles",

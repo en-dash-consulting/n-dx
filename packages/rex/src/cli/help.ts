@@ -78,8 +78,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Finds the highest-priority task that is ready to work on (not blocked,\n" +
       "not deferred). On a v2 tree a change with no tasks counts as one task.\n" +
       "Shows the task or change with its parent chain and explains why\n" +
-      "it was selected.",
+      "it was selected. On a branch with a work set (rex branch add), only\n" +
+      "that branch's tasks are picked.",
     options: [
+      { flag: "--any", description: "Pick outside the current branch's work set" },
       { flag: "--format=json", description: "Output as JSON" },
     ],
     examples: [
@@ -247,6 +249,40 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex change apply CH-2", description: "Apply its amendments to the product layer" },
     ],
     related: ["product", "add", "health"],
+  },
+  branch: {
+    tool: "rex",
+    command: "branch",
+    summary: "assign tasks to the current branch's work set (v2 PRD)",
+    usage: [
+      "rex branch add <id>… [--move] [--format=json] [dir]",
+      "rex branch remove <id>… [--format=json] [dir]",
+      "rex branch show [--format=json] [dir]",
+    ],
+    description:
+      "A branch's work set is the tasks assigned to it, recorded on the branch as\n" +
+      "delivery: { branch } in state.yaml. A task sits on at most one branch.\n\n" +
+      "add: assign tasks to the checked-out branch. A change id assigns its open\n" +
+      "tasks (a change with no tasks counts as one task, and its branch covers the\n" +
+      "tasks it is later split into unless a task has its own). A task already on\n" +
+      "another branch is refused, naming it, unless --move takes it over.\n" +
+      "remove: clear tasks (or a change's tasks) from the checked-out branch. A task\n" +
+      "on it only through its change stays; remove the change.\n" +
+      "show: list the branch's open tasks grouped by change, with their status.\n\n" +
+      "Ids are full ids, display ids or change ids. Refused on the default branch\n" +
+      "and on a detached HEAD: a work set belongs to a feature branch. Nothing is\n" +
+      "committed. v2 PRD only.",
+    options: [
+      { flag: "--move", description: "add: take tasks already on another branch" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex branch add CH-2", description: "Put CH-2's open tasks on this branch" },
+      { command: "rex branch add <task-id> --move", description: "Take a task from another branch" },
+      { command: "rex branch remove CH-2", description: "Take them off again" },
+      { command: "rex branch show", description: "List this branch's work set" },
+    ],
+    related: ["change", "next", "status"],
   },
   update: {
     tool: "rex",
@@ -1092,6 +1128,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   "migrate-to-folder-tree": ["init", "status", "validate"],
   product: ["change", "add", "health"],
   change: ["product", "add", "health"],
+  branch: ["change", "next", "status"],
   mcp: [],
 };
 

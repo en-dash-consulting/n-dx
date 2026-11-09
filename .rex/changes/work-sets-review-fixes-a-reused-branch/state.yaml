@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "15984ff5-933e-4fd7-bbb9-3ca3b6f5c446":
+    status: "completed"
+    startedAt: "2026-11-09T18:46:05.387Z"
+    completedAt: "2026-11-09T18:59:11.944Z"
+    endedAt: "2026-11-09T18:59:11.944Z"
+    activeIntervals: [{"end":"2026-11-09T18:59:11.944Z","start":"2026-11-09T18:46:05.387Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex unpickableUnits names why each open work-set unit cannot be picked; findNextWorkTask returns them as workSet.blocked; rex next/get_next_task/ndx work/--plan-queue/menu report blocked sets and do not report success; branch show marks units; branch add/assign_to_branch refuse Inbox changes and warn on outside blockers."
+    lastModified: "2026-11-09T18:59:11.944Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2e44fcd6-f576-4d6f-8a43-4fade67b4d32":
+    status: "completed"
+    startedAt: "2026-11-09T18:59:11.944Z"
+    completedAt: "2026-11-09T18:59:11.944Z"
+    endedAt: "2026-11-09T18:59:11.944Z"
+    activeIntervals: [{"end":"2026-11-09T18:59:11.944Z","start":"2026-11-09T18:59:11.944Z"}]
+    appliedAt: "2026-11-09T18:59:11.944Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-09T18:28:54.840Z"
+    lastModified: "2026-11-09T18:59:11.944Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6a45f6d1-b249-48ff-8e90-e45a7b49fc04":
+    status: "completed"
+    startedAt: "2026-11-09T18:29:46.287Z"
+    completedAt: "2026-11-09T18:45:57.122Z"
+    endedAt: "2026-11-09T18:45:57.122Z"
+    activeIntervals: [{"end":"2026-11-09T18:45:57.122Z","start":"2026-11-09T18:29:46.287Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rows whose delivery already named the branch at its fork point (merge-base of HEAD and the default branch, local and origin refs) are an earlier use: out of ids and hasAssignments, listed as WorkSet.earlier. Fork point read with git grep + cat-file --batch of state.yaml under the resolved rex changes/ dir (branch-naming.ts); unreadable fork point keeps old behaviour. branchWorkState is the one read; currentWorkSet, findNextWorkTask (returns earlierUse), rex next, get_next_task, rex branch show and hench (--resolve earlierUse, WorkSetExhaustedError finished vs exhausted) use it. Finished set says so and stays narrowed. Tests: rex e2e cli-branch-earlier-use (reused name, finished, rebased, no default branch), MCP and hench resolve/selection reused-name cases."
+    lastModified: "2026-11-09T18:45:57.122Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
