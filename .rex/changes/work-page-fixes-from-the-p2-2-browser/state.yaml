@@ -1,12 +1,22 @@
 schema: "rex/v2"
 items:
   "0704a8e5-e0a3-4831-9b92-b4ad1304312a":
+    status: "completed"
     startedAt: "2026-11-09T17:35:28.828Z"
-    activeIntervals: [{"end":"2026-11-09T17:40:34.909Z","start":"2026-11-09T17:35:28.828Z"}]
+    completedAt: "2026-11-09T17:44:30.731Z"
+    endedAt: "2026-11-09T17:44:30.731Z"
+    activeIntervals: [{"end":"2026-11-09T17:40:34.909Z","start":"2026-11-09T17:35:28.828Z"},{"end":"2026-11-09T17:44:30.731Z","start":"2026-11-09T17:44:30.731Z"}]
     failureReason: "The completion was refused: the run left work uncommitted."
-    lastModified: "2026-11-09T17:40:39.285Z"
+    lastModified: "2026-11-09T17:44:30.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ce060c1-f5cf-446c-985f-6f31d3220e3c":
+    status: "completed"
+    startedAt: "2026-11-09T17:44:30.731Z"
+    completedAt: "2026-11-09T17:44:30.731Z"
+    endedAt: "2026-11-09T17:44:30.731Z"
+    activeIntervals: [{"end":"2026-11-09T17:44:30.731Z","start":"2026-11-09T17:44:30.731Z"}]
+    appliedAt: "2026-11-09T17:44:30.731Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-09T17:34:55.423Z"
-    lastModified: "2026-11-09T17:34:59.476Z"
+    lastModified: "2026-11-09T17:44:30.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
