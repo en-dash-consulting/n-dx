@@ -297,10 +297,36 @@ describe("Codex spawn", () => {
     writeFileSync(config, '[mcp_servers.rex]\ncommand = "ndx"\n[mcp_servers.docs]\nurl = "u"\n');
     await session.sendTurn("two");
 
-    const [fresh, resumed] = spawned.map((s) => overrides(s.args).filter((o) => o.endsWith(".enabled=false")));
-    expect(fresh).toEqual(["mcp_servers.rex.enabled=false", "mcp_servers.sourcevision.enabled=false"]);
-    expect(resumed).toEqual(["mcp_servers.rex.enabled=false", "mcp_servers.docs.enabled=false"]);
+    // Each server's override is a complete disabled entry: valid whether or
+    // not Codex loads the project file (0.166.0 skips it under --ignore-user-config).
+    const project = (args: string[]) => overrides(args).filter((o) => o.startsWith("mcp_servers.") && !o.startsWith("mcp_servers.ndx-sidecar."));
+    const [fresh, resumed] = spawned.map((s) => project(s.args));
+    expect(fresh).toEqual([
+      "mcp_servers.rex.enabled=false", 'mcp_servers.rex.command="ndx-sidecar-disabled"',
+      "mcp_servers.sourcevision.enabled=false", 'mcp_servers.sourcevision.command="ndx-sidecar-disabled"',
+    ]);
+    expect(resumed).toEqual([
+      "mcp_servers.rex.enabled=false", 'mcp_servers.rex.command="ndx-sidecar-disabled"',
+      "mcp_servers.docs.enabled=false", 'mcp_servers.docs.url="http://127.0.0.1:9/ndx-sidecar-disabled"',
+    ]);
+    // The broker's own entry is untouched: its url is the session endpoint.
+    expect(overrides(spawned[0].args)).toContain(`mcp_servers.ndx-sidecar.url="${URL}"`);
+    expect(overrides(spawned[0].args).filter((o) => o.startsWith("mcp_servers.ndx-sidecar.enabled"))).toEqual([]);
     expect(spawned[1].args.slice(0, 2)).toEqual(["exec", "resume"]);
+  });
+
+  it.each([
+    ["neither command nor url", '[mcp_servers.half]\nargs = ["x"]\n'],
+    ["both command and url", '[mcp_servers.half]\ncommand = "x"\nurl = "https://x"\n'],
+  ])("refuses a turn when a project server declares %s, naming the file and the server, and spawns nothing", async (found, text) => {
+    mkdirSync(join(root, ".codex"));
+    const config = join(root, ".codex", "config.toml");
+    writeFileSync(config, text);
+    const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), endpoint)(record("codex")), vendor: "codex", cwd: root, spawn: recordingSpawn });
+    const turn = session.sendTurn("one");
+    await expect(turn).rejects.toThrow(config);
+    await expect(turn).rejects.toThrow(`"half" with ${found}`);
+    expect(spawned).toEqual([]);
   });
 
   it("refuses a turn, naming the file, when a project config cannot be read with confidence, and spawns nothing", async () => {

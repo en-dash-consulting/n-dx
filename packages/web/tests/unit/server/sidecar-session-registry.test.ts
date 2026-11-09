@@ -317,3 +317,69 @@ describe("vendor environment", () => {
     expect(resolveSidecarSessionEnv(root).envPolicy?.deny).toEqual(["FROM_NDX_*"]);
   });
 });
+
+describe("MCP backstop", () => {
+  /**
+   * A Codex stand-in that starts an MCP call on `server`, then waits until it
+   * is stopped (recording the signal), or exits by itself when `server` is the broker.
+   */
+  function codexCalling(server: string, killed: string[]): NonNullable<VendorSessionOptions["spawn"]> {
+    return (_binary, args, opts) => {
+      spawned.push({ args, env: opts.env });
+      const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+      const stdout = new PassThrough();
+      const exit = (signal: NodeJS.Signals | null) => {
+        Object.assign(child, signal ? { signalCode: signal } : { exitCode: 0 });
+        stdout.end();
+        setImmediate(() => {
+          child.emit("exit", signal ? null : 0, signal);
+          child.emit("close", signal ? null : 0, signal);
+        });
+      };
+      Object.assign(child, {
+        stdin: new PassThrough(), stdout, stderr: new PassThrough(), pid: undefined, exitCode: null, signalCode: null,
+        kill: (signal: NodeJS.Signals = "SIGTERM") => {
+          killed.push(signal);
+          exit(signal);
+          return true;
+        },
+      });
+      setImmediate(() => {
+        stdout.write(JSON.stringify({ type: "thread.started", thread_id: "t-1" }) + "\n");
+        stdout.write(JSON.stringify({
+          type: "item.started",
+          item: { id: "i-1", type: "mcp_tool_call", server, tool: "update_task_status", arguments: { id: "x" }, status: "in_progress" },
+        }) + "\n");
+        if (server === "ndx-sidecar") setImmediate(() => exit(null));
+      });
+      return child as unknown as ChildProcess;
+    };
+  }
+
+  it("stops a turn that uses an MCP server other than ndx-sidecar and records why in the transcript and the result", async () => {
+    const killed: string[] = [];
+    const reg = registry(() => ({ spawn: codexCalling("rex", killed) }));
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "codex" });
+
+    const result = await reg.sendTurn(id, "go");
+
+    expect(killed).toEqual(["SIGTERM"]);
+    expect(result.status).toBe("failed");
+    expect(result.error).toMatch(/MCP server "rex".*only ndx-sidecar/);
+    expect(reg.isRunning(id)).toBe(false);
+    const failure = reg.readFrames(id).find((f) => f.type === "event" && f.event.type === "failure");
+    expect(failure?.type === "event" && failure.event.failure?.message).toBe(result.error);
+  });
+
+  it("lets a turn that uses only ndx-sidecar run to its end", async () => {
+    const killed: string[] = [];
+    const reg = registry(() => ({ spawn: codexCalling("ndx-sidecar", killed) }));
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "codex" });
+
+    const result = await reg.sendTurn(id, "go");
+
+    expect(killed).toEqual([]);
+    expect(result.status).not.toBe("failed");
+    expect(reg.readFrames(id).some((f) => f.type === "event" && f.event.type === "failure")).toBe(false);
+  });
+});
