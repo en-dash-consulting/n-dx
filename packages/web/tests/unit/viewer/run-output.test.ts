@@ -3,6 +3,8 @@
  * The run-command output panel: terminal colours rendered rather than shown
  * as `[0m` text, and a log that starts at its last three lines.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
@@ -96,6 +98,42 @@ describe("RunOutput", () => {
     await mount("only\ntwo\n");
     expect(root.querySelector(".runcmd-output-toggle")).toBeNull();
     expect(lineTexts()).toEqual(["only", "two"]);
+  });
+
+  it("drops blank lines while collapsed, so a blank run cannot grow the box", async () => {
+    await mount(`one${"\n".repeat(8)}two\n`);
+    expect(lineTexts()).toEqual(["one", "two"]);
+    expect(root.querySelector(".runcmd-output-toggle")).toBeNull();
+  });
+
+  it("offers the full log when one long line overflows the collapsed box", async () => {
+    // jsdom does no layout: report a box whose content is taller than its cap.
+    const proto = HTMLElement.prototype;
+    const scroll = Object.getOwnPropertyDescriptor(proto, "scrollHeight");
+    const client = Object.getOwnPropertyDescriptor(proto, "clientHeight");
+    Object.defineProperty(proto, "scrollHeight", { configurable: true, get: () => 400 });
+    Object.defineProperty(proto, "clientHeight", { configurable: true, get: () => 60 });
+    try {
+      await mount(`${"x".repeat(20_000)}\n`);
+      const pre = root.querySelector<HTMLPreElement>(".runcmd-output")!;
+      expect(pre.classList.contains("runcmd-output--expanded")).toBe(false);
+      expect(pre.scrollTop).toBe(400);
+      const toggle = root.querySelector<HTMLButtonElement>(".runcmd-output-toggle")!;
+      expect(toggle.textContent).toBe("Show full log · 1 line");
+
+      await act(async () => { toggle.click(); });
+      expect(pre.classList.contains("runcmd-output--expanded")).toBe(true);
+      expect(root.querySelector(".runcmd-output-toggle")).not.toBeNull();
+    } finally {
+      if (scroll) Object.defineProperty(proto, "scrollHeight", scroll); else delete (proto as { scrollHeight?: number }).scrollHeight;
+      if (client) Object.defineProperty(proto, "clientHeight", client); else delete (proto as { clientHeight?: number }).clientHeight;
+    }
+  });
+
+  it("caps the collapsed box's height in the stylesheet, not only the expanded one", () => {
+    const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles/run-command.css"), "utf8");
+    const base = /\.runcmd-output\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(base).toMatch(/max-height\s*:/);
   });
 
   it("renders markup in the output as text", async () => {

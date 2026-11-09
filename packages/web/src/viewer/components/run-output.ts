@@ -145,15 +145,25 @@ function renderLine(line: AnsiLine, key: number) {
 export function RunOutput({ output }: { output: string }) {
   const lines = useMemo(() => parseAnsiLines(output), [output]);
   const [expanded, setExpanded] = useState(false);
+  // Set when the collapsed lines wrap past the box's three-line cap: a single
+  // logical line can be most of the log (a minified stack trace, or frames a
+  // tool redrew with cursor moves that `parseAnsiLines` drops).
+  const [overflowing, setOverflowing] = useState(false);
   const pre = useRef<HTMLPreElement>(null);
 
   const nonBlank = lines.filter((l) => l.text.trim() !== "");
-  const collapsible = nonBlank.length > COLLAPSED_LINES;
-  const shown = expanded || !collapsible ? lines : nonBlank.slice(-COLLAPSED_LINES);
+  // Collapsed shows non-blank lines only, so blank runs cannot grow the box.
+  const tail = nonBlank.slice(-COLLAPSED_LINES);
+  const collapsible = nonBlank.length > COLLAPSED_LINES || overflowing;
+  const shown = expanded ? lines : tail;
 
-  // The expanded log follows new output, like a terminal.
+  // Both states follow new output, like a terminal. Measure overflow only while
+  // collapsed, so the toggle stays to collapse an expanded log again.
   useLayoutEffect(() => {
-    if (expanded && pre.current) pre.current.scrollTop = pre.current.scrollHeight;
+    const el = pre.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    if (!expanded) setOverflowing(el.scrollHeight > el.clientHeight + 1);
   }, [expanded, output]);
 
   return h("div", { class: "runcmd-output-panel" },
@@ -167,7 +177,7 @@ export function RunOutput({ output }: { output: string }) {
             onClick: () => setExpanded(!expanded),
           }, expanded
             ? `Show last ${COLLAPSED_LINES} lines`
-            : `Show full log · ${nonBlank.length} lines`)
+            : `Show full log · ${nonBlank.length} line${nonBlank.length === 1 ? "" : "s"}`)
         : null,
     ),
     h("pre", {

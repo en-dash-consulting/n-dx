@@ -240,8 +240,13 @@
   color: var(--text-dim);
   font-family: var(--mono, monospace);
   font-size: 0.68rem;
+  line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+  /* Collapsed: three lines plus the padding (border-box). One logical line can
+     still wrap past that (a minified stack trace, frames redrawn with cursor
+     moves), so the box caps it and the component pins the scroll to the end. */
+  max-height: calc(3 * 1.4em + 0.8rem);
 }
 
 .runcmd-output--expanded {
