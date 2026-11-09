@@ -4,7 +4,7 @@
  *
  * Each leg: Settings › Robot Wrangler → pick the vendor card and its cheapest
  * model → Save → the Readiness list reports "Credentials valid" → on /live
- * choose "A set number" = 3 → Start now → wait on /hench-runs for three
+ * choose "A set number" = 3 → Start working → wait on /hench-runs for three
  * completed runs. The legs are serial on one fixture; the Codex leg seeds
  * its tasks only when it starts, so the Claude leg cannot pick them up, and
  * skips by name when `codex` is not on PATH or not logged in.
@@ -121,10 +121,9 @@ async function startThreeTasks(page: Page, firstTaskId: string): Promise<void> {
   await expect(page.locator(".live-idle .live-card-title")).toBeVisible({ timeout: 15_000 });
   await page.locator("select.start-task-mode-select").selectOption({ label: "A set number" });
   await page.locator("input.start-task-iterations").fill("3");
-  await page.getByRole("button", { name: /More ways to run/ }).click();
-  // In iterations mode the item's accessible name says what it commits to;
-  // its visible text is "Start now · 3 tasks", so locate by that.
-  const startNow = page.locator('.ready-menu [role="menuitem"]', { hasText: /^Start now/ });
+  // In iterations mode the button's accessible name says what it commits to;
+  // its visible text is "Start working · 3 tasks", so locate by that.
+  const startNow = page.locator(".live-idle .start-task-primary");
   await expect(startNow).toContainText("3 tasks");
   const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await startNow.click();

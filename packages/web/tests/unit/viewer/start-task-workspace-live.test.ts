@@ -57,7 +57,7 @@ const liveHref = (id: string) => workspaceLiveTaskUrl(card, id, "/p/app/workspac
 
 async function openModal(props: Record<string, unknown>): Promise<void> {
   root = renderToDiv(h(StartTaskButton, { taskId: "t 1", onStarted: () => {}, workspace: "feature", ...props }));
-  await act(async () => { root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click(); });
+  await act(async () => { root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click(); });
   await flush();
 }
 

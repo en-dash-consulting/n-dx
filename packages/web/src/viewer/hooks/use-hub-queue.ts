@@ -51,6 +51,8 @@ export interface HubQueueEntry {
   options?: Omit<RunOptions, "contextNotes">;
   /** It carries notes for the agent, which the hub does not send. */
   hasNotes?: true;
+  /** It carries run settings to save on the task when it starts, which the hub does not send. */
+  hasSaveRun?: true;
 }
 
 /** Mirrors DroppedEntry in hub/admission.ts: a queued run whose server refused it at its turn. */
