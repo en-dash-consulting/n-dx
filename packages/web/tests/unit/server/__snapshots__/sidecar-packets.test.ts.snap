@@ -7,9 +7,10 @@ Built by code from the repository's own records. No model wrote it.
 ## How to describe
 Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.
 - Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as "works", "properly" or "better" doing the work. Quote it and say what cannot be checked.
-- For every vague check, quote it and give the tightened wording in your reply, then say the operator applies it with \`rex update\` or the item editor. Do not call \`propose_prd_change\` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.
+- For every vague check, quote it and give the tightened wording in your reply, then raise one \`propose_item_edit\` card for the task with \`acceptanceCriteria\`: the task's full done-when list with the vague checks replaced and the rest kept as they are. The operator sees each check before and after, can adjust the wording, and nothing is written before Approve. Do not call \`propose_prd_change\` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.
 - Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.
 - Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -84,9 +85,10 @@ Built by code from the repository's own records. No model wrote it.
 ## How to describe
 Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.
 - Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as "works", "properly" or "better" doing the work. Quote it and say what cannot be checked.
-- For every vague check, quote it and give the tightened wording in your reply, then say the operator applies it with \`rex update\` or the item editor. Do not call \`propose_prd_change\` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.
+- For every vague check, quote it and give the tightened wording in your reply, then raise one \`propose_item_edit\` card for the task with \`acceptanceCriteria\`: the task's full done-when list with the vague checks replaced and the rest kept as they are. The operator sees each check before and after, can adjust the wording, and nothing is written before Approve. Do not call \`propose_prd_change\` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.
 - Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.
 - Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -159,6 +161,7 @@ Say why the task's newest run did not complete and what to do next, from the run
   - \`--fresh\` (\`fresh\`): \`start_work\` for the task with options \`{ "fresh": true }\`; the work card's resolve preview shows \`--fresh\`.
   - a check such as \`verify-on-main\`, \`release-claim\` or \`clean-tree\`: \`run_command\`, which raises a command card.
 - Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -222,6 +225,7 @@ Say why the task's newest run did not complete and what to do next, from the run
   - \`--fresh\` (\`fresh\`): \`start_work\` for the task with options \`{ "fresh": true }\`; the work card's resolve preview shows \`--fresh\`.
   - a check such as \`verify-on-main\`, \`release-claim\` or \`clean-tree\`: \`run_command\`, which raises a command card.
 - Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -283,6 +287,7 @@ Say why the task's newest run did not complete and what to do next, from the run
   - \`--fresh\` (\`fresh\`): \`start_work\` for the task with options \`{ "fresh": true }\`; the work card's resolve preview shows \`--fresh\`.
   - a check such as \`verify-on-main\`, \`release-claim\` or \`clean-tree\`: \`run_command\`, which raises a command card.
 - Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -347,6 +352,7 @@ Say why the task's newest run did not complete and what to do next, from the run
   - \`--fresh\` (\`fresh\`): \`start_work\` for the task with options \`{ "fresh": true }\`; the work card's resolve preview shows \`--fresh\`.
   - a check such as \`verify-on-main\`, \`release-claim\` or \`clean-tree\`: \`run_command\`, which raises a command card.
 - Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -406,6 +412,7 @@ Say why the task's newest run did not complete and what to do next, from the run
   - \`--fresh\` (\`fresh\`): \`start_work\` for the task with options \`{ "fresh": true }\`; the work card's resolve preview shows \`--fresh\`.
   - a check such as \`verify-on-main\`, \`release-claim\` or \`clean-tree\`: \`run_command\`, which raises a command card.
 - Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -470,6 +477,7 @@ Say why the task's newest run did not complete and what to do next, from the run
   - \`--fresh\` (\`fresh\`): \`start_work\` for the task with options \`{ "fresh": true }\`; the work card's resolve preview shows \`--fresh\`.
   - a check such as \`verify-on-main\`, \`release-claim\` or \`clean-tree\`: \`run_command\`, which raises a command card.
 - Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -525,6 +533,7 @@ Explain the target for someone who has not seen it: what it is, where it stands,
 - Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
 - Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
 - Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Constraint
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -561,6 +570,7 @@ Explain the target for someone who has not seen it: what it is, where it stands,
 - Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
 - Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
 - Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Product layer
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -608,6 +618,7 @@ Explain the target for someone who has not seen it: what it is, where it stands,
 - Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
 - Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
 - Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+- When you need the operator to decide between options, call \`ask_choice\` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.
 
 ## Capability
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_

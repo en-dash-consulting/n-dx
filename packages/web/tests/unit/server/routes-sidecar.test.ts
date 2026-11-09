@@ -130,6 +130,10 @@ const noEffects: SidecarActions = {
   writePlacement: async () => ({ ok: true, text: "Placed it.", ids: ["x"] }),
   checkLink: async () => "this test links nothing",
   writeLink: async () => ({ ok: true, text: "Linked it.", ids: ["x"] }),
+  checkItemEdit: async () => "this test edits nothing",
+  writeItemEdit: async () => ({ ok: true, text: "Edited it.", ids: ["x"] }),
+  checkStatus: async () => "no",
+  writeStatus: async () => ({ ok: true, text: "Set it.", ids: ["x"] }),
   readRunPlan: async () => "this test plans nothing",
   githubReadsAllowed: () => false,
   branchHealthEnabled: () => true,
@@ -580,8 +584,8 @@ describe("broker", () => {
     const client = await brokerClient(id);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
-      "propose_edit", "propose_link", "propose_prd_change", "propose_run_plan", "run_command", "start_work",
+      "ask_choice", "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
+      "propose_edit", "propose_item_edit", "propose_link", "propose_prd_change", "propose_run_plan", "propose_status", "run_command", "start_work",
     ]);
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });
@@ -609,6 +613,27 @@ describe("broker", () => {
     const result = await call;
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/denied card .*later/);
+
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("carries a choice card's answer from the decide route to the agent's tool result", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "ask_choice", arguments: { question: "Which store?", options: [{ label: "SQLite" }, { label: "Postgres" }] } });
+    const { cardId } = await cardAnnounced(id, "pending");
+
+    const notObject = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", answer: ["SQLite"] } });
+    expect(notObject.status).toBe(400);
+    const noAnswer = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve" } });
+    expect(noAnswer.status).toBe(400);
+
+    const decided = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", answer: { selected: [], other: "Redis" } } });
+    expect(decided.status).toBe(200);
+    const result = await call;
+    expect(result.isError).toBeFalsy();
+    expect(resultText(result)).toContain('wrote in (Other): "Redis"');
 
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });

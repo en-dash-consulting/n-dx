@@ -2,8 +2,10 @@
  * What an approved broker call does.
  *
  * The broker decides a call (`broker.ts`); this module carries out the
- * decided call and words the tool result the session's agent reads. Seven
- * tools run today: `run_command` as the workspace's Sidecar command job,
+ * decided call and words the tool result the session's agent reads. These
+ * tools run today: `propose_item_edit` as its item-edit card's write through
+ * rex's `edit_item` (`item-edit-card.ts`), with the operator's edits,
+ * `propose_status` as rex's `update_task_status` (`status-card.ts`), `run_command` as the workspace's Sidecar command job,
  * `start_work` through the hench execute route, `propose_prd_change` as
  * its change-set card's PRD write (`change-set.ts`), with the operator's
  * edits, `propose_run_plan`, which starts nothing: it names the chosen
@@ -24,8 +26,9 @@
  */
 
 import { laneSteps, stepRunOptions } from "../../shared/index.js";
-import type { QueuePlan, SidecarChangeSet, SidecarLink, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
+import { choiceResultText } from "./choice-card.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
 
 /** One effect's result, as the tool result states it. */
@@ -34,6 +37,8 @@ export interface CarryOutResult {
   text: string;
   /** The PRD items the effect wrote, in order. */
   ids?: string[];
+  /** True when rex recorded the effect without writing it: a hench run applies it after its test gate. Never set with `ok: false`. */
+  held?: boolean;
   /** A started run's end, for an effect that outlives its tool result: a failed end revises the card. */
   ended?: Promise<CarryOutResult>;
 }
@@ -58,6 +63,14 @@ export interface SidecarActions {
   checkLink(input: Record<string, unknown>): Promise<SidecarLink | string>;
   /** An approved link card's write: the ref onto the item's issues (v2) or links (v1). Never throws. */
   writeLink(link: SidecarLink): Promise<CarryOutResult>;
+  /** An item-edit call read against the PRD for its card: each changed field before and after, or why no card can be raised. Writes nothing. */
+  checkItemEdit(input: Record<string, unknown>): Promise<SidecarItemEdit | string>;
+  /** An approved item-edit card's write through rex's edit_item, with the operator's edits. Never throws. */
+  writeItemEdit(itemEdit: SidecarItemEdit): Promise<CarryOutResult>;
+  /** A status call read against the PRD for its card: the item's status, the proposed one and rex's verdict, or why no card can be raised. Writes nothing. */
+  checkStatus(input: Record<string, unknown>): Promise<SidecarStatusChange | string>;
+  /** An approved status card's write through rex's update_task_status, never forced. A transition rex refuses is a failed result with rex's message. Never throws. */
+  writeStatus(change: SidecarStatusChange): Promise<CarryOutResult>;
   /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
   /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
@@ -126,7 +139,7 @@ export async function carryOutDecision(
   if (outcome.decidedBy === "operator" || outcome.decidedBy === "withdrawn") {
     const { card } = outcome;
     const note = card.reason ? ` Operator's note: ${card.reason}` : "";
-    const nothing = tool === "draft_github_post" ? "Nothing was posted." : tool === "save_draft" ? "Nothing was saved." : "Nothing ran.";
+    const nothing = tool === "draft_github_post" ? "Nothing was posted." : tool === "save_draft" ? "Nothing was saved." : tool === "ask_choice" ? "No answer was given." : "Nothing ran.";
     if (outcome.decidedBy === "withdrawn") {
       return { ok: false, text: `Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}. ${nothing}` };
     }
@@ -155,8 +168,12 @@ async function carryOut(
 ): Promise<CarryOutResult> {
   const later = CARRIED_OUT_LATER[tool];
   if (later !== undefined) return { ok: true, text: `Recorded, not carried out yet: ${later} carries out ${tool} calls.` };
-  if (!actions) return { ok: false, text: `This server cannot carry out ${tool} calls; nothing ran.` };
   const card = cardOf(outcome);
+  // A question needs no server action: the operator's answer, on its card, is the result.
+  if (tool === "ask_choice") {
+    return card?.choice ? { ok: true, text: choiceResultText(card.choice) } : { ok: false, text: "The card carried no question; nothing was asked." };
+  }
+  if (!actions) return { ok: false, text: `This server cannot carry out ${tool} calls; nothing ran.` };
   switch (tool) {
     case "run_command":
       return actions.runCommand((input.argv as unknown[]).map(String), signal, typeof input.project === "string" ? input.project : undefined);
@@ -184,6 +201,18 @@ async function carryOut(
       // The card's link, read when it was raised; never the raw input.
       if (!card?.link) return { ok: false, text: "A link is written only from its approved card; nothing was written." };
       return actions.writeLink(card.link);
+    }
+    case "propose_item_edit": {
+      // The card's fields, with the operator's edits; never the raw input.
+      if (!card?.itemEdit) return { ok: false, text: "An item edit is written only from its approved card; nothing was written." };
+      const written = await actions.writeItemEdit(card.itemEdit);
+      const edited = written.ok && card.edited ? " The operator edited it before approving; the edited values were written." : "";
+      return { ...written, text: `${written.text}${edited}` };
+    }
+    case "propose_status": {
+      // The card's own change, as read when it was raised; never the raw input.
+      if (!card?.statusChange) return { ok: false, text: "A status is written only from its approved card; nothing was written." };
+      return actions.writeStatus(card.statusChange);
     }
     case "github_read": {
       const read = githubReadOf(input);

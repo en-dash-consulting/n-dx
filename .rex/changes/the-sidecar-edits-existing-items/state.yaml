@@ -1,0 +1,60 @@
+schema: "rex/v2"
+items:
+  "1718f19f-9f71-4cae-9a3d-e9c50c35737b":
+    status: "completed"
+    startedAt: "2026-11-06T18:21:43.313Z"
+    completedAt: "2026-11-06T18:25:31.179Z"
+    endedAt: "2026-11-06T18:25:31.179Z"
+    activeIntervals: [{"end":"2026-11-06T18:25:31.179Z","start":"2026-11-06T18:21:43.313Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "propose_prd_change takes optional tags; card has an editable tags field; approval writes them on v1 and v2."
+    lastModified: "2026-11-06T18:25:31.179Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5d52fd20-ac23-407f-808a-5cc245065564":
+    status: "completed"
+    startedAt: "2026-11-06T18:14:38.951Z"
+    completedAt: "2026-11-06T18:21:33.744Z"
+    endedAt: "2026-11-06T18:21:33.744Z"
+    activeIntervals: [{"end":"2026-11-06T18:21:33.744Z","start":"2026-11-06T18:14:38.951Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "propose_status card wired through broker-policy, broker-mcp, carry-out, routes-sidecar, hub-actions; writes via rex handleUpdateTaskStatus."
+    lastModified: "2026-11-06T18:21:33.744Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8334c419-88f6-4cc6-90d1-b22c88dc06fd":
+    status: "completed"
+    startedAt: "2026-11-06T17:59:03.369Z"
+    completedAt: "2026-11-06T18:14:30.344Z"
+    endedAt: "2026-11-06T18:14:30.344Z"
+    activeIntervals: [{"end":"2026-11-06T18:14:30.344Z","start":"2026-11-06T17:59:03.369Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "propose_item_edit broker tool + item-edit card (before/after diff, editable values) writing through rex handleEditItem; Describe lens uses it."
+    lastModified: "2026-11-06T18:14:30.344Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bd3a071a-6ad5-402d-9ae8-b872bd1969ed":
+    status: "completed"
+    startedAt: "2026-11-06T18:25:39.837Z"
+    completedAt: "2026-11-06T18:33:40.094Z"
+    endedAt: "2026-11-06T18:33:40.094Z"
+    activeIntervals: [{"end":"2026-11-06T18:33:40.094Z","start":"2026-11-06T18:25:39.837Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ask_choice broker tool and choice card (radio/checkbox rows, arrow keys, Other, Send); answer returns as the tool result; lenses told to use it."
+    lastModified: "2026-11-06T18:33:40.094Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d652a3f3-fd0f-4600-8916-9fc69685f0e2":
+    status: "completed"
+    startedAt: "2026-11-06T18:34:13.470Z"
+    completedAt: "2026-11-06T18:37:25.391Z"
+    endedAt: "2026-11-06T18:37:25.391Z"
+    activeIntervals: [{"end":"2026-11-06T18:37:25.391Z","start":"2026-11-06T18:34:13.470Z"}]
+    lastModified: "2026-11-06T18:37:25.391Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fc83b4cb-5237-4422-b590-d743d0f11c37":
+    status: "completed"
+    startedAt: "2026-11-06T18:37:25.391Z"
+    completedAt: "2026-11-06T18:37:25.391Z"
+    endedAt: "2026-11-06T18:37:25.391Z"
+    activeIntervals: [{"end":"2026-11-06T18:37:25.391Z","start":"2026-11-06T18:37:25.391Z"}]
+    appliedAt: "2026-11-06T18:37:25.391Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-06T18:37:25.391Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

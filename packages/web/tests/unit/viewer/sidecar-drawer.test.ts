@@ -32,6 +32,7 @@ import {
   type SidecarLensInfo,
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+import { StatusBody } from "../../../src/viewer/components/sidecar-status.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
 import { openExtensionTab } from "../../../src/viewer/components/sidecar-extension-tabs.js";
 import { installBasePathFetch, setBasePathForTests } from "../../../src/viewer/base-path.js";
@@ -1360,6 +1361,95 @@ describe("permission cards", () => {
     });
   });
 
+  describe("status card", () => {
+    const status = (rule: NonNullable<SidecarCard["statusChange"]>["rule"], to = "deferred"): SidecarCard => card("s1", 1, {
+      kind: "status", tool: "propose_status", allowListKey: null,
+      input: { id: "t1", status: to },
+      statusChange: { itemId: "t1", itemTitle: "Write the cache", from: "in_progress", to, reason: "waiting on design", rule },
+    });
+
+    it("shows the move and rex's rule, offers no always-allow, and Approve sends a plain approval", async () => {
+      await openWith([status({ allowed: true })]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("t1: in progress → deferred");
+      expect(root.querySelector(".sidecar-status-item")?.textContent).toBe("t1 Write the cache");
+      expect(root.querySelector(".sidecar-status-move")?.textContent).toBe("in progress → deferred");
+      expect(root.querySelector(".sidecar-status-reason")?.textContent).toBe("Why: waiting on design");
+      expect(root.querySelector(".sidecar-status-rule")?.textContent).toBe("Rex allows this move without force.");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("quotes rex's refusal on a move rex will not make", async () => {
+      await openWith([status({ allowed: false, message: 'Cannot move from "completed" to "pending".' }, "pending")]);
+      expect(root.querySelector(".sidecar-status-refused")?.textContent).toBe('Rex refuses this move: Cannot move from "completed" to "pending".');
+    });
+
+    const noteOf = (carriedOut: NonNullable<SidecarCard["carriedOut"]>): string | null | undefined => {
+      const decided = { ...status({ allowed: true }, "completed"), status: "approved" as const, carriedOut };
+      act(() => { render(h(StatusBody, { card: decided }), root); });
+      return root.querySelector(".sidecar-status-note")?.textContent;
+    };
+
+    it("says a completion held for a hench run is recorded, not written", () => {
+      expect(noteOf({ ok: true, held: true, ids: ["t1"] })).toBe("Recorded; the hench run applies it after its test gate.");
+    });
+
+    it("says a written status is written", () => {
+      expect(noteOf({ ok: true, ids: ["t1"] })).toBe("Status written.");
+    });
+  });
+
+  describe("item-edit card", () => {
+    const edit = (): SidecarCard => card("e1", 1, {
+      kind: "item-edit", tool: "propose_item_edit", allowListKey: null,
+      input: { id: "t1", acceptanceCriteria: ["Loads fast", "Loads in under 1 s"], tags: ["ui"] },
+      itemEdit: {
+        itemId: "t1", itemTitle: "Write the cache",
+        before: { acceptanceCriteria: ["Loads fast", "Works"], tags: [] },
+        after: { acceptanceCriteria: ["Loads fast", "Loads in under 1 s"], tags: ["ui"] },
+      },
+    });
+    const field = (name: string) => root.querySelector(`.sidecar-item-edit-field[data-field="${name}"]`)!;
+
+    it("shows each field before and after, offers no always-allow, and Approve sends no edits when none were made", async () => {
+      await openWith([edit()]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("t1: acceptanceCriteria, tags");
+      expect(root.querySelector(".sidecar-item-edit-item")?.textContent).toBe("t1 Write the cache");
+      const marks = [...field("acceptanceCriteria").querySelectorAll("li")].map((li) => [li.className, li.textContent?.trim()]);
+      expect(marks).toEqual([
+        ["sidecar-item-edit-removed", "− Works"],
+        ["sidecar-item-edit-kept", "Loads fast"],
+        ["sidecar-item-edit-added", "+ Loads in under 1 s"],
+      ]);
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      expect(root.querySelector(".sidecar-card-approve")?.textContent).toBe("Approve and write");
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("sends the operator's edited values with the approval, and the diff follows them", async () => {
+      await openWith([edit()]);
+      const tags = field("tags").querySelector<HTMLTextAreaElement>("textarea")!;
+      await act(async () => { tags.value = "ui\ncache"; tags.dispatchEvent(new Event("input", { bubbles: true })); });
+      expect([...field("tags").querySelectorAll("li.sidecar-item-edit-added")].map((li) => li.textContent?.trim())).toEqual(["+ ui", "+ cache"]);
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", edits: { tags: ["ui", "cache"] } }]);
+    });
+
+    it("sends no edits with a denial", async () => {
+      await openWith([edit()]);
+      const tags = field("tags").querySelector<HTMLTextAreaElement>("textarea")!;
+      await act(async () => { tags.value = "other"; tags.dispatchEvent(new Event("input", { bubbles: true })); });
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-deny")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
+  });
+
   describe("draft-file card", () => {
     const file = (): SidecarCard => card("f1", 1, { kind: "draft-file", tool: "save_draft", input: { kind: "restack-plan", path: "/h/hub/drafts/restack.md", content: "1. rebase #12" } });
     const pathInput = () => root.querySelector<HTMLInputElement>(".sidecar-draft-path-input")!;
@@ -1418,6 +1508,12 @@ describe("permission cards", () => {
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
     // Without its link (a card from before the link was read) the title is the call's own.
     link: { tool: "propose_link", input: { itemId: "t1", ref: "WM-2054" }, title: "t1 → WM-2054" },
+    // Without its fields (a card from before the item was read) the title is the item's id.
+    "item-edit": { tool: "propose_item_edit", input: { id: "t1", tags: ["ui"] }, title: "t1" },
+    // Without its change (a card from before the status was read) the title is the item's id.
+    status: { tool: "propose_status", input: { id: "t1", status: "deferred" }, title: "t1" },
+    // Without its choice (a card from before the question was read) the title is the call's question.
+    choice: { tool: "ask_choice", input: { question: "Which store?", options: [] }, title: "Which store?" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },

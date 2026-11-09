@@ -104,6 +104,9 @@ export type SidecarCardKind =
   | "placement"
   | "edit"
   | "link"
+  | "item-edit"
+  | "status"
+  | "choice"
   | "network-read"
   | "draft-post"
   | "draft-file"
@@ -150,6 +153,47 @@ export interface SidecarPlacement {
 /** A link card's item, tracker ref and the tracker's label; mirrors `SidecarLink` in shared/sidecar-card.ts. */
 export interface SidecarLink { itemId: string; title: string; ref: string; label: string | null }
 
+/** The fields an item-edit card changes; mirrors `SidecarItemEditFields` in shared/sidecar-card.ts. */
+export interface SidecarItemEditFields {
+  title?: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  tags?: string[];
+  priority?: "critical" | "high" | "medium" | "low";
+}
+
+/** A status card's item, its status and the proposed one, and rex's verdict on the move; mirrors `SidecarStatusChange` in shared/sidecar-card.ts. */
+export interface SidecarStatusChange {
+  itemId: string;
+  itemTitle: string;
+  from: string;
+  to: string;
+  reason?: string;
+  rule: { allowed: true } | { allowed: false; message: string };
+}
+
+/** A choice card's question, options and (once sent) the operator's answer; mirrors `SidecarChoice` in shared/sidecar-card.ts. */
+export interface SidecarChoice {
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect: boolean;
+  answer?: SidecarChoiceAnswer;
+}
+
+/** The labels the operator picked and any text from the Other row. */
+export interface SidecarChoiceAnswer {
+  selected: string[];
+  other?: string;
+}
+
+/** An item-edit card's item and each changed field before and after; mirrors `SidecarItemEdit` in shared/sidecar-card.ts. */
+export interface SidecarItemEdit {
+  itemId: string;
+  itemTitle: string;
+  before: SidecarItemEditFields;
+  after: SidecarItemEditFields;
+}
+
 /** One choice of an external-call card's picker; mirrors `SidecarFieldOption` in shared/sidecar-card.ts. */
 export interface SidecarFieldOption { value: string | number | boolean; label: string }
 
@@ -185,6 +229,12 @@ export interface SidecarCard {
   placement?: SidecarPlacement;
   /** A link card's item and tracker ref as approval writes them. */
   link?: SidecarLink;
+  /** An item-edit card's fields as read when it was raised and as approval writes them. */
+  itemEdit?: SidecarItemEdit;
+  /** A status card's change as read when it was raised. */
+  statusChange?: SidecarStatusChange;
+  /** A choice card's question and options, and the answer once sent. */
+  choice?: SidecarChoice;
   /** An external-call card's connection, workspace host, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */
@@ -198,7 +248,7 @@ export interface SidecarCard {
   /** The operator edited the change set, placement, path or call arguments before approving it. */
   edited?: true;
   /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote, `problems` an external server's validation errors. */
-  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
+  carriedOut?: { ok: boolean; ids?: string[]; held?: boolean; problems?: SidecarCallProblem[] };
 }
 
 /** A placement as one body: the shape `POST /api/rex/changes/:id/placement/check` takes, and a placement approval's edits. */
@@ -211,8 +261,8 @@ export interface SidecarCardDecision {
   reason?: string;
   /** "Always allow": only when the card has an allowListKey. */
   remember?: boolean;
-  /** A change-set approval's item edits; the approval writes the edited values. */
-  edits?: SidecarChangeSetEdit[] | PlacementEditBody;
+  /** A change-set approval's item edits, or an item-edit approval's field values; the approval writes the edited values. */
+  edits?: SidecarChangeSetEdit[] | PlacementEditBody | SidecarItemEditFields;
   /** A placement edit's dry run as the operator reviewed it; the server refuses the approval when its re-check moved from it. */
   reviewed?: SidecarPlacementCheck;
   /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
@@ -221,6 +271,8 @@ export interface SidecarCardDecision {
   path?: string;
   /** An external-call approval's arguments as edited on the card; the tool is called with these. */
   arguments?: Record<string, unknown>;
+  /** A choice card's answer: the option labels picked and the Other text; Send approves with it. */
+  answer?: SidecarChoiceAnswer;
 }
 
 /**
@@ -888,6 +940,7 @@ export function useSidecar(
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
         ...(decision.approve && decision.path !== undefined && { path: decision.path }),
         ...(decision.approve && decision.arguments !== undefined && { arguments: decision.arguments }),
+        ...(decision.approve && decision.answer !== undefined && { answer: decision.answer }),
       },
     );
     if (!mountedRef.current) return res.ok;

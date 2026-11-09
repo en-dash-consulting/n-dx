@@ -48,6 +48,7 @@ import {
   workOptions,
   type SidecarActions,
 } from "./carry-out.js";
+import { readChoiceCall } from "./choice-card.js";
 import { buildExternalCall, callProblems } from "./external-call.js";
 import { BRANCH_HEALTH_OFF_READ, CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 import { LEDGER_ENTRY_MAX_CHARS, type LedgerEntryType } from "./ledger.js";
@@ -72,7 +73,7 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
   },
   propose_prd_change: {
     description: [
-      "Propose PRD items to add. Always waits for the operator's change-set card, on which the operator can edit each item's title, description and done-when before approving; the result lists the ids written.",
+      "Propose PRD items to add. Always waits for the operator's change-set card, on which the operator can edit each item's title, description, done-when and tags before approving; the result lists the ids written.",
       "On a v2 PRD (product/ and changes/): item 1 is one change and every later item is one of its tasks; give `target` (a capability or constraint id) to place the change, or omit it and the change lands in the Inbox awaiting placement.",
       "On a v1 PRD: each item is added as add_item adds it, at the root or under `parentId` (an existing item) or `parent` (the index of an earlier item on this card); `type` defaults to the parent's child type.",
       "Nothing is applied: a change is never applied from a card.",
@@ -83,6 +84,7 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
         type: z.string().optional().describe("v1: epic, feature, task or subtask; v2: change (item 1) or task"),
         description: z.string().optional(),
         acceptanceCriteria: z.array(z.string()).optional().describe("Done-when: what must be true for the item to be complete"),
+        tags: z.array(z.string()).optional().describe("Tags to put on the new item"),
         priority: z.enum(["critical", "high", "medium", "low"]).optional(),
         parentId: z.string().optional().describe("v1: an existing item to add under"),
         parent: z.number().int().min(0).optional().describe("v1: the index of an earlier item on this card to add under"),
@@ -140,6 +142,45 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     input: {
       itemId: z.string().min(1).describe("The change, task or subtask to link"),
       ref: z.string().min(1).describe("A tracker key or the tracker item's URL"),
+    },
+  },
+  propose_item_edit: {
+    description: [
+      "Propose editing an existing PRD item: its title, description, done-when (acceptanceCriteria), tags or priority. Always waits for the operator's item-edit card, which shows each field before and after and lets the operator change the proposed values before approving; nothing is written before Approve, and never allow-listed.",
+      "Give only the fields to change. acceptanceCriteria and tags replace the whole list, so send every entry the item should keep.",
+      "Refused with no card when the item does not exist or already has the values. Status is not edited here.",
+    ].join(" "),
+    input: {
+      id: z.string().min(1).describe("The change, task or subtask to edit (id or display id)"),
+      title: z.string().min(1).optional(),
+      description: z.string().optional(),
+      acceptanceCriteria: z.array(z.string()).optional().describe("Done-when for the item's own work; replaces the list"),
+      tags: z.array(z.string()).optional().describe("Replaces the list"),
+      priority: z.enum(["critical", "high", "medium", "low"]).optional(),
+    },
+  },
+  propose_status: {
+    description: [
+      "Propose changing an existing PRD item's status (what rex update_task_status does). Always waits for the operator's status card, which shows the current and proposed status and rex's own transition rule; nothing is written before Approve, and never allow-listed.",
+      "Approval runs rex's own path, never forced: a move rex refuses (for example completed to pending) comes back as an error with rex's message, and completing an item runs rex's checks.",
+      "Refused with no card when the item does not exist or already has the status. Fields other than status are edited with propose_item_edit.",
+    ].join(" "),
+    input: {
+      id: z.string().min(1).describe("The change, task or subtask (id or display id)"),
+      status: z.enum(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled", "deleted"]).describe("The proposed status"),
+      reason: z.string().optional().describe("Why the status changes; shown on the card, and the failure reason when status is failing"),
+    },
+  },
+  ask_choice: {
+    description: [
+      "Ask the operator to decide between options you name; use it instead of writing \"A, B or C\" in your reply. Waits for the operator's choice card and returns their answer as the result.",
+      "Give two to twelve options, each a short `label` and an optional `description`. The card always offers an Other row for free text, so do not add one. Set `multiSelect` only when more than one answer can stand.",
+      "It writes nothing; a denied card means the operator declined to answer.",
+    ].join(" "),
+    input: {
+      question: z.string().min(1).describe("The decision, as one question"),
+      options: z.array(z.object({ label: z.string().min(1), description: z.string().optional() })).min(2).max(12),
+      multiSelect: z.boolean().optional().describe("Let the operator pick several options"),
     },
   },
   github_read: {
@@ -382,6 +423,26 @@ export function createBrokerMcpServer(
         if (typeof link === "string") return text(`No card was raised: ${link}. Nothing was written.`, true);
         annex.link = link;
       }
+      // An item-edit card shows each field read against the PRD; a call that changes nothing, or names no item, raises none.
+      if (name === "propose_item_edit") {
+        if (!actions) return text("No card was raised: this server cannot read the PRD. Nothing was written.", true);
+        const itemEdit = await actions.checkItemEdit(input);
+        if (typeof itemEdit === "string") return text(`No card was raised: ${itemEdit}. Nothing was written.`, true);
+        annex.itemEdit = itemEdit;
+      }
+      // A status card shows the item's status read against the PRD; an unknown item or an unchanged status raises none.
+      if (name === "propose_status") {
+        if (!actions) return text("No card was raised: this server cannot read the PRD. Nothing was written.", true);
+        const statusChange = await actions.checkStatus(input);
+        if (typeof statusChange === "string") return text(`No card was raised: ${statusChange}. Nothing was written.`, true);
+        annex.statusChange = statusChange;
+      }
+      // A choice card shows the question as read; a call with no real choice raises none.
+      if (name === "ask_choice") {
+        const choice = readChoiceCall(input);
+        if (typeof choice === "string") return text(`No card was raised: ${choice}. Nothing was asked.`, true);
+        annex.choice = choice;
+      }
       // A run-plan card lists the planner's own lanes; with no plan, or no lane, no card is raised.
       if (name === "propose_run_plan") {
         if (!actions) return text("No card was raised: this server cannot read the queue planner. Nothing started.", true);
@@ -410,7 +471,7 @@ export function createBrokerMcpServer(
         const result = await carryOutDecision(name, input, outcome, actions, carrying.signal);
         if (outcome.decidedBy !== "allow-list" && outcome.approved) {
           const { card } = outcome;
-          broker.recordCarriedOut(sessionId, card.id, { ok: result.ok, ...(result.ids && { ids: result.ids }) });
+          broker.recordCarriedOut(sessionId, card.id, { ok: result.ok, ...(result.ids && { ids: result.ids }), ...(result.held && { held: true }) });
           // A run that started can still fail; its card then reads failed, a run-plan lane open again,
           // and the session's next turn tells the agent, whose tool result said it started.
           void result.ended?.then((end) => { if (!end.ok) broker.reviseCarriedOutFailed(sessionId, card.id, end.text); });
