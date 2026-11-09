@@ -7,9 +7,9 @@ description: "packages/web/src/viewer/components/repo-trust-strip.ts `buildTrust
 acceptanceCriteria:
   - "With 300 PRD sources the strip's visible text stays under a fixed length (viewer test)"
   - "The full source list shows only under Details, collapsed by default (viewer test)"
-blockedBy:
-  - "f7cdcaab-b2f2-4495-8c98-e62e27e4e3dd"
 priority: "high"
 run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 source: "ndx-capture"
+blockedBy:
+  - "f7cdcaab-b2f2-4495-8c98-e62e27e4e3dd"
 ---

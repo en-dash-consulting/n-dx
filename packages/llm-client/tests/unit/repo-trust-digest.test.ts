@@ -206,7 +206,45 @@ describe("PRD run blocks", () => {
       { path: ".rex/prd_tree/epic/feature/task/index.md", run: { maxTurns: 5 } },
       { path: ".rex/product/cap/index.md", run: { review: true } },
     ]);
-    expect(collectRepoExecutionConfig(repo).sources).toContain(".rex/product/cap/index.md");
+    expect(collectRepoExecutionConfig(repo).sources).toEqual([".rex/** (3 PRD items with saved run settings)"]);
+  });
+
+  it("lists the blocks as one grouped source, however many files carry them", () => {
+    for (let i = 0; i < 300; i++) write(`.rex/changes/inbox/c${i}/index.md`, ITEM('{"tier":"light"}'));
+    write(".rex/changes/inbox/plain/index.md", "---\nid: p\n---\n");
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.sources).toEqual([".rex/changes/** (300 PRD items with saved run settings)"]);
+    expect(config.prdRunBlocks).toHaveLength(300);
+  });
+
+  it("adds no PRD source when no item saves a run block", () => {
+    write(".rex/changes/inbox/plain/index.md", "---\nid: p\n---\n");
+    expect(collectRepoExecutionConfig(repo).sources).toEqual([]);
+  });
+
+  it("keeps the digest it had when every block file was a source", () => {
+    // Pinned from the parent commit, when `sources` listed one path per file.
+    // `sources` stays outside the digest, so grouping it moves no acceptance.
+    write(".rex/changes/inbox/b/index.md", ITEM('{"tier":"light"}'));
+    write(".rex/changes/inbox/b/leaf.md", ITEM('{"skipTestGate":true}'));
+    write(".rex/product/cap/index.md", ITEM('{"review":true}'));
+    expect(collectRepoExecutionConfig(repo).digest).toBe("3a3047af9af1684f73ac312d1cd9c8fda1f0703646b52b1e23bb9e7e6c9cced2");
+  });
+
+  it("bounds the run-settings message and keeps every block in its values", () => {
+    for (let i = 0; i < 300; i++) write(`.rex/changes/inbox/c${String(i).padStart(3, "0")}/index.md`, ITEM('{"skipTestGate":true}'));
+    const f = finding("run-settings");
+    expect(f?.values).toHaveLength(300);
+    expect(f?.message.length).toBeLessThan(500);
+    expect(f?.message).toContain(".rex/changes/inbox/c000/index.md: skipTestGate=true");
+    expect(f?.message).toMatch(/and 295 more$/);
+  });
+
+  it("does not shorten a run-settings message that fits", () => {
+    write(".rex/changes/inbox/a/index.md", ITEM('{"skipTestGate":true}'));
+    expect(finding("run-settings")?.message).toBe(
+      "Saves run settings on PRD items that set execution posture: .rex/changes/inbox/a/index.md: skipTestGate=true",
+    );
   });
 
   it("reads a leaf task's <slug>.md as well as a folder's index.md", () => {

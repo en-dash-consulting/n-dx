@@ -11,5 +11,12 @@ items:
     lastModified: "2026-11-09T16:18:27.176Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f7cdcaab-b2f2-4495-8c98-e62e27e4e3dd":
-    lastModified: "2026-11-09T16:18:08.217Z"
+    status: "completed"
+    startedAt: "2026-11-09T16:19:25.588Z"
+    completedAt: "2026-11-09T16:25:13.039Z"
+    endedAt: "2026-11-09T16:25:13.039Z"
+    activeIntervals: [{"end":"2026-11-09T16:25:13.039Z","start":"2026-11-09T16:19:25.588Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "repo-trust sources lists PRD run blocks as one grouped entry with a count; run-settings message capped at 5 blocks + \"and N more\"; digest pinned unchanged."
+    lastModified: "2026-11-09T16:25:13.039Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

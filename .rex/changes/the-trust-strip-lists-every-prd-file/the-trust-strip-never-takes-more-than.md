@@ -7,9 +7,9 @@ description: "The strip sits above the page body in the shell's flex column (pac
 acceptanceCriteria:
   - "repo-trust.css caps the strip at about a third of the viewport and scrolls the expanded details inside it (stylesheet test)"
   - "With Details open, `.app-body` keeps at least two thirds of the viewport (browser check after the run)"
-blockedBy:
-  - "f7cdcaab-b2f2-4495-8c98-e62e27e4e3dd"
 priority: "high"
 run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 source: "ndx-capture"
+blockedBy:
+  - "f7cdcaab-b2f2-4495-8c98-e62e27e4e3dd"
 ---
