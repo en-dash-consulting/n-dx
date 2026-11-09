@@ -1,0 +1,13 @@
+---
+id: "3c749a61-122e-492c-b1d2-87404244803e"
+type: "task"
+title: "The right stage link never covers content on a body narrowed by the Sidecar drawer"
+slug: "the-right-stage-link-never-covers"
+description: "Run after the Tasks/Tune and Plan tile fixes. The stage links are position: absolute inside .app-body (styles/shell.css .stage-link, .stage-link-next { right: 0 }, z-index 15), and .main--staged reserves calc(var(--space-6) + var(--stage-link-w)) of padding on each side. With the drawer open, on Plan, the right \"Next: Work\" link covered task rows. Part of that was content overflowing the main column (fixed by the earlier tasks); make sure the link cannot cover content even so: either the reserved padding matches the link's real width on the narrowed body, or below a body width the right link hides or collapses (a container query on .app-body, which needs container-type: inline-size there; a viewport media query is wrong here because the drawer, not the viewport, narrows the body). Keep the links' existing behaviour at full width and the existing ≤560 px rule. Do not change the drawer's z-index or close logic. Operator notes: measured on the live dashboard at main 6560bedbf with a 1024 px viewport and a 440 px Sidecar drawer, so #main-content was 584 px wide. You cannot measure layout in this run; the operator re-measures in a real browser afterwards, so fix the CSS cause, not one page's numbers. Style only with tokens from packages/web/src/viewer/styles/tokens.css and keep both themes. Do not touch the Sidecar drawer's open/close logic (components/sidecar-drawer.ts close paths, --sidecar-w, the status dock's right offset): closing already gives the full width back. Do not edit .n-dx.json, packages/web/AGENTS.md or src/server/AGENTS.md; nothing turns on web.sidecar. Add rules where the existing selector lives rather than in a new stylesheet. Test the rule the way tests/unit/viewer/stage-tile-tree-fill.test.ts does (read the stylesheet and assert the declaration on the selector), and add a render test where markup changes. Run the touched viewer tests and the static root policy suites before finishing; add a @n-dx/web patch changeset."
+acceptanceCriteria:
+  - "The right stage link's space is reserved in .main--staged's padding at every body width, or the link hides/collapses below a body width through a container query on .app-body (stylesheet test)"
+  - "The stage links keep their full-width behaviour (existing shell and navigation tests pass)"
+priority: "high"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "ndx-capture"
+---

@@ -1,0 +1,13 @@
+---
+id: "9889cbdd-1a37-4d18-ab5f-cdef0e7967c5"
+type: "task"
+title: "Plan tiles: the open-count badge does not overlap the title, and titles do not break mid-word"
+slug: "plan-tiles-the-open-count-badge-does"
+description: "On Plan at a 1024 px viewport, even with the drawer closed, the \"N open\" badge on a stage tile overlaps the tile's title, and the title \"Testing & Documentation\" breaks mid-word. Tile heads are .stage-tile-head with .stage-tile-glyph, .stage-tile-title (white-space: nowrap), .stage-tile-blurb and .stage-tile-open (styles/stage-tiles.css, views/stage-tiles.ts, views/tile-summaries.ts); find the element that renders the \"N open\" count and the rule that lets it overlap (absolute positioning, a negative margin or an unshrinkable sibling). Give the badge its own space beside the title (flex-shrink: 0 on the badge, min-width: 0 plus ellipsis or wrapping at word boundaries on the title), and stop mid-word breaks on tile titles: overflow-wrap: normal / word-break: normal on the title, so long words wrap whole or ellipsize instead of splitting. Keep the rule scoped to tile titles; leave overflow-wrap: anywhere on body text that needs it. Operator notes: measured on the live dashboard at main 6560bedbf with a 1024 px viewport and a 440 px Sidecar drawer, so #main-content was 584 px wide. You cannot measure layout in this run; the operator re-measures in a real browser afterwards, so fix the CSS cause, not one page's numbers. Style only with tokens from packages/web/src/viewer/styles/tokens.css and keep both themes. Do not touch the Sidecar drawer's open/close logic (components/sidecar-drawer.ts close paths, --sidecar-w, the status dock's right offset): closing already gives the full width back. Do not edit .n-dx.json, packages/web/AGENTS.md or src/server/AGENTS.md; nothing turns on web.sidecar. Add rules where the existing selector lives rather than in a new stylesheet. Test the rule the way tests/unit/viewer/stage-tile-tree-fill.test.ts does (read the stylesheet and assert the declaration on the selector), and add a render test where markup changes. Run the touched viewer tests and the static root policy suites before finishing; add a @n-dx/web patch changeset."
+acceptanceCriteria:
+  - "The open-count badge and .stage-tile-title sit side by side without overlap: the badge does not shrink and the title has min-width: 0 (stylesheet test)"
+  - "Tile titles do not break mid-word (no overflow-wrap: anywhere / word-break: break-all on .stage-tile-title) (stylesheet test)"
+priority: "high"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+source: "ndx-capture"
+---
