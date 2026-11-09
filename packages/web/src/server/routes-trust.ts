@@ -33,6 +33,8 @@ export interface TrustResponse {
   findings: RepoTrustEvaluation["findings"];
   inventory: RepoTrustEvaluation["inventory"];
   sources: string[];
+  /** PRD items with a saved run block; `sources` names them as one grouped entry. */
+  prdRunBlocks: number;
   digest: string;
   trustedAt: string | null;
 }
@@ -44,6 +46,7 @@ export function toTrustResponse(ev: RepoTrustEvaluation): TrustResponse {
     findings: ev.findings,
     inventory: ev.inventory,
     sources: ev.config.sources,
+    prdRunBlocks: ev.config.prdRunBlocks.length,
     digest: ev.config.digest,
     trustedAt: ev.record?.trustedAt ?? null,
   };

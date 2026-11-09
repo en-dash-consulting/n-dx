@@ -55,6 +55,15 @@ describe("trust routes", () => {
     expect(typeof body.digest).toBe("string");
   });
 
+  it("GET /api/trust carries the count of PRD items with saved run settings", async () => {
+    const dir = join(tmpDir, ".rex", "changes", "c1", "t1");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "t1.md"), "---\nid: t1\ntitle: T\nrun:\n  tier: high\n---\n");
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/trust`)).json();
+    expect(body.prdRunBlocks).toBe(1);
+    expect(body.sources.some((s: string) => s.includes("1 PRD item with saved run settings"))).toBe(true);
+  });
+
   it("POST /api/trust/accept records trust in the user's home, and revoke forgets it", async () => {
     const accepted = await fetch(`http://127.0.0.1:${port}/api/trust/accept`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     expect(accepted.status).toBe(200);

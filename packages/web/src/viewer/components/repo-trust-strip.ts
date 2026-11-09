@@ -32,6 +32,8 @@ export interface RepoTrustView {
   restricted: boolean;
   findings: RepoTrustFindingView[];
   sources: string[];
+  /** PRD items with a saved run block. Absent from an older server. */
+  prdRunBlocks?: number;
   inventory?: {
     prd: { items: number; epics: number } | null;
     analysis: { analyzedAt: string | null; version: string | null } | null;
@@ -59,6 +61,9 @@ const MAX_NAMED_CHARS = 140;
 /** Sources listed under Details before "+N more". */
 const MAX_LISTED_SOURCES = 50;
 
+/** The grouped PRD entry llm-client adds to `sources`, e.g. `.rex/changes/** (214 PRD items with saved run settings)`. */
+const GROUPED_PRD_SOURCE = /\(\d+ PRD items? with saved run settings\)$/;
+
 function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
@@ -75,19 +80,27 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
   const headline = view.state === "changed"
     ? "This repository's execution config changed since you trusted it"
     : "This repository's execution config is not trusted";
+  // The PRD count has its own phrase, so the grouped entry is not also named.
+  const prdCount = view.prdRunBlocks ?? 0;
+  const prdPhrase = prdCount > 0
+    ? ` and ${prdCount} PRD item${prdCount === 1 ? "" : "s"} with saved run settings`
+    : "";
+  const nameable = prdCount > 0 ? view.sources.filter((s) => !GROUPED_PRD_SOURCE.test(s)) : view.sources;
+  // The phrase shares the line's budget, so the visible text stays under its cap.
+  const budget = MAX_NAMED_CHARS - prdPhrase.length;
   const named: string[] = [];
   let namedChars = 0;
-  for (const source of view.sources.slice(0, MAX_NAMED_SOURCES)) {
+  for (const source of nameable.slice(0, MAX_NAMED_SOURCES)) {
     const name = clip(source, MAX_SOURCE_NAME);
-    if (named.length > 0 && namedChars + name.length > MAX_NAMED_CHARS) break;
+    if (named.length > 0 && namedChars + name.length > budget) break;
     named.push(name);
     namedChars += name.length;
   }
-  const rest = view.sources.length - named.length;
+  const rest = nameable.length - named.length;
   const list = rest > 0 ? [...named, `+${rest} more`] : named;
   const sources = list.length ? ` (${list.join(", ")})` : "";
   const detail =
-    `${n} finding${n === 1 ? "" : "s"}${sources}. Until trusted, agent runs use the default guard, `
+    `${n} finding${n === 1 ? "" : "s"}${sources}${prdPhrase}. Until trusted, agent runs use the default guard, `
     + "bypassPermissions is lowered to acceptEdits, and verify_criteria does not run the repository's test command.";
   return {
     headline,

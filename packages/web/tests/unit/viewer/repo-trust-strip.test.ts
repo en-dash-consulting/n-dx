@@ -49,6 +49,28 @@ describe("buildTrustNotice", () => {
     expect(notice.detail).toMatch(/\+\d+ more\)/);
   });
 
+  it("shows the PRD item count when three config files come first", () => {
+    const sources = [".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/** (214 PRD items with saved run settings)"];
+    const notice = buildTrustNotice({ ...UNTRUSTED, sources, prdRunBlocks: 214 })!;
+    expect(notice.detail).toContain("(.hench/config.json, .n-dx.json, .mcp.json) and 214 PRD items with saved run settings");
+    expect(notice.detail).not.toContain("more");
+    expect(notice.sources).toEqual(sources);
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+  });
+
+  it("keeps the PRD count under the cap with long source names", () => {
+    const long = Array.from({ length: 3 }, (_, i) => `${"very-long-directory-name/".repeat(5)}c${i}.json`);
+    const sources = [...long, ".rex/changes/** (99999 PRD items with saved run settings)"];
+    const notice = buildTrustNotice({ ...UNTRUSTED, state: "changed", sources, prdRunBlocks: 99999 })!;
+    expect(notice.detail).toContain("99999 PRD items");
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+  });
+
+  it("behaves as before when an older server sends no count", () => {
+    const sources = [".a", ".b", ".c", ".rex/changes/** (2 PRD items with saved run settings)"];
+    expect(buildTrustNotice({ ...UNTRUSTED, sources })!.detail).toContain("(.a, .b, .c, +1 more)");
+  });
+
   it("says changed when the record is for another digest", () => {
     expect(buildTrustNotice({ ...UNTRUSTED, state: "changed" })!.headline).toContain("changed since you trusted it");
   });

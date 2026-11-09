@@ -91,6 +91,18 @@
   color: var(--text-dim);
 }
 
+.repo-trust-strip__sources {
+  margin: var(--space-2) 0 0 1.75rem;
+  color: var(--text-dim);
+}
+
+.repo-trust-strip__sources ul {
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .repo-trust-strip__error {
   margin-top: var(--space-2);
   color: var(--red);
