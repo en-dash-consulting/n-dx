@@ -229,10 +229,11 @@ export function unpickableUnits(tree: V2Tree, ids: readonly string[], options: P
   return ids.flatMap((id) => {
     const node = index.resolve(id);
     if (!node || pickable.has(node.id)) return [];
+    // The changes gating the unit, innermost first; a task-less change is its own.
     const changes = node.type === "change" ? [node, ...enclosingChanges(node, parentOf)] : enclosingChanges(node, parentOf);
     const change = changes[0];
     const reasons: string[] = [];
-    for (const held of [node, ...changes]) {
+    for (const held of node.type === "change" ? changes : [node, ...changes]) {
       const claim = claims.get(held.id);
       if (claim) reasons.push(`${ownerPrefix(node, held)}claimed by another worktree: ${claim.worktreeRoot}`);
       else if (options.excludeIds?.has(held.id)) reasons.push(`${ownerPrefix(node, held)}excluded from this selection`);

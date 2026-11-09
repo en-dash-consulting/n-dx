@@ -51,6 +51,9 @@ describe("unpickableUnits", () => {
     const claims = new Map([["c", { worktreeRoot: "/wt" }]]);
     expect(reasons(t, ["a"], { claims })).toEqual({ a: [`its change "c" (c) is claimed by another worktree: /wt`] });
     expect(reasons(t, ["a"], { excludeIds: new Set(["a"]) })).toEqual({ a: ["excluded from this selection"] });
+    // A task-less change is its own unit: its claim is named once.
+    expect(reasons(tree(change("solo")), ["solo"], { claims: new Map([["solo", { worktreeRoot: "/wt" }]]) }))
+      .toEqual({ solo: ["claimed by another worktree: /wt"] });
   });
 
   it("names a change awaiting placement, and a change that is not workable", () => {
