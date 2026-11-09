@@ -130,22 +130,25 @@ export const MAX_DROPPED_ENTRIES = 20;
  * A queue or dropped entry as `GET /api/hub/queue` shows it: the options
  * without `contextNotes`, which can run to 8 KB of operator prose that no
  * queue strip needs and that an unscoped snapshot would hand to every
- * project's viewer. `hasNotes` says there were some.
+ * project's viewer. `hasNotes` says there were some. The `saveRun` block goes
+ * the same way, reduced to `hasSaveRun`: its `run` can carry the task's notes
+ * too, and nothing on a queue strip reads the settings themselves.
  */
-export type QueueEntryView<T extends QueueEntry = QueueEntry> = Omit<T, "options"> & {
+export type QueueEntryView<T extends QueueEntry = QueueEntry> = Omit<T, "options" | "saveRun"> & {
   options?: Omit<RunOptions, "contextNotes">;
   hasNotes?: true;
+  hasSaveRun?: true;
 };
 
-/** Drop `contextNotes` from an entry, keeping a flag that there were some. */
+/** Drop `contextNotes` and `saveRun` from an entry, keeping a flag for each that was there. */
 export function redactQueueEntry<T extends QueueEntry>(entry: T): QueueEntryView<T> {
-  if (!entry.options) return entry;
-  const { options: full, ...rest } = entry;
-  const { contextNotes, ...options } = full;
+  const { options: full, saveRun, ...rest } = entry;
+  const { contextNotes, ...options } = full ?? {};
   return {
     ...rest,
-    ...(Object.keys(options).length > 0 ? { options } : {}),
+    ...(full && Object.keys(options).length > 0 ? { options } : {}),
     ...(contextNotes ? { hasNotes: true as const } : {}),
+    ...(saveRun ? { hasSaveRun: true as const } : {}),
   };
 }
 
