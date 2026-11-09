@@ -271,6 +271,12 @@ export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_W
  * Prints what it does on `err`. Never throws: the caller turns `ok: false`
  * into its own non-zero exit, with `message` as the error.
  *
+ * Only a missing build is fatal. When the built file is there and merely
+ * lags its source, a rebuild that fails — a type error mid-edit, a broken
+ * branch — or one another process still holds after the bounded wait leaves
+ * the command running on the build it has: `ok: true` with `failed`, the
+ * message (with the build's output) for the caller to print as a warning.
+ *
  * @param {string} entry  The file about to be run or served.
  * @param {object} [options]
  * @param {boolean} [options.checkLag]       Also rebuild a `dist/` that lags its source ({@link buildFacts}).
@@ -280,7 +286,8 @@ export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_W
  * @param {(entry: string, options: { checkLag?: boolean }) => BuildFacts} [options.facts]
  * @param {typeof runRebuild} [options.rebuild]
  * @param {typeof acquireRebuildLock} [options.lock]
- * @returns {Promise<{ ok: true, rebuilt: boolean } | { ok: false, message: string, reinstall?: boolean }>}
+ * @param {number} [options.lockWaitMs]     How long to wait for another process's rebuild of the same checkout.
+ * @returns {Promise<{ ok: true, rebuilt: boolean, failed?: string } | { ok: false, message: string, reinstall?: boolean }>}
  */
 export async function ensureSourceBuild(entry, {
   checkLag = false,
@@ -289,6 +296,7 @@ export async function ensureSourceBuild(entry, {
   facts = buildFacts,
   rebuild = runRebuild,
   lock = acquireRebuildLock,
+  lockWaitMs = REBUILD_LOCK_WAIT_MS,
 } = {}) {
   const judge = () => {
     const found = facts(entry, { checkLag });
@@ -300,11 +308,14 @@ export async function ensureSourceBuild(entry, {
   if (need.action === "none") return { ok: true, rebuilt: false };
   if (need.action === "reinstall") return { ok: false, reinstall: true, message: reinstallMessage(need, entry) };
 
+  // A build that is there carries on when the rebuild cannot be had; a missing one cannot.
+  const settle = (message) => (need.reason === "missing" ? { ok: false, message } : { ok: true, rebuilt: false, failed: message });
   const release = await lock(need.checkoutRoot, {
+    waitMs: lockWaitMs,
     onWait: () => err(`Waiting for another n-dx process to finish rebuilding ${need.name}…`),
   });
   if (!release) {
-    return { ok: false, message: `Another n-dx process is still rebuilding ${need.name} in ${need.checkoutRoot}; nothing was run.` };
+    return settle(`Another n-dx process was still rebuilding ${need.name} in ${need.checkoutRoot} after ${Math.round(lockWaitMs / 1000)}s.`);
   }
   try {
     // The build waited on may have been this one.
@@ -314,7 +325,7 @@ export async function ensureSourceBuild(entry, {
     err(rebuildNotice(need));
     const started = Date.now();
     const result = rebuild(need);
-    if (!result.ok) return { ok: false, message: rebuildFailureMessage(need, result) };
+    if (!result.ok) return settle(rebuildFailureMessage(need, result));
     if (!existsSync(entry)) {
       return { ok: false, message: `The rebuild of ${need.name} finished, but ${entry} is still missing.\n${result.output.trim()}` };
     }

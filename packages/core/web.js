@@ -1296,6 +1296,19 @@ export function noNonceNote(status, fix) {
 }
 
 /**
+ * The warning for a lagging `@n-dx/web` whose automatic rebuild failed: the
+ * build's own output, and that the command carries on with the build it has.
+ * Pure.
+ *
+ * @param {string} failure  {@link ensureSourceBuild}'s `failed` message, build output included.
+ * @param {string} webEntry
+ * @returns {string}
+ */
+export function rebuildFailedWarning(failure, webEntry) {
+  return `Warning: ${failure}\n  Going on with the existing build in ${dirname(dirname(webEntry))}, which is older than its source.`;
+}
+
+/**
  * Whether a missing nonce from a single-project server this command just
  * spawned is worth one forced rebuild and respawn: the route is missing (the
  * build is older than this ndx), the install is source-linked (there is
@@ -1412,6 +1425,21 @@ export function judgeHubBuild(build, web, sameDir = (a, b) => canonicalDir(a) ==
     return { action: "leave", note: `The running n-dx hub was started from ${where}, not this ndx's; it keeps serving.` };
   }
   return { action: "keep" };
+}
+
+/**
+ * {@link judgeHubBuild}'s verdict once the automatic rebuild is known. When
+ * it failed, the build a replacement would start is the one that could not
+ * be rebuilt, so replacing would restart every project onto nothing newer:
+ * the hub keeps serving, and the note says why. Pure.
+ *
+ * @param {ReturnType<typeof judgeHubBuild>} judged
+ * @param {boolean} rebuildFailed
+ * @returns {ReturnType<typeof judgeHubBuild>}
+ */
+export function afterRebuild(judged, rebuildFailed) {
+  if (judged.action !== "replace" || !rebuildFailed) return judged;
+  return { action: "leave", note: `The running n-dx hub is older than this ndx (${judged.text}), but @n-dx/web could not be rebuilt, so it keeps serving.` };
 }
 
 /**
@@ -1932,7 +1960,7 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile, deferred 
  *
  * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, note?: string, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
  */
-async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, force = false }) {
+async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, force = false, rebuildFailed = false }) {
   const wanted = tokenFile ? "token" : "open";
   const state = await hubAuthState(port, hubRequest, (p) => identifyOwnHub(p, home));
   if (state === "absent") return spawnHub(port, { tools, __dir, home, tokenFile });
@@ -1954,7 +1982,7 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null, web, forc
   // A hub that kept running across an upgrade or rebuild serves older code
   // than this CLI expects — first among it, no landing-nonce route.
   const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
-  const judged = health.status === 200 ? judgeHubBuild(health.body?.build, web) : { action: "keep" };
+  const judged = afterRebuild(health.status === 200 ? judgeHubBuild(health.body?.build, web) : { action: "keep" }, rebuildFailed);
   if (judged.action === "replace") return replaceOrDeferHub(port, { kind: "build", text: judged.text }, { tools, __dir, home, tokenFile, force });
   // Newer, or another checkout's: it keeps serving, and the note says why.
   const kept = judged.action === "leave" ? { note: judged.note } : {};
@@ -2588,9 +2616,11 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
     console.error(`Error: ${built.message}`);
     return 1;
   }
+  // A lagging build that could not be rebuilt still runs: say why it is older.
+  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
   const web = packageBuildIdentity(webEntry);
   try {
-    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile, web, force: !!flags["replace-hub"] });
+    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile, web, force: !!flags["replace-hub"], rebuildFailed: !!(built.ok && built.failed) });
   } catch (err) {
     console.error(err.message);
     return 1;
@@ -2893,6 +2923,8 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     console.error(`Error: ${built.message}`);
     return 1;
   }
+  // A lagging build that could not be rebuilt still runs: say why it is older.
+  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
   const web = packageBuildIdentity(webEntry);
   const hereServer = hereServerCommands(commandName, isPreview);
 
@@ -2966,11 +2998,15 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     if (hereToken && !hereNonce && shouldRebuildForNonce(hereNonceStatus, web, rebuiltForNonce)) {
       log(`The server built from ${join(web.packageDir, "dist")} is older than this ndx; rebuilding @n-dx/web and starting it again…`);
       const rebuilt = await ensureSourceBuild(webEntry, { force: true });
-      if (!rebuilt.ok) {
+      if (rebuilt.ok && rebuilt.failed) {
+        // Nothing newer to start: keep the server just started, without a sign-in link.
+        console.error(rebuildFailedWarning(rebuilt.failed, webEntry));
+      } else if (!rebuilt.ok) {
         console.error(`Error: ${rebuilt.message}`);
         return 1;
+      } else {
+        return runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName, rebuiltForNonce: true });
       }
-      return runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName, rebuiltForNonce: true });
     }
     log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
     if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, hereServer)));

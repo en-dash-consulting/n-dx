@@ -24,6 +24,8 @@ import {
   hereServerCommands,
   compareVersions,
   judgeHubBuild,
+  afterRebuild,
+  rebuildFailedWarning,
   noNonceNote,
   serverRefreshFix,
   shouldRebuildForNonce,
@@ -235,6 +237,29 @@ describe("judgeHubBuild", () => {
       expect(note.split("\n")).toHaveLength(1);
       expect(note).not.toMatch(/ndx hub stop|ndx start|restart|pnpm/i);
     }
+  });
+});
+
+describe("afterRebuild", () => {
+  it("leaves an older hub serving when @n-dx/web could not be rebuilt: there is nothing newer to start", () => {
+    const older = judgeHubBuild({ version: "1.2.2" }, current, (a, b) => a === b);
+    expect(older.action).toBe("replace");
+    const kept = afterRebuild(older, true);
+    expect(kept.action).toBe("leave");
+    expect(kept.note).toMatch(/could not be rebuilt, so it keeps serving\.$/);
+    expect(kept.note).not.toMatch(/ndx start\b|ndx hub stop|restart|pnpm/i);
+    expect(afterRebuild(older, false)).toBe(older);
+    expect(afterRebuild({ action: "keep" }, true)).toEqual({ action: "keep" });
+  });
+});
+
+describe("rebuildFailedWarning", () => {
+  it("carries the build's output and says the command goes on with the existing build", () => {
+    const text = rebuildFailedWarning("The automatic rebuild of @n-dx/web in /c exited with code 2.\nerror TS2322", join("/c", "packages", "web", "dist", "cli", "index.js"));
+    expect(text).toMatch(/^Warning: The automatic rebuild/);
+    expect(text).toContain("error TS2322");
+    expect(text).toContain("Going on with the existing build");
+    expect(text).not.toMatch(/pnpm/);
   });
 });
 

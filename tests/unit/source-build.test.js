@@ -148,6 +148,58 @@ describe("ensureSourceBuild", () => {
     expect(result.message).toContain("error TS1005");
   });
 
+  it("keeps a lagging build that fails to rebuild, warning with the build's output, instead of failing", async () => {
+    const entry = checkout({ dist: "lagging" });
+    const result = await ensureSourceBuild(entry, {
+      checkLag: true,
+      err: quiet,
+      lock: noLock,
+      rebuild: () => ({ ok: false, code: 2, output: "src/index.ts(3,7): error TS2322: Type 'string' is not assignable.\n" }),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.rebuilt).toBe(false);
+    expect(result.failed).toContain("exited with code 2");
+    expect(result.failed).toContain("error TS2322");
+    expect(existsSync(entry)).toBe(true);
+  });
+
+  it("waits for another process's rebuild of the same checkout, then goes on", async () => {
+    const entry = checkout({ dist: "lagging" });
+    const held = await acquireRebuildLock(root, { waitMs: 0 });
+    const lines = [];
+    let builds = 0;
+    let waiting;
+    const announced = new Promise((resolve) => { waiting = resolve; });
+    const pending = ensureSourceBuild(entry, {
+      checkLag: true,
+      err: (l) => { lines.push(l); waiting(); },
+      lockWaitMs: 30_000,
+      rebuild: () => { builds++; return { ok: true, code: 0, output: "" }; },
+    });
+    // The other process's build finishes: it rewrites dist/ and lets go.
+    await announced;
+    write("packages/web/dist/cli/index.js", "");
+    held();
+    expect(await pending).toEqual({ ok: true, rebuilt: false });
+    expect(lines[0]).toMatch(/Waiting for another n-dx process to finish rebuilding @n-dx\/web/);
+    // Its build was the one waited for: this one did not build again.
+    expect(builds).toBe(0);
+  });
+
+  it("goes on with a lagging build when the wait for another rebuild runs out, but not with a missing one", async () => {
+    const lagging = checkout({ dist: "lagging" });
+    const held = await acquireRebuildLock(root, { waitMs: 0 });
+    try {
+      const kept = await ensureSourceBuild(lagging, { checkLag: true, err: quiet, lockWaitMs: 100 });
+      expect(kept).toMatchObject({ ok: true, rebuilt: false, failed: expect.stringMatching(/still rebuilding @n-dx\/web/) });
+      rmSync(join(root, "packages/web/dist"), { recursive: true, force: true });
+      const missing = await ensureSourceBuild(lagging, { err: quiet, lockWaitMs: 100 });
+      expect(missing.ok).toBe(false);
+    } finally {
+      held();
+    }
+  });
+
   it("does not claim success when the build ran but the entry is still missing", async () => {
     const entry = checkout({ dist: "missing" });
     const result = await ensureSourceBuild(entry, { err: quiet, lock: noLock, rebuild: () => ({ ok: true, code: 0, output: "" }) });
