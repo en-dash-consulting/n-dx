@@ -230,7 +230,7 @@ The run record (`.hench/runs/`) carries what was actually used: `model`, `modelS
 
 Validation is strict: an unknown key, an unknown vendor name in `models`/`reviewModels`, a wrong type or an out-of-range value is rejected by one shared validator (`validateRunSettings`). An empty block `{}` is the same as no block and is never written. Writers reject bad input; the store itself is lenient. A malformed hand-edited block, or one with keys from a newer ndx, warns on load, round-trips through saves unchanged and never blocks writes to other items; `ndx work` ignores an invalid block with a warning until it is fixed. Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen per launch and are never saved.
 
-Writers: MCP `add_item` / `edit_item` (an object replaces the whole block, `null` removes it), `rex update --run='<json>'` (`--run=` or `--run=null` clears it), and, from PR 4, the dashboard's Prepare task Save. `PATCH /api/rex/items/:id` does **not** write `run`.
+Writers: MCP `add_item` / `edit_item` (an object replaces the whole block, `null` removes it), `rex update --run='<json>'` (`--run=` or `--run=null` clears it), and, from PR 4, the dashboard's Prepare task Save — plus Start Working, whose one click saves the project defaults on a task that carries no block before running it. `PATCH /api/rex/items/:id` does **not** write `run`.
 
 ---
 

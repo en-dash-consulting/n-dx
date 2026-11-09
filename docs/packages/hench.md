@@ -43,7 +43,9 @@ ndx work --epic="Auth System" --auto --iterations=2 .
 
 A PRD item can carry a `run` block saying how `ndx work` should run it — written
 by the rex MCP tools (`add_item` / `edit_item`), `rex update --run`, or the
-dashboard's Prepare task modal. Hench applies it.
+dashboard's Prepare task modal; the dashboard's Start Working button also
+writes the project defaults onto a task with no block before it starts the
+run. Hench applies it.
 
 **Precedence, per setting:** CLI flag > the task's `run` block > `hench.*` >
 `llm.*` > the built-in default.
