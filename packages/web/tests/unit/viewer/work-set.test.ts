@@ -110,6 +110,14 @@ describe("Work set sections", () => {
     expect(writes()).toEqual([{ url: "/api/rex/work-set/remove", method: "POST", body: { ids: ["c-1"] } }]);
   });
 
+  it("says so when Remove on a change takes nothing off, because an enclosing change holds the branch", async () => {
+    const nested = { id: "c-n", title: "Nested unit", status: "pending", inherited: true };
+    await mount(feature({ groups: [{ change: { id: "c-n", title: "Nested unit" }, units: [nested] }] }), { status: 200, body: { branch: "feat/x", removed: [] } });
+    expect(document.querySelector('[data-change-id="c-n"]')?.textContent).toContain("via its change");
+    await click(button("Remove change Nested unit"));
+    expect(document.querySelector(".work-set-message")?.textContent).toContain("Nothing was removed");
+  });
+
   it("shows a refused Remove inline and reloads nothing", async () => {
     await mount(feature(), { status: 409, body: { error: "task t-own is running in this checkout", code: "RUN_LIVE" } });
     const reads = calls.length;

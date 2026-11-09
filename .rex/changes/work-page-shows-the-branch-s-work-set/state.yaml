@@ -5,10 +5,14 @@ items:
     lastModified: "2026-11-09T17:05:30.853Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96d87594-7e56-4c39-9bbf-c632612f5c61":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-09T17:13:44.541Z"
-    activeIntervals: [{"start":"2026-11-09T17:13:44.541Z"}]
-    lastModified: "2026-11-09T17:13:45.214Z"
+    completedAt: "2026-11-09T17:18:02.986Z"
+    endedAt: "2026-11-09T17:18:02.986Z"
+    activeIntervals: [{"end":"2026-11-09T17:18:02.986Z","start":"2026-11-09T17:13:44.541Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Work page WorkQueue: On this branch (Remove) and Not on a branch (Add), server read adds `others`, Ready to run reloads and shows --any note on an empty set."
+    lastModified: "2026-11-09T17:18:02.986Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d25d1516-fa91-4a86-86a0-b7b51b1e604e":
     status: "completed"

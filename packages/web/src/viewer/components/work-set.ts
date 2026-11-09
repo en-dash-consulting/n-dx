@@ -41,6 +41,7 @@ const STATUS_LABEL: Record<string, string> = { pending: "Pending", in_progress: 
 const STATUS_ICON: Record<string, string> = { pending: "○", in_progress: "◐", failing: "✗" };
 
 const INHERITED_NOTE = "This task is on the branch through its change. Remove the change to take it off.";
+const ENCLOSING_NOTE = "Nothing was removed: this is on the branch through an enclosing change. Remove that change to take it off.";
 
 /** The work set read, reloaded on run frames and after a write. Null until the first answer, and on a server without the route. */
 export function useWorkSet() {
@@ -93,6 +94,10 @@ function WorkSetSections({ read, onChanged }: SectionsProps) {
         body: JSON.stringify({ ids: [id] }),
       });
       if (res.ok) {
+        const reply = (await res.json().catch(() => ({}))) as { removed?: unknown[] };
+        // A change whose units inherit from an enclosing change holds no delivery
+        // of its own: rex removes nothing and answers 200. Say so, not silence.
+        if (action === "remove" && Array.isArray(reply.removed) && reply.removed.length === 0) setMessage(ENCLOSING_NOTE);
         await onChanged();
       } else {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -130,6 +135,7 @@ function WorkSetSections({ read, onChanged }: SectionsProps) {
           ? h("span", { class: `prd-status-icon prd-status-${head.status}`, title: STATUS_LABEL[head.status] ?? head.status, "aria-label": STATUS_LABEL[head.status] ?? head.status }, STATUS_ICON[head.status] ?? "○")
           : null,
         h("h3", { class: "work-set-change-title" }, label(group.change)),
+        head?.inherited ? h("span", { class: "work-set-via" }, "via its change") : null,
         h("button", {
           type: "button",
           class: "prep-btn work-set-btn",
