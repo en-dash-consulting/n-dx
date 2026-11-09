@@ -55,6 +55,7 @@ import { HubSessionHostPicker } from "./session-host.js";
 import { proxiedTickPost, TrackerSyncClock } from "./tracker-sync.js";
 import type { TrackerSyncClockOptions } from "./tracker-sync.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
+import { sha256Hex, takeSessionHandover, writeSessionHandover } from "./session-handover.js";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -349,7 +350,8 @@ export class Hub {
     this.configProblems = problems;
     this.keepAlive = options.keepAlive ?? config.keepAlive;
     this.token = options.tokenFile ? ensureAuthToken(options.tokenFile) : null;
-    this.credentials = this.token ? new CredentialStore() : null;
+    // `sha256`: sessions handed over by a hub this one replaced are kept as digests.
+    this.credentials = this.token ? new CredentialStore({ sha256: sha256Hex }) : null;
     this.explicitSelfBin = options.selfBin;
     this.selfBin = resolveSelfBin(options.selfBin);
     this.ndxCli = resolveNdxCli(options.ndxCli);
@@ -424,6 +426,37 @@ export class Hub {
     if (!this.repairSelfBin()) faults.push("no-ndx-bin");
     if (!this.ndxCli) faults.push("no-ndx-cli");
     return faults;
+  }
+
+  /**
+   * Write this hub's live browser sessions for the hub `ndx start` is about to
+   * start in its place (session-handover.ts). Only ever asked for as part of
+   * a replacement; `ndx hub stop` never asks, so it still signs every tab out.
+   * Returns how many sessions were written; 0 without a token.
+   */
+  handOverSessions(): number {
+    if (!this.token || !this.credentials) return 0;
+    return writeSessionHandover({ home: this.hubHome, port: this.port, token: this.token }, this.credentials.exportSessions());
+  }
+
+  /**
+   * Take the sessions a replaced hub handed over, once, at startup: the file
+   * is deleted whatever it holds, and its sessions are kept only when it is
+   * recent and was written for this home, port and token.
+   */
+  takeOverSessions(): void {
+    if (!this.token || !this.credentials) {
+      // Nothing to sign in to: still never leave a hand-over lying around.
+      takeSessionHandover({ home: this.hubHome, port: this.port, token: "" });
+      return;
+    }
+    const taken = takeSessionHandover({ home: this.hubHome, port: this.port, token: this.token });
+    if (taken.taken) {
+      const n = this.credentials.importSessions(taken.sessions);
+      this.log(`[hub] kept ${n} signed-in browser session${n === 1 ? "" : "s"} from the hub this one replaced`);
+    } else if (taken.reason) {
+      this.log(`[hub] ignored a session hand-over: ${taken.reason}`);
+    }
   }
 
   /** Dashboard-started runs in flight across every project that has a server. */
@@ -781,6 +814,9 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     });
   });
   hub.setPort(port);
+  // Before any request is answered (this runs ahead of the next connection
+  // event): a tab signed in to the hub this one replaced stays signed in.
+  hub.takeOverSessions();
   writeHubPidFile(hubPidPath(hub.hubHome), { pid: process.pid, port, startedAt: hub.startedAt });
   log(`[hub] listening on http://${LOOPBACK_HOST}:${port}`);
 

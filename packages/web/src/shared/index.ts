@@ -99,7 +99,7 @@ export {
   removeTokenParam,
 } from "./auth.js";
 export { BROWSER_SESSION_SCRIPT, injectSessionScript } from "./browser-session.js";
-export type { AuthHeaders, AuthRouteAnswer, CredentialStoreOptions, RequestAccess } from "./auth.js";
+export type { AuthHeaders, AuthRouteAnswer, CredentialStoreOptions, HandedOverSession, RequestAccess } from "./auth.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,

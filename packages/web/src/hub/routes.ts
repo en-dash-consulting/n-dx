@@ -5,6 +5,8 @@
  *                                     the build it runs (version, build-stamp hash, package root),
  *                                     and `faults`: what it cannot do ("no-ndx-bin", "no-ndx-cli")
  *   GET    /api/hub/projects        — registered projects with live child status
+ *   POST   /api/hub/handover        — token only: write the live browser sessions for the hub
+ *                                     `ndx start` replaces this one with (session-handover.ts)
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
  *                                     (with ?hubSession=1, whether the hub session can run)
@@ -62,7 +64,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
-import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
+import { detectBasePath, projectIdFromBasePath, requestAccess, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
@@ -473,6 +475,18 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
       // n-dx CLI for extensions. `ndx start` replaces a hub that reports any.
       faults: hub.faults(),
     });
+    return true;
+  }
+
+  // `ndx start`, just before it stops this hub to replace it: write the live
+  // browser sessions for the new hub. The per-user token only — a browser
+  // session can never ask a hub to write its sessions anywhere.
+  if (path === "/handover" && method === "POST" && scopedProjectId === null) {
+    if (requestAccess(req.headers, hub.token, hub.credentials) !== "token" || !hub.token) {
+      error(res, 403, "Only the per-user token can ask the hub to hand its sessions over");
+      return true;
+    }
+    json(res, 200, { written: hub.handOverSessions() });
     return true;
   }
 

@@ -24,7 +24,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { terminateTreeByPid } from "../../packages/core/child-lifecycle.js";
 import {
@@ -46,9 +46,11 @@ const TOKEN = "t".repeat(48);
  */
 const OLDER_HUB = `
 const { createServer } = require("node:http");
-const { writeFileSync } = require("node:fs");
+const { appendFileSync, writeFileSync } = require("node:fs");
 const [portFile, token, busy, extra] = process.argv.slice(2);
 const server = createServer((req, res) => {
+  // Every request, in order, for the test to read once this process is gone.
+  appendFileSync(portFile + ".seen", req.method + " " + req.url + "\\n");
   const reply = (status, body) => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
@@ -242,6 +244,8 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.stderr).toContain("Its 2 projects come back on the same /p/<id>/ URLs.");
       expect(result.stdout).toMatch(/Serving again on port \d+: alpha-app, beta-app\./);
       expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      // It asked the old hub to hand its signed-in sessions over before stopping it.
+      expect(readFileSync(join(fx.home, "older-hub.port.seen"), "utf-8").split("\n")).toContain("POST /api/hub/handover");
 
       // The new hub minted the nonce the old one had no route for.
       expect(result.stdout).toContain("ndx_nonce=");
@@ -353,6 +357,29 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(health.body.faults).toEqual([]);
       await expectProjectsServedAgain(older.port);
     });
+  });
+
+  it("a plain ndx hub stop discards any session hand-over, so it still signs every tab out", async () => {
+    if (!canBindPorts) return;
+    const home = await createTmpDir("ndx-handover-stop-");
+    try {
+      const file = join(home, "hub-sessions.handover.json");
+      writeFileSync(file, "{}");
+      const port = await new Promise((resolvePromise) => {
+        const srv = createServer();
+        srv.listen(0, "127.0.0.1", () => { const p = srv.address().port; srv.close(() => resolvePromise(p)); });
+      });
+      const result = await new Promise((resolvePromise) => {
+        execFile("node", [CLI_PATH, "hub", "stop", `--port=${port}`], {
+          encoding: "utf-8",
+          ...withSandboxedClaudeConfig({ env: { ...process.env, N_DX_HOME: home } }),
+        }, (err, stdout, stderr) => resolvePromise({ code: err ? (err.code ?? 1) : 0, stdout, stderr }));
+      });
+      expect(result.code, result.stderr).toBe(0);
+      expect(existsSync(file)).toBe(false);
+    } finally {
+      await removeTmpDir(home);
+    }
   });
 
   describe("with Sidecar turns in flight on it", () => {

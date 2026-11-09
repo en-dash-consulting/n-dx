@@ -1063,6 +1063,18 @@ async function findOwnRunningHub(home, flagPort) {
 const HUB_DEFAULT_PORT = 3117;
 const HUB_REGISTRY_FILE = "hub.json";
 const HUB_PID_FILE = "hub.pid";
+/**
+ * The one-shot file a hub writes its live browser sessions to when this ndx
+ * replaces it, for the new hub to take at startup (packages/web/src/hub/
+ * session-handover.ts names it too). `ndx hub stop` removes it, so a plain
+ * stop still signs every tab out.
+ */
+export const SESSION_HANDOVER_FILE = "hub-sessions.handover.json";
+
+/** Remove any session hand-over in `home`; nothing to remove is fine. */
+async function discardSessionHandover(home) {
+  await unlink(join(home, SESSION_HANDOVER_FILE)).catch(() => {});
+}
 const HUB_CONFIG_FILE = "config.json";
 /** How long a freshly spawned hub gets to answer /api/hub/health. */
 const HUB_START_TIMEOUT_MS = 15_000;
@@ -2063,11 +2075,16 @@ async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, 
   if (plan.action === "defer") return { spawned: false, pid: null, deferred: plan.note };
 
   console.error(hubReplacementNotice(reason, port, Object.keys(projects).length, plan.interrupts));
+  // Signed-in dashboard tabs stay signed in: the old hub writes its live
+  // sessions (digests only) for the new one to take at startup. A hub too old
+  // to have the route answers 404, and its tabs sign in again.
+  await hubRequest(port, "POST", "/api/hub/handover", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
   // SIGTERM first and a long grace, as `ndx hub stop` does: the hub's handler
   // stops every project server before exiting. hub.json is kept, and the new
   // hub brings each project back from it under the same id.
   await terminateTreeByPid(own.pid, { forceKillTimeoutMs: HUB_STOP_GRACE_MS });
   if (!(await waitForPortFree(port, HUB_STOP_GRACE_MS + 5_000))) {
+    await discardSessionHandover(home);
     throw new Error(`The old n-dx hub (PID ${own.pid}) did not release port ${port}; nothing was started in its place.`);
   }
   const spawned = await spawnHub(port, { tools, __dir, home, tokenFile });
@@ -2435,6 +2452,9 @@ export async function runHub(rest, { commandName = "hub" } = {}) {
   }
 
   if (subcommand === "stop") {
+    // A stop is not a replacement: a hand-over left by one that failed must
+    // not sign the next hub's tabs in.
+    await discardSessionHandover(home);
     const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
     const pid = typeof health.body?.pid === "number" ? health.body.pid : (await readHubPid(home));
     if (health.status !== 200 && !pid) {
