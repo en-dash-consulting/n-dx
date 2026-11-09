@@ -25,7 +25,8 @@ describe("buildTrustNotice", () => {
     const notice = buildTrustNotice(UNTRUSTED)!;
     expect(notice.headline).toBe("This repository's execution config is not trusted");
     expect(notice.detail).toContain("1 finding (.hench/config.json, .mcp.json)");
-    expect(notice.detail).toContain("default guard");
+    expect(notice.detail).toContain("restricted until trusted");
+    expect(notice.restrictions).toContain("default guard");
     expect(notice.warnings).toHaveLength(1);
     expect(notice.infos).toEqual(["Defines the test command n-dx runs for verification: pnpm test"]);
   });
@@ -33,7 +34,7 @@ describe("buildTrustNotice", () => {
   it("keeps the visible text short with 300 PRD sources", () => {
     const sources = [".n-dx.json", ".hench/config.json", ...Array.from({ length: 300 }, (_, i) => `.rex/changes/some-long-change-slug-${i}/task-${i}.md`)];
     const notice = buildTrustNotice({ ...UNTRUSTED, sources })!;
-    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(260);
     expect(notice.detail).toContain("+299 more");
     expect(notice.sources).toHaveLength(50);
     expect(notice.moreSources).toBe(252);
@@ -44,7 +45,7 @@ describe("buildTrustNotice", () => {
     const finding = UNTRUSTED.findings[0]!;
     const findings = Array.from({ length: 99 }, () => finding);
     const notice = buildTrustNotice({ ...UNTRUSTED, state: "changed", sources, findings })!;
-    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(260);
     expect(notice.detail).toContain("99 findings");
     expect(notice.detail).toMatch(/\+\d+ more\)/);
   });
@@ -55,7 +56,22 @@ describe("buildTrustNotice", () => {
     expect(notice.detail).toContain("(.hench/config.json, .n-dx.json, .mcp.json) and 214 PRD items with saved run settings");
     expect(notice.detail).not.toContain("more");
     expect(notice.sources).toEqual(sources);
-    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(260);
+  });
+
+  it("keeps this repo's visible text near two lines and the restrictions under Details", () => {
+    const sources = [".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/** (177 PRD items with saved run settings)", ".claude/settings.json", ".codex/config.toml"];
+    const view = { ...UNTRUSTED, sources, prdRunBlocks: 177 };
+    const notice = buildTrustNotice(view)!;
+    expect(notice.headline.length + notice.detail.length).toBeLessThanOrEqual(220);
+    expect(notice.detail).not.toContain("bypassPermissions");
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    act(() => { render(h(RepoTrustStrip, { initial: view }), root); });
+    expect(root.textContent).not.toContain("bypassPermissions");
+    act(() => { Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "Details")!.click(); });
+    const details = root.querySelector(".repo-trust-strip__details")!;
+    expect(details.firstElementChild!.textContent).toContain("bypassPermissions is lowered to acceptEdits");
   });
 
   it("keeps the PRD count under the cap with long source names", () => {
@@ -63,7 +79,7 @@ describe("buildTrustNotice", () => {
     const sources = [...long, ".rex/changes/** (99999 PRD items with saved run settings)"];
     const notice = buildTrustNotice({ ...UNTRUSTED, state: "changed", sources, prdRunBlocks: 99999 })!;
     expect(notice.detail).toContain("99999 PRD items");
-    expect(notice.headline.length + notice.detail.length).toBeLessThan(400);
+    expect(notice.headline.length + notice.detail.length).toBeLessThan(260);
   });
 
   it("behaves as before when an older server sends no count", () => {

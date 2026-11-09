@@ -6,15 +6,16 @@
   padding: var(--space-2) var(--space-4);
   font-size: var(--font-sm);
   color: var(--text);
-  /* Never more than a third of the viewport: the page body keeps the rest.
+  /* Never more than a third of the viewport, shell chrome included (top nav
+     and bottom bar): `.app-body` keeps the other two thirds.
      The headline row stays put; only the details scroll (see __details).
      The strip itself scrolls only when the row alone outgrows the cap (a
      short viewport), so the buttons are never clipped out of reach. */
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
-  max-height: 33vh;
-  max-height: 33dvh;
+  max-height: calc(100vh / 3 - var(--topnav-h) - var(--bottombar-h));
+  max-height: calc(100dvh / 3 - var(--topnav-h) - var(--bottombar-h));
   overflow-y: auto;
 }
 
@@ -75,6 +76,11 @@
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast, #fff);
+}
+
+.repo-trust-strip__restrictions {
+  margin: var(--space-2) 0 0 1.75rem;
+  line-height: 1.5;
 }
 
 .repo-trust-strip__list {

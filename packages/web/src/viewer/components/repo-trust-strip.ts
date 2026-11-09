@@ -44,6 +44,8 @@ export interface RepoTrustView {
 export interface RepoTrustNotice {
   headline: string;
   detail: string;
+  /** What is restricted until trusted; shown first under Details, not in the visible line. */
+  restrictions: string;
   warnings: string[];
   infos: string[];
   /** Sources for the Details list, capped at MAX_LISTED_SOURCES. */
@@ -55,9 +57,13 @@ export interface RepoTrustNotice {
 /** Sources named in the always-visible line; the rest become "+N more". */
 const MAX_NAMED_SOURCES = 3;
 /** Longest source name printed in the always-visible line. */
-const MAX_SOURCE_NAME = 60;
+const MAX_SOURCE_NAME = 40;
 /** Total characters of source names in the always-visible line. */
-const MAX_NAMED_CHARS = 140;
+const MAX_NAMED_CHARS = 100;
+/** The restrictions sentence, shown first under Details. */
+const RESTRICTIONS =
+  "Until trusted, agent runs use the default guard, bypassPermissions is lowered to acceptEdits, "
+  + "and verify_criteria does not run the repository's test command.";
 /** Sources listed under Details before "+N more". */
 const MAX_LISTED_SOURCES = 50;
 
@@ -100,11 +106,11 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
   const list = rest > 0 ? [...named, `+${rest} more`] : named;
   const sources = list.length ? ` (${list.join(", ")})` : "";
   const detail =
-    `${n} finding${n === 1 ? "" : "s"}${sources}${prdPhrase}. Until trusted, agent runs use the default guard, `
-    + "bypassPermissions is lowered to acceptEdits, and verify_criteria does not run the repository's test command.";
+    `${n} finding${n === 1 ? "" : "s"}${sources}${prdPhrase}. Agent runs are restricted until trusted.`;
   return {
     headline,
     detail,
+    restrictions: RESTRICTIONS,
     warnings,
     infos,
     sources: view.sources.slice(0, MAX_LISTED_SOURCES),
@@ -178,6 +184,7 @@ export function RepoTrustStrip({ fetchImpl, initial }: RepoTrustStripProps = {})
     ),
     open
       ? h("div", { class: "repo-trust-strip__details" },
+          h("p", { class: "repo-trust-strip__restrictions" }, notice.restrictions),
           h("ul", { class: "repo-trust-strip__list" },
             ...notice.warnings.map((m) => h("li", { class: "repo-trust-strip__warning" }, m)),
             ...notice.infos.map((m) => h("li", { class: "repo-trust-strip__info" }, m)),
