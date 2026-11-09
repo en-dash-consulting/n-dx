@@ -67,6 +67,8 @@ export const DENY_NAME: RegExp[] = [
   /^set failing/i,
   /^i understand/i,
   /^clear all$/i,
+  // Creates a git branch and may switch the fixture's checkout.
+  /^start branch$/i,
   // PRD status picker options: the name is the icon, the label and, on the
   // current status, a check mark. They are adjacent spans, so identify()'s
   // textContent reads "●Completed" / "●Completed✓" with no spaces. Each one

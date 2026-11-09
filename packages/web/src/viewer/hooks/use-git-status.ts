@@ -33,6 +33,13 @@ export interface GitStatus {
 
 const POLL_INTERVAL_MS = 15_000;
 
+/** Fired on `window` when the dashboard switched the checkout's branch, so the status is re-read now rather than on the next poll. */
+export const BRANCH_SWITCHED_EVENT = "ndx:branch-switched";
+
+export function announceBranchSwitched(): void {
+  window.dispatchEvent(new CustomEvent(BRANCH_SWITCHED_EVENT));
+}
+
 export function useGitStatus(): { status: GitStatus | null; refetch: () => Promise<void> } {
   const [status, setStatus] = useState<GitStatus | null>(null);
 
@@ -47,6 +54,11 @@ export function useGitStatus(): { status: GitStatus | null; refetch: () => Promi
   }, []);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
+  useEffect(() => {
+    const onSwitched = () => { void fetchStatus(); };
+    window.addEventListener(BRANCH_SWITCHED_EVENT, onSwitched);
+    return () => window.removeEventListener(BRANCH_SWITCHED_EVENT, onSwitched);
+  }, [fetchStatus]);
   usePolling("git-status", fetchStatus, POLL_INTERVAL_MS);
 
   return { status, refetch: fetchStatus };

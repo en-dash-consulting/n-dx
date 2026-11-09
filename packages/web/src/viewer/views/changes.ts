@@ -13,7 +13,7 @@
 
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
-import { BrandedHeader, DescribeInSidecarButton } from "../components/index.js";
+import { BrandedHeader, DescribeInSidecarButton, StartBranchButton } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
@@ -123,6 +123,7 @@ function Change({ change, onSelect }: {
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),
+      isAppliedStage(change.stage) ? null : h(StartBranchButton, { changeId: change.id, ariaLabel: `Start a branch for ${change.title}` }),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
     ),
     change.intent ? h(Intent, { intent: change.intent }) : null,

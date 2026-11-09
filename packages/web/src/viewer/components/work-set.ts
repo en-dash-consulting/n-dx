@@ -8,12 +8,17 @@
  * section renders and the page is Ready to run alone. A refusal (409, such as a
  * live run) shows its message inline and changes nothing. Add and Remove reload
  * the read and Ready to run.
+ *
+ * "Start a branch" sits above the sections, and on each change not on the
+ * branch with that change preselected (`start-branch.ts`). A start that switched
+ * the checkout reloads the read and Ready to run the same way.
  */
 
 import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { useCliName, resolveCliLabel, useHenchRunsLiveRefresh } from "../hooks/index.js";
 import { ReadyToRun, type ReadyToRunProps } from "./ready-to-run.js";
+import { StartBranchButton } from "./start-branch.js";
 
 /** A unit of the `/api/rex/work-set` reply. */
 export interface WorkSetUnit {
@@ -143,6 +148,7 @@ function WorkSetSections({ read, onChanged }: SectionsProps) {
           "aria-label": `${action === "add" ? "Add" : "Remove"} change ${group.change.title}`,
           onClick: () => void write(action, group.change.id),
         }, action === "add" ? "Add" : "Remove"),
+        action === "add" ? h(StartBranchButton, { changeId: group.change.id, ariaLabel: `Start a branch for ${group.change.title}`, onSwitched: onChanged }) : null,
       ),
       units.length ? h("ul", { class: "work-set-list" }, units.map((u) => unitRow(u, action))) : null,
     );
@@ -171,6 +177,7 @@ export function WorkQueue(props: ReadyToRunProps) {
   const cliName = useCliName();
   const set = read && read.branch !== null && read.workSet ? read : null;
   return h("div", { class: "work-queue" },
+    h("div", { class: "work-queue-actions" }, h(StartBranchButton, { onSwitched: refresh })),
     set ? h(WorkSetSections, { read: set, onChanged: refresh }) : null,
     h(ReadyToRun, {
       ...props,

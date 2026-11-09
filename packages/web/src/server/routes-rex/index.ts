@@ -11,6 +11,7 @@
  *   placement.ts    — v2 Inbox placement: a change's shortlist, place and propose
  *   apply.ts        — v2 Apply of a change awaiting apply: preview, then apply
  *   work-set.ts     — The current branch's work set: read, add, remove
+ *   branch-start.ts — Start a branch for open changes: cut, switch, assign, commit
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
  *   prune.ts        — Prune preview and execution
@@ -31,6 +32,7 @@ import { routeProductReads, routeProductEdit } from "./product.js";
 import { routePlacement } from "./placement.js";
 import { routeApply } from "./apply.js";
 import { routeWorkSet } from "./work-set.js";
+import { routeBranchStart } from "./branch-start.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
 import { routePrune } from "./prune.js";
@@ -89,6 +91,9 @@ export function handleRexRoute(
 
   const workSetResult = routeWorkSet(path, method, req, res, ctx, broadcast);
   if (workSetResult !== false) return workSetResult;
+
+  const branchStartResult = routeBranchStart(path, method, req, res, ctx, broadcast);
+  if (branchStartResult !== false) return branchStartResult;
 
   const itemsResult = routeItems(path, method, req, res, ctx, broadcast, routeItemRequirements);
   if (itemsResult !== false) return itemsResult;

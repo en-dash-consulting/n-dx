@@ -81,7 +81,7 @@ describe("Work set sections", () => {
     expect(Array.from(on.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Remove", "Remove", "Remove"]);
     expect(on.querySelector('[data-unit-id="t-own"]')?.textContent).toContain("T-1 · Own task");
     const off = document.querySelector('[data-change-id="c-2"]')!;
-    expect(Array.from(off.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Add", "Add"]);
+    expect(Array.from(off.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Add", "Start a branch", "Add"]);
   });
 
   it("says a task is on the branch through its change, and Remove on it explains instead of writing", async () => {
