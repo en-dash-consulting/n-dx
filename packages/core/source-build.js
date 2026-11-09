@@ -19,7 +19,8 @@
  * and spawns, never imports, the packages it builds.
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { packageBuildIdentity, packageRootOf } from "./build-identity.mjs";
 import { spawnSyncCli } from "./win-spawn.js";
@@ -32,6 +33,13 @@ export const REBUILD_LOCK_WAIT_MS = 12 * 60_000;
 
 /** Name of the lock directory, inside the checkout's `node_modules/`. */
 export const REBUILD_LOCK_DIRNAME = ".ndx-rebuild.lock";
+
+/**
+ * A lock held longer than any rebuild may take is stale whatever its pid
+ * says. The lock sits in `node_modules/`, so it outlives a reboot, and the pid
+ * of a build that died with the machine can belong to an unrelated process.
+ */
+export const REBUILD_LOCK_STALE_MS = REBUILD_TIMEOUT_MS + 2 * 60_000;
 
 /**
  * @typedef {object} BuildFacts
@@ -216,45 +224,99 @@ function pidAlive(pid) {
   }
 }
 
+/** A lock directory's `owner.json`, or null when it is missing or half-written. */
+function readLockOwner(dir) {
+  try {
+    const owner = JSON.parse(readFileSync(join(dir, "owner.json"), "utf8"));
+    return owner && typeof owner === "object" ? owner : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the lock in `dir` is stale: its owner is gone, it is older than any
+ * rebuild may take ({@link REBUILD_LOCK_STALE_MS}), or it has had no readable
+ * owner for 30s (its taker died between `mkdir` and writing the owner).
+ */
+function lockIsStale(dir, isAlive, now) {
+  const owner = readLockOwner(dir);
+  if (!owner || !Number.isInteger(owner.pid)) {
+    const mtime = statSync(dir, { throwIfNoEntry: false })?.mtimeMs;
+    return mtime !== undefined && now - mtime > 30_000;
+  }
+  const started = Date.parse(owner.startedAt);
+  if (Number.isFinite(started) && now - started > REBUILD_LOCK_STALE_MS) return true;
+  return !isAlive(owner.pid);
+}
+
+/**
+ * Take a stale lock out of the way, so that only one of several waiters that
+ * all judged it stale does. Renaming is atomic: the waiter whose rename
+ * succeeds holds what was at `dir`, and judges it again — another waiter may
+ * have claimed the stale lock and taken a fresh one in its place since this
+ * one looked. A fresh lock is put back; a stale one is deleted.
+ *
+ * Returns whether to try for the lock again at once: false when the lock
+ * could not be moved (Windows refuses while a handle is open in it), so the
+ * caller waits and polls instead of spinning.
+ */
+function claimStaleLock(dir, isAlive) {
+  const tomb = `${dir}.stale.${process.pid}.${randomBytes(4).toString("hex")}`;
+  try {
+    renameSync(dir, tomb);
+  } catch (err) {
+    // ENOENT: another waiter claimed it first, or its owner released it.
+    return /** @type {NodeJS.ErrnoException} */ (err).code === "ENOENT";
+  }
+  if (lockIsStale(tomb, isAlive, Date.now())) {
+    rmSync(tomb, { recursive: true, force: true });
+    return true;
+  }
+  try {
+    renameSync(tomb, dir);
+  } catch {
+    // A third taker holds `dir` already. The lock moved aside is its owner's
+    // no longer: that owner's release finds another token and leaves `dir` be.
+    rmSync(tomb, { recursive: true, force: true });
+  }
+  return true;
+}
+
 /**
  * Take the checkout's rebuild lock, waiting for another n-dx process's build
  * to finish first. Two builds writing one `dist/` at once corrupt it.
  *
- * The lock is a directory (`mkdir` is atomic) holding its owner's pid; one
- * whose owner is gone is taken over. Returns a release function, or null when
+ * The lock is a directory (`mkdir` is atomic) holding its owner's pid and a
+ * token of its own. One whose owner is gone, or that is older than any rebuild
+ * may take, is claimed with an atomic rename ({@link claimStaleLock}), so two
+ * waiters never both take it over. The release function removes the lock only
+ * while it is still this taker's. Returns the release function, or null when
  * the wait ran out.
  *
  * @param {string} checkoutRoot
- * @param {{ waitMs?: number, pollMs?: number, onWait?: () => void }} [options]
+ * @param {{ waitMs?: number, pollMs?: number, onWait?: () => void, isAlive?: (pid: number) => boolean }} [options]
  * @returns {Promise<(() => void) | null>}
  */
-export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_WAIT_MS, pollMs = 500, onWait = () => {} } = {}) {
+export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_WAIT_MS, pollMs = 500, onWait = () => {}, isAlive = pidAlive } = {}) {
   const dir = join(checkoutRoot, "node_modules", REBUILD_LOCK_DIRNAME);
-  const owner = join(dir, "owner.json");
   const deadline = Date.now() + waitMs;
   let announced = false;
   for (;;) {
+    const token = randomBytes(8).toString("hex");
     try {
       mkdirSync(dirname(dir), { recursive: true });
       mkdirSync(dir);
-      writeFileSync(owner, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
-      return () => rmSync(dir, { recursive: true, force: true });
+      writeFileSync(join(dir, "owner.json"), JSON.stringify({ pid: process.pid, token, startedAt: new Date().toISOString() }));
+      return () => {
+        if (readLockOwner(dir)?.token === token) rmSync(dir, { recursive: true, force: true });
+      };
     } catch (err) {
-      if (/** @type {NodeJS.ErrnoException} */ (err).code !== "EEXIST") throw err;
+      const code = /** @type {NodeJS.ErrnoException} */ (err).code;
+      // ENOENT: the new lock was claimed as stale before its owner was written. Try again.
+      if (code !== "EEXIST" && code !== "ENOENT") throw err;
     }
-    let holder = null;
-    try {
-      holder = JSON.parse(readFileSync(owner, "utf8"))?.pid ?? null;
-    } catch {
-      // Being written, or left half-written: judged by age below.
-    }
-    const stale = Number.isInteger(holder)
-      ? !pidAlive(holder)
-      : Date.now() - (statSync(dir, { throwIfNoEntry: false })?.mtimeMs ?? 0) > 30_000;
-    if (stale) {
-      rmSync(dir, { recursive: true, force: true });
-      continue;
-    }
+    if (lockIsStale(dir, isAlive, Date.now()) && claimStaleLock(dir, isAlive)) continue;
     if (Date.now() >= deadline) return null;
     if (!announced) {
       announced = true;

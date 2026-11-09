@@ -15,11 +15,12 @@
  * @see packages/core/web.js — runHubMode and runWeb call ensureSourceBuild before spawning
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   REBUILD_LOCK_DIRNAME,
+  REBUILD_LOCK_STALE_MS,
   acquireRebuildLock,
   buildFacts,
   ensureSourceBuild,
@@ -281,5 +282,53 @@ describe("acquireRebuildLock", () => {
     expect(again).toBeTypeOf("function");
     again();
     expect(existsSync(dir)).toBe(false);
+  });
+
+  it("two waiters that both judged one lock stale never both take it over", async () => {
+    const dir = join(root, "node_modules", REBUILD_LOCK_DIRNAME);
+    const owner = join(dir, "owner.json");
+    const deadPid = 2 ** 30;
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(owner, JSON.stringify({ pid: deadPid, startedAt: new Date().toISOString() }));
+
+    // W2 reads the dead pid; before it acts, W1 claims the stale lock and takes
+    // a fresh one of its own (a live owner, this process) in its place.
+    let raced = false;
+    const isAlive = (pid) => {
+      if (pid === deadPid && !raced) {
+        raced = true;
+        rmSync(dir, { recursive: true, force: true });
+        mkdirSync(dir);
+        writeFileSync(owner, JSON.stringify({ pid: process.pid, token: "w1", startedAt: new Date().toISOString() }));
+        return false;
+      }
+      return pid !== deadPid;
+    };
+    const w2 = await acquireRebuildLock(root, { waitMs: 50, pollMs: 10, isAlive });
+    expect(raced).toBe(true);
+    // W1 still holds its lock; W2 waited and gave up instead of taking it.
+    expect(w2).toBeNull();
+    expect(JSON.parse(readFileSync(owner, "utf8")).token).toBe("w1");
+    // No tombstone is left beside it.
+    expect(readdirSync(join(root, "node_modules")).filter((n) => n.includes(".stale."))).toEqual([]);
+  });
+
+  it("a release removes the lock only while it is still its taker's", async () => {
+    const dir = join(root, "node_modules", REBUILD_LOCK_DIRNAME);
+    const release = await acquireRebuildLock(root, { waitMs: 0 });
+    // Taken over meanwhile (its owner judged stale): the new owner's lock stays.
+    writeFileSync(join(dir, "owner.json"), JSON.stringify({ pid: process.pid, token: "someone-else", startedAt: new Date().toISOString() }));
+    release();
+    expect(existsSync(dir)).toBe(true);
+  });
+
+  it("takes over a lock older than any rebuild, even when its pid is alive (reused after a reboot)", async () => {
+    const dir = join(root, "node_modules", REBUILD_LOCK_DIRNAME);
+    mkdirSync(dir, { recursive: true });
+    const startedAt = new Date(Date.now() - REBUILD_LOCK_STALE_MS - 60_000).toISOString();
+    writeFileSync(join(dir, "owner.json"), JSON.stringify({ pid: process.pid, startedAt }));
+    const taken = await acquireRebuildLock(root, { waitMs: 0 });
+    expect(taken).toBeTypeOf("function");
+    taken();
   });
 });
