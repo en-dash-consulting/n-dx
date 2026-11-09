@@ -31,14 +31,19 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 }
 
-async function mount(branch: string | null, reply: { status: number; body: unknown } = { status: 200, body: { switched: true, branch: "feat/x", assigned: [] } }, preselect?: string) {
+async function mount(
+  branch: string | null,
+  reply: { status: number; body: unknown } = { status: 200, body: { switched: true, branch: "feat/x", assigned: [] } },
+  preselect?: string,
+  workSet = branch !== null,
+) {
   posts = [];
   vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit = {}) => {
     if (init.method === "POST") {
       posts.push(JSON.parse(init.body as string));
       return { ok: reply.status < 300, status: reply.status, json: async () => reply.body };
     }
-    return { ok: true, status: 200, json: async () => ({ branch, defaultBranch: "main", changes: [PAY, BILL] }) };
+    return { ok: true, status: 200, json: async () => ({ branch, workSet, defaultBranch: "main", changes: [PAY, BILL] }) };
   }));
   const onClose = vi.fn();
   const onSwitched = vi.fn();
@@ -86,6 +91,13 @@ describe("Start a branch dialog", () => {
     const radios = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
     expect(radios.map((r) => r.value)).toEqual(["default", "current"]);
     expect(document.body.textContent).toContain("Stacked on feat/first");
+    cleanupRenderedDiv(root!);
+    root = undefined;
+
+    // A feature branch nothing is assigned to has no work set to stack on.
+    await mount("feat/empty", undefined, "c-1", false);
+    expect(document.querySelector('input[type="radio"]')).toBeNull();
+    expect(document.body.textContent).toContain("Cut from the default branch (main)");
   });
 
   it("sends the selection, name and base, and closes after a switch", async () => {

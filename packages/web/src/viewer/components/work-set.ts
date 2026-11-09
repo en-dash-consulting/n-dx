@@ -1,22 +1,25 @@
 /**
- * The Work page's top: the branch's work set, then Ready to run.
+ * The Work page's top: the branch's work set and Ready to run.
  *
  * Fed by `GET /api/rex/work-set`. When the checked-out branch has a work set the
- * page opens with "On this branch" (grouped by change, each with Remove) and
- * "Not on a branch" (the other open changes and tasks, each with Add). On the
- * default branch, a detached HEAD and a branch nothing is assigned to, neither
- * section renders and the page is Ready to run alone. A refusal (409, such as a
+ * page opens with "On this branch" (grouped by change, each with Remove), then
+ * Ready to run, then "Not on a branch" (the other open changes and tasks, each
+ * with Add; the first few groups, then "Show all N"), so the run controls stay
+ * near the top however many changes are open. On the default branch, a detached
+ * HEAD and a branch nothing is assigned to, neither section renders and the page
+ * is Ready to run alone. A refusal (409, such as a
  * live run) shows its message inline and changes nothing. Add and Remove reload
  * the read and Ready to run.
  *
  * "Start a branch" sits above the sections, and on each change not on the
  * branch with that change preselected (`start-branch.ts`). A start that switched
- * the checkout reloads the read and Ready to run the same way.
+ * the checkout announces `BRANCH_SWITCHED_EVENT`, and the read and Ready to run
+ * reload on it the same way.
  */
 
-import { h } from "preact";
+import { h, type ComponentChildren } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
-import { useCliName, resolveCliLabel, useHenchRunsLiveRefresh } from "../hooks/index.js";
+import { useCliName, resolveCliLabel, useHenchRunsLiveRefresh, BRANCH_SWITCHED_EVENT } from "../hooks/index.js";
 import { ReadyToRun, type ReadyToRunProps } from "./ready-to-run.js";
 import { StartBranchButton } from "./start-branch.js";
 
@@ -41,6 +44,9 @@ export interface WorkSetRead {
   groups: WorkSetGroup[];
   others: WorkSetGroup[];
 }
+
+/** Groups of "Not on a branch" shown before "Show all N". */
+const OFF_BRANCH_TOP_GROUPS = 10;
 
 const STATUS_LABEL: Record<string, string> = { pending: "Pending", in_progress: "In progress", failing: "Failing" };
 const STATUS_ICON: Record<string, string> = { pending: "○", in_progress: "◐", failing: "✗" };
@@ -74,17 +80,26 @@ export function useWorkSet() {
     await load();
     setVersion((v) => v + 1);
   }, [load]);
+  // A switch from any Start a branch dialog changes the branch both are read for.
+  useEffect(() => {
+    const onSwitched = () => { void refresh(); };
+    window.addEventListener(BRANCH_SWITCHED_EVENT, onSwitched);
+    return () => window.removeEventListener(BRANCH_SWITCHED_EVENT, onSwitched);
+  }, [refresh]);
   return { read, version, refresh };
 }
 
 interface SectionsProps {
   read: WorkSetRead;
   onChanged: () => Promise<void>;
+  /** Rendered between "On this branch" and "Not on a branch". */
+  children?: ComponentChildren;
 }
 
 const label = (n: { displayId?: string; title: string }) => (n.displayId ? `${n.displayId} · ${n.title}` : n.title);
 
-function WorkSetSections({ read, onChanged }: SectionsProps) {
+function WorkSetSections({ read, onChanged, children }: SectionsProps) {
+  const [showAllOff, setShowAllOff] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   /** The last refusal or explanation, shown once under the sections. */
   const [message, setMessage] = useState<string | null>(null);
@@ -148,7 +163,7 @@ function WorkSetSections({ read, onChanged }: SectionsProps) {
           "aria-label": `${action === "add" ? "Add" : "Remove"} change ${group.change.title}`,
           onClick: () => void write(action, group.change.id),
         }, action === "add" ? "Add" : "Remove"),
-        action === "add" ? h(StartBranchButton, { changeId: group.change.id, ariaLabel: `Start a branch for ${group.change.title}`, onSwitched: onChanged }) : null,
+        action === "add" ? h(StartBranchButton, { changeId: group.change.id, ariaLabel: `Start a branch for ${group.change.title}` }) : null,
       ),
       units.length ? h("ul", { class: "work-set-list" }, units.map((u) => unitRow(u, action))) : null,
     );
@@ -161,13 +176,18 @@ function WorkSetSections({ read, onChanged }: SectionsProps) {
         ? read.groups.map((g) => groupBlock(g, "remove"))
         : h("p", { class: "ready-empty" }, "No open work is on this branch."),
     ),
+    message ? h("div", { class: "ready-toast ready-toast-error work-set-message", role: "alert" }, message) : null,
+    children,
     read.others.length
       ? h("section", { class: "work-set-section", "aria-labelledby": "work-set-off-title" },
           h("h2", { id: "work-set-off-title", class: "ready-title-head" }, "Not on a branch"),
-          read.others.map((g) => groupBlock(g, "add")),
+          (showAllOff ? read.others : read.others.slice(0, OFF_BRANCH_TOP_GROUPS)).map((g) => groupBlock(g, "add")),
+          read.others.length > OFF_BRANCH_TOP_GROUPS
+            ? h("button", { type: "button", class: "ready-more", onClick: () => setShowAllOff(!showAllOff) },
+                showAllOff ? `Show top ${OFF_BRANCH_TOP_GROUPS}` : `Show all ${read.others.length}`)
+            : null,
         )
       : null,
-    message ? h("div", { class: "ready-toast ready-toast-error work-set-message", role: "alert" }, message) : null,
   );
 }
 
@@ -176,15 +196,15 @@ export function WorkQueue(props: ReadyToRunProps) {
   const { read, version, refresh } = useWorkSet();
   const cliName = useCliName();
   const set = read && read.branch !== null && read.workSet ? read : null;
+  const ready = h(ReadyToRun, {
+    ...props,
+    reloadKey: version,
+    emptyNote: set
+      ? resolveCliLabel("Nothing left in this branch's work set. To pick outside it, run {cli} work --any.", cliName)
+      : undefined,
+  });
   return h("div", { class: "work-queue" },
-    h("div", { class: "work-queue-actions" }, h(StartBranchButton, { onSwitched: refresh })),
-    set ? h(WorkSetSections, { read: set, onChanged: refresh }) : null,
-    h(ReadyToRun, {
-      ...props,
-      reloadKey: version,
-      emptyNote: set
-        ? resolveCliLabel("Nothing left in this branch's work set. To pick outside it, run {cli} work --any.", cliName)
-        : undefined,
-    }),
+    h("div", { class: "work-queue-actions" }, h(StartBranchButton, null)),
+    set ? h(WorkSetSections, { read: set, onChanged: refresh }, ready) : ready,
   );
 }

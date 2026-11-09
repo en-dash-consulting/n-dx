@@ -22,6 +22,7 @@ vi.mock("../../../src/viewer/hooks/use-project-metadata.js", async (orig) => ({
 }));
 
 import { WorkQueue } from "../../../src/viewer/components/work-set.js";
+import { announceBranchSwitched } from "../../../src/viewer/hooks/index.js";
 
 const OWN = { id: "t-own", displayId: "T-1", title: "Own task", status: "pending", inherited: false };
 const VIA = { id: "t-via", title: "Inherited task", status: "in_progress", inherited: true };
@@ -73,9 +74,9 @@ const click = async (el: Element) => { await act(async () => { (el as HTMLElemen
 const writes = () => calls.filter((c) => c.method === "POST");
 
 describe("Work set sections", () => {
-  it("shows On this branch first, by change with Remove, then Not on a branch with Add", async () => {
+  it("shows On this branch, then Ready to run, then Not on a branch with Add", async () => {
     await mount(feature());
-    expect(heads()).toEqual(["On this branch feat/x", "Not on a branch", "Ready to run"]);
+    expect(heads()).toEqual(["On this branch feat/x", "Ready to run", "Not on a branch"]);
     const on = document.querySelector('[data-change-id="c-1"]')!;
     expect(on.querySelector("h3")?.textContent).toBe("CH-1 · Add Apple Pay");
     expect(Array.from(on.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Remove", "Remove", "Remove"]);
@@ -133,6 +134,36 @@ describe("Work set sections", () => {
     expect(empty).toContain("No open work is on this branch.");
     expect(empty).toContain("Nothing left in this branch's work set. To pick outside it, run ndx-test work --any.");
     expect(document.body.textContent).not.toContain("Open the PRD");
+  });
+
+  it("pages Not on a branch: the first 10 groups, then Show all N, then Show top 10", async () => {
+    const others = Array.from({ length: 25 }, (_, i) => ({ change: { id: `o-${i}`, title: `Other ${i}` }, units: [{ id: `o-${i}`, title: `Other ${i}`, status: "pending", inherited: false }] }));
+    await mount(feature({ others }));
+    const offGroups = () => document.querySelectorAll("#work-set-off-title ~ .work-set-group").length;
+    const more = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".work-set-section .ready-more")).find((b) => /^Show/.test(b.textContent ?? ""))!;
+    expect(offGroups()).toBe(10);
+    expect(more().textContent).toBe("Show all 25");
+    await click(more());
+    expect(offGroups()).toBe(25);
+    expect(more().textContent).toBe("Show top 10");
+    await click(more());
+    expect(offGroups()).toBe(10);
+  });
+
+  it("shows no paging button when Not on a branch fits on one page", async () => {
+    await mount(feature());
+    expect(document.querySelector(".work-set-section .ready-more")).toBeNull();
+  });
+
+  it("re-reads the sections and Ready to run after a switched Start a branch, without a reload", async () => {
+    await mount({ branch: "main-ish", workSet: false, groups: [], others: [] });
+    expect(heads()).toEqual(["Ready to run"]);
+    const [reads, readies] = [() => calls.filter((c) => c.url === "/api/rex/work-set").length, () => calls.filter((c) => c.url.startsWith("/api/hench/ready")).length];
+    const [r0, y0] = [reads(), readies()];
+    await act(async () => { announceBranchSwitched(); });
+    await flush();
+    expect(reads()).toBe(r0 + 1);
+    expect(readies()).toBe(y0 + 1);
   });
 
   it("Ready to run lists what the server returned for the set", async () => {

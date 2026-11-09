@@ -13,8 +13,9 @@
  *
  * `branch` is null on the default branch and a detached HEAD, which have no
  * work set; `workSet` is false there and on a branch nothing is assigned to.
- * A unit is `inherited` when it has no `delivery` of its own: it is on the
- * branch through its change.
+ * A unit in the set is `inherited` when it has no `delivery` of
+ * its own: it is on the branch through its change. A unit not on the branch
+ * (`others`) is never inherited.
  *
  * Refusals are 409 `{ error, code }`: `V1_LAYOUT`, `NO_WORK_SET_BRANCH` (default
  * branch or detached HEAD), `RUN_LIVE` (a run is live in this checkout, whose
@@ -108,8 +109,8 @@ async function handleRead(res: ServerResponse, ctx: ServerContext): Promise<bool
       const reply: WorkSetWire = {
         branch: workSet.branch,
         workSet: true,
-        groups: groupUnits(tree, (n) => ids.has(n.id)),
-        others: groupUnits(tree, (n) => !ids.has(n.id) && isOpenUnit(n)),
+        groups: groupUnits(tree, (n) => ids.has(n.id), true),
+        others: groupUnits(tree, (n) => !ids.has(n.id) && isOpenUnit(n), false),
       };
       jsonResponse(res, 200, reply);
     }
@@ -129,8 +130,9 @@ function isOpenUnit(node: TreeNode): boolean {
   return node.type === "task" || (node.type === "change" && changeWorkShape(node) === "unit");
 }
 
-/** The units `include` accepts, grouped by their change in tree order; a task-less change is its own only unit. */
-function groupUnits(tree: V2Tree, include: (node: TreeNode) => boolean): WorkSetGroupWire[] {
+/** The units `include` accepts, grouped by their change in tree order; a task-less change is its own only unit.
+ * A unit `onBranch` with no delivery of its own is inherited from an enclosing change. */
+function groupUnits(tree: V2Tree, include: (node: TreeNode) => boolean, onBranch: boolean): WorkSetGroupWire[] {
   const groups = new Map<string, WorkSetGroupWire>();
   for (const { node, parent } of indexTree(tree).entries) {
     if (!include(node)) continue;
@@ -145,7 +147,7 @@ function groupUnits(tree: V2Tree, include: (node: TreeNode) => boolean): WorkSet
       ...(node.displayId ? { displayId: node.displayId } : {}),
       title: node.title,
       status: node.status ?? "pending",
-      inherited: node.delivery === undefined,
+      inherited: onBranch && node.delivery === undefined,
     });
   }
   return [...groups.values()];

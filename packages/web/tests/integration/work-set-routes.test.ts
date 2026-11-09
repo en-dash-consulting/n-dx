@@ -113,6 +113,32 @@ describe("branch work set routes", () => {
     });
   });
 
+  it("never marks a unit that is on no branch as inherited, whether a task-less change or a task of an unassigned change", async () => {
+    const SOLO = "c0000000-0000-4000-8000-0000000000b1";
+    const solo = join(ctx.rexDir, "changes", "solo-change");
+    mkdirSync(solo, { recursive: true });
+    writeFileSync(join(solo, "index.md"), `---\nid: "${SOLO}"\ntype: "change"\ntitle: "Solo change"\nslug: "solo-change"\n---\n`);
+    git(root, "checkout", "--quiet", "-b", "feat/x");
+    // Only SOLO is on the branch; the fixture change and its tasks are on none.
+    expect((await post("add", { ids: [SOLO] })).status).toBe(200);
+    const read = await workSet();
+    expect(read.groups.flatMap((g) => g.units)).toMatchObject([{ id: SOLO, inherited: false }]);
+    const others = read.others.flatMap((g) => g.units);
+    expect(others.map((u) => u.id)).toContain(TASK);
+    expect(others.every((u) => !u.inherited)).toBe(true);
+  });
+
+  it("marks a task-less change that is on no branch as not inherited", async () => {
+    const SOLO = "c0000000-0000-4000-8000-0000000000b1";
+    const solo = join(ctx.rexDir, "changes", "solo-change");
+    mkdirSync(solo, { recursive: true });
+    writeFileSync(join(solo, "index.md"), `---\nid: "${SOLO}"\ntype: "change"\ntitle: "Solo change"\nslug: "solo-change"\n---\n`);
+    git(root, "checkout", "--quiet", "-b", "feat/x");
+    assignOwnAndInherited("feat/x");
+    const others = (await workSet()).others;
+    expect(others.find((g) => g.change.id === SOLO)?.units).toMatchObject([{ id: SOLO, inherited: false }]);
+  });
+
   describe("POST add and remove", () => {
     it("adds a task through assign_to_branch, reports it, and removes it again", async () => {
       git(root, "checkout", "--quiet", "-b", "feat/x");

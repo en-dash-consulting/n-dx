@@ -1,7 +1,10 @@
 schema: "rex/v2"
 items:
   "0704a8e5-e0a3-4831-9b92-b4ad1304312a":
-    lastModified: "2026-11-09T17:35:02.662Z"
+    startedAt: "2026-11-09T17:35:28.828Z"
+    activeIntervals: [{"end":"2026-11-09T17:40:34.909Z","start":"2026-11-09T17:35:28.828Z"}]
+    failureReason: "The completion was refused: the run left work uncommitted."
+    lastModified: "2026-11-09T17:40:39.285Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ce060c1-f5cf-446c-985f-6f31d3220e3c":
     createdAt: "2026-11-09T17:34:55.423Z"

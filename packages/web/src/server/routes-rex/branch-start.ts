@@ -5,8 +5,9 @@
  *   POST /api/rex/branch/start  { changeIds, name, base: "default" | "current" }
  *
  * The read gives the dialog what it offers: the open changes (with the `slug`
- * the name is prefilled from), the current work-set branch (null on the default
- * branch and a detached HEAD, where stacking is not offered) and the default
+ * the name is prefilled from), the current branch (null on the default
+ * branch and a detached HEAD), whether it has a work set (the only case where
+ * stacking is offered) and the default
  * branch's name.
  *
  * The write cuts `name` from the base: the default branch (`origin/HEAD` when
@@ -24,7 +25,7 @@
  *   → `{ switched: false, branch, reason, switchCommand }`
  *
  * Refusals: 400 `BAD_REQUEST`, `INVALID_NAME`; 409 `V1_LAYOUT`, `NOT_OPEN`,
- * `NAME_TAKEN`, `NO_WORK_SET_BRANCH` (stacking off a work-set branch),
+ * `NAME_TAKEN`, `NO_WORK_SET_BRANCH` (stacking with no work-set branch checked out),
  * `NO_DEFAULT_BRANCH`. Nothing is created on any refusal.
  *
  * Git runs with argument arrays through llm-client's `exec`, never a shell.
@@ -41,6 +42,7 @@ import { refreshPRDCache } from "../prd-io.js";
 import { repositoryRunSlotUsage } from "../routes-hench.js";
 import {
   currentWorkSetBranch,
+  findNextWorkTask,
   handleAssignToBranch,
   indexTree,
   loadPrdModel,
@@ -59,8 +61,10 @@ export interface BranchStartChangeWire {
 }
 
 export interface BranchStartOptionsWire {
-  /** The checked-out work-set branch, or null (default branch, detached HEAD, no repo). */
+  /** The checked-out feature branch, or null (default branch, detached HEAD, no repo). */
   branch: string | null;
+  /** The checked-out branch has a work set: the only case stacking on it is offered. */
+  workSet: boolean;
   /** The default branch's name, or null when none resolves. */
   defaultBranch: string | null;
   /** Open changes, in tree order. */
@@ -144,6 +148,11 @@ async function currentHead(cwd: string): Promise<{ branch: string } | { detached
 
 type TreeNode = V2Tree["changes"][number];
 
+/** The checked-out branch holds a work set: the only branch a stacked one is cut from. */
+function branchHasWorkSet(tree: V2Tree, cwd: string): boolean {
+  return currentWorkSetBranch(cwd) !== null && findNextWorkTask(tree, { workspace: cwd }).workSet !== null;
+}
+
 function openChanges(tree: V2Tree): TreeNode[] {
   return indexTree(tree).entries
     .map(({ node }) => node)
@@ -155,13 +164,15 @@ async function handleOptions(res: ServerResponse, ctx: ServerContext): Promise<b
     const branch = currentWorkSetBranch(ctx.projectDir);
     const defaultBranch = (await resolveDefaultBranch(ctx.projectDir))?.name ?? null;
     const changes: BranchStartChangeWire[] = [];
+    let workSet = false;
     if ((await prdLayout(ctx.rexDir)) === "v2") {
       const { tree } = await loadPrdModel(ctx.rexDir);
+      workSet = branchHasWorkSet(tree, ctx.projectDir);
       for (const n of openChanges(tree)) {
         changes.push({ id: n.id, ...(n.displayId ? { displayId: n.displayId } : {}), title: n.title, slug: n.slug ?? n.id });
       }
     }
-    const reply: BranchStartOptionsWire = { branch, defaultBranch, changes };
+    const reply: BranchStartOptionsWire = { branch, workSet, defaultBranch, changes };
     jsonResponse(res, 200, reply);
   } catch (err) {
     jsonResponse(res, 500, { error: errorMessage(err) });
@@ -224,8 +235,8 @@ async function handleStart(
     let baseRef: string;
     if (body.base === "current") {
       const current = currentWorkSetBranch(cwd);
-      if (current === null) {
-        return refuse(res, 409, "NO_WORK_SET_BRANCH", "Stacking needs a work-set branch checked out; this checkout is on the default branch or a detached HEAD.");
+      if (current === null || !branchHasWorkSet(tree, cwd)) {
+        return refuse(res, 409, "NO_WORK_SET_BRANCH", "Stacking needs a branch with a work set checked out; this checkout is on the default branch, a detached HEAD or a branch nothing is assigned to.");
       }
       baseRef = `refs/heads/${current}`;
     } else {

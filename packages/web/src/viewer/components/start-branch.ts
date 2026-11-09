@@ -5,8 +5,7 @@
  * current work-set branch and the default branch) and submitted to
  * `POST /api/rex/branch/start`. The name is prefilled `feat/<slug>` from the
  * first selected change and follows the selection until the user types in it.
- * Stacking on the current branch is offered only when the checkout is on a
- * work-set branch.
+ * Stacking on the current branch is offered only when that branch has a work set.
  *
  * A clean idle checkout is switched and the changes assigned there; the dialog
  * closes and `onSwitched` lets the page re-read. A dirty checkout or a live run
@@ -30,6 +29,8 @@ export interface StartBranchChange {
 
 export interface StartBranchOptions {
   branch: string | null;
+  /** The current branch has a work set: the only case stacking is offered. */
+  workSet: boolean;
   defaultBranch: string | null;
   changes: StartBranchChange[];
 }
@@ -81,7 +82,7 @@ export function StartBranchDialog({ preselect, onClose, onSwitched }: StartBranc
           return;
         }
         const changes = Array.isArray(data.changes) ? data.changes : [];
-        setOptions({ branch: typeof data.branch === "string" ? data.branch : null, defaultBranch: data.defaultBranch ?? null, changes });
+        setOptions({ branch: typeof data.branch === "string" ? data.branch : null, workSet: data.workSet === true, defaultBranch: data.defaultBranch ?? null, changes });
         // A preselected change that is not open is dropped, not sent.
         setSelected((ids) => ids.filter((id) => changes.some((c) => c.id === id)));
       } catch (err) {
@@ -175,7 +176,7 @@ export function StartBranchDialog({ preselect, onClose, onSwitched }: StartBranc
           onInput: (e: Event) => { setNameEdited(true); setName((e.target as HTMLInputElement).value); },
         }),
       ),
-      options.branch !== null
+      options.branch !== null && options.workSet
         ? h("fieldset", { class: "start-branch-fieldset start-branch-base" },
             h("legend", null, "Base"),
             h("label", { class: "start-branch-option" },

@@ -64,6 +64,7 @@ describe("start a branch routes", () => {
     const read = (await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire;
     expect(read).toEqual({
       branch: null,
+      workSet: false,
       defaultBranch: "main",
       changes: [{ id: CHANGE, displayId: "CH-1", title: "Add Apple Pay", slug: "add-apple-pay" }],
     });
@@ -142,8 +143,16 @@ describe("start a branch routes", () => {
 
   it("stacks on the current work-set branch: the new branch's parent is its tip", async () => {
     git(root, "checkout", "--quiet", "-b", "feat/first");
-    git(root, "commit", "--quiet", "--allow-empty", "-m", "first");
+    // A different task-less change is on this branch, so it has a work set to stack on.
+    const first = join(ctx.rexDir, "changes", "first-change");
+    mkdirSync(first, { recursive: true });
+    writeFileSync(join(first, "index.md"), `---\nid: "c0000000-0000-4000-8000-0000000000b1"\ntype: "change"\ntitle: "First change"\nslug: "first-change"\n---\n`);
+    writeFileSync(join(first, "state.yaml"), `schema: "rex/v2"\nitems:\n  "c0000000-0000-4000-8000-0000000000b1":\n    delivery: {"branch": "feat/first"}\n`);
+    git(root, "add", ".");
+    git(root, "commit", "--quiet", "-m", "first");
     const tip = git(root, "rev-parse", "HEAD");
+    const read = (await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire;
+    expect(read).toMatchObject({ branch: "feat/first", workSet: true });
     const res = await post({ changeIds: [CHANGE], name: "feat/second", base: "current" });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ switched: true, branch: "feat/second" });
@@ -156,6 +165,15 @@ describe("start a branch routes", () => {
     const stacked = await post({ changeIds: [CHANGE], name: "feat/a", base: "current" });
     expect(stacked.status).toBe(409);
     expect(await stacked.json()).toMatchObject({ code: "NO_WORK_SET_BRANCH" });
+    // A feature branch nothing is assigned to has no work set either.
+    git(root, "checkout", "--quiet", "-b", "feat/empty");
+    const read = (await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire;
+    expect(read).toMatchObject({ branch: "feat/empty", workSet: false });
+    const emptyStacked = await post({ changeIds: [CHANGE], name: "feat/b", base: "current" });
+    expect(emptyStacked.status).toBe(409);
+    expect(await emptyStacked.json()).toMatchObject({ code: "NO_WORK_SET_BRANCH" });
+    git(root, "checkout", "--quiet", "main");
+    git(root, "branch", "-D", "feat/empty");
     for (const name of ["bad..name", "-x", "@{-1}"]) {
       const bad = await post({ changeIds: [CHANGE], name, base: "default" });
       expect(bad.status).toBe(400);
