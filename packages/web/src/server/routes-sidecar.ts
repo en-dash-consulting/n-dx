@@ -132,7 +132,7 @@ import {
   type SidecarTurnOutcome,
   type WorktreeSidecarRegistryOptions,
 } from "./sidecar/session-registry.js";
-import { hubVendorRefusal, sidecarCodexProjectFlags, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
+import { codexUserProviderRefusal, hubVendorRefusal, sidecarCodexProjectFlags, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
 import {
@@ -1400,6 +1400,8 @@ function createWorktreeSession(registry: SidecarSessionRegistry, worktree: strin
   if (fields instanceof Error) return { status: 400, error: fields.message };
   const lens = optionalString(body, "lens");
   if (lens instanceof Error) return { status: 400, error: lens.message };
+  const refusal = vendor === "codex" ? codexUserProviderRefusal() : null;
+  if (refusal) return { status: 400, error: refusal };
   const target = readTarget(body);
   if (target instanceof Error) return { status: 400, error: target.message };
   const session = registry.create({
@@ -1499,6 +1501,8 @@ async function handleSessionRoutes(
       if (session.endedAt) return refuse(res, 409, `Sidecar session ${id} has ended`);
       // Refused here, so no turn is recorded; the spawn reads the files again.
       if (session.vendor === "codex") {
+        const refusal = codexUserProviderRefusal();
+        if (refusal) return refuse(res, 409, refusal);
         try {
           sidecarCodexProjectFlags(session.worktree);
         } catch (err) {

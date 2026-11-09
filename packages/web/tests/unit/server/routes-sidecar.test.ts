@@ -150,6 +150,9 @@ function newRegistry(): SidecarSessionRegistry {
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "routes-sidecar-"));
+  // Never the developer's own ~/.codex: its model_provider would refuse every Codex session.
+  savedCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = join(root, "codex-home");
   ctx = { projectDir: root, svDir: join(root, ".sourcevision"), rexDir: join(root, ".rex"), dev: false };
   messages = [];
   waiters = [];
@@ -163,7 +166,19 @@ beforeEach(async () => {
 afterEach(async () => {
   await server.close();
   await removeTestDir(root);
+  if (savedCodexHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = savedCodexHome;
 });
+
+let savedCodexHome: string | undefined;
+
+/** Write the user Codex config the routes read through `CODEX_HOME`. */
+function writeUserCodexConfig(text: string): string {
+  const dir = process.env.CODEX_HOME as string;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.toml"), text);
+  return join(dir, "config.toml");
+}
 
 function api(path: string, init?: { method?: string; body?: unknown }): Promise<Response> {
   return fetch(`${server.baseUrl}/api/sidecar/sessions${path}`, {
@@ -284,6 +299,35 @@ describe("sessions", () => {
     expect(res.status).toBe(201);
     expect((await res.json()).session).toMatchObject({ vendor: "codex", worktree: root });
     expect(registry.list({ worktree: root })).toHaveLength(1);
+  });
+
+  it("creates a Codex session when the user Codex config selects openai", async () => {
+    writeUserCodexConfig(`model_provider = "openai"\n`);
+    expect((await api("", { method: "POST", body: { vendor: "codex" } })).status).toBe(201);
+  });
+
+  it.each([
+    ["top level", `model_provider = "azure"\n`],
+    ["selected profile", `model_provider = "openai"\nprofile = "az"\n\n[profiles.az]\nmodel_provider = "azure"\n`],
+  ])("refuses a Codex session, recording none, when the user Codex config selects another provider (%s)", async (_where, text) => {
+    const file = writeUserCodexConfig(text);
+    const res = await api("", { method: "POST", body: { vendor: "codex" } });
+    expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error).toContain(`"azure"`);
+    expect(error).toContain(file);
+    expect(error).toContain("Use Claude for the Sidecar");
+    expect(registry.list()).toHaveLength(0);
+    expect((await api("", { method: "POST", body: { vendor: "claude" } })).status).toBe(201);
+  });
+
+  it("refuses a Codex session, naming the file, when the user Codex config cannot be read", async () => {
+    const file = join(process.env.CODEX_HOME as string, "config.toml");
+    mkdirSync(file, { recursive: true });
+    const res = await api("", { method: "POST", body: { vendor: "codex" } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(file);
+    expect(registry.list()).toHaveLength(0);
   });
 
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
@@ -489,6 +533,27 @@ describe("turns", () => {
     expect((await res.json()).error).toContain(join(root, ".codex", "config.toml"));
     expect(spawns).toBe(0);
     expect(registry.get(id)?.cursor).toBe(0);
+  });
+
+  it("refuses a Codex turn without spawning when the user Codex config selects another provider", async () => {
+    mkdirSync(join(root, ".git"));
+    const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
+    const file = writeUserCodexConfig(`model_provider = "azure"\n`);
+    const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
+    expect(res.status).toBe(409);
+    const { error } = await res.json();
+    expect(error).toContain(`"azure"`);
+    expect(error).toContain(file);
+    expect(spawns).toBe(0);
+    expect(registry.get(id)?.cursor).toBe(0);
+  });
+
+  it("runs a Claude turn whatever provider the user Codex config selects", async () => {
+    writeUserCodexConfig(`model_provider = "azure"\n`);
+    const id = await createSession();
+    expect((await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } })).status).toBe(202);
+    await turnClosed(id);
+    expect(spawns).toBe(1);
   });
 
   it("refuses a turn on an ended session", async () => {

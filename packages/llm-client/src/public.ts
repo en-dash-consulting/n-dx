@@ -273,6 +273,8 @@ export {
   codexProjectMcpDisableFlags,
 } from "./codex-project-config.js";
 
+export { codexUserConfigPath, codexUserModelProvider } from "./codex-user-config.js";
+
 export {
   createOpenAiApiProvider,
   resolveOpenAiApiKey,

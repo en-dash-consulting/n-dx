@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "49104d5b-f333-4685-82b0-51a1ad8e402f":
+    status: "completed"
+    startedAt: "2026-11-09T18:49:01.462Z"
+    completedAt: "2026-11-09T18:49:01.462Z"
+    endedAt: "2026-11-09T18:49:01.462Z"
+    activeIntervals: [{"end":"2026-11-09T18:49:01.462Z","start":"2026-11-09T18:49:01.462Z"}]
+    appliedAt: "2026-11-09T18:49:01.462Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-09T18:28:59.530Z"
-    lastModified: "2026-11-09T18:29:25.735Z"
+    lastModified: "2026-11-09T18:49:01.462Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8d2ff447-281c-4255-8634-f2cce8bcd6cf":
     status: "completed"
@@ -15,5 +22,12 @@ items:
     lastModified: "2026-11-09T18:44:54.160Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96911f90-6e41-4fc3-91b5-ae1619c2fb3b":
-    lastModified: "2026-11-09T18:29:33.373Z"
+    status: "completed"
+    startedAt: "2026-11-09T18:45:02.177Z"
+    completedAt: "2026-11-09T18:49:01.462Z"
+    endedAt: "2026-11-09T18:49:01.462Z"
+    activeIntervals: [{"end":"2026-11-09T18:49:01.462Z","start":"2026-11-09T18:45:02.177Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client codexUserModelProvider/codexUserConfigPath (shared reader with codexUserEnvKey); web codexUserProviderRefusal refuses Codex Sidecar create (400) and turns (409, no spawn) for a non-openai or unreadable user Codex config."
+    lastModified: "2026-11-09T18:49:01.462Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
