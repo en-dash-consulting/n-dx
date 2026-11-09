@@ -46,7 +46,15 @@ test("empty state shows the pending task and a working Start button", async ({ p
   // defaults on a task that has none), and the arrow opens the Prepare task
   // modal.
   await expect(page.getByRole("button", { name: "Open the run settings for this task" })).toBeVisible();
+  // The click must reach the execute. Feedback alone is not proof: a refusal
+  // shown before any start (a settings read that stopped the click) also
+  // fills `.start-task-error`, and that is the "does nothing" bug again.
+  const executePosted = page.waitForRequest(
+    (req) => req.method() === "POST" && new URL(req.url()).pathname.endsWith("/api/hench/execute"),
+    { timeout: 8_000 },
+  );
   await page.getByRole("button", { name: "Start a run of this task now, with its saved run settings" }).click();
+  await executePosted;
 
   // The view must show *some* live feedback within a few seconds — either
   // the run transitioning through starting/running (a successful start hands
