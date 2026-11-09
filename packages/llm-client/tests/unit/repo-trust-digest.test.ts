@@ -7,7 +7,7 @@
  * trusted checkout to `changed`.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -206,20 +206,32 @@ describe("PRD run blocks", () => {
       { path: ".rex/prd_tree/epic/feature/task/index.md", run: { maxTurns: 5 } },
       { path: ".rex/product/cap/index.md", run: { review: true } },
     ]);
-    expect(collectRepoExecutionConfig(repo).sources).toEqual([".rex/** (3 PRD items with saved run settings)"]);
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.sources).toEqual([".rex/"]);
+    expect(config.prdRunBlocksPath).toBe(".rex/");
   });
 
-  it("lists the blocks as one grouped source, however many files carry them", () => {
+  it("lists the blocks as one directory source, however many files carry them", () => {
     for (let i = 0; i < 300; i++) write(`.rex/changes/inbox/c${i}/index.md`, ITEM('{"tier":"light"}'));
     write(".rex/changes/inbox/plain/index.md", "---\nid: p\n---\n");
+    write(".hench/config.json", "{}");
+    write(".n-dx.json", "{}");
     const config = collectRepoExecutionConfig(repo);
-    expect(config.sources).toEqual([".rex/changes/** (300 PRD items with saved run settings)"]);
     expect(config.prdRunBlocks).toHaveLength(300);
+    expect(config.prdRunBlocksPath).toBe(".rex/changes/");
+    expect(config.sources.filter((s) => s === config.prdRunBlocksPath)).toHaveLength(1);
+    expect(config.sources.filter((s) => s.startsWith(".rex/"))).toEqual([".rex/changes/"]);
+    for (const source of config.sources) {
+      expect(source).not.toMatch(/[*?()\s]/);
+      expect(existsSync(join(repo, source))).toBe(true);
+    }
   });
 
   it("adds no PRD source when no item saves a run block", () => {
     write(".rex/changes/inbox/plain/index.md", "---\nid: p\n---\n");
-    expect(collectRepoExecutionConfig(repo).sources).toEqual([]);
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.sources).toEqual([]);
+    expect(config.prdRunBlocksPath).toBeNull();
   });
 
   it("keeps the digest it had when every block file was a source", () => {

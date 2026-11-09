@@ -388,11 +388,19 @@ export interface RepoGateTestCommand {
 /** The execution-relevant subset of what the repository ships. */
 export interface RepoExecutionConfig {
   /**
-   * Which files were read, relative to the project root. Absent files are
-   * omitted. The PRD's run blocks are one grouped entry with their count;
+   * What was read, relative to the project root: every entry is a path to a
+   * file or a directory, never a glob or prose. Absent files are omitted. The
+   * PRD's run blocks are one directory entry,
+   * {@link RepoExecutionConfig.prdRunBlocksPath};
    * {@link RepoExecutionConfig.prdRunBlocks} names each file.
    */
   sources: string[];
+  /**
+   * The `sources` entry that stands for the PRD's run blocks, with a trailing
+   * `/`: the PRD subdirectory when every block sits in one, else the rex
+   * directory. Null when no PRD item saves a run block. Not in the digest.
+   */
+  prdRunBlocksPath: string | null;
   /** The language the repository declares. Reported, never used as the baseline. */
   language: string | null;
   /**
@@ -479,7 +487,7 @@ export interface RepoExecutionConfig {
    * root. git rm --cached cannot untrack such a file. Not in the digest.
    */
   localConfigNestedIn: string | null;
-  /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
+  /** sha256 over the canonical JSON of everything above except `sources`, `prdRunBlocksPath`, `detectedLanguage` and `envDeny`. */
   digest: string;
 }
 
@@ -907,16 +915,13 @@ function scanPrdRunBlocks(root: string, rexDir: string): RepoPrdRunBlock[] {
 }
 
 /**
- * The single `sources` entry for the PRD's run blocks, e.g.
- * `.rex/changes/** (214 PRD items with saved run settings)`. It names the
+ * The directory that holds the PRD's run blocks, e.g. `.rex/changes/`: the
  * PRD subdirectory when every block sits in one, else the rex directory.
  */
-function prdRunBlocksSource(rexRel: string, blocks: RepoPrdRunBlock[]): string | null {
+function prdRunBlocksDir(rexRel: string, blocks: RepoPrdRunBlock[]): string | null {
   if (!blocks.length) return null;
   const subdirs = new Set(blocks.map((b) => b.path.slice(rexRel.length + 1).split("/")[0]));
-  const dir = subdirs.size === 1 ? `${rexRel}/${[...subdirs][0]}` : rexRel;
-  const items = blocks.length === 1 ? "1 PRD item" : `${blocks.length} PRD items`;
-  return `${dir}/** (${items} with saved run settings)`;
+  return subdirs.size === 1 ? `${rexRel}/${[...subdirs][0]}/` : `${rexRel}/`;
 }
 
 /** Vendor names whose `llm.<vendor>` block the digest reads. */
@@ -1150,11 +1155,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
 
   // The PRD is repository content too, and a saved `run` block steers the
   // next run of the item it sits on.
-  // One grouped source, not a path per file: a PRD can save hundreds, and
+  // One directory source, not a path per file: a PRD can save hundreds, and
   // every reader of `sources` prints them. `prdRunBlocks` keeps each file.
   const prdRunBlocks = scanPrdRunBlocks(root, layout.rexDir);
-  const prdSource = prdRunBlocksSource(relOf(root, layout.rexDir), prdRunBlocks);
-  if (prdSource) sources.push(prdSource);
+  const prdRunBlocksPath = prdRunBlocksDir(relOf(root, layout.rexDir), prdRunBlocks);
+  if (prdRunBlocksPath) sources.push(prdRunBlocksPath);
 
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
@@ -1256,6 +1261,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
 
   return {
     sources,
+    prdRunBlocksPath,
     ...body,
     detectedLanguage: detectRepoLanguage(root),
     guard,
@@ -1998,7 +2004,13 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
       break;
   }
 
-  if (ev.config.sources.length) lines.push(`  Read from: ${ev.config.sources.join(", ")}`);
+  if (ev.config.sources.length) {
+    const { sources, prdRunBlocksPath, prdRunBlocks } = ev.config;
+    const n = prdRunBlocks.length;
+    const shown = sources.map((s) =>
+      s === prdRunBlocksPath ? `${s} (${n} PRD item${n === 1 ? "" : "s"} with saved run settings)` : s);
+    lines.push(`  Read from: ${shown.join(", ")}`);
+  }
   for (const f of warnings) lines.push(`  ! ${f.message}`);
   for (const f of infos) lines.push(`  - ${f.message}`);
 

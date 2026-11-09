@@ -51,18 +51,26 @@ describe("buildTrustNotice", () => {
   });
 
   it("shows the PRD item count when three config files come first", () => {
-    const sources = [".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/** (214 PRD items with saved run settings)"];
-    const notice = buildTrustNotice({ ...UNTRUSTED, sources, prdRunBlocks: 214 })!;
+    const sources = [".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/"];
+    const notice = buildTrustNotice({ ...UNTRUSTED, sources, prdRunBlocks: 214, prdRunBlocksPath: ".rex/changes/" })!;
     expect(notice.detail).toContain("(.hench/config.json, .n-dx.json, .mcp.json) and 214 PRD items with saved run settings");
     expect(notice.detail).not.toContain("more");
-    expect(notice.sources).toEqual(sources);
+    expect(notice.sources).toEqual([".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/ (214 PRD items with saved run settings)"]);
     expect(notice.headline.length + notice.detail.length).toBeLessThan(260);
   });
 
+  it("leaves out only the entry the server names as the PRD path", () => {
+    const sources = [".rex/", ".rex/changes/", ".a"];
+    const notice = buildTrustNotice({ ...UNTRUSTED, sources, prdRunBlocks: 2, prdRunBlocksPath: ".rex/changes/" })!;
+    expect(notice.detail).toContain("(.rex/, .a) and 2 PRD items with saved run settings");
+  });
+
   it("keeps this repo's visible text near two lines and the restrictions under Details", () => {
-    const sources = [".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/** (177 PRD items with saved run settings)", ".claude/settings.json", ".codex/config.toml"];
-    const view = { ...UNTRUSTED, sources, prdRunBlocks: 177 };
+    const sources = [".hench/config.json", ".n-dx.json", ".mcp.json", ".rex/changes/", ".claude/settings.json", ".codex/config.toml"];
+    const view = { ...UNTRUSTED, sources, prdRunBlocks: 177, prdRunBlocksPath: ".rex/changes/" };
     const notice = buildTrustNotice(view)!;
+    expect(notice.detail).toContain("177 PRD items");
+    expect(notice.detail).not.toContain(".rex/changes/");
     expect(notice.headline.length + notice.detail.length).toBeLessThanOrEqual(220);
     expect(notice.detail).not.toContain("bypassPermissions");
     const root = document.createElement("div");
@@ -76,14 +84,14 @@ describe("buildTrustNotice", () => {
 
   it("keeps the PRD count under the cap with long source names", () => {
     const long = Array.from({ length: 3 }, (_, i) => `${"very-long-directory-name/".repeat(5)}c${i}.json`);
-    const sources = [...long, ".rex/changes/** (99999 PRD items with saved run settings)"];
-    const notice = buildTrustNotice({ ...UNTRUSTED, state: "changed", sources, prdRunBlocks: 99999 })!;
+    const sources = [...long, ".rex/changes/"];
+    const notice = buildTrustNotice({ ...UNTRUSTED, state: "changed", sources, prdRunBlocks: 99999, prdRunBlocksPath: ".rex/changes/" })!;
     expect(notice.detail).toContain("99999 PRD items");
     expect(notice.headline.length + notice.detail.length).toBeLessThan(260);
   });
 
   it("behaves as before when an older server sends no count", () => {
-    const sources = [".a", ".b", ".c", ".rex/changes/** (2 PRD items with saved run settings)"];
+    const sources = [".a", ".b", ".c", ".rex/changes/"];
     expect(buildTrustNotice({ ...UNTRUSTED, sources })!.detail).toContain("(.a, .b, .c, +1 more)");
   });
 

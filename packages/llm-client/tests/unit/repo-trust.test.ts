@@ -681,7 +681,7 @@ describe("formatRepoTrustReport", () => {
       writeFileSync(join(dir, "index.md"), `---\nid: "c${i}"\nrun: {"skipTestGate":true,"permissionMode":"bypassPermissions"}\n---\n`);
     }
     const lines = formatRepoTrustReport(evaluateRepoTrust(repo, { ndxHome: home }), { inventory: true });
-    expect(lines.find((l) => l.includes("Read from:"))).toBe("  Read from: .rex/changes/** (300 PRD items with saved run settings)");
+    expect(lines.find((l) => l.includes("Read from:"))).toBe("  Read from: .rex/changes/ (300 PRD items with saved run settings)");
     expect(lines.length).toBeLessThan(20);
     for (const line of lines) expect(line.length).toBeLessThan(600);
   });

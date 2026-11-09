@@ -34,6 +34,8 @@ export interface RepoTrustView {
   sources: string[];
   /** PRD items with a saved run block. Absent from an older server. */
   prdRunBlocks?: number;
+  /** The `sources` entry that holds those blocks. Absent from an older server. */
+  prdRunBlocksPath?: string | null;
   inventory?: {
     prd: { items: number; epics: number } | null;
     analysis: { analyzedAt: string | null; version: string | null } | null;
@@ -67,9 +69,6 @@ const RESTRICTIONS =
 /** Sources listed under Details before "+N more". */
 const MAX_LISTED_SOURCES = 50;
 
-/** The grouped PRD entry llm-client adds to `sources`, e.g. `.rex/changes/** (214 PRD items with saved run settings)`. */
-const GROUPED_PRD_SOURCE = /\(\d+ PRD items? with saved run settings\)$/;
-
 function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
@@ -86,12 +85,13 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
   const headline = view.state === "changed"
     ? "This repository's execution config changed since you trusted it"
     : "This repository's execution config is not trusted";
-  // The PRD count has its own phrase, so the grouped entry is not also named.
+  // The PRD count has its own phrase, so the PRD directory is not also named.
   const prdCount = view.prdRunBlocks ?? 0;
-  const prdPhrase = prdCount > 0
-    ? ` and ${prdCount} PRD item${prdCount === 1 ? "" : "s"} with saved run settings`
-    : "";
-  const nameable = prdCount > 0 ? view.sources.filter((s) => !GROUPED_PRD_SOURCE.test(s)) : view.sources;
+  const prdItems = `${prdCount} PRD item${prdCount === 1 ? "" : "s"} with saved run settings`;
+  const prdPhrase = prdCount > 0 ? ` and ${prdItems}` : "";
+  const prdPath = prdCount > 0 ? view.prdRunBlocksPath ?? null : null;
+  const nameable = prdPath === null ? view.sources : view.sources.filter((s) => s !== prdPath);
+  const listed = view.sources.map((s) => (prdPath !== null && s === prdPath ? `${s} (${prdItems})` : s));
   // The phrase shares the line's budget, so the visible text stays under its cap.
   const budget = MAX_NAMED_CHARS - prdPhrase.length;
   const named: string[] = [];
@@ -113,7 +113,7 @@ export function buildTrustNotice(view: RepoTrustView | null): RepoTrustNotice | 
     restrictions: RESTRICTIONS,
     warnings,
     infos,
-    sources: view.sources.slice(0, MAX_LISTED_SOURCES),
+    sources: listed.slice(0, MAX_LISTED_SOURCES),
     moreSources: Math.max(0, view.sources.length - MAX_LISTED_SOURCES),
   };
 }

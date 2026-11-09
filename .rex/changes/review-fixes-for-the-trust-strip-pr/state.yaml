@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-09T18:26:33.687Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "452a9522-7ee1-488d-9e62-32741e20216a":
-    lastModified: "2026-11-09T18:26:32.189Z"
+    status: "completed"
+    startedAt: "2026-11-09T18:27:00.393Z"
+    completedAt: "2026-11-09T18:33:28.854Z"
+    endedAt: "2026-11-09T18:33:28.854Z"
+    activeIntervals: [{"end":"2026-11-09T18:33:28.854Z","start":"2026-11-09T18:27:00.393Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "RepoExecutionConfig.sources holds only paths; PRD run blocks are one directory entry named by new prdRunBlocksPath (outside the digest). Report and strip show the count; strip matches the path by equality; GROUPED_PRD_SOURCE removed."
+    lastModified: "2026-11-09T18:33:28.854Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd199c87-7456-441e-90ea-122f5daf354e":
     createdAt: "2026-11-09T18:26:05.391Z"
