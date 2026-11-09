@@ -33,6 +33,7 @@ import { formatSince } from "../../../src/viewer/utils/format.js";
 import { branchHealthChips, type BranchHealthResponse } from "../../../src/viewer/views/workspace-branch-health.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
+import { prepFixture } from "../../helpers/prep-fixture.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -453,7 +454,11 @@ describe("WorkspacesView", () => {
   });
 
   it("starts a run in the card's worktree, not the viewer's", async () => {
-    const { fetcher, calls } = makeFetcher({ "/api/hench/execute": { runId: "exec-9", status: "started" } });
+    const { fetcher, calls } = makeFetcher({
+      "/api/hench/execute": { runId: "exec-9", status: "started" },
+      // A task with no saved settings: the click sends the defaults with the execute.
+      "/api/hench/prep/next-1": prepFixture(),
+    });
     // StartTaskButton is shared with other views and posts through the global
     // fetch, so the recorder has to be installed there to see the header.
     const original = globalThis.fetch;
@@ -463,17 +468,18 @@ describe("WorkspacesView", () => {
 
       const branch = root.querySelectorAll(".workspace-card")[1];
       await act(async () => {
-        branch.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+        branch.querySelector<HTMLButtonElement>(".start-task-primary")!.click();
       });
-      await act(async () => {
-        branch.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
-        await new Promise((r) => setTimeout(r, 0));
-      });
+      for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
       const start = calls.find((c) => c.url === "/api/hench/execute" && c.method === "POST");
       expect(start).toBeDefined();
       // The task is the one /api/rex/next named for *that* workspace.
       expect(start!.workspace).toBe("feature");
+      // The read addresses that worktree too, and the settings travel with the
+      // execute (saved by that worktree's server once the start is accepted).
+      expect(calls.find((c) => c.url === "/api/hench/prep/next-1" && c.method === "GET")?.workspace).toBe("feature");
+      expect(calls.some((c) => c.method === "PUT")).toBe(false);
     } finally {
       globalThis.fetch = original;
     }

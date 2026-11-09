@@ -23,6 +23,9 @@ import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 
 import { resolveStore } from "@n-dx/rex";
+import { REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
+import { defaultsRunBlockOf } from "../../src/viewer/components/prepare-task-model.js";
+import { prepFixture } from "../helpers/prep-fixture.js";
 import type { PRDDocument, PRDItem } from "../../src/server/rex-gateway.js";
 import type { ServerContext } from "../../src/server/types.js";
 import { handleHenchPrepRoute, savedRunVersion } from "../../src/server/routes-hench-prep.js";
@@ -312,5 +315,33 @@ describe("PUT /api/hench/prep/:taskId", () => {
 
     expect(await storedRun(ctx, "task-1")).toEqual({ tier: "heavy" });
     expect(await storedRun(ctx, "task-2")).toEqual({ tier: "light" });
+  });
+
+  // Start Working's one click writes the project defaults on a task with no
+  // block. A block the route refused would stop the click before the run, so
+  // what `defaultsRunBlockOf` builds must pass rex's validator and the
+  // catalog check as they stand — for a plain run and for a reviewed one.
+  it("accepts the defaults block Start Working saves on a task with none", async () => {
+    const port = await open(ctx);
+    const base = prepFixture().resolved;
+    const model = { value: TIER_MODELS.claude.standard, source: "built-in" };
+    const plain = prepFixture({ resolved: { ...base, model } });
+    const reviewed = prepFixture({
+      resolved: {
+        ...base,
+        model,
+        provider: { value: "cli", source: "built-in" },
+        review: { value: true, source: "hench.review.mode" },
+        reviewMode: { value: "self", source: "hench.review.mode" },
+        reviewModel: { value: REVIEW_MODELS.claude, source: "built-in", vendorDefault: REVIEW_MODELS.claude },
+      },
+    });
+
+    for (const [taskId, prep] of [["task-1", plain], ["task-2", reviewed]] as const) {
+      const block = defaultsRunBlockOf(prep);
+      const res = await save(port, { run: block, version: "none" }, taskId);
+      expect(res.status, JSON.stringify(await res.clone().json())).toBe(200);
+      expect(await storedRun(ctx, taskId)).toEqual(block);
+    }
   });
 });

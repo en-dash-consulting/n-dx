@@ -56,7 +56,7 @@ describe("Prepare task modal stays on the task it was opened for", () => {
     stubFetch();
     const props = { onStarted: () => {}, navigateTo: () => {} };
     root = renderToDiv(h(StartTaskButton, { taskId: "task-A", ...props }));
-    await act(async () => { root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click(); });
+    await act(async () => { root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click(); });
     await flush();
     expect(prepUrls).toEqual(["/api/hench/prep/task-A"]);
 

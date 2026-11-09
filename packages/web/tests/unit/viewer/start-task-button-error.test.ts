@@ -19,6 +19,7 @@ import { h } from "preact";
 import { act } from "preact/test-utils";
 import { StartTaskButton } from "../../../src/viewer/components/start-task-button.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
+import { stubStartFetch } from "../../helpers/start-task-fetch.js";
 
 let root: HTMLDivElement | undefined;
 
@@ -28,27 +29,26 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Respond to the execute POST with one status and JSON body. */
-function stubFetch(status: number, body: unknown): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => ({
-      ok: status >= 200 && status < 300,
-      status,
-      json: async () => body,
-    })),
-  );
+/**
+ * Respond to the execute POST with one status and JSON body. The prep read
+ * answers for a task that already carries saved settings, so these tests are
+ * about the execute alone; the saving path has its own file.
+ */
+function stubFetch(status: number, body: unknown) {
+  return stubStartFetch({ execute: { status, body } });
 }
 
-/** Open the menu and choose "Start now" — the one-click run with no options. */
+/** Let the click's read, save and execute settle. */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+}
+
+/** The primary click — the one-click run. */
 async function chooseStartNow(): Promise<void> {
   await act(async () => {
-    root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+    root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click();
   });
-  await act(async () => {
-    root!.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
-    await new Promise((r) => setTimeout(r, 0));
-  });
+  await settle();
 }
 
 async function clickStart(onStarted = () => {}): Promise<void> {
@@ -110,14 +110,10 @@ describe("StartTaskButton refusal display", () => {
 
   /** Execute answers 202; the hub queue answers with `snapshot`. */
   function stubQueued(snapshot: Record<string, unknown>): void {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-      const queue = url === "/api/hub/queue";
-      return {
-        ok: true,
-        status: queue ? 200 : 202,
-        json: async () => queue ? snapshot : { queued: true, position: 3, reason: "at-capacity" },
-      };
-    }));
+    stubStartFetch({
+      execute: { status: 202, body: { queued: true, position: 3, reason: "at-capacity" } },
+      queue: snapshot,
+    });
   }
   const hubSnapshot = (extra: Record<string, unknown>) => ({
     entries: [], running: 1, freeMemoryBytes: null, limits: { maxSessions: 2, memoryFloorBytes: 0 }, memoryPaused: false, ...extra,
@@ -146,34 +142,14 @@ describe("StartTaskButton refusal display", () => {
   });
 
   it("starts with no options: the body is the task id alone", async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }));
-    vi.stubGlobal("fetch", fetchMock);
+    const stub = stubStartFetch();
     root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {}, workspace: "feat" }));
 
     await chooseStartNow();
 
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string; headers: Record<string, string> }];
-    expect(JSON.parse(init.body)).toEqual({ taskId: "t-1" });
-    expect(init.headers["X-Ndx-Workspace"]).toBe("feat");
-  });
-});
-
-describe("StartTaskButton primary click", () => {
-  it("opens the Prepare task modal, addressing the workspace, and starts nothing", async () => {
-    const fetchMock = vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: "x" }) }));
-    vi.stubGlobal("fetch", fetchMock);
-    root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {}, workspace: "feat" }));
-
-    await act(async () => {
-      root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click();
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    const calls = fetchMock.mock.calls as unknown as Array<[string, { method: string; headers: Record<string, string> }]>;
-    expect(calls.every(([url]) => url !== "/api/hench/execute")).toBe(true);
-    const prep = calls.find(([url]) => url === "/api/hench/prep/t-1");
-    expect(prep?.[1].headers["X-Ndx-Workspace"]).toBe("feat");
+    const [execute] = stub.executes();
+    expect(execute.body).toEqual({ taskId: "t-1" });
+    expect(execute.headers["X-Ndx-Workspace"]).toBe("feat");
   });
 });
 
@@ -192,28 +168,16 @@ describe("StartTaskButton migration offer", () => {
     "1 path in the PRD tree does not match slug rule 2, which this build implements.\n" +
     "Run 'rex migrate-slugs' on the default branch to bring the tree onto rule 2.";
 
-  /** Answer the first POST with the refusal and the second with a result. */
-  function stubRefusalThen(second: { status: number; body: unknown }): ReturnType<typeof vi.fn> {
-    const calls: unknown[] = [];
-    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
-      calls.push(JSON.parse(init.body));
-      const first = calls.length === 1;
-      const status = first ? 412 : second.status;
-      return {
-        ok: status >= 200 && status < 300,
-        status,
-        json: async () => (first ? { error: REFUSAL, migratable: true } : second.body),
-      };
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    return fetchMock as unknown as ReturnType<typeof vi.fn>;
+  /** Answer the first execute with the refusal and the second with a result. */
+  function stubRefusalThen(second: { status: number; body: unknown }) {
+    return stubStartFetch({ execute: [{ status: 412, body: { error: REFUSAL, migratable: true } }, second] });
   }
 
   async function clickMigrate(): Promise<void> {
     await act(async () => {
       root!.querySelector<HTMLButtonElement>(".start-task-migrate-btn")!.click();
-      await new Promise((r) => setTimeout(r, 0));
     });
+    await settle();
   }
 
   it("offers the migration when the server says one would fix it", async () => {
@@ -234,10 +198,7 @@ describe("StartTaskButton migration offer", () => {
       stubFetch(412, { error: REFUSAL, migratable: true });
       root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {} }));
       await act(async () => {
-        root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
-      });
-      await act(async () => {
-        root!.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
+        root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click();
         await vi.advanceTimersByTimeAsync(0);
       });
 
@@ -264,7 +225,7 @@ describe("StartTaskButton migration offer", () => {
   });
 
   it("sends migrateSlugs on the second request and reports the result", async () => {
-    const fetchMock = stubRefusalThen({
+    const stub = stubRefusalThen({
       status: 200,
       body: { migrated: true, message: "The PRD tree was migrated. Review it and commit it." },
     });
@@ -273,8 +234,9 @@ describe("StartTaskButton migration offer", () => {
     await clickStart(onStarted);
     await clickMigrate();
 
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ taskId: "t-1" });
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+    const [refused, migrate] = stub.executes();
+    expect(refused.body).toEqual({ taskId: "t-1" });
+    expect(migrate.body).toEqual({
       taskId: "t-1",
       migrateSlugs: true,
     });

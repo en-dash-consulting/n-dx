@@ -142,7 +142,16 @@
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  /* Shrinks beside the count badge and wraps between words, never inside one. */
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* The "N open" count keeps its own space beside the title. */
+.stage-tile-head .stage-section-badge {
+  flex-shrink: 0;
 }
 
 .stage-tile-blurb {
@@ -921,8 +930,15 @@
   font-size: 13px;
 }
 
+.outcomes-panel,
+.tooling-panel,
+.delivery-panel {
+  min-width: 0;
+}
+
 .outcomes-rows {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   margin: 0;
   padding: 0;
@@ -977,7 +993,7 @@
 
 .tooling-vendors {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -1004,7 +1020,7 @@
 .tooling-tiers { margin: var(--space-1) 0 0; }
 .tooling-tier { display: flex; gap: var(--space-2); }
 .tooling-tier dt { min-width: 4.5rem; color: var(--text-dim); }
-.tooling-tier dd { margin: 0; overflow-wrap: anywhere; }
+.tooling-tier dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 
 .tooling-line { margin: 0; }
 .tooling-extra:empty { display: none; }
@@ -1042,6 +1058,7 @@
 
 .delivery-dimensions {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   margin: 0;
   padding: 0;

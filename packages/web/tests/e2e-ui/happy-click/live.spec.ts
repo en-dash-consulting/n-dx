@@ -59,9 +59,12 @@ test("live overview: status check, fast analysis, stop-all disabled, history lin
   await mode.selectOption({ label: "Until done" });
   await expect(page.locator(".start-task-mode-hint")).toBeVisible();
   await mode.selectOption({ label: "This task" });
-  await page.getByRole("button", { name: /More ways to run/ }).click();
-  await expect(page.getByRole("menuitem", { name: /^Start now/ })).toBeVisible();
+  await page.getByRole("button", { name: "Open the run settings for this task" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  // The modal focuses its close button in the same effect pass that arms Escape.
+  await expect(page.locator(".prep-close")).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   const history = page.locator("a.live-more", { hasText: "Run history" });
   if (await history.count()) {

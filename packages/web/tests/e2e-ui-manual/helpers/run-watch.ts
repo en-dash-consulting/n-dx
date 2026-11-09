@@ -97,7 +97,7 @@ async function pollRuns(baseUrl: string, timeoutMs?: number): Promise<{ runs: Ru
   }
 }
 
-/** Call before Start now, so a previous leg can never satisfy the waiter. */
+/** Call before the start click, so a previous leg can never satisfy the waiter. */
 export async function snapshotRunIds(baseUrl: string): Promise<ReadonlySet<string>> {
   return new Set((await listRuns(baseUrl)).map((run) => run.id));
 }
@@ -106,12 +106,12 @@ const ACTIVE = new Set(["running", "in_progress", "starting", "pending"]);
 const FAILED = new Set(["failed", "error", "timeout", "budget_exceeded"]);
 
 /**
- * After "Start now": wait for the run to be recorded, then open its Live
+ * After the start click: wait for the run to be recorded, then open its Live
  * task page. The Live overview shows a started run inline rather than
  * navigating, and hench picks the task by priority when several are
  * pending, so the run record — not the click — says which task is live.
  * Returns that task id; `expectedTaskId` wins among runs absent from the
- * snapshot the caller took before Start now, including a fast finished run.
+ * snapshot the caller took before the click, including a fast finished run.
  */
 export async function openLiveTask(page: Page, expectedTaskId: string, knownRunIds: ReadonlySet<string>, timeoutMs = 60_000): Promise<string> {
   const baseUrl = new URL(page.url()).origin;
