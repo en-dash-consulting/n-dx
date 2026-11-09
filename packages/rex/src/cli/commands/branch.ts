@@ -64,7 +64,7 @@ export async function cmdBranch(
   try {
     const branch = requireWorkSetBranch(dir);
     if (sub === "show") return await show(dir, rexDir, branch, json);
-    if (sub === "add") return await add(rexDir, branch, refs, move, json);
+    if (sub === "add") return await add(dir, rexDir, branch, refs, move, json);
     return await remove(rexDir, branch, refs, json);
   } catch (err) {
     if (err instanceof WorkSetError) throw new CLIError(err.message);
@@ -108,8 +108,8 @@ async function show(dir: string, rexDir: string, branch: string, json: boolean):
   if (earlierUse) result(`${state.hasAssignments && !finished ? "\n" : ""}${earlierUse.message}.`);
 }
 
-async function add(rexDir: string, branch: string, refs: string[], move: boolean, json: boolean): Promise<void> {
-  const report = await assignToBranch(rexDir, refs, branch, { move });
+async function add(dir: string, rexDir: string, branch: string, refs: string[], move: boolean, json: boolean): Promise<void> {
+  const report = await assignToBranch(rexDir, refs, branch, { move, workspace: dir });
   const tree = (await loadPrdModel(rexDir)).tree;
   const from = new Map(report.moved.map((m) => [m.id, m.from]));
   const written = describeUnits(tree, report.assigned).map((u) => ({ ...u, ...(from.has(u.id) ? { movedFrom: from.get(u.id) } : {}) }));

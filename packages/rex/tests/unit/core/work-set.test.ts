@@ -188,6 +188,40 @@ describe("readWorkSet", () => {
   });
 });
 
+describe("planAssignToBranch: units an earlier branch of the name left", () => {
+  const earlier = (...ids: string[]) => ({ ids: new Set(ids), since: "fork1" });
+
+  it("adopts a unit whose own row is earlier, writing since, instead of reporting it already on the branch", () => {
+    const tree = fixture();
+    (tree.changes[0].children![0] as { delivery?: unknown }).delivery = { branch: "feat/x" };
+    const plan = planAssignToBranch(tree, ["t-pending"], "feat/x", { earlier: earlier("t-pending") });
+    expect(plan.report).toMatchObject({ assigned: ["t-pending"], moved: [], unchanged: [] });
+    expect(plan.changed).toBe(true);
+    expect(deliveries(plan.tree)).toEqual({ "t-pending": { branch: "feat/x", since: "fork1" } });
+    // Without the earlier rows, the same row is this branch's own.
+    expect(planAssignToBranch(tree, ["t-pending"], "feat/x").report.unchanged).toEqual(["t-pending"]);
+  });
+
+  it("gives a task inheriting from an earlier change its own delivery", () => {
+    const tree = splitSolo(task("s1"), task("s2"));
+    const plan = planAssignToBranch(tree, ["s1"], "feat/solo", { earlier: earlier("solo") });
+    expect(deliveries(plan.tree)).toEqual({ solo: { branch: "feat/solo" }, s1: { branch: "feat/solo", since: "fork1" } });
+    expect(readWorkSet(plan.tree, "feat/solo", new Set(["solo"]))).toMatchObject({ ids: ["s1"], hasAssignments: true, earlier: ["s2"] });
+  });
+
+  it("adopting a change takes its own delivery too, so a task added later follows it", () => {
+    const plan = planAssignToBranch(splitSolo(task("s1")), ["solo"], "feat/solo", { earlier: earlier("solo") });
+    expect(plan.report.assigned).toEqual(["s1", "solo"]);
+    expect(deliveries(plan.tree)).toMatchObject({ solo: { branch: "feat/solo", since: "fork1" } });
+  });
+
+  it("a move drops a since left from an earlier adoption", () => {
+    const tree = fixture();
+    (tree.changes[1] as { delivery?: unknown }).delivery = { branch: "feat/old", since: "fork0" };
+    expect(deliveries(planAssignToBranch(tree, ["solo"], "feat/x", { move: true }).tree)).toEqual({ solo: { branch: "feat/x" } });
+  });
+});
+
 /** `solo` assigned to feat/solo while task-less, then split into tasks. */
 function splitSolo(...tasks: ReturnType<typeof task>[]): V2Tree {
   const tree = planAssignToBranch(fixture(), ["solo"], "feat/solo").tree;

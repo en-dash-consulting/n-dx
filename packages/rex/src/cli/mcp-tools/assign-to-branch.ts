@@ -42,7 +42,7 @@ export async function handleAssignToBranch(projectDir: string, rexDir: string, a
       const inherited = inheritedUnits(tree, report.inherited);
       return textResult(JSON.stringify({ branch, removed, ...(inherited.length > 0 ? { inherited } : {}) }));
     }
-    const report = await assignToBranch(rexDir, args.ids, branch, { move: args.move });
+    const report = await assignToBranch(rexDir, args.ids, branch, { move: args.move, workspace: projectDir });
     const { tree } = await loadPrdModel(rexDir);
     const from = new Map(report.moved.map((m) => [m.id, m.from]));
     const assigned = describeUnits(tree, report.assigned).map((u) => (from.has(u.id) ? { ...u, movedFrom: from.get(u.id) } : u));
@@ -60,7 +60,8 @@ export const assignToBranchTool = defineTool({
     "Add changes and tasks to the current git branch's work set, or take them off with remove (v2 PRD). The work set is the tasks " +
     "assigned to the branch, recorded as delivery: { branch } in state.yaml; a task sits on at most one branch. A change id " +
     "assigns its open tasks (a change with no tasks counts as one task, and its branch covers the tasks it is later split into, " +
-    "unless a task has its own). A task already on another branch is refused, naming it, unless move is true. A change in the " +
+    "unless a task has its own). A task already on another branch is refused, naming it, unless move is true; one an earlier " +
+    "branch of this name left on the default branch joins this branch's set. A change in the " +
     "Inbox awaiting placement is refused: place it first. A task blocked by an unfinished item outside the set is assigned " +
     "with a warning naming it. Removing a change " +
     "takes off the tasks that inherit from it; a task that only inherits is listed under inherited with its change, unchanged. Acts on the checked-out branch of the session's workspace; refused on the default branch and on a " +

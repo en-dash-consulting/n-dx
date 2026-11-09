@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { FIXTURE_TASK, copyV2Fixture } from "../helpers/v2-fixture.js";
+import { handleAssignToBranch } from "../../src/cli/mcp-tools/assign-to-branch.js";
 
 const cliPath = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
 /** A second, low-priority task in the fixture change: picked only through a work set. */
@@ -115,6 +116,64 @@ describe("a work set and an earlier branch of the same name", () => {
     expect(next.earlierUse).toBeUndefined();
     expect(json("branch", "show")).toMatchObject({ hasWorkSet: true, finished: false });
     expect(rex("branch", "show")).toContain("Polish the sheet");
+  });
+
+  /** Assign LOW_TASK on feat/x and leave it open, merge feat/x into main, delete it and cut feat/x again. */
+  function leaveOpenMergeAndReuse(): void {
+    git("checkout", "-q", "-b", "feat/x");
+    rex("branch", "add", LOW_TASK);
+    git("add", "-A");
+    git("commit", "-q", "-m", "assign");
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge feat/x", "feat/x");
+    git("branch", "-q", "-D", "feat/x");
+    git("checkout", "-q", "-b", "feat/x");
+  }
+
+  /** The reused branch holds LOW_TASK as its own: shown in its set, picked by `rex next`, no earlier-use line. */
+  function expectAdopted(): void {
+    const shown = json("branch", "show");
+    expect(shown).toMatchObject({ hasWorkSet: true, finished: false });
+    expect(shown.earlierUse).toBeUndefined();
+    expect(shown.changes.flatMap((c: { units: Array<{ id: string }> }) => c.units.map((u) => u.id))).toEqual([LOW_TASK]);
+    const next = json("next");
+    expect(next.item.id).toBe(LOW_TASK);
+    expect(next.workSetBranch).toBe("feat/x");
+  }
+
+  it("rex branch add adopts an open task an earlier branch of the name left, instead of saying it is already on", async () => {
+    await init("main");
+    leaveOpenMergeAndReuse();
+    expect(json("branch", "show")).toMatchObject({ hasWorkSet: false, earlierUse: { ids: [LOW_TASK] } });
+
+    const added = rex("branch", "add", LOW_TASK);
+    expect(added).toContain("Added to feat/x");
+    expect(added).not.toContain("Already on");
+    expectAdopted();
+    expect(rex("branch", "add", LOW_TASK)).toContain("Already on feat/x");
+
+    // Merged and reused once more, the adopted row is the earlier branch's again.
+    git("add", "-A");
+    git("commit", "-q", "-m", "adopt");
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge feat/x again", "feat/x");
+    git("branch", "-q", "-D", "feat/x");
+    git("checkout", "-q", "-b", "feat/x");
+    expect(json("branch", "show")).toMatchObject({ hasWorkSet: false, earlierUse: { ids: [LOW_TASK] } });
+    expect(rex("branch", "add", LOW_TASK)).toContain("Added to feat/x");
+    expectAdopted();
+  });
+
+  it("MCP assign_to_branch adopts it the same way", async () => {
+    await init("main");
+    leaveOpenMergeAndReuse();
+
+    const res = await handleAssignToBranch(dir, join(dir, ".rex"), { ids: [LOW_TASK] });
+    expect(res.isError).toBeFalsy();
+    const body = JSON.parse(res.content[0].text);
+    expect(body.assigned.map((u: { id: string }) => u.id)).toEqual([LOW_TASK]);
+    expect(body.unchanged).toEqual([]);
+    expectAdopted();
   });
 
   it("without a default branch to read the fork point from, every row counts, as before", async () => {

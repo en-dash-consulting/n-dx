@@ -513,10 +513,16 @@ export const CheckResultSchema = z
 export interface Delivery {
   /** A branch name, never empty. */
   branch: string;
+  /**
+   * The fork point (commit) of the branch that took this unit over from an
+   * earlier branch of the same name. It makes the row differ from the one
+   * on the default branch, so it reads as this branch's, not the earlier one's.
+   */
+  since?: string;
   [key: string]: unknown;
 }
 
-export const DeliverySchema = z.object({ branch: z.string().min(1) }).passthrough();
+export const DeliverySchema = z.object({ branch: z.string().min(1), since: z.string().min(1).optional() }).passthrough();
 
 /**
  * Tool-written state for one item, as stored under its id in `state.yaml`.

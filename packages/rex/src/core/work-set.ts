@@ -38,6 +38,8 @@
  *   provenance. Rows that already named the branch where it left the default
  *   branch ({@link earlierUseRows}) belong to an earlier branch of that name,
  *   so a branch cut again under a merged branch's name has no work set.
+ *   Assigning one of their units there adopts it: the row gets `since`, this
+ *   branch's fork point, so it no longer matches the earlier one.
  * - **Select.** {@link currentWorkSet}: the checked-out branch's set, which
  *   `get_next_task`, `rex next` and `ndx work` narrow selection to unless
  *   asked for `any`. {@link branchWorkState} is the same read for a branch
@@ -55,7 +57,7 @@
  */
 
 import { isAbsolute, join, relative, sep } from "node:path";
-import { DeliverySchema, type ItemState } from "../schema/v2.js";
+import { DeliverySchema, type Delivery, type ItemState } from "../schema/v2.js";
 import { awaitsPlacement, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { currentWorkSetBranch, readStateFilesAt, workSetForkPoint } from "../store/branch-naming.js";
 import { resolveRexPaths } from "../store/paths.js";
@@ -75,6 +77,19 @@ export class WorkSetError extends Error {
 export interface AssignOptions {
   /** Take units already on another branch onto this one instead of refusing. */
   move?: boolean;
+  /**
+   * The rows an earlier branch of this name left ({@link earlierUseRows}).
+   * A unit on the branch only through one of them is not on it: assigning it
+   * adopts it, writing `since` so its row is this branch's.
+   */
+  earlier?: EarlierRows;
+}
+
+/** Rows an earlier branch of the name left, and the fork point that tells them apart. */
+export interface EarlierRows {
+  ids: ReadonlySet<string>;
+  /** Where the checked-out branch left the default branch. */
+  since: string;
 }
 
 export interface AssignReport {
@@ -162,9 +177,16 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
   }
 
   const deliveryOf = deliveryResolver(index);
+  const earlier = options.earlier;
+  /** Nodes on `branch` only through an earlier use of the name: assigning adopts them. */
+  const adopt = new Set<RuleNode>();
   const report: AssignReport = { branch, assigned: [], moved: [], unchanged: [], warnings: [] };
   for (const unit of units) {
-    const current = deliveryOf(unit);
+    let current = deliveryOf(unit);
+    if (current?.branch === branch && earlier?.ids.has(current.owner.id)) {
+      adopt.add(unit);
+      current = undefined;
+    }
     const from = current?.branch;
     if (from === branch) report.unchanged.push(unit.id);
     else if (current !== undefined && !options.move) {
@@ -177,20 +199,27 @@ export function planAssignToBranch(input: V2Tree, refs: readonly string[], branc
   }
   if (problems.length > 0) throw new WorkSetError(`Cannot assign to branch "${branch}": ${problems.join("; ")}`, problems);
 
-  // Moving a change moves the delivery its tasks inherit, so tasks it gains later follow it.
+  // Moving or adopting a change takes the delivery its tasks inherit, so tasks it gains later follow it.
   const retarget: RuleNode[] = [];
-  for (const owner of options.move ? owners : []) {
+  for (const owner of owners) {
     const from = owner.delivery?.branch;
-    if (units.has(owner) || from === undefined || from === branch) continue;
+    if (units.has(owner) || from === undefined) continue;
+    if (from === branch) {
+      if (!earlier?.ids.has(owner.id)) continue;
+      adopt.add(owner);
+    } else if (options.move) report.moved.push({ id: owner.id, from });
+    else continue;
     retarget.push(owner);
-    report.moved.push({ id: owner.id, from });
     report.assigned.push(owner.id);
   }
   const assigned = new Set(report.assigned);
-  for (const node of [...units, ...retarget]) if (assigned.has(node.id)) node.delivery = { ...node.delivery, branch };
+  for (const node of [...units, ...retarget]) {
+    if (assigned.has(node.id)) node.delivery = deliveryOn(branch, node.delivery, adopt.has(node) ? earlier?.since : undefined);
+  }
 
   // Assigned, but not pickable until a blocker outside the set is done.
-  const inSet = new Set(readWorkSet(tree, branch).ids);
+  const stillEarlier = new Set([...(earlier?.ids ?? [])].filter((id) => !assigned.has(id)));
+  const inSet = new Set(readWorkSet(tree, branch, stillEarlier).ids);
   for (const unit of units) {
     for (const ref of unit.blockedBy ?? []) {
       const blocker = index.resolve(ref);
@@ -319,33 +348,42 @@ export function currentWorkSet(tree: V2Tree, projectDir: string): WorkSet | null
  */
 export function branchWorkState(tree: V2Tree, projectDir: string, branch: string | null = currentWorkSetBranch(projectDir)): WorkSet | null {
   if (branch === null) return null;
-  return readWorkSet(tree, branch, earlierUseRows(projectDir, branch) ?? new Set());
+  return readWorkSet(tree, branch, earlierUseRows(projectDir, branch, tree)?.ids ?? new Set());
 }
 
 /**
- * Ids of the `state.yaml` rows whose `delivery` already named `branch` at its
- * fork point (`workSetForkPoint`): assignments of an earlier branch of this
- * name, merged into the default branch before this one was cut. Their
- * `delivery` stays as provenance; it is just not this branch's. A branch
- * rebased onto a newer default branch keeps its own rows, which are not on
- * the default branch yet. Null when the fork point cannot be read (no default
- * branch, a shallow clone, a rex directory outside the checkout, a row this
- * build cannot parse); every row then counts, as it did before.
+ * The `state.yaml` rows whose `delivery` already named `branch` at its fork
+ * point (`workSetForkPoint`) and still does in `tree` with the same `since`:
+ * assignments of an earlier branch of this name, merged into the default
+ * branch before this one was cut. Their `delivery` stays as provenance; it is
+ * just not this branch's. A row this branch assigned again carries this
+ * fork point as `since` (`planAssignToBranch` with `earlier`), so it differs
+ * and counts. A branch rebased onto a newer default branch keeps its own rows,
+ * which are not on the default branch yet. Null when the fork point cannot be
+ * read (no default branch, a shallow clone, a rex directory outside the
+ * checkout, a row this build cannot parse); every row then counts, as it did
+ * before.
  */
-export function earlierUseRows(projectDir: string, branch: string): Set<string> | null {
+export function earlierUseRows(projectDir: string, branch: string, tree: V2Tree): EarlierRows | null {
   const base = workSetForkPoint(projectDir);
   if (base === null) return null;
   const changesDir = relative(projectDir, join(resolveRexPaths(projectDir).rexDir, CHANGES_DIRNAME));
   if (changesDir === "" || changesDir.startsWith("..") || isAbsolute(changesDir)) return null;
   const files = readStateFilesAt(projectDir, base, changesDir.split(sep).join("/"), branch);
   if (files === null) return null;
+  const index = indexTree(tree);
   const ids = new Set<string>();
   for (const [path, text] of files) {
     const items = parseForkPointRows(text, `${base}:${path}`);
     if (items === null) return null;
-    for (const [id, row] of Object.entries(items)) if (row.delivery?.branch === branch) ids.add(id);
+    for (const [id, row] of Object.entries(items)) {
+      if (row.delivery?.branch !== branch) continue;
+      const now = index.resolve(id)?.delivery;
+      if (now?.branch === branch && now.since !== row.delivery.since) continue;
+      ids.add(id);
+    }
   }
-  return ids;
+  return { ids, since: base };
 }
 
 /** A `state.yaml` read at the fork point; null when this build cannot parse it. */
@@ -446,10 +484,17 @@ function unitInfo(node: RuleNode): UnitInfo {
   return { id: node.id, ...(node.displayId ? { displayId: node.displayId } : {}), title: node.title, status: node.status ?? "pending" };
 }
 
+export interface AssignToBranchOptions extends Omit<AssignOptions, "earlier"> {
+  /** The checkout `branch` is checked out in: its earlier use of the name ({@link earlierUseRows}) is read from it. */
+  workspace?: string;
+}
+
 /** {@link planAssignToBranch} on the tree under `rexDir`, inside the PRD transaction. */
-export async function assignToBranch(rexDir: string, refs: readonly string[], branch: string, options: AssignOptions = {}): Promise<AssignReport> {
+export async function assignToBranch(rexDir: string, refs: readonly string[], branch: string, options: AssignToBranchOptions = {}): Promise<AssignReport> {
+  const { workspace, ...rest } = options;
   const { result } = await withPrdModelTransaction(rexDir, ({ tree }) => {
-    const plan = planAssignToBranch(tree, refs, branch, options);
+    const earlier = workspace === undefined ? null : earlierUseRows(workspace, branch, tree);
+    const plan = planAssignToBranch(tree, refs, branch, earlier ? { ...rest, earlier } : rest);
     return { tree: plan.tree, result: plan.report };
   });
   return result;
@@ -468,6 +513,13 @@ function assertBranch(branch: string): void {
   if (!DeliverySchema.safeParse({ branch }).success || branch.trim() !== branch) {
     throw new WorkSetError(`Invalid branch name ${JSON.stringify(branch)}: expected a non-empty name without surrounding whitespace`);
   }
+}
+
+/** `previous` put on `branch`, with `since` when adopting from an earlier use of the name; a stale `since` is dropped. */
+function deliveryOn(branch: string, previous: Delivery | undefined, since: string | undefined): Delivery {
+  const next: Delivery = { ...previous, branch };
+  delete next.since;
+  return since === undefined ? next : { ...next, since };
 }
 
 /** A node's own `delivery`, else the nearest enclosing change's. */
