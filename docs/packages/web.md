@@ -230,7 +230,10 @@ the block, through the same save path and version check as the PUT, right
 before it spawns `ndx work`. A refused start leaves the task's `run` block and
 the working tree unchanged. When the read already reports a refusal (a dirty
 tree, the slug-rule 412) the click sends no `saveRun` at all, since a dirty
-tree is refused only by the spawned run.
+tree is refused only by the spawned run. When the read fails (a resolve error,
+its timeout, the server's cap on reads in flight), the click still starts the
+run as a plain execute: `ndx work` applies whatever the task carries, and only
+the snapshot of the defaults is skipped.
 
 Behind the hub's queue, the `saveRun` waits in the queue entry and is
 replayed with the request, so it is saved when the queued run actually

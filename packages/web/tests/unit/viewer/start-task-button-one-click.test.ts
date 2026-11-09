@@ -163,15 +163,35 @@ describe("Start Working: the primary click", () => {
     expect(errorText()).toContain("New executions are paused.");
   });
 
-  it("starts nothing when the run settings cannot be read", async () => {
-    const stub = stubStartFetch({ prep: { status: 502, body: { error: "Could not resolve the run: Exited with code 1" } } });
+  it.each([
+    ["a 502 from the resolve", { status: 502, body: { error: "Could not resolve the run: Exited with code 1" } }],
+    ["a busy refusal", { status: 503, body: { error: "Too many run-settings reads in flight" } }],
+  ])("starts as a plain execute when the run settings cannot be read (%s)", async (_label, prep) => {
+    // The read only snapshots the defaults onto a task with none. Failing it
+    // must not cost the start: the bare execute lets `ndx work` apply whatever
+    // the task carries, and the server's gates still apply.
+    const stub = stubStartFetch({ prep });
     mount();
 
     await clickPrimary();
 
     expect(stub.saves()).toHaveLength(0);
-    expect(stub.executes()).toHaveLength(0);
-    expect(errorText()).toContain("Could not resolve the run");
+    expect(stub.executes().map((c) => c.body)).toEqual([{ taskId: "t-1" }]);
+    expect(errorText()).toBeNull();
+  });
+
+  it("starts as a plain execute when the read itself throws", async () => {
+    const stub = stubStartFetch();
+    const inner = stub.fetch.getMockImplementation()!;
+    stub.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.startsWith("/api/hench/prep/")) throw new Error("network down");
+      return inner(url, init);
+    });
+    mount();
+
+    await clickPrimary();
+
+    expect(stub.executes().map((c) => c.body)).toEqual([{ taskId: "t-1" }]);
   });
 
   it("sends no saveRun on a run the read says will be refused, and lets the execute report it", async () => {

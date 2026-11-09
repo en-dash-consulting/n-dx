@@ -49,8 +49,15 @@
  * not start a run on settings the reader has never seen, and says so; a second
  * click finds the saved block and runs with it. Both reasons stay on screen
  * (not cleared after a few seconds like a transient refusal) and the arrow is
- * the way on. A failed read stops the same way, since without it the click
- * cannot tell whether the task carries settings.
+ * the way on.
+ *
+ * **A failed read still starts the run, as a plain execute.** The read exists
+ * only to snapshot the defaults onto a task that has none, and it spawns
+ * `ndx work --resolve` under a timeout and an in-flight cap, so a busy server
+ * or a few Workspaces clicks close together can make it fail. A bare execute
+ * carries no options, so `ndx work` still applies whatever block the task has
+ * (the project's settings otherwise), and every server gate still applies.
+ * Only the snapshot is lost; a later click on a readable server saves it.
  *
  * A hub that queues the run answers 202 `{queued, position, reason}`. That is
  * not a start: the button shows the position and the reason, and does not call
@@ -183,15 +190,15 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   }, []);
   useEffect(() => cancelClear, [cancelClear]);
 
-  // GET with no body, POST with one, PUT when the caller says so (saving the
-  // task's settings). The workspace header travels on all three: a click for
-  // another worktree reads, saves and starts in that worktree.
-  const request = useCallback(async (path: string, body?: unknown, method?: "PUT"): Promise<Reply> => {
+  // GET with no body, POST with one. The workspace header travels on both: a
+  // click for another worktree reads its settings and starts (saving them
+  // through the execute) in that worktree.
+  const request = useCallback(async (path: string, body?: unknown): Promise<Reply> => {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (workspace) headers["X-Ndx-Workspace"] = workspace;
     const res = await fetch(path, {
-      method: method ?? (body === undefined ? "GET" : "POST"),
+      method: body === undefined ? "GET" : "POST",
       headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
@@ -207,16 +214,13 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   /**
    * Read the task's run settings and decide what the execute carries: nothing
    * extra when it has a saved block, else the project defaults as `saveRun`
-   * for the server to save once the start is accepted. Resolves `{stop}` with
-   * the reason the run must not start when the settings cannot be read.
+   * for the server to save once the start is accepted. A read that fails
+   * adds nothing either, so the run starts as a plain execute.
    */
-  const settingsToSave = useCallback(async (): Promise<{ stop: string } | { saveRun?: SaveRun }> => {
+  const settingsToSave = useCallback(async (): Promise<{ saveRun?: SaveRun }> => {
     try {
       const read = await request(`/api/hench/prep/${encodeURIComponent(taskId)}`);
-      if (!read.ok) {
-        const reason = (read.data.error as string) || `HTTP ${read.status}`;
-        return { stop: `Could not read this task's run settings, so nothing was started: ${reason}` };
-      }
+      if (!read.ok) return {};
       const prep = read.data as unknown as PrepResponse;
       // A refused run gains no settings; the execute reports the refusal.
       if ((prep.refusals ?? []).length > 0) return {};
@@ -225,9 +229,8 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
       if (hasSavedRun(prep)) return {};
       const block = defaultsRunBlockOf(prep);
       return block ? { saveRun: { run: block, version: prep.savedVersion } } : {};
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : "the request failed";
-      return { stop: `Could not read this task's run settings, so nothing was started: ${reason}` };
+    } catch {
+      return {};
     }
   }, [request, taskId]);
 
@@ -241,11 +244,6 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     setCanMigrate(false);
     try {
       const prepared = await settingsToSave();
-      if ("stop" in prepared) {
-        // Stays until the next click: it says why nothing started.
-        setError(prepared.stop);
-        return;
-      }
       const { ok, status, data } = await execute({
         ...(mode === "single"
           ? {}
