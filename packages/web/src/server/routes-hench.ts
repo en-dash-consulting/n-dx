@@ -2443,6 +2443,35 @@ async function reserveAndStart(
   }
 }
 
+/** Remove a run's context-notes file in the background, warning when it cannot be. */
+function removeContextFile(contextFile: Awaited<ReturnType<typeof writeContextNotesFile>> | null): void {
+  contextFile?.remove().catch((err: unknown) => {
+    console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
+  });
+}
+
+/**
+ * Take a `saveRun` block back off the task when the start it was saved for
+ * never spawned. Best effort: the clear goes through the same versioned save,
+ * so a block someone else saved in the meantime is left alone (409), and a
+ * failure is logged rather than replacing the spawn error the caller reports.
+ */
+async function revertSavedRun(
+  ctx: ServerContext,
+  taskId: string,
+  version: string,
+  broadcast?: WebSocketBroadcaster,
+): Promise<void> {
+  try {
+    const reverted = await writeTaskRun(ctx, taskId, { run: undefined, version }, broadcast);
+    if (!reverted.ok) {
+      console.warn(`[hench] could not take the saved run settings off ${taskId} after a failed start: ${String(reverted.body.error)}`);
+    }
+  } catch (err) {
+    console.warn(`[hench] could not take the saved run settings off ${taskId} after a failed start: ${(err as Error).message}`);
+  }
+}
+
 /** The checks and spawn behind `POST /api/hench/execute`, run while the task is reserved. */
 async function startExecution(
   ctx: ServerContext,
@@ -2458,17 +2487,6 @@ async function startExecution(
   // of the request so `execute/check` answers for it too. Every mode starts on
   // this task; the modes that continue past it autoselect from there.
   const { taskId, task, status, options, mode, iterations, saveRun } = verdict;
-
-  // Every gate has passed, so this run starts (or fails to spawn). Only now are
-  // the request's settings written on the task — a refused start must leave
-  // the task's block and the working tree as they were. The spawned `ndx work`
-  // reads the task after this returns, so the run uses what was just saved.
-  // The task is still reserved (startingTasks), so no second start can slip in
-  // between the gates and the write.
-  if (saveRun) {
-    const written = await writeTaskRun(ctx, taskId, saveRun, broadcast);
-    if (!written.ok) return { kind: "answer", status: written.status, body: written.body };
-  }
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
@@ -2521,9 +2539,26 @@ async function startExecution(
     ...(iterations !== undefined ? { iterations } : {}),
   };
 
+  // Every gate has passed and everything the spawn needs is ready, so only now
+  // are the request's settings written on the task — a start the gates refuse
+  // leaves the task's block and the working tree as they were. The spawned
+  // `ndx work` reads the task after this returns, so the run uses what was just
+  // saved. The task is still reserved (startingTasks), so no second start can
+  // slip in between the gates and the write.
+  let savedVersion: string | null = null;
+  if (saveRun) {
+    const written = await writeTaskRun(ctx, taskId, saveRun, broadcast);
+    if (!written.ok) {
+      removeContextFile(contextFile);
+      return { kind: "answer", status: written.status, body: written.body };
+    }
+    savedVersion = written.version;
+  }
+
   // Spawn hench process with streaming stdout so the UI can show live output.
   // A spawn that throws (rather than rejecting `done`) is answered here, so the
-  // operator gets the reason and the context file does not outlive the request.
+  // operator gets the reason, the context file does not outlive the request,
+  // and the settings saved above for this start are taken off the task again.
   const spawned = attempt(() => spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
     stdio: "pipe",
@@ -2562,9 +2597,8 @@ async function startExecution(
     },
   }));
   if (!spawned.ok) {
-    contextFile?.remove().catch((err: unknown) => {
-      console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
-    });
+    removeContextFile(contextFile);
+    if (savedVersion !== null) await revertSavedRun(ctx, taskId, savedVersion, broadcast);
     return {
       kind: "answer",
       status: 500,

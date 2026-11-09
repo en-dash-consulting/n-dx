@@ -29,8 +29,10 @@
  *    claimed by another worktree, blocked, not actionable, the slug-rule 412),
  *    right before it spawns the run. So the settings the run used are on the
  *    task afterwards, where the modal shows them as "saved on task" and they
- *    can be changed, and a start the server refuses leaves the task's block
- *    and the working tree exactly as they were. Behind the hub's queue the
+ *    can be changed. A start refused by the server's gates leaves the task's
+ *    block and the working tree exactly as they were; one that passes them
+ *    and then fails to spawn has the block taken off again, best effort (the
+ *    item keeps its modification stamp). Behind the hub's queue the
  *    `saveRun` waits with the queued request and is saved when the run
  *    actually starts; a queued run dropped at its turn saves nothing.
  *

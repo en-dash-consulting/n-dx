@@ -227,8 +227,11 @@ execute gate — the slug-rule 412, blocked or non-actionable status, paused
 executions (503), a run already executing or starting, a claim from another
 worktree, an in-progress run still holding the task — and only then writes
 the block, through the same save path and version check as the PUT, right
-before it spawns `ndx work`. A refused start leaves the task's `run` block and
-the working tree unchanged. When the read already reports a refusal (a dirty
+before it spawns `ndx work`. A start refused by those gates leaves the task's
+`run` block and the working tree unchanged. One that passes them and then
+fails to spawn (a 500) has the block taken off again, best effort: the clear is
+versioned, so a block someone else saved meanwhile stays, and the task keeps the
+modification stamp the save left. When the read already reports a refusal (a dirty
 tree, the slug-rule 412) the click sends no `saveRun` at all, since a dirty
 tree is refused only by the spawned run. When the read fails (a resolve error,
 its timeout, the server's cap on reads in flight), the click still starts the

@@ -170,6 +170,26 @@ describe("POST /api/hench/execute with saveRun", () => {
     expect(await storedRun("task-2")).toBeNull();
   });
 
+  it("takes the saved block off again when the spawn fails (500)", async () => {
+    // Every gate passed, so the block was written; the start then failed.
+    // Best effort, not byte-for-byte: the block is gone, though the item keeps
+    // the modification stamp the two writes left.
+    let runWhenSpawned: unknown = "not called";
+    mocks.spawnManaged.mockImplementation(() => {
+      const item = (loadPRDSync(ctx.rexDir)?.items as Array<{ children?: Array<{ id: string; run?: unknown }> }>)[0]
+        .children?.find((c) => c.id === "task-1");
+      runWhenSpawned = item?.run ?? null;
+      throw new Error("spawn EACCES");
+    });
+
+    const res = await execute(withSave());
+
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/spawn EACCES/);
+    expect(runWhenSpawned).toEqual(BLOCK);
+    expect(await storedRun()).toBeNull();
+  });
+
   it("writes nothing when executions are paused (503)", async () => {
     expect((await post("/api/hench/throttle/pause", {})).status).toBe(200);
     const before = treeHash();
