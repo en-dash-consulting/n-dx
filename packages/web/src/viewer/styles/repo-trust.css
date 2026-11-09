@@ -6,9 +6,24 @@
   padding: var(--space-2) var(--space-4);
   font-size: var(--font-sm);
   color: var(--text);
+  /* Never more than a third of the viewport: the page body keeps the rest.
+     The headline row stays put; only the details scroll (see __details). */
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  max-height: 33vh;
+  max-height: 33dvh;
+  overflow: hidden;
+}
+
+.repo-trust-strip__details {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .repo-trust-strip__row {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);

@@ -164,18 +164,20 @@ export function RepoTrustStrip({ fetchImpl, initial }: RepoTrustStripProps = {})
       ),
     ),
     open
-      ? h("ul", { class: "repo-trust-strip__list" },
-          ...notice.warnings.map((m) => h("li", { class: "repo-trust-strip__warning" }, m)),
-          ...notice.infos.map((m) => h("li", { class: "repo-trust-strip__info" }, m)),
-        )
-      : null,
-    open && notice.sources.length
-      ? h("div", { class: "repo-trust-strip__sources" },
-          "Read from:",
-          h("ul", null,
-            ...notice.sources.map((p) => h("li", { class: "repo-trust-strip__source" }, p)),
-            notice.moreSources > 0 ? h("li", { class: "repo-trust-strip__source" }, `+${notice.moreSources} more`) : null,
+      ? h("div", { class: "repo-trust-strip__details" },
+          h("ul", { class: "repo-trust-strip__list" },
+            ...notice.warnings.map((m) => h("li", { class: "repo-trust-strip__warning" }, m)),
+            ...notice.infos.map((m) => h("li", { class: "repo-trust-strip__info" }, m)),
           ),
+          notice.sources.length
+            ? h("div", { class: "repo-trust-strip__sources" },
+                "Read from:",
+                h("ul", null,
+                  ...notice.sources.map((p) => h("li", { class: "repo-trust-strip__source" }, p)),
+                  notice.moreSources > 0 ? h("li", { class: "repo-trust-strip__source" }, `+${notice.moreSources} more`) : null,
+                ),
+              )
+            : null,
         )
       : null,
     error ? h("div", { class: "repo-trust-strip__error", role: "status" }, error) : null,
