@@ -8,12 +8,25 @@ import { join } from "node:path";
 
 const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles/repo-trust.css"), "utf8");
 
-function rule(selector: string): string {
-  const escaped = selector.replace(/\./g, "\\.");
-  const m = css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function ruleIn(source: string, selector: string): string {
+  const m = source.match(new RegExp(`(?:^|\\n)${escapeRegExp(selector)}\\s*\\{([^}]*)\\}`));
   if (!m) throw new Error(`no rule for ${selector}`);
   return m[1];
 }
+
+const rule = (selector: string): string => ruleIn(css, selector);
+
+describe("ruleIn", () => {
+  it("matches a selector's metacharacters literally", () => {
+    expect(ruleIn(".a\\:b[x] { color: red; }", ".a\\:b[x]")).toContain("red");
+    expect(() => ruleIn(".aab { color: blue; }", ".a.b")).toThrow();
+    expect(() => ruleIn("xab { color: blue; }", ".*")).toThrow();
+  });
+});
 
 describe("repo-trust.css", () => {
   it("caps the strip at a third of the viewport and keeps it from shrinking", () => {
