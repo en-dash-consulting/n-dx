@@ -8,6 +8,7 @@ import {
   findUncommittedWork,
   formatLoopRefusal,
   formatUncommittedWorkRefusal,
+  partitionDirtyPaths,
   reviewDedupeDir,
 } from "../../../../src/agent/lifecycle/uncommitted-work-gate.js";
 import { RM_RETRY } from "../../../helpers/index.js";
@@ -67,6 +68,53 @@ describe("findUncommittedWork", () => {
     // The discount must not hide real agent work alongside the log.
     await expect(findUncommittedWork(withDirty([`?? ${log}`, "?? src/uncommitted.ts"])))
       .resolves.toEqual({ clean: false, paths: ["src/uncommitted.ts"] });
+  });
+
+  it("does not discount a rename from src/ into .rex/ by its target", async () => {
+    const result = await findUncommittedWork(
+      withDirty(["R  src/app.ts -> .rex/changes/ch/app.ts"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+    );
+    expect(result.clean).toBe(false);
+    expect(result.paths.join("\n")).toContain("src/app.ts");
+  });
+
+  it("still discounts a rename wholly inside .rex/", async () => {
+    await expect(
+      findUncommittedWork(
+        withDirty(["R  .rex/changes/a/app.md -> .rex/changes/b/app.md"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
+  });
+
+  it("files a rename from src/ into .rex/ under other, not prd", async () => {
+    const part = await partitionDirtyPaths(OUTSIDE_ANY_REPO, {
+      listDirty: async () => ["R  src/app.ts -> .rex/changes/ch/app.ts"],
+    });
+    expect(part.prd).toEqual([]);
+    expect(part.other).toEqual([".rex/changes/ch/app.ts"]);
+  });
+
+  it("discounts a copy from src/ into .rex/ by its target: the source stays in place", async () => {
+    await expect(
+      findUncommittedWork(
+        withDirty(["C  src/app.ts -> .rex/changes/x/app.md"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
+  });
+
+  it("files a copy from src/ into .rex/ under prd", async () => {
+    const part = await partitionDirtyPaths(OUTSIDE_ANY_REPO, {
+      listDirty: async () => ["C  src/app.ts -> .rex/changes/x/app.md"],
+    });
+    expect(part.prd).toEqual([".rex/changes/x/app.md"]);
+    expect(part.other).toEqual([]);
+  });
+
+  it("names a rename source containing ' -> ' in full", async () => {
+    const result = await findUncommittedWork(
+      withDirty(['R  "src/a -> b.ts" -> .rex/changes/x/b.ts'], { discountPaths: [...PRD_COMMIT_PATHS] }),
+    );
+    expect(result).toEqual({ clean: false, paths: ["src/a -> b.ts"] });
   });
 
   it("does not count the PRD paths the completion commit still covers", async () => {

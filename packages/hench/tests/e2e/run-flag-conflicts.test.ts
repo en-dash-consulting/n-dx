@@ -65,6 +65,24 @@ describe("hench run — flag conflict refusals", () => {
     expect(stderr).toContain("cannot filter by assignee");
   });
 
+  it("refuses --epic-by-epic with --epic on a project with no PRD folder", () => {
+    // `hench init` alone leaves no PRD folder; the flag conflict must still win
+    // over "No PRD folder", since it fails on the arguments alone.
+    const { stderr, code } = runResult(["run", "--epic-by-epic", "--epic=x", tmpDir]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("Cannot use --epic-by-epic with --epic");
+    expect(stderr).not.toContain("No PRD folder");
+  });
+
+  it("refuses --review with --no-review on a project with no PRD folder", () => {
+    const { stderr, code } = runResult(["run", "--review", "--no-review", tmpDir]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("--review and --no-review were both passed");
+    expect(stderr).not.toContain("No PRD folder");
+  });
+
   it("accepts --epic-by-epic on its own (the refusal is the combination, not the flag)", () => {
     // Guards against a refusal written so broadly it breaks --epic-by-epic
     // itself. This run gets past argument validation; whatever it does next
