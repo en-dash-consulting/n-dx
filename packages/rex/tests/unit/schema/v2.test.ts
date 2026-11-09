@@ -618,6 +618,8 @@ describe("isolation", () => {
         "cli/commands/import-bundle.ts",
         "cli/commands/next.ts",
         "cli/mcp-tools/get-next-task.ts",
+        "cli/commands/branch.ts",
+        "cli/mcp-tools/assign-to-branch.ts",
         "cli/commands/prune.ts",
         "cli/commands/reorganize.ts",
         "cli/commands/reshape.ts",

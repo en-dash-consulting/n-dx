@@ -82,7 +82,7 @@ describe("get_next_task with a branch work set", () => {
     await call("update_task_status", { id: LOW_TASK, status: "completed" });
     const spent = await call("get_next_task");
     expect(spent.next).toBeNull();
-    expect(spent.message).toBe("Nothing left in this branch's work set; any: true picks outside it");
+    expect(spent.message).toBe("This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and any: true picks outside it");
     expect(spent.workSetBranch).toBe("feat/polish");
     expect((await call("get_next_task", { any: true })).item.id).toBe(FIXTURE_TASK);
 
@@ -111,5 +111,27 @@ describe("get_next_task with a branch work set", () => {
     const spent = await call("get_next_task");
     expect(spent.next).toBeNull();
     expect(spent.workSetBranch).toBe("feat/split");
+  });
+
+  it("a branch cut again under a merged branch's name has no work set, and names the earlier branch's tasks", async () => {
+    git("checkout", "-q", "-b", "feat/x");
+    await call("assign_to_branch", { ids: [LOW_TASK] });
+    await call("update_task_status", { id: LOW_TASK, status: "completed" });
+    git("add", "-A");
+    git("commit", "-q", "-m", "finish");
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge feat/x", "feat/x");
+    git("branch", "-q", "-D", "feat/x");
+    git("checkout", "-q", "-b", "feat/x");
+
+    const next = await call("get_next_task");
+    expect(next.item.id).toBe(FIXTURE_TASK);
+    expect(next.workSetBranch).toBeUndefined();
+    expect(next.earlierUse).toEqual({
+      branch: "feat/x",
+      ids: [LOW_TASK],
+      message: "1 task on feat/x comes from an earlier branch of this name; it is not in this branch's set",
+    });
+    expect((await call("get_next_task", { any: true })).earlierUse).toBeUndefined();
   });
 });

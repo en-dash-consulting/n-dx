@@ -31,7 +31,7 @@ describe("work sets on a v2 tree", () => {
     expect(await changeState()).toContain(`    delivery: {"branch":"feat/apple-pay"}\n`);
 
     const { tree } = await loadPrdModel(rexDir);
-    expect(readWorkSet(tree, "feat/apple-pay")).toEqual({ branch: "feat/apple-pay", ids: [FIXTURE_TASK], hasAssignments: true });
+    expect(readWorkSet(tree, "feat/apple-pay")).toEqual({ branch: "feat/apple-pay", ids: [FIXTURE_TASK], hasAssignments: true, earlier: [] });
 
     await expect(assignToBranch(rexDir, [FIXTURE_TASK], "feat/other")).rejects.toThrow(WorkSetError);
     expect(await changeState()).not.toContain("feat/other");

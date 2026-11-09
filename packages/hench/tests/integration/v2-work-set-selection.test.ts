@@ -17,9 +17,10 @@ import { resolveStore, isChangeLayerStore } from "@n-dx/rex";
 import type { PRDStore } from "@n-dx/rex";
 import { getActionableTasks, selectTaskEntry } from "../../src/agent/planning/brief.js";
 import {
+  branchWork,
   branchWorkSet,
   loadV2Tree,
-  WORK_SET_EXHAUSTED,
+  WORK_SET_FINISHED,
   WorkSetExhaustedError,
 } from "../../src/agent/planning/work-selection.js";
 import { cmdRun, peekNextTaskPriority, refuseEpicFlagsOnV2 } from "../../src/cli/commands/run.js";
@@ -68,15 +69,19 @@ async function plan(flags: Record<string, string> = {}): Promise<QueuePlan & { w
   }
 }
 
-/** Assign DOCS_ID to {@link BRANCH} and check that branch out. */
+/**
+ * Check {@link BRANCH} out and assign DOCS_ID to it there. The assignment is
+ * committed on the branch: one already on main where the branch left it
+ * would belong to an earlier branch of that name.
+ */
 async function assignDocsAndCheckout(): Promise<void> {
+  git("checkout", "-q", "-b", BRANCH);
   await appendFile(
     join(rexDir, "changes", "add-apple-pay", "state.yaml"),
     `  "${DOCS_ID}":\n    delivery: {"branch":"${BRANCH}"}\n`,
   );
   git("add", "-A");
   git("commit", "-q", "-m", "assign docs");
-  git("checkout", "-q", "-b", BRANCH);
 }
 
 beforeEach(async () => {
@@ -118,6 +123,24 @@ describe("selection without a work set is unchanged", () => {
     git("checkout", "-q", "main");
     expect(await pick({ workSetDir: root })).toBe(WIRE_ID);
   });
+
+  it("on a branch cut again under a merged branch's name, which names the earlier branch's tasks", async () => {
+    await assignDocsAndCheckout();
+    await (await store()).updateItem(DOCS_ID, { status: "completed" });
+    git("add", "-A");
+    git("commit", "-q", "-m", "docs done");
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge", BRANCH);
+    git("branch", "-q", "-D", BRANCH);
+    git("checkout", "-q", "-b", BRANCH);
+
+    expect(await pick({ workSetDir: root })).toBe(WIRE_ID);
+    const tree = (await loadV2Tree(await store()))!;
+    const read = branchWork(tree, root);
+    expect(read.workSet).toBeNull();
+    expect(read.earlierUse).toMatchObject({ branch: BRANCH, ids: [DOCS_ID] });
+    expect((await plan()).workSetBranch).toBeUndefined();
+  });
 });
 
 describe("on a branch with a work set", () => {
@@ -146,8 +169,11 @@ describe("on a branch with a work set", () => {
     await s.updateItem(DOCS_ID, { status: "completed" });
     const spent = pick({ workSetDir: root });
     await expect(spent).rejects.toBeInstanceOf(WorkSetExhaustedError);
-    await expect(spent).rejects.toThrow(WORK_SET_EXHAUSTED);
-    expect(WORK_SET_EXHAUSTED).toBe("Nothing left in this branch's work set; --any picks outside it");
+    // Every unit done: the set is finished, as rex next and `rex branch show` say.
+    await expect(spent).rejects.toThrow(WORK_SET_FINISHED);
+    expect(WORK_SET_FINISHED).toBe(
+      "This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and --any picks outside it",
+    );
     // --any still finds the rest of the PRD.
     expect(await pick()).toBe(WIRE_ID);
   });
@@ -172,7 +198,7 @@ describe("on a branch with a work set", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
       await cmdPlanQueue(root, {});
-      expect(log.mock.calls.map((c) => String(c[0]))).toContain(WORK_SET_EXHAUSTED);
+      expect(log.mock.calls.map((c) => String(c[0]))).toContain(WORK_SET_FINISHED);
     } finally {
       log.mockRestore();
     }
@@ -218,7 +244,7 @@ describe("on a branch with a work set", () => {
       git("add", "-A");
       git("commit", "-q", "-m", "docs done");
       const out = await dryRun({ loop: "true" });
-      expect(out).toContain(`${WORK_SET_EXHAUSTED} — loop finished after 0 task(s).`);
+      expect(out).toContain(`${WORK_SET_FINISHED} — loop finished after 0 task(s).`);
       expect(out).not.toContain("All tasks complete");
     });
 
@@ -226,7 +252,7 @@ describe("on a branch with a work set", () => {
       await (await store()).updateItem(DOCS_ID, { status: "completed" });
       git("add", "-A");
       git("commit", "-q", "-m", "docs done");
-      await expect(dryRun({ auto: "true" })).rejects.toThrow(WORK_SET_EXHAUSTED);
+      await expect(dryRun({ auto: "true" })).rejects.toThrow(WORK_SET_FINISHED);
     });
   });
 

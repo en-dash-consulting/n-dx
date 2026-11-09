@@ -51,17 +51,28 @@ export function readTreeAsReset(tree: V2Tree, ids: ReadonlySet<string>): V2Tree 
   return { product: tree.product, changes: reset(tree.changes) };
 }
 
-/** Said when the branch's work set has nothing left; rex next says the same. */
+/** Said when the branch's work set has open units and none can be picked; rex next says the same. */
 export const WORK_SET_EXHAUSTED = "Nothing left in this branch's work set; --any picks outside it";
+
+/** Said when every unit of the branch's work set is done; rex next and `rex branch show` say the same. */
+export const WORK_SET_FINISHED =
+  "This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and --any picks outside it";
+
+/** What to say when selection inside `workSet` picked nothing. */
+export function workSetEndMessage(workSet: BranchWorkSet): string {
+  return workSet.ids.length === 0 ? WORK_SET_FINISHED : WORK_SET_EXHAUSTED;
+}
 
 /**
  * Autoselection found nothing inside the branch's work set. `--loop` reads it
  * as "done", like the empty-selection error it replaces.
  */
 export class WorkSetExhaustedError extends Error {
-  constructor(readonly branch: string) {
-    super(WORK_SET_EXHAUSTED);
+  readonly branch: string;
+  constructor(workSet: BranchWorkSet) {
+    super(workSetEndMessage(workSet));
     this.name = "WorkSetExhaustedError";
+    this.branch = workSet.branch;
   }
 }
 
@@ -71,6 +82,14 @@ export interface BranchWorkSet {
   ids: readonly string[];
 }
 
+/** Units an earlier branch of this name left, as rex's selector reports them: not in the set. */
+export interface EarlierBranchUse {
+  branch: string;
+  ids: readonly string[];
+  /** The line rex next and `rex branch show` print for them. */
+  message: string;
+}
+
 /**
  * The work set selection in `projectDir` is narrowed to, as rex's selector
  * works it out (get_next_task's rule): null on the default branch, a detached
@@ -78,7 +97,21 @@ export interface BranchWorkSet {
  * (`--any`).
  */
 export function branchWorkSet(tree: V2Tree, projectDir: string | undefined): BranchWorkSet | null {
-  return projectDir ? findNextWorkTask(tree, { workspace: projectDir }).workSet : null;
+  return branchWork(tree, projectDir).workSet;
+}
+
+/**
+ * {@link branchWorkSet} with the units an earlier branch of this name left
+ * (`earlierUse`), which rex's selector reports and leaves out of the set.
+ * Both null when `projectDir` is absent (`--any`).
+ */
+export function branchWork(
+  tree: V2Tree,
+  projectDir: string | undefined,
+): { workSet: BranchWorkSet | null; earlierUse: EarlierBranchUse | null } {
+  if (!projectDir) return { workSet: null, earlierUse: null };
+  const { workSet, earlierUse } = findNextWorkTask(tree, { workspace: projectDir });
+  return { workSet, earlierUse };
 }
 
 export interface V2SelectOptions {

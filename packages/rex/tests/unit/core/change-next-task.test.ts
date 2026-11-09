@@ -96,7 +96,11 @@ describe("findNextWorkTask with a workspace", () => {
   it("returns the set with no task when the set has nothing left", () => {
     git("checkout", "-b", "feature/x");
     const done = tree(change("urgent"), change("mine", { status: "completed", delivery: { branch: "feature/x" } }));
-    expect(findNextWorkTask(done, { workspace: dir })).toEqual({ task: null, workSet: { branch: "feature/x", ids: [], hasAssignments: true } });
+    expect(findNextWorkTask(done, { workspace: dir })).toEqual({
+      task: null,
+      workSet: { branch: "feature/x", ids: [], hasAssignments: true, earlier: [] },
+      earlierUse: null,
+    });
   });
 
   it("leaves callers without a workspace unchanged", () => {

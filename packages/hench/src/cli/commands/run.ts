@@ -31,7 +31,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, nextV2Selection, v2RefPriority, V2_HAS_NO_EPICS, WORK_SET_EXHAUSTED, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, branchWorkSet, findV2Entry, loadV2Tree, nextV2Entry, nextV2Selection, v2RefPriority, V2_HAS_NO_EPICS, workSetEndMessage, WorkSetExhaustedError } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -1157,8 +1157,9 @@ async function selectTask(
 
   if (tasks.length === 0) {
     const tree = await loadV2Tree(store);
-    if (tree && branchWorkSet(tree, workSetDir)) {
-      output(WORK_SET_EXHAUSTED);
+    const workSet = tree ? branchWorkSet(tree, workSetDir) : null;
+    if (workSet) {
+      output(workSetEndMessage(workSet));
       process.exit(0);
     }
   }

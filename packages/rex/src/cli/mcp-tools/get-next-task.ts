@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
-import { currentWorkSet } from "../../core/work-set.js";
+import { workSetFinishedMessage, type EarlierUse, type WorkSet } from "../../core/work-set.js";
 import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import type { ChangeLayerStore } from "../../store/change-layer-store.js";
 import { collectForeignClaims, type ClaimsContext, type SkippedClaim } from "./claims.js";
@@ -17,7 +17,9 @@ export interface GetNextTaskArgs {
 /**
  * `projectDir` is the session's resolved workspace. When given on a v2 tree,
  * selection is narrowed to its checked-out branch's work set
- * ({@link currentWorkSet}) unless `args.any`; omitted, it is not narrowed.
+ * (`findNextWorkTask`'s, by `currentWorkSet`'s rule) unless `args.any`;
+ * omitted, it is not narrowed. Units from an earlier branch of the same name
+ * are reported as `earlierUse`.
  */
 export async function handleGetNextTask(
   store: PRDStore,
@@ -75,13 +77,18 @@ async function handleGetNextV2Work(
   projectDir: string | undefined,
 ): Promise<McpResult> {
   const tree = await store.loadTree();
-  const workSet = projectDir && !args?.any ? currentWorkSet(tree, projectDir) : null;
   const { excludeIds, skipped } = await collectForeignClaims(claims);
   const completed = completedWorkIds(tree);
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
-  const next = findNextWorkTask(tree, { excludeIds, tags: args?.tags, ...(workSet ? { workSet: new Set(workSet.ids) } : {}) });
-  const workSetField = workSet ? { workSetBranch: workSet.branch } : {};
-  if (!next) return noneLeft(skippedClaimed, workSetField);
+  const select = { excludeIds, tags: args?.tags };
+  const { task: next, workSet, earlierUse } = projectDir
+    ? findNextWorkTask(tree, { ...select, workspace: projectDir, any: args?.any === true })
+    : { task: findNextWorkTask(tree, select), workSet: null, earlierUse: null };
+  const workSetField = {
+    ...(workSet ? { workSetBranch: workSet.branch } : {}),
+    ...(earlierUse ? { earlierUse } : {}),
+  };
+  if (!next) return noneLeft(skippedClaimed, workSetField, workSet);
   return textResult(
     JSON.stringify(
       {
@@ -98,9 +105,13 @@ async function handleGetNextV2Work(
   );
 }
 
-function noneLeft(skippedClaimed: SkippedClaim[], workSetField: { workSetBranch?: string } = {}): McpResult {
-  const message = workSetField.workSetBranch !== undefined
-    ? WORK_SET_EXHAUSTED_MCP
+function noneLeft(
+  skippedClaimed: SkippedClaim[],
+  workSetField: { workSetBranch?: string; earlierUse?: EarlierUse } = {},
+  workSet: WorkSet | null = null,
+): McpResult {
+  const message = workSet
+    ? workSet.ids.length === 0 ? workSetFinishedMessage("any: true") : WORK_SET_EXHAUSTED_MCP
     : skippedClaimed.length > 0
       ? `No actionable tasks remaining that are not claimed by another worktree (${skippedClaimed.length} claimed elsewhere)`
       : "No actionable tasks remaining";

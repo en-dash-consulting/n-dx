@@ -15,12 +15,15 @@
 import { result } from "@n-dx/llm-client";
 import {
   assignToBranch,
+  branchWorkState,
   describeUnits,
+  earlierUseOf,
   groupWorkSet,
   inheritedUnits,
   requireWorkSetBranch,
   unassignFromBranch,
   WorkSetError,
+  workSetFinishedMessage,
   type UnitInfo,
 } from "../../core/work-set.js";
 import { resolveRexPaths } from "../../store/index.js";
@@ -58,7 +61,7 @@ export async function cmdBranch(
   await requireV2(rexDir, "branch");
   try {
     const branch = requireWorkSetBranch(dir);
-    if (sub === "show") return await show(rexDir, branch, json);
+    if (sub === "show") return await show(dir, rexDir, branch, json);
     if (sub === "add") return await add(rexDir, branch, refs, move, json);
     return await remove(rexDir, branch, refs, json);
   } catch (err) {
@@ -67,17 +70,30 @@ export async function cmdBranch(
   }
 }
 
-async function show(rexDir: string, branch: string, json: boolean): Promise<void> {
-  const groups = groupWorkSet((await loadPrdModel(rexDir)).tree, branch);
-  if (json) return result(JSON.stringify({ branch, changes: groups }, null, 2));
-  if (groups.length === 0) {
-    return result(`Branch ${branch} has no work set. Assign tasks with 'rex branch add <id>…'.`);
+/**
+ * The branch's work set by the rule selection narrows by (`branchWorkState`):
+ * none, open units, or finished (selection stays narrowed to it), plus the
+ * units an earlier branch of this name left, which are not in the set.
+ */
+async function show(dir: string, rexDir: string, branch: string, json: boolean): Promise<void> {
+  const tree = (await loadPrdModel(rexDir)).tree;
+  const state = branchWorkState(tree, dir, branch) ?? { branch, ids: [], hasAssignments: false, earlier: [] };
+  const groups = groupWorkSet(tree, state.ids);
+  const finished = state.hasAssignments && state.ids.length === 0;
+  const earlierUse = earlierUseOf(state);
+  if (json) {
+    return result(JSON.stringify({ branch, hasWorkSet: state.hasAssignments, finished, changes: groups, ...(earlierUse ? { earlierUse } : {}) }, null, 2));
   }
-  result(`Work set of ${branch}:`);
-  for (const { change, units } of groups) {
-    result(`\n${nodeLabel(change)}  ${change.title}`);
-    for (const u of units) result(`  ${unitLine(u)}  [${u.status}]`);
+  if (!state.hasAssignments) result(`Branch ${branch} has no work set. Assign tasks with 'rex branch add <id>…'.`);
+  else if (finished) result(`${workSetFinishedMessage("--any")} (${branch}).`);
+  else {
+    result(`Work set of ${branch}:`);
+    for (const { change, units } of groups) {
+      result(`\n${nodeLabel(change)}  ${change.title}`);
+      for (const u of units) result(`  ${unitLine(u)}  [${u.status}]`);
+    }
   }
+  if (earlierUse) result(`${state.hasAssignments && !finished ? "\n" : ""}${earlierUse.message}.`);
 }
 
 async function add(rexDir: string, branch: string, refs: string[], move: boolean, json: boolean): Promise<void> {

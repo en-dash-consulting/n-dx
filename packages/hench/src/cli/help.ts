@@ -45,7 +45,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
       { flag: "--epic-by-epic", description: "Process epics sequentially, advancing when done" },
       { flag: "--mine", description: "Only pick tasks whose assignee matches the current user (resolved from git identity, like lastModifiedBy). Filters both autoselection and the interactive menu; an explicit --task bypasses it. Refused with --epic-by-epic, which cannot filter by assignee." },
-      { flag: "--any", description: "Pick outside the branch's work set. On a branch with assigned tasks (rex branch add), autoselection, the interactive menu, --loop and --plan-queue pick only from them, and say \"Nothing left in this branch's work set\" when none remain; the default branch and a branch with no assignment are not narrowed. An explicit --task bypasses it." },
+      { flag: "--any", description: "Pick outside the branch's work set. On a branch with assigned tasks (rex branch add), autoselection, the interactive menu, --loop and --plan-queue pick only from them, and say the set is finished when all its tasks are done; the default branch and a branch with no assignment are not narrowed. An explicit --task bypasses it." },
       { flag: "--tags=<a,b>", description: "Only pick tasks carrying at least one of these tags" },
       { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially (e.g. --iterations=5)" },

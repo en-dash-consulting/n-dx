@@ -137,14 +137,21 @@ describe("planUnassignFromBranch", () => {
 describe("readWorkSet", () => {
   it("returns the open units on the branch and whether it has any assignment at all", () => {
     const tree = planAssignToBranch(fixture(), ["pay", "solo"], "feat/pay").tree;
-    expect(readWorkSet(tree, "feat/pay")).toEqual({ branch: "feat/pay", ids: ["t-pending", "t-progress", "t-failing", "solo"], hasAssignments: true });
-    expect(readWorkSet(tree, "feat/none")).toEqual({ branch: "feat/none", ids: [], hasAssignments: false });
+    expect(readWorkSet(tree, "feat/pay")).toEqual({ branch: "feat/pay", ids: ["t-pending", "t-progress", "t-failing", "solo"], hasAssignments: true, earlier: [] });
+    expect(readWorkSet(tree, "feat/none")).toEqual({ branch: "feat/none", ids: [], hasAssignments: false, earlier: [] });
   });
 
   it("still reports assignments when every unit on the branch is finished", () => {
     const tree = planAssignToBranch(fixture(), ["solo"], "feat/solo").tree;
     (tree.changes[1] as { status: string }).status = "completed";
-    expect(readWorkSet(tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: true });
+    expect(readWorkSet(tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: true, earlier: [] });
+  });
+
+  it("leaves rows from an earlier use of the name, and the units inheriting from them, out of the set", () => {
+    const tree = splitSolo(task("s1"), task("s2", { delivery: { branch: "feat/solo" } }));
+    // `solo` already named feat/solo where the branch left the default branch; s2 is this branch's own.
+    expect(readWorkSet(tree, "feat/solo", new Set(["solo"]))).toEqual({ branch: "feat/solo", ids: ["s2"], hasAssignments: true, earlier: ["s1"] });
+    expect(readWorkSet(tree, "feat/solo", new Set(["solo", "s2"]))).toEqual({ branch: "feat/solo", ids: [], hasAssignments: false, earlier: ["s1", "s2"] });
   });
 });
 
@@ -158,14 +165,14 @@ function splitSolo(...tasks: ReturnType<typeof task>[]): V2Tree {
 describe("inherited delivery", () => {
   it("a task-less change's branch covers the open tasks it is split into", () => {
     const tree = splitSolo(task("s1"), task("s2", { status: "failing" }), task("s-done", { status: "completed" }));
-    expect(readWorkSet(tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: ["s1", "s2"], hasAssignments: true });
+    expect(readWorkSet(tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: ["s1", "s2"], hasAssignments: true, earlier: [] });
     expect(effectiveDelivery(tree, "s1")).toMatchObject({ branch: "feat/solo", owner: { id: "solo" } });
   });
 
   it("a task's own delivery overrides its change's", () => {
     const tree = splitSolo(task("s1"), task("s2", { delivery: { branch: "feat/other" } }));
     expect(readWorkSet(tree, "feat/solo").ids).toEqual(["s1"]);
-    expect(readWorkSet(tree, "feat/other")).toEqual({ branch: "feat/other", ids: ["s2"], hasAssignments: true });
+    expect(readWorkSet(tree, "feat/other")).toEqual({ branch: "feat/other", ids: ["s2"], hasAssignments: true, earlier: [] });
     expect(effectiveDelivery(tree, "s2")).toMatchObject({ branch: "feat/other", owner: { id: "s2" } });
   });
 
@@ -199,14 +206,14 @@ describe("inherited delivery", () => {
     expect(deliveries(plan.tree)).toEqual({ solo: { branch: "feat/x" }, s1: { branch: "feat/x" } });
     (plan.tree.changes[1] as { children: unknown[] }).children.push(task("s-later"));
     expect(readWorkSet(plan.tree, "feat/x").ids).toEqual(["s1", "s-later"]);
-    expect(readWorkSet(plan.tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: false });
+    expect(readWorkSet(plan.tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: false, earlier: [] });
   });
 
   it("removing the change drops the inherited tasks and every task delivery equal to it", () => {
     const tree = splitSolo(task("s1"), task("s2", { delivery: { branch: "feat/solo" } }), task("s3", { delivery: { branch: "feat/other" } }));
     const plan = planUnassignFromBranch(tree, ["solo"], "feat/solo");
     expect(plan.report).toEqual({ removed: [{ id: "solo", from: "feat/solo" }, { id: "s2", from: "feat/solo" }], inherited: [] });
-    expect(readWorkSet(plan.tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: false });
+    expect(readWorkSet(plan.tree, "feat/solo")).toEqual({ branch: "feat/solo", ids: [], hasAssignments: false, earlier: [] });
     expect(readWorkSet(plan.tree, "feat/other").ids).toEqual(["s3"]);
   });
 

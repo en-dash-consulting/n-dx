@@ -16,7 +16,7 @@ import { findActionableWork, type WorkUnit } from "./change-selection.js";
 import { changeLayerItems } from "./layer-projection.js";
 import type { SelectionExplanation } from "./next-task.js";
 import { findItem } from "./tree.js";
-import { currentWorkSet, type WorkSet } from "./work-set.js";
+import { branchWorkState, earlierUseOf, type EarlierUse, type WorkSet } from "./work-set.js";
 
 export interface NextWorkOptions {
   /** Ids to pass over: units another worktree has claimed. */
@@ -29,7 +29,7 @@ export interface NextWorkOptions {
 
 /**
  * {@link NextWorkOptions} for a checkout: selection works out the branch work
- * set itself, by {@link currentWorkSet}'s rule, and returns it with the unit.
+ * set itself, by {@link branchWorkState}'s rule, and returns it with the unit.
  */
 export interface WorkspaceNextWorkOptions extends NextWorkOptions {
   /** The checkout whose branch work set narrows selection; it replaces `workSet` when the branch has one. */
@@ -42,8 +42,10 @@ export interface WorkspaceNextWorkOptions extends NextWorkOptions {
 export interface WorkspaceNextWork {
   /** The unit to run next; `null` when none is actionable (inside the work set, when there is one). */
   task: NextWorkTask | null;
-  /** The work set selection was narrowed to; null when it was not narrowed. An empty `ids` has nothing left. */
+  /** The work set selection was narrowed to; null when it was not narrowed. An empty `ids` is a finished set. */
   workSet: WorkSet | null;
+  /** Units on the branch from an earlier branch of its name, not in the set; null when none, or under `any`. */
+  earlierUse: EarlierUse | null;
 }
 
 export interface NextWorkTask {
@@ -68,9 +70,10 @@ export function findNextWorkTask(
   options: NextWorkOptions | WorkspaceNextWorkOptions = {},
 ): NextWorkTask | WorkspaceNextWork | null {
   if (!("workspace" in options) || typeof options.workspace !== "string") return selectNext(tree, options);
-  const workSet = options.any ? null : currentWorkSet(tree, options.workspace);
+  const state = options.any ? null : branchWorkState(tree, options.workspace);
+  const workSet = state?.hasAssignments ? state : null;
   const task = selectNext(tree, workSet ? { ...options, workSet: new Set(workSet.ids) } : options);
-  return { task, workSet };
+  return { task, workSet, earlierUse: earlierUseOf(state) };
 }
 
 function selectNext(tree: V2Tree, options: NextWorkOptions): NextWorkTask | null {

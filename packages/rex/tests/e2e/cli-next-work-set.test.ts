@@ -63,7 +63,7 @@ describe("rex next with a branch work set", () => {
     expect(rex("update", LOW_TASK, "--status=completed").status).toBe(0);
     const spent = rex("next");
     expect(spent.status, spent.stderr).toBe(0);
-    expect(spent.stdout).toContain("Nothing left in this branch's work set; --any picks outside it");
+    expect(spent.stdout).toContain("This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and --any picks outside it");
     expect(next().item).toBeNull();
     expect(next("--any").item.id).toBe(FIXTURE_TASK);
 

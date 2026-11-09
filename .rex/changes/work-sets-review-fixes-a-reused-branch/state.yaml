@@ -8,5 +8,12 @@ items:
     lastModified: "2026-11-09T18:29:03.376Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6a45f6d1-b249-48ff-8e90-e45a7b49fc04":
-    lastModified: "2026-11-09T18:29:01.573Z"
+    status: "completed"
+    startedAt: "2026-11-09T18:29:46.287Z"
+    completedAt: "2026-11-09T18:45:57.122Z"
+    endedAt: "2026-11-09T18:45:57.122Z"
+    activeIntervals: [{"end":"2026-11-09T18:45:57.122Z","start":"2026-11-09T18:29:46.287Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rows whose delivery already named the branch at its fork point (merge-base of HEAD and the default branch, local and origin refs) are an earlier use: out of ids and hasAssignments, listed as WorkSet.earlier. Fork point read with git grep + cat-file --batch of state.yaml under the resolved rex changes/ dir (branch-naming.ts); unreadable fork point keeps old behaviour. branchWorkState is the one read; currentWorkSet, findNextWorkTask (returns earlierUse), rex next, get_next_task, rex branch show and hench (--resolve earlierUse, WorkSetExhaustedError finished vs exhausted) use it. Finished set says so and stays narrowed. Tests: rex e2e cli-branch-earlier-use (reused name, finished, rebased, no default branch), MCP and hench resolve/selection reused-name cases."
+    lastModified: "2026-11-09T18:45:57.122Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

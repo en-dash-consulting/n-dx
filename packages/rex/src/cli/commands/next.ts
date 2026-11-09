@@ -6,7 +6,7 @@ import type { SkippedClaim } from "../mcp-tools/claims.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection, type SelectionExplanation } from "../../core/next-task.js";
 import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
-import { currentWorkSet } from "../../core/work-set.js";
+import { workSetFinishedMessage, type EarlierUse } from "../../core/work-set.js";
 
 import { info, result } from "../output.js";
 import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
@@ -57,35 +57,42 @@ export async function cmdNext(
  * their tasks, task-less changes as units, never the Inbox). `--format=json`
  * keeps the v1 fields and adds `changeId`, the change the unit belongs to.
  *
- * On a branch with a work set ({@link currentWorkSet}) only its units are
- * picked unless `--any`; JSON then adds `workSetBranch`.
+ * On a branch with a work set (`findNextWorkTask`'s, by `currentWorkSet`'s
+ * rule) only its units are picked unless `--any`; JSON then adds
+ * `workSetBranch`. A finished set says so. Units from an earlier branch of
+ * the same name are named in a line, and in JSON as `earlierUse`.
  */
 async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<string, string>): Promise<void> {
   const tree = await store.loadTree();
-  const workSet = flags.any === "true" ? null : currentWorkSet(tree, dir);
   const { excludeIds, skipped } = await foreignClaims(dir);
   const completed = completedWorkIds(tree);
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
-  const next = findNextWorkTask(tree, { excludeIds, ...(workSet ? { workSet: new Set(workSet.ids) } : {}) });
+  const { task: next, workSet, earlierUse } = findNextWorkTask(tree, { excludeIds, workspace: dir, any: flags.any === "true" });
   if (!next && tree.changes.length === 0 && flags.format !== "json") {
     result("No changes in PRD. Run: rex add --title=\"...\" " + dir);
     return;
   }
-  const workSetField = workSet ? { workSetBranch: workSet.branch } : {};
+  const workSetFields = {
+    ...(workSet ? { workSetBranch: workSet.branch } : {}),
+    ...(earlierUse ? { earlierUse } : {}),
+  };
+  const json = flags.format === "json";
+  if (earlierUse && !json) result(earlierUse.message);
   if (!next && workSet) {
-    if (flags.format === "json") {
-      result(JSON.stringify({ item: null, ...workSetField, message: WORK_SET_EXHAUSTED, skippedClaimed }, null, 2));
+    const message = workSet.ids.length === 0 ? workSetFinishedMessage("--any") : WORK_SET_EXHAUSTED;
+    if (json) {
+      result(JSON.stringify({ item: null, ...workSetFields, message, skippedClaimed }, null, 2));
       return;
     }
-    result(WORK_SET_EXHAUSTED);
+    result(message);
     printSkippedClaims(skippedClaimed, flags.verbose === "true");
     return;
   }
-  if (!next) return printNoneLeft(skippedClaimed, flags);
-  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id, ...workSetField }, true);
+  if (!next) return printNoneLeft(skippedClaimed, flags, earlierUse ? { earlierUse } : {});
+  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id, ...workSetFields }, true);
 }
 
-/** Said when the branch's work set has nothing left to pick. */
+/** Said when the branch's work set has open units and none can be picked. */
 const WORK_SET_EXHAUSTED = "Nothing left in this branch's work set; --any picks outside it";
 
 /**
@@ -99,9 +106,9 @@ function foreignClaims(dir: string): ReturnType<typeof collectForeignClaims> {
   });
 }
 
-function printNoneLeft(skippedClaimed: SkippedClaim[], flags: Record<string, string>): void {
+function printNoneLeft(skippedClaimed: SkippedClaim[], flags: Record<string, string>, extra: { earlierUse?: EarlierUse } = {}): void {
   if (flags.format === "json") {
-    result(JSON.stringify({ item: null, skippedClaimed }, null, 2));
+    result(JSON.stringify({ item: null, ...extra, skippedClaimed }, null, 2));
     return;
   }
   result(skippedClaimed.length > 0
@@ -116,7 +123,7 @@ function printNext(
   explanation: SelectionExplanation,
   skippedClaimed: SkippedClaim[],
   flags: Record<string, string>,
-  v2Fields: { changeId?: string; workSetBranch?: string } = {},
+  v2Fields: { changeId?: string; workSetBranch?: string; earlierUse?: EarlierUse } = {},
   v2 = false,
 ): void {
   if (flags.format === "json") {

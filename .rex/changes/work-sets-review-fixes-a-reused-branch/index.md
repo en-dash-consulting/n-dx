@@ -10,6 +10,6 @@ acceptanceCriteria:
 touches:
   - "7de075e7-b519-4f53-a17d-d0eea465530b"
 priority: "high"
-source: "ndx-capture"
 discoveredFrom: {"item":"d20fbfb8-af73-4dba-9fea-e514cc253512"}
+source: "ndx-capture"
 ---

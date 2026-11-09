@@ -44,7 +44,7 @@ The PRD is the product's requirements (the product layer) plus the changes being
 | `rex change apply <change> [dir]` | Apply a change's amendments to the product layer, as a steward |
 | `rex branch add <id>… [--move]` | Put a change's open tasks (or named tasks) on the current branch's work set. A task already on another branch is refused unless `--move` takes it over |
 | `rex branch remove <id>…` | Take tasks, or a change's tasks, off the current branch's work set. A task that is on the branch only through its change stays; remove the change |
-| `rex branch show` | List the current branch's open tasks, grouped by change. `--format=json` for scripts |
+| `rex branch show` | List the current branch's open tasks, grouped by change, or say the branch has no work set or that its set is finished. Tasks an earlier branch of the same name left on the default branch are named and are not in the set. `--format=json` for scripts |
 | `rex next [--any] [dir]` | The next actionable task. On a branch with a work set only its tasks are picked; `--any` picks outside it |
 | `rex release stamp <version> [dir]` | Stamp `shippedIn` on the changes a release ships |
 | `rex codeowners [dir]` | Write the host's code-owner files from the stewards lists (opt-in) |
@@ -216,7 +216,7 @@ By default on an interactive terminal, `ndx work` presents a menu to choose whic
 
 #### Branch work sets
 
-On a branch with a work set (`rex branch add`), `ndx work` picks only from it: autoselection, the interactive menu, `--loop` and `--plan-queue`. When the set has nothing left it says so; pass `--any` to pick outside it. An explicit `--task` bypasses the set. On the default branch, a detached HEAD or a branch with no assignments, selection is unchanged. `ndx work --resolve` reports the set as `workSet`, or `null`.
+On a branch with a work set (`rex branch add`), `ndx work` picks only from it: autoselection, the interactive menu, `--loop` and `--plan-queue`. When every task in the set is done it says the set is finished, and selection stays narrowed to it; pass `--any` to pick outside it. An explicit `--task` bypasses the set. On the default branch, a detached HEAD or a branch with no assignments, selection is unchanged. A task whose `delivery` already named the branch where it left the default branch belongs to an earlier branch of that name (merged since) and is not in the set; without a default branch to compare against, every assignment counts. `ndx work --resolve` reports the set as `workSet`, or `null`, and those earlier tasks as `earlierUse`.
 
 `rex branch` needs a v2 PRD, refuses on the default branch and a detached HEAD, and never commits: the assignment is a PRD edit committed with the branch's work.
 

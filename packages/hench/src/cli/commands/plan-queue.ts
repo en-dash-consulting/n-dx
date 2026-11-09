@@ -17,7 +17,7 @@ import { listWorktrees, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { loadConfig } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
-import { branchWorkSet, loadV2Tree, WORK_SET_EXHAUSTED } from "../../agent/planning/work-selection.js";
+import { branchWorkSet, loadV2Tree, workSetEndMessage } from "../../agent/planning/work-selection.js";
 import { resolveProjectCliName } from "../../agent/planning/cli-identity.js";
 import { TaskClaims } from "../../process/task-claims.js";
 import { countActiveLocksReadOnly } from "../../process/limiter.js";
@@ -220,7 +220,7 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
     return;
   }
   if (workSet && tasks.length === 0) {
-    output(WORK_SET_EXHAUSTED);
+    output(workSetEndMessage(workSet));
     return;
   }
   for (const line of formatPlan(plan)) output(line);

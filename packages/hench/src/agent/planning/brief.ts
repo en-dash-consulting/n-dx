@@ -394,7 +394,7 @@ export async function selectTaskEntry(
         ...(options.workSetDir ? { workspace: options.workSetDir } : {}),
       });
       candidate = entry;
-      if (!candidate) throw workSet ? new WorkSetExhaustedError(workSet.branch) : new Error("No actionable tasks found in PRD");
+      if (!candidate) throw workSet ? new WorkSetExhaustedError(workSet) : new Error("No actionable tasks found in PRD");
     } else if (epicId) {
       // Epic filter active: get all actionable tasks and filter to the epic.
       const epicTaskIds = collectEpicTaskIds(items, epicId);

@@ -32,8 +32,15 @@
  * - **Read.** {@link readWorkSet}: the open units on a branch, and whether the
  *   branch has any assignment at all, since a branch without one has no work
  *   set and selection there is unchanged.
+ * - **Earlier use.** `delivery` is never cleared on merge; it stays as
+ *   provenance. Rows that already named the branch where it left the default
+ *   branch ({@link earlierUseRows}) belong to an earlier branch of that name,
+ *   so a branch cut again under a merged branch's name has no work set.
  * - **Select.** {@link currentWorkSet}: the checked-out branch's set, which
- *   `get_next_task` and `rex next` narrow selection to unless asked for `any`.
+ *   `get_next_task`, `rex next` and `ndx work` narrow selection to unless
+ *   asked for `any`. {@link branchWorkState} is the same read for a branch
+ *   with no set, for `rex branch show` and the earlier-use line. A set whose
+ *   units are all done is finished, and still narrows selection.
  *
  * The plan functions are pure: they return a new tree and write nothing.
  * {@link assignToBranch} and {@link unassignFromBranch} run them inside
@@ -43,9 +50,13 @@
  * @module rex/core/work-set
  */
 
-import { DeliverySchema } from "../schema/v2.js";
+import { isAbsolute, join, relative, sep } from "node:path";
+import { DeliverySchema, type ItemState } from "../schema/v2.js";
 import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { currentWorkSetBranch } from "../store/branch-naming.js";
+import { currentWorkSetBranch, readStateFilesAt, workSetForkPoint } from "../store/branch-naming.js";
+import { resolveRexPaths } from "../store/paths.js";
+import { CHANGES_DIRNAME } from "../store/prd-model-reader.js";
+import { parseStateYaml } from "../store/state-writer.js";
 import { withPrdModelTransaction } from "../store/prd-model-transaction.js";
 import { changeWorkShape, isActionableStatus } from "./change-selection.js";
 
@@ -99,6 +110,12 @@ export interface WorkSet {
   ids: string[];
   /** Whether any live node, in any status, is on the branch. False: the branch has no work set. */
   hasAssignments: boolean;
+  /**
+   * Units, in any status, whose `delivery` already named the branch where it
+   * left the default branch: an earlier branch of this name, merged since.
+   * They are not in the set and count toward neither `ids` nor `hasAssignments`.
+   */
+  earlier: string[];
 }
 
 /** Assign the units `refs` name to `branch`. Throws {@link WorkSetError} on a refusal. */
@@ -189,17 +206,28 @@ export function planUnassignFromBranch(input: V2Tree, refs: readonly string[], o
   return { tree, report, changed: report.removed.length > 0 };
 }
 
-/** The work set of `branch`: its open units, by their own or an inherited `delivery`, and whether it has any assignment at all. */
-export function readWorkSet(tree: V2Tree, branch: string): WorkSet {
+/**
+ * The work set of `branch`: its open units, by their own or an inherited
+ * `delivery`, and whether it has any assignment at all. Nodes in `earlier`
+ * (rows that already named `branch` at its fork point, {@link earlierUseRows})
+ * belong to an earlier use of the name: they and the units inheriting from
+ * them are not in the set, and are listed in `earlier` instead.
+ */
+export function readWorkSet(tree: V2Tree, branch: string, earlier: ReadonlySet<string> = new Set()): WorkSet {
   const index = indexTree(tree);
   const deliveryOf = deliveryResolver(index);
   const ids: string[] = [];
+  const earlierUnits: string[] = [];
   let hasAssignments = false;
   for (const { node } of index.entries) {
-    if (node.delivery?.branch === branch) hasAssignments = true;
-    if (isUnit(node) && isActionableStatus(node.status) && deliveryOf(node)?.branch === branch) ids.push(node.id);
+    if (node.delivery?.branch === branch && !earlier.has(node.id)) hasAssignments = true;
+    if (!isUnit(node)) continue;
+    const delivery = deliveryOf(node);
+    if (delivery?.branch !== branch) continue;
+    if (earlier.has(delivery.owner.id)) earlierUnits.push(node.id);
+    else if (isActionableStatus(node.status)) ids.push(node.id);
   }
-  return { branch, ids, hasAssignments };
+  return { branch, ids, hasAssignments, earlier: earlierUnits };
 }
 
 /** The branch the node `ref` names is on, by its own or its nearest enclosing change's `delivery`; undefined when on none. */
@@ -239,15 +267,83 @@ export function requireWorkSetBranch(projectDir: string): string {
 
 /**
  * The work set selection is narrowed to in `projectDir`: its checked-out
- * branch's, when that branch has any assignment. Null on the default branch,
- * a detached HEAD or a branch with no assignment, where selection is not
- * narrowed. A set whose `ids` is empty has nothing left to pick.
+ * branch's, when that branch has any assignment of its own. Null on the
+ * default branch, a detached HEAD or a branch with no assignment, where
+ * selection is not narrowed. A set whose `ids` is empty is finished, and
+ * still narrows selection.
  */
 export function currentWorkSet(tree: V2Tree, projectDir: string): WorkSet | null {
-  const branch = currentWorkSetBranch(projectDir);
+  const state = branchWorkState(tree, projectDir);
+  return state?.hasAssignments ? state : null;
+}
+
+/**
+ * The checked-out branch's work set as every reader states it, whether or not
+ * it has one: {@link readWorkSet} with the rows {@link earlierUseRows} finds.
+ * Null only on the default branch, a detached HEAD or outside git.
+ * {@link currentWorkSet} is this, for a branch that has assignments.
+ */
+export function branchWorkState(tree: V2Tree, projectDir: string, branch: string | null = currentWorkSetBranch(projectDir)): WorkSet | null {
   if (branch === null) return null;
-  const set = readWorkSet(tree, branch);
-  return set.hasAssignments ? set : null;
+  return readWorkSet(tree, branch, earlierUseRows(projectDir, branch) ?? new Set());
+}
+
+/**
+ * Ids of the `state.yaml` rows whose `delivery` already named `branch` at its
+ * fork point (`workSetForkPoint`): assignments of an earlier branch of this
+ * name, merged into the default branch before this one was cut. Their
+ * `delivery` stays as provenance; it is just not this branch's. A branch
+ * rebased onto a newer default branch keeps its own rows, which are not on
+ * the default branch yet. Null when the fork point cannot be read (no default
+ * branch, a shallow clone, a rex directory outside the checkout, a row this
+ * build cannot parse); every row then counts, as it did before.
+ */
+export function earlierUseRows(projectDir: string, branch: string): Set<string> | null {
+  const base = workSetForkPoint(projectDir);
+  if (base === null) return null;
+  const changesDir = relative(projectDir, join(resolveRexPaths(projectDir).rexDir, CHANGES_DIRNAME));
+  if (changesDir === "" || changesDir.startsWith("..") || isAbsolute(changesDir)) return null;
+  const files = readStateFilesAt(projectDir, base, changesDir.split(sep).join("/"), branch);
+  if (files === null) return null;
+  const ids = new Set<string>();
+  for (const [path, text] of files) {
+    const items = parseForkPointRows(text, `${base}:${path}`);
+    if (items === null) return null;
+    for (const [id, row] of Object.entries(items)) if (row.delivery?.branch === branch) ids.add(id);
+  }
+  return ids;
+}
+
+/** A `state.yaml` read at the fork point; null when this build cannot parse it. */
+function parseForkPointRows(text: string, source: string): Record<string, ItemState> | null {
+  try {
+    return parseStateYaml(text, source, { ignoreSchemaStamp: true }).items;
+  } catch {
+    return null;
+  }
+}
+
+/** A branch's {@link WorkSet.earlier} units as every reader reports them. */
+export interface EarlierUse {
+  branch: string;
+  ids: string[];
+  /** The line readers print, naming the count and the branch. */
+  message: string;
+}
+
+/** `state`'s units from an earlier use of its branch name; null when it has none. */
+export function earlierUseOf(state: WorkSet | null): EarlierUse | null {
+  if (!state || state.earlier.length === 0) return null;
+  const n = state.earlier.length;
+  const message = n === 1
+    ? `1 task on ${state.branch} comes from an earlier branch of this name; it is not in this branch's set`
+    : `${n} tasks on ${state.branch} come from an earlier branch of this name; they are not in this branch's set`;
+  return { branch: state.branch, ids: [...state.earlier], message };
+}
+
+/** Said when a branch's work set has no open unit left: every one is done. */
+export function workSetFinishedMessage(anyHint: string): string {
+  return `This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and ${anyHint} picks outside it`;
 }
 
 /** `ids` as output names them, in the order given; an id the tree does not hold is skipped. */
@@ -277,9 +373,9 @@ export function inheritedUnits(tree: V2Tree, inherited: UnassignReport["inherite
   });
 }
 
-/** The open units on `branch`, grouped by the change they belong to, in tree order. */
-export function groupWorkSet(tree: V2Tree, branch: string): WorkSetGroup[] {
-  const ids = new Set(readWorkSet(tree, branch).ids);
+/** The units `unitIds` names (a work set's `ids` or `earlier`), grouped by the change they belong to, in tree order. */
+export function groupWorkSet(tree: V2Tree, unitIds: readonly string[]): WorkSetGroup[] {
+  const ids = new Set(unitIds);
   const groups = new Map<string, WorkSetGroup>();
   for (const { node, parent } of indexTree(tree).entries) {
     if (!ids.has(node.id)) continue;
