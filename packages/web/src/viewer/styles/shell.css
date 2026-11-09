@@ -182,6 +182,7 @@
   min-height: 0;
   display: flex;
   position: relative;
+  container-type: inline-size;
 }
 
 /* Room for the side stage links on staged pages. */
@@ -711,6 +712,14 @@
   .stage-section-toggle { flex-basis: 100%; }
   .stage-section-tablist { margin-left: var(--space-4); }
   .stage-section-body { padding-left: var(--space-3); padding-right: var(--space-3); }
+}
+
+/* A body narrowed by the Sidecar drawer: the viewport does not shrink, the body
+   does, so the width is asked of .app-body, not the window. Below it the side
+   links would sit on content; drop them and their gutters like the phone rule. */
+@container (max-width: 640px) {
+  .stage-links { display: none; }
+  .main--staged { padding-left: var(--space-3); padding-right: var(--space-3); }
 }
 
 /* Open Inbox count: orange, on the Plan tab and as the bottom-bar pill. */
