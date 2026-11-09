@@ -38,7 +38,7 @@ const SCANNED = [
 /** Advice this policy forbids, each with what it is. */
 export const FORBIDDEN = [
   { name: "ndx hub stop", pattern: /\bndx hub stop\b/ },
-  { name: "pnpm build / install", pattern: /\bpnpm\s+(?:(?:--filter|-F)(?:\s*=\s*|\s+)\S+\s+|-r\s+|--recursive\s+|run\s+)*(?:build|install|i)\b/ },
+  { name: "pnpm build / install", pattern: /\bpnpm\s+(?:(?:--filter|-F)(?:\s*=\s*|\s+)[^\s=]\S*\s+|-r\s+|--recursive\s+|run\s+)*(?:build|install|i)\b/ },
   { name: "restart the hub or server", pattern: /(?<!without )\brestart(?:ing)?\s+(?:it\b|the hub\b|the server\b|the dashboard\b|n-dx\b|ndx\b|your server\b)/i },
   { name: "stop, then ndx start", pattern: /\bthen\s+['"`]?ndx start\b/ },
 ];
@@ -255,6 +255,22 @@ describe("restart-advice policy", () => {
       `log("Hint: Run 'pnpm install' (or 'pnpm build') from the repo root");`,
     ];
     for (const source of added) expect(findRestartAdvice(source).length, source).toBeGreaterThan(0);
+  });
+
+  it("matches a --filter value however it is joined, in linear time on input built to backtrack", () => {
+    const pnpm = FORBIDDEN.find((rule) => rule.name === "pnpm build / install").pattern;
+    for (const text of ["pnpm --filter=@n-dx/web build", "pnpm -F = @n-dx/web build", "pnpm -F @n-dx/web -r run build", "pnpm i"]) {
+      expect(pnpm.test(text), text).toBe(true);
+    }
+    expect(pnpm.test("pnpm -F @n-dx/web test")).toBe(false);
+    // CodeQL js/redos: an operator and value that two alternatives could both
+    // split ('=' as the joiner, or as the value's first character).
+    for (const unit of ["\t=! -F", " =! -F"]) {
+      const started = performance.now();
+      // 28 units take the old pattern seconds; a linear one, well under a millisecond.
+      expect(pnpm.test(`pnpm -F${unit.repeat(28)}`)).toBe(false);
+      expect(performance.now() - started, JSON.stringify(unit)).toBeLessThan(500);
+    }
   });
 
   it("reads strings, not comments, regular expressions or code", () => {
