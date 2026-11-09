@@ -229,8 +229,9 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 
 ## Changeset Versioning
 
-- **Always default changeset bumps to `patch`** across all affected packages unless explicitly instructed otherwise by a user.
-- **Use the scoped package name** (`@n-dx/rex`, `@n-dx/hench`, …) in changeset frontmatter. An unscoped name is not in the workspace and fails `changeset status`, breaking the release pipeline.
+- **Default changeset bumps to `patch`** for every affected package unless the user says otherwise.
+- **Use the scoped package name** (`@n-dx/rex`, …) in frontmatter. An unscoped name fails `changeset status` and breaks the release.
+- **Write bodies per `.claude/skills/ndx-release-notes/SKILL.md`.**
 
 ## Key Files
 
