@@ -75,7 +75,7 @@ import { commandJobsOf, type CommandJobKind } from "./routes-commands.js";
 import { rexAnalyzeJobStatus } from "./routes-rex-analysis.js";
 import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport, type ProcessCommandLine } from "./domain-gateway.js";
-import { collectCompletedIds, estimateCostFromTotals, findNextTask, findNextWorkTask, walkTree, type V2Tree } from "./rex-gateway.js";
+import { collectCompletedIds, currentWorkSetBranch, estimateCostFromTotals, findNextTask, findNextWorkTask, walkTree, type V2Tree } from "./rex-gateway.js";
 import { runsAsOneTask } from "./runnable-units.js";
 import { runnableRowText } from "./runnable-row.js";
 import { loadPRDSync, isV2Tree, PRD_CACHE_DIR, PRD_CACHE_JSON, type CachedPRDDocument } from "./prd-io.js";
@@ -429,24 +429,37 @@ function prdIndexFor(rexDir: string): PrdIndex {
  * (tasks already running somewhere). Rex's own selection, asked repeatedly
  * with the previous answers excluded, rather than a second ranking.
  */
-function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>): LiveNextTask[] {
+function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>, projectDir: string): LiveNextTask[] {
   if (!index.doc) return [];
-  const key = [...excluded].sort().join("\n");
+  // On a v2 tree the pick is narrowed to the checked-out branch's work set, and
+  // a checkout changes the branch without changing the PRD, so the branch keys the memo.
+  const branch = index.v2 ? currentWorkSetBranch(projectDir) : null;
+  const key = `${branch ?? ""}\n${[...excluded].sort().join("\n")}`;
   const memo = index.nextByExcluded.get(key);
   if (memo) return memo;
-  const next = rankNextTasks(index, index.doc, excluded);
+  const next = rankNextTasks(index, index.doc, excluded, projectDir);
   index.nextByExcluded.set(key, next);
   return next;
 }
 
-function rankNextTasks(index: PrdIndex, doc: CachedPRDDocument, excluded: ReadonlySet<string>): LiveNextTask[] {
+function rankNextTasks(index: PrdIndex, doc: CachedPRDDocument, excluded: ReadonlySet<string>, projectDir: string): LiveNextTask[] {
   const excludeIds = new Set(excluded);
   const next: LiveNextTask[] = [];
   // Rex's change-layer projection retains each node's v2 fields. Selection
   // needs only that layer, so the monitor keeps using its watcher-owned cache.
   const tree: V2Tree | null = index.v2 ? { product: doc.product ?? [], changes: doc.items as unknown as V2Tree["changes"] } : null;
+  // The branch's work set is read once, with the first pick, and narrows the rest as `ndx work` is narrowed.
+  let workSet: ReadonlySet<string> | undefined;
+  let first = true;
   while (next.length < NEXT_TASK_LIMIT) {
-    const entry = tree ? findNextWorkTask(tree, { excludeIds }) : findNextTask(doc.items, index.completedIds, { excludeIds });
+    let entry;
+    if (!tree) entry = findNextTask(doc.items, index.completedIds, { excludeIds });
+    else if (first) {
+      const picked = findNextWorkTask(tree, { excludeIds, workspace: projectDir });
+      workSet = picked.workSet ? new Set(picked.workSet.ids) : undefined;
+      entry = picked.task;
+    } else entry = findNextWorkTask(tree, { excludeIds, workSet });
+    first = false;
     if (!entry) break;
     excludeIds.add(entry.item.id);
     next.push({
@@ -709,7 +722,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
     });
   }
 
-  const next = nextTasks(prdIndexFor(ctx.rexDir), runningTaskIds);
+  const next = nextTasks(prdIndexFor(ctx.rexDir), runningTaskIds, ctx.projectDir);
 
   const memory = readSystemMemory();
   const floorBytes = (sources.memoryFloorBytes ?? defaultMemoryFloor)();

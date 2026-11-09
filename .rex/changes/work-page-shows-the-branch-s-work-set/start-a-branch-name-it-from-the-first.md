@@ -9,9 +9,9 @@ acceptanceCriteria:
   - "On a dirty tree or with a live run it creates the branch only and says how to switch (web route tests)"
   - "A name clash is refused with nothing created, and a stacked start cuts from the current branch (web route tests)"
   - "The dialog prefills the name from the first change's slug and offers stacking only on a work-set branch (viewer test)"
-blockedBy:
-  - "96d87594-7e56-4c39-9bbf-c632612f5c61"
 priority: "high"
 run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 source: "ndx-capture"
+blockedBy:
+  - "96d87594-7e56-4c39-9bbf-c632612f5c61"
 ---

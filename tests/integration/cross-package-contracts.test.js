@@ -526,6 +526,9 @@ describe("web → rex gateway contract", () => {
     "nodeSpec",
     // Ready to run shows a change with no tasks as one task
     "changeWorkShape",
+    // The Work page's branch work set: Add and Remove write through assign_to_branch's handler
+    "handleAssignToBranch",
+    "currentWorkSetBranch",
     // trailer-commit evidence — the commits and files a Sidecar lens packet quotes
     "loadTrailerCommits",
     "loadCommitFiles",
@@ -1031,7 +1034,9 @@ describe("gateway export auto-detection", () => {
         // The Sidecar change-set card flags proposed items with smart add's own matcher.
         "findDuplicateItem",
         // Ready to run shows a change with no tasks as one task.
-        "changeWorkShape"],
+        "changeWorkShape",
+        // The Work page's branch work set: Add and Remove write through assign_to_branch's handler.
+        "handleAssignToBranch", "currentWorkSetBranch"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);

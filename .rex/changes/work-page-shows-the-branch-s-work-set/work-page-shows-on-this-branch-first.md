@@ -9,9 +9,9 @@ acceptanceCriteria:
   - "A task inherited from its change says so (viewer test)"
   - "On main and on an unassigned branch the Work page renders as before (viewer test)"
   - "Ready to run and Start show only the set's units, and an empty set names `--any` through the CLI-name helper (viewer test)"
-blockedBy:
-  - "d25d1516-fa91-4a86-86a0-b7b51b1e604e"
 priority: "high"
 run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
 source: "ndx-capture"
+blockedBy:
+  - "d25d1516-fa91-4a86-86a0-b7b51b1e604e"
 ---

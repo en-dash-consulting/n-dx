@@ -8,7 +8,14 @@ items:
     lastModified: "2026-11-09T17:05:11.778Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d25d1516-fa91-4a86-86a0-b7b51b1e604e":
-    lastModified: "2026-11-09T17:05:06.802Z"
+    status: "completed"
+    startedAt: "2026-11-09T17:06:05.774Z"
+    completedAt: "2026-11-09T17:13:35.921Z"
+    endedAt: "2026-11-09T17:13:35.921Z"
+    activeIntervals: [{"end":"2026-11-09T17:13:35.921Z","start":"2026-11-09T17:06:05.774Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "GET /api/rex/work-set, POST add/remove via handleAssignToBranch, Ready/Live/Plan glance narrowed to the branch work set; gateway held at 137."
+    lastModified: "2026-11-09T17:13:35.921Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f6300273-9ee4-46c2-8a4a-30cc4b200d69":
     lastModified: "2026-11-09T17:05:16.713Z"
