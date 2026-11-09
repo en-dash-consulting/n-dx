@@ -51,6 +51,15 @@ describe("describeLiveWork", () => {
     expect(describeLiveWork({ runs: [{ project: "a", count: 2 }], mcpSessions: [] })).toBe("2 agent runs (a)");
     expect(describeLiveWork({ runs: [], mcpSessions: [{ project: "b", count: 1 }] })).toBe("1 open MCP session (b)");
   });
+
+  it("names Sidecar turns in flight, in a project and in the hub's own Sidecar, so either defers", () => {
+    const project = { runs: [], mcpSessions: [], sidecarTurns: [{ project: "beta", count: 1 }] };
+    expect(describeLiveWork(project)).toBe("1 Sidecar turn in progress (beta)");
+    expect(describeLiveWork({ runs: [], mcpSessions: [], hubSidecarTurns: 1 })).toBe("a turn in progress in the hub's Sidecar");
+    expect(describeLiveWork({ ...busy, sidecarTurns: [{ project: "beta", count: 2 }], hubSidecarTurns: 1 }))
+      .toBe("1 agent run (alpha), 3 open MCP sessions (beta, gamma), 2 Sidecar turns in progress (beta) and a turn in progress in the hub's Sidecar");
+    expect(planHubReplacement({ reason, liveWork: { runs: [], mcpSessions: [], hubSidecarTurns: 1 }, force: false, port: 4100 }).action).toBe("defer");
+  });
 });
 
 describe("planHubReplacement", () => {

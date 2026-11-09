@@ -64,8 +64,12 @@ const server = createServer((req, res) => {
       return reply(201, { project: { id: "omega-app", status: { state: "healthy" } } });
     }
     if (req.method === "GET" && /^\\/p\\/[^/]+\\/api\\/hench\\/execute\\/status$/.test(url)) return reply(200, { executions: [] });
-    if (req.method === "GET" && /^\\/p\\/[^/]+\\/api\\/mcp\\/sessions$/.test(url)) {
-      return busy === "busy" ? reply(200, { rex: 1, sourcevision: 0 }) : reply(404, { error: "Not found" });
+    const liveWork = /^\\/p\\/([^/]+)\\/api\\/live-work$/.exec(url);
+    if (req.method === "GET" && liveWork) {
+      // \`busy\`: one MCP session per project. \`extra.turns[id]\`: Sidecar turns in that project's server.
+      const turns = (JSON.parse(extra || "{}").turns || {})[liveWork[1]] || { worktree: 0, hub: 0 };
+      if (busy !== "busy" && !JSON.parse(extra || "{}").turns) return reply(404, { error: "Not found" });
+      return reply(200, { mcpSessions: { rex: busy === "busy" ? 1 : 0, sourcevision: 0 }, sidecarTurns: turns });
     }
     // A newer hub has the nonce route; an older one proxies the request and gets 409.
     if (req.method === "POST" && url === "/api/auth/nonce" && JSON.parse(extra || "{}").nonce) return reply(200, { nonce: "n0nce", expiresAt: Date.now() + 60000 });
@@ -348,6 +352,38 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       const health = await hubGet(older.port, "/api/hub/health");
       expect(health.body.faults).toEqual([]);
       await expectProjectsServedAgain(older.port);
+    });
+  });
+
+  describe("with Sidecar turns in flight on it", () => {
+    let fx;
+    let older;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      // beta-app's own Sidecar has a turn running; alpha-app's server hosts the hub's Sidecar, also mid-turn.
+      older = await startOlderHub(fx.home, false, {
+        turns: { "alpha-app": { worktree: 0, hub: 1 }, "beta-app": { worktree: 1, hub: 0 } },
+      });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("defers, naming the project-scope and the hub-scope turn", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(result.stderr).toContain("would interrupt 1 Sidecar turn in progress (beta-app) and a turn in progress in the hub's Sidecar");
+      expect(result.stderr).toContain("--replace-hub");
+      expect(alive(older.child.pid)).toBe(true);
+      expectNoManualRestart(result.stdout + result.stderr);
     });
   });
 

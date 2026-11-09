@@ -2088,8 +2088,9 @@ async function waitForPortFree(port, timeoutMs) {
 /**
  * Work a hub restart would interrupt: hench runs holding a lock in each
  * registered project (an `ndx work` in a terminal holds one as much as a
- * dashboard run), runs the project's server reports as executing, and MCP
- * sessions open on it through the hub.
+ * dashboard run), runs the project's server reports as executing, and what
+ * its `/api/live-work` reports — MCP sessions open on it through the hub,
+ * and Sidecar turns in progress, the hub-scope session's included.
  *
  * Only called once the hub has been identified as this user's own, so the
  * token may go to it. A server that cannot answer — too old to report MCP
@@ -2113,21 +2114,30 @@ async function gatherHubLiveWork(port, projects) {
     }
     let executions = 0;
     let sessions = 0;
+    let turns = 0;
+    let hubTurns = 0;
     const base = `/p/${encodeURIComponent(record.id)}`;
-    const [ex, mcp] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/mcp/sessions`)]);
+    const [ex, live] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/live-work`)]);
     if (ex.status === 200 && Array.isArray(ex.body?.executions)) {
       executions = ex.body.executions.filter((e) => e?.status === "starting" || e?.status === "running").length;
     }
-    if (mcp.status === 200 && mcp.body && typeof mcp.body === "object") {
-      sessions = (Number(mcp.body.rex) || 0) + (Number(mcp.body.sourcevision) || 0);
+    // `/api/live-work`: MCP sessions, and Sidecar turns — the project's own,
+    // and the hub-scope session's when this server hosts it.
+    if (live.status === 200 && live.body && typeof live.body === "object") {
+      const count = (n) => (Number.isFinite(Number(n)) ? Math.max(0, Number(n)) : 0);
+      sessions = count(live.body.mcpSessions?.rex) + count(live.body.mcpSessions?.sourcevision);
+      turns = count(live.body.sidecarTurns?.worktree);
+      hubTurns = count(live.body.sidecarTurns?.hub);
     }
     // A dashboard run holds a hench lock too: the larger count, not the sum.
-    return { project: record.id, runs: Math.max(locks, executions), sessions };
+    return { project: record.id, runs: Math.max(locks, executions), sessions, turns, hubTurns };
   }));
   entries.sort((x, y) => x.project.localeCompare(y.project));
   return {
     runs: entries.map((e) => ({ project: e.project, count: e.runs })),
     mcpSessions: entries.map((e) => ({ project: e.project, count: e.sessions })),
+    sidecarTurns: entries.map((e) => ({ project: e.project, count: e.turns })),
+    hubSidecarTurns: entries.reduce((n, e) => n + e.hubTurns, 0),
   };
 }
 

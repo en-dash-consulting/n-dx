@@ -3,7 +3,6 @@
  *
  * POST/GET/DELETE /mcp/rex          — Rex MCP endpoint (Streamable HTTP transport)
  * POST/GET/DELETE /mcp/sourcevision — Sourcevision MCP endpoint (Streamable HTTP transport)
- * GET             /api/mcp/sessions — how many sessions each endpoint holds open
  *
  * Each endpoint manages its own transport + MCP server lifecycle.
  * Sessions are stateful (session ID generated per initialize request).
@@ -25,7 +24,6 @@ import type { ServerContext } from "./types.js";
 
 const MCP_REX_PATH = "/mcp/rex";
 const MCP_SV_PATH = "/mcp/sourcevision";
-const MCP_SESSIONS_PATH = "/api/mcp/sessions";
 
 /**
  * A per-session MCP transport + server pair.
@@ -263,14 +261,6 @@ export async function handleMcpRoute(
   // Strip query string for path matching
   const path = url.split("?")[0];
 
-  // How many sessions are open, for `ndx start`: replacing an older hub stops
-  // this server, which would cut those sessions off, so it waits for them.
-  if (path === MCP_SESSIONS_PATH && (req.method || "GET") === "GET") {
-    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    res.end(JSON.stringify(mcpSessionCounts()));
-    return true;
-  }
-
   // Only claim MCP paths; non-MCP paths fall through to other handlers.
   if (path !== MCP_REX_PATH && path !== MCP_SV_PATH) return false;
 
@@ -289,7 +279,7 @@ export async function handleMcpRoute(
 
 /**
  * Sessions open on each endpoint and active within the idle TTL — the ones
- * a client is still using. One the sweep has not yet closed but that has
+ * a client is still using. Reported on `GET /api/live-work` (routes-live-work.ts). One the sweep has not yet closed but that has
  * been idle past the TTL is about to go and is not counted.
  */
 export function mcpSessionCounts(now = Date.now()): { rex: number; sourcevision: number } {

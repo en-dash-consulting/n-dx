@@ -22,6 +22,7 @@ import {
   mcpSessionCounts,
   reloadMcpFactories,
 } from "../../../src/server/routes-mcp.js";
+import { liveWorkReport } from "../../../src/server/routes-live-work.js";
 import { handleRequestSecurity } from "../../../src/server/request-security.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -129,8 +130,8 @@ describe("MCP routes", () => {
     await client.close();
   });
 
-  it("GET /api/mcp/sessions counts the sessions open on each endpoint, for ndx start's hub replacement", async () => {
-    const count = async () => (await fetch(`http://127.0.0.1:${port}/api/mcp/sessions`)).json();
+  it("counts the sessions open on each endpoint, which GET /api/live-work reports for ndx start's hub replacement", async () => {
+    const count = async () => liveWorkReport().mcpSessions;
     expect(await count()).toEqual({ rex: 0, sourcevision: 0 });
 
     const client = new Client({ name: "test-client", version: "1.0.0" });

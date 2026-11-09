@@ -44,6 +44,8 @@ export const REPLACE_HUB_FLAG = "--replace-hub";
  * @typedef {object} HubLiveWork
  * @property {Array<{ project: string, count: number }>} runs         Agent runs (hench locks, dashboard executions) per project.
  * @property {Array<{ project: string, count: number }>} mcpSessions  MCP sessions open through the hub, per project.
+ * @property {Array<{ project: string, count: number }>} [sidecarTurns]  Sidecar turns in progress in each project's own sessions.
+ * @property {number} [hubSidecarTurns]  Turns in progress in the hub-scope Sidecar session (hosted by one project server).
  */
 
 /** @param {number} pid */
@@ -102,9 +104,15 @@ export function describeLiveWork(work) {
     const total = live.reduce((n, e) => n + e.count, 0);
     return `${total} ${total === 1 ? one : many} (${live.map((e) => e.project).join(", ")})`;
   };
-  const parts = [part(work.runs, "agent run", "agent runs"), part(work.mcpSessions, "open MCP session", "open MCP sessions")]
-    .filter(Boolean);
-  return parts.length === 0 ? null : parts.join(" and ");
+  const hubTurns = work.hubSidecarTurns ?? 0;
+  const parts = [
+    part(work.runs, "agent run", "agent runs"),
+    part(work.mcpSessions, "open MCP session", "open MCP sessions"),
+    part(work.sidecarTurns ?? [], "Sidecar turn in progress", "Sidecar turns in progress"),
+    hubTurns > 0 ? `${hubTurns === 1 ? "a turn" : `${hubTurns} turns`} in progress in the hub's Sidecar` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
 /**
