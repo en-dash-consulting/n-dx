@@ -67,6 +67,12 @@ const server = createServer((req, res) => {
     }
     if (req.method === "GET" && /^\\/p\\/[^/]+\\/api\\/hench\\/execute\\/status$/.test(url)) return reply(200, { executions: [] });
     const liveWork = /^\\/p\\/([^/]+)\\/api\\/live-work$/.exec(url);
+    // \`extra.exitOnLiveWork\`: another ndx start stops this hub while its live work is read.
+    if (req.method === "GET" && liveWork && JSON.parse(extra || "{}").exitOnLiveWork) {
+      server.close();
+      server.closeAllConnections();
+      return process.exit(0);
+    }
     if (req.method === "GET" && liveWork) {
       // \`extra.liveWorkStatus[id]\`: that project's server answers with this error status instead.
       const failed = (JSON.parse(extra || "{}").liveWorkStatus || {})[liveWork[1]];
@@ -520,6 +526,41 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.stderr).toContain(`The n-dx hub on port ${older.port} was replaced by another ndx start while this one was checking it`);
       expect(alive(older.child.pid)).toBe(true);
       expectNoManualRestart(result.stdout + result.stderr);
+    });
+  });
+
+  describe("when another ndx start stops the hub while its live work is read", () => {
+    let fx;
+    let older;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      // It closes its listener and exits on the first live-work probe, so no
+      // project answers: what the losing side of a concurrent replacement sees.
+      older = await startOlderHub(fx.home, false, { exitOnLiveWork: true });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("does not defer on the projects it could not ask, and serves from the hub there next", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(result.stderr).not.toContain("could not be checked");
+      expect(result.stderr).not.toContain("Registering with the n-dx hub failed");
+      expect(result.stdout).toContain("ndx_nonce=");
+      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expectNoManualRestart(result.stdout + result.stderr);
+      const health = await hubGet(older.port, "/api/hub/health");
+      expect(health.status).toBe(200);
+      expect(health.body.build).toBeTruthy();
     });
   });
 

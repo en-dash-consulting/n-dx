@@ -2108,6 +2108,9 @@ async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
  * first — nothing is stopped, and `{ changed: true }` asks the caller to
  * judge the hub that is there now. Without this the second command would stop
  * the hub the first had just started, and every project would go down twice.
+ * The same holds when the other command stops the hub while this one reads
+ * its live work: projects that could not be asked because the hub itself went
+ * away ({@link hubGoingAway}) defer nothing, and the hub there next is judged.
  *
  * @param {number} port
  * @param {import("./hub-replacement.js").HubReplacementReason} reason
@@ -2130,7 +2133,17 @@ async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, 
   const projects = await readHubRegistry(home);
   const liveWork = await gatherHubLiveWork(port, projects);
   const plan = planHubReplacement({ reason, liveWork, force, port });
-  if (plan.action === "defer") return { spawned: false, pid: null, deferred: plan.note };
+  if (plan.action === "defer") {
+    // A concurrent `ndx start` stopping this same hub makes every project
+    // unanswerable: the hub closes its listener first. Unanswered is not live
+    // work, so when the hub itself has gone quiet, wait for the port to come
+    // free or the other command's hub to answer, and judge what is there.
+    if ((liveWork.unchecked?.length ?? 0) > 0 && (await hubGoingAway(port, own.pid))) {
+      const settled = await waitForPortFreeOrNewHub(port, own.pid, home, HUB_STOP_GRACE_MS + 5_000);
+      if (settled !== "held") return { spawned: false, pid: null, changed: true };
+    }
+    return { spawned: false, pid: null, deferred: plan.note };
+  }
 
   console.error(hubReplacementNotice(reason, port, Object.keys(projects).length, plan.interrupts));
   // Signed-in dashboard tabs stay signed in: the old hub writes its live
@@ -2154,6 +2167,23 @@ async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, 
     : await spawnReplacementHub(() => spawnHub(port, { tools, __dir, home, tokenFile }), { port, projects: Object.keys(projects).length });
   const restored = await restoreHubProjects(port, projects, home);
   return { ...spawned, restored };
+}
+
+/**
+ * Whether the hub identified as `pid` is no longer the one serving `port`:
+ * its process is gone, it no longer answers its own health route (a hub
+ * closes its listener first when stopped), or another pid answers there.
+ *
+ * @param {number} port
+ * @param {number} pid
+ * @returns {Promise<boolean>}
+ */
+async function hubGoingAway(port, pid) {
+  if (!isProcessRunning(pid)) return true;
+  const health = await hubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
+  if (health.status !== 200) return true;
+  const answering = health.body?.pid;
+  return Number.isInteger(answering) && answering !== pid;
 }
 
 /** What a command that found its replacement already done reports: no spawn of its own, and a note. */
