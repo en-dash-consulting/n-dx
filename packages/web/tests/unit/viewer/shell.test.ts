@@ -502,21 +502,21 @@ describe("StagePage", () => {
 
   const planTiles = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
 
-  it("renders Plan as the capture bar, then Product, Inbox, Open changes, Plan health and Specs to tighten tiles", async () => {
+  it("renders Plan as the capture bar, then Inbox, Open changes, Plan health and Specs to tighten tiles", async () => {
     await mount(page("plan"));
     expect(sectionViews()).toEqual(["analysis"]);
-    expect(planTiles()).toEqual(["product-map", "inbox", "changes-glance", "plan-health", "spec-gaps"]);
+    expect(planTiles()).toEqual(["inbox", "changes-glance", "plan-health", "spec-gaps"]);
     const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
-    expect(spans).toEqual(["stage-tile--c12 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1", "stage-tile--c6 stage-tile--r1"]);
+    expect(spans).toEqual(["stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1", "stage-tile--c6 stage-tile--r1"]);
     expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
   });
 
-  it("opens Open changes full-screen with List and Tree tabs", async () => {
+  it("opens Open changes full-screen with List, Tree and Product tabs", async () => {
     await mount(page("plan"));
     act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes-glance"] .stage-tile-head')!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);
+    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree", "Product"]);
     act(() => { tabs[1]!.click(); });
     // Directly inside the tab panel: stage-tiles.css bounds the tree through `.stage-tile-content > div > .prd-view`.
     expect(full.querySelector('.stage-tile-content > div > [data-rendered="prd"]')).not.toBeNull();

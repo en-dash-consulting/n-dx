@@ -74,8 +74,6 @@ import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
-import { ProductAreaMap, openAreaChanges } from "./product-area-map.js";
-import { AreaInPlace } from "./area.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
@@ -198,20 +196,6 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
     case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
-    // A block opens its area in the tile's full-screen; the folded block, the whole map.
-    case "product-map": {
-      if (!opened) {
-        return h(ProductAreaMap, {
-          onOpenArea: (slug: string | null, title: string) =>
-            grid.openTile("product-map", slug ? { id: slug, label: title } : undefined),
-          onOpenChanges: (areaSlug: string | null) => openAreaChanges(ctx.navigateTo, areaSlug),
-        });
-      }
-      const slug = grid.focus?.id;
-      return slug
-        ? h(AreaInPlace, { slug, onOpenPage: () => ctx.navigateTo("product", { tab: `area/${encodeURIComponent(slug)}` }), navigateTo: ctx.navigateTo })
-        : h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo });
-    }
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);

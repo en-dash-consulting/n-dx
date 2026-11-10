@@ -80,11 +80,10 @@ afterEach(() => {
 });
 
 describe("routing", () => {
-  it("places Product and Changes on the Plan stage as server-backed rex views", () => {
+  it("places Changes on the Plan stage, with Product as its tab and no area map tile", () => {
     const plan = STAGES.plan.tiles!.filter((t) => !t.band && (t.view === "product" || t.view === "changes"));
     expect(plan).toEqual([
-      { view: "product", panel: "product-map", title: "Product", embedsView: true, cols: 12, rows: 2, v2Only: true, requiresServer: true },
-      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 6, v2Only: true, requiresServer: true },
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);

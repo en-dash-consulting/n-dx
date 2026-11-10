@@ -6,17 +6,13 @@ import {
   AreaBlock,
   BLOCK_STATUS_LABELS,
   BLOCK_STATUS_ORDER,
-  MAX_BLOCKS,
-  ProductAreaMap,
-  areaBlocks,
+  areaBlock,
   blockName,
   blockStatus,
-  openAreaChanges,
 } from "../../../src/viewer/views/product-area-map.js";
 import { areaPath } from "../../../src/viewer/views/area.js";
-import { stageFilter, storeFilter } from "../../../src/viewer/views/changes.js";
 import { areaCapabilityOfTab, areaSlugOfTab, parsePathnameRoute, routeTab, viewPathname } from "../../../src/viewer/route-state.js";
-import type { AreaSection, CapabilityRow, ProductMap } from "../../../src/viewer/views/product-model.js";
+import type { AreaSection, CapabilityRow } from "../../../src/viewer/views/product-model.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
 const overlay = (id: string) => ({ id, title: id, stage: "proposed" as const });
@@ -44,26 +40,12 @@ describe("blockStatus", () => {
   });
 });
 
-describe("areaBlocks", () => {
-  it("draws one block per area: size is its capability count, open changes are the server's per-area count", () => {
+describe("areaBlock", () => {
+  it("sizes a block by its capability count; open changes are the server's per-area count", () => {
     // The area's count wins over its capabilities' overlays: an addition under
     // the area, or an amendment of the area itself, appears in no overlay.
-    const [block] = areaBlocks([area("a", [cap({ openChanges: [overlay("x")] }), cap()], ["x", "y", "z"])]);
+    const block = areaBlock(area("a", [cap({ openChanges: [overlay("x")] }), cap()], ["x", "y", "z"]));
     expect(block).toMatchObject({ slug: "a", size: 2, openChanges: 3, status: "met" });
-  });
-
-  it("folds the smallest areas past the cap into one block, keeping order", () => {
-    const areas = Array.from({ length: MAX_BLOCKS + 3 }, (_, i) =>
-      area(`a${i}`, Array.from({ length: i < 3 ? 1 : 2 }, () => cap())));
-    // One change open in two folded areas counts once.
-    areas[0]!.openChangeIds = ["x"];
-    areas[1]!.openChangeIds = ["x", "y"];
-    const blocks = areaBlocks(areas);
-    expect(blocks).toHaveLength(MAX_BLOCKS);
-    const folded = blocks.at(-1)!;
-    expect(folded).toMatchObject({ label: "+4 smaller areas", slug: null, size: 5, openChanges: 2 });
-    // a0-a2 (one capability each) and the last of the equal-sized rest fold.
-    expect(blocks.slice(0, -1).map((b) => b.slug)).toEqual(areas.slice(3, MAX_BLOCKS + 2).map((a) => a.slug));
   });
 });
 
@@ -124,7 +106,7 @@ describe("AreaBlock", () => {
 
   it("is a button with an accessible name that opens on click", async () => {
     const onOpen = vi.fn();
-    const block = areaBlocks([area("a", [cap({ openChanges: [overlay("x")] })], ["x"])])[0]!;
+    const block = areaBlock(area("a", [cap({ openChanges: [overlay("x")] })], ["x"]));
     await act(async () => { render(h(AreaBlock, { block, onOpen }), root); });
     const button = root.querySelector("button")!;
     expect(button.getAttribute("aria-label")).toBe("A: 1 capability, met, 1 open change");
@@ -135,7 +117,7 @@ describe("AreaBlock", () => {
 
   describe("with an open-changes handler", () => {
     const mountBadge = async (openChangeIds: string[], onOpen = vi.fn(), onOpenChanges = vi.fn()) => {
-      const block = areaBlocks([area("a", [cap()], openChangeIds)])[0]!;
+      const block = areaBlock(area("a", [cap()], openChangeIds));
       await act(async () => { render(h(AreaBlock, { block, onOpen, onOpenChanges }), root); });
       return { onOpen, onOpenChanges };
     };
@@ -168,93 +150,8 @@ describe("AreaBlock", () => {
   });
 
   it("omits the marker when no change is open", async () => {
-    const block = areaBlocks([area("a", [cap()])])[0]!;
+    const block = areaBlock(area("a", [cap()]));
     await act(async () => { render(h(AreaBlock, { block, onOpen: () => {} }), root); });
     expect(root.querySelector(".pam-open")).toBeNull();
-  });
-});
-
-describe("openAreaChanges", () => {
-  afterEach(() => { localStorage.clear(); });
-
-  it("opens Open changes at ?area=<slug>, leaving the remembered filter alone", () => {
-    storeFilter(stageFilter("ready"));
-    const navigateTo = vi.fn();
-    openAreaChanges(navigateTo, "checkout");
-    expect(navigateTo).toHaveBeenCalledWith("changes", { area: "checkout" });
-    expect(localStorage.getItem("ndx.changes.filter")).toBe(stageFilter("ready"));
-  });
-
-  it("replaces a remembered filter with Open for the folded block", () => {
-    storeFilter(stageFilter("ready"));
-    const navigateTo = vi.fn();
-    openAreaChanges(navigateTo, null);
-    expect(localStorage.getItem("ndx.changes.filter")).toBe("open");
-    expect(navigateTo).toHaveBeenCalledWith("changes");
-  });
-});
-
-describe("ProductAreaMap", () => {
-  let root: HTMLElement;
-  const onOpenArea = vi.fn();
-  beforeEach(() => { root = document.createElement("div"); document.body.appendChild(root); onOpenArea.mockReset(); });
-  afterEach(() => { render(null, root); root.remove(); vi.unstubAllGlobals(); });
-
-  const map: ProductMap = {
-    areas: [area("a", [cap(), cap({ status: "changing" })]), area("b", [cap({ health: "defective" })])],
-    constraints: [],
-  };
-
-  async function mount(body: unknown) {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => body })));
-    await act(async () => { render(h(ProductAreaMap, { onOpenArea }), root); });
-    await act(async () => {});
-  }
-
-  it("draws a tinted block per area with a legend, and opens an area by slug", async () => {
-    await mount({ layout: "v2", map });
-    const blocks = [...root.querySelectorAll<HTMLButtonElement>(".pam-block")];
-    expect(blocks.map((b) => b.dataset.status)).toEqual(["changing", "defective"]);
-    // Area blocks keep the stylesheet's basis; only the spec map sizes it inline.
-    expect(blocks.map((b) => b.style.flexBasis)).toEqual(["", ""]);
-    expect(root.querySelector(".pam-legend")?.textContent).toContain("Defective");
-    blocks[1]!.click();
-    expect(onOpenArea).toHaveBeenCalledWith("b", "B");
-  });
-
-  it("explains size, tint and the open badge in one line, naming every block status", async () => {
-    await mount({ layout: "v2", map });
-    const key = root.querySelector(".pam-key")?.textContent ?? "";
-    expect(key).toMatch(/size = capabilities/);
-    expect(key).toMatch(/N open/);
-    for (const status of BLOCK_STATUS_ORDER) expect(key).toContain(BLOCK_STATUS_LABELS[status]);
-    // The tint names are the legend's swatch names, which tint the blocks.
-    const swatches = [...root.querySelectorAll(".pam-legend .pam-swatch")].map((s) => s.parentElement?.textContent);
-    expect(swatches).toEqual(BLOCK_STATUS_ORDER.map((s) => BLOCK_STATUS_LABELS[s]));
-  });
-
-  it("passes the area slug (what ?area= takes) from a badge, and none from the folded block's", async () => {
-    const onOpenChanges = vi.fn();
-    const areas = Array.from({ length: MAX_BLOCKS + 1 }, (_, i) => area(`a${i}`, [cap()], [`c${i}`]));
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ layout: "v2", map: { areas, constraints: [] } }) })));
-    await act(async () => { render(h(ProductAreaMap, { onOpenArea, onOpenChanges }), root); });
-    await act(async () => {});
-    root.querySelector<HTMLButtonElement>('[data-open-changes="id-a3"]')!.click();
-    expect(onOpenChanges).toHaveBeenLastCalledWith("a3", "A3");
-    root.querySelector<HTMLButtonElement>('[data-open-changes="folded"]')!.click();
-    expect(onOpenChanges).toHaveBeenLastCalledWith(null, "+2 smaller areas");
-    expect(onOpenArea).not.toHaveBeenCalled();
-  });
-
-  it("opens the folded block with no slug", async () => {
-    const areas = Array.from({ length: MAX_BLOCKS + 1 }, (_, i) => area(`a${i}`, [cap()]));
-    await mount({ layout: "v2", map: { areas, constraints: [] } });
-    root.querySelector<HTMLButtonElement>('.pam-block[data-block="folded"]')!.click();
-    expect(onOpenArea).toHaveBeenCalledWith(null, "+2 smaller areas");
-  });
-
-  it("says so when the project has no areas", async () => {
-    await mount({ layout: "v2", map: { areas: [], constraints: [] } });
-    expect(root.textContent).toContain("No areas yet");
   });
 });

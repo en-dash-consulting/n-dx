@@ -1,23 +1,14 @@
 /**
- * Plan's product area map: one block per area, sized by how many capabilities
- * it holds, tinted by its computed status, with a count of the open changes
- * that touch, amend or add under it (the server's `openChangeIds`). A block
- * opens the area view (views/area.ts) in the tile's full-screen, at
- * `/product/area/<slug>`.
- *
- * Reads the product map the Product page already fetches. `AreaBlock` is the
- * reusable part — the area view draws an area's capabilities with it.
+ * Product map blocks: one block per area or capability, sized by what it
+ * holds, tinted by its computed status, with a count of the open changes that
+ * touch, amend or add under it (the server's `openChangeIds`). Placement mode
+ * and the area view draw with `AreaBlock`; Plan no longer shows an area map.
  *
  * @module viewer/views/product-area-map
  */
 
 import { h } from "preact";
-import { useContext, useMemo } from "preact/hooks";
-import { useProductRead } from "../hooks/index.js";
-import { GhostCardsContext, ghostCountsByTarget } from "../components/index.js";
-import type { NavigateTo } from "../types.js";
-import { storeFilter } from "./changes.js";
-import type { AreaSection, ProductMap } from "./product-model.js";
+import type { AreaSection } from "./product-model.js";
 
 /** What tints a block. Defective outranks the status of the capabilities. */
 export type BlockStatus = "met" | "changing" | "proposed" | "defective";
@@ -30,9 +21,6 @@ export const BLOCK_STATUS_LABELS: Readonly<Record<BlockStatus, string>> = {
   proposed: "Proposed",
   defective: "Defective",
 };
-
-/** Blocks the map draws before the smallest areas fold into one. */
-export const MAX_BLOCKS = 12;
 
 /** The slice of a capability a block's status reads. */
 interface Counted {
@@ -98,36 +86,6 @@ export function areaBlock(area: AreaSection, ghostCounts: GhostCounts = new Map(
     openChanges: distinctOpenChanges([area]),
     slug: area.slug,
   };
-}
-
-/**
- * One block per area in the map's order. Past `MAX_BLOCKS`, the smallest areas
- * (ties keep the earlier area) fold into a "+N smaller areas" block.
- */
-export function areaBlocks(areas: readonly AreaSection[], ghostCounts: GhostCounts = new Map()): AreaBlockModel[] {
-  if (areas.length <= MAX_BLOCKS) return areas.map((a) => areaBlock(a, ghostCounts));
-  const keep = new Set(
-    areas
-      .map((area, index) => ({ area, index }))
-      .sort((a, b) => b.area.capabilities.length - a.area.capabilities.length || a.index - b.index)
-      .slice(0, MAX_BLOCKS - 1)
-      .map(({ area }) => area.id),
-  );
-  const folded = areas.filter((a) => !keep.has(a.id));
-  const rows = folded.flatMap((a) => a.capabilities);
-  return [
-    ...areas.filter((a) => keep.has(a.id)).map((a) => areaBlock(a, ghostCounts)),
-    {
-      ghosts: areaGhosts(folded, ghostCounts),
-      key: "folded",
-      label: `+${folded.length} smaller areas`,
-      size: rows.length,
-      unit: "capabilities",
-      status: blockStatus(rows),
-      openChanges: distinctOpenChanges(folded),
-      slug: null,
-    },
-  ];
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -234,74 +192,4 @@ export function BlockLegend() {
         BLOCK_STATUS_LABELS[status])),
     h("li", null, h("span", { class: "pam-open pam-legend-open", "aria-hidden": "true" }, "n open"), "open changes"),
   );
-}
-
-/**
- * What the product map's three encodings mean, in one line. The tint names come
- * from `BLOCK_STATUS_LABELS`, so they cannot drift from the block statuses.
- */
-export function mapKey(): string {
-  const tints = BLOCK_STATUS_ORDER.map((s) => BLOCK_STATUS_LABELS[s]).join(", ");
-  return `Block size = capabilities in the area · tint = computed status (${tints}) · N open = open changes touching it`;
-}
-
-/**
- * Opens an area from its block: its slug and title, or a null slug for the
- * block that folds the smaller areas (which opens the whole map).
- */
-export type OpenArea = (slug: string | null, title: string) => void;
-
-/**
- * Opens Open changes from a block's badge: the area's slug, or null for the
- * block that folds smaller areas (no single area to filter to).
- */
-export type OpenAreaChanges = (areaSlug: string | null, title: string) => void;
-
-/**
- * Opens Open changes at `?area=<slug>`, which lists the changes the badge
- * counted. The folded block opens on every open change, never on whatever
- * filter the page last remembered.
- */
-export function openAreaChanges(navigateTo: NavigateTo, areaSlug: string | null): void {
-  if (areaSlug) {
-    navigateTo("changes", { area: areaSlug });
-    return;
-  }
-  storeFilter("open");
-  navigateTo("changes");
-}
-
-export function AreaBlocks({ map, onOpenArea, onOpenChanges }: {
-  map: ProductMap;
-  onOpenArea: OpenArea;
-  onOpenChanges?: OpenAreaChanges;
-}) {
-  const cards = useContext(GhostCardsContext);
-  const ghostCounts = useMemo(() => ghostCountsByTarget(cards), [cards]);
-  if (map.areas.length === 0) {
-    return h("div", { class: "empty-state", role: "status" }, "No areas yet. They appear once the product layer is populated.");
-  }
-  return h("div", { class: "pam" },
-    h("div", { class: "pam-blocks" },
-      areaBlocks(map.areas, ghostCounts).map((block) =>
-        h(AreaBlock, {
-          key: block.key,
-          block,
-          onOpen: () => onOpenArea(block.slug, block.label),
-          onOpenChanges: onOpenChanges
-            ? () => onOpenChanges(block.slug, block.label)
-            : undefined,
-        }))),
-    h(BlockLegend, null),
-    h("p", { class: "pam-key" }, mapKey()),
-  );
-}
-
-/** The Product tile's panel on Plan. */
-export function ProductAreaMap({ onOpenArea, onOpenChanges }: { onOpenArea: OpenArea; onOpenChanges?: OpenAreaChanges }) {
-  const load = useProductRead("/api/rex/product", (body) => body.map as ProductMap);
-  if (load.state === "ready") return h(AreaBlocks, { map: load.data, onOpenArea, onOpenChanges });
-  if (load.state === "loading") return h("div", { class: "pam-pending", role: "status" }, "Loading...");
-  if (load.state === "v1") return null;
-  return h("div", { role: "alert" }, `Could not load the product map: ${load.message}`);
 }

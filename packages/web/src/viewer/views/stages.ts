@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "product-map" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -229,11 +229,10 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     tiles: [
       // On both layouts: a v1 tree reads Pending, In progress and Next.
       { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
-      // The area map. Full-screen shows the whole Product page; a block opens
-      // its area's view there instead (views/area.ts, `/product/area/<slug>`).
-      { view: "product", panel: "product-map", title: "Product", embedsView: true, cols: 12, rows: 2, v2Only: true, requiresServer: true },
+      // No product area map: readers could not tell what its blocks meant. The
+      // Product page is a tab of Open changes, and its routes still open it.
       { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
-      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       // The last check as lights; full-screen and "Open" show the whole Validation view.
       { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 6 },
       // Gaps in the open changes, each a link to the filtered list. Open changes is placed by its own tile.

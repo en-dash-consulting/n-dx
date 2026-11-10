@@ -10,7 +10,7 @@ import { h } from "preact";
 import { act } from "preact/test-utils";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 import { ChangesView, changesInArea } from "../../../src/viewer/views/changes.js";
-import { areaBlocks } from "../../../src/viewer/views/product-area-map.js";
+import { areaBlock } from "../../../src/viewer/views/product-area-map.js";
 import {
   CHANGE_STAGE_ORDER,
   UNSCHEDULED_RELEASE_LABEL,
@@ -375,7 +375,7 @@ describe("ChangesView filters", () => {
     it("lists only the area's open changes, as many as its map badge counts", () => {
       const el = mount(h(ChangesView, { changes: AREA_ROWS, area: "checkout" }));
       expect(ids(el).sort()).toEqual(["c1", "c2", "c3"]);
-      const badge = areaBlocks([SECTION])[0]!.openChanges;
+      const badge = areaBlock(SECTION).openChanges;
       expect(changesInArea(AREA_ROWS, "checkout")).toHaveLength(badge);
       expect(ids(el)).toHaveLength(badge);
       expect(chip(el, "area").querySelector(".ch-filter-count")!.textContent).toBe(String(badge));
