@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-11-05T20:51:49.575Z
-- **Commit** — `38e1f3f8af52`
-- **Content hash** — `beee9c6e09119ff9` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-11-10T14:10:51.366Z
+- **Commit** — `e44befe88938`
+- **Content hash** — `e29f76796b91ba95` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
-- **Per-call total** — 23,554 tokens (what every surface costs, summed)
-- **Unique fixed text** — 15,049 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 23,609 tokens (what every surface costs, summed)
+- **Unique fixed text** — 15,104 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -115,11 +115,11 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 4,747 per-call / 4,745 unique, 9 surfaces
+## hench — 4,802 per-call / 4,800 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 78 | 1,225 | — | 1,225 |
+| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 84 | 1,280 | — | 1,280 |
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
 | `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 40 | 184 | 115 | 299 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
@@ -177,7 +177,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,524 | n/a — 566 of the fixed text is on another branch | 958 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,579 | n/a — 621 of the fixed text is on another branch | 958 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts
@@ -227,7 +227,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 3,162 | 791 | 82.6% |
 | `brief` | 668 | 167 | 17.4% |
 
-## Workflow skills — 23,605 tokens, 14 skills
+## Workflow skills — 25,567 tokens, 15 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -246,6 +246,7 @@ portability guards until this table gave them a number.
 | `iso-map` | — | 8,285 | 2,072 |
 | `ndx-plan` | yes | 8,027 | 2,007 |
 | `ndx-work` | yes | 7,984 | 1,996 |
+| `ndx-release-notes` | — | 7,846 | 1,962 |
 | `triage` | — | 7,421 | 1,856 |
 | `dev-link` | — | 5,054 | 1,264 |
 | `ndx-config` | yes | 4,985 | 1,247 |

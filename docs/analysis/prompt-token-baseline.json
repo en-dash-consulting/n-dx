@@ -2,10 +2,10 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23554,
-    "uniqueTokens": 15049,
-    "skills": 14,
-    "skillTokens": 23605
+    "perCallTokens": 23609,
+    "uniqueTokens": 15104,
+    "skills": 15,
+    "skillTokens": 25567
   },
   "skills": [
     {
@@ -49,6 +49,13 @@
       "shipped": true,
       "chars": 7984,
       "tokens": 1996
+    },
+    {
+      "name": "ndx-release-notes",
+      "file": ".claude/skills/ndx-release-notes/SKILL.md",
+      "shipped": false,
+      "chars": 7846,
+      "tokens": 1962
     },
     {
       "name": "triage",
@@ -120,8 +127,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4747,
-      "uniqueTokens": 4745
+      "perCallTokens": 4802,
+      "uniqueTokens": 4800
     },
     "core": {
       "surfaces": 1,
@@ -806,11 +813,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 78,
+      "literals": 84,
       "constants": {},
-      "ownTokens": 1225,
-      "fixedChars": 4899,
-      "fixedTokens": 1225
+      "ownTokens": 1280,
+      "fixedChars": 5119,
+      "fixedTokens": 1280
     },
     {
       "pkg": "hench",
@@ -1017,9 +1024,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1524,
+      "fixedTokens": 1579,
       "branchConditional": true,
-      "unreachedTokens": 566
+      "unreachedTokens": 621
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -1074,8 +1081,8 @@
       }
     ]
   },
-  "contentHash": "beee9c6e09119ff9",
-  "recordedAt": "2026-11-05T20:51:49.575Z",
-  "commit": "38e1f3f8af52",
+  "contentHash": "e29f76796b91ba95",
+  "recordedAt": "2026-11-10T14:10:51.366Z",
+  "commit": "e44befe88938",
   "dirty": false
 }

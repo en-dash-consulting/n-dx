@@ -463,6 +463,15 @@ export interface HenchConfig {
    */
   promptAgentToMarkInProgress?: boolean;
   /**
+   * Project skills to name in every run's system prompt, by directory name
+   * (`.claude/skills/<name>/SKILL.md`, else `.agents/skills/<name>/SKILL.md`).
+   * The agent is told to read a listed skill's file before the work it covers,
+   * since it cannot invoke skills by name. Opt-in: operator workflows such as
+   * `ndx-work` live in the same directories and must not reach a running agent.
+   * A name with no file is skipped with a warning. Default: none.
+   */
+  projectSkills?: string[];
+  /**
    * When true, runs are in autonomous mode (non-interactive) without passing
    * --auto/--loop/--epic-by-epic on every invocation. In this mode:
    * - Test gate failures fail the run, as they do for any autonomous run —
@@ -2337,6 +2346,21 @@ export interface TaskBriefProject {
    * reference the correct command in generated code, docs, and instructions.
    */
   cliName?: string;
+  /**
+   * Project skills the operator named in `hench.projectSkills`, resolved to
+   * their files. The system prompt lists them so the agent reads the right
+   * one before the work it covers — it cannot invoke a skill by name.
+   */
+  skills?: TaskBriefProjectSkill[];
+}
+
+/** One entry of {@link TaskBriefProject.skills}. */
+export interface TaskBriefProjectSkill {
+  name: string;
+  /** Project-relative path to the skill's SKILL.md. */
+  path: string;
+  /** The skill's frontmatter description (may be empty). */
+  description: string;
 }
 
 export interface TaskBriefLogEntry {

@@ -37,6 +37,7 @@ import type { ClaimLostEvent, TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
+import { PROJECT_SKILL_DIRS, resolveProjectSkills } from "../planning/project-skills.js";
 import type { LLMVendor, PromptEnvelope } from "../../prd/llm-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
@@ -400,6 +401,13 @@ export async function prepareBrief(
   extraContext?: string,
 ): Promise<PreparedBrief> {
   const { brief, taskId: resolvedTaskId } = await assembleTaskBrief(store, taskId, options);
+  if (config.projectSkills?.length && options?.projectDir) {
+    const { skills, missing } = resolveProjectSkills(options.projectDir, config.projectSkills);
+    if (skills.length) brief.project = { ...brief.project, skills };
+    if (missing.length) {
+      warn(`hench.projectSkills: no SKILL.md for ${missing.join(", ")} under ${PROJECT_SKILL_DIRS.join(" or ")}; skipped.`);
+    }
+  }
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);
   const envelope = buildPromptEnvelope(brief, config, extraContext);
