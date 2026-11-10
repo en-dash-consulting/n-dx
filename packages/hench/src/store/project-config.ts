@@ -135,9 +135,13 @@ type EnvReportKind = Parameters<NonNullable<Parameters<typeof sharedResolveVendo
  * some row of the mode table.
  */
 export function cliEnvReportLine(label: string, names: readonly string[], kind: EnvReportKind): string {
-  return kind === "missing-credentials"
-    ? `${label}: a vendor mode is on but none of ${names.join(", ")} is set, so the CLI starts without them`
-    : `${label}: stripped ${names.join(", ")}`;
+  if (kind === "missing-credentials") {
+    return `${label}: a vendor mode is on but none of ${names.join(", ")} is set, so the CLI starts without them`;
+  }
+  if (kind === "scrubbed") {
+    return `${label}: n-dx set the API key, so Claude Code scrubs credentials from the agent's commands; they will not see ${names.join(", ")} (hench's test gate still does)`;
+  }
+  return `${label}: stripped ${names.join(", ")}`;
 }
 
 /**

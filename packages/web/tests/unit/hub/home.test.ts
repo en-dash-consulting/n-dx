@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { renderHomePage, renderCard, renderExtensionCard, homeExtensions, HOME_EXTENSIONS_WAIT_MS, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
 import type { HubOverview, ProjectCard } from "../../../src/hub/overview.js";
 import type { ExtensionView } from "../../../src/hub/extensions.js";
@@ -36,6 +39,7 @@ function card(overrides: Partial<ProjectCard> = {}): ProjectCard {
     remoteHost: "github.com",
     readiness: null,
     infrastructure: null,
+    initialized: true,
     ...overrides,
   };
 }
@@ -298,6 +302,159 @@ describe("themes", () => {
   });
 });
 
+describe("the Hub session toggle", () => {
+  /**
+   * The page's markup moved into the test document, where an iframe has a
+   * window, and the drawer's script run against it — the parsed document has
+   * no script runtime of its own.
+   */
+  function mountHome(): { toggle: HTMLButtonElement; drawer: HTMLElement; frame: HTMLIFrameElement } {
+    const parsed = renderToDocument(renderHomePage(TWO_PROJECTS, "", [], { hubSession: true }));
+    document.body.className = "";
+    document.body.innerHTML = parsed.body.innerHTML;
+    const script = [...parsed.querySelectorAll("script")]
+      .map((s) => s.textContent ?? "")
+      .find((text) => text.includes("hub-session-toggle"))!;
+    new Function("document", "window", "location", script)(document, window, window.location);
+    return {
+      toggle: document.getElementById("hub-session-toggle") as HTMLButtonElement,
+      drawer: document.getElementById("hub-session-drawer")!,
+      frame: document.getElementById("hub-session-frame") as HTMLIFrameElement,
+    };
+  }
+
+  const keyJ = (over: KeyboardEventInit): KeyboardEvent => new KeyboardEvent("keydown", { key: "j", bubbles: true, cancelable: true, ...over });
+
+  it("is not offered when the host does not report the hub lens available", () => {
+    for (const html of [renderHomePage(TWO_PROJECTS), renderHomePage(TWO_PROJECTS, "", [], { hubSession: false })]) {
+      const doc = renderToDocument(html);
+      expect(doc.getElementById("hub-session-toggle")).toBeNull();
+      expect(doc.getElementById("hub-session-drawer")).toBeNull();
+      expect(html).not.toContain("/hub/session/");
+    }
+  });
+
+  it("is a header button bound to ⌘J when the hub lens is available, with the drawer undocked and not yet loaded", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, "", [], { hubSession: true }));
+    const toggle = doc.querySelector("header #hub-session-toggle")!;
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle.textContent).toContain("Hub session");
+    expect(toggle.textContent).toContain("⌘J");
+    expect(toggle.getAttribute("aria-keyshortcuts")).toBe("Meta+J Control+J");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-controls")).toBe("hub-session-drawer");
+
+    const drawer = doc.getElementById("hub-session-drawer")!;
+    expect(drawer.hasAttribute("hidden")).toBe(true);
+    const frame = drawer.querySelector("iframe")!;
+    // The drawer-only viewer page, on the hub's own origin through /hub/session/.
+    expect(frame.getAttribute("data-src")).toBe("/hub/session/drawer");
+    expect(frame.hasAttribute("src")).toBe(false);
+  });
+
+  it("docks the drawer beside the page when pressed, loading the drawer page, and undocks it when pressed again", () => {
+    const { toggle, drawer, frame } = mountHome();
+    toggle.click();
+    expect(drawer.hidden).toBe(false);
+    expect(document.body.classList.contains("hub-docked")).toBe(true);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(frame.getAttribute("src")).toBe("/hub/session/drawer");
+
+    toggle.click();
+    expect(drawer.hidden).toBe(true);
+    expect(document.body.classList.contains("hub-docked")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("toggles on ⌘J and Ctrl+J, and leaves other chords alone", () => {
+    const { drawer } = mountHome();
+    const open = keyJ({ metaKey: true });
+    document.dispatchEvent(open);
+    expect(drawer.hidden).toBe(false);
+    expect(open.defaultPrevented).toBe(true);
+    document.dispatchEvent(keyJ({ ctrlKey: true }));
+    expect(drawer.hidden).toBe(true);
+    document.dispatchEvent(keyJ({ metaKey: true, shiftKey: true }));
+    document.dispatchEvent(keyJ({}));
+    expect(drawer.hidden).toBe(true);
+  });
+
+  it("undocks when its own frame asks, from the hub's origin only", () => {
+    const { toggle, drawer, frame } = mountHome();
+    toggle.click();
+    const close = { type: "ndx:hub-session:close" };
+    window.dispatchEvent(new MessageEvent("message", { data: close, origin: "http://elsewhere.test", source: frame.contentWindow }));
+    expect(drawer.hidden).toBe(false);
+    window.dispatchEvent(new MessageEvent("message", { data: close, origin: window.location.origin, source: window }));
+    expect(drawer.hidden).toBe(false);
+    window.dispatchEvent(new MessageEvent("message", { data: close, origin: window.location.origin, source: frame.contentWindow }));
+    expect(drawer.hidden).toBe(true);
+  });
+
+  describe("on the deferred page a navigation gets", () => {
+    /** The deferred shell mounted with its refresh and drawer scripts run against a stubbed sign-in and overview. */
+    async function mountDeferred(hubSession: boolean | undefined): Promise<{ toggle: HTMLButtonElement; drawer: HTMLElement; asked: string[] }> {
+      const parsed = renderToDocument(renderHomePage({ projects: [], generatedAt: "t" }, "", [], { deferred: true }));
+      document.body.className = "";
+      document.body.innerHTML = parsed.body.innerHTML;
+      const asked: string[] = [];
+      const fetchStub = (url: string) => {
+        asked.push(url);
+        const body = { projects: [], html: "", ...(hubSession !== undefined && url.includes("hubSession=1") && { hubSession }) };
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+      };
+      const win = { ndxAuth: { ready: Promise.resolve({ ok: true }) } };
+      const scripts = [...parsed.querySelectorAll("script")].map((s) => s.textContent ?? "");
+      const refresh = scripts.find((text) => text.includes("/api/hub/overview"))!;
+      const drawer = scripts.find((text) => text.includes("hub-session-toggle") && !text.includes("/api/hub/overview"))!;
+      const interval = vi.spyOn(globalThis, "setInterval").mockReturnValue(0 as unknown as ReturnType<typeof setInterval>);
+      try {
+        new Function("document", "window", "fetch", refresh)(document, win, fetchStub);
+      } finally {
+        interval.mockRestore();
+      }
+      new Function("document", "window", "location", drawer)(document, window, window.location);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { toggle: document.getElementById("hub-session-toggle") as HTMLButtonElement, drawer: document.getElementById("hub-session-drawer")!, asked };
+    }
+
+    it("a hidden toggle and an undocked drawer, and still no project, path or count", () => {
+      const html = renderHomePage({ projects: [], generatedAt: "t" }, "", [], { deferred: true });
+      const doc = renderToDocument(html);
+      expect(doc.getElementById("hub-session-toggle")!.hasAttribute("hidden")).toBe(true);
+      expect(doc.getElementById("hub-session-drawer")!.hasAttribute("hidden")).toBe(true);
+      expect(doc.getElementById("project-count")!.textContent).toBe("");
+      expect(html).not.toContain("/repos/");
+    });
+
+    it("shows the toggle once signed in when the host can run the hub lens", async () => {
+      const { toggle, drawer, asked } = await mountDeferred(true);
+      expect(asked).toEqual(["/api/hub/overview?hubSession=1"]);
+      expect(toggle.hidden).toBe(false);
+      toggle.click();
+      expect(drawer.hidden).toBe(false);
+    });
+
+    it("keeps it hidden, and ⌘J inert, when the host cannot", async () => {
+      const { toggle, drawer } = await mountDeferred(false);
+      expect(toggle.hidden).toBe(true);
+      document.dispatchEvent(keyJ({ metaKey: true }));
+      expect(drawer.hidden).toBe(true);
+      expect(document.body.classList.contains("hub-docked")).toBe(false);
+    });
+  });
+
+  it("keeps the hub home free of Preact and of src/viewer/", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../src/hub/home.ts"), "utf-8");
+    const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]);
+    expect(imports.length).toBeGreaterThan(0);
+    for (const spec of imports) {
+      expect(spec).not.toMatch(/preact/);
+      expect(spec).not.toMatch(/viewer\//);
+    }
+  });
+});
+
 describe("keyboard reachability", () => {
   it("makes every control a real link or button, with no positive tabindex", () => {
     const doc = renderToDocument(renderHomePage(TWO_PROJECTS));
@@ -415,6 +572,48 @@ describe("extensions on the home page", () => {
     }));
     expect(html).not.toContain("<b>x</b>");
     expect(html).not.toContain("<script>");
+  });
+});
+
+describe("an uninitialized project's card", () => {
+  const fresh = card({
+    id: "gamma", name: "Gamma", repoRoot: "/repos/gamma", url: "/p/gamma/",
+    initialized: false, percentComplete: null, nextTaskTitle: null, repoName: null, remoteHost: null,
+  });
+
+  it("offers Initialize as its only action, with no Start working or dashboard link", () => {
+    const doc = renderToDocument(renderHomePage({ generatedAt: "t", projects: [fresh] }));
+    const li = doc.querySelector(".card")!;
+    expect(li.classList.contains("card-uninitialized")).toBe(true);
+    expect(li.querySelectorAll("a")).toHaveLength(0);
+    expect(li.textContent).not.toContain("Start working");
+    expect(li.textContent).not.toContain("Open dashboard");
+    const buttons = [...li.querySelectorAll(".actions button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Initialize"]);
+    expect(buttons[0]!.classList.contains("action-primary")).toBe(true);
+    expect(li.getAttribute("data-init-base")).toBe("/p/gamma/");
+  });
+
+  it("says it is not initialized, and starts with its overlay and error hidden", () => {
+    const li = renderToDocument(renderCard(fresh)).querySelector(".card")!;
+    expect(cardFacts(fresh)[0]).toBe("not initialized");
+    expect(li.querySelector(".facts")!.textContent).toContain("not initialized");
+    expect((li.querySelector(".init-overlay") as HTMLElement).hidden).toBe(true);
+    expect(li.querySelector(".init-overlay")!.getAttribute("role")).toBe("status");
+    expect((li.querySelector(".init-error") as HTMLElement).hidden).toBe(true);
+  });
+
+  it("keeps the normal actions when initialization is unknown or the child is unreachable", () => {
+    for (const c of [card({ initialized: null }), card({ initialized: false, reachable: false })]) {
+      const html = renderCard(c);
+      expect(html).not.toContain("card-uninitialized");
+      expect(html).toContain("Open dashboard");
+    }
+  });
+
+  it("escapes the project id it carries for the init script", () => {
+    const html = renderCard({ ...fresh, id: `x"><script>` });
+    expect(html).not.toContain(`x"><script>`);
   });
 });
 

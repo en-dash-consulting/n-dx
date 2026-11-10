@@ -332,7 +332,7 @@ const ANALYSIS_HISTORY_MAX = 200;
  * and record the run — per phase and per task class — on the manifest and
  * in the machine-local history.
  */
-function finalizeTokenUsage(
+export function finalizeTokenUsage(
   ctx: AnalyzeContext,
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
 ): void {
@@ -347,7 +347,9 @@ function finalizeTokenUsage(
   // compared against, and the only moment it is both complete and still known.
   const outcome = readAnalysisOutcome(ctx.svDir);
   if (outcome) run.outcome = outcome;
-  run.jev = jevAvailability();
+  // What this run's own helper call gave, if it made one. A helper is never
+  // run here, so a run that did not ask Jev records it unknown.
+  run.jev = jevAvailability({ check: "cached" });
 
   const manifest = readManifest(ctx.absDir);
   if (ctx.tokenUsage.calls > 0) {

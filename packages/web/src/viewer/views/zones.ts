@@ -11,7 +11,7 @@
 import { h } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
-import type { CallGraph, Finding, Zone, ZoneCrossing } from "../external.js";
+import type { CallGraph, ExternalImport, Finding, Zone, ZoneCrossing } from "../external.js";
 import {
   CollapsibleSection,
   buildFileToZoneMap,
@@ -46,6 +46,8 @@ export type { ZoneData, BoxRect, FlowEdge, FileConnectionMap, FileToFileMap, Zon
 interface ZonesViewProps {
   data: LoadedData;
   onSelect: (detail: DetailItem | null) => void;
+  /** Reports the zone open in the slideout (null when none), so Sidecar can attach it. */
+  onOpenZoneChange?: (id: string | null) => void;
   navigateTo?: NavigateTo;
 }
 
@@ -258,7 +260,7 @@ function buildExplorerData(
   fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
   zones: LoadedData["zones"],
 ): { zoneDataList: ZoneData[]; unzonedFiles: FileInfo[] } {
-  const funcsByFile = new Map<string, import("../../schema/v1.js").FunctionNode[]>();
+  const funcsByFile = new Map<string, CallGraph["functions"]>();
   for (const fn of callGraph.functions) {
     let list = funcsByFile.get(fn.file);
     if (!list) { list = []; funcsByFile.set(fn.file, list); }
@@ -373,7 +375,7 @@ function buildExplorerData(
  */
 export function buildFileConnectionMap(
   callGraph: CallGraph,
-  externalImports: import("../../schema/v1.js").ExternalImport[],
+  externalImports: ExternalImport[],
   fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
   zones: LoadedData["zones"],
 ): FileConnectionMap {
@@ -2214,13 +2216,18 @@ function ZoneTableView({
 
 // ── Main component ───────────────────────────────────────────────────
 
-export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
+export function ZonesView({ data, onSelect, onOpenZoneChange, navigateTo }: ZonesViewProps) {
   const { zones, callGraph, imports: importsData } = data;
   const [search, setSearch] = useState("");
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
   const [expandedSubZones, setExpandedSubZones] = useState<ExpandedSubZones>(new Map());
   const [connectingOnlyZones, setConnectingOnlyZones] = useState<Set<string>>(new Set());
   const [slideoutZone, setSlideoutZone] = useState<Zone | null>(null);
+  const openZoneId = slideoutZone?.id ?? null;
+  useEffect(() => {
+    onOpenZoneChange?.(openZoneId);
+  }, [openZoneId, onOpenZoneChange]);
+  useEffect(() => () => onOpenZoneChange?.(null), [onOpenZoneChange]);
   const [viewMode, setViewMode] = useLocalStorageState<"graph" | "table">("ndx-zones-view-mode", "graph");
 
   // Zone pins from .n-dx.json (augmented by server onto zones response)

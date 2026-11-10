@@ -37,7 +37,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir, rm, open, rename, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveLayout } from "../../prd/llm-gateway.js";
+import { resolveLayout, vendorSessionDriver } from "../../prd/llm-gateway.js";
 import { effectiveGitSubcommands } from "./git-subcommands.js";
 
 /** File under `.hench/` holding the cached parent session. */
@@ -943,8 +943,9 @@ export interface SessionStrategyInput {
 /**
  * Resolve the session strategy actually available for this run.
  *
- * Forking needs a vendor CLI that can resume a session by id — today that is
- * the Claude CLI alone — and it needs hench to own the spawn, which the API
+ * Forking needs a vendor CLI whose session driver can fork a session by id —
+ * today that is the Claude CLI alone (`VendorSessionDriver.canFork`, in
+ * llm-client) — and it needs hench to own the spawn, which the API
  * provider does not (it manages its own conversation in-process). Both cases
  * degrade to cold rather than erroring: the strategy is an optimization, and
  * a config value that a vendor cannot honor should cost nothing but the
@@ -958,8 +959,8 @@ export function resolveSessionStrategy(input: SessionStrategyInput): SessionStra
   if (configured === "cold") return "cold";
   if (configured === "batch") return "batch";
 
-  // Default (or an explicit "fork"): only the Claude CLI can honor it.
-  const canFork = input.vendor === "claude" && input.provider === "cli";
+  // Default (or an explicit "fork"): only a CLI whose session driver forks.
+  const canFork = input.provider === "cli" && vendorSessionDriver(input.vendor)?.canFork === true;
   return canFork ? "fork" : "cold";
 }
 

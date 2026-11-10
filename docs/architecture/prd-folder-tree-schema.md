@@ -100,7 +100,7 @@ a status-only change does not rewrite the node's Markdown.
 | Execution | `status`, `startedAt`, `completedAt`, `endedAt`, `activeIntervals`, `failureReason`, `resolutionType`, `resolutionDetail` |
 | Product evidence | `metAt`, `revisedAt`, `reviewedHash`, `checks` |
 | Change evidence | `appliedAt`, `appliedAmendsHash`, `shippedIn`, `prs`, `issues` |
-| Bookkeeping | `assignee`, `ready`, `needsPlacement`, `lastModified`, `lastModifiedBy`, reserved `links` |
+| Bookkeeping | `assignee`, `ready`, `needsPlacement`, `createdAt` (changes; stamped once on first write, absent on changes recorded before it), `lastModified`, `lastModifiedBy`, reserved `links` |
 
 The work statuses are `pending`, `in_progress`, `completed`, `failing`,
 `deferred`, `blocked`, `cancelled` and `deleted`. Product status and health
@@ -161,6 +161,12 @@ reconstructs the tree under its lock. Narrative export is one-way prose
 and currently available for v1 only. Legacy migration commands are the
 explicit exception that can read or create older representations; routine
 mutations never create `prd.md`, `prd_*.md` or `prd.json`.
+
+After a git merge, `rex validate --post-merge` scans the raw v2 files: conflict
+markers, unparseable `state.yaml`, duplicate ids (all refused), `state.yaml`
+rows for an id no node file carries, and `blockedBy` refs to no id, display id
+or alias. `--repair` drops those rows (under the PRD lock) and refs; the
+residue comes from a resolution that kept one side's copy of an item.
 
 ## Verification
 

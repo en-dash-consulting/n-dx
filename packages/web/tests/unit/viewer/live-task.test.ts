@@ -42,6 +42,7 @@ function snapshot(over: Partial<LiveTaskSnapshot> = {}): LiveTaskSnapshot {
     task: {
       id: "t1", title: "Fix the thing", description: "Do it well", status: "in_progress", priority: "high",
       acceptanceCriteria: ["first", "second"],
+      links: [],
       epicChain: [{ id: "e", title: "Epic", itemType: "epic" }, { id: "f", title: "Feature", itemType: "feature" }],
     },
     runs: [run(), run({ runId: "r1", status: "failed", finishedAt: "2026-10-01T09:30:00.000Z", startedAt: "2026-10-01T09:00:00.000Z", pid: null, startedFrom: null, outcome: "Tests failed" })],
@@ -133,6 +134,7 @@ describe("the rendered page", () => {
       calls.push({ url: String(url), init });
       const u = String(url);
       if (u.startsWith("/api/live/task/")) return { ok: true, status: 200, json: async () => body };
+      if (u === "/api/connections/tracker") return { ok: true, status: 200, json: async () => ({ label: "CAOS" }) };
       if (u.includes("/events")) return { ok: true, status: 200, json: async () => eventsBody };
       if (u.includes("/log")) return { ok: true, status: 200, json: async () => ({ content: "full log\n", next: 9, reset: false, more: false }) };
       return { ok: true, status: 200, json: async () => ({}) };
@@ -156,6 +158,20 @@ describe("the rendered page", () => {
     await act(async () => { await flush(); });
     return navigateTo;
   }
+
+  it("shows the task's tracker links with the tracker's label, a URL as a link", async () => {
+    body = snapshot({ task: { ...snapshot().task!, links: ["WM-2054", "https://tracker.example/items/9"] } });
+    await mount();
+    const links = [...root.querySelectorAll(".live-task-tracker .tracker-link")];
+    expect(links.map((l) => l.textContent)).toEqual(["CAOS WM-2054", "CAOS tracker.example"]);
+    expect(links[0]!.tagName).toBe("SPAN");
+    expect(links[1]!.getAttribute("href")).toBe("https://tracker.example/items/9");
+  });
+
+  it("shows no tracker line for a task with no link", async () => {
+    await mount();
+    expect(root.querySelector(".live-task-tracker")).toBeNull();
+  });
 
   it("shows the header, the step stream with the current step, and the log tail", async () => {
     await mount();

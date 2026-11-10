@@ -21,6 +21,9 @@
  * the last one (`projectStamp`): the loop asks every 30 s and after each
  * edit, and a full emit reads the whole PRD and git.
  *
+ * It also serves the isometric code map `emit` writes beside them
+ * (`/data/iso-map.html`), which the Code map page and zone pages frame.
+ *
  * Environment (what `ndx graview serve .` sets):
  *   NDX_GRAVIEW_DIR    the project's graview dir: document.json and snapshot.json
  *   NDX_PROJECT_ROOT   the n-dx project; with NDX_GRAVIEW_CLI, what `POST /ndx/emit` re-emits
@@ -207,6 +210,30 @@ export function ndxDoor(): Plugin {
         const asked = (req.url ?? "").split("?")[0] ?? "";
         const url = asked.startsWith(base) ? asked.slice(base.length - 1) : asked;
         try {
+          if (graviewDir && url === "/data/iso-map.html") {
+            const file = join(graviewDir, "iso-map.html");
+            // Answered here, not passed on: Vite would serve a stale copy from public/data, or
+            // its single-page fallback, the face's own index.html, as if it were the map.
+            if (!existsSync(file)) {
+              res.statusCode = 404;
+              res.setHeader("cache-control", "no-store");
+              return void res.end();
+            }
+            res.setHeader("content-type", "text/html; charset=utf-8");
+            res.setHeader("cache-control", "no-store");
+            res.setHeader("x-ndx-iso-map", "1");
+            // Framed by this origin's pages only. The hub sets X-Frame-Options: DENY and frame-ancestors 'none'
+            // on everything it serves and keeps an upstream's own headers over them, so without these the face
+            // could not frame its map under /x/graview-face/; and under a bare `ndx graview serve` no other
+            // site may frame the map to steer it or probe which zones it draws. The map is self-contained:
+            // inline script and style, data and blob images, nothing fetched.
+            res.setHeader("x-frame-options", "SAMEORIGIN");
+            res.setHeader(
+              "content-security-policy",
+              "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+            );
+            return void createReadStream(file).pipe(res);
+          }
           if (graviewDir && (url === "/data/document.json" || url === "/data/snapshot.json")) {
             const file = join(graviewDir, url.slice("/data/".length));
             if (!existsSync(file)) return next();

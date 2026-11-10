@@ -27,9 +27,13 @@ const LIB = join(import.meta.dirname, "../../scripts/lib");
 /** Export names in the implementation: `export const|function|class <name>`. */
 function implementationExports() {
   const src = readFileSync(join(LIB, "stale-dist.mjs"), "utf-8");
-  return [...src.matchAll(/^export\s+(?:const|let|function|class)\s+([A-Za-z_$][\w$]*)/gm)]
-    .map((m) => m[1])
-    .sort();
+  const declared = [...src.matchAll(/^export\s+(?:const|let|function|class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+  // `export { a, b } from "…"`: the hash is defined in core and re-exported here.
+  const reexported = [...src.matchAll(/^export\s*\{([^}]*)\}\s*from\b/gm)]
+    .flatMap((m) => m[1].split(","))
+    .map((name) => name.trim().split(/\s+as\s+/).pop())
+    .filter(Boolean);
+  return [...declared, ...reexported].sort();
 }
 
 /** Export names in the declaration, including `interface` and `type`. */

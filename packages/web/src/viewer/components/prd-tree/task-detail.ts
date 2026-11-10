@@ -15,13 +15,19 @@ import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
+import { AskInSidecarButton } from "../ask-in-sidecar.js";
+import { TrackerLinksEditor } from "../tracker-links.js";
+import { ChangeTrackerChip } from "../tracker-chip.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
-import { useIndexMd } from "../../hooks/index.js";
+import { useFeatureToggle, useIndexMd } from "../../hooks/index.js";
+import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-verdict-banner.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
+import { ChangeApplySection } from "./change-apply.js";
+import { placementTab } from "../../route-state.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -68,6 +74,9 @@ const PRIORITY_OPTIONS: Array<{ value: Priority; label: string }> = [
   { value: "medium", label: "Medium" },
   { value: "low", label: "Low" },
 ];
+
+/** The items that link to a tracker work item: work, never the product layer. */
+const LINKABLE_TYPES: ReadonlySet<string> = new Set(["change", "epic", "feature", "task", "subtask"]);
 
 // Type labels come from itemTypeLabel() in shared/item-type.ts, via external.ts.
 
@@ -959,6 +968,7 @@ interface RunEntry {
     cacheCreationInput?: number;
     cacheReadInput?: number;
   };
+  diagnosis?: RunVerdict;
 }
 
 function runTotalTokens(r: RunEntry): number {
@@ -994,47 +1004,44 @@ function getRunStatusConfig(status: string) {
   return RUN_STATUS_ICONS[status] ?? { icon: "\u25cb", color: "var(--text-dim)" };
 }
 
-/** Fetches and displays hench runs associated with a task. */
-function HenchRunsList({
-  taskId,
-  navigateTo,
-}: {
-  taskId: string;
-  navigateTo?: NavigateTo;
-}) {
+/**
+ * A task's hench runs, fetched once for the detail panel: the verdict banner at
+ * the top and the runs list further down both read them. A `null` taskId (an
+ * item that is not a task or subtask) fetches nothing. Until the fetch lands,
+ * and when it fails, there are no runs, so neither renders.
+ */
+function useTaskRuns(taskId: string | null): RunEntry[] {
   const [runs, setRuns] = useState<RunEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setRuns([]);
+    if (!taskId) return;
     let cancelled = false;
-    setLoading(true);
-    setError(false);
-
     fetch(`/api/hench/runs?taskId=${encodeURIComponent(taskId)}`)
       .then((res) => {
         if (!res.ok) throw new Error("fetch failed");
         return res.json();
       })
       .then((json) => {
-        if (!cancelled) {
-          setRuns(json.runs ?? []);
-          setLoading(false);
-        }
+        if (!cancelled) setRuns(json.runs ?? []);
       })
       .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
+        if (!cancelled) setRuns([]);
       });
-
     return () => { cancelled = true; };
   }, [taskId]);
 
-  // Don't render the section at all while loading on first mount, or if no runs
-  if (loading) return null;
-  if (error) return null;
+  return runs;
+}
+
+/** Displays the hench runs associated with a task. */
+function HenchRunsList({
+  runs,
+  navigateTo,
+}: {
+  runs: readonly RunEntry[];
+  navigateTo?: NavigateTo;
+}) {
   if (runs.length === 0) return null;
 
   return h(
@@ -1131,6 +1138,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
   const itemType = itemTypeOf(item);
   const itemLabel = itemTypeLabel(itemType);
+  const runs = useTaskRuns(isWorkItemType(itemType) ? item.id : null);
+  const verdictEnabled = useFeatureToggle(RUN_VERDICT_FEATURE, false);
 
   // Determine if this item can have children added
   const canAddChild = onAddChild != null && canAddChildType(itemType);
@@ -1220,6 +1229,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       h("span", { class: `prd-level-badge prd-level-${itemType}` }, itemLabel),
       h("span", { class: "task-id" }, item.id.slice(0, 8)),
       h(CopyLinkButton, { path: `/prd/${item.id}`, compact: true }),
+      // Drawn only while web.sidecar is on. A task's lens is Describe, or Diagnose run after a failed run.
+      isWorkItemType(itemType) ? h(AskInSidecarButton, { kind: "task", itemId: item.id }) : null,
     ),
 
     // Editable title
@@ -1243,8 +1254,12 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           onOpenChange: (id: string) => onNavigateToItem?.(id),
           onWritten: onPrdChanged,
           onInboxState: setInInbox,
+          onPlaceOnMap: navigateTo ? (id: string) => navigateTo("product", { tab: placementTab(id) }) : undefined,
         })
       : null,
+
+    // Apply…: a change awaiting apply, previewed before it writes
+    isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, item, onWritten: onPrdChanged }) : null,
 
     // Status selector
     h(
@@ -1303,6 +1318,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         : null,
     ),
 
+    // Why the latest run did not complete: leads the panel, above the description
+    h(RunVerdictBanner, { runs, enabled: verdictEnabled }),
+
     // Description (editable)
     h(
       "div",
@@ -1359,7 +1377,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Associated hench runs (tasks/subtasks only)
     isWorkItemType(itemType)
-      ? h(HenchRunsList, { taskId: item.id, navigateTo })
+      ? h(HenchRunsList, { runs, navigateTo })
       : null,
 
     // Failure reason
@@ -1398,6 +1416,17 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       h("div", { class: "task-section-label" }, "Tags"),
       h(TagEditor, { tags: item.tags ?? [], onUpdate: handleTagsUpdate }),
     ),
+
+    // Tracker links: the item's work refs, with Link and Unlink on a task or change
+    LINKABLE_TYPES.has(itemType)
+      ? h(
+          "div",
+          { class: "task-section", "data-section": "tracker-links" },
+          h("div", { class: "task-section-label" }, "Tracker"),
+          h(TrackerLinksEditor, { itemId: item.id, refreshKey: item, onChanged: onPrdChanged }),
+          itemType === "change" ? h(ChangeTrackerChip, { changeId: item.id, refreshKey: item }) : null,
+        )
+      : null,
 
     // Requirements
     h(

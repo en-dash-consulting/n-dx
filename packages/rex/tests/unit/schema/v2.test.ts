@@ -426,10 +426,17 @@ describe("field coverage (design intent/state tables)", () => {
       "failureReason", "resolutionType", "resolutionDetail",
       "metAt", "revisedAt", "reviewedHash", "checks",
       "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "links",
-      "assignee", "ready", "needsPlacement",
+      "assignee", "ready", "needsPlacement", "createdAt",
       "lastModified", "lastModifiedBy",
     ];
     for (const f of STATE) expect(ItemStateSchema.shape, f).toHaveProperty(f);
+  });
+
+  it("the schema doc's state table names every state field", () => {
+    // The PRD schema is a soft-frozen surface: a state field the doc does not name is an undocumented contract change.
+    const doc = readFileSync(join(import.meta.dirname, "../../../../../docs/architecture/prd-folder-tree-schema.md"), "utf8");
+    const table = doc.slice(doc.indexOf("| State | Fields |"), doc.indexOf("The work statuses are"));
+    for (const f of Object.keys(ItemStateSchema.shape)) expect(table, f).toContain(`\`${f}\``);
   });
 });
 
@@ -480,8 +487,11 @@ describe("isolation", () => {
     // (core/change-next-task.ts), and v2 completion and apply-on-complete
     // behind update_task_status and `rex update --status`
     // (cli/v2-completion.ts), and the v1 deprecation notice, which reads the
-    // product folder name (cli/legacy-layout-notice.ts), and the callers that
-    // a name-matching check never saw: the analyzers and `rex recommend`,
+    // product folder name (cli/legacy-layout-notice.ts), and the v2 post-merge
+    // scan behind `rex validate --post-merge`, which reads raw state.yaml rows
+    // and node files so it can see a merge residue the store would reject
+    // (core/post-merge-validate-v2.ts), and the callers that a name-matching
+    // check never saw: the analyzers and `rex recommend`,
     // which tag code-health work with placement's CODE_HEALTH_TAG
     // (analyze/propose.ts, analyze/scanners.ts, cli/commands/recommend.ts),
     // the placement reason pass (analyze/place-reason.ts), the migration's
@@ -517,6 +527,7 @@ describe("isolation", () => {
         "store/prd-model-writer.ts",
         "store/prd-model-transaction.ts",
         "core/apply-amendments.ts",
+        "core/apply-change.ts",
         "core/apply-policy.ts",
         "core/product-edit.ts",
         "core/product-edges.ts",
@@ -577,6 +588,7 @@ describe("isolation", () => {
         "core/change-next-task.ts",
         "cli/v2-completion.ts",
         "cli/legacy-layout-notice.ts",
+        "core/post-merge-validate-v2.ts",
         "analyze/place-draft.ts",
         "analyze/propose.ts",
         "analyze/scanners.ts",
@@ -601,6 +613,7 @@ describe("isolation", () => {
         "cli/commands/prune.ts",
         "cli/commands/reorganize.ts",
         "cli/commands/reshape.ts",
+        "core/change-inbox.ts",
         ...readdirSync(join(srcRoot, "migrations/v1-to-v2"))
           .filter((f) => f.endsWith(".ts"))
           .map((f) => `migrations/v1-to-v2/${f}`),
@@ -620,6 +633,7 @@ describe("isolation", () => {
         "store/prd-model-writer.ts",
         "store/prd-model-transaction.ts",
         "core/apply-amendments.ts",
+        "core/apply-change.ts",
         "core/apply-policy.ts",
         "core/product-edit.ts",
         "core/product-edges.ts",

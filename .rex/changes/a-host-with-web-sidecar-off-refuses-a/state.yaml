@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "5372715a-cb29-4148-93bc-960b753c8b7f":
+    status: "completed"
+    startedAt: "2026-11-04T21:08:10.195Z"
+    completedAt: "2026-11-04T21:21:23.631Z"
+    endedAt: "2026-11-04T21:21:23.631Z"
+    activeIntervals: [{"end":"2026-11-04T21:21:23.631Z","start":"2026-11-04T21:08:10.195Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Project server upgrade path applies the web.sidecar route gate to /api/sidecar/hub/ paths (403 + x-ndx-feature-disabled, no 101); integration test through the hub against two built servers."
+    lastModified: "2026-11-04T21:21:23.631Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9eab4203-22e3-41df-b3d8-7eb300ec0ca3":
+    status: "completed"
+    startedAt: "2026-11-04T21:21:23.631Z"
+    completedAt: "2026-11-04T21:21:23.631Z"
+    endedAt: "2026-11-04T21:21:23.631Z"
+    activeIntervals: [{"end":"2026-11-04T21:21:23.631Z","start":"2026-11-04T21:21:23.631Z"}]
+    appliedAt: "2026-11-04T21:21:23.631Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-04T21:21:23.631Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

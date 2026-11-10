@@ -887,6 +887,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
       { flag: "--git", description: "Create a git repository when the target directory is not in one (answers the preflight prompt; required for non-interactive runs)" },
       { flag: "--no-git", description: "Never create a git repository — skip the preflight prompt and leave auto-commit features off" },
+      { flag: "--no-commit", description: "Leave the files init writes uncommitted (by default init commits exactly the paths it created or changed)" },
       { flag: "--no-claude", description: "Skip Claude Code integration (no CLAUDE.md, .claude/ modifications)" },
       { flag: "--no-codex", description: "Skip Codex integration (no AGENTS.md, .agents/, .codex/ modifications)" },
       { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex)" },
@@ -1029,6 +1030,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--resolve", description: "With --task: print, as JSON, the settings an autonomous run would use, the config key behind each, and every reason it would refuse to start. Runs nothing, and works without a configured vendor (reported as a refusal). See 'hench run --help'" },
+      { flag: "--plan-queue", description: "Print lanes of ready tasks that can run side by side, each with its command, and a reason for every ready task left out (--format=json for JSON). Advisory: runs nothing, claims nothing, writes nothing. See 'hench run --help'" },
+      { flag: "--require-unblocked", description: "With --task: refuse to start the task while any of its blockers is not completed (an explicit --task otherwise ignores blockers). --plan-queue lane commands pass it on each blocked step" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-mode=<off|self|pair>", description: "Who reviews: self (this vendor), pair (another vendor reviews, the executor fixes) or off. --review is self, --no-review is off; overrides a task's saved reviewMode" },
       { flag: "--reviewer=<claude|codex>", description: "The pair reviewer's vendor, over the task's saved reviewVendor and hench.review.vendor. Must differ from the executor's vendor; refused with --review or --no-review" },
@@ -1049,6 +1052,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx work", description: "Run next task interactively" },
       { command: "ndx work --task=abc123 .", description: "Run a specific task" },
       { command: "ndx work --task=abc123 --resolve .", description: "Show what a run of abc123 would use, without running it" },
+      { command: "ndx work --plan-queue .", description: "Show which ready tasks can run side by side, without running any" },
       { command: "ndx work --auto --loop .", description: "Continuously auto-run tasks" },
       { command: "ndx work --auto --yes .", description: "Run unattended, auto-commit each task" },
       { command: "ndx work --dry-run .", description: "Preview the brief without execution" },
@@ -1391,8 +1395,9 @@ const ORCHESTRATOR_HELP_DEFS = {
       "Every command re-emits first, so the graph is never older than the tree.\n" +
       "The projection is read-only: nothing is written under the rex,\n" +
       "sourcevision or hench directories. No @graview/* dependency: the binary\n" +
-      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, the\n" +
-      "installed @n-dx/graview-face's own graview, or npx -y graview@<pinned>.",
+      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, a\n" +
+      "@n-dx/graview-face checkout's own graview; npx -y graview@<pinned> only\n" +
+      "with graview.allowNpx: true or NDX_GRAVIEW_NPX=1.",
     options: [
       { flag: "--no-files", description: "Leave source files out (default: every file, with its zone, the commits that changed it and the capabilities living there)" },
       { flag: "--place=<slug>", description: "describe: one place (a titled lens) instead of the whole graph" },
@@ -1403,7 +1408,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     examples: [
       { command: "ndx graview emit .", description: "Write document.json and snapshot.json" },
-      { command: "ndx graview check .", description: "Validate the declaration with graview check" },
+      { command: "ndx graview check .", description: "Validate the declaration with graview check, and hold the emitted snapshot to it" },
       { command: "ndx graview serve .", description: "Run the product face on the fresh projection (http://localhost:5188)" },
       { command: "ndx graview serve --no-face .", description: "Serve the bare store for a Graview face to connect to" },
       { command: "ndx graview mcp . --list", description: "List the read tools an agent would get" },

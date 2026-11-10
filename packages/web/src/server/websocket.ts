@@ -439,7 +439,7 @@ function encodePingFrame(): Buffer {
  * ```
  */
 export function createWebSocketManager(opts?: WebSocketManagerOptions): {
-  handleUpgrade: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
+  handleUpgrade: (req: IncomingMessage, socket: Duplex, head: Buffer, refuse?: () => string | null) => void;
   broadcast: WebSocketBroadcaster;
   clientCount: () => number;
   shutdown: () => void;
@@ -512,7 +512,11 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     }, PING_INTERVAL_MS);
   }
 
-  function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
+  /**
+   * @param refuse Asked once the host, credential and origin checks pass: a raw
+   *   HTTP response to answer instead of the handshake, or null to accept.
+   */
+  function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, refuse?: () => string | null): void {
     const key = req.headers["sec-websocket-key"];
     if (!key) {
       socket.destroy();
@@ -550,6 +554,11 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
         socket.destroy();
         return;
       }
+    }
+    const refusal = refuse?.() ?? null;
+    if (refusal !== null) {
+      socket.end(refusal);
+      return;
     }
 
     // Enable TCP-level keepalive for OS-level dead-peer detection.

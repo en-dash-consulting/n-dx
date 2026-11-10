@@ -239,6 +239,55 @@ describe("resolveVendorCliEnv", () => {
     expect(resolveVendorCliEnv(withAuth("claude", "cli"), undefined, source(vertex))).toMatchObject(vertex);
   });
 
+  describe("no exported token the CLI ranks above the chosen credential reaches the child", () => {
+    // Claude Code ranks ANTHROPIC_AUTH_TOKEN above ANTHROPIC_API_KEY and the
+    // login; codex exec honours CODEX_API_KEY. Every casing goes.
+    const OUTRANKING = {
+      claude: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+      codex: ["OPENAI_API_KEY", "CODEX_API_KEY"],
+    } as const;
+    const LOGIN = {
+      claude: { CLAUDE_CODE_OAUTH_TOKEN: "placeholder-oauth", CLAUDE_CONFIG_DIR: "/claude" },
+      codex: { CODEX_ACCESS_TOKEN: "placeholder-access", CODEX_HOME: "/codex" },
+    } as const;
+    const tokens = (vendor: "claude" | "codex") => ({
+      ...Object.fromEntries(OUTRANKING[vendor].flatMap((name) => [[name, `placeholder-${name}`], [name.toLowerCase(), `placeholder-lower-${name}`]])),
+      ...LOGIN[vendor],
+    });
+    const namesOf = (env: NodeJS.ProcessEnv, list: readonly string[]) =>
+      Object.keys(env).filter((name) => list.includes(name.toUpperCase()));
+
+    it.each(CLI_VENDORS)("cli: the %s child gets no API key or token in any casing, and keeps its login plumbing", (vendor) => {
+      store(vendor);
+      const env = resolveVendorCliEnv(withAuth(vendor, "cli"), undefined, source(tokens(vendor)));
+      expect(namesOf(env, OUTRANKING[vendor])).toEqual([]);
+      expect(env).toMatchObject(LOGIN[vendor]);
+    });
+
+    it.each(CLI_VENDORS)("api: the %s child gets the chosen key and no token that outranks it", (vendor) => {
+      store(vendor);
+      const keyName = KEY_ENV[vendor];
+      const exported = tokens(vendor);
+      for (const name of Object.keys(exported)) if (name.toUpperCase() === keyName) delete exported[name];
+      const env = resolveVendorCliEnv(withAuth(vendor, "api"), undefined, { PATH: "/bin", NDX_HOME: home, ...exported });
+      expect(namesOf(env, OUTRANKING[vendor])).toEqual([keyName]);
+      expect(env[keyName]).toBe(STORED);
+      expect(env).toMatchObject(LOGIN[vendor]);
+    });
+
+    it("auto with nothing configured passes an exported token through", () => {
+      const env = resolveVendorCliEnv({ vendor: "claude" }, undefined, { PATH: "/bin", ANTHROPIC_AUTH_TOKEN: "placeholder-gateway" });
+      expect(env.ANTHROPIC_AUTH_TOKEN).toBe("placeholder-gateway");
+    });
+
+    it("cli: Bedrock and Vertex still get their credentials beside a dropped token", () => {
+      const bedrock = { CLAUDE_CODE_USE_BEDROCK: "1", AWS_BEARER_TOKEN_BEDROCK: "placeholder-bedrock" };
+      const env = resolveVendorCliEnv(withAuth("claude", "cli"), undefined, source({ ...bedrock, ANTHROPIC_AUTH_TOKEN: "placeholder-gateway" }));
+      expect(env).toMatchObject(bedrock);
+      expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    });
+  });
+
   it.each(CLI_VENDORS)("api: the %s CLI child gets the stored key under its own name only", (vendor) => {
     store(vendor);
     store(vendor === "claude" ? "codex" : "claude", "placeholder-other-vendor");
@@ -249,6 +298,47 @@ describe("resolveVendorCliEnv", () => {
     expect(env[KEY_ENV[vendor]]).toBe(STORED);
     expect(Object.entries(env).filter(([, v]) => v === STORED).map(([k]) => k)).toEqual([KEY_ENV[vendor]]);
     expect(Object.values(env)).not.toContain("placeholder-other-vendor");
+  });
+
+  describe("the agent's own commands never see a key n-dx hands the Claude CLI", () => {
+    const SCRUB = "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB";
+    const bare = (extra: Record<string, string> = {}) => ({ PATH: "/bin", NDX_HOME: home, ...extra });
+    afterEach(() => clearCredentialHelperCache());
+
+    it("api with a stored key: the CLI gets the key and scrubs it from its subprocesses", () => {
+      store("claude");
+      const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare());
+      expect(env.ANTHROPIC_API_KEY).toBe(STORED);
+      expect(env[SCRUB]).toBe("1");
+    });
+
+    it("api with a helper key: the same", () => {
+      // resolveVendorCliEnv takes no helperExec, so the helper really runs:
+      // node and a script, since helpers run without a shell (no `echo` on Windows).
+      const script = join(home, "print-key.mjs");
+      writeFileSync(script, `process.stdout.write(${JSON.stringify(HELPER)});\n`);
+      setHelperCredential("claude", [process.execPath, script], { ndxHome: home });
+      const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare());
+      expect(env.ANTHROPIC_API_KEY).toBe(HELPER);
+      expect(env[SCRUB]).toBe("1");
+    });
+
+    it("a scrub the environment turned off, in any casing, is turned back on", () => {
+      store("claude");
+      const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare({ [SCRUB]: "0", claude_code_subprocess_env_scrub: "0" }));
+      expect(Object.entries(env).filter(([k]) => k.toUpperCase() === SCRUB)).toEqual([[SCRUB, "1"]]);
+    });
+
+    it("a configured key under auto is scrubbed too", () => {
+      expect(resolveVendorCliEnv({ vendor: "claude", claude: { api_key: CONFIGURED } }, undefined, bare())[SCRUB]).toBe("1");
+    });
+
+    it("cli and a codex child are left alone", () => {
+      store("claude");
+      store("codex");
+      expect(resolveVendorCliEnv(withAuth("claude", "cli"), undefined, bare())[SCRUB]).toBeUndefined();
+      expect(resolveVendorCliEnv(withAuth("codex", "api"), undefined, bare())[SCRUB]).toBeUndefined();
+    });
   });
 
   it("api: no key from any source is a loud error naming the store and the setting", () => {

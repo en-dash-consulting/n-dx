@@ -31,6 +31,7 @@ import {
   handleCommandsRoute,
   invalidateAuthCheckCache,
   invalidateCommandEffectsCache,
+  startSidecarCommand,
 } from "../../../src/server/routes-commands.js";
 import { handleLlmRoute } from "../../../src/server/routes-llm.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -200,15 +201,52 @@ describe("commands route — init (setup wizard)", () => {
     }
   });
 
-  it("stays non-fatal when the store write fails", async () => {
-    stubManagedRun({ stdout: "n-dx initialized" });
+  /** Answer the store command with `store`; everything else as the git probe. */
+  function stubStore(store: () => Promise<Record<string, unknown>>) {
     execMock.mockImplementation(async (_bin: string, args: string[]) => {
-      if (args.includes("credentials.google")) throw new Error("store unavailable");
+      if (args.includes("credentials.google")) return store();
       return { stdout: "git version 2.45.0", stderr: "", exitCode: 0, error: null, launched: true };
     });
+  }
+
+  it("reports a store that exits non-zero, without the key", async () => {
+    // `exec` resolves on a failing exit — only the exit code says the key was lost.
+    stubManagedRun({ stdout: "n-dx initialized" });
+    stubStore(async () => ({
+      stdout: "",
+      stderr: `Error: credential store is locked (refusing to write ${KEY})\n`,
+      exitCode: 1,
+      error: null,
+      launched: true,
+    }));
+    await postInit({ provider: "google", googleApiKey: KEY });
+    const status = await waitForInit();
+
+    expect(status.error).toBeNull();
+    const warning = status.credentialWarning as string;
+    expect(warning).toContain("not stored");
+    expect(warning).toContain("ndx config credentials.google");
+    expect(warning).toContain("credential store is locked");
+    expect(JSON.stringify(status)).not.toContain(KEY);
+  });
+
+  it("reports a store command that could not run", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    stubStore(async () => { throw new Error("store unavailable"); });
+    await postInit({ provider: "google", googleApiKey: KEY });
+    const status = await waitForInit();
+
+    expect(status.error).toBeNull();
+    expect(status.credentialWarning).toContain("not stored");
+    expect(status.credentialWarning).toContain("store unavailable");
+  });
+
+  it("reports nothing when the key is stored", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
     await postInit({ provider: "google", googleApiKey: KEY });
     const status = await waitForInit();
     expect(status.error).toBeNull();
+    expect(status.credentialWarning).toBeNull();
   });
 
   it("runs no store command when no Google key was entered", async () => {
@@ -702,6 +740,68 @@ describe("commands route — shared .sourcevision write lock", () => {
     stubManagedRun({ stdout: "[refresh] ok" });
     expect((await post("refresh", {})).status).toBe(202);
     await waitForFinish("refresh");
+  });
+
+  describe("Sidecar commands", () => {
+    // What `ndx help --effects --format=json` declares: analyze writes .sourcevision/, status writes nothing.
+    beforeEach(() => {
+      invalidateCommandEffectsCache();
+      const declared = (command: string, writes: Array<{ path: string; what: string }>) =>
+        ({ command, summary: "", reads: [], writes, llm: [], network: [], duration: "", next: "" });
+      execMock.mockResolvedValue({
+        stdout: JSON.stringify({ effects: {
+          analyze: declared("analyze", [{ path: "{sourcevision}/", what: "analysis" }]),
+          status: declared("status", []),
+        } }),
+        stderr: "",
+        exitCode: 0,
+        error: null,
+        started: true,
+      });
+    });
+
+    it("refuses a Sidecar ndx analyze while sv-analyze holds the lock, naming the holder", async () => {
+      const child = stubManagedChild();
+      expect((await post("sv-analyze", { full: true })).status).toBe(202);
+
+      const started = await startSidecarCommand(ctx, ["ndx", "analyze", "."]);
+      expect(started).toEqual({ started: false, reason: expect.stringContaining("full analysis") });
+      expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+
+      child.finish({ exitCode: 0, stdout: "", stderr: "" });
+      await waitForFinish("sv-analyze");
+    });
+
+    it("holds the lock against dashboard writers while it runs and releases it when the job ends", async () => {
+      const child = stubManagedChild();
+      const started = await startSidecarCommand(ctx, ["ndx", "analyze", "."]);
+      if (!started.started) throw new Error(started.reason);
+
+      for (const path of ["refresh", "ci"]) {
+        const res = await post(path, {});
+        expect(res.status).toBe(409);
+        expect(((await res.json()) as { runningJob: string }).runningJob).toBe(`Sidecar command ${started.jobId} (ndx analyze .)`);
+      }
+
+      child.finish({ exitCode: 0, stdout: "", stderr: "" });
+      await started.settled;
+
+      stubManagedRun({ stdout: "[refresh] ok" });
+      expect((await post("refresh", {})).status).toBe(202);
+      await waitForFinish("refresh");
+    });
+
+    it("a Sidecar command that writes nothing to .sourcevision/ leaves the lock free", async () => {
+      const child = stubManagedChild();
+      const started = await startSidecarCommand(ctx, ["ndx", "status", "."]);
+      if (!started.started) throw new Error(started.reason);
+
+      expect((await post("sv-analyze", { full: true })).status).toBe(202);
+
+      child.finish({ exitCode: 0, stdout: "", stderr: "" });
+      await started.settled;
+      await waitForFinish("sv-analyze");
+    });
   });
 });
 
@@ -1905,6 +2005,18 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(first.cached).toBe(false);
     expect(second.cached).toBe(true);
     expect(second.ok).toBe(true);
+  });
+
+  it("auth/cached reads the last verdict and never spawns a check", async () => {
+    const cachedUrl = `http://127.0.0.1:${port}/api/commands/auth/cached`;
+    expect(await (await fetch(cachedUrl)).json()).toEqual({ cached: false });
+    expect(execMock).not.toHaveBeenCalled();
+
+    execMock.mockResolvedValue({ stdout: "claude: credentials OK", stderr: "", error: null });
+    await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" });
+    const body = await (await fetch(cachedUrl)).json();
+    expect(body).toMatchObject({ cached: true, ok: true });
+    expect(execMock).toHaveBeenCalledTimes(1);
   });
 
   it("auth?refresh=true forces a fresh check", async () => {

@@ -48,6 +48,8 @@ beforeEach(() => {
 
   vi.stubEnv("NDX_HOME", home);
   vi.stubEnv("NDX_GRAVIEW_BIN", "");
+  // npx runs only on the opt-in (graview-bin.ts); this suite is about where it runs once allowed.
+  vi.stubEnv("NDX_GRAVIEW_NPX", "1");
   vi.stubEnv("PATH", `${stubs}:/usr/bin:/bin`);
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});

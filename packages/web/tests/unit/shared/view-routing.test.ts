@@ -5,6 +5,7 @@ import {
   buildValidViews,
   isKnownViewPath,
   resolveViewAlias,
+  resolveViewAliasRoute,
 } from "../../../src/shared/view-routing.js";
 
 describe("view routing contract", () => {
@@ -78,6 +79,12 @@ describe("redirect aliases (0.8.0 navigation merge)", () => {
     for (const view of ["graph", "iso-map", "zones", "architecture", "routes"]) {
       expect(resolveViewAlias(view, validViews)).toBeNull();
     }
+  });
+
+  it("/command-reference lands on the Reference tab of Settings › Commands", () => {
+    const validViews = buildValidViews(null);
+    expect(resolveViewAliasRoute("command-reference", validViews)).toEqual({ view: "commands", sub: "reference" });
+    expect(resolveViewAliasRoute("rex-dashboard", validViews)).toEqual({ view: "work", sub: null });
   });
 
   it("an unrecognised segment resolves to no alias", () => {

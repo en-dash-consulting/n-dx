@@ -23,6 +23,7 @@ import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type Gravi
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
+import { describeMisfits } from "../fit.js";
 import { resolveLayout } from "../llm-gateway.js";
 import { FACE_EXTENSION, faceEnvironment, findInstalledFace, planProductFace, type FacePlan, type InstalledFace } from "../face.js";
 
@@ -32,7 +33,7 @@ type Subcommand = (typeof SUBCOMMANDS)[number];
 const USAGE = `ndx graview <command> [dir] [flags]
 
   emit [dir] [--no-files]         write document.json and snapshot.json under the graview dir
-  check [dir] [--json]            graview check on the emitted declaration
+  check [dir] [--json]            graview check on the emitted declaration, and the snapshot held to it
   describe [dir] [--place <slug>] graview describe over the emitted snapshot
   serve [dir] [--port <n>]        the product face (the graview-face extension, @n-dx/graview-face) on the
                                   fresh projection; --no-face, or no face enabled: graview serve, the bare store
@@ -46,7 +47,8 @@ const USAGE = `ndx graview <command> [dir] [flags]
   --quiet    print nothing but errors
 
 The graview binary comes from graview.bin in the project config, $NDX_GRAVIEW_BIN,
-PATH, the installed product face's own graview, or npx -y graview@<pinned>, in that order.
+PATH or a product face checkout's own graview, in that order; npx -y graview@<pinned>
+only when graview.allowNpx is true or $NDX_GRAVIEW_NPX=1. Nothing is downloaded unasked.
 `;
 
 interface ParsedArgs {
@@ -82,7 +84,8 @@ function parse(argv: string[]): ParsedArgs {
     else if (arg.startsWith("-")) {
       passthrough.push(arg);
       // A flag's value: the next token when it is not a flag and the flag takes one.
-      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite"].includes(arg);
+      // The value flags of the graview subcommands this CLI passes on: check, describe, serve and mcp (graview 0.1.67).
+      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite", "--allow-origin", "--remote-url", "--views", "--face", "--previous", "--width", "--id", "--seed"].includes(arg);
       if (takesValue && i + 1 < rest.length) passthrough.push(rest[++i]!);
     } else if (dir === undefined) dir = arg;
     else passthrough.push(arg);
@@ -99,7 +102,8 @@ function describeEmit(result: EmitResult): string {
     .map(([kind, n]) => `${n} ${n === 1 ? kind : plural(kind)}`);
   const rel = (p: string) => relativeToRoot(result.layout, p);
   const layer = result.productLayer === "proposed" ? "; product layer proposed by rex's migration plan" : "";
-  return `Wrote ${rel(result.documentPath)} and ${rel(result.snapshotPath)}: ${parts.join(", ")}; ${counts.edges} edges (PRD layout ${result.prdLayout}${layer}).`;
+  const map = result.isoMapPath ? `, and the code map at ${rel(result.isoMapPath)}` : "";
+  return `Wrote ${rel(result.documentPath)} and ${rel(result.snapshotPath)}: ${parts.join(", ")}; ${counts.edges} edges (PRD layout ${result.prdLayout}${layer})${map}.`;
 }
 
 /**
@@ -131,7 +135,8 @@ function run(cmd: string, args: string[], options: { cwd: string; env: NodeJS.Pr
 }
 
 /** graview's flags whose value is a path. */
-const PATH_FLAGS = ["--data", "--sqlite"];
+// Flags whose value is a path: resolved against the project, since npx runs graview elsewhere.
+const PATH_FLAGS = ["--data", "--sqlite", "--seed", "--previous", "--views", "--face"];
 
 /**
  * A relative path given to a path flag, made absolute against the project
@@ -255,6 +260,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     return 0;
   }
 
+  // A command that needs graview and has none stops before it writes anything; serve asks for
+  // a product face first, which needs no binary, so it is judged after the face plan below.
+  const needsBinary = parsed.sub !== "emit" && !(parsed.sub === "serve" && parsed.face);
+  const early = needsBinary ? resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(layout.root)) }) : undefined;
+  if (early?.source === "none") {
+    console.error(`ndx graview ${parsed.sub}: ${early.detail}`);
+    return 1;
+  }
+
   const emitted = await emitProjection(parsed.dir, {
     files: parsed.files ?? config.includeFiles ?? true,
     ref: config.mainRef,
@@ -262,6 +276,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     warn: (message) => console.error(`warning: ${message}`),
   });
   say(describeEmit(emitted));
+  // A snapshot the declaration does not admit fails later, in the face; say so now, and refuse it in check.
+  if (emitted.misfits.length > 0) console.error(`${parsed.sub === "check" ? "error" : "warning"}: ${describeMisfits(emitted.misfits)}`);
   if (parsed.sub === "emit") return 0;
 
   const root = emitted.layout.root;
@@ -276,12 +292,19 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     say(`product face: ${face.detail}`);
   }
 
-  const command = resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
+  const command = early ?? resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
+  // Everything past a product face needs a graview binary, and none is downloaded unasked.
+  if (command.source === "none") {
+    console.error(`ndx graview ${parsed.sub}: ${command.detail}`);
+    return 1;
+  }
   say(`graview: ${command.detail} (${command.source})`);
 
   switch (parsed.sub) {
-    case "check":
-      return runGraview(command, ["check", emitted.documentPath, ...parsed.passthrough], root);
+    case "check": {
+      const checked = await runGraview(command, ["check", emitted.documentPath, ...parsed.passthrough], root);
+      return checked !== 0 ? checked : emitted.misfits.length > 0 ? 1 : 0;
+    }
     case "describe":
       return runGraview(command, ["describe", emitted.documentPath, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);
     case "serve": {

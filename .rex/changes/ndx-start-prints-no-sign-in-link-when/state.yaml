@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "e8f8129f-c046-45a7-a6b1-b6e09e8b4350":
+    status: "completed"
+    startedAt: "2026-11-05T19:31:02.159Z"
+    completedAt: "2026-11-05T19:40:04.990Z"
+    endedAt: "2026-11-05T19:40:04.990Z"
+    activeIntervals: [{"end":"2026-11-05T19:40:04.990Z","start":"2026-11-05T19:31:02.159Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx start names an older hub/server and a working fix; hub health reports its build; status names an unregistered directory under a running hub"
+    appliedAt: "2026-11-05T19:40:04.990Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-05T19:40:04.990Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

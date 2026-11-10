@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "459057dc-b0be-4725-8d20-074b1f2b0fb8":
+    status: "completed"
+    startedAt: "2026-11-06T17:15:54.836Z"
+    completedAt: "2026-11-06T17:18:21.688Z"
+    endedAt: "2026-11-06T17:18:21.688Z"
+    activeIntervals: [{"end":"2026-11-06T17:18:21.688Z","start":"2026-11-06T17:15:54.836Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Failed dashboard run's broadcast error now built from runEndOutput with a 300-char per-stream cap when stderr has text; stdout-only keeps the last line."
+    appliedAt: "2026-11-06T17:18:21.688Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-06T17:18:21.688Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

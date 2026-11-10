@@ -38,6 +38,7 @@ import {
 } from "./rex-gateway.js";
 import type { V2Tree } from "./rex-gateway.js";
 import { completePreviewPlacement } from "./routes-rex/placement.js";
+import { buildAreaDetail } from "./routes-rex/product.js";
 import { isRootType, itemTypeOf, levelOf } from "../shared/index.js";
 
 /**
@@ -104,13 +105,35 @@ function v2PreviewChanges(parsed: unknown): unknown[] | null {
  * caller's catch would otherwise read it as unparseable output and show an
  * empty preview for a change rex did report.
  */
-async function withPreviewPlacements(ctx: ServerContext, changes: unknown[]): Promise<unknown[]> {
+async function withPreviewPlacements(ctx: ServerContext, changes: unknown[], area?: PreviewArea): Promise<unknown[]> {
   if (!changes.some((c) => (c as RexChangeRow | null)?.placement)) return changes;
-  const tree = await previewTree(ctx);
+  const tree = area?.tree ?? await previewTree(ctx);
   return changes.map((c) => {
     const row = c as RexChangeRow;
-    return row?.placement ? { ...row, placement: completePreviewPlacement(row.placement, tree) } : c;
+    return row?.placement ? { ...row, placement: completePreviewPlacement(row.placement, tree, area?.targets) } : c;
   });
+}
+
+/** The area a preview's shortlist is limited to: the tree it was resolved in and its targets. */
+interface PreviewArea {
+  id: string;
+  tree: V2Tree;
+  /** The area's capabilities and the constraints binding it, as the area view shows them. */
+  targets: ReadonlySet<string>;
+}
+
+/**
+ * Resolve the `area` a preview asked for, by id, display id or frozen slug.
+ * A string, or an error to answer with: an area needs a v2 tree, and a
+ * reference naming no live area is refused so request text never reaches argv.
+ */
+async function resolvePreviewArea(ctx: ServerContext, ref: unknown): Promise<PreviewArea | string> {
+  if (typeof ref !== "string" || ref.trim() === "") return "area must name an area";
+  if ((await prdLayout(ctx.rexDir)) !== "v2") return "area needs a v2 PRD, which has product areas";
+  const tree = (await loadPrdModel(ctx.rexDir)).tree as V2Tree;
+  const area = buildAreaDetail(tree, ref.trim());
+  if (!area) return "area does not name a live area in this PRD";
+  return { id: area.id, tree, targets: new Set([...area.capabilities, ...area.constraints].map((n) => n.id)) };
 }
 
 /** The project's v2 tree for preview areas, or null on v1 or when it cannot be read. */
@@ -1259,6 +1282,8 @@ async function handleSmartAddPreview(
     const input = JSON.parse(body) as {
       text: string;
       parentId?: string;
+      /** v2: limit each change's placement shortlist to this area's capabilities and constraints. */
+      area?: string;
     };
 
     if (!input.text || typeof input.text !== "string" || input.text.trim().length === 0) {
@@ -1281,6 +1306,12 @@ async function handleSmartAddPreview(
       return true;
     }
 
+    const area = input.area === undefined ? undefined : await resolvePreviewArea(ctx, input.area);
+    if (typeof area === "string") {
+      errorResponse(res, 400, area);
+      return true;
+    }
+
     const description = String(input.text).trim();
     // The dashboard preview is a draft the user reviews — `--fast` forces the
     // vendor's light tier (e.g. haiku) so the CLI provider completes well
@@ -1288,6 +1319,8 @@ async function handleSmartAddPreview(
     // `n-dx add` keeps the configured top-tier model.
     const args = ["add", "--format=json", "--fast", "--description", description];
     if (parentId !== undefined) args.push("--parent", parentId);
+    // Rex ranks within the area, so its targets below the global top five still make the shortlist.
+    if (area) args.push("--area", area.id);
     args.push(ctx.projectDir);
 
     const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
@@ -1343,7 +1376,7 @@ async function handleSmartAddPreview(
       if (changes) {
         jsonResponse(res, 200, {
           preview: true,
-          changes: await withPreviewPlacements(ctx, changes),
+          changes: await withPreviewPlacements(ctx, changes, area),
           proposals: [],
           confidence: 0,
           qualityIssues: (parsed as RexAddOutput).qualityIssues ?? [],

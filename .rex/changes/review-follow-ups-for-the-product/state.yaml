@@ -83,12 +83,24 @@ items:
     lastModified: "2026-10-16T21:25:32.998Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4191f655-9b6c-4527-8672-36b21879b36f":
+    status: "completed"
+    startedAt: "2026-10-17T01:06:10.879Z"
+    completedAt: "2026-10-17T01:10:55.358Z"
+    endedAt: "2026-10-17T01:10:55.358Z"
+    resolutionType: "code-change"
+    resolutionDetail: "checkGatewayImports now also matches dynamic import(\"pkg\"); e2e case added in cli-ci.test.js"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T05:45:46.211Z"
+    lastModified: "2026-10-17T01:10:55.655Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "475f175a-f3de-4a25-97c3-1751dfe713fa":
+    status: "completed"
+    startedAt: "2026-10-16T23:06:48.259Z"
+    completedAt: "2026-10-16T23:13:58.304Z"
+    endedAt: "2026-10-16T23:13:58.304Z"
+    resolutionType: "code-change"
+    resolutionDetail: "scanRestrictedImports catches read errors and returns them as unreadable; the architecture-policy step fails with \"cannot read <file>: <error>\"; e2e test added (c2c0a7c5d)"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T07:21:09.774Z"
+    lastModified: "2026-10-16T23:13:58.613Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4967ee91-e741-41b0-9ae9-d9d55e3f597a":
     status: "completed"
@@ -102,8 +114,8 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "51a8aed3-0098-43e1-9f84-87c080ababdd":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-13T19:52:36.022Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-11-07T02:16:14.862Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fd641c6-0cab-493b-a934-be788ae4463f":
     status: "cancelled"
     resolutionType: "acknowledgment"
@@ -208,11 +220,6 @@ items:
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-16T22:13:33.052Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "a55c7225-d9fc-451b-9b52-d48773e0f0fb":
-    status: "deferred"
-    assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-09T14:52:34.967Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "b1f05a4d-4947-4a7c-b2b5-e3bbed289b76":
     status: "completed"
     startedAt: "2026-10-28T01:41:55.788Z"
@@ -333,10 +340,6 @@ items:
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-28T00:08:31.551Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
-  "f7af456c-cc9d-4464-ac95-cb04572405db":
-    assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-13T19:52:30.050Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "fabfa3a2-9ef6-4f3e-a6f7-80c2223c8657":
     status: "completed"
     startedAt: "2026-10-16T05:05:12.165Z"
@@ -354,6 +357,12 @@ items:
     lastModified: "2026-10-16T05:14:11.016Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "ffa2a8cd-3a0f-4c58-baea-570eb9900f14":
+    status: "completed"
+    startedAt: "2026-10-17T01:16:02.119Z"
+    completedAt: "2026-10-17T01:20:51.138Z"
+    endedAt: "2026-10-17T01:20:51.138Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/e2e/docs-skill-table-drift.test.js; aligned 3 skills.md rows verbatim (ndx-graview also, after the resync onto main); skills.md selects root-docs via VALIDATED_DOC_PAGES."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T04:35:59.167Z"
+    lastModified: "2026-10-17T01:20:51.436Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

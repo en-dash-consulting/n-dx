@@ -11,6 +11,7 @@
  * - **stuck**    — consecutive-failure detection for task-level blocking
  * - **workflow** — historical run analysis → optimization suggestions
  * - **summary**  — post-run summarization (tool calls, files, tests)
+ * - **run-verdict** — why a run did not complete, and the ranked next action
  *
  * All modules follow the same contract:
  * - Pure functions operating on typed inputs (RunRecord[], config, etc.)
@@ -131,3 +132,7 @@ export type {
 
 // ── Summary ──────────────────────────────────────────────────────────
 export { buildRunSummary } from "./summary.js";
+
+// ── Run verdict ──────────────────────────────────────────────────────
+export { classifyRun, countAttempts, MAX_VERDICT_ATTEMPTS } from "./run-verdict.js";
+export type { RunVerdictInput } from "./run-verdict.js";

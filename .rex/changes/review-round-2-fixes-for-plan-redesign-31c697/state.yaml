@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "31c697b5-ded2-49a2-8c5e-b57a26de854e":
+    status: "completed"
+    startedAt: "2026-11-06T16:44:49.008Z"
+    completedAt: "2026-11-06T16:44:49.008Z"
+    endedAt: "2026-11-06T16:44:49.008Z"
+    activeIntervals: [{"end":"2026-11-06T16:44:49.008Z","start":"2026-11-06T16:44:49.008Z"}]
+    appliedAt: "2026-11-06T16:44:49.008Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-06T16:44:49.008Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "97f65c3a-2c23-439c-8de3-482f8dcdb1c5":
+    status: "completed"
+    startedAt: "2026-11-06T16:40:11.499Z"
+    completedAt: "2026-11-06T16:44:49.008Z"
+    endedAt: "2026-11-06T16:44:49.008Z"
+    activeIntervals: [{"end":"2026-11-06T16:44:49.008Z","start":"2026-11-06T16:40:11.499Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: capability detail carries inboxChanges (held changes amending/touching it); capability page renders them under Waiting in the Inbox with a link; overlays and Product total unchanged."
+    lastModified: "2026-11-06T16:44:49.008Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f8f7cb2f-87ac-42f1-a551-e6774e6a93f5":
+    status: "completed"
+    startedAt: "2026-11-06T16:35:52.019Z"
+    completedAt: "2026-11-06T16:39:26.324Z"
+    endedAt: "2026-11-06T16:39:26.324Z"
+    activeIntervals: [{"end":"2026-11-06T16:39:26.324Z","start":"2026-11-06T16:35:52.019Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "isMovingChange takes the index and excludes changes awaiting placement, so held changes count only in the Inbox; server test added."
+    lastModified: "2026-11-06T16:39:26.324Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

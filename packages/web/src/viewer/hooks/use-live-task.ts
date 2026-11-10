@@ -40,6 +40,8 @@ export interface LiveTaskItem {
   status: string;
   priority: string | null;
   acceptanceCriteria: string[];
+  /** The tracker work refs the task links to; mirrors routes-live-task.ts. */
+  links: string[];
   epicChain: LiveTaskChainLink[];
 }
 

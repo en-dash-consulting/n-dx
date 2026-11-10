@@ -13,6 +13,7 @@
 
 import { exec } from "./exec-gateway.js";
 import type { SidecarState, SidecarStatus } from "./sidecars.js";
+import { FRAME_KEY_SEGMENT } from "./frame-keys.js";
 
 /**
  * The extension contract version this hub speaks, carried as `apiVersion` by
@@ -33,6 +34,7 @@ export interface ExtensionManifest {
   sidecar?: { bin: string; health?: string; idleStopMinutes?: number };
   hub?: { label: string; description?: string };
   projectLinks?: Array<{ label: string; path: string }>;
+  sidecarTab?: { label: string; path: string };
   [key: string]: unknown;
 }
 
@@ -110,6 +112,11 @@ export interface ExtensionView {
   sidecar: ExtensionSidecarView | null;
   /** Only with `?project=<id>`: its project links for that project, empty unless enabled. */
   links?: ExtensionLinkView[];
+  /**
+   * Only with `?project=<id>`: its Sidecar drawer tab for that project. Null
+   * unless the extension is enabled, compatible and has a sidecar and a tab.
+   */
+  tab?: ExtensionLinkView | null;
 }
 
 export interface ExtensionsAnswer {
@@ -120,10 +127,18 @@ export interface ExtensionsAnswer {
 
 /** Fill a link path's `{projectId}` and `{repoRoot}`, each URL-encoded. */
 export function resolveProjectLink(name: string, path: string, project: { id: string; repoRoot: string }): string {
-  const filled = path
+  return `/x/${name}${fillLinkPath(path, project)}`;
+}
+
+/** A `sidecarTab` path resolved for one project under a frame key's mount, `/x/<name>/~f/<key>/…`. */
+export function resolveFrameUrl(name: string, key: string, path: string, project: { id: string; repoRoot: string }): string {
+  return `/x/${name}/${FRAME_KEY_SEGMENT}/${key}${fillLinkPath(path, project)}`;
+}
+
+function fillLinkPath(path: string, project: { id: string; repoRoot: string }): string {
+  return path
     .replace(/\{projectId\}/g, encodeURIComponent(project.id))
     .replace(/\{repoRoot\}/g, encodeURIComponent(project.repoRoot));
-  return `/x/${name}${filled}`;
 }
 
 /** Join core's listing with the running sidecars; with `project`, resolve each enabled extension's links. */
@@ -153,9 +168,13 @@ export function buildExtensionsAnswer(
         : null,
     };
     if (project) {
-      view.links = ext.state === "enabled" && hasSidecar && name !== null
+      const served = ext.state === "enabled" && hasSidecar && name !== null;
+      view.links = served
         ? (m?.projectLinks ?? []).map((l) => ({ label: l.label, url: resolveProjectLink(name, l.path, project) }))
         : [];
+      view.tab = served && m?.sidecarTab
+        ? { label: m.sidecarTab.label, url: resolveProjectLink(name, m.sidecarTab.path, project) }
+        : null;
     }
     return view;
   });

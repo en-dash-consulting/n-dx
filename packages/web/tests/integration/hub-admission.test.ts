@@ -98,6 +98,7 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
           options?: Record<string, unknown>;
           mode?: string;
           iterations?: number;
+          saveRun?: Record<string, unknown>;
         };
         const taskId = parsed.taskId ?? "";
         const refusal = child.refuse.get(taskId);
@@ -112,6 +113,7 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
           ...(parsed.options ? { options: parsed.options } : {}),
           ...(parsed.mode ? { mode: parsed.mode } : {}),
           ...(parsed.iterations !== undefined ? { iterations: parsed.iterations } : {}),
+          ...(parsed.saveRun ? { saveRun: parsed.saveRun } : {}),
         });
         child.running.add(taskId);
         json(200, { runId: `run-${taskId}`, taskId });
@@ -236,6 +238,61 @@ describe("hub admission gate", () => {
     alpha.running.delete("task-1");
     await waitFor(() => beta.received.length === 1, 4_000);
     expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, mode: "loop" });
+  });
+
+  it("replays a queued run's saveRun, so the settings are saved when the run starts", async () => {
+    // Start Working's one click on a task with no settings sends them with
+    // the execute; the project server saves them only when the start passes
+    // its gates. Behind the queue that is the replay, so the entry must carry
+    // them there, and a run dropped at its turn never saves anything.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const saveRun = { run: { tier: "standard", skipTestGate: false }, version: "none" };
+    const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { saveRun });
+    expect(queued.status).toBe(202);
+    expect(beta.received).toHaveLength(0);
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, saveRun });
+  });
+
+  it("never serves a queued saveRun from the queue, only a flag that there is one", async () => {
+    // `saveRun.run` can carry the task's context notes, which the unscoped
+    // snapshot must not hand to every project's viewer.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    const secret = "private notes saved with beta's settings";
+    const saveRun = { run: { tier: "standard", contextNotes: secret }, version: "none" };
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { saveRun });
+
+    for (const path of ["/api/hub/queue", "/p/beta/api/hub/queue", "/p/alpha/api/hub/queue"]) {
+      const text = await (await fetch(`http://127.0.0.1:${h.port}${path}`)).text();
+      expect(text).not.toContain(secret);
+      expect(text).not.toContain("saveRun");
+    }
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries[0]).toMatchObject({ taskId: "task-2", hasSaveRun: true });
+    expect(queue.entries[0]).not.toHaveProperty("options");
+
+    // Redacted from the snapshot only: the replay still carries it.
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, saveRun });
+  });
+
+  it("forwards a saveRun that is not an object instead of queuing it", async () => {
+    // The project server answers its 400 now; queued, it would only surface
+    // as a run dropped minutes later.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const res = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { saveRun: "nope" });
+
+    // Forwarded straight through: the server's own answer, not a 202 queued.
+    expect(res.status).toBe(200);
+    expect(beta.received).toHaveLength(1);
   });
 
   it("replays an iterations count with its mode", async () => {

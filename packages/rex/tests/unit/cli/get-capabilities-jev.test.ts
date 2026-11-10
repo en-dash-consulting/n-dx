@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { setHelperCredential } from "@n-dx/llm-client";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,5 +40,14 @@ describe("get_capabilities jev", () => {
     const { text, body } = await report();
     expect(body.jev).toEqual({ available: true, source: "env" });
     expect(text).not.toContain(SECRET);
+  });
+
+  it("reports a helper entry as unknown, not available, without running it", async () => {
+    const ran = join(home, "helper-ran");
+    const script = join(home, "helper.cjs");
+    writeFileSync(script, `require("node:fs").writeFileSync(${JSON.stringify(ran)}, "");`);
+    setHelperCredential("typesafe", [process.execPath, script], { ndxHome: home });
+    expect((await report()).body.jev).toEqual({ available: null, source: "helper" });
+    expect(existsSync(ran)).toBe(false);
   });
 });

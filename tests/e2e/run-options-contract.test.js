@@ -42,7 +42,7 @@ const { RUN_SETTING_KEYS, validateRunSettings } = await import(join(ROOT, "packa
 const HENCH_ONLY = new Set(["resetDeferred"]);
 const DASHBOARD_ONLY = new Set(["contextNotes"]);
 /** Chosen per launch, never saved in a task's `run` block. */
-const LAUNCH_ONLY = new Set(["fresh", "allowDirty"]);
+const LAUNCH_ONLY = new Set(["fresh", "allowDirty", "requireUnblocked"]);
 /** Launch-time model options and the portable keys a saved block holds instead. */
 const SAVED_MODEL_KEYS = { model: ["tier", "models"], reviewModel: ["reviewTier", "reviewModels"] };
 const savedKeys = (keys) => keys.flatMap((k) => SAVED_MODEL_KEYS[k] ?? [k]);

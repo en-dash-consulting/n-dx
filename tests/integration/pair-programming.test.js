@@ -874,7 +874,8 @@ describe("runReviewerLlm", () => {
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
     expect(capturedArgs[0]).toBe("exec");
-    expect(capturedArgs[1]).toBe("-");
+    // The stdin marker ends argv, after the shell-environment overrides.
+    expect(capturedArgs.at(-1)).toBe("-");
     // Prompt must NOT appear in argv — it is delivered via stdin.
     expect(capturedArgs.join(" ")).not.toContain("review this code");
   });
@@ -1021,7 +1022,7 @@ describe("runReviewerLlmCapturing", () => {
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
     expect(capturedArgs[0]).toBe("exec");
-    expect(capturedArgs[1]).toBe("-");
+    expect(capturedArgs.at(-1)).toBe("-");
     expect(capturedArgs.join(" ")).not.toContain("review this");
   });
 
@@ -1314,6 +1315,12 @@ describe("buildReviewerArgs", () => {
     expect(buildReviewerArgs("codex")).toEqual(["exec", "-"]);
   });
 
+  it("puts the codex shell-environment overrides after exec, and drops them for claude", () => {
+    const flags = ["-c", "shell_environment_policy.set.OPENAI_API_KEY=''"];
+    expect(buildReviewerArgs("codex", "gpt-5-codex", flags)).toEqual(["exec", ...flags, "--model", "gpt-5-codex", "-"]);
+    expect(buildReviewerArgs("claude", undefined, flags)).toEqual(["-p", "-"]);
+  });
+
   it("adds --model for claude only when a model is given", () => {
     expect(buildReviewerArgs("claude", "opus")).toEqual(["-p", "-", "--model", "opus"]);
     expect(buildReviewerArgs("claude")).toEqual(["-p", "-"]);
@@ -1332,7 +1339,14 @@ describe("buildReviewerArgs", () => {
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "codex", model: "gpt-5-codex" });
 
-    expect(JSON.parse(readFileSync(argvFile, "utf-8"))).toEqual(["exec", "--model", "gpt-5-codex", "-"]);
+    // The `-c` overrides keep the Codex credentials out of the reviewer agent's commands.
+    expect(JSON.parse(readFileSync(argvFile, "utf-8"))).toEqual([
+      "exec",
+      "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
+      "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
+      "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
+      "--model", "gpt-5-codex", "-",
+    ]);
     expect(result.model).toBe("gpt-5-codex");
     expect(formatReviewBanner("codex", result)).toContain("Reviewer (codex, gpt-5-codex)");
   });

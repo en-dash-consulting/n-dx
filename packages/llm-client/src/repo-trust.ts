@@ -387,8 +387,20 @@ export interface RepoGateTestCommand {
 
 /** The execution-relevant subset of what the repository ships. */
 export interface RepoExecutionConfig {
-  /** Which files were read, relative to the project root. Absent files are omitted. */
+  /**
+   * What was read, relative to the project root: every entry is a path to a
+   * file or a directory, never a glob or prose. Absent files are omitted. The
+   * PRD's run blocks are one directory entry,
+   * {@link RepoExecutionConfig.prdRunBlocksPath};
+   * {@link RepoExecutionConfig.prdRunBlocks} names each file.
+   */
   sources: string[];
+  /**
+   * The `sources` entry that stands for the PRD's run blocks, with a trailing
+   * `/`: the PRD subdirectory when every block sits in one, else the rex
+   * directory. Null when no PRD item saves a run block. Not in the digest.
+   */
+  prdRunBlocksPath: string | null;
   /** The language the repository declares. Reported, never used as the baseline. */
   language: string | null;
   /**
@@ -426,6 +438,12 @@ export interface RepoExecutionConfig {
    * sorted: the vendor CLI, graview binary or graview face n-dx runs.
    */
   vendorCliPaths: string[];
+  /**
+   * The project config's {@link NETWORK_READ_FIELDS} that are `true`, as
+   * sorted `path = true` lines: reads n-dx runs with the user's GitHub login
+   * without asking first.
+   */
+  networkReads: string[];
   permissionMode: string | null;
   provider: string | null;
   posture: RepoRunPosture;
@@ -469,7 +487,7 @@ export interface RepoExecutionConfig {
    * root. git rm --cached cannot untrack such a file. Not in the digest.
    */
   localConfigNestedIn: string | null;
-  /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
+  /** sha256 over the canonical JSON of everything above except `sources`, `prdRunBlocksPath`, `detectedLanguage` and `envDeny`. */
   digest: string;
 }
 
@@ -547,6 +565,24 @@ export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
   ["llm", "claude", "cli_path"],
   ["llm", "codex", "cli_path"],
 ];
+
+/**
+ * Project-config switches that, set `true`, let n-dx run a network read with
+ * the user's credentials without asking: `web.sidecarGithubReads` lets the
+ * Sidecar's `github_read`, its Diagnose branch packet and
+ * `GET /api/branch-health` run gh with the user's login and no network-read
+ * card. `false` only tightens. The project config's `true` applies only once
+ * the user has trusted it; the user's `.n-dx.local.json` always applies.
+ */
+export const NETWORK_READ_FIELDS: readonly (readonly string[])[] = [
+  ["web", "sidecarGithubReads"],
+];
+
+/** The {@link NETWORK_READ_FIELDS} a config object turns on, as sorted `path = true` lines. */
+export function networkReadsIn(config: Record<string, unknown> | null): string[] {
+  if (!config) return [];
+  return NETWORK_READ_FIELDS.filter((path) => fieldAt(config, path) === true).map((path) => `${path.join(".")} = true`).sort();
+}
 
 /**
  * The {@link CREDENTIAL_ROUTING_FIELDS} a config object sets, and each
@@ -878,6 +914,16 @@ function scanPrdRunBlocks(root: string, rexDir: string): RepoPrdRunBlock[] {
   return blocks.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+/**
+ * The directory that holds the PRD's run blocks, e.g. `.rex/changes/`: the
+ * PRD subdirectory when every block sits in one, else the rex directory.
+ */
+function prdRunBlocksDir(rexRel: string, blocks: RepoPrdRunBlock[]): string | null {
+  if (!blocks.length) return null;
+  const subdirs = new Set(blocks.map((b) => b.path.slice(rexRel.length + 1).split("/")[0]));
+  return subdirs.size === 1 ? `${rexRel}/${[...subdirs][0]}/` : `${rexRel}/`;
+}
+
 /** Vendor names whose `llm.<vendor>` block the digest reads. */
 const LLM_VENDOR_KEYS = ["claude", "codex", "google", "local"] as const;
 
@@ -1109,8 +1155,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
 
   // The PRD is repository content too, and a saved `run` block steers the
   // next run of the item it sits on.
+  // One directory source, not a path per file: a PRD can save hundreds, and
+  // every reader of `sources` prints them. `prdRunBlocks` keeps each file.
   const prdRunBlocks = scanPrdRunBlocks(root, layout.rexDir);
-  for (const block of prdRunBlocks) sources.push(block.path);
+  const prdRunBlocksPath = prdRunBlocksDir(relOf(root, layout.rexDir), prdRunBlocks);
+  if (prdRunBlocksPath) sources.push(prdRunBlocksPath);
 
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
@@ -1139,9 +1188,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ...vendorCliPathsIn(effective),
     ...(henchClaudePath && henchClaudePath !== "claude" ? [`hench.claudePath = ${henchClaudePath}`] : []),
   ].sort();
+  const networkReads = networkReadsIn(effective);
   const projectSetsGated = optionalString(sectionOf(projectConfig, "rex")?.test)
     || credentialRoutingIn(projectConfig).length
-    || vendorCliPathsIn(projectConfig).length;
+    || vendorCliPathsIn(projectConfig).length
+    || networkReadsIn(projectConfig).length;
   if (projectSetsGated && !projectHench) {
     sources.push(relOf(root, layout.configFile));
   }
@@ -1183,6 +1234,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     // Present only when set, for the same reason.
     ...(credentialRouting.length ? { credentialRouting } : {}),
     ...(vendorCliPaths.length ? { vendorCliPaths } : {}),
+    ...(networkReads.length ? { networkReads } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     ...(posture.autonomous !== null ? { autonomous: posture.autonomous } : {}),
@@ -1209,6 +1261,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
 
   return {
     sources,
+    prdRunBlocksPath,
     ...body,
     detectedLanguage: detectRepoLanguage(root),
     guard,
@@ -1216,6 +1269,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     envDeny: [...envDeny].sort(),
     credentialRouting,
     vendorCliPaths,
+    networkReads,
     localConfigTracked,
     localConfigUnanswered,
     localConfigTrackedPaths,
@@ -1251,6 +1305,7 @@ export type RepoTrustFindingCode =
   | "env-allow-added"
   | "credential-routing"
   | "vendor-cli-path"
+  | "network-reads"
   | "permission-bypass"
   | "test-command"
   | "mcp-servers"
@@ -1303,6 +1358,9 @@ export interface RepoTrustFinding {
   /** The concrete values behind the message, for a UI that wants to list them. */
   values: string[];
 }
+
+/** PRD run blocks the `run-settings` message names before "and N more". */
+const RUN_SETTINGS_SHOWN = 5;
 
 const SHELL_RISK = /[;&|`$]|\b(curl|wget|sh -c|bash -c|powershell|iex\b|Invoke-Expression)\b/i;
 
@@ -1490,6 +1548,15 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
     });
   }
 
+  if (config.networkReads.length) {
+    findings.push({
+      code: "network-reads",
+      severity: "warning",
+      message: `Lets n-dx run GitHub reads with your login without asking first: ${config.networkReads.join(", ")}`,
+      values: [...config.networkReads],
+    });
+  }
+
   if (config.permissionMode === "bypassPermissions") {
     findings.push({
       code: "permission-bypass",
@@ -1593,12 +1660,15 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
     .map((b) => ({ path: b.path, keys: runBlockPostureKeys(b.run) }))
     .filter((b) => b.keys.length > 0);
   if (posturedBlocks.length) {
-    const shown = posturedBlocks.map((b) => `${b.path}: ${b.keys.join(", ")}`);
+    const all = posturedBlocks.map((b) => `${b.path}: ${b.keys.join(", ")}`);
+    // The message names a few; `values` keeps every block for a full review.
+    const more = all.length - RUN_SETTINGS_SHOWN;
+    const listed = all.slice(0, RUN_SETTINGS_SHOWN).join("; ") + (more > 0 ? `; and ${more} more` : "");
     findings.push({
       code: "run-settings",
       severity: "warning",
-      message: `Saves run settings on PRD items that set execution posture: ${shown.join("; ")}`,
-      values: shown,
+      message: `Saves run settings on PRD items that set execution posture: ${listed}`,
+      values: all,
     });
   }
 
@@ -1934,7 +2004,13 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
       break;
   }
 
-  if (ev.config.sources.length) lines.push(`  Read from: ${ev.config.sources.join(", ")}`);
+  if (ev.config.sources.length) {
+    const { sources, prdRunBlocksPath, prdRunBlocks } = ev.config;
+    const n = prdRunBlocks.length;
+    const shown = sources.map((s) =>
+      s === prdRunBlocksPath ? `${s} (${n} PRD item${n === 1 ? "" : "s"} with saved run settings)` : s);
+    lines.push(`  Read from: ${shown.join(", ")}`);
+  }
   for (const f of warnings) lines.push(`  ! ${f.message}`);
   for (const f of infos) lines.push(`  - ${f.message}`);
 

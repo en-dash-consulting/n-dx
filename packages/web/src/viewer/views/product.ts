@@ -98,7 +98,11 @@ function Area({ area, onSelectCapability }: {
   area: AreaSection;
   onSelectCapability?: (id: string) => void;
 }) {
-  return h("section", { class: "pm-area", "aria-label": area.title },
+  return h("section", {
+    id: `product-area-${area.slug}`,
+    class: "pm-area",
+    "aria-label": area.title,
+  },
     h("h3", { class: "section-header" },
       area.title,
       area.displayId ? h("span", { class: "pm-display-id" }, area.displayId) : null,

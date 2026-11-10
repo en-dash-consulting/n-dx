@@ -4,7 +4,8 @@
  * there is no copy to drift), every titled lens draws as a place over a
  * real-shaped snapshot, and this face's registry builds over it.
  */
-import { placesOf, type Principal } from "@graview/core";
+import { type Principal } from "@graview/core";
+import { placesOf } from "@graview/core/seat";
 import { describePlace } from "@graview/core/describe";
 import { compileDocumentFiles, type DocumentFiles } from "@graview/core/testing";
 import { describe, expect, it, beforeAll } from "vitest";
@@ -40,7 +41,7 @@ describe("the declaration n-dx emits", () => {
 
   it("titles its lenses, so each is a place", () => {
     const places = placesOf(app).filter((p) => p.lens);
-    expect(places.map((p) => p.lens).sort()).toEqual(["blocks", "blocks", "calendar", "columns", "coverage", "coverage", "timeline"]);
+    expect(places.map((p) => p.lens).sort()).toEqual(["blocks", "blocks", "calendar", "calendar", "columns", "coverage", "coverage"]);
   });
 
   it("draws every titled place over the snapshot", () => {

@@ -48,7 +48,6 @@ import {
   RexDashboard,
   TokenUsageView,
   ValidationView,
-  RequirementsView,
   ActivityView,
   TaskAuditView,
   WorkflowOptimizationView,
@@ -63,17 +62,26 @@ import {
 import {
   HenchRunsView,
   AdaptiveOptimizationView,
+  OutcomesPanel,
 } from "./domain-hench.js";
 
 import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
+import { LifecycleStrip } from "./lifecycle-strip.js";
+import { ChangesGlance } from "./changes-glance.js";
+import { ChangesSummaryProvider } from "./changes-summary-context.js";
+import { PlanHealth } from "./plan-health.js";
+import { SpecGapsPanel } from "./spec-gaps.js";
+import { ProductAreaMap, openAreaChanges } from "./product-area-map.js";
+import { AreaInPlace } from "./area.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
+import { areaCapabilityOfTab, areaSlugOfTab, placeChangeOfTab } from "../route-state.js";
 
 import {
   WorkflowView,
@@ -81,6 +89,7 @@ import {
   CommandReferenceView,
   RobotWranglerView,
   ProjectView,
+  ToolingPanel,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -96,6 +105,20 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /** The tab the route names on a view that keeps it in its path (Commands: `reference`). */
+  selectedTab?: string | null;
+  /** The area slug `?area=` names on Open changes, which it filters to that area. */
+  selectedArea?: string | null;
+  /** The Product page reports the capability it has open, so Sidecar can attach it. */
+  setOpenCapability?: (id: string | null) => void;
+  /** The PRD page reports the item selected in its tree, which the route does not carry. */
+  setOpenTask?: (id: string | null) => void;
+  /** The Zones page reports the zone open in its slideout, which the route does not carry. */
+  setOpenZone?: (id: string | null) => void;
+  /** Attach a Workspaces worktree card to Sidecar (null detaches); absent while Sidecar is off. */
+  attachWorktree?: (key: string | null) => void;
+  /** The worktree card attached to Sidecar, by workspace key. */
+  attachedWorktree?: string | null;
   /**
    * Whether the detail panel (a file, zone or PRD item) is showing beside the
    * page, so a full-screen dashboard tile leaves room for it.
@@ -141,20 +164,27 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
 
 /** A stage page, rendering each of its sections and tiles through this registry. */
 function stage(id: StageId): ViewRenderer {
-  return (ctx) => h(StagePage, {
+  const page: ViewRenderer = (ctx) => h(StagePage, {
     stage: id,
     validViews: validViewsOf(ctx),
     navigateTo: ctx.navigateTo,
     // On a tiled stage the lead Overview drops what its tiles show.
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
-      : renderActiveView(view, { ...ctx, inSection: true })),
+      // A stage's own lead is its question, not a view the registry could render.
+      : view === id
+        ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
+        : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
+  // Plan's lifecycle strip and open-changes glance share one summary read.
+  return id === "plan"
+    ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
+    : page;
 }
 
 /** The parts of a stage page that are not views of their own. */
@@ -167,6 +197,26 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "next-steps": return h(NextStepsPanel, { embedded: true });
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
     case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
+    case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
+    // A block opens its area in the tile's full-screen; the folded block, the whole map.
+    case "product-map": {
+      if (!opened) {
+        return h(ProductAreaMap, {
+          onOpenArea: (slug: string | null, title: string) =>
+            grid.openTile("product-map", slug ? { id: slug, label: title } : undefined),
+          onOpenChanges: (areaSlug: string | null) => openAreaChanges(ctx.navigateTo, areaSlug),
+        });
+      }
+      const slug = grid.focus?.id;
+      return slug
+        ? h(AreaInPlace, { slug, onOpenPage: () => ctx.navigateTo("product", { tab: `area/${encodeURIComponent(slug)}` }), navigateTo: ctx.navigateTo })
+        : h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo });
+    }
+    case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
+    case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
+    case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);
+    case "outcomes": return h(OutcomesPanel, null);
+    case "tooling": return h(ToolingPanel, { navigateTo: ctx.navigateTo });
   }
 }
 
@@ -176,6 +226,7 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "analyze": stage("analyze"),
   "plan": stage("plan"),
+  "tune": stage("tune"),
   // `/work/prep/<taskId>` is the Work page with the Prepare task modal open
   // over it; closing returns to `/work`, a start hands off to Live.
   "work": (ctx) => h(Fragment, null,
@@ -190,8 +241,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
       : null,
   ),
 
-  "workspaces": () =>
-    h(WorkspacesView, null),
+  "workspaces": ({ attachWorktree, attachedWorktree }) =>
+    h(WorkspacesView, { onAttachSidecar: attachWorktree, attachedWorktree: attachedWorktree ?? null }),
 
   "live": ({ data, navigateTo, jobs }) =>
     h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),
@@ -216,8 +267,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "iso-map": ({ data }) =>
     h(IsoMapView, { analysisStamp: isoMapAnalysisStamp(data) }),
 
-  "zones": ({ data, setDetail, navigateTo }) =>
-    h(ZonesView, { data, onSelect: setDetail, navigateTo }),
+  "zones": ({ data, setDetail, setOpenZone, navigateTo }) =>
+    h(ZonesView, { data, onSelect: setDetail, onOpenZoneChange: setOpenZone, navigateTo }),
 
   "files": ({ data, setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }) =>
     h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }),
@@ -243,14 +294,25 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "rex-dashboard": ({ navigateTo }) =>
     h(RexDashboard, { navigateTo }),
 
-  "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, navigateTo }) =>
-    h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo }),
+  "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, setOpenTask, navigateTo }) =>
+    h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, onSelectedItemChange: setOpenTask, navigateTo }),
 
-  "product": () =>
-    h(ProductPage, null),
+  // Keyed apart from "requirements", which renders the same page in the same
+  // slot: without the key, moving between the two routes would keep the
+  // previous route's tab.
+  "product": ({ setOpenCapability, selectedTab, navigateTo }) =>
+    h(ProductPage, {
+      key: "product",
+      onCapabilityChange: setOpenCapability,
+      areaSlug: areaSlugOfTab(selectedTab ?? null),
+      areaCapabilityId: areaCapabilityOfTab(selectedTab ?? null),
+      placeChangeId: placeChangeOfTab(selectedTab ?? null),
+      onLeaveArea: () => navigateTo("product"),
+      navigateTo,
+    }),
 
-  "changes": ({ navigateTo }) =>
-    h(ChangesPage, { navigateTo }),
+  "changes": ({ navigateTo, selectedArea }) =>
+    h(ChangesPage, { navigateTo, area: selectedArea ?? null }),
 
   // The Plan section shows a few rows; the page is the triage queue.
   "inbox": ({ navigateTo, inSection }) =>
@@ -270,8 +332,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "validation": ({ navigateTo }) =>
     h(ValidationView, { navigateTo }),
 
-  "requirements": () =>
-    h(RequirementsView, null),
+  // Requirements is a tab of the Product page; the route opens that tab.
+  "requirements": ({ setOpenCapability }) =>
+    h(ProductPage, { key: "requirements", onCapabilityChange: setOpenCapability, initialTab: "requirements" }),
 
   "activity": () =>
     h(ActivityView, null),
@@ -291,8 +354,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "workflow": ({ navigateTo }) =>
     h(WorkflowView, { navigateTo }),
 
-  "commands": ({ jobs }) =>
-    h(CommandsView, { jobs }),
+  "commands": ({ jobs, navigateTo, selectedTab }) =>
+    h(CommandsView, { jobs, navigateTo, tab: selectedTab === "reference" ? "reference" : "run" }),
 
   "command-reference": () =>
     h(CommandReferenceView, null),

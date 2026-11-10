@@ -24,6 +24,7 @@
 import { join } from "node:path";
 
 import {
+  PROJECT_DIRS,
   relativeToRoot,
   resolveLayout,
   type LayoutMode,
@@ -77,6 +78,32 @@ export function stateDirNameUnder(which: StateDirKey, mode: LayoutMode): string 
 }
 
 /**
+ * The part of {@link REX_BOOKKEEPING_ENTRIES} that is machine-local and must
+ * never be committed: the derived cache, the locks and the backup store. The
+ * pre-run planning commit leaves these out — a backup is a whole copy of the
+ * PRD, and a committed lock would read as held in every clone.
+ */
+const REX_MACHINE_LOCAL_ENTRIES: readonly string[] = [
+  `${PRD_CACHE_DIRNAME}/`,
+  // Locks and the backup store. The blanket `.rex/` prefix this list replaced
+  // covered them; `rex init` does not, because it appends only
+  // n-dx_workflow.md, execution-log*.jsonl and the derived cache — the lock
+  // and backup patterns live in the ndx.gitignore block an operator pastes by
+  // hand. On a project that skipped that paste they are untracked, so a lock
+  // held while the end-of-run snapshot is taken (the dashboard, an MCP write)
+  // read as the run's own changed work and fired the full-suite gate.
+  //
+  // Literals rather than rex's constants: PRD_LOCK_FILENAME and
+  // RESHAPE_LOCK_FILENAME are not on rex's public surface, and widening it for
+  // three file names would cost more than it buys. Same reasoning as
+  // execution-log.1.jsonl below.
+  "prd.lock",
+  "prd.json.lock",
+  "reshape.lock",
+  ".backups/",
+];
+
+/**
  * What rex writes inside its state directory that is bookkeeping rather than
  * project content, relative to that directory.
  *
@@ -103,7 +130,6 @@ const REX_BOOKKEEPING_ENTRIES: readonly string[] = [
   // rex's side that this list did not follow would silently stop discounting
   // the thing it names.
   `${PRD_TREE_DIRNAME}/`,
-  `${PRD_CACHE_DIRNAME}/`,
   // A v2 tree's layers, prd_tree/'s counterparts: completing a task writes
   // changes/<change>/state.yaml, and applying a change writes product/.
   `${V2_PRODUCT_DIRNAME}/`,
@@ -117,22 +143,7 @@ const REX_BOOKKEEPING_ENTRIES: readonly string[] = [
   "archive.json",
   "pending-proposals.json",
   "acknowledged-findings.json",
-  // Locks and the backup store. The blanket `.rex/` prefix this list replaced
-  // covered them; `rex init` does not, because it appends only
-  // n-dx_workflow.md, execution-log*.jsonl and the derived cache — the lock
-  // and backup patterns live in the ndx.gitignore block an operator pastes by
-  // hand. On a project that skipped that paste they are untracked, so a lock
-  // held while the end-of-run snapshot is taken (the dashboard, an MCP write)
-  // read as the run's own changed work and fired the full-suite gate.
-  //
-  // Literals rather than rex's constants: PRD_LOCK_FILENAME and
-  // RESHAPE_LOCK_FILENAME are not on rex's public surface, and widening it for
-  // three file names would cost more than it buys. Same reasoning as
-  // execution-log.1.jsonl above.
-  "prd.lock",
-  "prd.json.lock",
-  "reshape.lock",
-  ".backups/",
+  ...REX_MACHINE_LOCAL_ENTRIES,
 ];
 
 /**
@@ -173,6 +184,40 @@ export const BOOKKEEPING_PATHS: readonly string[] = [
   ...bookkeepingPathsUnder("ndx"),
 ];
 
+/**
+ * n-dx's own planning files, in **both** layouts: rex's bookkeeping (the PRD
+ * roots, `state.yaml`, the logs and records in {@link REX_BOOKKEEPING_ENTRIES})
+ * and the project config (`.n-dx.json`, `.ndx/config.json`).
+ *
+ * The pre-run gate commits these on their own before a run (decision UT1):
+ * planning a change dirties them, and refusing to start over files n-dx wrote
+ * itself left a run unstartable on a tree that held nothing else.
+ *
+ * Unlike {@link BOOKKEEPING_PATHS} this leaves hench's state directory out.
+ * `.hench/config.json` is operator configuration that must still stop an
+ * autonomous run, and hench's runtime artifacts are dropped before this list
+ * is consulted.
+ */
+export const PLANNING_PATHS: readonly string[] = (["legacy", "ndx"] as const).flatMap((mode) => {
+  const layout = resolveLayout(".", { mode });
+  const rexDir = stateDirNameUnder("rex", mode);
+  return [
+    ...REX_BOOKKEEPING_ENTRIES
+      .filter((entry) => !REX_MACHINE_LOCAL_ENTRIES.includes(entry))
+      .map((entry) => `${rexDir}/${entry}`),
+    relativeToRoot(layout, layout.configFile),
+  ];
+});
+
+/**
+ * Rex's machine-local files in **both** layouts — the derived cache, the locks
+ * and the backup store. The pre-run gate neither commits nor refuses on them:
+ * they are n-dx's own, and no clone should ever receive them.
+ */
+export const REX_MACHINE_LOCAL_PATHS: readonly string[] = (["legacy", "ndx"] as const).flatMap((mode) =>
+  REX_MACHINE_LOCAL_ENTRIES.map((entry) => `${stateDirNameUnder("rex", mode)}/${entry}`),
+);
+
 /** Hench's config file inside its state directory. */
 export const HENCH_CONFIG_FILENAME = "config.json";
 
@@ -212,6 +257,23 @@ export interface HenchPaths {
   recoveryDir: string;
   /** Per-run MCP server configs. */
   agentMcpDir: string;
+}
+
+/**
+ * The rex directory hench reads the PRD from, given its configured `rexDir`.
+ *
+ * The configured value defaults to the legacy `.rex` (the schema default, and
+ * what every config written before the `.ndx/` layout holds). On a project
+ * moved to `.ndx/` that folder no longer exists, so a configured value equal
+ * to the legacy default yields to the layout's rex dir. Any other value was
+ * set deliberately and wins.
+ *
+ * @param root        Absolute project root.
+ * @param configured  `config.rexDir` from hench's config, relative to `root`.
+ */
+export function resolveHenchRexDir(root: string, configured: string): string {
+  if (configured === PROJECT_DIRS.REX) return resolveLayout(root).rexDir;
+  return join(root, configured);
 }
 
 /**

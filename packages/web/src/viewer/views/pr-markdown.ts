@@ -1,4 +1,4 @@
-import { h, type ComponentChildren } from "preact";
+import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import {
@@ -7,6 +7,7 @@ import {
   copyTextToClipboard,
   type ClipboardFailureReason,
 } from "../utils/clipboard.js";
+import { renderMarkdown } from "../utils/markdown.js";
 
 interface PRMarkdownResponse {
   markdown: string | null;
@@ -95,93 +96,6 @@ function formatStaleDuration(ms: number | null): string {
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
   const hours = Math.round(minutes / 60);
   return `${hours} hour${hours === 1 ? "" : "s"}`;
-}
-
-function renderMarkdownPreview(markdown: string) {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-  const blocks: ComponentChildren[] = [];
-  let i = 0;
-  let key = 0;
-
-  while (i < lines.length) {
-    const line = lines[i] ?? "";
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      i += 1;
-      continue;
-    }
-
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const text = headingMatch[2].trim();
-      const tag = `h${level}` as keyof HTMLElementTagNameMap;
-      blocks.push(h(tag, { class: "pr-markdown-preview-heading", key: `h-${key += 1}` }, text));
-      i += 1;
-      continue;
-    }
-
-    if (/^```/.test(trimmed)) {
-      const langMatch = trimmed.match(/^```([\w-]+)?\s*$/);
-      const language = langMatch?.[1] ?? "";
-      const codeLines: string[] = [];
-      i += 1;
-      while (i < lines.length && !/^```/.test((lines[i] ?? "").trim())) {
-        codeLines.push(lines[i] ?? "");
-        i += 1;
-      }
-      if (i < lines.length) i += 1;
-      blocks.push(
-        h("pre", { class: "pr-markdown-preview-code", key: `c-${key += 1}` },
-          h("code", { class: language ? `language-${language}` : undefined }, codeLines.join("\n")),
-        ),
-      );
-      continue;
-    }
-
-    const unorderedMatch = line.match(/^[-*+]\s+(.+)$/);
-    if (unorderedMatch) {
-      const items: ComponentChildren[] = [];
-      while (i < lines.length) {
-        const candidate = lines[i] ?? "";
-        const match = candidate.match(/^[-*+]\s+(.+)$/);
-        if (!match) break;
-        items.push(h("li", { key: `ul-item-${key += 1}` }, match[1].trim()));
-        i += 1;
-      }
-      blocks.push(h("ul", { class: "pr-markdown-preview-list", key: `ul-${key += 1}` }, items));
-      continue;
-    }
-
-    const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
-    if (orderedMatch) {
-      const items: ComponentChildren[] = [];
-      while (i < lines.length) {
-        const candidate = lines[i] ?? "";
-        const match = candidate.match(/^\d+\.\s+(.+)$/);
-        if (!match) break;
-        items.push(h("li", { key: `ol-item-${key += 1}` }, match[1].trim()));
-        i += 1;
-      }
-      blocks.push(h("ol", { class: "pr-markdown-preview-list", key: `ol-${key += 1}` }, items));
-      continue;
-    }
-
-    const paragraphLines: string[] = [];
-    while (i < lines.length) {
-      const candidate = lines[i] ?? "";
-      const candidateTrimmed = candidate.trim();
-      if (!candidateTrimmed || /^(#{1,6})\s+/.test(candidate) || /^```/.test(candidateTrimmed) || /^[-*+]\s+/.test(candidate) || /^\d+\.\s+/.test(candidate)) {
-        break;
-      }
-      paragraphLines.push(candidateTrimmed);
-      i += 1;
-    }
-    blocks.push(h("p", { class: "pr-markdown-preview-paragraph", key: `p-${key += 1}` }, paragraphLines.join(" ")));
-  }
-
-  return blocks;
 }
 
 export function PRMarkdownView() {
@@ -442,7 +356,7 @@ export function PRMarkdownView() {
                 "aria-labelledby": "pr-markdown-tab-preview",
               },
                 h("h4", { class: "section-header-sm" }, "Preview"),
-                h("div", { class: "pr-markdown-preview" }, renderMarkdownPreview(markdown)),
+                h("div", { class: "pr-markdown-preview" }, renderMarkdown(markdown, { classPrefix: "pr-markdown-preview" })),
               )
             : h("section", {
                 class: "pr-markdown-panel",

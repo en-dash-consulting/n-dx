@@ -1,0 +1,54 @@
+schema: "rex/v2"
+items:
+  "0e769946-9b91-4d17-9376-c691ba7f41ea":
+    status: "completed"
+    startedAt: "2026-11-02T23:12:12.433Z"
+    completedAt: "2026-11-02T23:35:35.731Z"
+    endedAt: "2026-11-02T23:35:35.731Z"
+    activeIntervals: [{"end":"2026-11-02T23:26:09.484Z","start":"2026-11-02T23:12:12.433Z"},{"end":"2026-11-02T23:35:35.731Z","start":"2026-11-02T23:35:35.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement card in 0bda1cef6 with review repair 739f8bcf4 (run 002f12ee) and barrel fix 6483ec01b: Place with Sidecar on the Inbox triage page and a change awaiting placement attaches a change item and opens Place; the card shows the shortlist radios, a propose row, touches/amends, an amendment editor and rex dry-run line, re-checked through placement/check with Place disabled until it returns; the server dry-runs the operator edit before approval and writes it. Gate failed on the server/client boundary test (main.ts imported place-with-sidecar.js directly); fixed by importing through components/index.js, after which the affected gate passes 3/3 suites. Browser-checked with web.sidecar and rex.placementDraft on locally (not committed): attach, card, amends re-check refusal, deny writes nothing, an approved touches placement written and logged (via Sidecar), then reverted. That check found the Place packet cutting the shortlist for long intents, fixed in 4483f8f76 under 23eb7360."
+    lastModified: "2026-11-02T23:35:35.731Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "23eb7360-bb32-40cf-b670-988fd545d4bb":
+    status: "completed"
+    startedAt: "2026-11-02T20:59:16.033Z"
+    completedAt: "2026-11-02T23:11:05.862Z"
+    endedAt: "2026-11-02T23:11:05.862Z"
+    activeIntervals: [{"end":"2026-11-02T21:26:23.502Z","start":"2026-11-02T20:59:16.033Z"},{"end":"2026-11-02T23:11:05.862Z","start":"2026-11-02T23:11:05.862Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Place lens in fe857f1c0 with review repair b9dff1479 (run db9c913f): 6k Place packet over buildChangePlacement (the GET placement builder), PLACE_INSTRUCTIONS, place_change_card dry-run on raise and written on approval through the shared writePlacement under the PRD model transaction, refusing a placement that moved while the card waited; POST placement/check writes nothing (tree-hash test). Rex suggestPlacement gains relationRule and per-candidate amendedBy. Gate failed only on graview-app-trust, pre-existing (NDX_CLI_PATH inherited under ndx work; fix in #940); the affected gate outside hench passes 6/6 suites. The review finding that no drawer entry attaches a change is task 0e769946."
+    lastModified: "2026-11-02T23:11:05.862Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8ca54c75-dc5d-4a34-88da-c13b51ffc90c":
+    status: "completed"
+    startedAt: "2026-11-02T23:48:56.209Z"
+    completedAt: "2026-11-02T23:52:22.527Z"
+    endedAt: "2026-11-02T23:52:22.527Z"
+    activeIntervals: [{"end":"2026-11-02T23:52:22.527Z","start":"2026-11-02T23:48:56.209Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "writePlacement passes now to the transaction; sidecarDecisionFields keeps approvedBy only when lastModified equals that stamp."
+    lastModified: "2026-11-02T23:52:22.527Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a2f27dcc-4c2d-4dd0-9b22-89c5a0956a00":
+    status: "completed"
+    startedAt: "2026-11-02T23:52:22.527Z"
+    completedAt: "2026-11-02T23:52:22.527Z"
+    endedAt: "2026-11-02T23:52:22.527Z"
+    activeIntervals: [{"end":"2026-11-02T23:52:22.527Z","start":"2026-11-02T23:52:22.527Z"}]
+    appliedAt: "2026-11-02T23:52:22.527Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    issues: ["https://www.notion.so/3f7a80b7192481a09ce5d406106f8408","https://www.notion.so/3f7a80b71924816794b4d9312cd470ed"]
+    lastModified: "2026-11-02T23:52:22.527Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dc9f6945-8db1-466b-8857-fee10b03c5f6":
+    status: "completed"
+    startedAt: "2026-11-02T23:40:48.460Z"
+    completedAt: "2026-11-02T23:48:13.371Z"
+    endedAt: "2026-11-02T23:48:13.371Z"
+    activeIntervals: [{"end":"2026-11-02T23:48:13.371Z","start":"2026-11-02T23:40:48.460Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sidecar placement writes (placement card, Plan-lens change set) add decidedBy/approvedBy/reasons to change_placed/change_proposed; CLI, MCP, dashboard unchanged; log readers tested with the fields."
+    lastModified: "2026-11-02T23:48:13.371Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

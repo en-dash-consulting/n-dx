@@ -45,6 +45,9 @@ import { resolveWebPaths } from "./paths.js";
 /** `command` value for a SourceVision Ask call. */
 export const ASK_COMMAND = "ask";
 
+/** `command` value for a finished Sidecar turn. */
+export const SIDECAR_COMMAND = "sidecar";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -85,6 +88,8 @@ export interface DashboardUsageRecord {
    */
   calls: number;
   outcome: DashboardUsageOutcome;
+  /** Sidecar lens the turn ran under, when one was set. */
+  lens?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +197,7 @@ function parseRecord(line: string): DashboardUsageRecord | null {
     cacheReadTokens: readNumber(obj, "cacheReadTokens"),
     calls: readNumber(obj, "calls"),
     outcome: readOutcome(obj["outcome"]),
+    ...(typeof obj["lens"] === "string" && obj["lens"] && { lens: obj["lens"] }),
   };
 }
 

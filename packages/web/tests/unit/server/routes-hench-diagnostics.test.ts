@@ -109,6 +109,30 @@ describe("Hench runs diagnostics in API", () => {
     expect(data.runs[0].tokenDiagnosticStatus).toBeUndefined();
   });
 
+  it("summary carries the tier and a gate verdict only when the gate ran", async () => {
+    const runsDir = join(tmpDir, ".hench", "runs");
+    const base = {
+      taskId: "t", taskTitle: "T", startedAt: new Date().toISOString(), status: "completed",
+      turns: 1, model: "sonnet", tokenUsage: { input: 1, output: 1 }, toolCalls: [], weight: "heavy",
+    };
+    const files: Record<string, unknown> = {
+      passed: { ...base, id: "passed", testGate: { ran: true, passed: true, packages: [] } },
+      failed: { ...base, id: "failed", testGate: { ran: true, passed: false, packages: [] } },
+      skipped: { ...base, id: "skipped", testGate: { ran: false, passed: false, packages: [], skipReason: "no changes" } },
+      none: { ...base, id: "none", weight: undefined },
+    };
+    for (const [id, run] of Object.entries(files)) await writeFile(join(runsDir, `${id}.json`), JSON.stringify(run));
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
+    const { runs } = await res.json() as { runs: Array<{ id: string; weight?: string; gate?: string }> };
+    const byId = Object.fromEntries(runs.map((r) => [r.id, r]));
+    expect(byId.passed).toMatchObject({ weight: "heavy", gate: "passed" });
+    expect(byId.failed.gate).toBe("failed");
+    expect(byId.skipped.gate).toBeUndefined();
+    expect(byId.none.weight).toBeUndefined();
+    expect(byId.none.gate).toBeUndefined();
+  });
+
   it("detail endpoint includes full diagnostics", async () => {
     const runsDir = join(tmpDir, ".hench", "runs");
     const run = {
@@ -178,5 +202,27 @@ describe("Hench runs diagnostics in API", () => {
     const data = await res.json();
     expect(data.runs[0].vendor).toBe("codex");
     expect(data.runs[0].tokenDiagnosticStatus).toBe("unavailable");
+  });
+
+  it("carries the run file's diagnosis verdict in the summary, and drops a malformed one", async () => {
+    const runsDir = join(tmpDir, ".hench", "runs");
+    const diagnosis = {
+      class: "no-changes",
+      summary: "The run made no commits.",
+      evidence: ["commits: 0"],
+      actions: [{ kind: "tighten-done-when", label: "Tighten the task's done-when" }],
+      attempt: { n: 1, of: 2 },
+    };
+    const base = {
+      taskId: "t5", taskTitle: "Verdict", status: "failed", turns: 2, model: "sonnet",
+      tokenUsage: { input: 1, output: 1 }, toolCalls: [],
+    };
+    await writeFile(join(runsDir, "run-verdict.json"), JSON.stringify({ ...base, id: "run-verdict", startedAt: "2026-10-28T10:00:00.000Z", diagnosis }));
+    await writeFile(join(runsDir, "run-bad.json"), JSON.stringify({ ...base, id: "run-bad", startedAt: "2026-10-28T09:00:00.000Z", diagnosis: { class: 3 } }));
+
+    const data = await (await fetch(`http://127.0.0.1:${port}/api/hench/runs?taskId=t5`)).json();
+    expect(data.runs.map((r: { id: string }) => r.id)).toEqual(["run-verdict", "run-bad"]);
+    expect(data.runs[0].diagnosis).toEqual(diagnosis);
+    expect(data.runs[1].diagnosis).toBeUndefined();
   });
 });

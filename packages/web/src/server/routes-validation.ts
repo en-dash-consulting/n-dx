@@ -14,6 +14,9 @@ import {
   walkTree,
   findItem,
   collectAllIds,
+  prdLayout,
+  loadPrdModel,
+  checkStaleReleasePlans,
 } from "./rex-gateway.js";
 import { type ItemType, TYPE_PARENTS, isItemType, itemTypeOf } from "../shared/index.js";
 import { loadPRDSync } from "./prd-io.js";
@@ -167,8 +170,16 @@ function findStuckItems(items: PRDItem[], now?: number): StuckResult[] {
   return stuck;
 }
 
-function validateDAG(items: PRDItem[]): { valid: boolean; errors: Array<{ message: string; itemId?: string }> } {
-  const errors: Array<{ message: string; itemId?: string }> = [];
+type DagError = { message: string; itemId?: string };
+
+/**
+ * Dependency-graph faults, split so each has its own check: `integrity` holds
+ * duplicate ids and self-references, `unresolved` holds blockedBy references
+ * to an id the PRD does not contain.
+ */
+function validateDAG(items: PRDItem[]): { integrity: DagError[]; unresolved: DagError[] } {
+  const errors: DagError[] = [];
+  const unresolved: DagError[] = [];
   const allIds = collectAllIds(items);
 
   // Check for duplicates
@@ -190,32 +201,38 @@ function validateDAG(items: PRDItem[]): { valid: boolean; errors: Array<{ messag
         if (dep === item.id) {
           errors.push({ message: `Self-reference: "${item.id}" blocks itself`, itemId: item.id });
         } else if (!allIds.has(dep)) {
-          errors.push({ message: `Orphan reference: "${item.id}" blocked by unknown "${dep}"`, itemId: item.id });
+          unresolved.push({ message: `Orphan reference: "${item.id}" blocked by unknown "${dep}"`, itemId: item.id });
         }
       }
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { integrity: errors, unresolved };
 }
 
-function runValidation(items: PRDItem[]): {
+function runValidation(items: PRDItem[], extraChecks: CheckResult[] = []): {
   ok: boolean;
   checks: CheckResult[];
   summary: { total: number; passed: number; failed: number; warnings: number };
 } {
   const checks: CheckResult[] = [];
 
-  // DAG integrity
+  // DAG integrity and unresolved dependencies
   const dagResult = validateDAG(items);
+  const withTitle = (e: DagError) => ({
+    message: e.message,
+    itemId: e.itemId,
+    itemTitle: e.itemId ? findItemById(items, e.itemId)?.title : undefined,
+  });
   checks.push({
     name: "DAG integrity",
-    pass: dagResult.valid,
-    errors: dagResult.errors.map((e) => ({
-      message: e.message,
-      itemId: e.itemId,
-      itemTitle: e.itemId ? findItemById(items, e.itemId)?.title : undefined,
-    })),
+    pass: dagResult.integrity.length === 0,
+    errors: dagResult.integrity.map(withTitle),
+  });
+  checks.push({
+    name: "unresolved dependencies",
+    pass: dagResult.unresolved.length === 0,
+    errors: dagResult.unresolved.map(withTitle),
   });
 
   // Hierarchy placement
@@ -274,6 +291,8 @@ function runValidation(items: PRDItem[]): {
       errors: blockedNoDeps,
     });
   }
+
+  checks.push(...extraChecks);
 
   const errorChecks = checks.filter((c) => !c.pass && c.severity !== "warn");
   const ok = errorChecks.length === 0;
@@ -465,21 +484,44 @@ export function handleValidationRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): boolean | Promise<boolean> {
   const url = req.url || "/";
   const method = req.method || "GET";
 
   // GET /api/rex/validate
   if (url.startsWith(VALIDATION_PREFIX) && method === "GET") {
-    const doc = loadPRD(ctx);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    return (async () => {
+      const doc = loadPRD(ctx);
+      if (!doc) {
+        errorResponse(res, 404, "No PRD data found");
+        return true;
+      }
 
-    const result = runValidation(doc.items);
-    jsonResponse(res, 200, result);
-    return true;
+      // The same rule `rex validate` runs, so both name the same stale plans.
+      // Only a v2 tree has releases and a change layer to plan against.
+      const extra: CheckResult[] = [];
+      if ((await prdLayout(ctx.rexDir)) === "v2") {
+        try {
+          const stale = checkStaleReleasePlans((await loadPrdModel(ctx.rexDir)).tree);
+          extra.push({
+            name: "release plans",
+            pass: stale.length === 0,
+            severity: "warn",
+            errors: stale.map((f) => ({ message: f.message, itemId: f.nodeId })),
+          });
+        } catch (err) {
+          // An unreadable tree must not read as "no stale plans", nor take the
+          // other checks down with it: the check fails and says why.
+          extra.push({
+            name: "release plans",
+            pass: false,
+            errors: [{ message: `Could not read the v2 tree: ${(err as Error).message}` }],
+          });
+        }
+      }
+      jsonResponse(res, 200, { ...runValidation(doc.items, extra), ranAt: new Date().toISOString() });
+      return true;
+    })();
   }
 
   // GET /api/rex/dependency-graph

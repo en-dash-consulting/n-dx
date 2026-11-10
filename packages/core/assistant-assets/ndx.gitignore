@@ -30,6 +30,8 @@
 .hench/mcp/
 # Warm-parent session cache, rewritten on every orientation. Machine-local.
 .hench/session-cache.json
+# Dashboard Sidecar session index and transcripts (self-ignoring; listed for clarity).
+.hench/sidecar/
 .hench-commit-msg.txt
 .ndx-commit-msg.txt
 
@@ -47,6 +49,10 @@
 .n-dx-web.port
 # Dashboard LLM spend ledger, one line per Ask call (`ndx start`)
 .n-dx-web-usage.jsonl
+# The same three files on the `.ndx/` layout
+.ndx/web.pid
+.ndx/web.port
+.ndx/web-usage.jsonl
 
 # Run logs
 .run-logs/

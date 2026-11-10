@@ -356,7 +356,11 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     // The worktree's marker files are gone: it points at no server now.
     await expect(readFile(join(worktreeA, ".n-dx-web.pid"), "utf-8")).rejects.toThrow();
     await expect(readFile(join(worktreeA, ".n-dx-web.port"), "utf-8")).rejects.toThrow();
-    expect(runStart(["status", worktreeA]).stdout).toContain("No background server recorded");
+    // The hub is still this user's, on its port, so status says the worktree is
+    // not registered with it rather than "no server" beside "another process".
+    const status = runStart(["status", worktreeA]).stdout;
+    expect(status).toContain(`hub is running on port ${hubPort}`);
+    expect(status).toContain("no registration with it is recorded");
   });
 
   it("stop in the last worktree unregisters the project, and the hub exits with its last project", async () => {

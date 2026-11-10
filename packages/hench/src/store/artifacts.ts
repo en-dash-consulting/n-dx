@@ -47,7 +47,9 @@ import { CLI_LOG_FILENAME } from "../prd/llm-gateway.js";
 import {
   AGENT_MCP_DIRNAME,
   LOCKS_DIRNAME,
+  PLANNING_PATHS,
   RECOVERY_DIRNAME,
+  REX_MACHINE_LOCAL_PATHS,
   REVIEWS_DIRNAME,
   RUNS_DIRNAME,
   stateDirNameUnder,
@@ -269,20 +271,42 @@ export function splitPorcelainLines(output: string): string[] {
   return output.split(/\r?\n/).filter((line) => line.trim().length > 0);
 }
 
-export function parsePorcelainPath(line: string): string {
+function unquotePorcelainPath(path: string): string {
+  const trimmed = path.trim();
+  return trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')
+    ? trimmed.slice(1, -1)
+    : trimmed;
+}
+
+/** Split a porcelain line into its path(s); `from` is set only for R/C lines. */
+function splitPorcelainPaths(line: string): { from?: string; to: string } {
   const status = line.slice(0, 2);
-  let path = line.length > 3 ? line.slice(3) : line.trim();
+  const path = line.length > 3 ? line.slice(3) : line.trim();
 
   if (status.includes("R") || status.includes("C")) {
     const arrow = path.lastIndexOf(" -> ");
-    if (arrow !== -1) path = path.slice(arrow + 4);
+    if (arrow !== -1) {
+      return {
+        from: unquotePorcelainPath(path.slice(0, arrow)),
+        to: unquotePorcelainPath(path.slice(arrow + 4)),
+      };
+    }
   }
+  return { to: unquotePorcelainPath(path) };
+}
 
-  path = path.trim();
-  if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) {
-    path = path.slice(1, -1);
-  }
-  return path;
+/** The path a porcelain line leaves behind: the new path of an R/C line. */
+export function parsePorcelainPath(line: string): string {
+  return splitPorcelainPaths(line).to;
+}
+
+/**
+ * A porcelain line's path for display: `old -> new` for an R/C line, so a move
+ * out of a non-planning path names its source, otherwise the plain path.
+ */
+export function formatPorcelainPath(line: string): string {
+  const { from, to } = splitPorcelainPaths(line);
+  return from === undefined ? to : `${from} -> ${to}`;
 }
 
 /**
@@ -306,4 +330,65 @@ export async function excludeHenchRuntimeArtifacts(
 ): Promise<string[]> {
   const prefix = await repoRelativePrefix(projectDir);
   return porcelainLines.filter((line) => !isHenchRuntimeArtifact(parsePorcelainPath(line), prefix));
+}
+
+/** A dirty tree split into n-dx's own planning files and everything else. */
+export interface PlanningSplit {
+  /**
+   * Repository-relative paths of dirty planning files, as git reported them.
+   * A rename or copy contributes both its paths, so committing the list
+   * records the source's deletion too.
+   */
+  planning: string[];
+  /**
+   * The remaining porcelain lines, less rex's machine-local files
+   * (`REX_MACHINE_LOCAL_PATHS`): work the pre-run gate still refuses on.
+   */
+  other: string[];
+}
+
+/**
+ * Split porcelain lines (hench's runtime artifacts already dropped) into
+ * n-dx's planning files, {@link PLANNING_PATHS}, and the rest.
+ *
+ * A rename or copy counts as planning only when both of its paths are: the
+ * pre-run commit stages by path, and a rename out of `src/` into `.rex/`
+ * would otherwise land half of an operator's change in n-dx's commit.
+ *
+ * @param porcelainLines - porcelain lines, as produced for `projectDir`
+ * @param projectDir - the directory those lines were collected for
+ */
+export async function splitPlanningPaths(
+  porcelainLines: string[],
+  projectDir: string,
+): Promise<PlanningSplit> {
+  const prefix = await repoRelativePrefix(projectDir);
+  const isPlanning = (path: string): boolean => matchesProjectPath(path, PLANNING_PATHS, prefix);
+  const split: PlanningSplit = { planning: [], other: [] };
+  for (const line of porcelainLines) {
+    const path = parsePorcelainPath(line);
+    const source = renameSource(line);
+    // Rex's locks, backups and derived cache: neither committed nor refused on.
+    if (source === undefined && matchesProjectPath(path, REX_MACHINE_LOCAL_PATHS, prefix)) continue;
+    if (source === undefined) {
+      if (isPlanning(path)) split.planning.push(path);
+      else split.other.push(line);
+    } else if (isPlanning(path) && isPlanning(source)) {
+      split.planning.push(source, path);
+    } else {
+      split.other.push(line);
+    }
+  }
+  return split;
+}
+
+/** The `old` half of a rename or copy line (`R  old -> new`), unquoted; else undefined. */
+function renameSource(line: string): string | undefined {
+  const status = line.slice(0, 2);
+  if (!status.includes("R") && !status.includes("C")) return undefined;
+  const body = line.slice(3);
+  const arrow = body.lastIndexOf(" -> ");
+  if (arrow === -1) return undefined;
+  const old = body.slice(0, arrow).trim();
+  return old.length >= 2 && old.startsWith('"') && old.endsWith('"') ? old.slice(1, -1) : old;
 }

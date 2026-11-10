@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -50,6 +50,16 @@ describe.each(LAYOUTS)("sourcevision file access on the $name layout", ({ contai
 
     expect(resolveSourcevisionPaths(projectDir).svDir).toBe(join(projectDir, svDir));
     expect(existsSync(join(projectDir, svDir, "manifest.json"))).toBe(true);
+  });
+
+  it("gitignores the layout's machine-local cache, once, even on re-init", () => {
+    writeFileSync(join(projectDir, ".gitignore"), "node_modules/");
+    cmdInit(projectDir);
+    cmdInit(projectDir);
+
+    const lines = readFileSync(join(projectDir, ".gitignore"), "utf-8").split("\n");
+    expect(lines).toContain("node_modules/");
+    expect(lines.filter((l) => l === `${svDir.split("\\").join("/")}/.cache/`)).toHaveLength(1);
   });
 
   it("does not create the other layout's directory", () => {

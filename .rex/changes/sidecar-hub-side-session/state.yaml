@@ -1,0 +1,161 @@
+schema: "rex/v2"
+items:
+  "1240c8fa-201e-4663-9f91-384aadd9402f":
+    status: "completed"
+    startedAt: "2026-11-04T19:30:47.366Z"
+    completedAt: "2026-11-04T20:03:53.337Z"
+    endedAt: "2026-11-04T20:03:53.337Z"
+    activeIntervals: [{"end":"2026-11-04T20:03:01.281Z","start":"2026-11-04T19:30:47.366Z"},{"end":"2026-11-04T20:03:53.337Z","start":"2026-11-04T20:03:53.337Z"}]
+    lastModified: "2026-11-04T20:03:53.337Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21c2ba30-9be8-46b1-96ac-2531c0dd753b":
+    status: "completed"
+    startedAt: "2026-11-04T20:04:20.222Z"
+    completedAt: "2026-11-04T20:25:49.792Z"
+    endedAt: "2026-11-04T20:25:49.792Z"
+    activeIntervals: [{"end":"2026-11-04T20:25:49.792Z","start":"2026-11-04T20:04:20.222Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Shutdown refuses hub routes (503), interrupts hub turns, releases the lock only after whenIdle (5 s bound; else lock kept for dead-pid takeover)."
+    lastModified: "2026-11-04T20:25:49.792Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "255ac873-9d63-4e5f-988a-9955cf807a00":
+    status: "completed"
+    startedAt: "2026-11-02T23:35:12.119Z"
+    completedAt: "2026-11-02T23:39:32.141Z"
+    endedAt: "2026-11-02T23:39:32.141Z"
+    activeIntervals: [{"end":"2026-11-02T23:39:32.141Z","start":"2026-11-02T23:35:12.119Z"}]
+    lastModified: "2026-11-02T23:39:32.141Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "26ddda60-dd72-4d59-b529-2570bbd13a32":
+    status: "completed"
+    startedAt: "2026-11-03T00:59:02.745Z"
+    completedAt: "2026-11-03T01:19:11.637Z"
+    endedAt: "2026-11-03T01:19:11.637Z"
+    activeIntervals: [{"end":"2026-11-03T01:19:11.637Z","start":"2026-11-03T00:59:02.745Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub ledger at <ndx home>/hub/ledger.jsonl (decision-needed, handoff types), carried on every hub turn; hub handoff route + worktree handoff and ledger/latest routes; snapshot shows session notes; drawer lists worktrees with Open in worktree sidecar; ?sidecar= opens the worktree drawer."
+    lastModified: "2026-11-03T01:19:11.637Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2b2b2441-2c3d-43c9-85a1-99049f429b7b":
+    status: "completed"
+    startedAt: "2026-11-03T00:14:16.235Z"
+    completedAt: "2026-11-03T00:20:08.452Z"
+    endedAt: "2026-11-03T00:20:08.452Z"
+    activeIntervals: [{"end":"2026-11-03T00:20:08.452Z","start":"2026-11-03T00:14:16.235Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub marks a host that answers 403 with x-ndx-feature-disabled: web.sidecar and skips it; refusal naming web.sidecar when all healthy projects are skipped. Tests in hub-session-proxy.test.ts."
+    lastModified: "2026-11-03T00:20:08.452Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4704cdf5-d927-44d5-aea8-0147a5bce9f1":
+    status: "completed"
+    startedAt: "2026-11-04T20:26:16.726Z"
+    completedAt: "2026-11-04T20:36:49.938Z"
+    endedAt: "2026-11-04T20:36:49.938Z"
+    activeIntervals: [{"end":"2026-11-04T20:36:49.938Z","start":"2026-11-04T20:26:16.726Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "resolveDraftPath refuses .git segments case-insensitively after stripping trailing dots/spaces, and checks the nearest existing ancestor's realpathSync.native path; unit + broker tests cover .GIT, .git., '.git ', symlink into .git."
+    lastModified: "2026-11-04T20:36:49.938Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "702e743b-b4b4-4956-b7c3-9672a024963f":
+    status: "completed"
+    startedAt: "2026-11-03T01:37:44.731Z"
+    completedAt: "2026-11-03T01:40:48.029Z"
+    endedAt: "2026-11-03T01:40:48.029Z"
+    activeIntervals: [{"end":"2026-11-03T01:40:48.029Z","start":"2026-11-03T01:37:44.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added two tests to sidecar-drawer.test.ts covering the ?sidecar= handoff effect (on and off); verified the on-test fails without the effect."
+    lastModified: "2026-11-03T01:40:48.029Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "73f42fbb-cc9b-4c44-8798-06959e234fe2":
+    status: "completed"
+    startedAt: "2026-11-07T02:12:17.047Z"
+    completedAt: "2026-11-07T02:12:17.047Z"
+    endedAt: "2026-11-07T02:12:17.047Z"
+    activeIntervals: [{"end":"2026-11-07T02:12:17.047Z","start":"2026-11-07T02:12:17.047Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "All 15 tasks completed and landed with N-DX-Item trailers on main (Sidecar H1, merged with the Sidecar stack); the change itself was left pending. Reconciled in the 2026-11-06 PRD audit."
+    appliedAt: "2026-11-07T02:12:17.047Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
+    lastModified: "2026-11-07T02:15:59.355Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "771fdf69-d81a-483e-8108-7d1c1be810cb":
+    status: "completed"
+    startedAt: "2026-11-03T00:20:14.057Z"
+    completedAt: "2026-11-03T00:25:25.142Z"
+    endedAt: "2026-11-03T00:25:25.142Z"
+    activeIntervals: [{"end":"2026-11-03T00:25:25.142Z","start":"2026-11-03T00:20:14.057Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Snapshot fingerprints commit only via new SidecarContextOptions.packetDelivered after a completed turn."
+    lastModified: "2026-11-03T00:25:25.142Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7c678969-1cd3-46f4-a629-1b7e917dba5e":
+    status: "completed"
+    startedAt: "2026-11-03T01:34:39.117Z"
+    completedAt: "2026-11-03T01:37:39.192Z"
+    endedAt: "2026-11-03T01:37:39.192Z"
+    activeIntervals: [{"end":"2026-11-03T01:37:39.192Z","start":"2026-11-03T01:34:39.117Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-sidecar-hub.test.ts: fake Claude honours a HANG prompt; new test lists tools over the hub mcp route and asserts exactly the four hub tools. Verified it fails with brokerScope removed."
+    lastModified: "2026-11-03T01:37:39.192Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8981254d-f128-4a04-9b3a-fc06ca075754":
+    status: "completed"
+    startedAt: "2026-11-04T19:12:38.424Z"
+    completedAt: "2026-11-04T19:29:54.871Z"
+    endedAt: "2026-11-04T19:29:54.871Z"
+    activeIntervals: [{"end":"2026-11-04T19:29:54.871Z","start":"2026-11-04T19:12:38.424Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "decideProxy's hub-session branch drops ndx_ticket as well as ndx_token; unit + integration tests added."
+    lastModified: "2026-11-04T19:29:54.871Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
+    status: "completed"
+    startedAt: "2026-11-03T01:21:57.799Z"
+    completedAt: "2026-11-03T01:34:13.759Z"
+    endedAt: "2026-11-03T01:34:13.759Z"
+    activeIntervals: [{"end":"2026-11-03T01:34:13.759Z","start":"2026-11-03T01:21:57.799Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub broker scoped to run_command (fixed read-only set per project), draft_github_post (project + target, cwd repoRoot), new never-allow-listable save_draft, ledger_append; acting tools not offered."
+    lastModified: "2026-11-03T01:34:13.759Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9d5af533-0705-482b-bc9f-031f9460bd9c":
+    status: "completed"
+    startedAt: "2026-11-03T22:05:49.566Z"
+    completedAt: "2026-11-03T22:15:54.221Z"
+    endedAt: "2026-11-03T22:15:54.221Z"
+    activeIntervals: [{"end":"2026-11-03T22:15:54.221Z","start":"2026-11-03T22:05:49.566Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Deferred home renders a hidden toggle shown by ?hubSession=1 overview read; hub serves credential-less GET text/html /hub/session/drawer from host with token; host injects session script into drawer page."
+    lastModified: "2026-11-03T22:15:54.221Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a23d8599-329b-438e-b907-f6370e63e9d2":
+    status: "completed"
+    startedAt: "2026-11-02T23:42:50.371Z"
+    completedAt: "2026-11-03T00:07:43.996Z"
+    endedAt: "2026-11-03T00:07:43.996Z"
+    activeIntervals: [{"end":"2026-11-03T00:07:43.996Z","start":"2026-11-02T23:42:50.371Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub session hosted via <ndx home>/hub/sidecar/host.lock (pid, port); hub proxies /hub/session/* to /api/sidecar/hub/* on the picked host (lock holder, else first healthy; unreachable skipped until next health check); hub lens = snapshot packet every turn, gated on web.sidecar; ceiling 40k via web.sidecarContextCeiling.hub; Claude spawn --tools \"\" + broker only; Codex refused; broker actions refuse all."
+    lastModified: "2026-11-03T00:07:43.996Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a5beb47d-a6c2-47da-a926-3078533e060d":
+    status: "completed"
+    startedAt: "2026-11-02T23:13:12.933Z"
+    completedAt: "2026-11-02T23:30:29.668Z"
+    endedAt: "2026-11-02T23:30:29.668Z"
+    activeIntervals: [{"end":"2026-11-02T23:30:29.668Z","start":"2026-11-02T23:13:12.933Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "buildHubSnapshot (pure, 8k cap, priority drops, Δ fingerprints) + HTTP-only fetcher via hub; GET /api/changesets; additive status rex.layout, worktrees diagnosisClass, branch-health githubReads."
+    lastModified: "2026-11-02T23:30:29.668Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ea48bb24-27cc-4224-9e09-2d6ab4a54cc2":
+    status: "completed"
+    startedAt: "2026-11-03T00:28:24.666Z"
+    completedAt: "2026-11-03T00:55:59.409Z"
+    endedAt: "2026-11-03T00:55:59.409Z"
+    activeIntervals: [{"end":"2026-11-03T00:55:59.409Z","start":"2026-11-03T00:28:24.666Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub home toggle (⌘J) gated by probeHubLens docks an iframe of /hub/session/drawer, a drawer-only viewer entry (viewer/hub-session.ts) built beside the dashboard; host routes /api/sidecar/hub/{drawer,lens,snapshot}; head chips + read-only · drafts + ceiling meter; tests for both home states and the drawer."
+    lastModified: "2026-11-03T00:55:59.409Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

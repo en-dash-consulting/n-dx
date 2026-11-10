@@ -64,19 +64,19 @@ export const RESERVED_EXTENSION_NAMES = Object.freeze([
   "ext", "x", "hub", "extensions", "paths",
 ]);
 
-/** Placeholders a `projectLinks[].path` may carry; the hub fills them in. */
+/** Placeholders a `projectLinks[].path` or `sidecarTab.path` may carry; the hub fills them in. */
 export const PROJECT_LINK_PLACEHOLDERS = Object.freeze(["projectId", "repoRoot"]);
 
 /** Fields of the v1 `ndx.extension` block, in the order the docs list them. */
 export const EXTENSION_MANIFEST_FIELDS = Object.freeze([
   "apiVersion", "name", "displayName", "ndxVersion", "commands",
-  "sidecar", "hub", "projectLinks", "configSchema",
+  "sidecar", "hub", "projectLinks", "sidecarTab", "configSchema",
 ]);
 
 const COMMAND_FIELDS = ["name", "bin", "summary"];
 const SIDECAR_FIELDS = ["bin", "health", "idleStopMinutes"];
 const HUB_FIELDS = ["label", "description"];
-const PROJECT_LINK_FIELDS = ["label", "path"];
+const LINK_TARGET_FIELDS = ["label", "path"];
 
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MAX_NAME_LENGTH = 40;
@@ -113,7 +113,8 @@ export const EXTENSION_MANIFEST_RULES = Object.freeze({
   "package-path": "use a relative path inside the package, e.g. bin/cli.js",
   "url-path": "use a path starting with /, e.g. /healthz",
   "positive-integer": "use a whole number of minutes, 1 or more",
-  "needs-sidecar": "declare a sidecar, or remove the hub and projectLinks entries",
+  "needs-sidecar": "declare a sidecar, or remove the hub, projectLinks and sidecarTab entries",
+  "link-dot-segment": "remove the . and .. segments (raw or %2e) so the path stays under /x/<name>/",
   "link-placeholder": `use only ${PROJECT_LINK_PLACEHOLDERS.map((p) => `{${p}}`).join(" and ")} as placeholders`,
 });
 
@@ -144,6 +145,12 @@ export const EXTENSION_MANIFEST_RULES = Object.freeze({
  */
 
 /**
+ * @typedef {object} ExtensionSidecarTab
+ * @property {string} label
+ * @property {string} path  Under the extension's mount; may carry `{projectId}` and `{repoRoot}`.
+ */
+
+/**
  * The v1 `ndx.extension` block.
  *
  * @typedef {object} ExtensionManifest
@@ -155,6 +162,7 @@ export const EXTENSION_MANIFEST_RULES = Object.freeze({
  * @property {ExtensionSidecar} [sidecar]
  * @property {ExtensionHubEntry} [hub]
  * @property {ExtensionProjectLink[]} [projectLinks]
+ * @property {ExtensionSidecarTab} [sidecarTab]  The one tab the extension adds to the Sidecar drawer.
  * @property {string} [configSchema]  Path inside the package to a JSON Schema for the config section.
  */
 
@@ -317,24 +325,19 @@ export function validateExtensionManifest(packageJson, options) {
       links.forEach((link, i) => {
         const path = `${at("projectLinks")}[${i}]`;
         if (!isObject(link)) { report(path, "object", `is ${describe(link)}`); return; }
-        checkUnknown(link, PROJECT_LINK_FIELDS, path, report);
-        if (link.label === undefined) report(`${path}.label`, "required", "is missing");
-        else checkString(link.label, `${path}.label`, report);
-        if (link.path === undefined) report(`${path}.path`, "required", "is missing");
-        else if (checkString(link.path, `${path}.path`, report)) {
-          if (!link.path.startsWith("/")) report(`${path}.path`, "url-path", `"${link.path}" does not start with /`);
-          // `[^{}]`, not `[^}]`: a run of `{` would otherwise rescan to the end from each one.
-          for (const [, placeholder] of link.path.matchAll(/\{([^{}]*)\}/g)) {
-            if (!PROJECT_LINK_PLACEHOLDERS.includes(placeholder)) {
-              report(`${path}.path`, "link-placeholder", `{${placeholder}} is not a placeholder the hub fills`);
-            }
-          }
-        }
+        checkLinkTarget(link, path, report);
       });
       if (links.length > 0 && sidecar === undefined) {
         report(at("projectLinks"), "needs-sidecar", "links to pages no sidecar serves");
       }
     }
+  }
+
+  const tab = block.sidecarTab;
+  if (tab !== undefined) {
+    if (!isObject(tab)) report(at("sidecarTab"), "object", `is ${describe(tab)}`);
+    else checkLinkTarget(tab, at("sidecarTab"), report);
+    if (sidecar === undefined) report(at("sidecarTab"), "needs-sidecar", "shows a page no sidecar serves");
   }
 
   if (block.configSchema !== undefined) checkPackagePath(block.configSchema, at("configSchema"), report);
@@ -582,6 +585,45 @@ function describe(value) {
 /**
  * @typedef {(path: string, rule: keyof typeof EXTENSION_MANIFEST_RULES, message: string) => void} Report
  */
+
+/**
+ * A `{ label, path }` that points at a page under the extension's mount: a
+ * project link or the Sidecar tab.
+ *
+ * @param {Record<string, unknown>} target
+ * @param {string} path
+ * @param {Report} report
+ */
+function checkLinkTarget(target, path, report) {
+  checkUnknown(target, LINK_TARGET_FIELDS, path, report);
+  if (target.label === undefined) report(`${path}.label`, "required", "is missing");
+  else checkString(target.label, `${path}.label`, report);
+  if (target.path === undefined) report(`${path}.path`, "required", "is missing");
+  else if (checkString(target.path, `${path}.path`, report)) {
+    if (!target.path.startsWith("/")) report(`${path}.path`, "url-path", `"${target.path}" does not start with /`);
+    if (hasDotSegment(target.path)) {
+      report(`${path}.path`, "link-dot-segment", `"${target.path}" has a . or .. segment, which leaves /x/<name>/`);
+    }
+    // `[^{}]`, not `[^}]`: a run of `{` would otherwise rescan to the end from each one.
+    for (const [, placeholder] of target.path.matchAll(/\{([^{}]*)\}/g)) {
+      if (!PROJECT_LINK_PLACEHOLDERS.includes(placeholder)) {
+        report(`${path}.path`, "link-placeholder", `{${placeholder}} is not a placeholder the hub fills`);
+      }
+    }
+  }
+}
+
+/**
+ * True when the path part of a link (before `?` or `#`) has a `.` or `..`
+ * segment. A browser drops `%2e` and treats `\` as `/` before it resolves dot
+ * segments, so both count.
+ *
+ * @param {string} linkPath
+ */
+function hasDotSegment(linkPath) {
+  const pathPart = linkPath.split(/[?#]/, 1)[0];
+  return pathPart.split(/[/\\]/).some((segment) => /^\.{1,2}$/.test(segment.replace(/%2e/gi, ".")));
+}
 
 /**
  * @param {Record<string, unknown>} obj

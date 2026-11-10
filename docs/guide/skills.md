@@ -19,16 +19,17 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 
 | Skill | Purpose | Invoke |
 |-------|---------|--------|
-| [`no-plan-mode`](#no-plan-mode) | Prevent plan-mode stalls in autonomous hench runs | Always active in `ndx work --auto` |
+| [`no-plan-mode`](#no-plan-mode) | Prevent plan-mode stalls in autonomous hench agent runs | Always active in `ndx work --auto` |
 | [`ndx-plan`](#ndx-plan) | Analyze the codebase and propose PRD updates | `/ndx-plan` |
-| [`ndx-status`](#ndx-status) | Show project status combining PRD progress and codebase health | `/ndx-status` |
+| [`ndx-status`](#ndx-status) | Show comprehensive project status combining PRD progress and codebase health | `/ndx-status` |
 | [`ndx-capture`](#ndx-capture) | Capture a requirement, feature idea, or task from conversation context | `/ndx-capture [description]` |
 | [`ndx-zone`](#ndx-zone) | Deep-dive into an architectural zone's structure and health | `/ndx-zone [zone-id]` |
 | [`ndx-work`](#ndx-work) | Pick up a task from the PRD and begin working on it | `/ndx-work [task-id]` |
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
 | [`ndx-reshape`](#ndx-reshape) | Restructure the PRD — regroup, reparent, merge overlaps and place changes | `/ndx-reshape` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
-| [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
+| [`ndx-graview`](#ndx-graview) | Run the product map and report what is wrong | `/ndx-graview` |
+| [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, and capture only what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 
 ::: info The PRD skills work on v1 and v2 PRDs
 `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-work` and `/ndx-adversarial-review` detect the layout from `get_prd_status` and branch on it. On a v1 PRD (the one `ndx init` creates) they add items with a level (epic, feature, task, subtask) and a parent. On a v2 PRD, where every new item enters as a change in the Inbox (see [Changes and apply](./concepts/changes-and-apply)), the authoring skills add changes and place them with `place_change`, and `/ndx-work` picks up only placed changes and their tasks.
@@ -188,6 +189,23 @@ they all share:
 5. Verifies with `reorganize` (rex MCP)
 
 **Customization:** Adjust the target epic count or naming conventions in the skill body to match your team's PRD style guide.
+
+---
+
+### ndx-graview
+
+**Purpose:** Bring up the product map, the Graview face over the PRD, the analysis and the runs, and say what it shows and what is wrong with it. Useful when trying n-dx on a new repository.
+
+**When it triggers:** Invoke with `/ndx-graview`.
+
+**What it does:**
+1. Runs `ndx graview info .`: the graview binary, the face (the `graview-face` extension), and whether the face can write back through the hub
+2. Runs `ndx graview check .` and keeps the counts and every misfit, meaning a node or an edge the declaration does not admit
+3. Starts `ndx graview serve .` in the background (port 5188, or the next free one) and reads the URL it prints
+4. Walks the pages, with a browser tool when there is one: home, Needs attention, the Inbox, an area, a capability, a zone and its code map, Runs and Spend
+5. Reports the URL, the sync state, the misfits and one line per problem, with the page it is on
+
+**What it will not do:** change code, the declaration or the PRD, or capture what it found. That is a separate `/ndx-capture` run. It leaves the face running for you to look at.
 
 ---
 

@@ -197,10 +197,32 @@ describe("the rendered page", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url: String(url), init });
       if (String(url).includes("/api/live")) return { ok: true, status: 200, json: async () => body };
-      if (String(url).includes("/api/hench/throttle")) return { ok: true, status: 200, json: async () => ({ paused: false }) };
+      if (String(url).includes("/api/hench/throttle")) {
+        if (init?.method === "PUT") {
+          const { maxConcurrent } = JSON.parse(String(init.body));
+          return { ok: true, status: 200, json: async () => ({ ok: true, concurrencyOverride: maxConcurrent, effectiveMaxConcurrent: maxConcurrent ?? 3 }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ paused: false, effectiveMaxConcurrent: 3, concurrencyOverride: null, configMaxConcurrent: 3 }) };
+      }
+      if (String(url).includes("/api/hench/memory")) return { ok: true, status: 200, json: async () => MEMORY };
+      if (String(url).includes("/api/hench/concurrency")) return { ok: true, status: 200, json: async () => CONCURRENCY };
       return { ok: true, status: 200, json: async () => ({}) };
     }));
   });
+
+  const MEMORY = {
+    system: { totalBytes: 16 * 1024 ** 3, freeBytes: 4 * 1024 ** 3, availableBytes: 4 * 1024 ** 3, usedBytes: 12 * 1024 ** 3, usedPercent: 75 },
+    server: { pid: 1, rssBytes: 1, heapUsedBytes: 1, heapTotalBytes: 2, externalBytes: 0 },
+    processes: [],
+    health: "healthy",
+    loadAvg: [1, 1, 1],
+    cpuCount: 8,
+    timestamp: "2026-10-01T12:00:00.000Z",
+  };
+  const CONCURRENCY = {
+    processCount: 1, maxConcurrent: 3, slotsAvailable: 2, level: "moderate", utilization: 0.33,
+    totalRunning: 1, dashboardActive: 1, diskRunning: 0, pendingTasks: 0, timestamp: "2026-10-01T12:00:00.000Z",
+  };
 
   afterEach(() => {
     render(null, root);
@@ -219,6 +241,51 @@ describe("the rendered page", () => {
     await act(async () => { await flush(); });
     return navigateTo;
   }
+
+  it("shows memory pressure and slots once, in the machine strip, with no side-column duplicate", async () => {
+    await mount();
+    await act(async () => { await flush(); });
+    expect(root.textContent).not.toContain("Memory and concurrency");
+    expect(root.querySelector(".live-side .memory-panel")).toBeNull();
+    expect(root.querySelector(".live-side .concurrency-panel")).toBeNull();
+    // The strip is the one place memory pressure and slots are shown.
+    const labels = [...root.querySelectorAll(".live-machine .live-tile-label")].map((el) => el.textContent);
+    expect(labels).toContain("Memory");
+    expect(labels.some((l) => l?.startsWith("Hench slots"))).toBe(true);
+    expect(root.querySelector(".live-side")?.textContent).not.toMatch(/Memory|slots/i);
+  });
+
+  it("sets and clears the concurrency override from the Hench slots tile", async () => {
+    await mount();
+    await act(async () => { await flush(); });
+    const stepper = root.querySelector(".live-machine .live-slots-stepper")!;
+    expect(stepper.textContent).toContain("limit 3");
+    expect(stepper.textContent).not.toContain("Reset");
+
+    await act(async () => {
+      (stepper.querySelector('[aria-label="Fewer slots"]') as HTMLButtonElement).click();
+      await flush();
+    });
+    const put = calls.find((c) => c.init?.method === "PUT")!;
+    expect(put.url).toBe("/api/hench/throttle");
+    expect(JSON.parse(String(put.init!.body))).toEqual({ maxConcurrent: 2 });
+    expect(root.querySelector(".live-slots-stepper")!.textContent).toContain("limit 2");
+
+    await act(async () => {
+      ([...root.querySelectorAll(".live-slots-stepper button")].find((b) => b.textContent === "Reset") as HTMLButtonElement).click();
+      await flush();
+    });
+    const last = calls.filter((c) => c.init?.method === "PUT").pop()!;
+    expect(JSON.parse(String(last.init!.body))).toEqual({ maxConcurrent: null });
+  });
+
+  it("names the stepper's limit as the repository's when the tile counts the machine", async () => {
+    const base = snapshot();
+    body = { ...base, machine: { ...base.machine, slots: { scope: "machine", inUse: 2, max: 4, available: 2, queued: 0 } } };
+    await mount();
+    await act(async () => { await flush(); });
+    expect(root.querySelector(".live-slots-stepper")!.textContent).toContain("repository limit 3");
+  });
 
   it("shows idle with Start working and both analysis options when nothing runs", async () => {
     await mount();
@@ -258,11 +325,9 @@ describe("the rendered page", () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Stop 1 run in this worktree"));
   });
 
-  it("starts the next task through the execute route from the Start now menu item", async () => {
+  it("starts the next task through the execute route from the Start working button", async () => {
     const navigateTo = await mount();
-    const caret = root.querySelector<HTMLButtonElement>(".start-task-caret")!;
-    await act(async () => { caret.click(); await flush(); });
-    const start = [...root.querySelectorAll("button")].find((b) => b.textContent === "Start now")!;
+    const start = root.querySelector<HTMLButtonElement>(".live-idle .start-task-primary")!;
     await act(async () => { start.click(); await flush(); });
     const post = calls.find((c) => c.url.includes("/api/hench/execute"));
     expect(post?.init?.method).toBe("POST");

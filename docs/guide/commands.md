@@ -39,6 +39,7 @@ The PRD is the product's requirements (the product layer) plus the changes being
 |---------|-------------|
 | `rex product show [<node>] [dir]` | The areas, capabilities and constraints with computed status and health; with a node, its statement, capability criteria and changes |
 | `rex product edit <node> [dir]` | Edit a capability's or constraint's statement (`--statement`) or capability criteria (`--capability-criterion="<id>: <text>"`); `--editorial` for wording only |
+| `rex change inbox [--format=json] [dir]` | List every open change awaiting placement, oldest first: id, title, intent, age in days and the top 5 places it could go, with scores and reasons. On a v1 PRD it says "not applicable" and exits 0 |
 | `rex change place <change> [dir]` | Without `--target`, the shortlist of places a change could go; with `--target=<node> --relation=touches\|amends`, record it; with `--propose --type=capability\|constraint --under=<area> --title="…"`, propose a new node when nothing fits |
 | `rex change apply <change> [dir]` | Apply a change's amendments to the product layer, as a steward |
 | `rex release stamp <version> [dir]` | Stamp `shippedIn` on the changes a release ships |
@@ -194,6 +195,7 @@ ndx work --epic="Auth System" --auto . # scope to one top-level item
 ndx work --dry-run .                   # preview without executing
 ndx work --model=claude-opus-5-5 .        # override model
 ndx work --auto --loop .               # run continuously until done
+ndx work --plan-queue .                # which ready tasks can run side by side (runs nothing)
 ```
 
 #### Task selection modes
@@ -205,6 +207,7 @@ By default on an interactive terminal, `ndx work` presents a menu to choose whic
 | _(none, TTY)_ | Interactive menu — pick a task from the list |
 | `--auto` | Auto-select highest-priority pending task |
 | `--task=<id>` | Run a specific task by ID |
+| `--task=<id> --require-unblocked` | Run it only if every task it is blocked by is completed; otherwise refuse and exit non-zero |
 
 #### Running multiple tasks
 
@@ -251,13 +254,13 @@ ndx start stop .            # stop daemon
 ndx graview emit .          # write document.json and snapshot.json under the graview dir
 ndx graview check .         # re-emit, then graview check on the declaration
 ndx graview describe .      # re-emit, then graview describe: the places and acts the document declares
-ndx graview serve .         # re-emit, then the product face (@n-dx/graview-face) on http://localhost:5188
+ndx graview serve .         # re-emit, then the product face (@n-dx/graview-face) on http://localhost:5188, or the next free port
 ndx graview mcp .           # re-emit, then graview mcp over stdio on the snapshot
 ndx graview info .          # where the projection, the graview binary, the face and rex's MCP endpoint are
 ndx graview emit --no-files .  # leave file nodes out
 ```
 
-`ndx graview` projects the PRD tree, sourcevision's zones and components and hench's runs into a [Graview](https://graview.dev) declaration and a `{nodes, edges}` snapshot under the layout's graview dir (`.graview/`, or `.ndx/graview/` on the `.ndx` layout), then spawns the `graview` CLI on them. No `@graview/*` package is installed with n-dx: the binary is found through `graview.bin` in the project config, `$NDX_GRAVIEW_BIN`, PATH, the installed `@n-dx/graview-face`'s own `graview`, then `npx -y graview@<pinned>`. `serve` runs the separately published `@n-dx/graview-face` when it is installed or beside the adapter in the monorepo; when the repository is registered with the hub (`ndx start .`), the face writes changes and tasks back to rex through its MCP endpoint. See [Graview projection](../architecture/graview-projection.md).
+`ndx graview` projects the PRD tree, sourcevision's zones and components and hench's runs into a [Graview](https://graview.dev) declaration and a `{nodes, edges}` snapshot under the layout's graview dir (`.graview/`, or `.ndx/graview/` on the `.ndx` layout), then spawns the `graview` CLI on them. No `@graview/*` package is installed with n-dx: the binary is found through `graview.bin` in the project config, `$NDX_GRAVIEW_BIN`, PATH, a checkout of `@n-dx/graview-face`'s own `graview` (the published face installs none), then, only with `graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1`, `npx -y graview@<pinned>` (`NDX_GRAVIEW_NPX=0` refuses it whatever the config says). `serve` runs the separately published `@n-dx/graview-face` when it is installed or beside the adapter in the monorepo; when the repository is registered with the hub (`ndx start .`), the face writes changes and tasks back to rex through its MCP endpoint. Without `--port` the face takes 5188 or the next free port, so several projects can each serve one. The `/ndx-graview` skill runs the whole check-serve-walk loop and reports what the map shows. See [Graview projection](../architecture/graview-projection.md).
 
 ### status
 

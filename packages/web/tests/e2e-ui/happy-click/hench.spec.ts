@@ -128,10 +128,13 @@ test("workspaces: the card opens its workspace; the run-mode picker clamps itera
     await expect(iterations).toHaveValue("2");
     await mode.selectOption({ label: "This task" });
 
-    await page.getByRole("button", { name: /More ways to run/ }).first().click();
-    await expect(page.getByRole("menu")).toBeVisible();
+    // The arrow opens the run settings (Prepare task) directly; Escape closes them.
+    await page.locator(".start-task-caret").first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    // The modal focuses its close button in the same effect pass that arms Escape.
+    await expect(page.locator(".prep-close")).toBeFocused();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   }
 
   await open.click();

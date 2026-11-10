@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "49a1b628-345d-46bf-8d30-7645cb6d50db":
+    status: "completed"
+    startedAt: "2026-11-05T17:46:19.778Z"
+    completedAt: "2026-11-05T18:10:05.519Z"
+    endedAt: "2026-11-05T18:10:05.519Z"
+    activeIntervals: [{"end":"2026-11-05T18:10:05.519Z","start":"2026-11-05T17:46:19.778Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex suggestPlacements batch (index, nodes, open amenders built once) + node keywords memoized; area read and placements route use it; gateway swaps suggestPlacement for suggestPlacements at 135"
+    appliedAt: "2026-11-05T18:10:05.519Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-05T18:10:05.519Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

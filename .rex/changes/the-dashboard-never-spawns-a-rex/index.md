@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "Test: a fixture project with a planted node_modules/.bin/rex does not run it from POST /api/commands/recommend; the test fails on the code before the fix"
 touches:
   - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
+fix: true
 priority: "high"
 discoveredFrom: {"item":"82468601-c666-4943-a9ac-b11bb0149372"}
 tags:

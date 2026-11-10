@@ -12,25 +12,27 @@
 
 import { h } from "preact";
 import type { ComponentChild } from "preact";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import {
   STAGES,
   visibleStages,
+  tileForScope,
+  tilesForLayout,
   stageProduct,
   viewLabel,
   viewBlurb,
   viewGlyph,
   type StageId,
   type StageSection,
-  type StageSectionBadge,
   type StageTab,
   type StageTile,
 } from "./stages.js";
 import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
-import { TileGrid, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
+import { BADGES, CountPill } from "./stage-badge.js";
+import { TileGrid, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -61,20 +63,6 @@ interface SectionProps {
   navigateTo: NavigateTo;
   renderView: RenderView;
 }
-
-interface BadgeDef {
-  /** The count, or null while status is unknown or the tree has none (v1). */
-  count(status: ProjectStatus | null): number | null;
-  /** Accessible name for the pill. */
-  label(count: number): string;
-}
-
-const BADGES: Record<StageSectionBadge, BadgeDef> = {
-  inbox: {
-    count: (status) => status?.rex.inbox?.open ?? null,
-    label: (n) => `${n} change${n === 1 ? "" : "s"} in the Inbox`,
-  },
-};
 
 /**
  * A section with a header count. Its own component so only badged sections
@@ -116,7 +104,6 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
     setChosen(next);
     writeOpenState(key, next);
   };
-  const badge = section.badge ? BADGES[section.badge] : null;
   const toggleFull = () => {
     const next = !full;
     setFull(next);
@@ -140,12 +127,7 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
       },
         h("span", { class: "stage-section-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
         h("span", { class: "stage-section-title" }, title),
-        badge && count !== null
-          ? h("span", { class: "stage-section-badge", "data-count": String(count) },
-              h("span", { "aria-hidden": "true" }, count.toLocaleString()),
-              h("span", { class: "sr-only" }, badge.label(count)),
-            )
-          : null,
+        section.badge ? h(CountPill, { badge: section.badge, count }) : null,
         h("span", { class: "stage-section-blurb" }, blurb),
       ),
       section.scroll && open
@@ -207,6 +189,7 @@ const NO_SUMMARY: RenderSummary = () => null;
 export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
+  const cliName = useCliName();
   const gates: Record<string, boolean> = {
     "sourcevision.prMarkdown": useFeatureToggle("sourcevision.prMarkdown", false),
     "sourcevision.ask": useFeatureToggle("sourcevision.ask", false),
@@ -218,14 +201,13 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
     && (!s.featureGate || gates[s.featureGate])
     && !(s.requiresServer && deployed),
   );
-  const tiles = (def.tiles ?? []).filter((t) =>
-    validViews.has(t.view)
-    && (!t.featureGate || gates[t.featureGate])
+  const tilesFor = (layout: "v1" | "v2") => tilesForLayout(def, layout).flatMap((t) => tileForScope(stage, t, validViews) ?? []).filter((t) =>
+    (!t.featureGate || gates[t.featureGate])
     && !(t.requiresServer && deployed)
     && !(t.hiddenWhenDeployed && deployed),
   );
   const tabsOf = (tile: StageTile): StageTab[] =>
-    [{ view: tile.view }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
+    [{ view: tile.view, label: tile.tabLabel }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
 
   return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
@@ -233,7 +215,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       h("div", { class: "stage-page-heading" },
         h("div", { class: "stage-page-titles" },
           h("h1", { class: "stage-page-title" }, viewLabel(stage)),
-          h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
+          h("p", { class: "stage-page-blurb" }, resolveCliLabel(viewBlurb(stage), cliName)),
         ),
         headStatus,
       ),
@@ -254,9 +236,38 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       return h(s.badge ? BadgedSection : Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
     def.tiles
-      ? h(TileGrid, { stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
+      ? def.v1Tiles
+        ? h(LayoutTileGrid, {
+            stage, tiles: tilesFor("v2"), v1Tiles: tilesFor("v1"), deployed, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo,
+          })
+        : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo })
       : null,
   );
+}
+
+type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; deployed: boolean };
+
+/**
+ * A grid whose tiles follow the project's PRD layout, read from project status
+ * so only a stage with `v1Tiles` subscribes. A static export has no status and
+ * no server-backed v2 tiles, so it takes the v1 set. Before the first status
+ * arrives the layout is unknown: only the layout-agnostic tiles mount, because
+ * a v2 tile's preview fires v2-only requests a v1 project cannot answer. A
+ * project with no PRD (`rex.exists === false`, which carries no layout) takes
+ * the v1 set without its PRD-only tiles, so Tasks shows its "no PRD yet" empty
+ * state and nothing says to migrate. A later null (a failed poll, a server
+ * restart) keeps the last known state: swapping tile sets would unmount the
+ * open tile and lose its state.
+ */
+function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridProps) {
+  const known = useRef<"v1" | "v2" | "none" | undefined>(undefined);
+  const status = useProjectStatus();
+  if (status) known.current = status.rex?.exists === false ? "none" : status.rex?.layout ?? "v2";
+  const shown = deployed || known.current === "v1" ? v1Tiles
+    : known.current === "none" ? v1Tiles.filter((t) => !t.requiresPrd)
+    : known.current === "v2" ? tiles
+    : tiles.filter((t) => !t.v2Only);
+  return h(TileGrid, { ...grid, tiles: shown });
 }
 
 // ── Landing ────────────────────────────────────────────────────
@@ -290,9 +301,17 @@ function stageFacts(stage: StageId, status: Partial<ProjectStatus> | null): Fact
     if (!rex?.exists || !rex.stats) return [["—", "no PRD yet"]];
     return [[rex.stats.total.toLocaleString(), "items"], [`${Math.round(rex.percentComplete)}%`, "complete"], [String(rex.stats.pending), "pending"]];
   }
-  const hench = status.hench;
-  if (!hench) return [];
-  return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
+  if (stage === "work") {
+    const hench = status.hench;
+    if (!hench) return [];
+    return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
+  }
+  // Tune has no number of its own yet (S5 adds Outcomes by tier). Repeating
+  // Work's run counts here would read as a bug, so the card shows none.
+  // Every stage is named above, so a new one cannot fall through to hench.
+  const _exhaustive: "tune" = stage;
+  void _exhaustive;
+  return [];
 }
 
 // ── Next-step panel ────────────────────────────────────────────
@@ -374,12 +393,13 @@ export interface HomeViewProps {
 
 export function HomeView({ validViews, navigateTo }: HomeViewProps) {
   const status = useProjectStatus();
+  const cliName = useCliName();
   const stages = visibleStages(validViews);
 
   return h("div", { class: "home" },
     h("div", { class: "home-head" },
       h("h1", null, "n-dx"),
-      h("p", null, "Three stages in a loop — understand the code, decide what to build, let the agent build it."),
+      h("p", null, "Four stages in a loop — understand the code, decide what to build, let the agent build it, then tune the workflow."),
     ),
     h(NextStepPanel, { status }),
     // Reserved for A8's preflight card — intentionally empty until then.
@@ -401,7 +421,7 @@ export function HomeView({ validViews, navigateTo }: HomeViewProps) {
           h("span", { class: "stage-card-glyph", "aria-hidden": "true" }, viewGlyph(id)),
           h("span", { class: "stage-card-name" }, label),
           h("span", { class: "stage-card-hint" }, product),
-          h("span", { class: "stage-card-blurb" }, viewBlurb(id)),
+          h("span", { class: "stage-card-blurb" }, resolveCliLabel(viewBlurb(id), cliName)),
           facts.length
             ? h("span", { class: "stage-card-facts" },
                 facts.map(([v, k]) => h("span", { key: k, class: "stage-card-fact" },

@@ -1,5 +1,16 @@
 # @n-dx/lang-java
 
+## 0.10.3
+
+### Patch Changes
+
+- [#909](https://github.com/en-dash-consulting/n-dx/pull/909) [`55d304a`](https://github.com/en-dash-consulting/n-dx/commit/55d304a06b9e7547490a64e91888a9c25ac64621) Thanks [@endash-shal](https://github.com/endash-shal)! - Resolve Java inherited member types, method references and visible wildcard imports; recognize interface entry points and additional JDK packages. Match Gradle type-safe project accessors to declared projects. Preserve Go workspace import resolution for oversized generated files and report discovery failures even when no build file was found. Reuse verified extracted grammar toolchains without keeping duplicate archives.
+
+- [#909](https://github.com/en-dash-consulting/n-dx/pull/909) [`3edfb23`](https://github.com/en-dash-consulting/n-dx/commit/3edfb2303189207193062818fd0a358a2569e78f) Thanks [@endash-shal](https://github.com/endash-shal)! - The Java resolver keeps each declaration's own supertypes: when two modules declare the same class, an inherited member type is looked up only through the supertypes of the declaration in the referencing file, and of a supertype declared in several files only the ones that file sees give members or are followed. The SVG and SMIL DOM (`org.w3c.dom.svg`, `org.w3c.dom.smil`, shipped in xml-apis-ext and Batik) are named `java:` rather than `java:stdlib:`.
+- Updated dependencies [[`55d304a`](https://github.com/en-dash-consulting/n-dx/commit/55d304a06b9e7547490a64e91888a9c25ac64621), [`c01c1cf`](https://github.com/en-dash-consulting/n-dx/commit/c01c1cfdd02e8140e19816cdc7532a14536b691d), [`3edfb23`](https://github.com/en-dash-consulting/n-dx/commit/3edfb2303189207193062818fd0a358a2569e78f)]:
+  - @n-dx/lang-kit@0.10.3
+  - @n-dx/lang-runtime@0.10.3
+
 ## 0.10.2
 
 ### Patch Changes

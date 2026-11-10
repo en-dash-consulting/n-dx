@@ -41,7 +41,9 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { STATUS_CODES } from "node:http";
 import type { ServerContext } from "./types.js";
+import { FEATURE_DISABLED_HEADER } from "../shared/index.js";
 import { jsonResponse } from "./response-utils.js";
 import { isFeatureEnabled } from "./routes-features.js";
 
@@ -51,6 +53,12 @@ export interface RouteFeatureGate {
   feature: string;
   /** Paths this gate covers exactly (query string already stripped). */
   exact: readonly string[];
+  /**
+   * A path this gate covers with everything beneath it, for a feature that
+   * owns a whole route family with ids in the path. `/api/x` covers `/api/x`
+   * and `/api/x/…`, never `/api/xy`.
+   */
+  prefix?: string;
   /** Why these endpoints belong to this toggle. Read by humans, not code. */
   reason: string;
   /**
@@ -89,6 +97,29 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     reason: "Reads for the PR Markdown page. Listed exactly so an unrelated subpath is still a 404, not a 403.",
   },
   {
+    feature: "web.sidecar",
+    exact: ["/api/commands/sidecar-command/status", "/api/commands/sidecar-command/stop"],
+    prefix: "/api/sidecar",
+    reason:
+      "Every Sidecar session route, reads included: a turn spends tokens through the vendor CLI, and the session ids are in the path. " +
+      "The Sidecar command job's status and stop routes too: only an approved Sidecar call starts that job, and the job tray skips a refused status.",
+  },
+  {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/connections",
+    reason:
+      "The operator's connections and their OAuth sign-in. Only the Sidecar uses them, and listing one connects it, " +
+      "which spawns a stdio server.",
+  },
+  {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/tracker",
+    reason:
+      "Tracker sync's tick, activity log and card decisions. A tick calls the tracker through a connection, so it is off with the connections.",
+  },
+  {
     feature: "rex.placementDraft",
     // Documents the endpoint; it carries a change id, so no exact path matches
     // it here and routes-rex/placement.ts refuses with this module's body.
@@ -96,12 +127,24 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     reason: "Draft with the model: each call spends tokens on the prd.place model. Writes nothing.",
     selfEnforced: true,
   },
+  {
+    feature: "hench.readyNext",
+    exact: ["/api/hench/plan-queue"],
+    reason: "Live's Ready next section. Each call spawns `ndx work --plan-queue`, so it is off when the section is.",
+  },
+  {
+    feature: "git.branchHealth",
+    exact: ["/api/branch-health"],
+    reason:
+      "The Workspaces health strip's one read. Each call runs git (and gh when GitHub reads are on), so it is off when the strip is.",
+  },
 ];
 
 /** The gate covering `pathname`, or null when the path is ungated. */
 export function findRouteFeatureGate(pathname: string): RouteFeatureGate | null {
   for (const gate of ROUTE_FEATURE_GATES) {
     if (gate.exact.includes(pathname)) return gate;
+    if (gate.prefix && (pathname === gate.prefix || pathname.startsWith(`${gate.prefix}/`))) return gate;
   }
   return null;
 }
@@ -146,6 +189,29 @@ export function enforceRouteFeatureGate(
   if (!gate || gate.selfEnforced) return false;
   if (isFeatureEnabled(ctx.projectDir, gate.feature)) return false;
 
+  res.setHeader(FEATURE_DISABLED_HEADER, gate.feature);
   jsonResponse(res, 403, featureDisabledBody(gate.feature, pathname));
   return true;
+}
+
+/**
+ * {@link enforceRouteFeatureGate} for a WebSocket upgrade: the raw 403 to write
+ * on the socket in place of the handshake when `pathname`'s toggle is off, or
+ * null. The flag is read per call, as on the HTTP path.
+ */
+export function featureDisabledUpgradeResponse(pathname: string, ctx: ServerContext): string | null {
+  const gate = findRouteFeatureGate(pathname);
+  if (!gate || gate.selfEnforced) return null;
+  if (isFeatureEnabled(ctx.projectDir, gate.feature)) return null;
+
+  const body = JSON.stringify(featureDisabledBody(gate.feature, pathname));
+  return [
+    `HTTP/1.1 403 ${STATUS_CODES[403]}`,
+    "Content-Type: application/json",
+    `${FEATURE_DISABLED_HEADER}: ${gate.feature}`,
+    "Connection: close",
+    `Content-Length: ${Buffer.byteLength(body)}`,
+    "",
+    body,
+  ].join("\r\n");
 }

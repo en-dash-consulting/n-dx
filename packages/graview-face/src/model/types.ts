@@ -287,13 +287,13 @@ export type Edges = {
   };
   readonly run: {
     /** the work this run was for */
-    readonly ranFor: "change" | "task";
+    readonly ranFor: "change" | "task" | "capability" | "constraint" | "area";
     /** the commits this run made */
     readonly produced: "commit";
   };
   readonly commit: {
     /** the work this commit landed for */
-    readonly landedFor: "change" | "task";
+    readonly landedFor: "change" | "task" | "capability" | "constraint" | "area";
     /** the capabilities the work this commit landed for was placed on */
     readonly realizes: "capability";
     /** the files this commit changed */

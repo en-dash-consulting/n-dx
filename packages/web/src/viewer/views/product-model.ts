@@ -157,11 +157,18 @@ export interface ConstraintRow {
 /** An area and the capabilities under it. */
 export interface AreaSection {
   id: string;
+  /** Frozen v2 slug: the area's address, `/product/area/<slug>`. */
+  slug: string;
   displayId?: string;
   title: string;
   summary?: string;
   stewards?: string[];
   capabilities: CapabilityRow[];
+  /**
+   * Distinct open changes that touch or amend the area or a node in it, or add
+   * a node under one; the server works it out. The area map counts these.
+   */
+  openChangeIds: string[];
 }
 
 /** Everything the Product page renders. */
@@ -207,10 +214,98 @@ export interface ChangeRow {
   needsPlacement?: boolean;
   /** Open and held for placement by rex: `ndx work` refuses it. Absent on applied history. */
   awaitsPlacement?: boolean;
+  /** In the Inbox: open with `needsPlacement`, held or not. The rows the Inbox lists and its count. */
+  inbox?: boolean;
   amends: AmendedNode[];
   touches: TouchedNode[];
   taskCount: number;
   completedTaskCount: number;
+  /** No acceptance criteria on the change, or on one of its open tasks. */
+  criteriaGap: boolean;
+  /** Distinct blockers, on the change or its open tasks, that are not completed. */
+  openBlockers: number;
+  /**
+   * The areas whose `openChangeIds` list this change, in the map's order.
+   * Absent on applied history and on an open change no area counts.
+   */
+  areas?: AreaRef[];
+}
+
+/** An area an open change counts toward: what Open changes' area filter matches and names. */
+export interface AreaRef {
+  id: string;
+  slug: string;
+  title: string;
+}
+
+// ── Plan's glance read ───────────────────────────────────────────────
+
+/** The stages an open change can be in. */
+export type OpenChangeStage = Exclude<ChangeStage, "applied" | "shipped">;
+
+/** One placed open change, as Plan's open-changes glance shows it. */
+export interface GlanceChange {
+  id: string;
+  displayId?: string;
+  title: string;
+  stage: OpenChangeStage;
+  priority?: string;
+  plannedRelease?: string;
+  taskCount: number;
+  completedTaskCount: number;
+  criteriaGap: boolean;
+  openBlockers: number;
+}
+
+/** The unit `ndx work` would run next, and why rex picked it. */
+export interface NextPick {
+  id: string;
+  displayId?: string;
+  title: string;
+  type: "change" | "task" | "subtask";
+  changeId: string;
+  changeDisplayId?: string;
+  changeTitle: string;
+  /** Rex's selection reason code. */
+  reason: "in_progress" | "ready_to_finalize" | "priority";
+  /** Rex's wording of that reason. Display only. */
+  summary: string;
+}
+
+/**
+ * `GET /api/rex/changes/summary`: stage counts over placed open changes,
+ * the Inbox counted apart, the placed open changes and rex's next pick.
+ */
+export interface ChangeSummary {
+  inbox: number;
+  /** Inbox changes also counted in a stage: with no capability to place them on, rex does not hold them. */
+  inboxInStage: number;
+  stages: Record<OpenChangeStage, number>;
+  open: GlanceChange[];
+  next: NextPick | null;
+  /** Automated and metric requirements on open changes and their tasks, where `rex ready` reads them, and the open changes that hold none. */
+  requirements: { total: number; uncovered: number };
+}
+
+// ── Apply ────────────────────────────────────────────────────────────
+
+/** One amendment of an apply and the product node it creates, edits or retires. */
+export interface AppliedAmendment {
+  delta: AmendmentDelta;
+  summary: string;
+  node: { id: string; displayId?: string; title: string; type: string };
+  /** Where an added node lands. */
+  under?: { id: string; displayId?: string; title: string };
+}
+
+/** `POST /api/rex/changes/:id/apply/preview` and `…/apply` on a v2 project. */
+export interface ChangeApply {
+  layout: "v2";
+  change: string;
+  appliedAt: string;
+  applied: AppliedAmendment[];
+  /** What the preview was judged on; Apply sends it back, and a moved change answers 409. */
+  hash: string;
 }
 
 // ── Inbox placement ──────────────────────────────────────────────────
@@ -234,14 +329,29 @@ export interface PlacementCandidate {
   strength: PlacementStrength;
   /** Which rules fired. */
   reasons: string[];
+  /** Other open changes that already amend this candidate. */
+  amendedBy?: string[];
 }
 
 /** `GET /api/rex/changes/:id/placement` on a v2 project. */
 export interface ChangePlacement {
   layout: "v2";
-  change: { id: string; title: string; intent?: string; status: string; taskCount: number; tags?: string[] };
+  change: {
+    id: string;
+    title: string;
+    intent?: string;
+    status: string;
+    taskCount: number;
+    tags?: string[];
+    /** When the change was first recorded; absent when neither `createdAt` nor `lastModified` is set. */
+    createdAt?: string;
+    /** Whole days from `createdAt` to the read. */
+    ageDays?: number;
+  };
   /** The rules' relation for this change; every candidate carries it. */
   relation: PlacementRelation;
+  /** The rule that set `relation`. */
+  relationRule: string;
   /** The top two candidates share a score, so their order is arbitrary. */
   tied: boolean;
   shortlist: PlacementCandidate[];
@@ -311,11 +421,12 @@ export interface PlacementDraft {
 
 /**
  * Why rex refused a placement or a proposal: the `kind` of a 422 answer from
- * `/place` or `/propose`, mirroring rex's `ChangePlacementErrorKind`.
+ * `/place`, `/propose` or `/unplace`, mirroring rex's `ChangePlacementErrorKind`.
  * `no-such-change` arrives as a 404 instead.
  */
 export type PlacementRefusalKind =
   | "not-a-target"
+  | "not-touched"
   | "content-needs-amends"
   | "already-amends"
   | "already-proposed"
@@ -385,6 +496,81 @@ export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
   dependsOn: Array<{ id: string; title: string }>;
   history: CapabilityHistoryEntry[];
   code: CodeSite[];
+  /** Open changes amending this capability, with what each would change. */
+  pendingAmendments: PendingAmendment[];
+  /**
+   * Inbox changes held for placement that amend or touch this capability, such
+   * as the draft a spec edit here makes. Never in `openChanges`.
+   */
+  inboxChanges: HeldChange[];
+}
+
+/** An Inbox change held for placement: an overlay with no stage, since it has not entered one. */
+export type HeldChange = Omit<OpenChangeOverlay, "stage">;
+
+/** One open change's edit to a capability: a replacement statement and criterion deltas. */
+export interface PendingAmendment {
+  changeId: string;
+  changeDisplayId?: string;
+  changeTitle: string;
+  stage: ChangeStage;
+  delta: AmendmentDelta;
+  summary: string;
+  /** The replacement statement, when the amendment carries one. */
+  proposed?: string;
+  criteria?: {
+    add: Array<{ id: string; text: string }>;
+    replace: Array<{ id: string; text: string }>;
+    remove: string[];
+  };
+}
+
+/** An Inbox change whose top placement candidate sits in the area: rex's best guess, not a placement. */
+export interface AreaInboxGuess {
+  id: string;
+  displayId?: string;
+  title: string;
+  target: { id: string; title: string; type: "capability" | "constraint" };
+  relation: PlacementRelation;
+  /** `tied` when the top two candidates share a score, as the Inbox page shows it. */
+  strength: PlacementStrength | "tied";
+}
+
+/** An applied change that amended or touched the area or a node in it. */
+export interface AreaAppliedChange {
+  id: string;
+  displayId?: string;
+  title: string;
+  appliedAt?: string;
+  shippedIn?: string;
+}
+
+/** Everything the area view renders; the server computes every field. */
+export interface AreaDetail {
+  id: string;
+  slug: string;
+  displayId?: string;
+  title: string;
+  summary?: string;
+  stewards: string[];
+  counts: {
+    capabilities: number;
+    constraints: number;
+    met: number;
+    changing: number;
+    defective: number;
+    openChanges: number;
+  };
+  capabilities: CapabilityRow[];
+  /** Constraints that bind the area or any of its capabilities. */
+  constraints: ConstraintRow[];
+  /** Open changes amending or touching the area or its capabilities. */
+  openChanges: OpenChangeOverlay[];
+  inbox: AreaInboxGuess[];
+  /** The five most recently applied, newest first. */
+  recentlyApplied: AreaAppliedChange[];
+  /** The files each capability lists in `realizedBy`. Empty until code is linked. */
+  code: Array<{ capabilityId: string; path: string }>;
 }
 
 /**
@@ -595,6 +781,40 @@ export function groupChangesByRelease(changes: readonly ChangeRow[]): ReleaseGro
   return groups;
 }
 
+/** One release heading of Plan's glance. */
+export interface GlanceGroup {
+  label: string;
+  changes: GlanceChange[];
+}
+
+/**
+ * Group the glance's changes by planned release: newest release first
+ * (`compareReleases`, reversed), Unscheduled last. The glance reads like a
+ * roadmap, so what is next leads and the backlog trails. A blank release is
+ * unscheduled and surrounding whitespace is trimmed, as in
+ * `groupChangesByRelease`. Changes keep the order given within a group.
+ */
+export function groupGlanceByRelease(changes: readonly GlanceChange[]): GlanceGroup[] {
+  const byRelease = new Map<string, GlanceChange[]>();
+  const unscheduled: GlanceChange[] = [];
+  for (const change of changes) {
+    const release = change.plannedRelease?.trim();
+    if (!release) unscheduled.push(change);
+    else byRelease.set(release, [...(byRelease.get(release) ?? []), change]);
+  }
+  const groups = [...byRelease.entries()]
+    .sort(([a], [b]) => compareReleases(b, a))
+    .map(([label, rows]) => ({ label, changes: rows }));
+  if (unscheduled.length > 0) groups.push({ label: UNSCHEDULED_RELEASE_LABEL, changes: unscheduled });
+  return groups;
+}
+
+/** The one gap chip a row shows: blocked outranks no criteria. */
+export function glanceGap(change: Pick<GlanceChange, "criteriaGap" | "openBlockers">): "blocked" | "no-criteria" | null {
+  if (change.openBlockers > 0) return "blocked";
+  return change.criteriaGap ? "no-criteria" : null;
+}
+
 /**
  * A capability the Product page highlights: its spec has moved ahead of the
  * build, or what was built is broken. These are the two rows a reader is
@@ -626,7 +846,9 @@ export interface ProductTotals {
 
 export function productTotals(map: ProductMap): ProductTotals {
   const capabilities = map.areas.flatMap((area) => area.capabilities);
-  const openChangeIds = new Set<string>();
+  // The server's per-area set holds changes no capability overlay carries (one
+  // that adds a capability, one that removes an area); the area map counts it.
+  const openChangeIds = new Set<string>(map.areas.flatMap((area) => area.openChangeIds));
   for (const capability of capabilities) {
     for (const change of capability.openChanges) openChangeIds.add(change.id);
   }

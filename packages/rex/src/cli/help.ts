@@ -136,6 +136,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--description=\"...\"", description: "Item description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion (done when) for this item, manual mode only (repeatable, one per flag); not a capability criterion" },
       { flag: "--type=<type>", description: "v2 only: change (default), task or subtask" },
+      { flag: "--area=<id|slug>", description: "v2 only: suggest placement among this area's capabilities and constraints only" },
       { flag: "--source=\"...\"", description: "Item source, manual mode only (e.g. ndx-capture)" },
       { flag: "--file=<path>", description: "Import from a freeform text file (repeatable)" },
       { flag: "--accept", description: "Auto-accept LLM proposals without review" },
@@ -190,13 +191,19 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   change: {
     tool: "rex",
     command: "change",
-    summary: "place or apply a change (v2 PRD)",
+    summary: "list the Inbox, place or apply a change (v2 PRD)",
     usage: [
+      "rex change inbox [--format=json] [dir]",
       "rex change place <change> [--target=<node>] [--relation=touches|amends] [options] [dir]",
       "rex change place <change> --propose --type=capability|constraint --under=<area> --title=\"...\" [options] [dir]",
       "rex change apply <change> [--force] [dir]",
     ],
     description:
+      "inbox: list every open change awaiting placement (needsPlacement), oldest\n" +
+      "first: id, title, intent, age in days (from when the change was first\n" +
+      "recorded) and the placement rules' top 5 candidates with their scores and\n" +
+      "reasons. On a v1 PRD it answers 'not applicable' and exits 0 (JSON:\n" +
+      "{ \"applicable\": false }).\n\n" +
       "place: without --target, print the placement rules' shortlist of\n" +
       "capabilities and constraints the change could amend or touch, best first.\n" +
       "With --target, record it: touches joins the change's touches; amends adds\n" +
@@ -231,6 +238,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--format=json", description: "Machine-readable output" },
     ],
     examples: [
+      { command: "rex change inbox", description: "List the changes awaiting placement, with age and shortlist" },
       { command: "rex change place CH-2", description: "Show where the change could go" },
       { command: "rex change place CH-2 --target=A1.1 --relation=touches", description: "It works on the capability" },
       { command: "rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion=\"c3: A refund reaches the card\"", description: "It adds a capability criterion" },

@@ -28,8 +28,11 @@
  * GET  /api/commands/reshape/status  — reshape status and proposal report
  * POST /api/commands/reshape/stop    — interrupt the running reshape pass
  * POST /api/commands/auth            — verify LLM provider credentials (spawns `ndx auth`)
+ * GET  /api/commands/auth/cached     — the last credential-check result, if any; never spawns
  * POST /api/commands/validate-tokens — hench vendor token-accuracy check
  * POST /api/commands/export-pdf      — sourcevision PDF report (returns the written path)
+ * GET  /api/commands/sidecar-command/status — the command a Sidecar session last ran (see startSidecarCommand)
+ * POST /api/commands/sidecar-command/stop   — interrupt it
  *
  * Every async trigger above is a {@link JobSlot}: a pollable status plus the
  * child handle its `/stop` needs. The dashboard's shared job tray polls those
@@ -38,6 +41,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
@@ -52,6 +56,7 @@ import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
+import type { SidecarCommandEnd } from "./sidecar/carry-out.js";
 
 const CMD_PREFIX = "/api/commands/";
 
@@ -161,6 +166,11 @@ interface InitStatus {
    * because `ndx init` treats a failed `git init` as a warning, not a failure.
    */
   gitInitialized: boolean | null;
+  /**
+   * Set when init succeeded but the wizard's Google key could not be stored:
+   * what failed and how to store it. Never contains the key. Null otherwise.
+   */
+  credentialWarning: string | null;
 }
 
 // Module-level singleton — one init at a time per server process. The
@@ -175,6 +185,7 @@ const initStatuses = new WorkspaceScoped<InitStatus>(() => ({
   error: null,
   gitRequested: false,
   gitInitialized: null,
+  credentialWarning: null,
 }));
 
 // ── Binary resolution helpers ─────────────────────────────────────────
@@ -234,17 +245,24 @@ function managedChildError(
  */
 const svWriteJobs = new WorkspaceScoped<{ job: string | null }>(() => ({ job: null }));
 
+/** Take the workspace's lock for `jobName`; returns the holder's label when another job has it. */
+function takeSvWriteLock(ctx: ServerContext, jobName: string): string | null {
+  const lock = svWriteJobs.get(ctx);
+  if (lock.job) return lock.job;
+  lock.job = jobName;
+  return null;
+}
+
 /** Take the workspace's lock or answer 409 naming the in-flight job. */
 function acquireSvWriteLock(res: ServerResponse, ctx: ServerContext, jobName: string): boolean {
-  const lock = svWriteJobs.get(ctx);
-  if (lock.job) {
+  const holder = takeSvWriteLock(ctx, jobName);
+  if (holder) {
     jsonResponse(res, 409, {
-      error: `Cannot start ${jobName}: ${lock.job} is already running`,
-      runningJob: lock.job,
+      error: `Cannot start ${jobName}: ${holder} is already running`,
+      runningJob: holder,
     });
     return false;
   }
-  lock.job = jobName;
   return true;
 }
 
@@ -898,6 +916,7 @@ async function handleInit(
   initStatus.error = null;
   initStatus.gitRequested = git === true;
   initStatus.gitInitialized = null;
+  initStatus.credentialWarning = null;
 
   // Return 202 immediately, run in background — first-time init runs a
   // sourcevision analyze pass and can take a while on a large repo.
@@ -934,15 +953,10 @@ async function handleInit(
     // covers these same fields post-init). Set here via the same `ndx
     // config` CLI path that page documents; failures here are non-fatal —
     // init itself already succeeded, and these can be set from Settings.
-    // The key goes to the credential store on stdin, never on argv: a spawned
-    // argv is visible in the process list and the history warning would land
-    // in the init log.
+    // The store is the only place the Google key goes, so a failed store is
+    // reported rather than dropped.
     if (provider === "google" && googleApiKey) {
-      await foundationExec(bin, [...prefixArgs, "config", "credentials.google", "--stdin", ctx.projectDir], {
-        cwd: ctx.projectDir,
-        timeout: 15_000,
-        input: googleApiKey,
-      }).catch(() => {});
+      initStatus.credentialWarning = await storeInitGoogleKey(bin, prefixArgs, ctx.projectDir, googleApiKey);
     }
     if (provider === "local") {
       if (localHost) {
@@ -975,6 +989,46 @@ async function handleInit(
   });
 
   return true;
+}
+
+/**
+ * Store the wizard's Google key with `ndx config credentials.google --stdin`.
+ * Returns null when stored, otherwise a warning naming the failure and how to
+ * store the key by hand.
+ *
+ * The key goes on stdin, never argv: a spawned argv is visible in the process
+ * list, and the CLI's history warning would land in the init log. The failure
+ * detail comes from the CLI's stderr, so the key is cut out of it before
+ * redaction — a reason that echoed the key would otherwise reach the browser.
+ */
+async function storeInitGoogleKey(
+  bin: string,
+  prefixArgs: string[],
+  projectDir: string,
+  key: string,
+): Promise<string | null> {
+  let detail: string;
+  try {
+    const result = await foundationExec(bin, [...prefixArgs, "config", "credentials.google", "--stdin", projectDir], {
+      cwd: projectDir,
+      timeout: 15_000,
+      input: key,
+    });
+    if (result.exitCode === 0) return null;
+    detail = lastLine(result.stderr)
+      || result.error?.message
+      || (result.exitCode === null ? "timed out" : `exit code ${result.exitCode}`);
+  } catch (err) {
+    detail = errorMessage(err);
+  }
+  const reason = redactSecrets(detail.split(key).join("[key]"));
+  return `Google API key was not stored (${reason}). `
+    + "Store it with: ndx config credentials.google";
+}
+
+function lastLine(text: string): string {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines[lines.length - 1] ?? "";
 }
 
 /**
@@ -1275,17 +1329,45 @@ export function startAsyncJob(
   /** Set when the job writes .sourcevision/ — takes the shared writer lock. */
   svWriteLockLabel?: string,
 ): boolean {
-  const status = job.status;
-  if (status.running) {
-    jsonResponse(res, 409, { error: `${label} is already running`, startedAt: status.startedAt });
+  if (job.status.running) {
+    jsonResponse(res, 409, { error: `${label} is already running`, startedAt: job.status.startedAt });
     return true;
   }
   if (svWriteLockLabel && !acquireSvWriteLock(res, ctx, svWriteLockLabel)) {
     return true;
   }
+  const startedAt = launchAsyncJob(job, bin, cmdArgs, ctx, timeout, (status) => {
+    if (svWriteLockLabel) releaseSvWriteLock(ctx);
+    if (broadcast && broadcastType) {
+      broadcast({ type: broadcastType, ok: !status.error, timestamp: status.finishedAt });
+    }
+  });
+  jsonResponse(res, 202, {
+    ok: true,
+    startedAt,
+    message: `${label} started. Poll the status endpoint for progress.`,
+  });
+  return true;
+}
 
+/**
+ * Spawn `bin` into an idle `job` and return its start time; `onSettled` runs
+ * once the job has ended, with its status final and the child's full result
+ * (absent when the child never produced one). The caller has checked that
+ * the job is not running.
+ */
+function launchAsyncJob<S extends AsyncJobStatus>(
+  job: JobSlot<S>,
+  bin: string,
+  cmdArgs: string[],
+  ctx: ServerContext,
+  timeout: number,
+  onSettled?: (status: S, result?: SpawnToolResult) => void,
+): string {
+  const status = job.status;
+  const startedAt = new Date().toISOString();
   status.running = true;
-  status.startedAt = new Date().toISOString();
+  status.startedAt = startedAt;
   status.finishedAt = null;
   status.report = null;
   status.output = "";
@@ -1293,28 +1375,11 @@ export function startAsyncJob(
   status.stopped = false;
   job.stopRequested = false;
 
-  jsonResponse(res, 202, {
-    ok: true,
-    startedAt: status.startedAt,
-    message: `${label} started. Poll the status endpoint for progress.`,
-  });
-
   // The whole stream is accumulated, not just the displayed tail: `report`
   // is JSON.parse'd from it, and a payload larger than the display slice
   // would otherwise be truncated into a parse failure.
   let streamed = "";
-  const child = spawnManaged(bin, cmdArgs, {
-    cwd: ctx.projectDir,
-    timeout,
-    stdio: "pipe",
-    onStdout: (chunk) => {
-      streamed = (streamed + chunk).slice(-1_000_000);
-      status.output = streamed.trim().slice(-5000);
-    },
-  });
-  job.child = child;
-
-  const settle = (error: string | null) => {
+  const settle = (error: string | null, result?: SpawnToolResult) => {
     const wasStopped = job.stopRequested;
     status.running = false;
     status.finishedAt = new Date().toISOString();
@@ -1322,8 +1387,27 @@ export function startAsyncJob(
     status.error = wasStopped ? null : error;
     job.child = null;
     job.stopRequested = false;
-    if (svWriteLockLabel) releaseSvWriteLock(ctx);
+    onSettled?.(status, result);
   };
+
+  // `spawn` throws synchronously on an argument it rejects (a NUL byte); the
+  // job must then end failed rather than stay "running" with no child to stop.
+  let child: ManagedChild;
+  try {
+    child = spawnManaged(bin, cmdArgs, {
+      cwd: ctx.projectDir,
+      timeout,
+      stdio: "pipe",
+      onStdout: (chunk) => {
+        streamed = (streamed + chunk).slice(-1_000_000);
+        status.output = streamed.trim().slice(-5000);
+      },
+    });
+  } catch (err) {
+    settle(errorMessage(err));
+    throw err;
+  }
+  job.child = child;
 
   child.done.then((result) => {
     status.output = outputTail((result.stdout || "").trim(), 5000);
@@ -1332,16 +1416,12 @@ export function startAsyncJob(
     } catch {
       status.report = null; // not JSON — `output` carries the text
     }
-    settle(managedChildError(result, timeout));
-
-    if (broadcast && broadcastType) {
-      broadcast({ type: broadcastType, ok: !status.error, timestamp: status.finishedAt });
-    }
+    settle(managedChildError(result, timeout), result);
   }).catch((err: unknown) => {
     settle(errorMessage(err));
   });
 
-  return true;
+  return startedAt;
 }
 
 /** Interrupt a report-producing job started by {@link startAsyncJob}. */
@@ -1349,8 +1429,97 @@ export function stopAsyncJob(res: ServerResponse, job: AsyncJob, label: string):
   return stopJob(res, job, label);
 }
 
+// ── Sidecar commands ──────────────────────────────────────────────────
+
+/** A command a Sidecar session ran once its card was approved, or the allow-list covered it. */
+export interface SidecarCommandStatus extends AsyncJobStatus {
+  /** Names this run in the session's tool result; null before the first run. */
+  jobId: string | null;
+  /** The argv as the agent asked for it, space-joined. */
+  command: string | null;
+}
+
+const sidecarCommandJobs = new WorkspaceScoped<JobSlot<SidecarCommandStatus>>(() => ({
+  status: { ...newJobStatus(), jobId: null, command: null },
+  child: null,
+  stopRequested: false,
+}));
+
+export type SidecarCommandStart =
+  | { started: true; jobId: string; command: string; startedAt: string; settled: Promise<SidecarCommandEnd> }
+  | { started: false; reason: string };
+
+/**
+ * Run an approved Sidecar `run_command` as the workspace's `sidecar-command`
+ * job, so it shows in the job tray and on Live with Stop like any dashboard
+ * job. Only `ndx` (or the project's CLI name) and `git` run: argv, never a
+ * shell. One at a time per workspace; a second while one runs is refused.
+ * An `ndx` subcommand that writes `.sourcevision/` takes the shared writer
+ * lock for the job's life, so it and the dashboard's analyze, CI and refresh
+ * refuse each other rather than write at once.
+ * `settled` resolves once the job ends, with its exit code and everything it
+ * printed, for the session's tool result.
+ */
+export async function startSidecarCommand(
+  ctx: ServerContext,
+  argv: readonly string[],
+  broadcast?: WebSocketBroadcaster,
+): Promise<SidecarCommandStart> {
+  const [program = "", ...rest] = argv;
+  const isNdx = program === "ndx" || program === readCliName(ctx.projectDir);
+  // Read before any check: nothing below awaits, so the checks and the start are one step.
+  const writesSv = isNdx && await ndxSubcommandWritesSv(ctx, rest);
+  const job = sidecarCommandJobs.get(ctx);
+  const command = argv.join(" ");
+  if (job.status.running) {
+    return { started: false, reason: `Sidecar command ${job.status.jobId} (${job.status.command}) is still running` };
+  }
+  let bin: string;
+  let args: string[];
+  let timeout: number;
+  if (isNdx) {
+    const ndx = resolveNdxBin(ctx);
+    bin = ndx.bin;
+    args = [...ndx.args, ...rest];
+    timeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, rest[0] ?? "", rest.slice(1));
+  } else if (program === "git") {
+    bin = "git";
+    args = rest;
+    timeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, "git");
+  } else {
+    return { started: false, reason: `Sidecar runs ndx and git commands only, not "${program}"` };
+  }
+  const jobId = `sidecar-command-${randomUUID().slice(0, 8)}`;
+  if (writesSv) {
+    const holder = takeSvWriteLock(ctx, `Sidecar command ${jobId} (${command})`);
+    if (holder) return { started: false, reason: `${holder} is already running and writes .sourcevision/` };
+  }
+  job.status.jobId = jobId;
+  job.status.command = command;
+  let ended!: (end: SidecarCommandEnd) => void;
+  const settled = new Promise<SidecarCommandEnd>((resolve) => { ended = resolve; });
+  try {
+    // A spawn that throws settles first, so this releases the lock on that path too.
+    const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status, result) => {
+      if (writesSv) releaseSvWriteLock(ctx);
+      broadcast?.({ type: "commands:sidecar-command-finished", jobId, ok: !status.error, timestamp: status.finishedAt });
+      const stdout = (result?.stdout ?? "").trimEnd();
+      const stderr = (result?.stderr ?? "").trimEnd();
+      ended({
+        exitCode: result?.exitCode ?? null,
+        output: [stdout, stderr].filter(Boolean).join("\n"),
+        error: status.error,
+        stopped: status.stopped,
+      });
+    });
+    return { started: true, jobId, command, startedAt, settled };
+  } catch (err) {
+    return { started: false, reason: `the command could not be started: ${errorMessage(err)}` };
+  }
+}
+
 /** The dashboard-started background jobs the job tray and the Live overview list. */
-export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend";
+export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend" | "sidecar-command";
 
 /** One job's status, reduced to what every kind shares. */
 export interface CommandJobSnapshot {
@@ -1382,6 +1551,7 @@ export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
     snapshotJob("reshape", reshapeJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
     snapshotJob("refresh", refreshSlots.peekByKey(workspaceKey)?.status, (s) => s.phases.at(-1) ?? lastOutputLine(s.output)),
     snapshotJob("recommend", recommendJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("sidecar-command", sidecarCommandJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output) ?? s.command),
   ].filter((job): job is CommandJobSnapshot => job !== null);
 }
 
@@ -1429,6 +1599,7 @@ export function getCommandJobStatusesForTests(ctx: ServerContext): {
   refresh: RefreshStatus;
   selfHeal: SelfHealStatus;
   init: InitStatus;
+  sidecarCommand: SidecarCommandStatus;
 } {
   return {
     ci: ciJobs.get(ctx).status,
@@ -1437,6 +1608,7 @@ export function getCommandJobStatusesForTests(ctx: ServerContext): {
     refresh: refreshSlots.get(ctx).status,
     selfHeal: selfHealSlots.get(ctx).status,
     init: initStatuses.get(ctx),
+    sidecarCommand: sidecarCommandJobs.get(ctx).status,
   };
 }
 
@@ -1643,6 +1815,18 @@ async function handleAuth(
   }
   const result = await authCheckInFlight;
   jsonResponse(res, 200, { ...result, cached: false });
+  return true;
+}
+
+/**
+ * GET /api/commands/auth/cached — the cached credential-check result, or
+ * `{ cached: false }` when there is none. Never spawns: read-only surfaces
+ * (Tune's Your tooling tile) show a verdict only when one already exists and
+ * leave the live check, which runs the vendor CLI on a real prompt, to Robot
+ * Wrangler's Re-check.
+ */
+function handleAuthCached(res: ServerResponse): boolean {
+  jsonResponse(res, 200, authCheckCache ? { ...authCheckCache, cached: true } : { cached: false });
   return true;
 }
 
@@ -1922,6 +2106,20 @@ function loadCommandEffects(ctx: ServerContext): Promise<EffectsLoad> {
   return pending;
 }
 
+/**
+ * Whether `ndx <args>` can write `.sourcevision/`, by the subcommand's declared
+ * effects — conditional writes included, and a passthrough (`ndx sv …`) counts
+ * because its subcommand decides. Errs toward true: a subcommand without a
+ * declaration, or declarations the CLI cannot report, is treated as a writer.
+ */
+async function ndxSubcommandWritesSv(ctx: ServerContext, args: readonly string[]): Promise<boolean> {
+  const subcommand = args.find((arg) => !arg.startsWith("-"));
+  if (!subcommand) return false;
+  const declared = (await loadCommandEffects(ctx)).effects?.[subcommand];
+  if (!declared) return true;
+  return declared.writes.some((write) => write.path.startsWith("{sourcevision}"));
+}
+
 /** GET /api/commands/manifest — grouped command reference with availability and effects. */
 async function handleManifest(
   _req: IncomingMessage,
@@ -2115,6 +2313,9 @@ export function handleCommandsRoute(
   if (path === "auth" && method === "POST") {
     return handleAuth(req, res, ctx);
   }
+  if (path === "auth/cached" && method === "GET") {
+    return handleAuthCached(res);
+  }
   if (path === "validate-tokens" && method === "POST") {
     return handleValidateTokens(req, res, ctx);
   }
@@ -2143,6 +2344,13 @@ export function handleCommandsRoute(
   }
   if (path === "reshape/stop" && method === "POST") {
     return stopAsyncJob(res, reshapeJobs.get(ctx), "Reshape");
+  }
+  if (path === "sidecar-command/status" && method === "GET") {
+    jsonResponse(res, 200, { ...sidecarCommandJobs.get(ctx).status });
+    return true;
+  }
+  if (path === "sidecar-command/stop" && method === "POST") {
+    return stopJob(res, sidecarCommandJobs.get(ctx), "Sidecar command");
   }
 
   return false;

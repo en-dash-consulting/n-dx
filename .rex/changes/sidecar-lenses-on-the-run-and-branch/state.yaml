@@ -1,0 +1,104 @@
+schema: "rex/v2"
+items:
+  "0729f8d2-ca98-44ed-a772-ee6e56bd1239":
+    status: "completed"
+    startedAt: "2026-10-30T15:19:43.461Z"
+    completedAt: "2026-10-30T15:25:15.493Z"
+    endedAt: "2026-10-30T15:25:15.493Z"
+    activeIntervals: [{"end":"2026-10-30T15:25:15.493Z","start":"2026-10-30T15:19:43.461Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Work card slots count live runs across every worktree; start refused at the limit naming holders; run-plan lane reads Work card raised until its run starts."
+    lastModified: "2026-10-30T15:25:15.493Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2914d715-6f3b-4183-95f2-5ce8f6acd8c0":
+    status: "completed"
+    startedAt: "2026-10-29T18:45:47.835Z"
+    completedAt: "2026-10-29T19:06:30.029Z"
+    endedAt: "2026-10-29T19:06:30.029Z"
+    activeIntervals: [{"end":"2026-10-29T19:06:30.029Z","start":"2026-10-29T18:45:47.835Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "LENS_PACKETS['diagnose-run'] is now an 8k packet with target task; builder, run read, instructions, drawer target check, docs section and tests added."
+    lastModified: "2026-10-29T19:06:30.029Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4eff15bb-269f-40f0-bc34-cee4ee243b17":
+    status: "completed"
+    startedAt: "2026-10-30T14:18:22.066Z"
+    completedAt: "2026-10-30T14:21:01.594Z"
+    endedAt: "2026-10-30T14:21:01.594Z"
+    activeIntervals: [{"end":"2026-10-30T14:21:01.594Z","start":"2026-10-30T14:18:22.066Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-hench-prep tests pin diagnoseTaskRun's argv, JSON parse, failure paths and in-flight refusal"
+    lastModified: "2026-10-30T14:21:01.594Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "55faa034-3df0-41a1-9aef-67d1dc896340":
+    status: "completed"
+    startedAt: "2026-10-30T16:36:46.602Z"
+    completedAt: "2026-10-30T18:35:37.118Z"
+    endedAt: "2026-10-30T18:35:37.118Z"
+    activeIntervals: [{"end":"2026-10-30T18:11:21.215Z","start":"2026-10-30T16:36:46.602Z"},{"end":"2026-10-30T18:35:37.118Z","start":"2026-10-30T18:35:37.118Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Diagnose branch lens with worktree attach, github_read and draft_github_post carried out (9e9959745, review repairs c13f74681). Run 7e3a28f9 failed its gate only on agents-md-size-budget (+215); trimmed in 21755076d, then the affected gate and policy tests pass. Browser-checked on R1 (#907): toggle-off, worktree attach, source conflicts with no card, network-read card and PR read. Trust bypass tracked by c7e09da1."
+    lastModified: "2026-10-30T18:35:37.118Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6dcba986-4fe6-4d8d-ab84-54d45db119b1":
+    status: "completed"
+    startedAt: "2026-10-30T18:35:37.118Z"
+    completedAt: "2026-10-30T18:35:37.118Z"
+    endedAt: "2026-10-30T18:35:37.118Z"
+    activeIntervals: [{"end":"2026-10-30T18:35:37.118Z","start":"2026-10-30T18:35:37.118Z"}]
+    appliedAt: "2026-10-30T18:35:37.118Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    issues: ["https://www.notion.so/3f7a80b71924810aa984d37d94970566","https://www.notion.so/3f7a80b7192481c99690f94435b87799","https://www.notion.so/3f7a80b7192481d190ddd2eea210d9a5"]
+    lastModified: "2026-10-30T18:35:37.118Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "793240d0-5f3d-49c7-aff3-9cac77685681":
+    status: "completed"
+    startedAt: "2026-10-30T15:37:34.670Z"
+    completedAt: "2026-10-30T15:42:33.344Z"
+    endedAt: "2026-10-30T15:42:33.344Z"
+    activeIntervals: [{"end":"2026-10-30T15:42:33.344Z","start":"2026-10-30T15:37:34.670Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option (b): a chosen lane whose work card was denied, withdrawn or refused shows Start lane on the settled run-plan card; it sends a turn naming the lane's first task and forbidding a new plan card."
+    lastModified: "2026-10-30T15:42:33.344Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "99f8a9e1-7454-4780-acb6-393062ef0b1a":
+    status: "completed"
+    startedAt: "2026-10-30T16:22:30.326Z"
+    completedAt: "2026-10-30T16:26:21.686Z"
+    endedAt: "2026-10-30T16:26:21.686Z"
+    activeIntervals: [{"end":"2026-10-30T16:26:21.686Z","start":"2026-10-30T16:22:30.326Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: workOptions in sidecar/carry-out.ts defaults requireUnblocked true unless passed false; preview and start share it. Tests added."
+    lastModified: "2026-10-30T16:26:21.686Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a08b5226-df96-4c01-8a36-90a48a74a294":
+    status: "completed"
+    startedAt: "2026-10-29T19:34:27.517Z"
+    completedAt: "2026-10-29T19:43:59.553Z"
+    endedAt: "2026-10-29T19:43:59.553Z"
+    activeIntervals: [{"end":"2026-10-29T19:43:59.553Z","start":"2026-10-29T19:34:27.517Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lens menu marks unmet targets; Diagnose packet spawns hench runs diagnose via SpawnedReads; re-run settings carried; PK4 comment fixed (e77af6811)"
+    lastModified: "2026-10-29T19:43:59.553Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c5b1bbf2-6528-40f9-94bc-f504cd9d05b0":
+    status: "completed"
+    startedAt: "2026-10-30T14:29:44.630Z"
+    completedAt: "2026-10-30T15:08:15.328Z"
+    endedAt: "2026-10-30T15:08:15.328Z"
+    activeIntervals: [{"end":"2026-10-30T14:51:02.085Z","start":"2026-10-30T14:29:44.630Z"},{"end":"2026-10-30T15:08:15.328Z","start":"2026-10-30T15:08:15.328Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Guide lens and run-plan card (b84f6d01a); viewer gateway cap raised for the shared queue plan (85b223f01). Verified by hand after run 8264b19e failed only architecture-policy: policy and affected gate pass, browser-checked Guide on the ready list."
+    lastModified: "2026-10-30T15:08:15.328Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fd15413c-b43a-4755-8087-7fae64bef710":
+    status: "completed"
+    startedAt: "2026-10-30T15:50:47.544Z"
+    completedAt: "2026-10-30T16:19:43.266Z"
+    endedAt: "2026-10-30T16:19:43.266Z"
+    activeIntervals: [{"end":"2026-10-30T16:10:11.942Z","start":"2026-10-30T15:50:47.544Z"},{"end":"2026-10-30T16:19:43.266Z","start":"2026-10-30T16:19:43.266Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "requireUnblocked as a run option through RUN_OPTION_SPECS and the execute route, work card preview lists open blockers (b29c7b111). Run f0367468 failed its gate only in graview-app-trust tests it did not touch; the same affected gate (649a66dd3) re-run passes all 4 suites. Server-side default tracked by 99f8a9e1."
+    lastModified: "2026-10-30T16:19:43.266Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

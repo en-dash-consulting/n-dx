@@ -6,6 +6,8 @@
  *   over the tree's live capabilities and constraints. Rules only: the text
  *   model and Jev are seams a caller with a model supplies to
  *   `decidePlacement`; the caller of this module (an assistant) is the model.
+ *   {@link suggestPlacements} ranks many changes against one tree, building
+ *   the index, the nodes and the open amenders once.
  * - {@link recordPlacement} writes the choice: a `touches` target joins the
  *   change's `touches`; an `amends` target becomes a `modified` amendment with
  *   `base` set to the target's current spec hash, so apply refuses it if the
@@ -25,6 +27,9 @@
  * - {@link draftPlacement} asks an injected text model (`prd.place`) for a
  *   pick or a proposal and returns it unwritten, for a person to accept
  *   through the two above.
+ * - {@link recordUnplacement} takes back one `touches` target. An amendment is
+ *   edited, not removed there. A change left with no home goes back to the
+ *   Inbox (`needsPlacement`).
  *
  * An open change is placed either way. An applied change (migrated history
  * still in the Inbox) is placed with `touches` only: its amendments already
@@ -41,12 +46,14 @@
 import { randomUUID } from "node:crypto";
 import type { AddedNodeType, Amendment, ChangeNode, CriteriaDelta, Criterion } from "../schema/v2.js";
 import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
-import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
+import { computeEdges } from "./product-edges.js";
 import {
   asProposal,
   PLACEMENT_SHORTLIST_SIZE,
   placeChange,
   placementRelation,
+  placementRelationRule,
   placementStrength,
   rankPlacementCandidates,
   type PlacementArea,
@@ -63,6 +70,7 @@ import {
 /** Why a placement was refused. Each surface words its own hint by kind; the message is the MCP wording. */
 export type ChangePlacementErrorKind =
   | "not-a-target"
+  | "not-touched"
   | "content-needs-amends"
   | "already-amends"
   | "already-proposed"
@@ -103,18 +111,54 @@ export interface SuggestedPlacementCandidate extends PlacementCandidate {
   strength: PlacementStrength;
 }
 
+/** A {@link SuggestedPlacementCandidate} as {@link suggestPlacement} returns it. */
+export interface SuggestedPlacementRow extends SuggestedPlacementCandidate {
+  /**
+   * Other open changes (display id or id) that already amend this candidate.
+   * Whichever of them applies first moves the spec an amendment's `base` pins,
+   * so apply then refuses an amends placement made here. Empty when none.
+   */
+  amendedBy: string[];
+}
+
 export interface PlacementSuggestion {
   /** Id of the change placed. */
   change: string;
   /** The rules' relation for this change; every candidate carries it. */
   relation: PlacementRelation;
+  /** The rule that set {@link relation}, in words. */
+  relationRule: string;
+  /** When the change was first recorded: `createdAt`, else `lastModified` for a change older than that field. Absent when neither is set. */
+  createdAt?: string;
+  /** Whole days from `createdAt` to the read's `now`, never negative. */
+  ageDays?: number;
   /**
    * The top two candidates share a score: their order is the id tiebreak, not
    * the rules, so the first is no better a pick than the second.
    */
   tied: boolean;
   /** Rules ranking, best first. Empty when no rule fired. */
-  shortlist: SuggestedPlacementCandidate[];
+  shortlist: SuggestedPlacementRow[];
+}
+
+export interface SuggestPlacementOptions {
+  /**
+   * Rank only this area's targets: the capabilities whose nearest area it is,
+   * and the constraints binding the area or one of them. An id, display id,
+   * alias or frozen slug; one naming no live area is refused (`not-an-area`).
+   */
+  area?: string;
+  /** The read's clock for `ageDays`; defaults to the current time. */
+  now?: Date;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** A change's first-recorded time and whole-day age at `now`. */
+export function changeAge(node: Pick<RuleNode, "createdAt" | "lastModified">, now: Date): { createdAt?: string; ageDays?: number } {
+  const stamp = [node.createdAt, node.lastModified].find((v): v is string => typeof v === "string" && !Number.isNaN(Date.parse(v)));
+  if (stamp === undefined) return {};
+  return { createdAt: stamp, ageDays: Math.max(0, Math.floor((now.getTime() - Date.parse(stamp)) / MS_PER_DAY)) };
 }
 
 /**
@@ -122,19 +166,125 @@ export interface PlacementSuggestion {
  * amend or touch. An applied change only touches, so every candidate carries
  * touches for one.
  */
-export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize = PLACEMENT_SHORTLIST_SIZE): PlacementSuggestion {
-  const change = placeableChange(tree, changeRef);
+export function suggestPlacement(
+  tree: V2Tree,
+  changeRef: string,
+  shortlistSize = PLACEMENT_SHORTLIST_SIZE,
+  options: SuggestPlacementOptions = {},
+): PlacementSuggestion {
+  return suggestFrom(placementContext(tree, options), changeRef, shortlistSize, options.now ?? new Date());
+}
+
+/** One ref's {@link suggestPlacement} result, or the refusal it threw. */
+export type PlacementSuggestionResult = { suggestion: PlacementSuggestion } | { error: ChangePlacementError };
+
+/**
+ * {@link suggestPlacement} for each of `changeRefs`, keyed by ref, with the
+ * tree index, the ranked nodes and the open amenders built once rather than
+ * once per change. A ref that cannot be placed carries its refusal; an area
+ * that is not live refuses the whole call, as it would every single one.
+ */
+export function suggestPlacements(
+  tree: V2Tree,
+  changeRefs: Iterable<string>,
+  shortlistSize = PLACEMENT_SHORTLIST_SIZE,
+  options: SuggestPlacementOptions = {},
+): Map<string, PlacementSuggestionResult> {
+  const context = placementContext(tree, options);
+  const now = options.now ?? new Date();
+  const out = new Map<string, PlacementSuggestionResult>();
+  for (const ref of changeRefs) {
+    try {
+      out.set(ref, { suggestion: suggestFrom(context, ref, shortlistSize, now) });
+    } catch (err) {
+      if (!(err instanceof ChangePlacementError)) throw err;
+      out.set(ref, { error: err });
+    }
+  }
+  return out;
+}
+
+/** What ranking any change against one tree needs, independent of the change. */
+interface PlacementContext {
+  index: TreeIndex;
+  nodes: PlacementNode[];
+  /** Per product node id, every open change amending it (modified or removed), in tree order. */
+  amenders: Map<string, Array<{ id: string; label: string }>>;
+}
+
+function placementContext(tree: V2Tree, options: SuggestPlacementOptions): PlacementContext {
+  const index = indexTree(tree);
+  const inArea = options.area === undefined ? undefined : areaTargets(tree, index, options.area);
+  const all = placementNodes(index);
+  return { index, nodes: inArea ? all.filter((n) => inArea.has(n.id)) : all, amenders: openAmenders(index) };
+}
+
+function suggestFrom(context: PlacementContext, changeRef: string, shortlistSize: number, now: Date): PlacementSuggestion {
+  const change = placeableChange(context.index, changeRef);
   const input = placementInput(change);
-  const relation = defaultRelation(change);
+  const { relation, rule } = defaultRelationRule(change);
   // Rank at least two, so a tie shows even when the caller asks for one.
-  const ranked = rankPlacementCandidates(input, placementNodes(tree), Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
+  const ranked = rankPlacementCandidates(input, context.nodes, Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
   const [top, next] = ranked;
   return {
     change: change.id,
     relation,
+    relationRule: rule,
+    ...changeAge(change, now),
     tied: top !== undefined && next !== undefined && top.score === next.score,
-    shortlist: ranked.slice(0, shortlistSize).map((c) => ({ ...c, strength: placementStrength(c.score) })),
+    shortlist: ranked.slice(0, shortlistSize).map((c) => ({
+      ...c,
+      strength: placementStrength(c.score),
+      amendedBy: amendedByOthers(context.amenders.get(c.target), change.id),
+    })),
   };
+}
+
+/** The labels of `amenders` other than `changeId`, each once, first claim first. */
+function amendedByOthers(amenders: ReadonlyArray<{ id: string; label: string }> | undefined, changeId: string): string[] {
+  const labels: string[] = [];
+  for (const { id, label } of amenders ?? []) if (id !== changeId && !labels.includes(label)) labels.push(label);
+  return labels;
+}
+
+/** The ids of the capabilities and constraints that are `areaRef`'s placement targets. */
+function areaTargets(tree: V2Tree, index: TreeIndex, areaRef: string): Set<string> {
+  const resolved = index.resolve(areaRef);
+  const area = resolved?.type === "area"
+    ? resolved
+    : index.entries.find(({ node, root }) => root === "product" && node.type === "area" && node.slug === areaRef)?.node;
+  if (!area || area.type !== "area") {
+    const plain = `"${areaRef}" is not a live area`;
+    throw new ChangePlacementError(`${plain} (see get_product)`, "not-an-area", plain);
+  }
+  const parentOf = new Map(index.entries.map((e) => [e.node.id, e.parent]));
+  const nearestArea = (id: string): string | undefined => {
+    for (let p = parentOf.get(id); p; p = parentOf.get(p.id)) if (p.type === "area") return p.id;
+    return undefined;
+  };
+  const capabilities = index.entries
+    .filter(({ node, root }) => root === "product" && node.type === "capability" && nearestArea(node.id) === area.id)
+    .map(({ node }) => node.id);
+  const { boundBy } = computeEdges(tree);
+  const constraints = [area.id, ...capabilities].flatMap((id) => boundBy[id] ?? []);
+  return new Set([...capabilities, ...constraints]);
+}
+
+/** Per product node id, the open changes that amend it (modified or removed), with their display id or id. */
+function openAmenders(index: TreeIndex): Map<string, Array<{ id: string; label: string }>> {
+  const out = new Map<string, Array<{ id: string; label: string }>>();
+  for (const { node } of index.entries) {
+    if (node.type !== "change" || !isOpenChange(node)) continue;
+    for (const amendment of node.amends ?? []) {
+      if (amendment.delta === "added") continue;
+      const target = index.resolve(amendment.target);
+      if (!target) continue;
+      const list = out.get(target.id) ?? [];
+      list.push({ id: node.id, label: node.displayId ?? node.id });
+      out.set(target.id, list);
+    }
+  }
+  return out;
 }
 
 export interface RecordPlacementInput {
@@ -167,7 +317,7 @@ export interface RecordPlacementResult {
 export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPlacementInput, now: Date): RecordPlacementResult {
   const next = structuredClone(tree);
   const index = indexTree(next);
-  const change = placeableChange(next, changeRef) as ChangeNode & RuleNode;
+  const change = placeableChange(index, changeRef) as ChangeNode & RuleNode;
   if (isAppliedChange(change) && (input.relation === "amends" || input.proposed !== undefined || input.criteria !== undefined)) {
     throw appliedChangeAmends(change);
   }
@@ -225,6 +375,38 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy };
 }
 
+export interface RecordUnplacementResult {
+  /** The new tree; the input is not modified. */
+  tree: V2Tree;
+  change: string;
+  /** Id of the capability or constraint the change no longer touches. */
+  target: string;
+}
+
+/**
+ * Take back the change `changeRef`'s touches of `targetRef`. Only a touches
+ * goes: an amendment is edited, not removed here. A change left with neither
+ * amends nor touches returns to the Inbox. A cancelled or deleted change is
+ * refused, as {@link recordPlacement} refuses it.
+ */
+export function recordUnplacement(tree: V2Tree, changeRef: string, targetRef: string, now: Date): RecordUnplacementResult {
+  const next = structuredClone(tree);
+  const index = indexTree(next);
+  const change = placeableChange(index, changeRef) as ChangeNode & RuleNode;
+  const target = index.resolve(targetRef);
+  const touches = change.touches ?? [];
+  const rest = target ? touches.filter((ref) => index.resolve(ref) !== target) : touches;
+  if (!target || rest.length === touches.length) {
+    throw new ChangePlacementError(`Change ${change.displayId ?? change.id} does not touch "${targetRef}"`, "not-touched");
+  }
+  if (rest.length) change.touches = rest;
+  else delete change.touches;
+  if (!change.amends?.length && !rest.length) change.needsPlacement = true;
+
+  refuseRuleErrors(next, change, now);
+  return { tree: next, change: change.id, target: target.id };
+}
+
 export interface RecordProposalInput {
   /** The kind of node proposed. */
   type: AddedNodeType;
@@ -273,7 +455,7 @@ export function recordProposal(
 ): RecordProposalResult {
   const next = structuredClone(tree);
   const index = indexTree(next);
-  const change = placeableChange(next, changeRef) as ChangeNode & RuleNode;
+  const change = placeableChange(index, changeRef) as ChangeNode & RuleNode;
   // An added amendment on an applied change would never be applied.
   if (isAppliedChange(change)) throw appliedChangeAmends(change);
   const label = change.displayId ?? change.id;
@@ -350,11 +532,12 @@ export interface PlacementDraft {
  * draft is the rules shortlist alone.
  */
 export async function draftPlacement(tree: V2Tree, changeRef: string, model?: PlacementModel): Promise<PlacementDraft> {
-  const change = placeableChange(tree, changeRef);
+  const index = indexTree(tree);
+  const change = placeableChange(index, changeRef);
   // A pick could only touch, and a proposal is refused outright: drafting is for open changes.
   if (isAppliedChange(change)) throw appliedChangeAmends(change);
   const input = placementInput(change);
-  const result = await placeChange(input, placementNodes(tree), { model, areas: placementAreas(tree) });
+  const result = await placeChange(input, placementNodes(index), { model, areas: placementAreas(tree) });
   const warnings = [...result.warnings];
   const { shortlist } = result;
   const [top, next] = shortlist;
@@ -430,8 +613,8 @@ function novelApplyProblems(before: V2Tree, after: V2Tree, changeId: string, now
 }
 
 /** The open or applied change `ref` names, or a refusal naming why it cannot be placed. */
-function placeableChange(tree: V2Tree, ref: string): RuleNode {
-  const node = indexTree(tree).resolve(ref);
+function placeableChange(index: TreeIndex, ref: string): RuleNode {
+  const node = index.resolve(ref);
   if (!node || node.type !== "change") throw new ChangePlacementError(`No live change "${ref}"`, "no-such-change");
   // A change cancelled after it was applied stays refused: abandoned, whatever appliedAt says.
   const abandoned = node.status === "cancelled" || node.status === "deleted";
@@ -451,7 +634,13 @@ function appliedChangeAmends(change: RuleNode): ChangePlacementError {
 
 /** The rules' relation for an open change; touches for an applied one. */
 function defaultRelation(change: RuleNode): PlacementRelation {
-  return isAppliedChange(change) ? "touches" : placementRelation(placementInput(change));
+  return defaultRelationRule(change).relation;
+}
+
+/** {@link defaultRelation} and the rule that set it. */
+function defaultRelationRule(change: RuleNode): { relation: PlacementRelation; rule: string } {
+  if (isAppliedChange(change)) return { relation: "touches", rule: "the change is applied, and an applied change only touches" };
+  return placementRelationRule(placementInput(change));
 }
 
 function placementInput(node: RuleNode): PlacementChange {
@@ -465,8 +654,8 @@ function placementInput(node: RuleNode): PlacementChange {
 }
 
 /** Every live capability and constraint, as the ranker sees it. */
-function placementNodes(tree: V2Tree): PlacementNode[] {
-  return indexTree(tree).entries.flatMap(({ node, root }): PlacementNode[] => {
+function placementNodes(index: TreeIndex): PlacementNode[] {
+  return index.entries.flatMap(({ node, root }): PlacementNode[] => {
     if (root !== "product" || (node.type !== "capability" && node.type !== "constraint")) return [];
     return [{
       id: node.id,

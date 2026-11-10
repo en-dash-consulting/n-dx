@@ -1,0 +1,71 @@
+schema: "rex/v2"
+items:
+  "2aea5018-9b76-454e-af29-e64abc6d516d":
+    status: "completed"
+    startedAt: "2026-11-07T02:09:43.889Z"
+    completedAt: "2026-11-07T02:10:49.295Z"
+    endedAt: "2026-11-07T02:10:49.295Z"
+    activeIntervals: [{"end":"2026-11-07T02:10:49.295Z","start":"2026-11-07T02:09:43.889Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: ".next-step-title gets min-width: 0 and overflow-wrap: anywhere; stylesheet test added"
+    lastModified: "2026-11-07T02:10:49.295Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c749a61-122e-492c-b1d2-87404244803e":
+    status: "completed"
+    startedAt: "2026-11-07T01:59:07.141Z"
+    completedAt: "2026-11-07T02:01:17.486Z"
+    endedAt: "2026-11-07T02:01:17.486Z"
+    activeIntervals: [{"end":"2026-11-07T02:01:17.486Z","start":"2026-11-07T01:59:07.141Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: ".app-body is an inline-size container; below 640 px the stage links hide and the gutters drop."
+    lastModified: "2026-11-07T02:01:17.486Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "65f61f71-2e28-4f13-bf00-34549bc5157d":
+    status: "completed"
+    startedAt: "2026-11-07T01:52:17.060Z"
+    completedAt: "2026-11-07T01:55:37.181Z"
+    endedAt: "2026-11-07T01:55:37.181Z"
+    activeIntervals: [{"end":"2026-11-07T01:55:37.181Z","start":"2026-11-07T01:52:17.060Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: ".prd-tag-list shrinks/wraps (flex 0 1 auto, min-width 0); Tune panel grids minmax(0,1fr), panels min-width 0; stylesheet test added."
+    lastModified: "2026-11-07T01:55:37.181Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "87222b56-9808-45fb-8bdb-1eec4465438c":
+    status: "completed"
+    startedAt: "2026-11-07T02:01:51.156Z"
+    completedAt: "2026-11-07T02:03:02.227Z"
+    endedAt: "2026-11-07T02:03:02.227Z"
+    activeIntervals: [{"end":"2026-11-07T02:03:02.227Z","start":"2026-11-07T02:01:51.156Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "live.css: .live-container gets margin-inline: auto, 1200px cap kept. Stylesheet test + changeset. Commit 110732c1a."
+    lastModified: "2026-11-07T02:03:02.227Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8a883929-ec2e-4fd2-bc9d-d9a48fcf0e82":
+    status: "completed"
+    startedAt: "2026-11-07T02:08:24.464Z"
+    completedAt: "2026-11-07T02:09:32.893Z"
+    endedAt: "2026-11-07T02:09:32.893Z"
+    activeIntervals: [{"end":"2026-11-07T02:09:32.893Z","start":"2026-11-07T02:08:24.464Z"}]
+    lastModified: "2026-11-07T02:09:32.893Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9889cbdd-1a37-4d18-ab5f-cdef0e7967c5":
+    status: "completed"
+    startedAt: "2026-11-07T01:55:46.316Z"
+    completedAt: "2026-11-07T01:58:57.900Z"
+    endedAt: "2026-11-07T01:58:57.900Z"
+    activeIntervals: [{"end":"2026-11-07T01:58:57.900Z","start":"2026-11-07T01:55:46.316Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "stage-tiles.css: .stage-tile-title min-width 0, wraps at words (overflow-wrap/word-break normal); .stage-tile-head .stage-section-badge flex-shrink 0. Commit c01f2709d."
+    lastModified: "2026-11-07T01:58:57.900Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a4e86fcf-f11a-46cf-ac1c-27102bae5722":
+    status: "completed"
+    startedAt: "2026-11-07T02:10:49.295Z"
+    completedAt: "2026-11-07T02:10:49.295Z"
+    endedAt: "2026-11-07T02:10:49.295Z"
+    activeIntervals: [{"end":"2026-11-07T02:10:49.295Z","start":"2026-11-07T02:10:49.295Z"}]
+    appliedAt: "2026-11-07T02:10:49.295Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-07T01:51:12.232Z"
+    lastModified: "2026-11-07T02:10:49.295Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

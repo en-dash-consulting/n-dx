@@ -42,6 +42,7 @@
 @import "./workflow.css";
 @import "./project-settings.css";
 @import "./project.css";
+@import "./connections.css";
 @import "./pr-markdown.css";
 @import "./ask.css";
 @import "./ask-refinements.css";
@@ -54,8 +55,8 @@
 @import "./active-operations.css";
 @import "./git-status.css";
 @import "./run-command.css";
-@import "./sessions-panel.css";
 @import "./status-dock.css";
+@import "./sidecar.css";
 @import "./stage-tiles.css";
 @import "./search-overlay.css";
 @import "./neolithic-overlay.css";

@@ -279,6 +279,20 @@
   color: var(--text-muted);
 }
 
+/* The area chip is a label, not a button; only its × acts. */
+.ch-filter-area { cursor: default; padding-right: var(--space-1); }
+.ch-filter-remove {
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0 var(--space-1);
+  cursor: pointer;
+}
+.ch-filter-remove:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.ch-filter-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .ch-map-links {
   margin: var(--space-2) 0 0;
   padding: 0;
@@ -568,6 +582,17 @@
   border-color: var(--accent);
 }
 
+.inbox-age,
+.inbox-guess-score {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox-age {
+  margin-left: auto;
+  font-size: var(--font-xs);
+}
+
 .inbox-more {
   align-self: flex-start;
   font-size: var(--font-sm);
@@ -712,3 +737,253 @@
 
 .ch-needs-placement-link { background: none; font: inherit; font-size: inherit; cursor: pointer; }
 .ch-needs-placement-link:hover { background: color-mix(in srgb, var(--orange) 12%, transparent); }
+
+/* ── Product area map (views/product-area-map.ts) ──────────────── */
+
+.pam { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.pam-blocks { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Width follows the block's size (flex-grow, set inline); the basis keeps a
+ * one-unit block readable. The spec map also sets the basis inline from the
+ * criteria count (area-spec-map.ts specBlockBasis), because a full wrapping
+ * row leaves flex-grow almost no free space to share. The automatic minimum
+ * (min-width: auto) keeps a block at least as wide as its longest word, and
+ * max-width clamps that minimum to the row, so a label wraps between words. */
+.pam-block {
+  flex-basis: 8rem;
+  min-width: auto;
+  max-width: 100%;
+  min-height: 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-1);
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pam-block:hover { background: var(--bg-hover); }
+.pam-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* break-word, not anywhere: a word moves whole to the next line and splits
+ * only when it is wider than the whole block. */
+.pam-label { font-weight: 600; overflow-wrap: break-word; }
+.pam-size { color: var(--text-muted); font-size: var(--font-sm); }
+.pam-size.pam-pending { color: var(--accent, var(--text)); font-weight: 600; }
+
+.pam-met { border-color: var(--green); }
+.pam-changing { border-color: var(--accent); }
+.pam-proposed { border-color: var(--text-muted); }
+.pam-defective { border-color: var(--red); }
+.pam-block.pam-met { background: color-mix(in srgb, var(--green) 12%, var(--bg-surface)); }
+.pam-block.pam-changing { background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface)); }
+.pam-block.pam-proposed { background: color-mix(in srgb, var(--text-muted) 10%, var(--bg-surface)); }
+.pam-block.pam-defective { background: color-mix(in srgb, var(--red) 14%, var(--bg-surface)); }
+
+/* Open changes touching the area. */
+.pam-open {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  min-width: 1.4em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg-surface);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* The badge sits over the block's top edge; a badged block reserves that strip
+ * so the label starts below it, whatever the count's width. */
+.pam-block:has(> .pam-open),
+.pam-cell > .pam-block {
+  padding-top: calc(var(--space-1) * 2 + 1lh);
+}
+
+/* A block with a badge button: the wrapper is the flex item, the block fills it. */
+.pam-cell { position: relative; display: flex; min-width: auto; max-width: 100%; flex-basis: 8rem; }
+.pam-cell > .pam-block { flex: 1 1 auto; }
+.pam-open-button { border: 0; font-family: inherit; cursor: pointer; }
+.pam-open-button:hover { background: color-mix(in srgb, var(--accent) 80%, var(--text)); }
+.pam-open-button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.pam-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+.pam-legend li { display: flex; align-items: center; gap: var(--space-1); }
+.pam-swatch { width: 0.9em; height: 0.9em; border-radius: 2px; border: 2px solid; }
+.pam-swatch.pam-met { background: var(--green); }
+.pam-swatch.pam-changing { background: var(--accent); }
+.pam-swatch.pam-proposed { background: var(--text-muted); }
+.pam-swatch.pam-defective { background: var(--red); }
+.pam-legend-open { position: static; }
+.pam-key { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--font-sm); }
+
+/* ── Area view (views/area.ts) ─────────────────────────────────── */
+
+.area-container { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.area-head { display: flex; flex-direction: column; gap: var(--space-2); }
+.area-summary { margin: 0; }
+.area-head-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+
+.area-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+
+.area-steward-none { color: var(--text-muted); font-style: italic; }
+.area-actions { display: flex; gap: var(--space-2); margin-left: auto; }
+
+/* "+ Change in this area": the capture, limited to the area, above the spec map. */
+.area-capture { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); margin-bottom: var(--space-3); }
+.area-capture > .smart-add-panel { align-self: stretch; }
+
+/* ── Area cards (views/area-cards.ts) ──────────────────────────── */
+
+.area-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); gap: var(--space-3); align-items: start; }
+@media (max-width: 800px) { .area-body { grid-template-columns: minmax(0, 1fr); } }
+.area-cards { display: flex; flex-direction: column; gap: var(--space-2); }
+.area-capability { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); }
+.area-capability:focus { outline: none; }
+.area-capability-title { margin: 0; }
+.cap-amendment { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.cap-amendment-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.cap-diff-statement { display: grid; gap: var(--space-2); }
+.cap-diff-label { color: var(--text-muted); font-size: var(--font-sm); }
+.cap-diff-statement .cap-diff-before, .cap-diff-row del { background: color-mix(in srgb, var(--red) 14%, transparent); }
+.cap-diff-statement .cap-diff-after, .cap-diff-row ins { background: color-mix(in srgb, var(--success, #2e8540) 14%, transparent); text-decoration: none; }
+.cap-diff-criteria { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.cap-diff-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.area-card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); }
+.area-card-title { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.area-card-count { color: var(--text-muted); font-size: var(--font-sm); font-weight: 400; }
+.area-card-list, .area-card-files { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.area-card-files { padding-left: var(--space-3); }
+.area-card-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.area-card-title-text, .area-card-group-title { overflow-wrap: anywhere; }
+.area-card-group-title { font-weight: 600; }
+.area-card-empty { margin: 0; padding: var(--space-2); font-size: var(--font-sm); }
+.area-link-code { margin-top: var(--space-1); }
+.area-link-code summary { cursor: pointer; color: var(--accent); }
+
+/* ── Area spec map (views/area-spec-map.ts) ────────────────────── */
+
+.asm { display: flex; flex-direction: column; gap: var(--space-2); }
+.asm .pam { padding: 0; }
+/* Selected is an inset ring; the outline stays for keyboard focus alone, so a
+   selected block and a focused one never look the same. No background: the
+   status tint must survive selection. Forced colours drop box-shadow, so the
+   ring becomes a thick system-colour border there. */
+.pam-block[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--accent); }
+@media (forced-colors: active) {
+  .pam-block[aria-pressed="true"] { border: 3px solid Highlight; }
+}
+.asm-bands { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.asm-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-muted);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.asm-band-defective { border-left-color: var(--red); }
+.asm-band-title { font-weight: 600; overflow-wrap: anywhere; }
+/* Items a waiting Sidecar card proposes for the constraint: dashed, in the band's flow. */
+.asm-band-ghost { border: 1px dashed var(--text-muted); background: transparent; color: var(--text-muted); font-weight: 600; }
+
+/* ── Placement mode (views/placement-mode.ts) ──────────────────── */
+
+.placing-container { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.placing-crumb { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1); font-size: var(--font-sm); color: var(--text-dim); }
+.placing-label {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+/* The candidate panel is wide (about 380px): cards need room for a statement. */
+.placing-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem); gap: var(--space-3); align-items: start; }
+@media (max-width: 800px) { .placing-body { grid-template-columns: minmax(0, 1fr); } }
+.placing-map { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.placing-note { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
+.placing-map .pam { padding: 0; }
+/* The panel yields to a Sidecar placement card: one line, and the way back. */
+.placing-yield {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--accent); border-radius: var(--radius-md);
+  font-size: var(--font-sm); color: var(--text-dim);
+}
+
+/* Candidate homes are lit; blocks sharing words are near; every other block steps back. */
+.pam-placing .pam-block:not(.pam-lit):not(.pam-near):not(.pam-ghost):not(.pam-placed) { opacity: 0.45; }
+/* A proposed capability: dashed and unfilled, on the map before it exists. */
+.pam-block.pam-ghost { border: 2px dashed var(--accent); background: transparent; cursor: default; }
+.pam-block.pam-lit { box-shadow: 0 0 0 2px var(--accent); }
+.pam-block.pam-near { outline: 1px dashed var(--accent); outline-offset: -3px; }
+.pam-lit-note { color: var(--accent); font-size: var(--font-sm); font-weight: 600; }
+/* A home this change was placed on in this visit carries the change's marker. */
+.pam-block.pam-placed { box-shadow: 0 0 0 2px var(--green, var(--accent)); }
+.pam-placed-mark { color: var(--green, var(--accent)); font-size: var(--font-sm); font-weight: 600; }
+.pam-near-note { color: var(--text-dim); font-size: var(--font-sm); }
+@media (forced-colors: active) {
+  .pam-block.pam-lit { border: 3px solid Highlight; }
+  .pam-block.pam-near { outline-color: Highlight; }
+}
+
+/* Candidates in other areas, above the zoomed map. */
+.placing-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.placing-chip {
+  display: inline-flex; align-items: baseline; gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-surface); color: var(--text);
+  font-size: var(--font-sm); cursor: pointer;
+}
+.placing-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.placing-chip-rank, .placing-chip-area { color: var(--text-dim); }
+.placing-chip-title { font-weight: 600; overflow-wrap: anywhere; }
+
+/* Items a waiting Sidecar card proposes for the block (SP5): dashed, apart from the real open-change count. */
+.pam-ghost-mark {
+  position: absolute;
+  bottom: var(--space-1);
+  right: var(--space-1);
+  min-width: 1.4em;
+  padding: 0 0.4em;
+  border: 1px dashed var(--text-muted);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-align: center;
+}

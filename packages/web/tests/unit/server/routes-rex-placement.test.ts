@@ -11,7 +11,8 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import type { ChangePlacement } from "../../../src/viewer/views/product-model.js";
-import { indexTree, loadPrdModel as loadModel, resolveStore, withPrdModelTransaction } from "@n-dx/rex";
+import { indexTree, loadPrdModel as loadModel, nodeSpec, resolveStore, specHash, withPrdModelTransaction } from "@n-dx/rex";
+import { createHash } from "node:crypto";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const modelLoads = vi.hoisted(() => vi.fn());
@@ -105,7 +106,15 @@ describe("placement routes on a v2 project", () => {
     expect(status).toBe(200);
     const placement = body as ChangePlacement;
     expect(placement.layout).toBe("v2");
-    expect(placement.change).toEqual({ id: inboxId, title: "Pay by card retries a declined card", intent: "A shopper retries after a decline.", status: "pending", taskCount: 0 });
+    expect(placement.change).toEqual({
+      id: inboxId,
+      title: "Pay by card retries a declined card",
+      intent: "A shopper retries after a decline.",
+      status: "pending",
+      taskCount: 0,
+      createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      ageDays: 0,
+    });
     expect(["touches", "amends"]).toContain(placement.relation);
     expect(typeof placement.tied).toBe("boolean");
     expect(placement.shortlist[0]).toMatchObject({
@@ -120,6 +129,9 @@ describe("placement routes on a v2 project", () => {
     expect(typeof top.score).toBe("number");
     expect(["strong", "possible", "weak"]).toContain(top.strength);
     expect(Array.isArray(top.reasons)).toBe(true);
+    // Rex names the rule behind the relation, and the open change already amending the top candidate.
+    expect(placement.relationRule).toBe("the title does not open with an amending verb, and the intent has no Relation line");
+    expect(top.amendedBy).toEqual(["CH-1"]);
     // A read writes nothing and tells no one.
     expect(frames).toEqual([]);
   });
@@ -140,6 +152,16 @@ describe("placement routes on a v2 project", () => {
     expect(body.placements[inboxId]).toEqual(single.body);
   });
 
+  it("GET changes/placements rows carry the change's age from its createdAt", async () => {
+    const createdAt = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    await withPrdModelTransaction(rexDir, (model) => {
+      (indexTree(model.tree).resolve(inboxId) as { createdAt?: string }).createdAt = createdAt;
+      return { tree: model.tree, result: undefined };
+    });
+    const { body } = await json(await fetch(`${base}/changes/placements`));
+    expect(body.placements[inboxId].change).toMatchObject({ createdAt, ageDays: 3 });
+  });
+
   it("POST place touches a capability: clears needsPlacement, leaves the Inbox, logs and broadcasts", async () => {
     expect(folderOf(inboxId)?.split(sep)[0]).toBe("inbox");
     const { status, body } = await json(await send(`changes/${inboxId}/place`, { target: "A1.1", relation: "touches" }));
@@ -150,7 +172,48 @@ describe("placement routes on a v2 project", () => {
     expect(item?.needsPlacement).toBeUndefined();
     expect(folderOf(inboxId)?.split(sep)[0]).not.toBe("inbox");
     expect(logEvents().at(-1)).toMatchObject({ event: "change_placed", itemId: inboxId });
+    // A dashboard placement logs what it always did: no decision fields.
+    expect(Object.keys(logEvents().at(-1)!).sort()).toEqual(["detail", "event", "itemId", "timestamp"]);
     expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
+  });
+
+  it("POST unplace takes back a touches: the change returns to the Inbox, logs and broadcasts", async () => {
+    await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" });
+    frames.length = 0;
+    const { status, body } = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
+    expect(status).toBe(200);
+    expect(body).toEqual({ change: inboxId, target: CAPABILITY_ID });
+
+    const item = await (await resolveStore(rexDir)).getItem(inboxId);
+    expect(item?.needsPlacement).toBe(true);
+    expect(item?.touches ?? []).toEqual([]);
+    expect(logEvents().at(-1)).toMatchObject({ event: "change_unplaced", itemId: inboxId });
+    expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
+  });
+
+  it("POST unplace refuses a node the change does not touch, and a body with no target, writing nothing", async () => {
+    const refused = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
+    expect(refused.status).toBe(422);
+    expect(refused.body.kind).toBe("not-touched");
+    expect((await json(await send(`changes/${inboxId}/unplace`, {}))).status).toBe(400);
+    expect((await json(await send(`changes/nope/unplace`, { target: CAPABILITY_ID }))).status).toBe(404);
+    expect(frames).toEqual([]);
+  });
+
+  it("POST unplace refuses a cancelled change with change-not-open, writing nothing", async () => {
+    await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" });
+    await withPrdModelTransaction(rexDir, ({ tree }) => {
+      indexTree(tree).resolve(inboxId)!.status = "cancelled";
+      return { tree, result: undefined };
+    });
+    frames.length = 0;
+    const before = indexTree((await loadModel(rexDir)).tree).resolve(inboxId)!;
+    const refused = await json(await send(`changes/${inboxId}/unplace`, { target: CAPABILITY_ID }));
+    expect(refused).toMatchObject({ status: 422, body: { kind: "change-not-open" } });
+    const after = indexTree((await loadModel(rexDir)).tree).resolve(inboxId)!;
+    expect({ touches: after.touches, needsPlacement: after.needsPlacement }).toEqual({ touches: before.touches, needsPlacement: before.needsPlacement });
+    expect(after.touches).toEqual([CAPABILITY_ID]);
+    expect(frames).toEqual([]);
   });
 
   it("POST place amends a capability with a criteria delta", async () => {
@@ -179,6 +242,7 @@ describe("placement routes on a v2 project", () => {
     expect(item?.needsPlacement).toBeUndefined();
     expect(folderOf(inboxId)?.split(sep)[0]).not.toBe("inbox");
     expect(logEvents().at(-1)).toMatchObject({ event: "change_proposed", itemId: inboxId });
+    expect(Object.keys(logEvents().at(-1)!).sort()).toEqual(["detail", "event", "itemId", "timestamp"]);
     expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
   });
 
@@ -358,6 +422,64 @@ describe("placement routes on a v2 project", () => {
       expect(await json(await draft())).toMatchObject({ status: 422, body: { kind: "applied-change-amends" } });
     });
   });
+
+  describe("POST placement/check", () => {
+    /** One hash over every file under the rex directory, the execution log included. */
+    const treeHash = (): string => {
+      const hash = createHash("sha256");
+      const walk = (dir: string): void => {
+        for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+          const path = join(dir, entry.name);
+          if (entry.isDirectory()) walk(path);
+          else hash.update(relative(rexDir, path)).update("\0").update(readFileSync(path)).update("\0");
+        }
+      };
+      walk(rexDir);
+      return hash.digest("hex");
+    };
+    const check = (body: unknown, change = inboxId) => send(`changes/${change}/placement/check`, body);
+
+    it("dry-runs an amends placement with a criteria delta: the target's spec hash, and nothing written", async () => {
+      const before = treeHash();
+      const { status, body } = await json(await check({ target: "A1.1", relation: "amends", criteria: { add: [{ id: "c3", text: "A declined card can be retried" }] } }));
+      expect(status).toBe(200);
+      const { tree } = await loadModel(rexDir);
+      const capability = indexTree(tree).resolve(CAPABILITY_ID)!;
+      expect(body).toEqual({
+        layout: "v2",
+        change: inboxId,
+        check: {
+          ok: true, action: "place", target: CAPABILITY_ID, title: "Pay by card", relation: "amends",
+          base: specHash(nodeSpec(capability)), warnings: [],
+        },
+      });
+      expect(treeHash()).toBe(before);
+      expect(frames).toEqual([]);
+    });
+
+    it("dry-runs a proposal and a touches placement, writing nothing", async () => {
+      const before = treeHash();
+      const proposed = await json(await check({ propose: { type: "capability", under: AREA_ID, title: "Retry a declined card", proposed: "A shopper retries." } }));
+      expect(proposed.body.check).toEqual({ ok: true, action: "propose", type: "capability", under: AREA_ID, title: "Retry a declined card", warnings: [] });
+      const touched = await json(await check({ target: CAPABILITY_ID, relation: "touches" }));
+      expect(touched.body.check).toEqual({ ok: true, action: "place", target: CAPABILITY_ID, title: "Pay by card", relation: "touches", warnings: [] });
+      expect(treeHash()).toBe(before);
+    });
+
+    it("answers rex's refusal kind and message as the dry run, writing nothing", async () => {
+      const before = treeHash();
+      const { status, body } = await json(await check({ target: CAPABILITY_ID, relation: "amends" }));
+      expect(status).toBe(200);
+      expect(body.check).toMatchObject({ ok: false, kind: "nothing-to-modify", error: expect.stringContaining("Cannot place change") });
+      expect(treeHash()).toBe(before);
+    });
+
+    it("answers 400 for an unreadable body and 404 for an unknown change", async () => {
+      expect((await check({ relation: "amends" })).status).toBe(400);
+      expect((await check({ target: CAPABILITY_ID, propose: { type: "capability", under: AREA_ID, title: "x" } })).status).toBe(400);
+      expect((await check({ target: CAPABILITY_ID }, "no-such-change")).status).toBe(404);
+    });
+  });
 });
 
 describe("placement routes on a v1 project", () => {
@@ -379,10 +501,18 @@ describe("placement routes on a v1 project", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it("GET changes/placements keeps its refusal: 409 naming v1", async () => {
+    const res = await fetch(`${base}/changes/placements`);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("v1");
+    expect(existsSync(join(tmpDir, ".rex", "product"))).toBe(false);
+  });
+
   it.each([
     ["GET", "placement", undefined],
     ["POST", "place", { target: CAPABILITY_ID }],
     ["POST", "propose", { type: "capability", under: AREA_ID, title: "New" }],
+    ["POST", "placement/check", { target: CAPABILITY_ID }],
   ])("%s %s answers 409 and writes nothing", async (method, action, body) => {
     const res = await fetch(`${base}/changes/${PLACED_CHANGE_ID}/${action}`, {
       method,

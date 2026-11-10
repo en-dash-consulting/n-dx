@@ -8,6 +8,7 @@ import {
   isWorkItem,
   buildChangeBrief,
   resolveWorkById,
+  indexTree,
 } from "../../prd/rex-gateway.js";
 import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 import {
@@ -187,6 +188,35 @@ export function explicitTaskRefusal(
   );
 }
 
+/**
+ * Why an explicitly selected task must not start yet under
+ * `--require-unblocked`, or undefined when every blocker is completed.
+ * An explicit `--task` otherwise ignores blockers, so a queue-plan lane
+ * (`ndx work --task=a --auto . && ndx work --task=b --require-unblocked --auto .`)
+ * passes this flag to stop b when a's run exited 0 without completing a.
+ * A blocker ref that resolves to nothing counts as open: the guard refuses
+ * rather than guess.
+ */
+export function openBlockersRefusal(
+  item: PRDItem,
+  items: PRDItem[],
+  tree: V2Tree | undefined,
+  cliName = DEFAULT_CLI_NAME,
+): CLIError | undefined {
+  const refs = item.blockedBy ?? [];
+  if (refs.length === 0) return undefined;
+  const index = tree ? indexTree(tree) : undefined;
+  const statusOf = (ref: string): string | undefined =>
+    index ? index.resolve(ref)?.status : findItem(items, ref)?.item.status;
+  const open = refs.filter((ref) => statusOf(ref) !== "completed");
+  if (open.length === 0) return undefined;
+  const named = open.map((ref) => `${ref} (${statusOf(ref) ?? "not found"})`).join(", ");
+  return new CLIError(
+    `Task "${item.title}" (${item.id}) is blocked by unfinished work: ${named}. --require-unblocked refuses to start it.`,
+    `Finish its blockers first ('${cliName} work --task=<blocker-id> .'), or run it without --require-unblocked.`,
+  );
+}
+
 function itemToTaskBrief(item: PRDItem): TaskBriefTask {
   return {
     id: item.id,
@@ -255,6 +285,12 @@ export interface SelectTaskOptions {
    * `rawItems` only supply the entry; there is no epic level to scope to.
    */
   tree?: V2Tree;
+  /**
+   * With an explicit `taskId`: refuse it while any of its blockers is not
+   * completed ({@link openBlockersRefusal}). Autoselection already skips
+   * blocked tasks, so the option changes nothing without `taskId`.
+   */
+  requireUnblocked?: boolean;
 }
 
 /**
@@ -302,6 +338,10 @@ export async function selectTaskEntry(
     const named = tree ? namedChangeEntry(tree, items, taskId, entry) : null;
     const changeNotActionable = named ? explicitTaskRefusal(named.item, cliName) : undefined;
     if (changeNotActionable) throw changeNotActionable;
+    if (options.requireUnblocked) {
+      const blocked = openBlockersRefusal(entry.item, items, tree, cliName);
+      if (blocked) throw blocked;
+    }
     // An explicit task another worktree is working on is refused, not stolen.
     // Claiming is the check: the store answers atomically under its lock.
     if (claims) {

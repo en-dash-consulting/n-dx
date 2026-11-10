@@ -11,10 +11,6 @@
 
 export { ActiveTasksPanel } from "./active-tasks-panel.js";
 export type { ActiveRun } from "./active-tasks-panel.js";
-export { ConcurrencyPanel } from "./concurrency-panel.js";
-export { MemoryPanel } from "./memory-panel.js";
-export { WsHealthPanel } from "./ws-health-panel.js";
-export { ThrottleControlsPanel } from "./throttle-controls.js";
 export { DetailPanel } from "./detail-panel.js";
 export { LiveTab, PeekLink, jobTarget, runTarget, isCurrentWorktree, liveHref } from "./live-tab.js";
 export type { LiveTabProps, PeekLinkProps, PeekTarget } from "./live-tab.js";
@@ -48,6 +44,7 @@ export {
   buildShareableUrl,
   type CopyLinkButtonProps,
 } from "./copy-link-button.js";
+export { CopyTextButton, type CopyTextButtonProps } from "./copy-text-button.js";
 export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
 export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
@@ -64,10 +61,8 @@ export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
 export { ActiveOperationsTray } from "./active-operations-tray.js";
 export type { ActiveOperationsTrayProps } from "./active-operations-tray.js";
-export { GitStatusBanner } from "./git-status-banner.js";
-export type { GitStatusBannerProps } from "./git-status-banner.js";
-export { SessionsPanel } from "./sessions-panel.js";
-export type { SessionsPanelProps } from "./sessions-panel.js";
+export { GitStatusChip } from "./git-status-chip.js";
+export type { GitStatusChipProps } from "./git-status-chip.js";
 
 // ── Status indicators ───────────────────────────────────────────────
 
@@ -120,6 +115,32 @@ export { TopNav } from "./top-nav.js";
 export type { TopNavProps } from "./top-nav.js";
 export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
+export { TrackerLinkList, TrackerLinksEditor, resetTrackerLabel, useTrackerLabel } from "./tracker-links.js";
+export type { TrackerLinksEditorProps } from "./tracker-links.js";
+export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
+export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
+export { StrengthChip } from "./strength-chip.js";
+export type { GuessStrength } from "./strength-chip.js";
+export { HubSessionDrawer, HubCeilingMeter, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
+export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
+export { PlaceWithSidecarContext, PlaceWithSidecarButton } from "./place-with-sidecar.js";
+export { SidecarPlacementContext, createCardDrafts, draftOnTarget, useCardDraft, useCardDrafts } from "./sidecar-placement.js";
+export type { CardDrafts, PlacementDraft, SidecarPlacementShare } from "./sidecar-placement.js";
+export { TrackerCardForm, errorOf as trackerErrorOf } from "./tracker-card-form.js";
+export type { TrackerCardFormProps } from "./tracker-card-form.js";
+export { CreateInTrackerButton, TrackerChip, asTrackerChipRead, useTrackerChips } from "./tracker-chip.js";
+export type { TrackerChipRead } from "./tracker-chip.js";
+export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
+export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
+export { PlanWithSidecarContext, PlanWithSidecarButton, PlanInAreaButton, planFirstTurn, planSurvivesAreaReport } from "./plan-with-sidecar.js";
+export type { PlanWithSidecar } from "./plan-with-sidecar.js";
+export { DescribeInSidecarContext, DescribeInSidecarButton } from "./describe-in-sidecar.js";
+export type { DescribeInSidecar } from "./describe-in-sidecar.js";
+export { DiagnoseInSidecarContext, DiagnoseInSidecarButton, RunVerdictChip, isFailedRun, newestRunIds } from "./diagnose-in-sidecar.js";
+export { AskInSidecarContext, AskInSidecarButton } from "./ask-in-sidecar.js";
+export type { AskInSidecar, AskInSidecarKind } from "./ask-in-sidecar.js";
+export { GhostCardsContext, ghostChanges, ghostCountsByTarget, ghostStripCounts } from "./ghost-changes.js";
+export type { GhostChange } from "./ghost-changes.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";

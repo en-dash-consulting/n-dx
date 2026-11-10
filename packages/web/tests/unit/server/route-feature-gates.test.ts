@@ -26,6 +26,7 @@ import {
   enforceRouteFeatureGate,
   findRouteFeatureGate,
 } from "../../../src/server/route-feature-gates.js";
+import { FEATURE_DISABLED_HEADER } from "../../../src/shared/index.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -66,6 +67,15 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/apply-refinements", "sourcevision.ask"],
   ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
   ["/api/sv/pr-markdown/state", "sourcevision.prMarkdown"],
+  ["/api/sidecar/sessions", "web.sidecar"],
+  ["/api/sidecar/sessions/abc/turns", "web.sidecar"],
+  ["/api/sidecar/sessions/abc/frames", "web.sidecar"],
+  ["/api/commands/sidecar-command/status", "web.sidecar"],
+  ["/api/commands/sidecar-command/stop", "web.sidecar"],
+  ["/api/tracker/sync/tick", "web.sidecar"],
+  ["/api/tracker/activity", "web.sidecar"],
+  ["/api/hench/plan-queue", "hench.readyNext"],
+  ["/api/branch-health", "git.branchHealth"],
 ];
 
 /** A server that answers 200 "reached" for anything the gate lets past. */
@@ -124,6 +134,8 @@ describe("route feature gates", () => {
     const res = await fetch(`http://127.0.0.1:${port}${path}`);
 
     expect(res.status).toBe(403);
+    // The hub's session-host picker reads the refused flag from this header.
+    expect(res.headers.get(FEATURE_DISABLED_HEADER)).toBe(feature);
     const body = await res.json();
     expect(body.feature).toBe(feature);
     expect(body.kind).toBe("feature_disabled");
@@ -131,6 +143,16 @@ describe("route feature gates", () => {
     // terminal, where the `feature` field is not what anyone sees first.
     expect(body.error).toContain(feature);
     expect(body.suggestion).toContain(feature);
+  });
+
+  it("refuses PATCH on a Sidecar session with 403 while web.sidecar is off, and passes it once on", async () => {
+    const url = `http://127.0.0.1:${port}/api/sidecar/sessions/abc`;
+    const refused = await fetch(url, { method: "PATCH", body: "{}" });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).feature).toBe("web.sidecar");
+
+    await setFeatures({ "web.sidecar": true });
+    expect((await fetch(url, { method: "PATCH", body: "{}" })).status).toBe(200);
   });
 
   // ── Per route: passed through once the flag is on ───────────────────────
@@ -152,11 +174,17 @@ describe("route feature gates", () => {
   });
 
   it("gates listed paths exactly, so a subpath or near-miss is ungated", async () => {
-    // Every gate is an exact list: an unlisted subpath falls through to the
-    // router's own 404 rather than answering 403 for a feature it is not part of.
+    // An exact list: an unlisted subpath falls through to the router's own
+    // 404 rather than answering 403 for a feature it is not part of.
     expect(findRouteFeatureGate("/api/sv/pr-markdown")).not.toBeNull();
     expect(findRouteFeatureGate("/api/sv/pr-markdown/unlisted")).toBeNull();
     expect(findRouteFeatureGate("/api/sv/pr-markdown-extra")).toBeNull();
+  });
+
+  it("gates a prefix with everything beneath it, but not a near-miss", () => {
+    expect(findRouteFeatureGate("/api/sidecar")?.feature).toBe("web.sidecar");
+    expect(findRouteFeatureGate("/api/sidecar/sessions/x/interrupt")?.feature).toBe("web.sidecar");
+    expect(findRouteFeatureGate("/api/sidecarx")).toBeNull();
   });
 
   it("gates on the path alone, ignoring the query string", async () => {

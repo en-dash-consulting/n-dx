@@ -34,8 +34,10 @@
  * @module web/hub/home
  */
 
+import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES } from "../shared/index.js";
 import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
+import type { HubUsageTotals } from "./usage-ledger.js";
 import { injectSessionScript } from "../shared/index.js";
 
 export function escapeHtml(value: string): string {
@@ -93,6 +95,30 @@ export function repoLabel(card: ProjectCard): string | null {
 }
 
 /**
+ * True when the card should offer Initialize: the child answered and said n-dx
+ * is not set up there. An unknown answer (unreachable child, older build) is
+ * not "uninitialized" — those cards keep the actions they always had.
+ */
+export function needsInit(card: ProjectCard): boolean {
+  return card.reachable && card.initialized === false;
+}
+
+/**
+ * What the card's Initialize button posts to the project's own
+ * `POST /api/commands/init` — the setup wizard's route, so the hub runs the
+ * same `ndx init` the wizard does. These are the wizard's defaults (Claude,
+ * both assistants). `git` is added per run from the wizard's preflight — see
+ * `initBody` in the init script.
+ */
+export const HUB_INIT_REQUEST = { provider: "claude" } as const;
+
+/**
+ * How long the card waits on a run before giving up and unlocking. The
+ * project server's own init timeout is five minutes; the slack covers polling.
+ */
+export const HUB_INIT_CLIENT_TIMEOUT_MS = 330_000;
+
+/**
  * The card's one-line summary, in the order someone scanning for a project
  * reads it: what it is doing, then what state it is in, then what is next.
  */
@@ -100,7 +126,7 @@ export function cardFacts(card: ProjectCard): string[] {
   if (!card.reachable) {
     return [card.error ? `not answering — ${card.error}` : "not answering"];
   }
-  const facts: string[] = [];
+  const facts: string[] = needsInit(card) ? ["not initialized"] : [];
   const running = runningLabel(card);
   if (running) facts.push(running);
   if (card.branch) facts.push(card.branch);
@@ -114,6 +140,9 @@ export function cardFacts(card: ProjectCard): string[] {
   if (infrastructure) facts.push(infrastructure);
   return facts;
 }
+
+/** The docked hub session drawer's width, the viewer drawer's default. */
+const HUB_DRAWER_WIDTH = 440;
 
 const STYLES = `
 :root {
@@ -227,9 +256,33 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Uninitialized card and its in-card init run */
+.card-uninitialized { position: relative; }
+.card-uninitialized .card-title span.name { font-weight: 600; font-size: 1rem; }
+.init-error { color: var(--red); font-size: 0.75rem; margin: 0; overflow-wrap: anywhere; }
+.init-error[hidden] { display: none; }
+.init-overlay {
+  position: absolute; inset: 0; z-index: 1; border-radius: 10px; padding: 1rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;
+  background: var(--bg-surface); opacity: 0.94; color: var(--text-dim); font-size: 0.8rem; cursor: progress;
+}
+.init-overlay[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 2.4s; }
 }
+
+/* Hub session: docked to the right, the page narrows rather than being covered. */
+.hub-session-btn kbd { font: inherit; font-size: 0.68rem; color: var(--text-muted); margin-left: 0.35rem; }
+.hub-session-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
+.hub-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: ${HUB_DRAWER_WIDTH}px; max-width: 100vw;
+  border-left: 1px solid var(--border); background: var(--bg-surface);
+}
+.hub-drawer[hidden] { display: none; }
+.hub-drawer iframe { border: 0; width: 100%; height: 100%; display: block; }
+body.hub-docked { padding-right: calc(${HUB_DRAWER_WIDTH}px + 1.5rem); }
+@media (max-width: 52rem) { body.hub-docked { padding-right: 1.5rem; } }
 `;
 
 /**
@@ -242,28 +295,55 @@ const REFRESH_SCRIPT = `
   var list = document.getElementById("cards");
   if (!list) return;
   var count = document.getElementById("project-count");
-  function tick() {
-    fetch("/api/hub/overview", { headers: { accept: "application/json" } })
+  // A card mid-init (or showing an init failure) is kept as it is: swapping it
+  // would drop its overlay or its error. It yields once the server's card for
+  // that project is an initialized one. A running card also survives a tick
+  // that shows its project unreachable — one status poll timing out while
+  // init analyzes — or the card would come back unlocked mid-run.
+  function keepInitCards(stale) {
+    var fresh = list.querySelectorAll(".card[data-project-id]");
+    for (var i = 0; i < stale.length; i++) {
+      var id = stale[i].getAttribute("data-project-id");
+      var running = stale[i].getAttribute("data-init-state") === "running";
+      for (var j = 0; j < fresh.length; j++) {
+        if (fresh[j].getAttribute("data-project-id") !== id) continue;
+        var cls = fresh[j].classList;
+        if (cls.contains("card-uninitialized") || (running && cls.contains("card-unreachable"))) {
+          list.replaceChild(stale[i], fresh[j]);
+        }
+        break;
+      }
+    }
+  }
+  function tick(withSession) {
+    return fetch("/api/hub/overview" + (withSession ? "?hubSession=1" : ""), { headers: { accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || typeof data.html !== "string") return;
+        // The deferred page's toggle waits, hidden, for the host's answer.
+        var session = document.getElementById("hub-session-toggle");
+        if (session && typeof data.hubSession === "boolean") session.hidden = !data.hubSession;
         if (count && data.projects) {
           var n = data.projects.length;
           count.textContent = n === 1 ? "1 project" : n + " projects";
         }
         // Never yank focus out from under someone mid-keyboard-navigation.
         if (list.contains(document.activeElement)) return;
+        var stale = Array.prototype.slice.call(list.querySelectorAll("[data-init-state]"));
         list.innerHTML = data.html || '<li class="empty">No project is registered yet.</li>';
+        keepInitCards(stale);
       })
       .catch(function () {});
   }
+  // The init script asks for a refresh the moment a run succeeds.
+  window.ndxHubRefresh = tick;
   // A deferred page (sent to a navigation, which carries no credential) has
   // no cards yet: load them as soon as the session script has signed in.
   if (list.hasAttribute("data-deferred")) {
     var ready = window.ndxAuth ? window.ndxAuth.ready : Promise.resolve({ ok: true });
-    ready.then(function (state) { if (state.ok) tick(); });
+    ready.then(function (state) { if (state.ok) tick(true); });
   }
-  setInterval(tick, 5000);
+  setInterval(function () { tick(false); }, 5000);
 })();
 `;
 
@@ -400,6 +480,217 @@ const NEW_PROJECT_SCRIPT = `
 `;
 
 /**
+ * The Hub session toggle: the button and ⌘J (Ctrl+J) dock or undock the
+ * drawer. Its page loads on the first open, so a home page nobody opens the
+ * session from never wakes the host. The keystroke inside the drawer lands in
+ * its frame, so the frame posts {@link HUB_SESSION_CLOSE_MESSAGE} instead.
+ */
+const HUB_SESSION_SCRIPT = `
+(function () {
+  var toggle = document.getElementById("hub-session-toggle");
+  var drawer = document.getElementById("hub-session-drawer");
+  var frame = document.getElementById("hub-session-frame");
+  if (!toggle || !drawer || !frame) return;
+  function setOpen(open) {
+    drawer.hidden = !open;
+    document.body.classList.toggle("hub-docked", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      if (!frame.getAttribute("src")) frame.setAttribute("src", frame.getAttribute("data-src"));
+      frame.focus();
+    } else {
+      toggle.focus();
+    }
+  }
+  toggle.addEventListener("click", function () { setOpen(drawer.hidden); });
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "j") {
+      // A hidden toggle (the deferred page before the host said yes) offers nothing to open.
+      if (toggle.hidden && drawer.hidden) return;
+      e.preventDefault();
+      setOpen(drawer.hidden);
+    }
+  });
+  window.addEventListener("message", function (e) {
+    if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+    if (e.data && e.data.type === ${JSON.stringify(HUB_SESSION_CLOSE_MESSAGE)}) setOpen(false);
+  });
+})();
+`;
+
+/**
+ * Initialize an uninitialized project from its card, without leaving the page.
+ *
+ * Runs the setup wizard's own path through the proxy: `POST
+ * <project>/api/commands/init`, then poll `<project>/api/commands/init/status`.
+ * While it runs the card is under an overlay showing the latest step and the
+ * elapsed time, and its button is disabled. Every way out unlocks the card:
+ * success hands it to the refresh tick, which renders the initialized card;
+ * a failure, a refused start, a lost server or the client deadline shows the
+ * error and turns the button into Retry.
+ */
+const INIT_SCRIPT = `
+(function () {
+  var list = document.getElementById("cards");
+  if (!list) return;
+  var POLL_MS = 1500;
+  var DEADLINE_MS = ${HUB_INIT_CLIENT_TIMEOUT_MS};
+  var MAX_POLL_FAILURES = 20;
+
+  function parts(card) {
+    return {
+      button: card.querySelector('[data-action="init"]'),
+      overlay: card.querySelector(".init-overlay"),
+      phase: card.querySelector(".init-phase"),
+      error: card.querySelector(".init-error")
+    };
+  }
+
+  function lock(card, message) {
+    var p = parts(card);
+    card.setAttribute("data-init-state", "running");
+    card.setAttribute("aria-busy", "true");
+    p.button.disabled = true;
+    p.error.hidden = true;
+    p.phase.textContent = message;
+    p.overlay.hidden = false;
+  }
+
+  function fail(card, message) {
+    var p = parts(card);
+    card.setAttribute("data-init-state", "failed");
+    card.removeAttribute("aria-busy");
+    p.overlay.hidden = true;
+    p.error.textContent = message;
+    p.error.hidden = false;
+    p.button.textContent = "Retry";
+    p.button.disabled = false;
+  }
+
+  function succeed(card) {
+    var p = parts(card);
+    // No data-init-state: the next refresh replaces this card with the
+    // initialized one. The overlay stays up until it does.
+    card.removeAttribute("data-init-state");
+    card.removeAttribute("aria-busy");
+    p.phase.textContent = "Initialized — loading the project…";
+    if (card.contains(document.activeElement)) document.activeElement.blur();
+    if (window.ndxHubRefresh) window.ndxHubRefresh();
+  }
+
+  // The last line the run printed, ANSI stripped, or a generic step name.
+  function phaseOf(status, startedAt) {
+    var lines = String(status.output || "").replace(/\\u001b\\[[0-9;]*[A-Za-z]/g, "").split("\\n");
+    var step = "";
+    for (var i = lines.length - 1; i >= 0 && !step; i--) step = lines[i].trim();
+    var seconds = Math.round((Date.now() - startedAt) / 1000);
+    return (step || "Initializing…") + " (" + seconds + "s)";
+  }
+
+  function watch(card, base, startedAt) {
+    var failures = 0;
+    var timer = setInterval(function () {
+      if (Date.now() - startedAt > DEADLINE_MS) {
+        clearInterval(timer);
+        fail(card, "Initialization did not finish in time. Check the project's server, then retry.");
+        return;
+      }
+      fetch(base + "api/commands/init/status", { headers: { accept: "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (status) {
+          failures = 0;
+          if (status.running || !status.finishedAt) {
+            card.querySelector(".init-phase").textContent = phaseOf(status, startedAt);
+            return;
+          }
+          clearInterval(timer);
+          if (status.error) fail(card, status.error);
+          else succeed(card);
+        })
+        .catch(function (err) {
+          if (++failures < MAX_POLL_FAILURES) return;
+          clearInterval(timer);
+          fail(card, "Lost contact with the project's server: " + (err && err.message ? err.message : err));
+        });
+    }, POLL_MS);
+  }
+
+  // The route runs \`ndx init\` without a TTY, so its "Initialize git?" prompt
+  // never fires and an empty folder would stay outside version control, with
+  // hench's auto-commit off. The wizard asks, its box ticked by default; the
+  // card has no question to ask, so it takes that default from the wizard's
+  // own preflight. No preflight answer leaves \`git\` out, as the wizard does.
+  function initBody(preflight) {
+    var body = ${JSON.stringify(HUB_INIT_REQUEST)};
+    if (preflight && preflight.isRepo === false && preflight.gitAvailable === true) body.git = true;
+    return body;
+  }
+
+  function start(card) {
+    if (card.getAttribute("data-init-state") === "running") return;
+    var base = card.getAttribute("data-init-base");
+    var startedAt = Date.now();
+    lock(card, "Starting initialization…");
+    fetch(base + "api/commands/init/preflight", { headers: { accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (preflight) {
+        return fetch(base + "api/commands/init", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(initBody(preflight))
+        });
+      })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; })
+          .then(function (body) { return { status: r.status, body: body }; });
+      })
+      .then(function (result) {
+        // 409: a run is already going (another tab, or the wizard) — watch it.
+        if (result.status === 202 || result.status === 409) {
+          card.querySelector(".init-phase").textContent = "Initializing…";
+          watch(card, base, startedAt);
+          return;
+        }
+        fail(card, (result.body && result.body.error) || ("Could not start initialization (HTTP " + result.status + ")."));
+      })
+      .catch(function (err) {
+        fail(card, String(err && err.message ? err.message : err));
+      });
+  }
+
+  list.addEventListener("click", function (event) {
+    var target = event.target;
+    var button = target && target.closest ? target.closest('[data-action="init"]') : null;
+    if (!button || button.disabled) return;
+    var card = button.closest(".card-uninitialized");
+    if (card) start(card);
+  });
+})();
+`;
+
+/**
+ * The header's Hub session toggle; nothing unless the host reports the hub
+ * lens available. `"pending"` (the deferred page) renders it hidden, for the
+ * page's script to show once the host has answered.
+ */
+export function renderHubSessionToggle(hubSession: boolean | "pending"): string {
+  if (!hubSession) return "";
+  const hidden = hubSession === "pending" ? " hidden" : "";
+  return `<button class="theme-toggle hub-session-btn" type="button" id="hub-session-toggle"${hidden} aria-expanded="false" aria-controls="hub-session-drawer" aria-keyshortcuts="Meta+J Control+J" title="Hub session (⌘J)">Hub session<kbd aria-hidden="true">⌘J</kbd></button>`;
+}
+
+/** The docked drawer: a frame for the drawer-only viewer page the host serves through the hub. */
+export function renderHubSessionDrawer(hubSession: boolean | "pending"): string {
+  if (!hubSession) return "";
+  const src = `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.drawer}`;
+  return `<aside class="hub-drawer" id="hub-session-drawer" aria-label="Hub session" hidden>
+    <iframe id="hub-session-frame" title="Hub session" data-src="${escapeHtml(src)}"></iframe>
+  </aside>
+  <script>${HUB_SESSION_SCRIPT}</script>`;
+}
+
+/**
  * The new-project panel. `defaultParent` is rendered into the field rather
  * than fetched, so the path is on screen in the first paint — the script
  * refreshes it, but a slow or failed fetch still leaves something true there.
@@ -433,14 +724,44 @@ function statusDot(card: ProjectCard): string {
   return `<span class="dot dot-${escapeHtml(state)}" title="${escapeHtml(state)}" aria-hidden="true"></span>`;
 }
 
+/**
+ * The card for a project n-dx is not set up in: Initialize is its only action,
+ * and it links nowhere — the project's URL would only serve the setup wizard
+ * the button already runs. `data-init-base` is where the init script sends the
+ * wizard's requests; the overlay and error line are its to show.
+ */
+function renderUninitializedCard(card: ProjectCard, facts: string, repoLine: string): string {
+  return `<li class="card card-uninitialized" data-project-id="${escapeHtml(card.id)}" data-init-base="${escapeHtml(card.url)}">
+    <div class="card-title">${statusDot(card)}<span class="name">${escapeHtml(card.name)}</span></div>
+    ${repoLine}
+    <p class="path">${escapeHtml(card.repoRoot)}</p>
+    <div class="facts">${facts}</div>
+    <p class="init-error" role="alert" hidden></p>
+    <div class="actions">
+      <button type="button" class="action action-primary" data-action="init">Initialize</button>
+    </div>
+    <div class="init-overlay" role="status" aria-live="polite" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="init-phase">Initializing…</span>
+    </div>
+  </li>`;
+}
+
 /** One card. Exported so the refresh endpoint renders exactly what the page did. */
 export function renderCard(card: ProjectCard): string {
   const facts = cardFacts(card)
     .map((fact, index) => {
-      const cls = !card.reachable ? "fact fact-error" : index === 0 && runningLabel(card) ? "fact fact-running" : "fact";
+      const cls = !card.reachable ? "fact fact-error" : index === 0 && runningLabel(card) && !needsInit(card) ? "fact fact-running" : "fact";
       return `<span class="${cls}">${escapeHtml(fact)}</span>`;
     })
     .join("");
+
+  // Above the path, because it answers the same question better: the path says
+  // where this checkout happens to live, the repo says what it is.
+  const repo = repoLabel(card);
+  const repoLine = repo ? `<p class="repo">${escapeHtml(repo)}</p>` : "";
+
+  if (needsInit(card)) return renderUninitializedCard(card, facts, repoLine);
 
   const next = card.nextTaskTitle
     ? `<p class="next" title="${escapeHtml(card.nextTaskTitle)}">Next: ${escapeHtml(card.nextTaskTitle)}</p>`
@@ -456,12 +777,7 @@ export function renderCard(card: ProjectCard): string {
     </div>`
     : `<div class="actions"><a class="action" href="${escapeHtml(card.url)}">Open dashboard</a></div>`;
 
-  // Above the path, because it answers the same question better: the path says
-  // where this checkout happens to live, the repo says what it is.
-  const repo = repoLabel(card);
-  const repoLine = repo ? `<p class="repo">${escapeHtml(repo)}</p>` : "";
-
-  return `<li class="card${card.reachable ? "" : " card-unreachable"}">
+  return `<li class="card${card.reachable ? "" : " card-unreachable"}" data-project-id="${escapeHtml(card.id)}">
     <div class="card-title">${statusDot(card)}<a href="${escapeHtml(card.url)}">${escapeHtml(card.name)}</a></div>
     ${repoLine}
     <p class="path">${escapeHtml(card.repoRoot)}</p>
@@ -532,6 +848,31 @@ export function renderExtensionsSection(extensions: ExtensionView[]): string {
   <ul class="cards" id="extensions">${shown.map(renderExtensionCard).join("")}</ul>`;
 }
 
+export interface HomePageOptions {
+  hubSession?: boolean;
+  /**
+   * Send the shell only: no project, path or count is in the markup, and
+   * the page's script loads the cards once it has signed in. What a browser
+   * navigation gets, since it carries no credential (see shared/auth.ts).
+   */
+  deferred?: boolean;
+  /** The hub session's spend so far, from `<ndx home>/hub/usage.jsonl`; shown once it has a turn. */
+  hubSpend?: HubUsageTotals;
+}
+
+function compactTokens(n: number): string {
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+}
+
+/** The header's hub-session spend, or nothing before the first turn. */
+export function renderHubSpend(spend: HubUsageTotals | undefined): string {
+  if (!spend || spend.turns === 0) return "";
+  const turns = spend.turns === 1 ? "1 turn" : `${spend.turns} turns`;
+  const cache = spend.cacheCreationTokens + spend.cacheReadTokens;
+  const detail = `${compactTokens(spend.inputTokens)} in / ${compactTokens(spend.outputTokens)} out${cache > 0 ? ` / ${compactTokens(cache)} cache` : ""}`;
+  return `<span class="count" id="hub-spend" title="Hub session spend, all hosts">Hub session: ${escapeHtml(turns)}, ${escapeHtml(detail)}</span>`;
+}
+
 /**
  * The whole page.
  *
@@ -540,20 +881,18 @@ export function renderExtensionsSection(extensions: ExtensionView[]): string {
  *   this module stays pure rendering.
  * @param extensions `GET /api/hub/extensions`'s entries; empty when the hub
  *   could not list them, which leaves the row off rather than failing the page.
+ * @param options.hubSession The hub session's host can run the hub lens
+ *   (`probeHubLens`): the header gets the Hub session toggle and the page its
+ *   drawer. Off by default, so nothing offers a session no host can run.
  */
 export function renderHomePage(
   overview: HubOverview,
   defaultParent = "",
   extensions: ExtensionView[] = [],
-  options: {
-    /**
-     * Send the shell only: no project, path or count is in the markup, and
-     * the page's script loads the cards once it has signed in. What a browser
-     * navigation gets, since it carries no credential (see shared/auth.ts).
-     */
-    deferred?: boolean;
-  } = {},
+  options: HomePageOptions = {},
 ): string {
+  // A deferred page cannot know yet: its first read after sign-in asks.
+  const hubSession = options.deferred ? "pending" : options.hubSession === true;
   const { projects } = overview;
   const body = options.deferred
     ? `<ul class="cards" id="cards" data-deferred><li class="empty">Loading…</li></ul>`
@@ -587,13 +926,16 @@ export function renderHomePage(
   <header>
     <h1>n-dx hub</h1>
     <span class="count" id="project-count">${escapeHtml(count)}</span>
+    ${renderHubSpend(options.hubSpend)}
     <button class="new-btn" type="button" id="new-toggle" aria-expanded="false" aria-controls="new-panel">New project</button>
+    ${renderHubSessionToggle(hubSession)}
     <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle colour theme">Theme</button>
   </header>
   ${renderNewProjectPanel(defaultParent)}
   ${body}
   ${renderExtensionsSection(extensions)}
 </div>
+${renderHubSessionDrawer(hubSession)}
 <script>
   (function () {
     var button = document.getElementById("theme-toggle");
@@ -607,6 +949,7 @@ export function renderHomePage(
 </script>
 <script>${REFRESH_SCRIPT}</script>
 <script>${NEW_PROJECT_SCRIPT}</script>
+<script>${INIT_SCRIPT}</script>
 </body>
 </html>`);
 }

@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { getCurrentHead, getCurrentBranch, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import { SCHEMA_VERSION } from "../sourcevision-core.js";
@@ -24,6 +24,12 @@ export function cmdInit(dir: string): void {
   // What to call the directory in output — `.sourcevision` or
   // `.ndx/sourcevision`, whichever this project is on.
   const svDirName = relativeToRoot(layout, svDir);
+
+  // `.cache/` is machine-local (see docs/architecture/generated-files.md).
+  // Ignore it before the already-initialized return so a re-init fixes a
+  // project initialized without the entry: `ndx init` commits what init
+  // wrote, and would otherwise commit the cache with it.
+  ensureGitignoreEntry(absDir, `${svDirName}/.cache/`);
 
   if (existsSync(join(svDir, "manifest.json"))) {
     info(`${svDirName}/ already initialized in ${absDir}`);
@@ -66,4 +72,18 @@ export function cmdInit(dir: string): void {
   info("Next steps:");
   info("  sourcevision analyze    Run the analysis pipeline");
   info("  sourcevision serve      View results in the browser");
+}
+
+/** Append `entry` to the project's `.gitignore` unless a line already names it. */
+function ensureGitignoreEntry(dir: string, entry: string): void {
+  const gitignorePath = join(dir, ".gitignore");
+  let content = "";
+  try {
+    content = readFileSync(gitignorePath, "utf-8");
+  } catch {
+    // No .gitignore yet
+  }
+  if (content.split(/\r?\n/).some((line) => line.trim() === entry)) return;
+  const sep = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
+  writeFileSync(gitignorePath, content + sep + entry + "\n", "utf-8");
 }

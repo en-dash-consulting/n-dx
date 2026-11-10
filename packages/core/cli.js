@@ -49,7 +49,7 @@ import {
   resolveAutoConfirm,
   runConfirmationPrompt,
 } from "./self-heal-confirm.js";
-import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
+import { resolveCommandTimeout, subcommandOf, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
   runWeb,
@@ -106,8 +106,10 @@ import { generateTargetReadme } from "./readme-generator.js";
 import {
   runGitPreflight,
   formatGitWarningLines,
-  commitInitBaseline,
+  snapshotDirtyPaths,
+  finishInitCommit,
   formatGitInitCommitLines,
+  machineLocalIgnoreEntries,
 } from "./git-preflight.js";
 import { formatClaudeCliNotFoundError, moveDiscoveredClaudePath } from "./claude-integration.js";
 import {
@@ -120,7 +122,7 @@ import {
   dim,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
-import { ensureGitignoreEntry } from "./gitignore.js";
+import { ensureGitignoreEntry, ensureWebRuntimeIgnores } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
 import { DEFAULT_MIGRATION_PLAN_OUT, hasV2Tree, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
@@ -679,7 +681,7 @@ function extractInitGitConsent(args) {
 }
 
 function stripInitGitFlags(args) {
-  return args.filter((a) => a !== "--git" && a !== "--no-git");
+  return args.filter((a) => a !== "--git" && a !== "--no-git" && a !== "--no-commit");
 }
 
 function extractInitClaudeModel(args) {
@@ -870,6 +872,20 @@ function recordInitVersion(dir, version) {
   } catch {
     // Non-fatal — failure to record version doesn't affect init outcome.
   }
+}
+
+/**
+ * Record the n-dx version that ran init and the CLI name the project uses.
+ * Both go to the project config file, so this runs before the init commit.
+ *
+ * @param {string} dir
+ */
+function recordInitIdentity(dir) {
+  try {
+    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+    recordInitVersion(dir, version);
+  } catch { /* non-fatal */ }
+  recordCliName(dir);
 }
 
 /**
@@ -1640,10 +1656,15 @@ async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
   const gitConsent = extractInitGitConsent(rest);
+  const commitInit = !rest.includes("--no-commit");
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
   const quiet = flags.includes("--quiet") || flags.includes("-q");
+
+  // What the user already had changed, before init writes anything: init
+  // commits only the paths that changed after this point.
+  const gitBefore = commitInit ? snapshotDirtyPaths(dir) : null;
 
   await repairInitConfig(dir, quiet);
 
@@ -1681,6 +1702,8 @@ async function handleInit(rest) {
   // it produces carries PRD data and run summaries, so it must not be
   // committable by accident.
   ensureGitignoreEntry(dir, "ndx-export/");
+  // The dashboard's pid/port markers and spend ledger are machine-local.
+  ensureWebRuntimeIgnores(dir, layout);
   // Every vendor-CLI invocation appends to claude_commands.log in the project
   // (cli-log.js); left untracked it shows in every git status, and hench's
   // uncommitted-work gate refuses to complete a task over it.
@@ -1688,6 +1711,10 @@ async function handleInit(rest) {
   // The Graview projection is derived from the PRD, the analysis and the runs
   // and rebuilt by every `ndx graview` command, so it is never committed.
   ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
+  // The dashboard's pid/port/spend files and the analysis caches are rewritten
+  // on every server start and analysis. Committed — by init's own commit, or a
+  // user's first `git add .` — they dirty the tree again and block `ndx work`.
+  for (const entry of machineLocalIgnoreEntries(dir)) ensureGitignoreEntry(dir, entry);
   ensureGitattributesRules(dir, layout);
   ensureMergeDriverRegistered(dir);
   // Independent of the Claude integration and of how it finds Claude: a
@@ -1720,6 +1747,11 @@ async function handleInit(rest) {
         tools,
         runInitCapture,
         gitResult,
+        gitBefore,
+        commitInit,
+        // Runs before the init commit, so the identity it writes to the
+        // config file is part of that commit rather than left dirty.
+        recordIdentity: () => recordInitIdentity(dir),
       });
     } catch (err) {
       console.error(err?.message || err);
@@ -1729,11 +1761,6 @@ async function handleInit(rest) {
         if (inkResult.error) console.error(inkResult.error);
         exitWithCleanup(1);
       }
-      try {
-        const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
-        recordInitVersion(dir, version);
-      } catch { /* non-fatal */ }
-      recordCliName(dir);
       exitWithCleanup(0);
     }
   }
@@ -1773,11 +1800,7 @@ async function handleInit(rest) {
     providerSource: providerSourceKey,  // raw key ("flag"|"config"|"prompt"), not display label
   });
 
-  try {
-    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
-    recordInitVersion(dir, version);
-  } catch { /* non-fatal */ }
-  recordCliName(dir);
+  recordInitIdentity(dir);
 
   // Generate a target-repo README before assistant artifacts so the user's
   // project documentation reflects only their own manifest/structure — not
@@ -1796,13 +1819,10 @@ async function handleInit(rest) {
   // until re-init (the regression that caused #284).
   const skillTrackingHints = checkSkillTracking(dir, assistantEnabled);
 
-  // When the user just consented to `git init` in the preflight, stage and
-  // commit the n-dx baseline now that every tool directory and assistant
-  // surface has been written.  Done AFTER all writes so the snapshot is
-  // complete; a missing path here would just be skipped, not error.
-  const gitCommitResult = gitResult?.status === "initialized"
-    ? commitInitBaseline(dir)
-    : null;
+  // Commit what init wrote — the baseline in a repository the preflight just
+  // created, otherwise only the paths init changed — so the first `ndx work`
+  // starts on a clean tree. Done AFTER all writes so the snapshot is complete.
+  const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit });
 
   printStaticInitSummary({
     dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider,
@@ -2423,6 +2443,13 @@ async function handleWork(rest) {
     exitWithCleanup(0);
   }
 
+  // --plan-queue: hench prints the advisory lane plan and starts nothing, so
+  // like --resolve it needs no identity line, vendor or interrupt handler.
+  if (flags.some((f) => f === "--plan-queue" || (f.startsWith("--plan-queue=") && f !== "--plan-queue=false"))) {
+    await runAgentOrDie(["run", ...flags, dir]);
+    exitWithCleanup(0);
+  }
+
   // Which n-dx is about to run, against which checkout. A run is the most
   // expensive thing this CLI starts and the hardest to attribute afterwards:
   // the run record says what happened but not which install produced it, and
@@ -2484,12 +2511,14 @@ function printWorkIdentity(dir) {
 /**
  * The `jev:` line of `ndx status`: whether TypeSafe's key resolves and from
  * where (env, file or helper), never the value. Asks llm-client's credential
- * CLI, which owns the store; a helper is reported, not run.
+ * CLI, which owns the store; a helper is reported, not run. A store that was
+ * not read (refused for its mode, invalid, unknown version) is named with its
+ * fix, not reported as a missing key. A helper entry is `unverified`, not
+ * `available`: only running it shows whether it resolves.
  *
  * @returns {string}
  */
 function formatJevLine() {
-  const unavailable = "jev: unavailable (store a key: ndx config credentials.typesafe)";
   try {
     const script = _require.resolve("@n-dx/llm-client/dist/cli/credentials.js");
     const out = execFileSyncCli(process.execPath, [script, "status", "--json"], {
@@ -2497,7 +2526,12 @@ function formatJevLine() {
       stdio: ["ignore", "pipe", "pipe"],
     });
     const typesafe = JSON.parse(out).find((s) => s.name === "typesafe");
-    return typesafe?.source ? `jev: available (${typesafe.source})` : unavailable;
+    if (typesafe?.helperResult === "not-run") {
+      return "jev: unverified (helper, not run; ndx config credentials --check runs it)";
+    }
+    if (typesafe?.source) return `jev: available (${typesafe.source})`;
+    if (typesafe?.storeProblem) return `jev: unavailable (${typesafe.storeProblem})`;
+    return "jev: unavailable (store a key: ndx config credentials.typesafe)";
   } catch {
     return "jev: unknown (could not read the credential store; ndx config credentials)";
   }
@@ -3870,7 +3904,9 @@ async function main() {
     ? process.cwd()
     : resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
   const projectConfig = extension ? {} : await loadProjectConfig(dir).catch(() => ({}));
-  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig);
+  // The subcommand is the first word that is not a flag or a flag's value: `ndx rex -q mcp .` and
+  // `ndx rex --format json mcp .` are both the rex MCP server.
+  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig, subcommandOf(command ?? "", rest));
 
   // Resolve BETA experimental flags from the same config read, so childEnv() can
   // forward them to sub-CLIs without a second filesystem hit.

@@ -261,7 +261,55 @@ describe("resolveVendorCliEnv", () => {
     const env = resolveVendorCliEnv({ claude: { api_key: "configured" } }, undefined, {
       anthropic_api_key: "old", github_token: "secret", claudecode: "nested",
     });
-    expect(env).toEqual({ ANTHROPIC_API_KEY: "configured" });
+    expect(env).toEqual({ ANTHROPIC_API_KEY: "configured", CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" });
+  });
+
+  describe("scrub report for allowed credential-shaped names", () => {
+    const source = { ANTHROPIC_API_KEY: "sk-exported", DB_PASSWORD: "pw", SSH_AUTH_SOCK: "/sock", PATH: "/bin" };
+    const allow = { allow: ["DB_PASSWORD"] };
+    const reports = (claude: Record<string, unknown>) => {
+      const out: Array<[string[], string]> = [];
+      resolveVendorCliEnv({ vendor: "claude", claude } as never, allow, source, (names, kind) => out.push([names, kind]));
+      return out;
+    };
+
+    it("names an allowed DB_PASSWORD, never its value, under auth api", () => {
+      const out = reports({ auth: "api" });
+      expect(out).toContainEqual([["DB_PASSWORD"], "scrubbed"]);
+      expect(out.flatMap(([names]) => names)).not.toContain("pw");
+    });
+
+    it("never names an allowed GitHub token, which the scrub leaves in place", () => {
+      const out: Array<[string[], string]> = [];
+      resolveVendorCliEnv(
+        { vendor: "claude", claude: { auth: "api" } } as never,
+        { allow: ["DB_PASSWORD", "GITHUB_TOKEN", "GH_TOKEN"] },
+        { ...source, GITHUB_TOKEN: "ghp", GH_TOKEN: "gho" },
+        (names, kind) => out.push([names, kind]),
+      );
+      expect(out).toContainEqual([["DB_PASSWORD"], "scrubbed"]);
+    });
+
+    it("stays silent for a vendor other than Claude, even with the scrub flag exported", () => {
+      const out: string[] = [];
+      resolveVendorCliEnv(
+        { vendor: "codex" } as never,
+        { allow: ["DB_PASSWORD", "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] },
+        { ...source, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" },
+        (_n, kind) => out.push(kind),
+      );
+      expect(out).not.toContain("scrubbed");
+    });
+
+    it("stays silent under auth cli, where nothing turns the scrub on", () => {
+      expect(reports({ auth: "cli" }).filter(([, kind]) => kind === "scrubbed")).toEqual([]);
+    });
+
+    it("stays silent under auth api when the allowlist passes nothing credential-shaped", () => {
+      const out: string[] = [];
+      resolveVendorCliEnv({ vendor: "claude", claude: { auth: "api" } }, undefined, source, (_n, kind) => out.push(kind));
+      expect(out).not.toContain("scrubbed");
+    });
   });
 });
 

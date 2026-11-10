@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "3b2366c1-cd0e-4758-87ec-ac618072bc96":
+    status: "completed"
+    startedAt: "2026-11-06T04:16:28.138Z"
+    completedAt: "2026-11-06T04:16:28.138Z"
+    endedAt: "2026-11-06T04:16:28.138Z"
+    activeIntervals: [{"end":"2026-11-06T04:16:28.138Z","start":"2026-11-06T04:16:28.138Z"}]
+    appliedAt: "2026-11-06T04:16:28.138Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-06T04:16:28.138Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f26763d3-04a3-4be7-86b0-0ee5321934f4":
+    status: "completed"
+    startedAt: "2026-11-06T04:15:58.239Z"
+    completedAt: "2026-11-06T04:16:28.138Z"
+    endedAt: "2026-11-06T04:16:28.138Z"
+    activeIntervals: [{"end":"2026-11-06T04:16:28.138Z","start":"2026-11-06T04:15:58.239Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sidecar-connections.md: explicit Create in tracker raises the card whatever the rule mode, no tracker call until approval; routes list adds create and state."
+    lastModified: "2026-11-06T04:16:28.138Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

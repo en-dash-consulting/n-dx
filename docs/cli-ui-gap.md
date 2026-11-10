@@ -46,7 +46,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | Command | Writes | LLM phases (calls) | Network | Takes |
 |---------|--------|--------------------|---------|-------|
 | `ndx init` | `{rex}/, {hench}/, {sourcevision}/`<br>`{config}, .gitignore, .gitattributes`<br>CLAUDE.md, AGENTS.md, .claude/, .agents/, .codex/, .mcp.json<br>README.md<br>`~/.claude.json` (only with --mcp-scope=local)<br>`.git/` (only with --git, or on a TTY when the preflight prompt is accepted) | auth probe ~0-1 | llm-provider | under a minute |
-| `ndx migrate-layout` | `.ndx/`<br>`.gitignore, .gitattributes`<br>git commits (only without --no-commit) | none | none | seconds |
+| `ndx migrate-layout` | `.ndx/`<br>`.gitignore, .gitattributes`<br>`{hench}/config.json` (only when it holds the legacy default .rex)<br>git commits (only without --no-commit) | none | none | seconds |
 | `ndx migrate` | `.ndx/` (only without --plan or --apply, on a legacy layout and without --dry-run)<br>`{rex}/prd_tree/` (only without --plan or --apply, on a flat-file PRD and without --dry-run)<br>--out (default ./migration-plan.json) (only with --plan, or without --plan or --apply on a v1 tree)<br>--summary (default: --out with .md) (only with --plan, or without --plan or --apply on a v1 tree)<br>`{rex}/` (only with --apply, or without --plan or --apply on a v1 tree, and without --dry-run) | placement ~0-N, none with --rules-only<br>spec draft ~0-N, none with --rules-only<br>review ~0-N, none with --rules-only or --no-jev-review<br>_none with `--rules-only`_ | llm-provider (only without --rules-only) | seconds with --rules-only; up to an hour over a large PRD with the model passes |
 | `ndx analyze` | `{sourcevision}/` | classify ~0-N batches of 30 files<br>zones ~1-2 per batch of 7 zones; more passes with --full<br>primer ~0-1<br>narration ~1 per escalated zone<br>_none with `--fast`_ | llm-provider | under a minute on a small repo; several minutes with --deep or --full |
 | `ndx iso` | `{sourcevision}/iso-map.html`<br>iso-map.html (only with --source=scan on a project that has never been analyzed) | none | none | seconds; longer with --source=scan on a large repo, which walks the tree |
@@ -89,7 +89,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx next` | nothing (read-only) | none | none | seconds |
 | `ndx tree` | nothing (read-only) | none | none | seconds |
 | `ndx tree-diff` | nothing (read-only) | none | none | seconds |
-| `ndx graview` | `{graview}/document.json and {graview}/snapshot.json`<br>`{graview}/cache/` (only when the PRD has a product layer and the project is a git repository)<br>`{graview}/data/` (only for serve and mcp) | none | remote (only when no graview binary is configured or on PATH) | seconds to emit; serve and mcp run until stopped |
+| `ndx graview` | `{graview}/document.json and {graview}/snapshot.json`<br>`{graview}/cache/` (only when the PRD has a product layer and the project is a git repository)<br>`{graview}/data/` (only for serve and mcp) | none | remote (only when no graview binary is found and graview.allowNpx or NDX_GRAVIEW_NPX=1 allows the download) | seconds to emit; serve and mcp run until stopped |
 | `ndx readiness` | nothing (read-only) | none | none | seconds |
 | `ndx reset` | `{sourcevision}/` | none | none | seconds |
 | `ndx show` | nothing (read-only) | none | none | seconds |

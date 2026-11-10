@@ -6,9 +6,29 @@
   padding: var(--space-2) var(--space-4);
   font-size: var(--font-sm);
   color: var(--text);
+  /* Never more than a third of the viewport, shell chrome included (top nav
+     and bottom bar): `.app-body` keeps the other two thirds.
+     The headline row stays put; only the details scroll (see __details).
+     The strip itself scrolls only when the row alone outgrows the cap (a
+     short viewport), so the buttons are never clipped out of reach. The 5rem
+     floor keeps that scroll box usable where the third minus the chrome
+     reaches zero (a viewport under ~280px tall, e.g. 300% zoom). */
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  max-height: max(5rem, calc(100vh / 3 - var(--topnav-h) - var(--bottombar-h)));
+  max-height: max(5rem, calc(100dvh / 3 - var(--topnav-h) - var(--bottombar-h)));
+  overflow-y: auto;
+}
+
+.repo-trust-strip__details {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .repo-trust-strip__row {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
@@ -60,6 +80,11 @@
   color: var(--accent-contrast, #fff);
 }
 
+.repo-trust-strip__restrictions {
+  margin: var(--space-2) 0 0 1.75rem;
+  line-height: 1.5;
+}
+
 .repo-trust-strip__list {
   margin: var(--space-2) 0 0 1.75rem;
   padding: 0 0 0 var(--space-4);
@@ -72,6 +97,18 @@
 
 .repo-trust-strip__info {
   color: var(--text-dim);
+}
+
+.repo-trust-strip__sources {
+  margin: var(--space-2) 0 0 1.75rem;
+  color: var(--text-dim);
+}
+
+.repo-trust-strip__sources ul {
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .repo-trust-strip__error {

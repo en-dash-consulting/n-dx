@@ -30,6 +30,7 @@ import { AggregationResultCache } from "./aggregation-cache.js";
 import {
   dashboardUsagePath,
   readDashboardUsage,
+  SIDECAR_COMMAND,
 } from "./dashboard-usage.js";
 import {
   DEFAULT_LLM_VENDOR,
@@ -57,10 +58,10 @@ interface PackageTokenUsage {
  * `web` is the dashboard itself (the Ask panel), and it is a peer of the three
  * CLI packages rather than a sub-case of any of them.
  */
-type TokenPackage = "rex" | "hench" | "sv" | "web";
+type TokenPackage = "rex" | "hench" | "sv" | "web" | "sidecar";
 
 /** Every package key, in the order the dashboard renders them. */
-const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web"];
+const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web", "sidecar"];
 
 interface AggregateTokenUsage {
   packages: ToolBreakdown;
@@ -179,6 +180,7 @@ function emptyToolBreakdown(): ToolBreakdown {
     hench: emptyPackageUsage(),
     sv: emptyPackageUsage(),
     web: emptyPackageUsage(),
+    sidecar: emptyPackageUsage(),
   };
 }
 
@@ -572,7 +574,7 @@ function extractDashboardEvents(
     events.push({
       timestamp: record.timestamp,
       command: record.command,
-      package: "web",
+      package: record.command === SIDECAR_COMMAND ? "sidecar" : "web",
       inputTokens: record.inputTokens,
       outputTokens: record.outputTokens,
       cacheCreationTokens: record.cacheCreationTokens,

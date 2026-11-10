@@ -1,3 +1,9 @@
 # Grammar builds from before the packs owned their grammars left WASM and a
 # download cache here. Nothing builds here now; kept so old checkouts stay clean.
 /build/
+
+# An IDE's Gradle import (e.g. VS Code's Java extensions) runs Gradle on the
+# gradle-build fixtures and leaves its cache and reports beside them. The
+# tests only parse the build scripts; none of this is fixture content.
+/tests/fixtures/gradle-build/**/.gradle/
+/tests/fixtures/gradle-build/**/build/

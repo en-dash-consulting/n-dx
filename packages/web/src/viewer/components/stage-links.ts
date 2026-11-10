@@ -1,6 +1,6 @@
 /**
  * The two small vertical buttons on the page edges that step around the loop:
- * Analysis → Plan → Work → Analysis. Shown on every page that belongs to a
+ * Analysis → Plan → Work → Tune → Analysis. Shown on every page that belongs to a
  * stage, so the next move is always one click away. On a scoped viewer with a
  * single stage there is nowhere to step to, and nothing is shown.
  */

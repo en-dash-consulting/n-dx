@@ -1,5 +1,13 @@
 # @n-dx/lang-terraform
 
+## 0.10.3
+
+### Patch Changes
+
+- Updated dependencies [[`55d304a`](https://github.com/en-dash-consulting/n-dx/commit/55d304a06b9e7547490a64e91888a9c25ac64621), [`c01c1cf`](https://github.com/en-dash-consulting/n-dx/commit/c01c1cfdd02e8140e19816cdc7532a14536b691d), [`3edfb23`](https://github.com/en-dash-consulting/n-dx/commit/3edfb2303189207193062818fd0a358a2569e78f)]:
+  - @n-dx/lang-kit@0.10.3
+  - @n-dx/lang-runtime@0.10.3
+
 ## 0.10.2
 
 ### Patch Changes

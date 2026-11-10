@@ -42,7 +42,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
       <Hero eyebrow={<Under context={context} node={node} what={`Change${eyebrow.length ? ` · ${eyebrow.join(" · ")}` : ""}`} />} title={facts.label} lede={node.intent}>
         <StatusBadge status={node.status} />
         {node.priority ? <Badge plain>{said(node.priority)} priority</Badge> : null}
-        {node.inbox === true ? <Badge tone="warn">in the Inbox: a person confirms what it targets</Badge> : null}
+        {node.inbox === true && isOpen(node) ? <Badge tone="warn">in the Inbox: a person confirms what it targets</Badge> : null}
         {node.fix === true ? <Badge tone="warn">fix</Badge> : null}
         {node.spike === true ? <Badge>spike</Badge> : null}
         {node.plannedRelease ? <Badge plain>planned for {node.plannedRelease}</Badge> : null}
@@ -139,7 +139,8 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
 const FILTERS: { key: string; label: string; test: (n: Of<"change">) => boolean }[] = [
   { key: "open", label: "Open", test: isOpen },
   { key: "in_progress", label: "In progress", test: (n) => n.status === "in_progress" },
-  { key: "inbox", label: "Inbox", test: (n) => n.inbox === true },
+  // An open change only, as attention() and the sidebar count it: a finished one rex never placed waits on no one.
+  { key: "inbox", label: "Inbox", test: (n) => n.inbox === true && isOpen(n) },
   { key: "blocked", label: "Blocked", test: (n) => n.status === "blocked" || n.status === "failing" },
   { key: "pending", label: "Pending", test: (n) => n.status === "pending" },
   { key: "done", label: "Done", test: (n) => n.status === "completed" },

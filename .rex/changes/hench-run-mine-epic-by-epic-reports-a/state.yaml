@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "aab04326-e030-4ea2-a4ed-c7ce3f1dc34d":
+    status: "completed"
+    startedAt: "2026-11-06T03:51:55.539Z"
+    completedAt: "2026-11-06T03:53:57.387Z"
+    endedAt: "2026-11-06T03:53:57.387Z"
+    activeIntervals: [{"end":"2026-11-06T03:53:57.387Z","start":"2026-11-06T03:51:55.539Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Moved the --mine/--epic-by-epic refusal to the top of cmdRun, before config load and assertPrdFolderExists."
+    appliedAt: "2026-11-06T03:53:57.387Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-06T03:53:57.387Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

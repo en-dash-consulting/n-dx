@@ -43,6 +43,7 @@ function snapshot(over: Partial<LiveTaskSnapshot> = {}): LiveTaskSnapshot {
     task: {
       id: "t1", title: "Fix the thing", description: "Do it well", status: "completed", priority: "high",
       acceptanceCriteria: ["first"],
+      links: [],
       epicChain: [{ id: "e", title: "Epic", itemType: "epic" }, { id: "f", title: "Feature", itemType: "feature" }],
     },
     runs: [run()],
@@ -271,15 +272,13 @@ describe("the finished run's page", () => {
   it("re-runs the task and switches the page to the new run", async () => {
     await mount();
     expect(root.textContent).toContain("Re-run");
-    const caret = [...root.querySelectorAll<HTMLButtonElement>(".start-task-caret")][0]!;
-    await act(async () => { caret.click(); await flush(); });
     // The next snapshot has the new run; the page must stop showing the old one.
     body = snapshot({
       task: { ...snapshot().task!, status: "in_progress" },
       runs: [run({ runId: "r2", status: "running", finishedAt: null, pid: 99, startedFrom: "dashboard", outcome: null }), run()],
     });
-    const startNow = [...root.querySelectorAll<HTMLButtonElement>("[role=menuitem]")].find((b) => b.textContent === "Start now")!;
-    await act(async () => { startNow.click(); await flush(); });
+    const rerun = [...root.querySelectorAll<HTMLButtonElement>(".start-task-primary")][0]!;
+    await act(async () => { rerun.click(); await flush(); });
     await act(async () => { await flush(); });
 
     const post = calls.find((c) => c.url === "/api/hench/execute");

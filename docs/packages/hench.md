@@ -29,6 +29,7 @@ hench template list .                # list workflow templates
 hench template apply <name> .        # apply a saved template
 hench status .                       # show recent runs
 hench show <run-id> .                # detailed run transcript
+hench runs diagnose <run-id> .       # why a run failed, and what to do next
 ```
 
 Or through the orchestrator:
@@ -42,7 +43,9 @@ ndx work --epic="Auth System" --auto --iterations=2 .
 
 A PRD item can carry a `run` block saying how `ndx work` should run it — written
 by the rex MCP tools (`add_item` / `edit_item`), `rex update --run`, or the
-dashboard's Prepare task modal. Hench applies it.
+dashboard's Prepare task modal; the dashboard's Start Working button also
+writes the project defaults onto a task with no block before it starts the
+run. Hench applies it.
 
 **Precedence, per setting:** CLI flag > the task's `run` block > `hench.*` >
 `llm.*` > the built-in default.
@@ -220,3 +223,73 @@ Two fields on `run.json` say which model ran and why:
   `vendor-default`), in the same vocabulary `ndx work --resolve` reports. It
   answers "why did this run use that model" without re-deriving the chain
   against config that may since have changed.
+
+### Run verdict
+
+A run that ends in any status other than completed gets a `diagnosis`: a
+verdict from fixed rules over the record, its events and its review report,
+with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
+A record still at `running` whose process is gone (`check-runs` verdict
+`orphaned`) is classified as ending it would record it: `failed`, with the
+run-end error. Nothing is saved; a completed run, or a running one whose
+process may be alive, is refused.
+
+| Class | Signal | First action |
+|-------|--------|--------------|
+| `test-gate-new` | The gate's failure digest names a file the run changed; an absolute digest path under the run's worktree is read repo-relative | Follow-up run with the digest, then re-run |
+| `test-gate-preexisting` | The digest names only files the run did not change. No baseline runs, so the verdict says the failure is in tests the run did not edit and was not checked on main; it never asserts the failure predates the run | Run the failing tests on main |
+| `completion-held` | `completionHold` with outcome `not-applied` (`applied` and `bypassed` are not holds), or `gateOnlyRetry` | `--fresh`, or fix by hand and verify |
+| `completion-held` | The completion gate refused on uncommitted work; outranks every rule but `claim-lost` | Commit or discard the uncommitted paths, then verify |
+| `review-blocked` | The review left a must-fix finding unrepaired | Follow-up run with the findings |
+| `claim-lost` | `claimLost`: another worktree took the task. A `readOnlyRefusal` (the forked attempt made no edits and the task re-ran cold) is never a class; it is one evidence line on the class the rest of the record gives | Release the claim, then re-run |
+| `budget-timeout` | `budget_exceeded`, `timeout`, or a brief too large for the context window | Split the task, or raise its tier |
+| `vendor-transient` | `error_transient`, or an auth, rate-limit (a CLI session limit included) or transient failure, read from failure events or from `run.error`, so it fires with the event pipeline off | Retry later; for auth, re-authenticate the vendor CLI and re-run |
+| `no-changes` | The agent made at least one tool call, and made no commits or changed only PRD files. A run that dies before its first tool call is not `no-changes` | Tighten the done-when |
+| `unclassified` | None of the above; never guessed | Read the run log |
+
+`attempt` counts the task's finished runs that did not complete, capped at 2. On
+the second attempt the verdict drops every re-run action and leads with a
+follow-up fix or a split. The verdict's summary is written as the task's
+`failureReason` when it has none, or when its current one is an earlier run's
+verdict, so the next brief names the latest cause. A reason a person or the
+agent wrote is kept. The dashboard shows the
+verdict on the task page behind the `hench.runVerdict` toggle.
+
+### Queue plan
+
+`ndx work --plan-queue [--format=json] .` groups a v2 PRD's ready tasks into
+lanes that can run side by side, from fixed rules with no model call. It starts
+no run, takes no claim and writes no file.
+
+- A lane holds 1 to 3 tasks of one change, each of effective tier light or
+  standard (the task's saved `run.tier`, else its change's, else the tier
+  `agent.execute` routes to). A task blocked only by tasks of its own lane runs
+  after them.
+- Lanes offered together come from changes whose `touches` do not overlap. A
+  change with no `touches` never shares the plan with another lane.
+- Tasks tagged `review-critical`, `migration` or `cross-package`, on the task
+  or its change, are left out: run them on their own.
+- At most `guard.maxConcurrentProcesses` minus the runs active now are offered.
+  Live runs are counted in every worktree `git worktree list` names for the
+  repository, since their lanes share the machine; outside a repository, or when
+  git fails, only this worktree is counted and the summary says so. The run
+  limiter itself still counts per worktree.
+
+A lane's command runs its tasks one after another in the current checkout
+(`ndx work --task=a --auto . && ndx work --task=b --auto .`). Every lane's
+command targets `.`, so lane 1 runs here and **each later lane must run in its
+own worktree**: two lanes in one checkout collide, the later one meeting the
+earlier one's uncommitted edits. While a run is live in this worktree, lane 1
+needs its own worktree too. The summary, each such lane's text block and Live's
+Ready next say so. An explicit
+`--task` ignores blockers, and a run can exit 0 without completing its task (a
+transient vendor error), so the step for a blocked task adds
+`--require-unblocked`: it refuses to start while any blocker is not completed.
+The JSON has
+`lanes [{command, changeId, ownWorktree, tasks [{id, title, reason}]}]`
+(`ownWorktree` is true for every lane after the first, and for lane 1 while a
+run is live in this worktree), `excluded
+[{id, title, reason}]`, `activeRuns`, `activeRunsByWorktree [{path, runs}]`,
+`runLimit` and `summary`; every ready task
+appears once, with its reason. Live shows the plan as Ready next behind the
+`hench.readyNext` toggle.

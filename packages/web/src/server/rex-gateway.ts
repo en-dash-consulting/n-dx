@@ -49,24 +49,44 @@ export type { ProposedWork } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
 // The Product, Changes and capability views on a v2 tree: rex's model and its
 // derived product status, never recomputed in web (routes-rex/product.ts).
-export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, awaitsPlacement, specHash, nodeSpec } from "@n-dx/rex";
+export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, isInboxChange, awaitsPlacement, specHash, nodeSpec } from "@n-dx/rex";
 export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
+// The area view: which constraints bind a product node (`boundBy`) is rex's
+// rule, the one `get_capability` reports (routes-rex/product.ts).
+export { computeEdges } from "@n-dx/rex";
 // The capability page's edit form: rex decides what a spec edit does (editorial
 // re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
 export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
+// A change's Apply… in the detail panel: rex previews and applies, the entry MCP
+// apply_change runs, and returns its refusal as data (routes-rex/apply.ts).
+export { applyChange } from "@n-dx/rex";
+
+// ---- Rex trailer-commit evidence ---------------------------------------------
+// The commits whose `N-DX-Item` trailer names an item, and the files each
+// changed: the code evidence a Sidecar lens packet quotes (sidecar/packet-sources.ts).
+export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
 
 // ---- Rex change placement ---------------------------------------------------
 // The Inbox routes read a change's placement shortlist and place or propose it
 // through rex's own rule (the one `rex change place` and MCP `place_change`
 // run), so the shortlist, the strength bands and the refusals stay rex's.
-export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError, placementStrength } from "@n-dx/rex";
-export type { ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate } from "@n-dx/rex";
+// `suggestPlacements` ranks one change or many against one tree, building rex's
+// placement inputs once: the area read and the Inbox list rank every Inbox change.
+// `recordUnplacement` is "Place & add another"'s Remove: rex refuses a closed change and runs its rules.
+export { suggestPlacements, recordPlacement, recordProposal, recordUnplacement, ChangePlacementError, placementStrength } from "@n-dx/rex";
+export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
 export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
-export type { RecordProposalInput, RecordProposalOptions, RecordProposalResult } from "@n-dx/rex";
+export type { RecordProposalInput, RecordProposalResult } from "@n-dx/rex";
 export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
 // "Draft with the model" (behind rex.placementDraft): the `prd.place` text
 // model drafts a pick or a proposal and writes nothing.
 export { draftChangePlacement } from "@n-dx/rex";
+
+// ---- Rex duplicate match ----------------------------------------------------
+// The Sidecar change-set card flags a proposed item that matches an existing
+// one by the rule smart add flags duplicates by.
+export { findDuplicateItem } from "@n-dx/rex";
+export type { DuplicateItemMatch } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it
@@ -163,7 +183,7 @@ export {
 } from "@n-dx/rex";
 
 // ---- Rex health -------------------------------------------------------------
-export { computeHealthScore } from "@n-dx/rex";
+export { computeHealthScore, checkStaleReleasePlans } from "@n-dx/rex";
 
 // ---- Rex reorganize ---------------------------------------------------------
 export { detectReorganizations, applyProposals } from "@n-dx/rex";

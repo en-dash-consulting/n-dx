@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
@@ -52,6 +52,14 @@ describe("TileGrid", () => {
     expect(tile("files").className).toContain("stage-tile--r2");
   });
 
+  it("draws a band above the grid, outside its fixed rows, with no header to open it", () => {
+    mount({ tiles: [{ view: "changes", panel: "flow", title: "Lifecycle", band: true }, ...TILES] });
+    const band = root.querySelector<HTMLElement>(".stage-bands > .stage-band[data-tile='flow']")!;
+    expect(band.querySelector(".panel-flow")).not.toBeNull();
+    expect(band.querySelector(".stage-tile-head")).toBeNull();
+    expect(root.querySelector(".stage-tiles [data-tile='flow']")).toBeNull();
+  });
+
   it("shows a summary where one exists, else the view as a preview", () => {
     mount();
     expect(tile("problems").querySelector(".summary")?.textContent).toBe("5 critical");
@@ -68,6 +76,32 @@ describe("TileGrid", () => {
     act(() => tile("map").querySelector<HTMLButtonElement>(".expand-map")!.click());
     expect(dialog()!.querySelector(".panel-map-opened")).not.toBeNull();
     expect(dialog()!.querySelector("h2")?.textContent).toBe("Codebase map");
+  });
+
+  it("opens a tile at a focus from its panel: the trail names it, the tile step drops it, Esc returns", () => {
+    mount({
+      renderPanel: (p, opened, grid) => opened
+        ? h("div", { class: `panel-${p}-opened`, "data-focus": grid.focus?.id ?? "" })
+        : h("button", { class: `open-${p}`, onClick: () => grid.openTile(p, { id: "checkout", label: "Checkout" }) }, "Checkout"),
+    });
+    const opener = tile("map").querySelector<HTMLButtonElement>(".open-map")!;
+    opener.focus();
+    act(() => opener.click());
+    expect(dialog()!.querySelector("[role=dialog]")?.getAttribute("aria-label")).toBe("Checkout");
+    const trail = dialog()!.querySelector(".stage-tile-trail")!;
+    expect([...trail.querySelectorAll("button, h2")].map((el) => el.textContent)).toEqual(["← Analysis", "Codebase map", "Checkout"]);
+    expect(dialog()!.querySelector<HTMLElement>(".panel-map-opened")?.dataset.focus).toBe("checkout");
+
+    // The tile step keeps the modal open, on the tile as a whole.
+    act(() => trail.querySelector<HTMLButtonElement>(".stage-tile-trail-tile")!.click());
+    expect(dialog()!.querySelector<HTMLElement>(".panel-map-opened")?.dataset.focus).toBe("");
+    expect(dialog()!.querySelector("h2")?.textContent).toBe("Codebase map");
+
+    // Closing hands focus back to the block without scrolling the page.
+    const focus = vi.spyOn(opener, "focus");
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+    expect(dialog()).toBeNull();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 
   it("renders a chromeless tile as its panel alone, with no header to open it", () => {
@@ -94,10 +128,19 @@ describe("TileGrid", () => {
     expect(document.activeElement).toBe(head("problems"));
   });
 
-  it("has two modes only: an opened tile offers no Open link", () => {
+  it("offers no Open ↗ without a navigateTo", () => {
     mount();
     act(() => head("files").click());
     expect([...dialog()!.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Open ↗");
+  });
+
+  it("opens a tile's own page from Open ↗ in the modal", () => {
+    const calls: unknown[][] = [];
+    mount({ navigateTo: (...a) => { calls.push(a); } });
+    act(() => head("files").click());
+    const open = [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Open ↗")!;
+    act(() => open.click());
+    expect(calls).toEqual([["files"]]);
   });
 
   it("heads an opened tile with a trail back to the stage, which closes it", () => {

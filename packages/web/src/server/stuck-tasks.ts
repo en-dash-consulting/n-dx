@@ -20,15 +20,22 @@ export const DEFAULT_MAX_FAILED_ATTEMPTS = 3;
 /** Statuses hench counts as a hard failure; rate limits and network blips do not count. */
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded"]);
 
-interface RunLike {
+/** The fields of a run file these rules read; the rest of the file is kept as read. */
+export interface RunLike {
   taskId?: unknown;
   status?: unknown;
   review?: { failed?: unknown; gated?: unknown };
+  [field: string]: unknown;
 }
 
 /** A run refused only by the missing-review gate says nothing about the task: hench skips it. */
-function isReviewGateRefusal(run: RunLike): boolean {
+export function isReviewGateRefusal(run: RunLike): boolean {
   return run.review !== undefined && run.review.failed !== undefined && run.review.gated === true;
+}
+
+/** Whether hench counts `run` as a hard failure of its task. */
+export function isHardFailure(run: RunLike): boolean {
+  return typeof run.status === "string" && FAILURE_STATUSES.has(run.status);
 }
 
 /**
@@ -45,7 +52,7 @@ export function stuckTaskIdsFromRuns(runsNewestFirst: readonly RunLike[], thresh
   for (const run of runsNewestFirst) {
     if (typeof run.taskId !== "string" || ended.has(run.taskId)) continue;
     if (isReviewGateRefusal(run)) continue;
-    if (typeof run.status === "string" && FAILURE_STATUSES.has(run.status)) {
+    if (isHardFailure(run)) {
       const count = (streak.get(run.taskId) ?? 0) + 1;
       streak.set(run.taskId, count);
       if (count >= threshold) stuck.add(run.taskId);
@@ -70,11 +77,19 @@ async function readRunFile(path: string): Promise<RunLike> {
 /** Read `<runsDir>` (newest first, by run id as hench does) and return the stuck task ids. */
 export async function loadStuckTaskIds(runsDir: string, threshold: number): Promise<Set<string>> {
   if (threshold <= 0) return new Set();
+  return stuckTaskIdsFromRuns(await readRunRecords(runsDir), threshold);
+}
+
+/**
+ * Every run record in `<runsDir>`, newest first by run id as hench's
+ * `listRuns` orders them; none when the directory cannot be read.
+ */
+export async function readRunRecords(runsDir: string): Promise<RunLike[]> {
   let files: string[];
   try {
     files = await readdir(runsDir);
   } catch {
-    return new Set();
+    return [];
   }
   // One file per run id, newest first by id (as hench's listRuns orders them); `.json` wins over `.json.gz`.
   const byId = new Map<string, string>();
@@ -84,6 +99,5 @@ export async function loadStuckTaskIds(runsDir: string, threshold: number): Prom
   const newestFirst = [...byId.entries()].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0)).map(([, name]) => name);
   // A file that cannot be read or parsed is not a run record; hench's listRuns drops it too.
   const settled = await Promise.allSettled(newestFirst.map((name) => readRunFile(join(runsDir, name))));
-  const runs = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-  return stuckTaskIdsFromRuns(runs, threshold);
+  return settled.flatMap((r) => (r.status === "fulfilled" && r.value && typeof r.value === "object" ? [r.value] : []));
 }

@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm, readFile } from "node:fs/promises";
+import { appendFile, mkdtemp, writeFile, mkdir, rm, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -124,6 +124,15 @@ describe("dashboard usage ledger", () => {
     );
 
     expect(readDashboardUsage(tmpDir).map((r) => r.inputTokens)).toEqual([1, 3]);
+  });
+
+  it("round-trips a Sidecar record's lens and reads a line with a field it does not know", async () => {
+    recordDashboardUsage(tmpDir, usageRecord({ command: "sidecar", lens: "plan" }));
+    await appendFile(dashboardUsagePath(tmpDir), `${JSON.stringify({ ...usageRecord({ inputTokens: 7 }), futureField: { a: 1 } })}\n`, "utf-8");
+
+    const records = readDashboardUsage(tmpDir);
+    expect(records[0]).toMatchObject({ command: "sidecar", lens: "plan" });
+    expect(records[1]).toEqual(usageRecord({ inputTokens: 7 }));
   });
 
   it("drops a record with no timestamp instead of dating it to now", async () => {
@@ -333,6 +342,19 @@ describe("Ask spend in the utilization rollup", () => {
     expect(askCommand?.inputTokens).toBe(900);
     const runCommand = data.commands.find((c) => c.package === "hench" && c.command === "run");
     expect(runCommand?.inputTokens).toBe(5_000);
+  });
+
+  it("shows Sidecar turns as their own bucket, apart from Ask", async () => {
+    routeOptions = stub(() => Promise.resolve({ text: "ok", tokenUsage: { input: 900, output: 60 } }));
+    await ask("Anything?");
+    recordDashboardUsage(tmpDir, usageRecord({ command: "sidecar", lens: "plan", inputTokens: 300, outputTokens: 40 }));
+
+    const data = await utilization();
+
+    expect(data.usage.packages.sidecar.inputTokens).toBe(300);
+    expect(data.usage.packages.sidecar.calls).toBe(1);
+    expect(data.usage.packages.web.inputTokens).toBe(900);
+    expect(data.commands.find((c) => c.package === "sidecar" && c.command === "sidecar")?.inputTokens).toBe(300);
   });
 
   it("reports the ask's cache tokens rather than folding them away", async () => {

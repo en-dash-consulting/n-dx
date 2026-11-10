@@ -8,7 +8,8 @@
  * kind, a field or a relation renamed in the declaration fails `tsc` here
  * instead of drawing a blank section.
  */
-import { isCurrent, labelOf, readableFields, type AnySchema, type Store } from "@graview/core";
+import { isCurrent, labelOf, type AnySchema, type Store } from "@graview/core";
+import { readableFields } from "@graview/core/words";
 import { typedReader } from "@graview/core/typed";
 import type { AnyRecord, Edges, Kinds, Types } from "./types.js";
 

@@ -27,6 +27,7 @@ import {
   viewGlyph,
   viewLabel,
   visibleStages,
+  type StageId,
 } from "../../../src/viewer/views/stages.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -95,8 +96,8 @@ const ALL = buildValidViews(null);
 // ── The layout as data ─────────────────────────────────────────
 
 describe("stages.ts", () => {
-  it("orders the loop Analysis → Plan → Work", () => {
-    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
+  it("orders the loop Analysis → Plan → Work → Tune", () => {
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
   });
 
   it("lists only real views, each with a registry renderer", () => {
@@ -120,30 +121,39 @@ describe("stages.ts", () => {
     ]);
   });
 
-  it("puts PRD items and the execution log at the top of Work", () => {
+  it("puts PRD items and the audit at the top of Work", () => {
     const work = STAGES.work.sections.map((s) => s.view);
-    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "activity"]);
+    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "hench-audit"]);
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
-  it("puts CLI help above History on Plan", () => {
-    const plan = STAGES.plan.sections.map((s) => s.view);
-    expect(plan.indexOf("command-reference")).toBeLessThan(plan.indexOf("hench-runs"));
+  it("keeps All Commands off Plan: it is the Reference tab of Settings › Commands", () => {
+    expect(stageViews("plan")).not.toContain("command-reference");
+    expect(isSettingsView("commands")).toBe(true);
   });
 
   it("finds a view's stage, honouring the viewer's scope", () => {
     expect(stageForView("zones")).toBe("analyze");
     expect(stageForView("iso-map")).toBe("analyze"); // the dashboard's hero tile
     expect(stageForView("graph")).toBe("analyze"); // off the page, still the stage's
-    expect(stageForView("hench-runs")).toBe("plan");
+    expect(stageForView("hench-runs")).toBe("tune");
     expect(stageForView("rex-dashboard")).toBe("work");
     expect(stageForView("work")).toBe("work");
     expect(stageForView("home")).toBeNull();
     expect(stageForView("robot-wrangler")).toBeNull();
-    // Token Usage is on Work only; a Rex-only viewer has no Work stage.
-    expect(stageForView("token-usage")).toBe("work");
+    // Token Usage is on Tune only; a Rex viewer's borrowed Tune does not show
+    // global views, so there it lights no stage.
+    expect(stageForView("token-usage")).toBe("tune");
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
-    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("work");
+    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("tune");
+  });
+
+  it("places the PRD Graph and Execution Log on Tune in a Rex viewer", () => {
+    const rex = buildValidViews("rex");
+    expect(stageForView("merge-graph", rex)).toBe("tune");
+    expect(stageForView("activity", rex)).toBe("tune");
+    // Hench's own Tune views are not in a Rex viewer at all.
+    expect(stageForView("hench-runs", rex)).toBeNull();
   });
 
   it("lists each view in at most one stage", () => {
@@ -159,10 +169,11 @@ describe("stages.ts", () => {
   });
 
   it("gives a scoped viewer only its own stage", () => {
-    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work"]);
+    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work", "tune"]);
     expect(visibleStages(buildValidViews("sourcevision"))).toEqual(["analyze"]);
-    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan"]);
-    expect(visibleStages(buildValidViews("hench"))).toEqual(["work"]);
+    // Rex borrows Tune for the PRD Graph and Execution Log.
+    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan", "tune"]);
+    expect(visibleStages(buildValidViews("hench"))).toEqual(["work", "tune"]);
   });
 });
 
@@ -176,10 +187,10 @@ describe("TopNav", () => {
   const tabLabels = () => Array.from(root.querySelectorAll(".topnav-tab[data-stage] .topnav-tab-label")).map((el) => el.textContent);
   const activeTab = () => root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent ?? null;
 
-  it("shows exactly the three stages, under the View navigation landmark", async () => {
+  it("shows exactly the four stages, under the View navigation landmark", async () => {
     await mount(nav("home"));
     expect(root.querySelector('nav[aria-label="View navigation"]')).not.toBeNull();
-    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work"]);
+    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work", "Tune"]);
     expect(activeTab()).toBeNull();
     expect(root.querySelector(".topnav-brand")?.getAttribute("aria-current")).toBe("page");
   });
@@ -246,6 +257,83 @@ describe("TopNav", () => {
     expect(root.querySelector(".runcmd-start")?.textContent).toBe("Run npm run dev");
   });
 
+  it("marks a failed run on the button and in its title, not only in the label", async () => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          // The shape routes-run-commands.ts settles a non-zero exit into.
+          status: { running: false, exitCode: 1, error: "Exited with code 1", stopped: false, label: "npm run dev" },
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn.classList.contains("runcmd-btn--error")).toBe(true);
+    expect(btn.title).toContain("Exited with code 1");
+  });
+
+  it.each([
+    [{ exitCode: 0, stopped: false }, "runcmd-btn--finished", "Finished"],
+    [{ exitCode: 143, stopped: true }, null, "Stopped"],
+  ])("shows a settled run's state %o on the button and in its title", async (settled, cls, text) => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          status: { running: false, error: null, label: "npm run dev", ...settled },
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn.classList.contains("runcmd-btn--error")).toBe(false);
+    if (cls) expect(btn.classList.contains(cls)).toBe(true);
+    expect(btn.title).toContain(text);
+  });
+
+  it("offers the served app as an Open app button opposite Stop, with the log collapsed", async () => {
+    const fallback = globalThis.fetch;
+    const output = [
+      "\x1b[2m> demo@1.0.0 dev\x1b[22m",
+      "",
+      "  \x1b[32m\x1b[1mVITE\x1b[22m v6.0.0\x1b[39m  ready in 210 ms",
+      "  \x1b[32m➜\x1b[39m  \x1b[1mLocal\x1b[22m:   \x1b[36mhttp://localhost:\x1b[1m5173\x1b[22m/\x1b[39m",
+      "  \x1b[2m➜  press h + enter to show help\x1b[22m",
+      "",
+    ].join("\n");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          status: { running: true, label: "npm run dev", output, url: "http://localhost:5173/", exitCode: null, error: null, stopped: false },
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    // The link lives in the menu, not beside the nav button.
+    expect(root.querySelector(".runcmd-open")).toBeNull();
+    act(() => { root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!.click(); });
+
+    const actions = root.querySelector(".runcmd-actions")!;
+    const open = actions.firstElementChild as HTMLAnchorElement;
+    expect(open.classList.contains("runcmd-open")).toBe(true);
+    expect(open.getAttribute("href")).toBe("http://localhost:5173/");
+    expect(open.target).toBe("_blank");
+    expect(actions.lastElementChild?.classList.contains("runcmd-stop")).toBe(true);
+
+    const pre = root.querySelector(".runcmd-output")!;
+    expect(pre.textContent).not.toContain("\x1b");
+    expect(pre.querySelectorAll(".runcmd-line")).toHaveLength(3);
+    expect(pre.textContent).toContain("Local:   http://localhost:5173/");
+    expect(pre.querySelector(".ansi-fg-6")).not.toBeNull();
+  });
+
   it("keeps the run-project control, disabled, in a static export", async () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
     await mount(nav("home"));
@@ -262,9 +350,11 @@ describe("StageLinks", () => {
 
   it("points each stage at its neighbours, wrapping around the loop", async () => {
     await mount(h(StageLinks, { stage: "analyze", validViews: ALL, onNavigate: vi.fn() }));
-    expect(links()).toEqual(["work", "plan"]);
+    expect(links()).toEqual(["tune", "plan"]);
     await act(async () => { render(h(StageLinks, { stage: "work", validViews: ALL, onNavigate: vi.fn() }), root); });
-    expect(links()).toEqual(["plan", "analyze"]);
+    expect(links()).toEqual(["plan", "tune"]);
+    await act(async () => { render(h(StageLinks, { stage: "tune", validViews: ALL, onNavigate: vi.fn() }), root); });
+    expect(links()).toEqual(["work", "analyze"]);
   });
 
   it("navigates on click and labels both directions", async () => {
@@ -289,7 +379,7 @@ describe("StageLinks", () => {
 describe("StagePage", () => {
   const rendered: ViewId[] = [];
   const renderView = (view: ViewId) => { rendered.push(view); return h("div", { class: "fake-view", "data-rendered": view }); };
-  const page = (stage: "analyze" | "plan" | "work", validViews = ALL, navigateTo = vi.fn()) =>
+  const page = (stage: StageId, validViews = ALL, navigateTo = vi.fn()) =>
     h(StagePage, { stage, validViews, navigateTo, renderView });
   const sectionViews = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view);
 
@@ -320,41 +410,45 @@ describe("StagePage", () => {
 
   it("opens and closes a section, remembering the choice", async () => {
     await mount(page("work"));
-    const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="activity"] .stage-section-toggle')!;
+    const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="hench-audit"] .stage-section-toggle')!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     act(() => { toggle.click(); });
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     const body = document.getElementById(toggle.getAttribute("aria-controls")!);
-    expect(body?.querySelector('[data-rendered="activity"]')).not.toBeNull();
-    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:activity": true });
+    expect(body?.querySelector('[data-rendered="hench-audit"]')).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:hench-audit": true });
 
     render(null, root);
     root.remove();
     await mount(page("work"));
-    expect(root.querySelector('.stage-section[data-view="activity"] .stage-section-toggle')?.getAttribute("aria-expanded")).toBe("true");
+    expect(root.querySelector('.stage-section[data-view="hench-audit"] .stage-section-toggle')?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("keeps History a bounded scroll region until Expand, remembering the choice", async () => {
-    expect(STAGES.work.sections.find((s) => s.view === "activity")?.scroll).toBe(true);
-    expect(STAGES.plan.sections.find((s) => s.view === "hench-runs")?.scroll).toBe(true);
+  // No stage section sets `scroll` now that the run history and log are Tune
+  // tabs, so the option is exercised on a section given it for this test.
+  it("keeps a scroll section a bounded region until Expand, remembering the choice", async () => {
+    const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
+    Object.assign(audit, { scroll: true });
+    try {
+      localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-audit": true }));
+      await mount(page("work"));
+      const history = () => root.querySelector('.stage-section[data-view="hench-audit"]')!;
+      const body = () => history().querySelector<HTMLElement>(".stage-section-body")!;
+      const expand = () => history().querySelector<HTMLButtonElement>(".stage-section-expand")!;
 
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:activity": true }));
-    await mount(page("work"));
-    const history = () => root.querySelector('.stage-section[data-view="activity"]')!;
-    const body = () => history().querySelector<HTMLElement>(".stage-section-body")!;
-    const expand = () => history().querySelector<HTMLButtonElement>(".stage-section-expand")!;
+      expect(body().classList.contains("stage-section-body--scroll")).toBe(true);
+      expect(body().getAttribute("tabindex")).toBe("0");
+      expect(expand().getAttribute("aria-expanded")).toBe("false");
 
-    expect(body().classList.contains("stage-section-body--scroll")).toBe(true);
-    expect(body().getAttribute("tabindex")).toBe("0");
-    expect(expand().getAttribute("aria-expanded")).toBe("false");
-
-    act(() => { expand().click(); });
-    expect(body().classList.contains("stage-section-body--scroll")).toBe(false);
-    expect(expand().getAttribute("aria-expanded")).toBe("true");
-    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:activity:full": true });
+      act(() => { expand().click(); });
+      expect(body().classList.contains("stage-section-body--scroll")).toBe(false);
+      expect(expand().getAttribute("aria-expanded")).toBe("true");
+      expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:hench-audit:full": true });
+    } finally {
+      Object.assign(audit, { scroll: undefined });
+    }
 
     // Sections without the option get no Expand control.
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-audit": true }));
     render(null, root);
     root.remove();
     await mount(page("work"));
@@ -406,34 +500,65 @@ describe("StagePage", () => {
     expect(map.getAttribute("aria-label")).toBe("Codebase map");
   });
 
-  it("opens a section's view on its own page", async () => {
-    const navigateTo = vi.fn();
-    await mount(page("plan", ALL, navigateTo));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="validation"] .stage-section-open')!.click(); });
-    expect(navigateTo).toHaveBeenCalledWith("validation");
-  });
+  const planTiles = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
 
-  it("embeds the Tasks tree, open on arrival, in a bounded-height body it can fill", async () => {
+  it("renders Plan as the capture bar, then Product, Inbox, Open changes, Plan health and Specs to tighten tiles", async () => {
     await mount(page("plan"));
-    expect(rendered).toContain("prd");
-    const body = root.querySelector('.stage-section[data-view="prd"] .stage-section-body');
-    // The tree's virtual scroller sizes itself from this container; without a
-    // bounded height it measures zero and shows no items.
-    expect(body?.classList.contains("stage-section-body--fill")).toBe(true);
-    expect(body?.querySelector('[data-rendered="prd"]')).not.toBeNull();
+    expect(sectionViews()).toEqual(["analysis"]);
+    expect(planTiles()).toEqual(["product-map", "inbox", "changes-glance", "plan-health", "spec-gaps"]);
+    const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
+    expect(spans).toEqual(["stage-tile--c12 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1", "stage-tile--c6 stage-tile--r1"]);
+    expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
   });
 
-  it("keeps Work lit when its Usage section is opened", async () => {
-    const navigateTo = vi.fn();
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:token-usage": true }));
-    await mount(page("work", ALL, navigateTo));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="token-usage"] .stage-section-open')!.click(); });
-    expect(navigateTo).toHaveBeenCalledWith("token-usage");
+  it("opens Open changes full-screen with List and Tree tabs", async () => {
+    await mount(page("plan"));
+    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes-glance"] .stage-tile-head')!.click(); });
+    const full = root.querySelector(".stage-tile-fullscreen")!;
+    const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);
+    act(() => { tabs[1]!.click(); });
+    // Directly inside the tab panel: stage-tiles.css bounds the tree through `.stage-tile-content > div > .prd-view`.
+    expect(full.querySelector('.stage-tile-content > div > [data-rendered="prd"]')).not.toBeNull();
+  });
 
-    render(null, root);
-    root.remove();
+  it("a v1 project shows Tasks and Product tiles in place of the Inbox and Open changes tiles", async () => {
+    stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
+    await mount(page("plan"));
+    expect(planTiles()).toEqual(["prd", "product", "plan-health"]);
+    const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
+    expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
+    expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");
+  });
+
+  it("keeps Tasks under Plan though Plan lists it only as a tab", () => {
+    expect(stageForView("prd")).toBe("plan");
+  });
+
+  it("renders Tune as a tile grid after its lead, with Spend, Shipped and Outcomes beside Runs", async () => {
+    await mount(page("tune"));
+    expect(sectionViews()).toEqual(["tune"]);
+    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes", "tooling"]);
+  });
+
+  it("a Rex viewer's Tune draws the Execution Log (promoted from Runs' tab) and the PRD Graph, and no Spend", async () => {
+    await mount(page("tune", buildValidViews("rex")));
+    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+    expect(tiles).toEqual(["activity", "merge-graph"]);
+  });
+
+  it("gives a Rex viewer a Tune tab that lights on the PRD Graph and Execution Log", async () => {
+    const rex = buildValidViews("rex");
+    for (const view of ["merge-graph", "activity"] as const) {
+      await mount(h(TopNav, { view, validViews: rex, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
+      expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
+    }
+  });
+
+  it("keeps Tune lit on the pages of its tiles", async () => {
     await mount(h(TopNav, { view: "token-usage", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
-    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
   });
 
   it("drops sections outside the viewer's scope", async () => {
@@ -447,11 +572,11 @@ describe("StagePage", () => {
 // ── Landing ────────────────────────────────────────────────────
 
 describe("HomeView", () => {
-  it("shows the three stages as columns in loop order, each going to its stage", async () => {
+  it("shows the four stages as columns in loop order, each going to its stage", async () => {
     const navigateTo = vi.fn();
     await mount(h(HomeView, { validViews: ALL, navigateTo }));
     const cards = Array.from(root.querySelectorAll<HTMLButtonElement>(".stage-card"));
-    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work"]);
+    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work", "Tune"]);
     expect(cards.every((c) => c.querySelector(".stage-card-mark img"))).toBe(true);
     act(() => { cards[1].click(); });
     expect(navigateTo).toHaveBeenCalledWith("plan");
@@ -484,14 +609,14 @@ describe("HomeView next-step panel", () => {
     rex: { ...STATUS.rex, exists: true, stats: { ...STATUS.rex.stats, total: 0 }, nextTaskTitle: null },
   };
 
-  it("names `init` on a never-touched project, above the three stage cards", async () => {
+  it("names `init` on a never-touched project, above the four stage cards", async () => {
     stubApi([], NOT_INITIALIZED);
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     const panel = root.querySelector(".next-step-panel");
     expect(panel?.getAttribute("data-state")).toBe("not-initialized");
     expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
-    // The panel replaces no stage content — all three cards are still there.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+    // The panel replaces no stage content — all four cards are still there.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
     const panelIndex = Array.from(root.querySelector(".home")!.children).indexOf(panel!);
     const stagesIndex = Array.from(root.querySelector(".home")!.children).findIndex((el) => el.classList.contains("home-stages"));
     expect(panelIndex).toBeLessThan(stagesIndex);
@@ -564,7 +689,7 @@ describe("HomeView next-step panel", () => {
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     expect(root.querySelector(".next-step-panel")).toBeNull();
     // Home itself still renders — the cards just carry no numbers.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
   });
 });
 

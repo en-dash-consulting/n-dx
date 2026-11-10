@@ -1,0 +1,67 @@
+schema: "rex/v2"
+items:
+  "21dc372a-cf64-4436-988e-cfc50de92949":
+    status: "completed"
+    startedAt: "2026-11-05T11:47:27.009Z"
+    completedAt: "2026-11-05T12:01:33.905Z"
+    endedAt: "2026-11-05T12:01:33.905Z"
+    activeIntervals: [{"end":"2026-11-05T11:59:58.756Z","start":"2026-11-05T11:47:27.009Z"},{"end":"2026-11-05T12:01:33.905Z","start":"2026-11-05T12:01:33.905Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T12:01:33.905Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "231adb0e-64e8-401c-91ed-c6ca8e30f5ad":
+    status: "completed"
+    startedAt: "2026-11-05T11:19:23.267Z"
+    completedAt: "2026-11-05T11:34:24.371Z"
+    endedAt: "2026-11-05T11:34:24.371Z"
+    activeIntervals: [{"end":"2026-11-05T11:32:56.923Z","start":"2026-11-05T11:19:23.267Z"},{"end":"2026-11-05T11:34:24.371Z","start":"2026-11-05T11:34:24.371Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
+    lastModified: "2026-11-05T11:34:24.371Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "327fdc16-955c-4428-a05a-4195d92b8c7c":
+    status: "completed"
+    startedAt: "2026-11-05T12:01:39.738Z"
+    completedAt: "2026-11-05T12:17:05.982Z"
+    endedAt: "2026-11-05T12:17:05.982Z"
+    activeIntervals: [{"end":"2026-11-05T12:15:29.921Z","start":"2026-11-05T12:01:39.738Z"},{"end":"2026-11-05T12:17:05.982Z","start":"2026-11-05T12:17:05.982Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T12:17:05.982Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3dcb6301-dd80-41a3-9929-ee2977c57eca":
+    status: "completed"
+    startedAt: "2026-11-05T12:17:12.026Z"
+    completedAt: "2026-11-05T12:30:24.745Z"
+    endedAt: "2026-11-05T12:30:24.745Z"
+    activeIntervals: [{"end":"2026-11-05T12:28:53.409Z","start":"2026-11-05T12:17:12.026Z"},{"end":"2026-11-05T12:30:24.745Z","start":"2026-11-05T12:30:24.745Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- shows field-level error styling after blur on empty title\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T12:30:24.745Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4c55d13a-5799-4158-bbe2-bcaf30ddaede":
+    status: "completed"
+    startedAt: "2026-11-05T11:34:30.151Z"
+    completedAt: "2026-11-05T11:47:21.409Z"
+    endedAt: "2026-11-05T11:47:21.409Z"
+    activeIntervals: [{"end":"2026-11-05T11:45:49.216Z","start":"2026-11-05T11:34:30.151Z"},{"end":"2026-11-05T11:47:21.409Z","start":"2026-11-05T11:47:21.409Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T11:47:21.409Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "59259b06-9964-48af-b9de-f2b4be6cd51a":
+    status: "completed"
+    startedAt: "2026-11-05T12:31:20.391Z"
+    completedAt: "2026-11-05T12:42:56.536Z"
+    endedAt: "2026-11-05T12:42:56.536Z"
+    activeIntervals: [{"end":"2026-11-05T12:38:48.302Z","start":"2026-11-05T12:31:20.391Z"},{"end":"2026-11-05T12:42:56.536Z","start":"2026-11-05T12:42:56.536Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- every `rex <command>` exists in rex --help\n- tests/e2e/docs-command-refs.test.js > user docs name only commands and MCP tools the build has > every `rex <command>` exists in rex --help\n  AssertionError: expected [ 'docs/packages/web.md: rex ready' ] to deeply equal []\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T12:42:56.536Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f86e6895-eaa2-4d7f-85c8-e6964a9b1fa7":
+    status: "completed"
+    startedAt: "2026-11-05T12:42:56.536Z"
+    completedAt: "2026-11-05T12:42:56.536Z"
+    endedAt: "2026-11-05T12:42:56.536Z"
+    activeIntervals: [{"end":"2026-11-05T12:42:56.536Z","start":"2026-11-05T12:42:56.536Z"}]
+    appliedAt: "2026-11-05T12:42:56.536Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-05T12:42:56.536Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

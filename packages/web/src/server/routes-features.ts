@@ -40,7 +40,7 @@ interface FeatureDefinition {
   impact: string;
   /** Longer explanation revealed by the toggle's info control. */
   details?: string;
-  package: "sourcevision" | "rex" | "hench" | "git";
+  package: FeatureToggle["package"];
   stability: "experimental" | "stable" | "deprecated";
   defaultValue: boolean;
 }
@@ -161,6 +161,24 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "experimental",
     defaultValue: false,
   },
+  {
+    key: "hench.runVerdict",
+    label: "Run verdict banner",
+    description: "Show a verdict banner on a task's detail panel when its latest run did not complete: why it failed, the first thing to do next, and which attempt it was.",
+    impact: "Read-only. The verdict comes from fixed rules over the run record (hench runs diagnose), with no model call.",
+    package: "hench",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  {
+    key: "hench.readyNext",
+    label: "Ready next",
+    description: "Replace Live's Up next list with Ready next: lanes of ready tasks that can run side by side, each with its command and the reason for every task in or out.",
+    impact: "Read-only. The plan comes from fixed rules (ndx work --plan-queue), with no model call; it starts no run and claims nothing.",
+    package: "hench",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Git ───────────────────────────────────────────────────────────
   {
     key: FAIL_FORWARD_FEATURE,
@@ -192,6 +210,25 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     description: "When every uncommitted file came from the same tool — all PRD files, or all SourceVision scan output — commit them automatically with a constant message instead of waiting for the button in the git panel.",
     impact: "Only ever commits a tree that contains nothing else, and never pushes. A tree holding any of your own work is left alone.",
     package: "git",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  {
+    key: "git.branchHealth",
+    label: "Branch health",
+    description: "Show a health strip on each Workspaces card: commits ahead of and behind its base, files predicted to conflict, whether the branches it stacks on are contained, and its PR's failing checks. Expand the strip for the full status.",
+    impact: "Read-only, from fixed rules with no model call. git computes the predicted merge in its object store and never touches the worktree, index or HEAD. gh is asked only when Sidecar GitHub reads (web.sidecarGithubReads) are on. When disabled, /api/branch-health refuses.",
+    package: "git",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  // ── Web dashboard ──────────────────────────────────────────────────
+  {
+    key: "web.sidecar",
+    label: "Sidecar",
+    description: "Hold conversations with a vendor CLI from the dashboard: each turn posts to the server, which runs the CLI and streams the reply back.",
+    impact: "Each turn spends tokens through your Claude or Codex CLI. When disabled, every /api/sidecar route refuses.",
+    package: "web",
     stability: "experimental",
     defaultValue: false,
   },

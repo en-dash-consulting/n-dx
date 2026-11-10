@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "421688bd-3b79-49b0-b979-b4143026b032":
+    status: "completed"
+    startedAt: "2026-11-09T18:33:38.094Z"
+    completedAt: "2026-11-09T18:35:11.716Z"
+    endedAt: "2026-11-09T18:35:11.716Z"
+    activeIntervals: [{"end":"2026-11-09T18:35:11.716Z","start":"2026-11-09T18:33:38.094Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "repo-trust-css.test.ts escapes the full regex metacharacter set via a local escapeRegExp; self-check added."
+    lastModified: "2026-11-09T18:35:11.716Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "452a9522-7ee1-488d-9e62-32741e20216a":
+    status: "completed"
+    startedAt: "2026-11-09T18:27:00.393Z"
+    completedAt: "2026-11-09T18:33:28.854Z"
+    endedAt: "2026-11-09T18:33:28.854Z"
+    activeIntervals: [{"end":"2026-11-09T18:33:28.854Z","start":"2026-11-09T18:27:00.393Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "RepoExecutionConfig.sources holds only paths; PRD run blocks are one directory entry named by new prdRunBlocksPath (outside the digest). Report and strip show the count; strip matches the path by equality; GROUPED_PRD_SOURCE removed."
+    lastModified: "2026-11-09T18:33:28.854Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fd199c87-7456-441e-90ea-122f5daf354e":
+    status: "completed"
+    startedAt: "2026-11-09T18:35:11.716Z"
+    completedAt: "2026-11-09T18:35:11.716Z"
+    endedAt: "2026-11-09T18:35:11.716Z"
+    activeIntervals: [{"end":"2026-11-09T18:35:11.716Z","start":"2026-11-09T18:35:11.716Z"}]
+    appliedAt: "2026-11-09T18:35:11.716Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-09T18:26:05.391Z"
+    lastModified: "2026-11-09T18:35:11.716Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,6 +1,6 @@
 import { h, render, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
+import { useState, useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import type { DetailItem, ViewId } from "./types.js";
 import { ALL_DATA_FILES } from "./external.js";
 import {
@@ -18,8 +18,6 @@ import {
   RefreshQueueStatus,
   PollingSuspensionIndicator,
   ActiveOperationsTray,
-  GitStatusBanner,
-  SessionsPanel,
   type ServerIdentity,
   SearchOverlay,
   useSearchOverlay,
@@ -30,6 +28,17 @@ import {
   initDensity,
   RepoTrustStrip,
   ServerUnavailableNotice,
+  SidecarDock,
+  PlaceWithSidecarContext,
+  SidecarPlacementContext,
+  createCardDrafts,
+  PlanWithSidecarContext,
+  planFirstTurn,
+  planSurvivesAreaReport,
+  AskInSidecarContext,
+  DescribeInSidecarContext,
+  DiagnoseInSidecarContext,
+  GhostCardsContext,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -42,12 +51,9 @@ import {
   useActiveOperations,
   useGitStatus,
   useAutoCommitGenerated,
-  useWorktrees,
-  useClaims,
-  useLive,
-  isAnalysisJob,
-  liveRunCount,
   useFeatureToggle,
+  useSidecarShell,
+  useSidecarProposals,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -58,6 +64,7 @@ import { waitForSession } from "./session.js";
 import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
 import { LiveBar } from "./views/domain-live.js";
+import { captureSignInReturn } from "./views/connections.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
@@ -67,6 +74,8 @@ if (isDeployedMode()) {
   // Served through the hub at /p/<id>/: prefix every root-relative fetch.
   // At the root this is a no-op.
   installBasePathFetch();
+  // Before the router's first history write, which keeps the path alone.
+  captureSignInReturn();
 }
 
 initTheme();
@@ -119,6 +128,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     selectedZone,
     selectedRunId,
     selectedTaskId,
+    selectedTab,
+    selectedArea,
     askSeed,
     navigateTo,
     handleSidebarNav,
@@ -139,12 +150,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // again — a second caller would mean a second poller and a second socket.
   const jobs = useActiveOperations();
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
-  const { worktrees } = useWorktrees();
-  const { claims } = useClaims();
-  const liveAvailable = validViews.has("live") && !isDeployedMode();
-  const live = useLive(liveAvailable);
-  const analyses = live?.jobs.filter(isAnalysisJob).length ?? 0;
-  const liveRuns = live ? liveRunCount(live) : null;
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -159,6 +164,30 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // enrichment gate before their hooks run.
   const askEnabled = useFeatureToggle("sourcevision.ask", false);
   useAutoCommitGenerated(gitStatus, useFeatureToggle("git.autoCommitGenerated", false), refetchGitStatus);
+  // The Product page reports its open capability, which Sidecar attaches.
+  const [openCapability, setOpenCapability] = useState<string | null>(null);
+  // The PRD page reports the task picked in its tree, which the route does not carry.
+  const [openTask, setOpenTask] = useState<string | null>(null);
+  // The Zones page reports the zone open in its slideout, which the route does not carry.
+  const [openZone, setOpenZone] = useState<string | null>(null);
+  // The Workspaces board reports the worktree card attached to Sidecar (Diagnose branch).
+  const [openWorktree, setOpenWorktree] = useState<string | null>(null);
+  // The change "Place with Sidecar" attached (Place lens); dropped when the operator leaves the page.
+  const [openChange, setOpenChange] = useState<string | null>(null);
+  // The task whose failed run "Diagnose in Sidecar" attached (Diagnose run lens); dropped with the page.
+  const [diagnoseTask, setDiagnoseTask] = useState<string | null>(null);
+  // "Plan with Sidecar" on a capture bar: the Plan lens, aimed at an area when the capture was scoped to one; dropped with the page.
+  const [planWith, setPlanWith] = useState<{ area: string | null; seq: number } | null>(null);
+  // The text that bar typed, waiting to go as the session's first turn once the session holds that lens and target.
+  const [planText, setPlanText] = useState<string | null>(null);
+  // The area view that is open (Plan's tile or the Product page) and the capability selected in it; it reports itself while mounted.
+  const [openArea, setOpenArea] = useState<{ id: string; label: string; capabilityId: string | null } | null>(null);
+  // The change "Describe in Sidecar" / "Tighten with Sidecar" attached (Describe lens); dropped with the page.
+  const [describeChange, setDescribeChange] = useState<string | null>(null);
+  // The task, capability or zone "Ask Sidecar" / "Explain in Sidecar" attached (its kind's lens); dropped with the page.
+  const [askItem, setAskItem] = useState<{ kind: "task" | "capability" | "zone"; ref: string; seq: number } | null>(null);
+  // The change selected in the Inbox triage queue (Place lens); the page reports it while mounted.
+  const [inboxChange, setInboxChange] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -183,6 +212,135 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     fallbackPage(validViews),
   );
   const pageView: ViewId = page.view;
+  // Sidecar: the drawer attaches the page under any settings overlay. The top-nav button, ⌘J and the drawer all read `web.sidecar` here.
+  // A static export has no server to hold a session.
+  const sidecarShell = useSidecarShell(
+    useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
+    { view: pageView, zone: openZone ?? page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange, diagnoseTaskId: diagnoseTask, describeChangeId: describeChange, inboxChangeId: inboxChange, ask: askItem, plan: planWith, areaView: openArea },
+  );
+  const showSidecar = sidecarShell.drawer.show;
+  // The waiting change-set cards, read once for every Plan surface that draws their ghosts (UX5, SP5).
+  const proposals = useSidecarProposals(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
+  useEffect(() => { setOpenChange(null); setDiagnoseTask(null); setDescribeChange(null); setAskItem(null); setPlanWith(null); setPlanText(null); }, [pageView]);
+  // Send the typed text once the open session has followed the attachment (a PATCH answers
+  // the change), so the turn opens with the Plan lens and its target rather than racing them.
+  const { sidecar, drawer } = sidecarShell;
+  useEffect(() => {
+    if (planText === null || !planWith) return;
+    const next = planFirstTurn({
+      drawerOpen: drawer.open,
+      ready: sidecar.attachment.ready,
+      lens: sidecar.attachment.lens.running,
+      busy: sidecar.running || sidecar.sending,
+      session: sidecar.session,
+      area: planWith.area,
+      followError: sidecar.followError,
+    });
+    if (next.action === "wait") return;
+    if (next.action === "new-session") {
+      // The open session has ended: the first turn goes to a fresh one. Once per click.
+      if (planSessionStarted.current) return;
+      planSessionStarted.current = true;
+      void sidecar.newSession().then((ok) => { if (!ok) setPlanText(null); });
+      return;
+    }
+    setPlanText(null);
+    if (next.action === "fail") sidecar.reportError(next.reason);
+    else void sidecar.send(planText);
+  }, [planText, planWith, drawer.open, sidecar.attachment.ready, sidecar.attachment.lens.running, sidecar.session, sidecar.running, sidecar.sending, sidecar.followError]);
+  const planSessionStarted = useRef(false);
+  const planWithRef = useRef(planWith);
+  planWithRef.current = planWith;
+  // Null while Sidecar is off, so no capture bar offers "Plan with Sidecar". A change sent to
+  // Place or a run sent to Diagnose would outrank the Plan lens, so a click lets both go.
+  const planWithSidecar = useMemo(
+    () => (sidecarShell.button ? {
+      plan: (text: string, area?: string) => {
+        setAskItem(null);
+        setOpenChange(null);
+        setDiagnoseTask(null);
+        setDescribeChange(null);
+        setPlanWith((prev) => ({ area: area ?? null, seq: (prev?.seq ?? 0) + 1 }));
+        planSessionStarted.current = false;
+        setPlanText(text);
+        showSidecar();
+      },
+      planIn: (areaId: string) => {
+        setAskItem(null);
+        setOpenChange(null);
+        setDiagnoseTask(null);
+        setDescribeChange(null);
+        setPlanWith((prev) => ({ area: areaId, seq: (prev?.seq ?? 0) + 1 }));
+        setPlanText(null);
+        showSidecar();
+      },
+      reportArea: (area: { id: string; label: string; capabilityId: string | null } | null) => {
+        setOpenArea(area);
+        if (!planSurvivesAreaReport(planWithRef.current, area)) {
+          planWithRef.current = null;
+          setPlanWith(null);
+          setPlanText(null);
+        }
+      },
+    } : null),
+    [sidecarShell.button !== null, showSidecar],
+  );
+  // Null while Sidecar is off, so no change offers "Describe in Sidecar". Describe on a change
+  // outranks the Plan lens, Diagnose and Place, so a click lets them go.
+  const describeInSidecar = useMemo(
+    () => (sidecarShell.button ? {
+      describe: (id: string) => {
+        setOpenChange(null);
+        setDiagnoseTask(null);
+        setPlanWith(null);
+        setPlanText(null);
+        setDescribeChange(id);
+        showSidecar();
+      },
+      attached: describeChange,
+    } : null),
+    [sidecarShell.button !== null, showSidecar, describeChange],
+  );
+  // Null while Sidecar is off, so no task, capability or zone page offers Ask or Explain. An ask
+  // outranks the Plan lens, so a click lets it go; a change sent to Place, Describe or Diagnose outranks the ask.
+  const askInSidecar = useMemo(
+    () => (sidecarShell.button ? {
+      ask: (kind: "task" | "capability" | "zone", ref: string) => {
+        setPlanWith(null);
+        setPlanText(null);
+        setAskItem((prev) => ({ kind, ref, seq: (prev?.seq ?? 0) + 1 }));
+        showSidecar();
+      },
+      attached: askItem ? { kind: askItem.kind, ref: askItem.ref } : null,
+    } : null),
+    [sidecarShell.button !== null, showSidecar, askItem],
+  );
+  // Null while Sidecar is off, so no failed run offers "Diagnose in Sidecar".
+  const diagnoseInSidecar = useMemo(
+    () => (sidecarShell.button ? { diagnose: (taskId: string) => { setDescribeChange(null); setDiagnoseTask(taskId); showSidecar(); }, attached: diagnoseTask } : null),
+    [sidecarShell.button !== null, showSidecar, diagnoseTask],
+  );
+  // Null while Sidecar is off, so no change offers "Place with Sidecar".
+  const placeWithSidecar = useMemo(
+    () => (sidecarShell.button ? { place: (id: string) => { setDescribeChange(null); setOpenChange(id); showSidecar(); }, attached: openChange, select: setInboxChange } : null),
+    [sidecarShell.button !== null, showSidecar, openChange],
+  );
+  // The drawer's placement cards and one working copy per card, shared with placement mode (SP2).
+  // Null while Sidecar is off, so the candidate panel never yields.
+  const [cardDrafts] = useState(createCardDrafts);
+  const placementCards = sidecar.cards;
+  const placementShare = useMemo(
+    () => (sidecarShell.button ? { cards: placementCards.filter((c) => c.kind === "placement"), drafts: cardDrafts } : null),
+    [sidecarShell.button !== null, placementCards],
+  );
+  // Null while Sidecar is off, so the Workspaces cards offer no attach control.
+  const attachWorktree = useMemo(
+    () => (sidecarShell.button ? (key: string | null) => {
+      setOpenWorktree(key);
+      if (key) showSidecar();
+    } : undefined),
+    [sidecarShell.button !== null, showSidecar],
+  );
   const stage = stageForView(pageView, validViews);
 
   // The commands sheet is UI state, not a route. Any navigation lowers it —
@@ -254,15 +412,15 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, setOpenZone, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(Fragment, null,
+  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(AskInSidecarContext.Provider, { value: askInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
+    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope, sidecar: sidecarShell.button }),
     isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
       ? h(LiveBar, { view: pageView, taskId: page.taskId, navigateTo })
       : null,
@@ -270,23 +428,27 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     // trusted. Server-backed; renders nothing in a standalone viewer. Below
     // LiveBar so the nav chrome stays contiguous — both sit above main content.
     h(RepoTrustStrip, null),
-    h("div", { class: "app-body" },
-      h("main", {
-        id: "main-content",
-        // The Tasks (prd) view manages its own internal scroll region, so the
-        // main column becomes a non-scrolling flex container for it.
-        class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
-        role: "main",
-        "aria-label": "Main content",
-        onClick: handleTripleClick,
-      },
-        h(PageTitle, { view: pageView }),
-        renderViewContent(pageView, loading, viewCtx),
+    // The Sidecar drawer docks beside the page body, never over it: the body
+    // (and the stage links inside it) narrows by the drawer's width.
+    h(SidecarDock, { open: sidecarShell.drawer.open, sidecar: sidecarShell.sidecar, onClose: sidecarShell.drawer.close },
+      h("div", { class: "app-body" },
+        h("main", {
+          id: "main-content",
+          // The Tasks (prd) view manages its own internal scroll region, so the
+          // main column becomes a non-scrolling flex container for it.
+          class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
+          role: "main",
+          "aria-label": "Main content",
+          onClick: handleTripleClick,
+        },
+          h(PageTitle, { view: pageView }),
+          renderViewContent(pageView, loading, viewCtx),
+        ),
+        h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
+        !isFeatureDisabled("detailPanel")
+          ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
+          : null,
       ),
-      h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
-      !isFeatureDisabled("detailPanel")
-        ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
-        : null,
     ),
     h(BottomBar, {
       server,
@@ -296,6 +458,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       settingsOpen,
       onToggleCommands: toggleCommands,
       commandsOpen,
+      gitStatus,
+      onGitCommitted: refetchGitStatus,
     }),
     h(CommandsSheet, { open: commandsOpen, onClose: closeCommands },
       renderActiveView("command-reference", viewCtx),
@@ -311,8 +475,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
         ? h("div", { class: "refresh-toast", role: "status", "aria-live": "polite" }, "Data updated")
         : null,
       h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
-      h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
-      h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
       h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
       h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     ),
@@ -331,7 +493,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  );
+  ))))))));
 }
 
 const root = document.getElementById("app");

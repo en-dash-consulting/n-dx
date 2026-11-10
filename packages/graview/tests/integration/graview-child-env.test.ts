@@ -80,6 +80,8 @@ describe.skipIf(process.platform === "win32")("the environment graview's childre
   });
 
   it("the npx fallback does not receive a credential, and keeps npm's own config", async () => {
+    // npx runs only on the opt-in (graview-bin.ts); without it there is no fallback to check.
+    vi.stubEnv("NDX_GRAVIEW_NPX", "1");
     executable(join(stubs, "npx"), `#!/bin/sh\nenv > ${JSON.stringify(envFile())}\n`);
     expect(await main(["check", root, "--quiet"])).toBe(0);
     const env = childEnv();

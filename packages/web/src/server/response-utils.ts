@@ -119,3 +119,20 @@ export function readBody(req: IncomingMessage, res?: ServerResponse): Promise<st
     req.on("error", reject);
   });
 }
+
+/** The request body as a JSON object (empty body: `{}`), else the reason it is not one. */
+export async function readJsonObject(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<Record<string, unknown> | string> {
+  let parsed: unknown;
+  try {
+    const body = await readBody(req, res);
+    parsed = body.trim() ? JSON.parse(body) : {};
+  } catch (err) {
+    return `Invalid request body: ${errorMessage(err)}`;
+  }
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : "Request body must be a JSON object";
+}

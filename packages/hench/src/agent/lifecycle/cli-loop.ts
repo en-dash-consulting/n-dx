@@ -147,6 +147,7 @@ import {
 import type { SharedLoopOptions } from "./shared.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
+import { parseLineEvents } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
 import {
@@ -431,6 +432,10 @@ function sleep(ms: number): Promise<void> {
  * This bridge converts the adapter's normalized RuntimeEvent into the
  * mutation-based accumulation that the rest of cli-loop expects. It also
  * emits stream output for the dashboard/CLI UI.
+ *
+ * `toolCallsById` holds this spawn's calls by vendor call id, so a result that
+ * names its call (Claude `tool_use_id`) lands on that call even when several
+ * calls precede their results; a result without one goes to the latest call.
  */
 function applyRuntimeEvent(
   event: RuntimeEvent,
@@ -554,8 +559,14 @@ export function toPersistedEvent(event: RuntimeEvent): PersistedRuntimeEvent {
     timestamp: event.timestamp,
   };
   if (event.text !== undefined) persisted.text = event.text;
-  if (event.toolCall) persisted.toolCall = { tool: event.toolCall.tool, input: { ...event.toolCall.input } };
-  if (event.toolResult) persisted.toolResult = { tool: event.toolResult.tool, output: event.toolResult.output, durationMs: event.toolResult.durationMs };
+  if (event.toolCall) {
+    persisted.toolCall = { tool: event.toolCall.tool, input: { ...event.toolCall.input } };
+    if (event.toolCall.id !== undefined) persisted.toolCall.id = event.toolCall.id;
+  }
+  if (event.toolResult) {
+    persisted.toolResult = { tool: event.toolResult.tool, output: event.toolResult.output, durationMs: event.toolResult.durationMs };
+    if (event.toolResult.id !== undefined) persisted.toolResult.id = event.toolResult.id;
+  }
   if (event.tokenUsage) persisted.tokenUsage = { ...event.tokenUsage };
   if (event.failure) {
     persisted.failure = { category: event.failure.category, message: event.failure.message };
@@ -1325,12 +1336,37 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
     }
 
     function processLine(line: string): void {
-      // Step 1: Parse the line through the adapter for event classification
-      const event = adapter.parseEvent(line, turnCounter.value + 1, {});
+      // Step 1: Parse the line through the adapter for event classification.
+      // One line can carry several events (a Claude `user` line answering two
+      // tool calls), so every step below runs per event.
+      const events = parseLineEvents(adapter, line, turnCounter.value + 1);
+      for (const event of events) onToolEvent(event);
 
+      if (useEventPipeline && accumulator) {
+        // ── Event pipeline: push to accumulator + emit UI ──
+        for (const event of events) {
+          eventCount++;
+          accumulator.push(event);
+          emitStreamOutput(event, vendorLabel);
+          if (event.type === "assistant") turnCounter.value++;
+          if (liveProgress) liveProgress.turns = turnCounter.value;
+        }
+        processRawLinePipeline(line, events.length > 0);
+      } else {
+        // ── Legacy: inline mutation ──
+        for (const event of events) {
+          eventCount++;
+          applyRuntimeEvent(event, result, turnCounter, vendorLabel, toolCallsById);
+        }
+        processRawLineLegacy(line, events.length > 0);
+      }
+    }
+
+    /** The intercepts and narration a parsed tool call drives. */
+    function onToolEvent(event: RuntimeEvent): void {
       // Turn cap for vendors without a flag for it: every assistant message
       // and tool call is one agent step.
-      if (countSteps && (event?.type === "assistant" || event?.type === "tool_use")) {
+      if (countSteps && (event.type === "assistant" || event.type === "tool_use")) {
         agentSteps++;
         if (agentSteps > maxTurns) stopForTurnCap(agentSteps);
       }
@@ -1339,7 +1375,7 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
       // above the pipeline branches, so it happens once for both of them —
       // and reuses the tool call the adapter has already parsed rather than
       // adding a second pass over the output.
-      if (event?.type === "tool_use" && event.toolCall) {
+      if (event.type === "tool_use" && event.toolCall) {
         recordFileWork(event.toolCall.tool, event.toolCall.input, event.turn);
       }
 
@@ -1347,7 +1383,7 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
       // plan text and terminate the spawn so the outer loop can prompt the
       // user (or auto-accept) and re-run with permissionMode "acceptEdits".
       if (
-        event?.type === "tool_use" &&
+        event.type === "tool_use" &&
         event.toolCall?.tool === "ExitPlanMode" &&
         !result.planModeIntercept
       ) {
@@ -1362,7 +1398,7 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
 
       // Background-wait signal: recorded, not acted on. Which calls count is
       // the adapter's business. See SpawnResult.backgroundWait.
-      if (event?.type === "tool_use" && event.toolCall && adapter.detectBackgroundWait) {
+      if (event.type === "tool_use" && event.toolCall && adapter.detectBackgroundWait) {
         const signal = adapter.detectBackgroundWait(event.toolCall);
         if (signal) result.backgroundWait = signal;
       }
@@ -1374,7 +1410,7 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
       // Only invocations feed the detector here: a tool's result arrives on a
       // later line (Claude's `user` message), after the call has to be judged,
       // so on this path it falls back to name+arguments identity.
-      if (livelock && event?.type === "tool_use" && event.toolCall && !result.livelock) {
+      if (livelock && event.type === "tool_use" && event.toolCall && !result.livelock) {
         const detection = livelock.record({
           tool: event.toolCall.tool,
           input: event.toolCall.input,
@@ -1387,98 +1423,82 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
           void terminateProcessTree(proc);
         }
       }
+    }
 
-      if (useEventPipeline && accumulator) {
-        // ── Event pipeline: push to accumulator + emit UI ──
-        if (event) {
-          eventCount++;
-          accumulator.push(event);
-          emitStreamOutput(event, vendorLabel);
-          if (event.type === "assistant") turnCounter.value++;
-          if (liveProgress) liveProgress.turns = turnCounter.value;
-        }
-
-        // Step 2: Extract token usage → RuntimeEvent → accumulator
-        if (line.trim()) {
-          try {
-            const rawJson = JSON.parse(line);
-            captureSessionId(rawJson);
-            if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
-            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
-            if (tokenEvent) {
-              accumulator.push(tokenEvent);
-              // Mirror the accumulator's own arithmetic (a plain sum over token
-              // events) rather than reading its derived getter, which rebuilds
-              // from the whole event list and would make this O(n²) per spawn.
-              if (liveProgress && tokenEvent.tokenUsage) {
-                liveProgress.tokenUsage = addTokenUsage(liveProgress.tokenUsage, tokenEvent.tokenUsage);
-              }
-            }
-
-            // Extract completion metadata (num_turns, cost_usd) from raw JSON
-            const type = rawJson.type as string | undefined;
-            if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
-              if (typeof rawJson.num_turns === "number") completionTurns = rawJson.num_turns;
-              if (typeof rawJson.cost_usd === "number") completionCostUsd = rawJson.cost_usd;
-
-              // Fallback token usage from completion event
-              if (rawJson.usage && typeof rawJson.usage === "object") {
-                if (accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
-                  const fallback = parseStreamTokenUsage(rawJson);
-                  if (fallback) {
-                    accumulator.push({
-                      type: "token_usage",
-                      vendor: tokenMetadata.vendor,
-                      turn: turnCounter.value || 1,
-                      timestamp: new Date().toISOString(),
-                      tokenUsage: fallback,
-                    });
-                  }
-                }
-              }
-            }
-          } catch {
-            if (!event && line.trim()) {
-              info(line);
-            }
-          }
-        }
-      } else {
-        // ── Legacy: inline mutation ──
-        if (event) {
-          eventCount++;
-          applyRuntimeEvent(event, result, turnCounter, vendorLabel, toolCallsById);
-        }
-
-        // Step 2: Extract token usage from raw JSON (parallel to event parsing)
-        // Token usage lives in the raw JSON payload, not in RuntimeEvent.
-        if (line.trim()) {
-          try {
-            const rawJson = JSON.parse(line);
-            captureSessionId(rawJson);
-            if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
-            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
-
-            // Extract completion metadata (num_turns, cost_usd, fallback usage)
-            const type = rawJson.type as string | undefined;
-            if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
-              extractCompletionMetadata(rawJson, result);
-            }
-          } catch {
-            // Not JSON — stream raw output for visibility if adapter didn't handle it
-            if (!event && line.trim()) {
-              info(line);
-            }
+    /** Step 2 on the event pipeline: token usage, session id and completion metadata from the raw line. */
+    function processRawLinePipeline(line: string, parsed: boolean): void {
+      if (!accumulator || !line.trim()) return;
+      try {
+        const rawJson = JSON.parse(line);
+        captureSessionId(rawJson);
+        if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
+        const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
+        if (tokenEvent) {
+          accumulator.push(tokenEvent);
+          // Mirror the accumulator's own arithmetic (a plain sum over token
+          // events) rather than reading its derived getter, which rebuilds
+          // from the whole event list and would make this O(n²) per spawn.
+          if (liveProgress && tokenEvent.tokenUsage) {
+            liveProgress.tokenUsage = addTokenUsage(liveProgress.tokenUsage, tokenEvent.tokenUsage);
           }
         }
 
-        // The legacy path mutates `result` line by line, so live counters are a
-        // copy of it rather than a parallel tally. Taken after token extraction
-        // so a line's usage is included in the same beat as its turn.
-        if (liveProgress) {
-          liveProgress.turns = result.turns || turnCounter.value;
-          liveProgress.tokenUsage = { ...result.tokenUsage };
+        // Extract completion metadata (num_turns, cost_usd) from raw JSON
+        const type = rawJson.type as string | undefined;
+        if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
+          if (typeof rawJson.num_turns === "number") completionTurns = rawJson.num_turns;
+          if (typeof rawJson.cost_usd === "number") completionCostUsd = rawJson.cost_usd;
+
+          // Fallback token usage from completion event
+          if (rawJson.usage && typeof rawJson.usage === "object") {
+            if (accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
+              const fallback = parseStreamTokenUsage(rawJson);
+              if (fallback) {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: turnCounter.value || 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: fallback,
+                });
+              }
+            }
+          }
         }
+      } catch {
+        if (!parsed) info(line);
+      }
+    }
+
+    /**
+     * Step 2 on the legacy path: token usage lives in the raw JSON payload,
+     * not in RuntimeEvent, so it is read beside event parsing.
+     */
+    function processRawLineLegacy(line: string, parsed: boolean): void {
+      if (line.trim()) {
+        try {
+          const rawJson = JSON.parse(line);
+          captureSessionId(rawJson);
+          if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
+          extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
+
+          // Extract completion metadata (num_turns, cost_usd, fallback usage)
+          const type = rawJson.type as string | undefined;
+          if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
+            extractCompletionMetadata(rawJson, result);
+          }
+        } catch {
+          // Not JSON — stream raw output for visibility if adapter didn't handle it
+          if (!parsed) info(line);
+        }
+      }
+
+      // The legacy path mutates `result` line by line, so live counters are a
+      // copy of it rather than a parallel tally. Taken after token extraction
+      // so a line's usage is included in the same beat as its turn.
+      if (liveProgress) {
+        liveProgress.turns = result.turns || turnCounter.value;
+        liveProgress.tokenUsage = { ...result.tokenUsage };
       }
     }
   });

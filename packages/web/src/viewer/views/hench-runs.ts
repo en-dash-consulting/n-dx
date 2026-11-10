@@ -20,12 +20,13 @@ import {
   RexTaskLink,
   CopyLinkButton,
   ActiveTasksPanel,
-  ConcurrencyPanel,
-  MemoryPanel,
-  WsHealthPanel,
-  ThrottleControlsPanel,
   TaskStartControl,
+  DiagnoseInSidecarButton,
+  RunVerdictChip,
+  isFailedRun,
+  newestRunIds,
 } from "../components/index.js";
+import type { RunVerdict } from "../components/prd-tree/run-verdict-banner.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import type { ActiveRun } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
@@ -67,10 +68,16 @@ interface RunSummary {
   };
   /** Vendor active for this run (e.g. "claude", "codex"). */
   vendor?: string;
+  /** The run classifier's verdict on a run that did not complete; absent on older records. */
+  diagnosis?: RunVerdict;
   /** Token diagnostic status: complete, partial, or unavailable. */
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /** Tier of the model the run used: "light", "standard", "heavy" or "custom". */
+  weight?: string;
+  /** The test gate's verdict; absent when the gate did not run or left no result. */
+  gate?: "passed" | "failed";
   /** Worktree this run was recorded in — present when the list was fetched with `scope=repo`. */
   worktree?: RunWorktree;
   /**
@@ -507,10 +514,12 @@ function RunMetrics({ runs }: { runs: RunSummary[] }) {
 }
 
 /** Individual run card in the list. */
-function RunCard({ run, isSelected, isHighlighted, showWorktree, onClick, navigateTo, cardRef }: {
+function RunCard({ run, isSelected, isHighlighted, isNewestOfTask, showWorktree, onClick, navigateTo, cardRef }: {
   run: RunSummary;
   isSelected: boolean;
   isHighlighted?: boolean;
+  /** The task's newest run: the one Diagnose in Sidecar reads. */
+  isNewestOfTask?: boolean;
   /** Render the worktree chip. Off when every loaded run is from one worktree — the chip would say the same thing on every card. */
   showWorktree?: boolean;
   onClick: () => void;
@@ -567,6 +576,10 @@ function RunCard({ run, isSelected, isHighlighted, showWorktree, onClick, naviga
 
     // Bottom row: metadata chips
     h("div", { class: "hench-run-meta" },
+      isFailedRun(run.status) ? h(RunVerdictChip, { diagnosis: run.diagnosis }) : null,
+      isFailedRun(run.status) && isNewestOfTask && run.taskId
+        ? h(DiagnoseInSidecarButton, { taskId: run.taskId })
+        : null,
       h("span", { class: "hench-run-chip" }, fmtDuration(run.startedAt, run.finishedAt)),
       h("span", { class: "hench-run-chip" }, `${run.turns} turns`),
       h("span", { class: "hench-run-chip" }, fmtTokens(totalTokens) + " tokens"),
@@ -1326,6 +1339,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   const worktreeOptions = useMemo(() => collectWorktreeOptions(runs), [runs]);
   const multipleWorktrees = worktreeOptions.length > 1;
+  // Over every loaded run, not the filtered list, so a filter never promotes an older run.
+  const newestIds = useMemo(() => newestRunIds(runs), [runs]);
 
   // Scroll the deep-linked run card into view when it renders
   const scrolledRef = useRef(false);
@@ -1547,6 +1562,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
           run,
           isSelected: selectedRunId === run.id,
           isHighlighted: isHL,
+          isNewestOfTask: newestIds.has(run.id),
           showWorktree: multipleWorktrees,
           onClick: () => handleSelectRun(run.id),
           navigateTo,
@@ -1556,22 +1572,6 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       filteredRuns.length === 0
         ? h("div", { class: "hench-no-results" }, "No runs match the selected filter.")
         : null,
-    ),
-
-    // System status — operational diagnostics tucked into a collapsed drawer so
-    // the run history stays the focus. Expand to inspect live infrastructure.
-    h("details", { class: "hench-system-status" },
-      h("summary", { class: "hench-system-status-summary" },
-        h("span", { class: "hench-system-status-chevron", "aria-hidden": "true" }, "▸"),
-        h("span", { class: "hench-system-status-label" }, "System status"),
-        h("span", { class: "hench-system-status-hint" }, "concurrency · memory · sockets · throttle"),
-      ),
-      h("div", { class: "hench-system-status-body" },
-        h(ConcurrencyPanel, null),
-        h(MemoryPanel, null),
-        h(WsHealthPanel, null),
-        h(ThrottleControlsPanel, null),
-      ),
     ),
   );
 }

@@ -35,6 +35,7 @@ const BASE = Object.freeze({
   sidecar: { bin: "bin/serve.js", health: "/healthz", idleStopMinutes: 15 },
   hub: { label: "Recon", description: "Batch-prepare repositories" },
   projectLinks: [{ label: "Assessment", path: "/project/{projectId}?root={repoRoot}" }],
+  sidecarTab: { label: "Recon", path: "/tab?project={projectId}&root={repoRoot}" },
   configSchema: "schema/config.json",
 });
 
@@ -81,8 +82,8 @@ const RULE_FIXTURES = {
   "array": { fail: (m) => { m.projectLinks = BASE.projectLinks[0]; }, pass: (m) => { m.projectLinks = []; } },
   "object": { fail: (m) => { m.sidecar = "bin/serve.js"; }, pass: (m) => { m.sidecar = { bin: "bin/serve.js" }; } },
   "nothing-declared": {
-    fail: (m) => { m.commands = []; delete m.sidecar; delete m.hub; delete m.projectLinks; },
-    pass: (m) => { delete m.sidecar; delete m.hub; delete m.projectLinks; },
+    fail: (m) => { m.commands = []; delete m.sidecar; delete m.hub; delete m.projectLinks; delete m.sidecarTab; },
+    pass: (m) => { delete m.sidecar; delete m.hub; delete m.projectLinks; delete m.sidecarTab; },
   },
   "command-duplicate": {
     fail: (m) => { m.commands.push({ ...m.commands[0] }); },
@@ -91,7 +92,11 @@ const RULE_FIXTURES = {
   "package-path": { fail: (m) => { m.sidecar.bin = "../other/serve.js"; }, pass: (m) => { m.sidecar.bin = "./dist/serve.js"; } },
   "url-path": { fail: (m) => { m.sidecar.health = "healthz"; }, pass: (m) => { m.sidecar.health = "/ready"; } },
   "positive-integer": { fail: (m) => { m.sidecar.idleStopMinutes = 0; }, pass: (m) => { m.sidecar.idleStopMinutes = 1; } },
-  "needs-sidecar": { fail: (m) => { delete m.sidecar; }, pass: (m) => { delete m.sidecar; delete m.hub; delete m.projectLinks; } },
+  "needs-sidecar": { fail: (m) => { delete m.sidecar; }, pass: (m) => { delete m.sidecar; delete m.hub; delete m.projectLinks; delete m.sidecarTab; } },
+  "link-dot-segment": {
+    fail: (m) => { m.projectLinks[0].path = "/../../api/hub/extensions"; },
+    pass: (m) => { m.projectLinks[0].path = "/project/v1.2/..report?root=../x"; },
+  },
   "link-placeholder": {
     fail: (m) => { m.projectLinks[0].path = "/project/{projectName}"; },
     pass: (m) => { m.projectLinks[0].path = "/project/{projectId}"; },
@@ -121,6 +126,53 @@ describe("validateExtensionManifest", () => {
       expect(passed.status).toBe("valid");
     });
   }
+
+  describe("sidecarTab", () => {
+    const problems = (edit) => validate(pkg(edit)).problems.map((p) => `${p.path} ${p.rule}`);
+
+    it("is accepted with a label and a path, and apiVersion stays 1", () => {
+      const result = validate(pkg());
+      expect(result.status).toBe("valid");
+      expect(result.manifest?.sidecarTab).toEqual(BASE.sidecarTab);
+      expect(SUPPORTED_EXTENSION_API_VERSIONS).toEqual([1]);
+    });
+
+    it("needs the sidecar block", () => {
+      expect(problems((m) => { delete m.sidecar; delete m.hub; delete m.projectLinks; }))
+        .toEqual(["ndx.extension.sidecarTab needs-sidecar"]);
+    });
+
+    it("refuses an unknown key inside the tab", () => {
+      expect(problems((m) => { m.sidecarTab.icon = "x"; })).toEqual(["ndx.extension.sidecarTab.icon unknown-field"]);
+    });
+
+    it("refuses a path that does not start with /", () => {
+      expect(problems((m) => { m.sidecarTab.path = "tab"; })).toEqual(["ndx.extension.sidecarTab.path url-path"]);
+    });
+
+    it("refuses a dot segment in the tab and link paths, raw or percent-encoded", () => {
+      for (const bad of ["/../../api/hub/extensions", "/%2e%2e/%2E%2e/api", "/a/./b", "/a/..", "/a\\..\\b", "/%2e?x=1"]) {
+        expect(problems((m) => { m.sidecarTab.path = bad; }), bad).toEqual(["ndx.extension.sidecarTab.path link-dot-segment"]);
+        expect(problems((m) => { m.projectLinks[0].path = bad; }), bad).toEqual(["ndx.extension.projectLinks[0].path link-dot-segment"]);
+      }
+    });
+
+    it("refuses an unknown placeholder", () => {
+      expect(problems((m) => { m.sidecarTab.path = "/tab/{projectName}"; }))
+        .toEqual(["ndx.extension.sidecarTab.path link-placeholder"]);
+    });
+
+    it("refuses an empty label, a missing path and a non-object", () => {
+      expect(problems((m) => { m.sidecarTab.label = ""; })).toEqual(["ndx.extension.sidecarTab.label non-empty-string"]);
+      expect(problems((m) => { delete m.sidecarTab.path; })).toEqual(["ndx.extension.sidecarTab.path required"]);
+      expect(problems((m) => { m.sidecarTab = "/tab"; })).toEqual(["ndx.extension.sidecarTab object"]);
+    });
+
+    it("refuses a control character in the label and the path", () => {
+      expect(problems((m) => { m.sidecarTab.label = "Recon\u001b"; })).toEqual(["ndx.extension.sidecarTab.label control-character"]);
+      expect(problems((m) => { m.sidecarTab.path = "/tab\n"; })).toEqual(["ndx.extension.sidecarTab.path control-character"]);
+    });
+  });
 
   it("reports an unknown apiVersion as incompatible and checks nothing else", () => {
     const result = validate(pkg((m) => { m.apiVersion = 2; m.name = "Not A Slug"; m.futureField = true; }));

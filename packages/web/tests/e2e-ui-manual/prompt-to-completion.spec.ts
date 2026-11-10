@@ -98,9 +98,9 @@ test("a typed prompt becomes a task the agent completes", async ({ page }, testI
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
   const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
-  await page.getByRole("button", { name: /More ways to run/ }).click();
   const baseSha = headSha(project.dir);
-  await page.getByRole("menuitem", { name: /^Start now/ }).click();
+  // The one-click start: the task's saved settings, or the project defaults saved on it.
+  await page.locator(".live-idle .start-task-primary").click();
 
   // The proposal may hold several tasks; hench starts the highest-priority one.
   const startedTaskId = await openLiveTask(page, task.id, knownRunIds);

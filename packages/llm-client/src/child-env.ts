@@ -133,8 +133,12 @@ export function strippedEnvNames(env: NodeJS.ProcessEnv, policy: EnvPolicy): str
   return Object.keys(env).filter((name) => env[name] !== undefined && !envNameAllowed(name, policy)).sort();
 }
 
-/** What `onStripped` is reporting: names removed, or a vendor mode whose credentials never arrived. */
-export type EnvReportKind = "stripped" | "missing-credentials";
+/**
+ * What `onStripped` is reporting: names removed, a vendor mode whose
+ * credentials never arrived, or credential-shaped names the operator allowed
+ * that Claude Code's subprocess scrub keeps from the agent's commands.
+ */
+export type EnvReportKind = "stripped" | "missing-credentials" | "scrubbed";
 
 /** Bedrock names that address or trust-anchor the endpoint but are not credentials. */
 const BEDROCK_PLUMBING = ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_CA_BUNDLE"];
@@ -222,6 +226,11 @@ interface VendorEnvSpec {
   keyEnv?: (config: LLMConfig) => string;
   /** Authentication names retained in addition to `keyEnv`. */
   authNames: readonly string[];
+  /**
+   * Tokens in `authNames` the CLI uses ahead of the key n-dx chose or the CLI
+   * login. Removed whenever `llm.<vendor>.auth` is `cli` or n-dx sets the key.
+   */
+  outranksKey?: readonly string[];
   /** The configured API key, if any. */
   configKey: (config: LLMConfig) => string | undefined;
 }
@@ -233,11 +242,17 @@ const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
   [LLM_VENDOR.CLAUDE]: {
     keyEnv: () => "ANTHROPIC_API_KEY",
     authNames: ["ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR"],
+    // Claude Code ranks ANTHROPIC_AUTH_TOKEN above ANTHROPIC_API_KEY and the
+    // login; CLAUDE_CODE_OAUTH_TOKEN ranks below both:
+    // https://code.claude.com/docs/en/authentication
+    outranksKey: ["ANTHROPIC_AUTH_TOKEN"],
     configKey: (config) => config.claude?.api_key,
   },
   [LLM_VENDOR.CODEX]: {
     keyEnv: () => "OPENAI_API_KEY",
     authNames: ["CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"],
+    // codex exec authenticates with CODEX_API_KEY when it is set.
+    outranksKey: ["CODEX_API_KEY"],
     configKey: (config) => config.codex?.api_key,
   },
   [LLM_VENDOR.GOOGLE]: {
@@ -255,16 +270,65 @@ const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
 };
 
 /**
+ * Claude Code passes its environment to the commands it runs (Bash tool, hooks,
+ * stdio MCP servers) unless this is `1`; with it, those subprocesses lose
+ * ANTHROPIC_API_KEY and other credentials while Claude Code keeps them for its
+ * own API calls: https://code.claude.com/docs/en/env-vars
+ */
+const CLAUDE_SUBPROCESS_ENV_SCRUB = "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB";
+
+/** Turn the scrub on, replacing any casing of the name the environment set. */
+function scrubAgentSubprocesses(env: NodeJS.ProcessEnv): void {
+  for (const name of Object.keys(env)) {
+    if (name.toUpperCase() === CLAUDE_SUBPROCESS_ENV_SCRUB) delete env[name];
+  }
+  env[CLAUDE_SUBPROCESS_ENV_SCRUB] = "1";
+}
+
+const DEFAULT_DENY_RES = compile(DEFAULT_ENV_DENY);
+const DEFAULT_ALLOW_RES = compile(DEFAULT_ENV_ALLOW);
+
+/**
+ * GitHub tokens Claude Code documents its subprocess scrub as leaving in
+ * place, so an allowed one still reaches the agent's commands.
+ */
+const SCRUB_KEEPS = new Set(["GITHUB_TOKEN", "GH_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"]);
+
+/**
+ * Names in `env` kept only by an operator allow entry: credential-shaped by
+ * the default deny list, and neither default plumbing, the vendor's auth nor a
+ * GitHub token the scrub keeps. Claude Code's scrub removes credential-looking
+ * names from the commands the agent runs, so these reach Claude Code but not
+ * those commands.
+ */
+function scrubbedAllowedNames(env: NodeJS.ProcessEnv, authSet: ReadonlySet<string>): string[] {
+  return Object.keys(env)
+    .filter((name) => !authSet.has(name.toUpperCase()))
+    .filter((name) => !SCRUB_KEEPS.has(name.toUpperCase()))
+    .filter((name) => DEFAULT_DENY_RES.some((re) => re.test(name)))
+    .filter((name) => !DEFAULT_ALLOW_RES.some((re) => re.test(name)))
+    .sort();
+}
+
+/**
  * Filter a vendor CLI's environment without exposing unrelated credentials.
  * `onStripped` receives names only, never values: once for the names removed,
- * and once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
- * on but none of that mode's credential names reached the child.
+ * once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
+ * on but none of that mode's credential names reached the child, and once
+ * (kind `scrubbed`) when the Claude scrub is on and the allowlist kept a
+ * credential-shaped name, which the agent's commands will then lack.
  *
  * `llm.<vendor>.auth` decides the vendor key ({@link vendorAuthSetting}):
  * `cli` removes it, so the CLI uses its own login; `api` sets it from config,
  * the environment or the credential store, and throws when none holds one;
  * `auto` sets a configured key and passes an exported one through, never a
- * stored one. Bedrock and Vertex credentials are untouched in every mode.
+ * stored one. Under `cli`, and whenever this function sets the key, every
+ * casing of a token the CLI ranks above it (`outranksKey`) is removed too;
+ * the login plumbing stays. Bedrock and Vertex credentials are untouched in
+ * every mode.
+ * Whenever this function sets the Claude key itself, it also sets
+ * `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, so the agent's own commands cannot
+ * read it; an exported key passed through under `auto` is not scrubbed.
  *
  * @throws {ClaudeClientError} reason `auth` when `auth` is `api` and no key resolves.
  */
@@ -295,31 +359,34 @@ export function resolveVendorCliEnv(
   }
   if (keyName && isKeyedVendor(vendor)) {
     // Windows treats environment names case-insensitively, so every casing of
-    // the key's name goes: none may shadow (or smuggle) the chosen credential.
-    const dropKeyName = (): void => {
+    // a name goes: none may shadow (or smuggle) the chosen credential.
+    const drop = (names: readonly string[]): void => {
+      const upper = new Set(names.map((name) => name.toUpperCase()));
       for (const name of Object.keys(env)) {
-        if (name.toUpperCase() === keyName.toUpperCase()) delete env[name];
+        if (upper.has(name.toUpperCase())) delete env[name];
       }
+    };
+    const outranking = spec.outranksKey ?? [];
+    const setKey = (value: string): void => {
+      drop([keyName, ...outranking]);
+      env[keyName] = value;
+      if (vendor === LLM_VENDOR.CLAUDE) scrubAgentSubprocesses(env);
     };
     const auth = vendorAuthSetting(vendor, config);
     if (auth === "cli") {
       // The CLI login, and nothing that would outrank it.
-      dropKeyName();
+      drop([keyName, ...outranking]);
     } else if (auth === "api") {
       // Any source, the credential store included; the store is found through
       // the environment this child is built from. Only this vendor's key name
       // carries it.
       const key = resolveVendorKey(vendor, config, { env: source });
       if (!key) throw missingVendorKeyError(vendor, config);
-      dropKeyName();
-      env[keyName] = key.value;
+      setKey(key.value);
     } else {
       // auto: a configured key, else whatever was exported. Never the store.
       const apiKey = spec.configKey(config);
-      if (apiKey) {
-        dropKeyName();
-        env[keyName] = apiKey;
-      }
+      if (apiKey) setKey(apiKey);
     }
   }
   for (const name of Object.keys(env)) {
@@ -332,5 +399,10 @@ export function resolveVendorCliEnv(
     .filter((mode) => !mode.credentials.some((name) => present.has(name.toUpperCase())))
     .flatMap((mode) => mode.credentials);
   if (missing.length > 0) onStripped?.(missing, "missing-credentials");
+  // Only Claude Code reads the scrub flag; another vendor's commands keep everything.
+  if (vendor === LLM_VENDOR.CLAUDE && env[CLAUDE_SUBPROCESS_ENV_SCRUB] === "1") {
+    const scrubbed = scrubbedAllowedNames(env, authSet);
+    if (scrubbed.length > 0) onStripped?.(scrubbed, "scrubbed");
+  }
   return env;
 }

@@ -15,6 +15,7 @@ import { isExecutableOnPath } from "@n-dx/llm-client";
 
 import type { ServerContext } from "../../../src/server/types.js";
 import {
+  appendOutput,
   handleRunCommandsRoute,
   resetRunCommandJobs,
 } from "../../../src/server/routes-run-commands.js";
@@ -208,5 +209,20 @@ describe("/api/run-commands", () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/something-else`);
     // The test server answers 404 for anything the handler declines.
     expect(res.status).toBe(404);
+  });
+});
+
+describe("appendOutput", () => {
+  it("keeps everything under the limit", () => {
+    expect(appendOutput("a\n", "b\n", 10)).toBe("a\nb\n");
+  });
+
+  it("drops the oldest text past the limit, cutting at a line start", () => {
+    // The cut would land inside "\x1b[31m"; the partial line goes with it.
+    expect(appendOutput("old\n\x1b[31mred\x1b[0m\n", "next\n", 14)).toBe("next\n");
+  });
+
+  it("keeps the tail of one overlong line rather than emptying the log", () => {
+    expect(appendOutput("", "x".repeat(20), 5)).toBe("xxxxx");
   });
 });

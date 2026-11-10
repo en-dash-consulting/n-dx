@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "65a40ad5-dfcd-4095-93bc-09e0c68e323c":
+    status: "completed"
+    startedAt: "2026-11-06T16:06:12.426Z"
+    completedAt: "2026-11-06T16:08:39.047Z"
+    endedAt: "2026-11-06T16:08:39.047Z"
+    activeIntervals: [{"end":"2026-11-06T16:08:39.047Z","start":"2026-11-06T16:06:12.426Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "stageOf's isStarted judges by status (in_progress, failing), not startedAt; test with a pending task carrying startedAt expects proposed."
+    lastModified: "2026-11-06T16:08:39.047Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d6d2e5fa-eff7-4f5a-ad70-eb092d813236":
+    status: "completed"
+    startedAt: "2026-11-06T16:08:39.047Z"
+    completedAt: "2026-11-06T16:08:39.047Z"
+    endedAt: "2026-11-06T16:08:39.047Z"
+    activeIntervals: [{"end":"2026-11-06T16:08:39.047Z","start":"2026-11-06T16:08:39.047Z"}]
+    appliedAt: "2026-11-06T16:08:39.047Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-06T16:08:39.047Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

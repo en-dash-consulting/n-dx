@@ -37,10 +37,10 @@ import { itemTypeOf } from "../external.js";
 // ---------------------------------------------------------------------------
 
 /** Package keys the server aggregates by; `web` is the dashboard itself. */
-type TokenPackage = "hench" | "rex" | "sv" | "web";
+type TokenPackage = "hench" | "rex" | "sv" | "web" | "sidecar";
 
 /** Render order, shared by the chart stack, the donut, and the legend. */
-const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web"];
+const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web", "sidecar"];
 
 /**
  * Wire shapes below are `as`-cast from `res.json()`, so they describe what the
@@ -253,6 +253,7 @@ const PKG_COLORS: Record<string, string> = {
   rex: "var(--brand-purple)",
   sv: "var(--brand-orange)",
   web: "var(--brand-green)",
+  sidecar: "var(--brand-rose)",
 };
 
 const PKG_LABELS: Record<string, string> = {
@@ -260,6 +261,7 @@ const PKG_LABELS: Record<string, string> = {
   rex: "Rex",
   sv: "Sourcevision",
   web: "Dashboard",
+  sidecar: "Sidecar",
 };
 
 /**

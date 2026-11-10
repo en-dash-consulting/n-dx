@@ -18,5 +18,5 @@ remains:
 
 | # | What | Workaround here | Item |
 |---|------|-----------------|------|
-| 3 | A `timeline` needs lanes: `columns` or a `column` role bound to a choice field. Runs have no natural lane. | Runs are laned by outcome (`status`). | — (declaration choice, not a framework defect) |
+| 3 | A `timeline` lays spans out in numbers, so it never drew runs, which span dates; Graview 0.1.63 says so (`lens-cannot-draw`). | Runs are a `calendar`, "When runs ran", spanning `startedAt` to `finishedAt`. | — (declaration choice, not a framework defect) |
 | 4 | `brand.typography` takes a face name from a fixed list, not a CSS stack. | Manrope / Inter / JetBrains Mono, loaded in index.html. | — |

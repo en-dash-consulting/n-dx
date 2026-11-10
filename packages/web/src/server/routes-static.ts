@@ -7,8 +7,8 @@ import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
-import { isKnownViewPath, resolveViewAlias, buildValidViews } from "../shared/view-routing.js";
-import { injectSessionScript } from "../shared/index.js";
+import { isKnownViewPath, buildValidViews, resolveViewAliasRoute } from "../shared/view-routing.js";
+import { OAUTH_CALLBACK_PATH, injectSessionScript } from "../shared/index.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
 (function(){
@@ -44,6 +44,8 @@ export interface StaticAssets {
   resolvedPackageRoot: string;
   getViewerHtml: () => string;
   getLandingHtml: () => string | null;
+  /** The drawer-only hub session page, built beside the viewer; null when it is not there. */
+  getHubSessionHtml: () => string | null;
   findAssetPath: (filename: string) => string | null;
 }
 
@@ -120,6 +122,16 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     return cachedLandingHtml;
   }
 
+  // Beside whichever index.html was found: built in dist/viewer/, the unbuilt template in src/viewer/.
+  const hubSessionPath = resolve(viewerDir, "hub-session.html");
+  let cachedHubSessionHtml: string | null | undefined;
+  function getHubSessionHtml(): string | null {
+    if (dev || cachedHubSessionHtml === undefined) {
+      cachedHubSessionHtml = existsSync(hubSessionPath) ? readFileSync(hubSessionPath, "utf-8") : null;
+    }
+    return cachedHubSessionHtml;
+  }
+
   function findAssetPath(filename: string): string | null {
     const inViewer = resolve(resolvedViewerDir, filename);
     const inRoot = resolve(resolvedPackageRoot, filename);
@@ -133,6 +145,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     resolvedPackageRoot,
     getViewerHtml,
     getLandingHtml,
+    getHubSessionHtml,
     findAssetPath,
   };
 }
@@ -192,14 +205,17 @@ export function handleStaticRoute(
   // its own page (resolveViewAlias returns null there, and the request falls
   // through unchanged). Any sub-path and query string survive the redirect.
   const aliasSegment = pathOnly.slice(1).split("/")[0];
-  const aliasTarget = resolveViewAlias(aliasSegment, buildValidViews(ctx.scope ?? null));
-  if (aliasTarget) {
-    const rest = pathOnly.slice(1 + aliasSegment.length);
+  const alias = resolveViewAliasRoute(aliasSegment, buildValidViews(ctx.scope ?? null));
+  if (alias) {
+    const aliasTarget = alias.view;
+    const typed = pathOnly.slice(1 + aliasSegment.length);
+    const rest = typed || (alias.sub ? `/${alias.sub}` : "");
     // Relative, not root-relative: start.ts strips a /w/<key>/ workspace slot
     // from req.url before this runs, and the hub proxy re-prefixes only
     // /p/<id>/, so "/analyze" would drop the slot and land on the anchor.
     // One "../" per sub-path segment climbs back to the alias's directory.
-    const up = "../".repeat((rest.match(/\//g) ?? []).length);
+    // Only the sub-path the caller typed counts; one the alias adds is below the target.
+    const up = "../".repeat((typed.match(/\//g) ?? []).length);
     const location = `${up}${aliasTarget}${rest}${queryString ? `?${queryString}` : ""}`;
     // 302, not 301: a browser caches a 301 per URL indefinitely, and the same
     // localhost URL may later be a rex-scoped viewer or a build without the alias.
@@ -220,6 +236,14 @@ export function handleStaticRoute(
       res.writeHead(404);
       res.end("Not found");
     }
+    return true;
+  }
+
+  // A connection sign-in's fixed callback: the viewer reads the code, state
+  // and iss and posts them with its session (views/connections.ts).
+  if (pathOnly === OAUTH_CALLBACK_PATH) {
+    res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-store" });
+    res.end(assets.getViewerHtml());
     return true;
   }
 

@@ -44,6 +44,7 @@ const DOC = {
         { id: "t-done", title: "Done task", level: "task" as const, status: "completed" as const },
         { id: "t-blocked", title: "Blocked task", level: "task" as const, status: "blocked" as const },
         { id: "t-deferred", title: "Deferred task", level: "task" as const, status: "deferred" as const },
+        { id: "t-waiting", title: "Waiting task", level: "task" as const, status: "pending" as const, blockedBy: ["t-progress", "t-done", "t-deferred"] },
       ],
     },
   ],
@@ -156,6 +157,7 @@ describe("the resolution report", () => {
       branch: git(projectDir, "branch", "--show-current"),
       isAnchor: true,
       dirty: false,
+      planningCommit: [],
     });
     expect(r.resolved).toEqual({
       vendor: { value: "claude", source: "llm.vendor" },
@@ -173,6 +175,7 @@ describe("the resolution report", () => {
       tokenBudget: { value: 0, source: "hench.tokenBudget" },
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
+      requireUnblocked: { value: false, source: "built-in" },
       resetDeferred: { value: false, source: "built-in" },
     });
     // llm.<vendor>.auth has no per-run flag, so it sits beside `resolved`.
@@ -211,6 +214,7 @@ describe("the resolution report", () => {
       "token-budget": "1000",
       fresh: "true",
       "allow-dirty": "true",
+      "require-unblocked": "true",
       "reset-deferred": "true",
     });
 
@@ -228,7 +232,7 @@ describe("the resolution report", () => {
     expect(codes(r)).toEqual(["provider-unsupported"]);
     expect(r.command).toBe(
       "ndx work --task=t-pending --auto --model=opus --provider=api --permission-mode=plan --review " +
-        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --reset-deferred ${projectDir}`,
+        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --require-unblocked --reset-deferred ${projectDir}`,
     );
   });
 
@@ -429,6 +433,32 @@ describe("refusals are reported, not thrown", () => {
     expect(r.resolved.resetDeferred).toEqual({ value: true, source: "cli-flag" });
   });
 
+  describe("blocked, under --require-unblocked", () => {
+    it("names each blocker that is not completed, and keeps the flag in the command", async () => {
+      const r = await resolve({ task: "t-waiting", "require-unblocked": "true" });
+      expect(codes(r)).toEqual(["blocked"]);
+      expect(r.refusals[0].message).toContain("t-progress (in_progress)");
+      expect(r.refusals[0].message).toContain("t-deferred (deferred)");
+      expect(r.refusals[0].message).not.toContain("t-done");
+      expect(r.command).toContain("--require-unblocked");
+      expect(r.resolved.requireUnblocked).toEqual({ value: true, source: "cli-flag" });
+    });
+
+    it("is not reported without --require-unblocked", async () => {
+      expect(codes(await resolve({ task: "t-waiting" }))).toEqual([]);
+    });
+
+    it("is not reported when every blocker is completed", async () => {
+      expect(codes(await resolve({ task: "t-pending", "require-unblocked": "true" }))).toEqual([]);
+    });
+
+    it("matches the run, which refuses the same task", async () => {
+      await expect(
+        cmdRun(projectDir, { task: "t-waiting", auto: "true", "require-unblocked": "true" }),
+      ).rejects.toThrow(/blocked by unfinished work: t-progress \(in_progress\), t-deferred \(deferred\)/);
+    });
+  });
+
   it("an in-progress task is actionable: the run resumes it", async () => {
     expect(codes(await resolve({ task: "t-progress" }))).toEqual([]);
   });
@@ -527,6 +557,47 @@ describe("refusals are reported, not thrown", () => {
     expect(codes(r)).toEqual(["dirty-tree"]);
     expect(r.workspace.dirty).toBe(true);
     expect(codes(await resolve({ task: "t-pending", "allow-dirty": "true" }))).toEqual([]);
+  });
+
+  it("reports the planning files a run would commit, instead of refusing on them", async () => {
+    await writeFile(join(rexDir, "pending-proposals.json"), "[]\n", "utf-8");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(codes(r)).toEqual([]);
+    expect(r.workspace.planningCommit).toEqual([".rex/pending-proposals.json"]);
+    const warning = r.warnings.find((w) => w.code === "planning-commit");
+    expect(warning?.message).toContain(".rex/pending-proposals.json");
+
+    // --allow-dirty leaves the tree alone, so nothing would be committed.
+    const allowed = await resolve({ task: "t-pending", "allow-dirty": "true" });
+    expect(allowed.workspace.planningCommit).toEqual([]);
+    expect(allowed.warnings.map((w) => w.code)).not.toContain("planning-commit");
+  });
+
+  it("dirty-tree names a rename's source as well as its target", async () => {
+    await mkdir(join(projectDir, "src"), { recursive: true });
+    await writeFile(join(projectDir, "src", "app.ts"), "export {};\n", "utf-8");
+    git(projectDir, "add", "src/app.ts");
+    git(projectDir, "commit", "-q", "-m", "add app");
+    await mkdir(join(rexDir, "changes", "ch"), { recursive: true });
+    git(projectDir, "mv", "src/app.ts", ".rex/changes/ch/app.ts");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(codes(r)).toEqual(["dirty-tree"]);
+    const refusal = r.refusals.find((x) => x.code === "dirty-tree");
+    expect(refusal?.message).toContain("src/app.ts -> .rex/changes/ch/app.ts");
+  });
+
+  it("dirty-tree names only the non-planning files when both are dirty", async () => {
+    await writeFile(join(rexDir, "pending-proposals.json"), "[]\n", "utf-8");
+    await writeFile(join(projectDir, "scratch.txt"), "work in progress", "utf-8");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(codes(r)).toEqual(["dirty-tree"]);
+    const refusal = r.refusals.find((x) => x.code === "dirty-tree");
+    expect(refusal?.message).toContain("scratch.txt");
+    expect(refusal?.message).not.toContain("pending-proposals.json");
+    expect(r.workspace.planningCommit).toEqual([]);
   });
 });
 

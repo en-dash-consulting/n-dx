@@ -223,6 +223,7 @@ export const COMMAND_EFFECTS = {
     writes: [
       { path: ".ndx/", what: "the moved tool directories and config" },
       { path: ".gitignore, .gitattributes", what: "rewritten path patterns" },
+      { path: "{hench}/config.json", what: "rexDir pointed at the new rex dir", conditional: true, when: "when it holds the legacy default .rex" },
       { path: "git commits", what: "the move", conditional: true, when: "without --no-commit" },
     ],
     llm: [],
@@ -717,7 +718,7 @@ export const COMMAND_EFFECTS = {
       { path: "{graview}/data/", what: "graview's own store", conditional: true, when: "for serve and mcp" },
     ],
     llm: [],
-    network: [{ to: "remote", what: "the npm registry, for graview through npx", when: "when no graview binary is configured or on PATH" }],
+    network: [{ to: "remote", what: "the npm registry, for graview through npx", when: "when no graview binary is found and graview.allowNpx or NDX_GRAVIEW_NPX=1 allows the download" }],
     delegates: "graview",
     duration: "seconds to emit; serve and mcp run until stopped",
     next: "ndx graview serve .",

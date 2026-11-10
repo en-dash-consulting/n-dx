@@ -161,9 +161,9 @@ the MCP server descriptors.
 only Claude Code's own behaviour belongs in `claude-addendum.md`, which never
 reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` enforces this.
 
-Re-run `ndx init` after editing `packages/core/assistant-assets/`.
-`tests/e2e/agents-md-size-budget.test.js` limits root + nested instructions:
-Codex drops their tail past `project_doc_max_bytes`. Put detail in `docs/`.
+Re-run `ndx init --no-commit .` after editing `packages/core/assistant-assets/`.
+`tests/e2e/agents-md-size-budget.test.js` caps root + nested instructions:
+Codex truncates past `project_doc_max_bytes`. Put detail in `docs/`.
 
 ## n-dx Orchestration Commands
 
@@ -223,7 +223,7 @@ Follow `.rex/workflow.md` for task execution discipline. Key steps:
 
 ## Available Skills
 
-The following skills are installed in `.agents/skills/`. Each skill directory contains a `SKILL.md` with detailed instructions.
+The following skills are installed in `.agents/skills/`.
 
 - **no-plan-mode** — Prevent plan-mode stalls in autonomous hench agent runs
 - **ndx-plan** — Analyze the codebase and propose PRD updates
@@ -234,6 +234,7 @@ The following skills are installed in `.agents/skills/`. Each skill directory co
 - **ndx-config** `[key] [value]` — View or change n-dx configuration with guided assistance
 - **ndx-reshape** — Restructure the PRD — regroup, reparent, merge overlaps and place changes
 - **ndx-feedback** `[description]` — Submit feedback, bug reports, or feature requests for n-dx
+- **ndx-graview** — Run the product map and report what is wrong
 - **ndx-adversarial-review** `[task-id | name | topic]` — Attack a change or a completion claim, triage what breaks, and capture only what the user approves
 
 ## MCP Servers

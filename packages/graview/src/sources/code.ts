@@ -57,6 +57,7 @@ export function readCode(sourcevisionDir: string, options: ReadCodeOptions, warn
         coupling: zone.coupling,
         fileCount: zone.files.length,
         depth: zone.depth ?? depth,
+        // Sorted, so past Graview's 200 (the snapshot builder cuts to its caps) the first in path order stay.
         entryPoints: zone.entryPoints.length > 0 ? [...zone.entryPoints].sort() : undefined,
       });
       if (parent) edges.push({ kind: "under", from: zone.id, to: parent.id });

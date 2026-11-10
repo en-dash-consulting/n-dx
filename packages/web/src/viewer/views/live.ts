@@ -32,7 +32,10 @@ import {
   type LiveRunFull,
   type LiveSnapshot,
 } from "../hooks/index.js";
+import { useFeatureToggle } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
+import { READY_NEXT_FEATURE, ReadyNext } from "./live-ready-next.js";
+import { TrackerActivitySection } from "./live-tracker.js";
 import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
@@ -145,13 +148,89 @@ function Header({ snapshot, connection, refresh }: HeaderProps) {
 
 // ── Machine strip ────────────────────────────────────────────────────
 
-function MachineStrip({ snapshot }: { snapshot: LiveSnapshot }) {
+const SLOTS_MIN = 1;
+const SLOTS_MAX = 20; // the throttle route's own bounds
+
+interface ThrottleLimit {
+  effectiveMaxConcurrent: number;
+  concurrencyOverride: number | null;
+  configMaxConcurrent: number;
+}
+
+/** Sets the runtime concurrency override for this session; Reset returns to the config value. */
+function SlotsStepper({ scope, refresh }: { scope: LiveSnapshot["machine"]["slots"]["scope"]; refresh: () => Promise<void> }) {
+  const [limit, setLimit] = useState<ThrottleLimit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/hench/throttle")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((state: Partial<ThrottleLimit> | null) => {
+        if (!cancelled && state && typeof state.effectiveMaxConcurrent === "number") {
+          setLimit({
+            effectiveMaxConcurrent: state.effectiveMaxConcurrent,
+            concurrencyOverride: state.concurrencyOverride ?? null,
+            configMaxConcurrent: state.configMaxConcurrent ?? state.effectiveMaxConcurrent,
+          });
+        }
+      })
+      .catch(() => { /* The control stays hidden until the limit is known. */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const set = useCallback(async (maxConcurrent: number | null) => {
+    setError(null);
+    try {
+      const res = await fetch("/api/hench/throttle", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxConcurrent }),
+      });
+      if (!res.ok) {
+        setError(await errorOf(res, "Could not set the limit"));
+        return;
+      }
+      const body = await res.json() as { concurrencyOverride: number | null; effectiveMaxConcurrent: number };
+      setLimit((prev) => prev && { ...prev, concurrencyOverride: body.concurrencyOverride, effectiveMaxConcurrent: body.effectiveMaxConcurrent });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not set the limit");
+    }
+  }, [refresh]);
+
+  if (!limit) return null;
+  const { effectiveMaxConcurrent: now, concurrencyOverride: override } = limit;
+  return h("span", { class: "live-slots-stepper" },
+    h("button", {
+      type: "button", class: "cmd-btn cmd-btn-secondary", "aria-label": "Fewer slots",
+      disabled: now <= SLOTS_MIN, onClick: () => set(now - 1),
+    }, "−"),
+    // Under the hub the tile counts the machine; the override caps this repository only.
+    h("span", { class: "live-slots-limit", "aria-live": "polite" },
+      scope === "machine" ? `repository limit ${now}` : `limit ${now}`),
+    h("button", {
+      type: "button", class: "cmd-btn cmd-btn-secondary", "aria-label": "More slots",
+      disabled: now >= SLOTS_MAX, onClick: () => set(now + 1),
+    }, "+"),
+    override !== null
+      ? h("button", {
+        type: "button", class: "cmd-btn cmd-btn-secondary", onClick: () => set(null),
+        title: `Back to the configured ${limit.configMaxConcurrent}`,
+      }, "Reset")
+      : null,
+    error ? h("span", { class: "live-error", role: "alert" }, error) : null,
+  );
+}
+
+function MachineStrip({ snapshot, refresh }: { snapshot: LiveSnapshot; refresh: () => Promise<void> }) {
   const tiles = machineTiles(snapshot.machine, snapshot.jobs.length, snapshot.queue.starting.length);
   return h("section", { class: "live-machine", "aria-label": "Machine" },
     tiles.map((t) => h("div", { key: t.key, class: `live-tile${t.warn ? " live-tile-warn" : ""}` },
       h("span", { class: "live-tile-label" }, t.label),
       h("span", { class: "live-tile-value" }, t.value),
       t.detail ? h("span", { class: "live-tile-detail" }, t.detail) : null,
+      t.key === "slots" ? h(SlotsStepper, { scope: snapshot.machine.slots.scope, refresh }) : null,
     )),
   );
 }
@@ -336,6 +415,7 @@ function AttentionSection({ snapshot, navigateTo, refresh }: { snapshot: LiveSna
 // ── Side column ──────────────────────────────────────────────────────
 
 function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: NavigateTo }) {
+  const readyNext = useFeatureToggle(READY_NEXT_FEATURE, false);
   const [paused, setPaused] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -364,11 +444,15 @@ function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: N
   }, [paused]);
 
   const { next } = snapshot.queue;
-  return h("section", { class: "live-side-section", "aria-labelledby": "live-queue-h" },
-    h("h3", { id: "live-queue-h", class: "live-side-title" }, "Up next"),
-    next.length === 0
-      ? h("p", { class: "live-muted" }, "Nothing actionable in the PRD.")
-      : h("ol", { class: "live-queue" }, next.map((t: LiveNextTask) =>
+  // Ready next takes the Up next list's place; the loop control stays.
+  const readyKey = [...next.map((t) => t.id), ...snapshot.runs.map((r) => r.runId)].join(",");
+  const list = readyNext
+    ? h(ReadyNext, { refreshKey: readyKey, navigateTo })
+    : [
+      h("h3", { key: "h", id: "live-queue-h", class: "live-side-title" }, "Up next"),
+      next.length === 0
+        ? h("p", { key: "l", class: "live-muted" }, "Nothing actionable in the PRD.")
+        : h("ol", { key: "l", class: "live-queue" }, next.map((t: LiveNextTask) =>
         h("li", { key: t.id },
           h("a", {
             class: "live-queue-item",
@@ -377,6 +461,9 @@ function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: N
           }, h("span", { class: "live-card-title" }, t.title),
             chainLabel(t.epicChain) ? h("span", { class: "live-card-chain" }, chainLabel(t.epicChain)) : null),
         ))),
+    ];
+  return h("section", { class: "live-side-section", "aria-labelledby": readyNext ? "live-ready-h" : "live-queue-h" },
+    list,
     paused === null ? null : h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", onClick: toggle },
       paused ? "Resume loop" : "Pause loop after current"),
     paused ? h("p", { class: "live-muted" }, "New tasks are paused; running ones finish.") : null,
@@ -505,7 +592,7 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
       ? h("p", { class: "live-muted", role: "status" },
         connection === "offline" ? "The dashboard server is not answering." : "Loading…")
       : [
-        h(MachineStrip, { key: "machine", snapshot }),
+        h(MachineStrip, { key: "machine", snapshot, refresh }),
         h("div", { key: "body", class: "live-body" },
           h("div", { class: "live-main" },
             needsLook ? h(AttentionSection, { snapshot, navigateTo, refresh }) : null,
@@ -518,6 +605,7 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
                     ? h(RunCard, { key: item.key, run: item.run, navigateTo })
                     : h(JobCard, { key: item.key, job: item.job, navigateTo }))))
                 : null,
+            h(TrackerActivitySection, { refreshKey: snapshot.generatedAt, navigateTo }),
           ),
           h("aside", { class: "live-side", "aria-label": "Queue and history" },
             h(Queue, { snapshot, navigateTo }),

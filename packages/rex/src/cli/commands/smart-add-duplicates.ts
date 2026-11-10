@@ -1,5 +1,5 @@
-import { similarity } from "../../analyze/dedupe.js";
 import { pickLoEFields } from "../../analyze/index.js";
+import { scoreDuplicate, type DuplicateItemMatch } from "../../core/duplicate-match.js";
 import { walkTree } from "../../core/tree.js";
 import { parsePRDFileDate } from "../../store/index.js";
 import type {
@@ -17,8 +17,6 @@ import type { Proposal, DuplicateReasonMetadata, DuplicateReasonType } from "../
  * Used by cross-file duplicate detection to prefer matches from older files.
  */
 export type ItemFileMap = ReadonlyMap<string, string>;
-
-const DUPLICATE_THRESHOLD = 0.7;
 
 export type ProposalNodeKind = "epic" | "feature" | "task";
 export type DuplicateReason = "exact_title" | "semantic_title" | "content_overlap" | "none";
@@ -198,75 +196,12 @@ export function attachDuplicateReasonsToProposals(
   });
 }
 
-interface CandidateScore {
-  item: PRDItem;
-  score: number;
-  reason: Exclude<DuplicateReason, "none">;
-}
-
-function normalize(text: string): string {
-  return text.toLowerCase().trim().replace(/\s+/g, " ");
-}
-
-function titleContains(a: string, b: string): boolean {
-  if (a.length < 5 || b.length < 5) return false;
-  return a.includes(b) || b.includes(a);
-}
-
-function buildNodeContent(node: ProposalNode): string {
-  const parts: string[] = [];
-  if (node.description) parts.push(node.description);
-  if (node.acceptanceCriteria?.length) parts.push(node.acceptanceCriteria.join(" "));
-  return parts.join(" ").trim();
-}
-
-function buildItemContent(item: PRDItem): string {
-  const parts: string[] = [];
-  if (item.description) parts.push(item.description);
-  if (item.acceptanceCriteria?.length) parts.push(item.acceptanceCriteria.join(" "));
-  return parts.join(" ").trim();
-}
+type CandidateScore = DuplicateItemMatch;
 
 function scoreNodeAgainstItem(node: ProposalNode, item: PRDItem): CandidateScore | null {
   // Only match items at the same level (epic↔epic, feature↔feature, task↔task)
   if (node.kind !== item.level) return null;
-
-  const nodeTitle = normalize(node.title);
-  const itemTitle = normalize(item.title);
-
-  if (nodeTitle === itemTitle) {
-    return { item, score: 1, reason: "exact_title" };
-  }
-
-  if (titleContains(nodeTitle, itemTitle)) {
-    return { item, score: 0.95, reason: "semantic_title" };
-  }
-
-  const titleScore = similarity(node.title, item.title);
-  const nodeContent = buildNodeContent(node);
-  const itemContent = buildItemContent(item);
-  const contentScore =
-    nodeContent.length > 0 && itemContent.length > 0
-      ? similarity(nodeContent, itemContent)
-      : 0;
-
-  const blended = Math.max(
-    titleScore,
-    (titleScore * 0.75) + (contentScore * 0.25),
-    contentScore * 0.7,
-  );
-
-  const isDuplicate =
-    blended >= DUPLICATE_THRESHOLD ||
-    (titleScore >= 0.62 && contentScore >= 0.55);
-
-  if (!isDuplicate) return null;
-
-  return {
-    item,
-    score: blended,
-    reason: contentScore > titleScore ? "content_overlap" : "semantic_title",
-  };
+  return scoreDuplicate(node, item);
 }
 
 export function flattenProposalNodes(proposals: Proposal[]): ProposalNode[] {

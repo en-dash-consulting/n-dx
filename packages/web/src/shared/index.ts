@@ -12,6 +12,12 @@ export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
   HUB_PATH,
+  HUB_SESSION_PATH,
+  HUB_SIDECAR_API_PREFIX,
+  HUB_SESSION_ROUTES,
+  HUB_SESSION_CLOSE_MESSAGE,
+  HUB_SIDECAR_HOST_LOCK_SEGMENTS,
+  hubSessionUpstreamPath,
   PROJECT_PATH_PREFIX,
   WORKSPACE_PATH_PREFIX,
   detectBasePath,
@@ -26,7 +32,9 @@ export {
   webSocketUrl,
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
-export { PAGE_CSP, STRICT_CSP, applySecurityHeaders, applyStrictContentPolicy } from "./response-headers.js";
+export { OAUTH_CALLBACK_PATH, formatSignInState, parseSignInState } from "./oauth-callback.js";
+export type { SignInState } from "./oauth-callback.js";
+export { PAGE_CSP, SAME_ORIGIN_FRAME_PAGE_CSP, STRICT_CSP, applySameOriginFramePolicy, applySecurityHeaders, applyStrictContentPolicy } from "./response-headers.js";
 export type { HeaderSink } from "./response-headers.js";
 export {
   V1_LEVELS,
@@ -58,7 +66,7 @@ export {
   criteriaLabel,
 } from "./item-type.js";
 export type { ItemType, ItemTypeCarrier, V1Level, ProductType, ChangeType } from "./item-type.js";
-export { HUB_ADMISSION_HEADER, MAX_HEADER_QUEUE_ENTRIES, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
+export { FEATURE_DISABLED_HEADER, HUB_ADMISSION_HEADER, MAX_HEADER_QUEUE_ENTRIES, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
 export type { HubAdmissionHeader, HubMemoryPressure, HubQueuedRequest } from "./hub-admission.js";
 export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";
 export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand, RunMode, RunModeCheck } from "./run-options.js";
@@ -101,4 +109,12 @@ export {
   buildValidViews,
   isKnownViewPath,
   resolveViewAlias,
+  resolveViewAliasRoute,
 } from "./view-routing.js";
+export { OWN_WORKTREE_NOTE, laneSteps, stepRunOptions } from "./queue-plan.js";
+export type { PlannedLane, PlannedTask, QueuePlan, StepRunOptions } from "./queue-plan.js";
+export { SIDECAR_SESSION_ENDED_REASON } from "./sidecar-card.js";
+export type { SidecarChangeSet, SidecarChangeSetItem, SidecarChangeSetEdit, SidecarChangeSetPlacement } from "./sidecar-card.js";
+export type { SidecarLink } from "./sidecar-card.js";
+export type { SidecarCriterion, SidecarPlacement, SidecarPlacementCheck, SidecarPlacementRequest } from "./sidecar-card.js";
+export type { SidecarCallProblem, SidecarExternalCall, SidecarFieldOption } from "./sidecar-card.js";

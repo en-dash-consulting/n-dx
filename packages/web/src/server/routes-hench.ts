@@ -34,8 +34,10 @@
  * DELETE /api/hench/templates/:id         — delete a user-defined template
  * GET    /api/hench/prep/:taskId, POST …/preview, GET /api/hench/ready — see routes-hench-prep.ts
  * POST   /api/hench/execute               — trigger Hench run for a specific task
- *                                            ({ taskId, options? }; options per
- *                                            src/shared/run-options.ts)
+ *                                            ({ taskId, options?, saveRun? }; options per
+ *                                            src/shared/run-options.ts; saveRun {run, version}
+ *                                            is saved on the task after every gate passes,
+ *                                            via task-run-settings.ts)
  * POST   /api/hench/execute/check         — the same request's verdict without starting it
  *                                            (always 200: { ok } or { ok: false, status, error })
  * GET    /api/hench/execute/status         — get all active execution statuses
@@ -79,6 +81,7 @@ import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
+  fieldDefaultForProject,
   validateFieldValue,
   validateConfigKeyValue,
   validateConfigConstraints,
@@ -90,7 +93,7 @@ import {
 import { resolveActiveVendor } from "./routes-llm.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
-import type { ItemTokenTuple, ItemRunTokens } from "./rex-gateway.js";
+import type { ItemTokenTuple, ItemRunTokens, RunSettings } from "./rex-gateway.js";
 import {
   collectAllIds,
   aggregateItemTokenUsage,
@@ -132,7 +135,10 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
+import { checkSaveRunRequest, runConflictBody, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
+import type { SaveRunRequest } from "./task-run-settings.js";
+import { readDiagnosis, type RunDiagnosisSummary } from "./run-diagnosis.js";
+import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type QueuePlan, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -229,6 +235,23 @@ interface RunSummary {
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /**
+   * The run classifier's verdict, copied from the run file as hench wrote it
+   * (`RunRecord.diagnosis`). Absent on completed runs and older records.
+   * Read from the file like every other field here: web never imports hench.
+   */
+  diagnosis?: RunDiagnosisSummary;
+  /**
+   * Tier of the model the run actually used (`RunRecord.weight`): "light",
+   * "standard", "heavy" or "custom". Absent on older records.
+   */
+  weight?: string;
+  /**
+   * The test gate's verdict (`RunRecord.testGate`): "passed" or "failed" when
+   * the suite ran, absent when it did not run (skipped, could not launch) or
+   * the record has no gate result.
+   */
+  gate?: "passed" | "failed";
   /**
    * The worktree whose `.hench/runs/` this run was read from. Present only
    * for `?scope=repo` responses; the default (served-directory) listing is
@@ -361,7 +384,21 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     vendor: diagnostics?.vendor as string | undefined,
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
     invocationContext: run.invocationContext as RunSummary["invocationContext"],
+    diagnosis: readDiagnosis(run.diagnosis),
+    weight: typeof run.weight === "string" ? run.weight : undefined,
+    gate: readGateVerdict(run.testGate),
   };
+}
+
+/**
+ * A verdict only when the gate executed: `ran: false` means skipped or
+ * inconclusive, and its `passed` is meaningless (see `TestGateResult`).
+ */
+function readGateVerdict(raw: unknown): RunSummary["gate"] {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const gate = raw as { ran?: unknown; passed?: unknown };
+  if (gate.ran !== true || typeof gate.passed !== "boolean") return undefined;
+  return gate.passed ? "passed" : "failed";
 }
 
 // ── Repo-scope runs (worktree aggregation) ──────────────────────────────────
@@ -932,7 +969,7 @@ function routeConfig(rc: RouteContext): boolean | Promise<boolean> | null {
 
     const fields = CONFIG_FIELD_META.map((field) => {
       const value = getNestedValue(config, field.path);
-      const { defaultValue } = field;
+      const defaultValue = fieldDefaultForProject(field, rc.ctx.projectDir);
       // An absent key is the default by definition — hench fills it in on load
       // — so it is never marked as differing, whatever the default happens to be.
       const isDefault =
@@ -1018,7 +1055,59 @@ export function handleHenchRoute(
     ?? routeConfig(rc)
     ?? routeTemplates(rc)
     ?? routeConcurrency(rc)
+    ?? routePlanQueue(rc)
     ?? false;
+}
+
+/** Routes: plan-queue (gated by hench.readyNext in route-feature-gates.ts) */
+function routePlanQueue(rc: RouteContext): Promise<boolean> | null {
+  if (rc.path === "plan-queue" && rc.method === "GET") return handlePlanQueue(rc.res, rc.ctx);
+  return null;
+}
+
+/** How long `ndx work --plan-queue` may take: it reads the PRD and the claims, nothing more. */
+const PLAN_QUEUE_TIMEOUT_MS = 60_000;
+
+/**
+ * GET /api/hench/plan-queue — the advisory lane plan for Live's Ready next.
+ *
+ * Spawns `ndx work --plan-queue --format=json` through the same ndx path a run
+ * uses, so the rules stay hench's and web never imports it. The command starts
+ * nothing and writes nothing; its JSON is passed through as hench printed it.
+ */
+async function handlePlanQueue(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const read = await readQueuePlan(ctx);
+  if (read.ok) jsonResponse(res, 200, read.plan);
+  else errorResponse(res, 500, read.failure);
+  return true;
+}
+
+/**
+ * The planner's plan, as `GET /api/hench/plan-queue` reads it: one spawn of
+ * `ndx work --plan-queue --format=json`, its JSON passed through as hench
+ * printed it. The Sidecar Guide lens reads it through here too, so there is
+ * one spawn and one parse. `signal` aborts the spawn.
+ */
+export async function readQueuePlan(
+  ctx: ServerContext,
+  signal?: AbortSignal,
+): Promise<{ ok: true; plan: QueuePlan } | { ok: false; failure: string }> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cli = readCliName(ctx.projectDir);
+  const result = await exec(
+    bin,
+    [...prefixArgs, "work", "--plan-queue", "--format=json", ctx.projectDir],
+    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS, ...(signal && { signal }) },
+  );
+  if (!result.launched || result.exitCode !== 0) {
+    const detail = (result.stderr.trim() || result.stdout.trim() || "no output").slice(0, 2000);
+    return { ok: false, failure: `'${cli} work --plan-queue' did not complete: ${detail}` };
+  }
+  try {
+    return { ok: true, plan: JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))) as QueuePlan };
+  } catch {
+    return { ok: false, failure: `'${cli} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}` };
+  }
 }
 
 /** Routes: concurrency */
@@ -1839,10 +1928,26 @@ function findPRDItem(
 }
 
 /** A blocking item as the blocked-task 409 names it. */
-interface BlockerSummary {
+export interface BlockerSummary {
   id: string;
   title: string;
   status: string;
+}
+
+/** `"Title" (id, status)` for each blocker, comma-separated. */
+export function nameBlockers(blockers: readonly BlockerSummary[]): string {
+  return blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ");
+}
+
+/**
+ * The task's blockers that are not completed, as `--require-unblocked` judges
+ * them (a blocker missing from the PRD counts as open). Empty when the PRD or
+ * the task cannot be read.
+ */
+export function openTaskBlockers(ctx: ServerContext, taskId: string): BlockerSummary[] {
+  const items = loadPRDForExecute(ctx)?.items as Array<Record<string, unknown>> | undefined;
+  const task = items ? findPRDItem(items, taskId) : null;
+  return items && task ? describeBlockers(items, task).filter((b) => b.status !== "completed") : [];
 }
 
 /** The task's `blockedBy` items, with titles; an id no longer in the PRD keeps its id as title. */
@@ -1958,6 +2063,12 @@ type ExecuteVerdict =
     mode: RunMode;
     /** Task count for `mode: "iterations"`, already range-checked. */
     iterations?: number;
+    /**
+     * Run settings to save on the task before it starts (`saveRun`), checked
+     * against the same validator and version as `PUT /api/hench/prep`. Saved
+     * by the spawn path only, after every gate above it has passed.
+     */
+    saveRun?: SaveRunRequest;
   };
 
 const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
@@ -2003,6 +2114,18 @@ async function judgeExecuteRequest(
   const checkedMode = checkRunMode(body);
   if (!checkedMode.ok) return refused(400, { error: checkedMode.error });
 
+  // Settings to save on the task when it starts (Start Working's one click on
+  // a task with none). Shape and values are checked here, as a PUT would check
+  // them, so a malformed block is a 400 before anything is read or written.
+  let saveRun: SaveRunRequest | undefined;
+  if (body.saveRun !== undefined) {
+    const checkedSave = await checkSaveRunRequest(ctx.projectDir, body.saveRun);
+    if (!checkedSave.ok) {
+      return refused(400, { error: checkedSave.error, ...(checkedSave.key ? { key: checkedSave.key } : {}) });
+    }
+    saveRun = checkedSave.request;
+  }
+
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
   // from reading a repository fault as a problem with the task they picked.
@@ -2047,14 +2170,24 @@ async function judgeExecuteRequest(
   const status = task.status as string;
   if (status === "blocked") {
     const blockers = describeBlockers(items, task);
-    const named = blockers.length > 0
-      ? blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ")
-      : "no recorded blockers";
+    const named = blockers.length > 0 ? nameBlockers(blockers) : "no recorded blockers";
     return refused(409, {
       error: `Task is blocked by ${named}. Finish or unblock ${blockers.length === 1 ? "it" : "them"} first.`,
       taskId,
       blockedBy: blockers,
     });
+  }
+  // The spawned run would refuse too, but only after this route answered 202:
+  // judged here, a refusal reaches the caller instead of a run that exits at once.
+  if (options.requireUnblocked) {
+    const open = describeBlockers(items, task).filter((b) => b.status !== "completed");
+    if (open.length > 0) {
+      return refused(409, {
+        error: `Task is waiting on unfinished work: ${nameBlockers(open)}. requireUnblocked refuses to start it until ${open.length === 1 ? "that blocker is" : "those blockers are"} completed.`,
+        taskId,
+        blockedBy: open,
+      });
+    }
   }
   if (!ACTIONABLE_STATUSES.has(status)) {
     return refused(409, {
@@ -2118,6 +2251,16 @@ async function judgeExecuteRequest(
     }
   }
 
+  // Last gate: settings the request would save must still be saving over the
+  // block it read. Judged read-only here so `execute/check` (and the hub, before
+  // it queues) answers for it too; the save itself re-checks inside its PRD
+  // transaction, which is the check that cannot be raced.
+  if (saveRun) {
+    const current = (task.run as RunSettings | undefined) ?? null;
+    const currentVersion = savedRunVersion(current);
+    if (currentVersion !== saveRun.version) return refused(409, runConflictBody(current, currentVersion));
+  }
+
   return {
     kind: "runnable",
     taskId,
@@ -2126,6 +2269,7 @@ async function judgeExecuteRequest(
     options,
     mode: checkedMode.mode,
     ...(checkedMode.iterations !== undefined ? { iterations: checkedMode.iterations } : {}),
+    ...(saveRun ? { saveRun } : {}),
   };
 }
 
@@ -2172,47 +2316,177 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const { startingTasks } = stateForCtx(ctx);
   const body = await readExecuteBody(req, res);
   if (!body) return true;
+  const outcome = await reserveAndStart(ctx, body, broadcast);
+  if (outcome.kind === "migrate") return await runTreeMigration(res, ctx);
+  jsonResponse(res, outcome.status, outcome.body);
+  return true;
+}
 
-  // Reserve the task before the first await below: the checks await claims,
-  // the run holder and the context file, and a second request for the same
-  // task arriving meanwhile would otherwise pass them too and spawn a second
-  // run. Released on every exit; once spawned, activeExecutions holds it.
+/** What an execute request came to: an answer for the client, or the consented slug migration. */
+type ExecuteOutcome =
+  | { kind: "migrate" }
+  | { kind: "answer"; status: number; body: Record<string, unknown>; run?: SpawnedRun };
+
+/** How long a dashboard run reads `starting` before it reads `running`: hench's preflight runs in that window. */
+export const STARTING_PHASE_MS = 2000;
+
+/** Characters of each stream {@link runEndOutput} keeps by default. */
+export const RUN_END_STREAM_MAX_CHARS = 4000;
+
+/** Characters of each stream a failed dashboard run's broadcast `error` keeps. */
+const EXEC_STATE_ERROR_STREAM_CHARS = 300;
+
+/**
+ * The end of stdout for a failed run's `error`. hench prints a refusal as a
+ * header followed by indented detail lines (a dirty-file list), then a closing
+ * "Stopped before running." line, so keep everything from the header of the
+ * last indented list on: the header survives however long the list is. A block
+ * longer than {@link RUN_END_STREAM_MAX_CHARS} keeps its head. Output with no
+ * indented line keeps its last {@link EXEC_STATE_ERROR_STREAM_CHARS}.
+ */
+export function lastStdoutBlock(stdout: string | undefined): string {
+  const lines = (stdout ?? "").trimEnd().split(/\r?\n/);
+  const isIndented = (line: string): boolean => /^\s+\S/.test(line);
+  let last = lines.length - 1;
+  while (last >= 0 && !isIndented(lines[last])) last--;
+  if (last < 0) return lines.join("\n").trim().slice(-EXEC_STATE_ERROR_STREAM_CHARS);
+  let header = last;
+  while (header > 0 && (lines[header].trim() === "" || isIndented(lines[header]))) header--;
+  return lines.slice(header).join("\n").trim().slice(0, RUN_END_STREAM_MAX_CHARS);
+}
+
+/**
+ * What a finished run printed: the end of stderr, then the end of stdout, each
+ * cut to `maxChars`. hench warns on stderr but prints its pre-run refusals on
+ * stdout, so a warning must not hide the refusal that follows it.
+ */
+export function runEndOutput(stderr: string | undefined, stdout: string | undefined, maxChars = RUN_END_STREAM_MAX_CHARS): string {
+  const tail = (text: string | undefined): string => (text ?? "").trim().slice(-maxChars);
+  return [tail(stderr), tail(stdout)].filter(Boolean).join("\n");
+}
+
+/** How a dashboard-started `ndx work` process ended. `output` is {@link runEndOutput} of its two streams. */
+export interface RunEnd {
+  ok: boolean;
+  exitCode: number | null;
+  output: string;
+}
+
+/** A spawned run's two moments: `started` settles with null once it passes its starting phase, or with its end if it exits first. */
+interface SpawnedRun {
+  started: Promise<RunEnd | null>;
+  ended: Promise<RunEnd>;
+}
+
+/** {@link startTaskExecution}'s answer; with `awaitStart`, `exited` is the end of a run that exited inside its starting phase. */
+export interface ExecutionStart {
+  status: number;
+  body: Record<string, unknown>;
+  exited?: RunEnd;
+  /** Settles when the spawned run ends; absent when nothing spawned. */
+  ended?: Promise<RunEnd>;
+}
+
+/**
+ * Start a run on `taskId` exactly as `POST /api/hench/execute` would, for a
+ * caller inside this server: an approved Sidecar `start_work` card. Answers
+ * what the route would have answered — 202 with the run, or the refusal.
+ * Never migrates the tree: that consent belongs to the operator's button.
+ *
+ * `awaitStart` opts in to waiting out the run's starting phase, where hench's
+ * preflight refuses a dirty tree or a missing task: a run that exits inside it
+ * comes back as `exited`. The route itself still answers 202 at once.
+ */
+export async function startTaskExecution(
+  ctx: ServerContext,
+  request: { taskId: string; options?: unknown },
+  broadcast?: WebSocketBroadcaster,
+  { awaitStart = false, startingPhaseMs = STARTING_PHASE_MS }: { awaitStart?: boolean; startingPhaseMs?: number } = {},
+): Promise<ExecutionStart> {
+  const outcome = await reserveAndStart(ctx, { taskId: request.taskId, options: request.options }, broadcast, startingPhaseMs);
+  // Unreachable without `migrateSlugs` in the body, which this request never carries.
+  if (outcome.kind === "migrate") throw new Error("startTaskExecution never migrates the PRD tree");
+  const answer: ExecutionStart = { status: outcome.status, body: outcome.body };
+  if (!outcome.run) return answer;
+  answer.ended = outcome.run.ended;
+  if (awaitStart) {
+    const exited = await outcome.run.started;
+    if (exited) answer.exited = exited;
+  }
+  return answer;
+}
+
+/**
+ * Reserve the task before the first await: the checks await claims, the run
+ * holder and the context file, and a second request for the same task
+ * arriving meanwhile would otherwise pass them too and spawn a second run.
+ * Released on every exit; once spawned, activeExecutions holds it.
+ */
+async function reserveAndStart(
+  ctx: ServerContext,
+  body: Record<string, unknown>,
+  broadcast?: WebSocketBroadcaster,
+  startingPhaseMs = STARTING_PHASE_MS,
+): Promise<ExecuteOutcome> {
+  const { startingTasks } = stateForCtx(ctx);
   const taskId = typeof body.taskId === "string" && body.taskId ? body.taskId : null;
   if (taskId) {
-    if (startingTasks.has(taskId)) {
-      jsonResponse(res, 409, alreadyStarting(taskId));
-      return true;
-    }
+    if (startingTasks.has(taskId)) return { kind: "answer", status: 409, body: alreadyStarting(taskId) };
     startingTasks.add(taskId);
   }
   try {
-    return await startExecution(res, ctx, body, broadcast);
+    return await startExecution(ctx, body, broadcast, startingPhaseMs);
   } finally {
     if (taskId) startingTasks.delete(taskId);
   }
 }
 
+/** Remove a run's context-notes file in the background, warning when it cannot be. */
+function removeContextFile(contextFile: Awaited<ReturnType<typeof writeContextNotesFile>> | null): void {
+  contextFile?.remove().catch((err: unknown) => {
+    console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
+  });
+}
+
+/**
+ * Take a `saveRun` block back off the task when the start it was saved for
+ * never spawned. Best effort: the clear goes through the same versioned save,
+ * so a block someone else saved in the meantime is left alone (409), and a
+ * failure is logged rather than replacing the spawn error the caller reports.
+ */
+async function revertSavedRun(
+  ctx: ServerContext,
+  taskId: string,
+  version: string,
+  broadcast?: WebSocketBroadcaster,
+): Promise<void> {
+  try {
+    const reverted = await writeTaskRun(ctx, taskId, { run: undefined, version }, broadcast);
+    if (!reverted.ok) {
+      console.warn(`[hench] could not take the saved run settings off ${taskId} after a failed start: ${String(reverted.body.error)}`);
+    }
+  } catch (err) {
+    console.warn(`[hench] could not take the saved run settings off ${taskId} after a failed start: ${(err as Error).message}`);
+  }
+}
+
 /** The checks and spawn behind `POST /api/hench/execute`, run while the task is reserved. */
 async function startExecution(
-  res: ServerResponse,
   ctx: ServerContext,
   body: Record<string, unknown>,
-  broadcast?: WebSocketBroadcaster,
-): Promise<boolean> {
+  broadcast: WebSocketBroadcaster | undefined,
+  startingPhaseMs: number,
+): Promise<ExecuteOutcome> {
   const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
   const verdict = await judgeExecuteRequest(ctx, body, { holdsReservation: true });
-  if (verdict.kind === "refused") {
-    jsonResponse(res, verdict.status, verdict.body);
-    return true;
-  }
-  if (verdict.kind === "migrate") return await runTreeMigration(res, ctx);
+  if (verdict.kind === "refused") return { kind: "answer", status: verdict.status, body: verdict.body };
+  if (verdict.kind === "migrate") return verdict;
   // How many tasks this one request works through, judged above with the rest
   // of the request so `execute/check` answers for it too. Every mode starts on
   // this task; the modes that continue past it autoselect from there.
-  const { taskId, task, status, options, mode, iterations } = verdict;
+  const { taskId, task, status, options, mode, iterations, saveRun } = verdict;
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
@@ -2265,9 +2539,26 @@ async function startExecution(
     ...(iterations !== undefined ? { iterations } : {}),
   };
 
+  // Every gate has passed and everything the spawn needs is ready, so only now
+  // are the request's settings written on the task — a start the gates refuse
+  // leaves the task's block and the working tree as they were. The spawned
+  // `ndx work` reads the task after this returns, so the run uses what was just
+  // saved. The task is still reserved (startingTasks), so no second start can
+  // slip in between the gates and the write.
+  let savedVersion: string | null = null;
+  if (saveRun) {
+    const written = await writeTaskRun(ctx, taskId, saveRun, broadcast);
+    if (!written.ok) {
+      removeContextFile(contextFile);
+      return { kind: "answer", status: written.status, body: written.body };
+    }
+    savedVersion = written.version;
+  }
+
   // Spawn hench process with streaming stdout so the UI can show live output.
   // A spawn that throws (rather than rejecting `done`) is answered here, so the
-  // operator gets the reason and the context file does not outlive the request.
+  // operator gets the reason, the context file does not outlive the request,
+  // and the settings saved above for this start are taken off the task again.
   const spawned = attempt(() => spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
     stdio: "pipe",
@@ -2306,11 +2597,13 @@ async function startExecution(
     },
   }));
   if (!spawned.ok) {
-    contextFile?.remove().catch((err: unknown) => {
-      console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
-    });
-    errorResponse(res, 500, `Could not start '${readCliName(ctx.projectDir)} work': ${spawned.error.message}`);
-    return true;
+    removeContextFile(contextFile);
+    if (savedVersion !== null) await revertSavedRun(ctx, taskId, savedVersion, broadcast);
+    return {
+      kind: "answer",
+      status: 500,
+      body: { error: `Could not start '${readCliName(ctx.projectDir)} work': ${spawned.error.message}` },
+    };
   }
   const handle = spawned.value;
 
@@ -2323,6 +2616,18 @@ async function startExecution(
   // Broadcast initial state
   broadcastExecState(broadcast, execState);
 
+  // Each settles once: whichever of the timer and the exit comes first decides `started`.
+  let settleStarted!: (end: RunEnd | null) => void;
+  let settleEnded!: (end: RunEnd) => void;
+  const run: SpawnedRun = {
+    started: new Promise((resolve) => { settleStarted = resolve; }),
+    ended: new Promise((resolve) => { settleEnded = resolve; }),
+  };
+  const finish = (end: RunEnd): void => {
+    settleStarted(end);
+    settleEnded(end);
+  };
+
   // Transition to "running" after a short delay (hench takes a moment to initialize)
   setTimeout(() => {
     const entry = activeExecutions.get(taskId);
@@ -2330,7 +2635,8 @@ async function startExecution(
       entry.state.status = "running";
       broadcastExecState(broadcast, { ...entry.state });
     }
-  }, 2000);
+    settleStarted(null);
+  }, startingPhaseMs);
 
   // Handle process completion
   handle.done
@@ -2357,19 +2663,22 @@ async function startExecution(
           ? result.stdout.split("\n").filter((l) => l.trim()).at(-1)
           : undefined;
         if (!isSuccess) {
-          // stderr is empty for this failure mode (hench logs the reason via
-          // its normal stdout info() logging, not console.error), so fall
-          // back to the last meaningful stdout line rather than leaving the
-          // dashboard with no explanation at all.
-          entry.state.error = (result.stderr ? result.stderr.slice(-200) : undefined)
-            || lastOutLine
+          // hench logs most failure reasons on stdout (info()), but warns on
+          // stderr and refuses on stdout, so when stderr has text keep the end
+          // of each stream: a warning must not hide the refusal. With stderr
+          // empty, the last meaningful stdout line is the reason.
+          entry.state.error = (result.stderr?.trim()
+            ? [result.stderr.trim().slice(-EXEC_STATE_ERROR_STREAM_CHARS), lastStdoutBlock(result.stdout)]
+                .filter(Boolean)
+                .join("\n")
+            : lastOutLine)
             || "Task run failed";
           appendLog(ctx, {
             timestamp: entry.state.finishedAt,
             event: "task_execution_failed",
             itemId: taskId,
             detail: `"${taskTitle}" failed (exit ${result.exitCode}): ${
-              (result.stderr || result.stdout || "").trim().slice(-2000) || "no output captured"
+              runEndOutput(result.stderr, result.stdout, 1000) || "no output captured"
             }`,
           });
         }
@@ -2379,6 +2688,7 @@ async function startExecution(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
+      finish({ ok: result.exitCode === 0, exitCode: result.exitCode, output: runEndOutput(result.stderr, result.stdout) });
     })
     .catch((err) => {
       const entry = activeExecutions.get(taskId);
@@ -2397,6 +2707,7 @@ async function startExecution(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
+      finish({ ok: false, exitCode: null, output: errorMessage(err) });
     })
     .finally(() => {
       contextFile?.remove().catch((err: unknown) => {
@@ -2405,16 +2716,20 @@ async function startExecution(
     });
 
   // Return immediately with tracking info, echoing the options the run got.
-  jsonResponse(res, 202, {
-    runId,
-    taskId,
-    taskTitle,
-    status: "started",
-    options,
-    mode,
-    ...(iterations !== undefined ? { iterations } : {}),
-  });
-  return true;
+  return {
+    kind: "answer",
+    run,
+    status: 202,
+    body: {
+      runId,
+      taskId,
+      taskTitle,
+      status: "started",
+      options,
+      mode,
+      ...(iterations !== undefined ? { iterations } : {}),
+    },
+  };
 }
 
 /**
@@ -2486,24 +2801,26 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
-/** One worktree's runs, for the routes that sweep every worktree. */
-interface RunTarget {
+/** One worktree's runs, for the routes that sweep every worktree and the Sidecar Diagnose run lens. */
+export interface RunTarget {
   root: string;
   runsDir: string;
   /** Absent outside a git repository, where the served directory is the only target. */
   worktree?: RunWorktree;
+  /** The worktree this server serves. */
+  served: boolean;
 }
 
 /** Every worktree of the repository, or the served directory alone outside one. */
-async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
+export async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
   const sources = await resolveRunSources(ctx);
   return sources.length > 0
-    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
-    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx) }];
+    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree, served: s.served }))
+    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx), served: true }];
 }
 
 /** Judge a run against its worktree's lock files and this dashboard's children, read now. */
-function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
+export function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
   const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
   return judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, dashboardExecutionsFor(target.root));
 }
@@ -3469,6 +3786,49 @@ export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
     utilization: Math.min(1, utilization),
     locks,
   };
+}
+
+/**
+ * Runs on the machine against `guard.maxConcurrentProcesses`: live lock holders
+ * in every worktree of the repository, as `GET /api/live` and the queue planner
+ * count them, plus runs this server spawned that hold no lock yet (a run takes
+ * its lock a moment after the spawn). An untagged lock cannot be matched to its
+ * run, so the count errs toward full. Outside a repository, or when git fails,
+ * only this worktree counts.
+ */
+export async function repositoryRunSlotUsage(
+  ctx: ServerContext,
+): Promise<{
+  inUse: number;
+  max: number;
+  holders: Array<{ taskId: string | null; worktree: string }>;
+  /** The holders in `ctx.projectDir` itself: a run there is in the checkout a new run would start in. */
+  here: Array<{ taskId: string | null; worktree: string }>;
+}> {
+  const self = ctx.projectDir;
+  const listed = (await listWorktrees(self).catch(() => [])).filter((wt) => !wt.bare).map((wt) => wt.path);
+  const canonicalOf = (p: string): string => {
+    try {
+      return realpathSync.native(p);
+    } catch {
+      return p;
+    }
+  };
+  const paths = new Map(listed.map((p) => [canonicalOf(p), p]));
+  if (!paths.has(canonicalOf(self))) paths.set(canonicalOf(self), self);
+  const holders: Array<{ taskId: string | null; worktree: string }> = [];
+  for (const path of paths.values()) {
+    for (const lock of collectLiveLocks(locksDirOf(resolveLayout(path).henchDir))) {
+      holders.push({ taskId: lock.taskId ?? null, worktree: path });
+    }
+  }
+  const locked = new Set(holders.map((h) => h.taskId).filter(Boolean));
+  for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
+    if (!locked.has(taskId)) holders.push({ taskId, worktree: self });
+  }
+  const selfKey = canonicalOf(self);
+  const here = holders.filter((h) => canonicalOf(h.worktree) === selfKey);
+  return { inUse: holders.length, max: getEffectiveMaxConcurrent(self), holders, here };
 }
 
 /** How full `inUse` of `max` slots is. */

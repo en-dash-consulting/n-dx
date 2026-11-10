@@ -73,6 +73,7 @@ export interface PrepResolvedSettings {
   tokenBudget: PrepResolved<number>;
   fresh: PrepResolved<boolean>;
   allowDirty: PrepResolved<boolean>;
+  requireUnblocked: PrepResolved<boolean>;
 }
 
 /** `GET /api/hench/prep/:taskId`, as the modal reads it. */
@@ -142,6 +143,7 @@ export interface PrepDefaults {
   tokenBudget: number;
   fresh: boolean;
   allowDirty: boolean;
+  requireUnblocked: boolean;
   contextNotes: string;
 }
 
@@ -161,6 +163,7 @@ export function defaultsOf(prep: PrepResponse): PrepDefaults {
     tokenBudget: r.tokenBudget.value,
     fresh: r.fresh.value,
     allowDirty: r.allowDirty.value,
+    requireUnblocked: r.requireUnblocked.value,
     // Notes have no project default, so the task's own are the starting value:
     // a run with no edit gets them from hench, and a Save with no edit keeps
     // them. Started empty, an unrelated Save would silently delete them.
@@ -318,7 +321,7 @@ export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptio
  * Fields chosen per launch, which a save must never carry: they describe how
  * this one run starts, not how the task should be run.
  */
-const LAUNCH_ONLY: ReadonlySet<RunOptionKey> = new Set(["fresh", "allowDirty"] as RunOptionKey[]);
+const LAUNCH_ONLY: ReadonlySet<RunOptionKey> = new Set(["fresh", "allowDirty", "requireUnblocked"] as RunOptionKey[]);
 
 /**
  * The two fields a saved block spells as a portable tier plus per-vendor pins
@@ -427,6 +430,81 @@ export function saveBodyOf(
   }
   // Likewise a reviewer vendor with no pair review to serve.
   if (reviewModeOf(defaults, edits) !== "pair") delete block["reviewVendor"];
+  return Object.keys(block).length > 0 ? block : null;
+}
+
+/** Whether the task carries a saved `run` block of its own. */
+export function hasSavedRun(prep: PrepResponse): boolean {
+  return savedCount(prep) > 0 || (prep.savedVersion !== undefined && prep.savedVersion !== "none");
+}
+
+/** Permission modes rex lets a task save; `bypassPermissions` is refused on an item by design. */
+const SAVEABLE_PERMISSION_MODES: ReadonlySet<string> = new Set(["default", "acceptEdits"]);
+const SAVEABLE_REVIEW_MODES: ReadonlySet<string> = new Set(["off", "self", "pair"]);
+const SAVEABLE_PROVIDERS: ReadonlySet<string> = new Set(["cli", "api"]);
+/** Vendors rex accepts as a saved pair reviewer (`RUN_SETTING_REVIEW_VENDORS`). */
+const SAVEABLE_REVIEW_VENDORS: ReadonlySet<string> = new Set(["claude", "codex"]);
+/** rex's bounds on a saved `maxTurns` (`RUN_SETTING_MAX_TURNS_MIN..MAX`). */
+const SAVEABLE_MAX_TURNS = { min: 1, max: 500 } as const;
+
+/**
+ * The `run` block Start Working saves on a task that carries none: the
+ * settings the Prepare task modal shows for it, written down as the task's
+ * own, so the settings a one-click run used are visible and editable on the
+ * task afterwards.
+ *
+ * Deliberately the opposite of {@link saveBodyOf}, which omits a field equal
+ * to its project default so a later config change still reaches the task.
+ * Here the reader asked for exactly that freeze: the click records what this
+ * run is about to use. It is only ever written to a task with no block, so it
+ * never overwrites a choice someone made.
+ *
+ * What a saved block cannot hold is left to the project, where the run will
+ * find it anyway:
+ *
+ * - launch-time fields (`fresh`, `allowDirty`, `requireUnblocked`);
+ * - `permissionMode: bypassPermissions`, which rex refuses on an item, and a
+ *   mode the vendor has none of (`null`);
+ * - `maxTurns` on a CLI run, which ignores it, or outside rex's bounds;
+ * - a reviewer model or reviewer vendor when no review / no pair review runs.
+ *
+ * Models are written as pins for the vendor that resolves them — the agent
+ * model under the executor's vendor, the reviewer model under the reviewer's
+ * (the pair reviewer's own vendor for a pair review, as hench reads it).
+ * `reviewMode` is written rather than `review`, being the finer statement.
+ *
+ * Returns null when nothing is left to save.
+ */
+export function defaultsRunBlockOf(prep: PrepResponse): Record<string, unknown> | null {
+  const d = defaultsOf(prep);
+  const vendor = prep.resolved.vendor.value;
+  const block: Record<string, unknown> = {};
+
+  if (d.model && vendor) block["models"] = { [vendor]: d.model };
+  if (SAVEABLE_PROVIDERS.has(d.provider)) block["provider"] = d.provider;
+  if (SAVEABLE_PERMISSION_MODES.has(d.permissionMode)) block["permissionMode"] = d.permissionMode;
+  if (SAVEABLE_REVIEW_MODES.has(d.reviewMode)) block["reviewMode"] = d.reviewMode;
+
+  const pair = d.reviewMode === "pair";
+  if (pair && SAVEABLE_REVIEW_VENDORS.has(d.reviewVendor)) block["reviewVendor"] = d.reviewVendor;
+  if (d.review) {
+    const reviewer = pair && d.reviewVendor ? d.reviewVendor : vendor;
+    if (d.reviewModel && reviewer) block["reviewModels"] = { [reviewer]: d.reviewModel };
+    block["reviewOptional"] = d.reviewOptional;
+  }
+
+  block["skipTestGate"] = d.skipTestGate;
+  if (
+    maxTurnsApplies(d, {})
+    && Number.isInteger(d.maxTurns)
+    && d.maxTurns >= SAVEABLE_MAX_TURNS.min
+    && d.maxTurns <= SAVEABLE_MAX_TURNS.max
+  ) {
+    block["maxTurns"] = d.maxTurns;
+  }
+  if (Number.isSafeInteger(d.tokenBudget) && d.tokenBudget >= 0) block["tokenBudget"] = d.tokenBudget;
+  if (d.contextNotes) block["contextNotes"] = d.contextNotes;
+
   return Object.keys(block).length > 0 ? block : null;
 }
 

@@ -151,6 +151,13 @@ export interface TerminateTreeOptions {
   /** Grace period before escalating, and the bound on each wait phase. */
   forceKillTimeoutMs?: number;
   /**
+   * POSIX graceful path: timeout for the `ps` read that finds descendants.
+   * Defaults to `forceKillTimeoutMs`. A short grace on a loaded host would
+   * otherwise make the read come back empty and leave descendants running, so
+   * callers with a short grace pass a longer scan budget. Not used by `freeze`.
+   */
+  scanTimeoutMs?: number;
+  /**
    * Overridable so both strategies are exercised on any host. CI runs on a
    * single platform at a time, so without this seam one branch ships untested.
    */
@@ -548,6 +555,7 @@ async function terminatePosixTree(
   killGroup: NonNullable<TerminateTreeOptions["killGroup"]>,
   spawnImpl: typeof spawn,
   freeze: boolean,
+  scanTimeoutMs: number,
 ): Promise<void> {
   if (!isChildRunning(child)) return;
   if (!child.pid) return terminateChildProcess(child, forceKillTimeoutMs);
@@ -566,7 +574,7 @@ async function terminatePosixTree(
 
   // Collect descendants BEFORE signalling: once the direct child dies its
   // children are reparented to init and the pid->ppid links to it are gone.
-  const descendants = await posixDescendants(rootPid, spawnImpl, forceKillTimeoutMs);
+  const descendants = await posixDescendants(rootPid, spawnImpl, scanTimeoutMs);
 
   let groupSignalled = false;
   try {
@@ -705,11 +713,12 @@ export async function terminateProcessTree(
       process.kill(pid, signal);
     },
     freeze = false,
+    scanTimeoutMs = forceKillTimeoutMs,
   }: TerminateTreeOptions = {},
 ): Promise<void> {
   if (!isChildRunning(child)) return;
 
   return supportsProcessGroups(platform)
-    ? terminatePosixTree(child, forceKillTimeoutMs, killGroup, spawnImpl, freeze)
+    ? terminatePosixTree(child, forceKillTimeoutMs, killGroup, spawnImpl, freeze, scanTimeoutMs)
     : terminateWindowsTree(child, forceKillTimeoutMs, spawnImpl);
 }

@@ -177,14 +177,38 @@ function isArchitectureConstraint(node: PlacementNode): boolean {
  * decides it.
  */
 export function placementRelation(change: PlacementChange): PlacementRelation {
-  if (change.fix === true || isCodeHealthChange(change)) return "touches";
-  const marked = RELATION_MARKER.exec(change.intent ?? "")?.[1]?.toLowerCase();
-  if (marked === "amends" || marked === "touches") return marked;
-  const lead = /^\s*([a-z]+)/i.exec(change.title)?.[1]?.toLowerCase();
-  return lead !== undefined && AMENDING_VERBS.has(lead) ? "amends" : "touches";
+  return placementRelationRule(change).relation;
 }
 
-function scoreNode(change: PlacementChange, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {
+/** {@link placementRelation}'s answer and, in words, the rule that gave it. */
+export function placementRelationRule(change: PlacementChange): { relation: PlacementRelation; rule: string } {
+  if (change.fix === true) return { relation: "touches", rule: "the change is a fix (fix: true), and a fix always touches" };
+  if (isCodeHealthChange(change)) return { relation: "touches", rule: `the change carries the ${CODE_HEALTH_TAG} tag, and a code-health finding always touches` };
+  const marked = RELATION_MARKER.exec(change.intent ?? "")?.[1]?.toLowerCase();
+  if (marked === "amends" || marked === "touches") return { relation: marked, rule: `the intent's "Relation: ${marked}" line` };
+  const lead = /^\s*([a-z]+)/i.exec(change.title)?.[1]?.toLowerCase();
+  return lead !== undefined && AMENDING_VERBS.has(lead)
+    ? { relation: "amends", rule: `the title opens with the amending verb "${lead}"` }
+    : { relation: "touches", rule: "the title does not open with an amending verb, and the intent has no Relation line" };
+}
+
+/**
+ * Each node's keywords, kept against the text they came from. Ranking many
+ * changes against one node list (an Inbox) extracts a node's keywords once,
+ * not once per change; a node whose text changed is extracted again.
+ */
+const nodeKeywordCache = new WeakMap<PlacementNode, { text: string; words: string[] }>();
+
+function nodeKeywords(node: PlacementNode): string[] {
+  const text = `${node.title} ${node.statement ?? ""}`;
+  const cached = nodeKeywordCache.get(node);
+  if (cached?.text === text) return cached.words;
+  const words = extractKeywords(text);
+  nodeKeywordCache.set(node, { text, words });
+  return words;
+}
+
+function scoreNode(change: PlacementChange, changeWords: ReadonlySet<string>, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {
   const text = `${change.title}\n${change.intent ?? ""}`;
   let score = 0;
   const reasons: string[] = [];
@@ -216,8 +240,7 @@ function scoreNode(change: PlacementChange, node: PlacementNode, relation: Place
     }
   }
 
-  const changeWords = new Set(extractKeywords(text));
-  const shared = extractKeywords(`${node.title} ${node.statement ?? ""}`).filter((w) => changeWords.has(w));
+  const shared = nodeKeywords(node).filter((w) => changeWords.has(w));
   if (shared.length > 0) {
     score += WEIGHT_TOKEN * shared.length;
     reasons.push(`words: ${shared.join(", ")}`);
@@ -233,8 +256,9 @@ export function rankPlacementCandidates(
   size: number = PLACEMENT_SHORTLIST_SIZE,
 ): PlacementCandidate[] {
   const relation = placementRelation(change);
+  const changeWords = new Set(extractKeywords(`${change.title}\n${change.intent ?? ""}`));
   return nodes
-    .map((node) => scoreNode(change, node, relation))
+    .map((node) => scoreNode(change, changeWords, node, relation))
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score || a.target.localeCompare(b.target))
     .slice(0, size);

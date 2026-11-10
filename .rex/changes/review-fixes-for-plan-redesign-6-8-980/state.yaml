@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "161cbeed-8c8c-4411-bf4d-5c9400d08a36":
+    status: "completed"
+    startedAt: "2026-11-06T04:04:11.774Z"
+    completedAt: "2026-11-06T04:06:25.473Z"
+    endedAt: "2026-11-06T04:06:25.473Z"
+    activeIntervals: [{"end":"2026-11-06T04:06:25.473Z","start":"2026-11-06T04:04:11.774Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "useInPlaceAddress restores restoreTo via replaceAppHistory; hub-prefix area-view test added; history guard word-bounded."
+    lastModified: "2026-11-06T04:06:25.473Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4621f6fe-f229-4d31-ab50-d22c4c9e30a3":
+    status: "completed"
+    startedAt: "2026-11-06T04:11:48.875Z"
+    completedAt: "2026-11-06T04:11:48.875Z"
+    endedAt: "2026-11-06T04:11:48.875Z"
+    activeIntervals: [{"end":"2026-11-06T04:11:48.875Z","start":"2026-11-06T04:11:48.875Z"}]
+    appliedAt: "2026-11-06T04:11:48.875Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-06T04:11:48.875Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "61981436-d7f0-4d4b-b4b3-bc00ecc887a1":
+    status: "completed"
+    startedAt: "2026-11-06T04:06:32.750Z"
+    completedAt: "2026-11-06T04:08:40.808Z"
+    endedAt: "2026-11-06T04:08:40.808Z"
+    activeIntervals: [{"end":"2026-11-06T04:08:40.808Z","start":"2026-11-06T04:06:32.750Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "areaCapabilityOfTab guards decodeURIComponent and returns null on a malformed id; tests added."
+    lastModified: "2026-11-06T04:08:40.808Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c1a3d73b-606b-4a74-af66-5bdb948adee0":
+    status: "completed"
+    startedAt: "2026-11-06T04:08:48.091Z"
+    completedAt: "2026-11-06T04:11:48.875Z"
+    endedAt: "2026-11-06T04:11:48.875Z"
+    activeIntervals: [{"end":"2026-11-06T04:11:48.875Z","start":"2026-11-06T04:08:48.091Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "area.ts listed check and lookup use liveCapabilities; buildAreaDetail counts exclude retired; tests added."
+    lastModified: "2026-11-06T04:11:48.875Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -128,6 +128,7 @@ export const ROOT_DOCS_TEST_FILES = [
   "tests/e2e/docs-command-refs.test.js",
   "tests/e2e/cli-ui-gap-drift.test.js",
   "tests/unit/cli-smoke-parity.test.js",
+  "tests/e2e/docs-skill-table-drift.test.js",
 ];
 
 /**
@@ -235,6 +236,7 @@ export const VALIDATED_ARTIFACTS = {
  * - `docs-command-refs` reads `docs/index.md` and every page under
  *   `docs/guide/` and `docs/packages/`, nested ones and `skills.md` included.
  * - `cli-ui-gap-drift` reads `docs/cli-ui-gap.md`.
+ * - `docs-skill-table-drift` reads the skill table in `docs/guide/skills.md`.
  * - `cli-smoke-parity` reads the error-code table in
  *   `docs/contributing/cli-smoke-parity.md`.
  * - `assistant-parity-smoke` is a root-drift file that also reads two pages.
@@ -269,6 +271,11 @@ export const VALIDATED_DOC_PAGES = [
     label: ROOT_DOCS_LABEL,
     tests: ["tests/e2e/cli-ui-gap-drift.test.js"],
     match: (file) => file === "docs/cli-ui-gap.md",
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/docs-skill-table-drift.test.js"],
+    match: (file) => file === "docs/guide/skills.md",
   },
   {
     label: ROOT_DOCS_LABEL,

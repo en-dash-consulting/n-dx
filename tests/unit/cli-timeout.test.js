@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_TIMEOUT_MS,
+  NO_DEFAULT_TIMEOUT_COMMANDS,
+  SERVER_SUBCOMMANDS,
+  subcommandOf,
   resolveCommandTimeout,
   withCommandTimeout,
 } from "../../packages/core/cli-timeout.js";
@@ -52,9 +56,73 @@ describe("resolveCommandTimeout", () => {
     expect(resolveCommandTimeout("analyze", cfg)).toBe(0);
   });
 
+  it("returns 0 for graview serve and mcp, which serve, but times graview's one-shot subcommands", () => {
+    expect(resolveCommandTimeout("graview", {}, "serve")).toBe(0);
+    expect(resolveCommandTimeout("graview", {}, "mcp")).toBe(0);
+    expect(resolveCommandTimeout("graview", {}, "emit")).toBe(DEFAULT_TIMEOUT_MS);
+    expect(resolveCommandTimeout("graview", {}, "check")).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("returns 0 for the stdio MCP servers .mcp.json registers and the hub bridge, but times their one-shot siblings", () => {
+    const cfg = { cli: { timeoutMs: 3000 } };
+    for (const [command, sub] of [["rex", "mcp"], ["sv", "mcp"], ["sourcevision", "mcp"], ["sv", "serve"], ["sourcevision", "serve"], ["mcp", "rex"]]) {
+      expect(resolveCommandTimeout(command, {}, sub), `${command} ${sub}`).toBe(0);
+      expect(resolveCommandTimeout(command, cfg, sub), `${command} ${sub} under cli.timeoutMs`).toBe(0);
+    }
+    expect(resolveCommandTimeout("rex", cfg, "status")).toBe(3000);
+    expect(resolveCommandTimeout("sv", {}, "analyze")).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  const SUBCOMMAND_CASES = [
+    ["rex", ["mcp", "."], "mcp"],
+    ["rex", ["-q", "mcp", "."], "mcp"],
+    ["rex", ["--format", "json", "mcp", "."], "mcp"],
+    ["rex", ["--format=json", "mcp", "."], "mcp"],
+    ["rex", ["add", "--title", "mcp"], "add"],
+    ["rex", ["status", "."], "status"],
+    ["sv", ["--quiet", "serve", "."], "serve"],
+    ["graview", ["serve", ".", "--port", "4000"], "serve"],
+    ["graview", ["--place", "home", "describe", "."], "home"],
+    ["rex", [], undefined],
+  ];
+
+  it.each(SUBCOMMAND_CASES)("reads the subcommand of %s %j as %s: a flag, or a flag's value before a server, does not hide it", (command, rest, expected) => {
+    expect(subcommandOf(command, rest)).toBe(expected);
+  });
+
+  it("cli.js times a command by subcommandOf, so `ndx rex --format json mcp .` is the rex MCP server", () => {
+    const cli = readFileSync(new URL("../../packages/core/cli.js", import.meta.url), "utf-8");
+    expect(cli).toContain('resolveCommandTimeout(command ?? "", projectConfig, subcommandOf(command ?? "", rest))');
+    expect(resolveCommandTimeout("rex", { cli: { timeoutMs: 3000 } }, subcommandOf("rex", ["--format", "json", "mcp", "."]))).toBe(0);
+  });
+
+  it("the dashboard's copy of the server subcommands matches core's", () => {
+    const web = readFileSync(new URL("../../packages/web/src/server/routes-cli-timeout.ts", import.meta.url), "utf-8");
+    const literal = /const SERVER_SUBCOMMANDS: Record<string, readonly string\[\]> = (\{[^\n]*\});/.exec(web)?.[1];
+    expect(literal, "routes-cli-timeout.ts no longer declares SERVER_SUBCOMMANDS on one line").toBeDefined();
+    const theirs = JSON.parse(literal.replace(/([a-z]+):/g, '"$1":'));
+    const ours = Object.fromEntries([...SERVER_SUBCOMMANDS].map(([k, v]) => [k, [...v].sort()]));
+    expect(Object.fromEntries(Object.entries(theirs).map(([k, v]) => [k, [...v].sort()]))).toEqual(ours);
+  });
+
+  it("the dashboard's copy of the server list matches core's", () => {
+    const web = readFileSync(new URL("../../packages/web/src/server/routes-cli-timeout.ts", import.meta.url), "utf-8");
+    const list = /const NO_DEFAULT_TIMEOUT_COMMANDS = (\[[^\]]*\]);/.exec(web)?.[1];
+    expect(list, "routes-cli-timeout.ts no longer declares NO_DEFAULT_TIMEOUT_COMMANDS").toBeDefined();
+    expect(JSON.parse(list).sort()).toEqual([...NO_DEFAULT_TIMEOUT_COMMANDS].sort());
+  });
+
+  it("the global cli.timeoutMs does not bound a server", () => {
+    const cfg = { cli: { timeoutMs: 5000 } };
+    expect(resolveCommandTimeout("start", cfg)).toBe(0);
+    expect(resolveCommandTimeout("graview", cfg, "serve")).toBe(0);
+    expect(resolveCommandTimeout("graview", cfg, "emit")).toBe(5000);
+  });
+
   it("per-command override applies to server commands too", () => {
     const cfg = { cli: { timeouts: { start: 7200000 } } };
     expect(resolveCommandTimeout("start", cfg)).toBe(7200000);
+    expect(resolveCommandTimeout("graview", { cli: { timeouts: { graview: 60000 } } }, "serve")).toBe(60000);
   });
 
   it("ignores negative per-command values and falls back to the default", () => {

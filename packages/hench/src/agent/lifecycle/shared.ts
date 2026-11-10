@@ -41,9 +41,12 @@ import { PROJECT_SKILL_DIRS, resolveProjectSkills } from "../planning/project-sk
 import type { LLMVendor, PromptEnvelope } from "../../prd/llm-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
+  formatPorcelainPath,
   matchesProjectPath,
   parsePorcelainPath,
   repoRelativePrefix,
+  splitPlanningPaths,
+  type PlanningSplit,
 } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { ensureRunLogsIgnored, openRunLog, persistRunLog, type RunLogWriter } from "../../store/run-log.js";
@@ -76,12 +79,13 @@ import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
 import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
 import { section, subsection, stream, detail, info, warn, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
+import { recordRunDiagnosis } from "./run-diagnosis.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
-import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
+import { fetchCodexTokenUsage, resolveCodexQuotaKey, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import { V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
@@ -1280,7 +1284,7 @@ async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): 
 
   try {
     const llmConfig = await loadLLMConfig(projectDir);
-    const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
+    const codexApiKey = resolveCodexQuotaKey(llmConfig).key;
 
     if (!codexApiKey || !run.model) {
       // Silent skip: no API key available or model not set
@@ -2098,6 +2102,45 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
   await execGitMutation(projectDir, ["add", "-A"], 30_000);
   const trailers = `N-DX: pre-run commit gate\n${buildCoAuthoredByTrailerLine()}`;
   await execGitMutation(projectDir, ["commit", "-m", message, "-m", trailers], 30_000);
+}
+
+/** Subject of the commit that lands n-dx's own planning files before a run. */
+export const PLANNING_COMMIT_SUBJECT = "chore(prd): commit planning changes before run";
+
+/**
+ * Commit exactly `paths` — n-dx's planning files — and nothing else.
+ *
+ * The paths are repository-relative (porcelain), so each is spelled as a
+ * `:(top,literal)` pathspec: right from a project in a subdirectory, and no
+ * glob in a slug can widen it. The same pathspecs go to `git commit`, which
+ * then records only those paths even if something else was already staged.
+ * A path-limited commit takes each path's worktree state, deletions included,
+ * but only for paths git already knows; `add` is there for untracked files.
+ * Paths missing from the worktree are kept out of `add`: one removed with
+ * `git rm` (or a rename's source) is in neither the worktree nor the index,
+ * so `add` refuses it, while `commit` still finds it in HEAD.
+ *
+ * @param itemId The task about to run, for the `N-DX-Item` trailer; omitted
+ *   when selection has not picked one yet.
+ */
+async function commitPlanningChanges(projectDir: string, paths: string[], itemId?: string): Promise<void> {
+  // No paths would mean a bare `git commit`, which takes the whole index.
+  if (paths.length === 0) throw new Error("no planning files to commit");
+  const spec = (path: string) => `:(top,literal)${path}`;
+  const pathspecs = paths.map(spec);
+  const top = (await execStdout("git", ["rev-parse", "--show-toplevel"], { cwd: projectDir, timeout: 15_000 })).trim();
+  const present = paths.filter((path) => existsSync(join(top || projectDir, path)));
+  if (present.length > 0) await execGitMutation(projectDir, ["add", "--", ...present.map(spec)], 30_000);
+  const trailers = [
+    "N-DX: pre-run commit gate",
+    ...(itemId ? [`N-DX-Item: ${itemId}`] : []),
+    buildCoAuthoredByTrailerLine(),
+  ].join("\n");
+  await execGitMutation(
+    projectDir,
+    ["commit", "-m", PLANNING_COMMIT_SUBJECT, "-m", trailers, "--", ...pathspecs],
+    30_000,
+  );
 }
 
 /**
@@ -3001,6 +3044,12 @@ export interface PreRunCommitGateOptions {
    * a git repository) means there is nothing to enforce.
    */
   origin?: RunGitOrigin;
+  /**
+   * The task about to run, named in the `N-DX-Item` trailer of the planning
+   * commit. Known when `--task` was given (every dashboard and Sidecar start);
+   * left out otherwise, because selection has not run yet.
+   */
+  itemId?: string;
   /** Test seams — default to the real implementations. */
   deps?: {
     listDirty?: (dir: string) => Promise<string[]>;
@@ -3010,6 +3059,8 @@ export interface PreRunCommitGateOptions {
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
     confirmDiscard?: (fileCount: number) => Promise<boolean>;
     commit?: (dir: string, message: string) => Promise<void>;
+    commitPlanning?: (dir: string, paths: string[], itemId?: string) => Promise<void>;
+    splitPlanning?: (lines: string[], dir: string) => Promise<PlanningSplit>;
     stash?: (dir: string, message: string) => Promise<void>;
     discard?: (dir: string) => Promise<string | undefined>;
     checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
@@ -3030,7 +3081,10 @@ export interface PreRunCommitGateOptions {
  *   taken first, and its sha reported, so the answer is still recoverable.
  * - `stop` / `proceed` — as before.
  *
- * Clean trees always proceed without prompting.
+ * Clean trees always proceed without prompting. A tree whose only dirt is
+ * n-dx's planning files (`PLANNING_PATHS`, store/paths.ts) gets those committed on
+ * their own and proceeds, unless --allow-dirty; otherwise everything below
+ * sees only the other files.
  *
  * Autonomous runs (--auto/--loop/--epic-by-epic) must not silently fold
  * pre-existing changes into hench's own commits. On a TTY they get the same
@@ -3073,11 +3127,29 @@ export async function performPreRunCommitGateIfNeeded(
   // Dry runs never touch the working tree; skip the gate entirely.
   if (dryRun) return "proceed";
 
-  const dirty = await excludeHenchRuntimeArtifacts(await listDirty(projectDir), projectDir);
-  if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
+  const allDirty = await excludeHenchRuntimeArtifacts(await listDirty(projectDir), projectDir);
+  if (allDirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
+
+  // n-dx's own planning files (PRD roots, project config) are not someone
+  // else's work: when they are all that is dirty, they get a commit of their
+  // own and the run starts (decision UT1). Anything else dirty is handled
+  // below as before, and the refusal names only those files. --allow-dirty
+  // means "leave my tree alone", so it skips the planning commit too.
+  let dirty = allDirty;
+  if (!allowDirty) {
+    const split = await (deps.splitPlanning ?? splitPlanningPaths)(allDirty, projectDir);
+    if (split.other.length === 0) {
+      // Only rex's machine-local files: nothing to commit, and an empty
+      // pathspec list would make `git commit` take the whole index.
+      if (split.planning.length === 0) return "proceed";
+      return commitPlanningBeforeRun(projectDir, split.planning, opts, deps.commitPlanning ?? commitPlanningChanges, checkOrigin);
+    }
+    dirty = split.other;
+  }
 
   const magnitude = await measureMagnitude(projectDir);
   const magnitudeLabel = `${dirty.length} uncommitted file(s), ${magnitude.linesChanged} line(s) changed`;
+  const fileList = formatDirtyFileList(dirty);
   // An autonomous run that would otherwise have refused is itself an
   // escalation: the prompt must not let a bare Enter proceed into the loop
   // with someone else's changes in the tree, so the default becomes "commit"
@@ -3108,7 +3180,7 @@ export async function performPreRunCommitGateIfNeeded(
     if (autonomous && !allowDirty) {
       info(
         `⚠ Refusing to start an autonomous run with ${magnitudeLabel} in the working tree. ` +
-          `Commit or stash them, or pass --allow-dirty to proceed anyway.`,
+          `Commit or stash them, or pass --allow-dirty to proceed anyway.\n${fileList}`,
       );
       return "stop";
     }
@@ -3117,7 +3189,7 @@ export async function performPreRunCommitGateIfNeeded(
     if (requireCleanTree) {
       info(
         `⚠ hench.git.requireCleanTree is set: refusing to start with ${magnitudeLabel} in the working tree. ` +
-          `Commit or stash them, or pass --allow-dirty to proceed anyway.`,
+          `Commit or stash them, or pass --allow-dirty to proceed anyway.\n${fileList}`,
       );
       return "stop";
     }
@@ -3201,6 +3273,43 @@ export async function performPreRunCommitGateIfNeeded(
     );
     return "stop";
   }
+  return "proceed";
+}
+
+/** At most this many paths are listed under a refusal; the rest are counted. */
+const DIRTY_FILE_LIST_LIMIT = 20;
+
+/** Indented path list of porcelain lines, capped at {@link DIRTY_FILE_LIST_LIMIT}. */
+function formatDirtyFileList(porcelainLines: string[]): string {
+  const shown = porcelainLines.slice(0, DIRTY_FILE_LIST_LIMIT).map((line) => `  ${formatPorcelainPath(line)}`);
+  const rest = porcelainLines.length - shown.length;
+  return [...shown, ...(rest > 0 ? [`  … and ${rest} more`] : [])].join("\n");
+}
+
+/**
+ * The pre-run gate's planning-only path: commit `paths` on their own and start.
+ * Refuses instead when the checkout moved since the invocation began, or when
+ * the commit fails — a run must not start on top of a half-made commit.
+ */
+async function commitPlanningBeforeRun(
+  projectDir: string,
+  paths: string[],
+  opts: PreRunCommitGateOptions,
+  commitPlanning: (dir: string, paths: string[], itemId?: string) => Promise<void>,
+  checkOrigin: (dir: string, origin: RunGitOrigin | undefined) => string | undefined,
+): Promise<PreRunCommitGateResult> {
+  const drift = checkOrigin(projectDir, opts.origin);
+  if (drift) {
+    info(`⚠ Refusing to commit n-dx planning files: ${drift}. They remain in the working tree.`);
+    return "stop";
+  }
+  try {
+    await commitPlanning(projectDir, paths, opts.itemId);
+  } catch (err) {
+    info(`⚠ Could not commit n-dx planning files: ${(err as Error).message} — stopping before work starts.`);
+    return "stop";
+  }
+  info(`Committed ${paths.length} n-dx planning file(s) before the run (${PLANNING_COMMIT_SUBJECT}).`);
   return "proceed";
 }
 
@@ -5006,6 +5115,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
+
+  // Why it failed and what to do next, for `hench runs diagnose` and the task
+  // page's verdict banner. Narration: a verdict that cannot be formed must not
+  // change how the run ended, so the failure is reported and the run saved.
+  try {
+    const diagnosis = await recordRunDiagnosis({ projectDir, henchDir, run, store: opts.store });
+    if (diagnosis) info(`Verdict: ${diagnosis.class} — ${diagnosis.summary}`);
+  } catch (err) {
+    warn(`Run verdict not recorded: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   await saveRun(henchDir, run);
 
   // The last event, before the stream is closed below. A reader tailing the

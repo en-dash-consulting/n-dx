@@ -16,6 +16,7 @@ export {
   DEFAULT_ESCALATION_MAX_ATTEMPTS,
   MIN_REVIEW_ROUNDS,
   MAX_REVIEW_ROUNDS,
+  RUN_VERDICT_CLASSES,
   DEFAULT_SESSION_TIMEOUT_MS,
   RUN_GUARD_AUDIT_MAX_DENIALS,
 } from "./v1.js";
@@ -67,6 +68,10 @@ export type {
   RunCommitItemMismatch,
   RunCompletionHold,
   RunGateOnlyRetry,
+  RunDiagnosis,
+  RunVerdictClass,
+  RunVerdictAction,
+  RunVerdictActionKind,
   RunSessionRecord,
   TaskBrief,
   TaskBriefChangeSection,

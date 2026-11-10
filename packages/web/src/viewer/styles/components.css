@@ -293,8 +293,8 @@
   text-align: center;
 }
 
-/* Split button: the primary opens Prepare task, the caret's menu holds Start now.
-   The container and menu are the shared .ready-split / .ready-menu rules. */
+/* Split button: the primary starts the run, the caret opens Prepare task.
+   The container is the shared .ready-split rule. */
 .start-task-primary {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;

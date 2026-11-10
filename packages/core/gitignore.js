@@ -18,6 +18,8 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { relativeToRoot } from "./layout.js";
+
 /**
  * Is `relPath` tracked by git in `cwd`? False outside a repo or without git.
  *
@@ -97,4 +99,20 @@ export function ensureGitignoreEntry(dir, entry) {
   const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "") + entry + "\n";
   writeFileSync(gitignorePath, content + suffix, "utf-8");
   return true;
+}
+
+/**
+ * Ignore the dashboard's machine-local files for this layout: the pid and port
+ * markers `ndx start` writes and the LLM spend ledger the dashboard appends to.
+ * Spelled from the resolved layout, so `.ndx/` projects get
+ * `.ndx/web-usage.jsonl` and legacy projects `.n-dx-web-usage.jsonl`.
+ * Idempotent.
+ *
+ * @param {string} dir  Project root
+ * @param {import("./layout.js").Layout} layout  Resolved layout of `dir`
+ */
+export function ensureWebRuntimeIgnores(dir, layout) {
+  for (const file of [layout.webPidFile, layout.webPortFile, layout.webUsageFile]) {
+    ensureGitignoreEntry(dir, relativeToRoot(layout, file));
+  }
 }

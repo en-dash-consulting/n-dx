@@ -51,7 +51,10 @@
 .ndx-deployed .task-tag-remove,
 .ndx-deployed .task-tag-edit,
 .ndx-deployed .task-criterion-add,
-.ndx-deployed .task-criterion-remove {
+.ndx-deployed .task-criterion-remove,
+.ndx-deployed .tracker-link-add,
+.ndx-deployed .tracker-unlink,
+.ndx-deployed .tracker-link-input-wrapper {
   display: none !important;
 }
 
@@ -72,8 +75,7 @@
 
 /* ── Hench execution controls ──────────────────────────────────────── */
 .ndx-deployed .hench-execute-btn,
-.ndx-deployed .hench-terminate-btn,
-.ndx-deployed .hench-throttle-controls {
+.ndx-deployed .hench-terminate-btn {
   display: none !important;
 }
 
@@ -82,7 +84,7 @@
 .ndx-deployed .polling-suspension-indicator,
 .ndx-deployed .refresh-queue-status,
 .ndx-deployed .active-operations-tray,
-.ndx-deployed .git-status-banner,
+.ndx-deployed .git-status-chip,
 .ndx-deployed .memory-warning-banner,
 .ndx-deployed .degradation-banner {
   display: none !important;

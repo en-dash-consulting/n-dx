@@ -12,9 +12,9 @@
  * is configured; silently skipped otherwise.
  *
  * Codex (OpenAI): fetches real-time quota from the OpenAI billing API when
- * OPENAI_API_KEY (or llm.codex.api_key in .n-dx.json) is configured. When Codex
- * is the active vendor but no API key is present (the `codex login` session-auth
- * path), an "unavailable" notice is surfaced instead of silently skipping.
+ * `llm.codex.auth` allows an API key and one resolves (codex-api-key.ts). When
+ * Codex is the active vendor but no key may be used (the `codex login`
+ * session-auth path), an "unavailable" notice is surfaced instead.
  *
  * On any failure either provider is silently skipped so the caller's
  * inter-run loop is never interrupted by quota-check errors.
@@ -40,6 +40,8 @@ export type {
   FetchCodexTokenUsageOptions,
 } from "./codex-token-retrieval.js";
 export { fetchCodexTokenUsage } from "./codex-token-retrieval.js";
+export type { CodexQuotaKey } from "./codex-api-key.js";
+export { resolveCodexQuotaKey } from "./codex-api-key.js";
 export type {
   TokenValidationResult,
   TokenValidationIssue,
@@ -57,6 +59,7 @@ export {
 export { validateRunTokensPostRun } from "./token-validation-hook.js";
 
 import { fetchCodexQuota } from "./codex-quota.js";
+import { resolveCodexQuotaKey } from "./codex-api-key.js";
 import { fetchClaudeQuota } from "./claude-quota.js";
 import { fetchGoogleQuota } from "./google-quota.js";
 import { LLM_VENDOR, loadLLMConfig, resolveVendorModel } from "../prd/llm-gateway.js";
@@ -77,8 +80,8 @@ import type { QuotaRemaining } from "./types.js";
  * Claude: attempted unconditionally (no API key required); returns data only
  * when a weekly token budget is configured in .n-dx.json.
  *
- * Codex: attempted when OPENAI_API_KEY is set or llm.codex.api_key appears
- * in .n-dx.json (read from process.cwd()).  Failures are silently discarded
+ * Codex: attempted when `llm.codex.auth` allows an API key and one resolves
+ * (config read from process.cwd()).  Failures are silently discarded
  * to preserve inter-run loop continuity. When Codex is the active vendor and no
  * key is available (session auth via `codex login`), a single "unavailable"
  * notice entry is returned so the missing quota is explained rather than hidden.
@@ -115,28 +118,26 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
   // ── Codex (OpenAI) ──────────────────────────────────────────────────────────
   // Real-time: queries the OpenAI billing API when an API key is available.
   {
-    const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
+    const codexKey = resolveCodexQuotaKey(llmConfig);
     const codexModel = resolveVendorModel(LLM_VENDOR.CODEX, llmConfig);
 
-    if (codexApiKey) {
-      const codexResult = await fetchCodexQuota({ apiKey: codexApiKey, model: codexModel });
+    if (codexKey.key) {
+      const codexResult = await fetchCodexQuota({ apiKey: codexKey.key, model: codexModel });
       if (codexResult.ok) {
         results.push(codexResult.quota);
       }
       // On failure: silently skip — the inter-run loop must never be interrupted
       // by quota-check errors.
     } else if (activeVendor === LLM_VENDOR.CODEX) {
-      // No OPENAI_API_KEY: the primary Codex auth path is `codex login` (ChatGPT
-      // session), which never sets an API key — the CLI provider even deletes it
-      // so session auth wins. The billing quota API requires an API key, so
-      // session-auth quota is not retrievable there. Surface a clear notice
-      // instead of silently skipping, so the user understands why no quota shows.
+      // No key may be used under llm.codex.auth (typically `codex login`
+      // session auth). The billing quota API requires one, so say what would
+      // enable quota instead of silently skipping.
       results.push({
         vendor: LLM_VENDOR.CODEX,
         model: codexModel,
         percentRemaining: 0,
         unavailable: true,
-        notice: "codex login (session auth) — export OPENAI_API_KEY or run 'ndx config credentials.codex' for quota (storing a key does not switch modes; 'ndx config llm.codex.auth api' does)",
+        notice: codexKey.notice,
       });
     }
   }

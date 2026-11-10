@@ -61,10 +61,24 @@ const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const SHARED_CONFIG_PATH = (dir) => join(dir, ".n-dx.json");
 const LOCAL_CONFIG_PATH = (dir) => join(dir, ".n-dx.local.json");
 
+// A vendor key exported in the developer's shell outranks the credential store
+// when `ndx config` reports where a key comes from, so a test asserting
+// "credential store" fails on any machine with GEMINI_API_KEY set. The CLI
+// runs without them unless a test passes its own `env`.
+const VENDOR_KEY_VARS = [
+  "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
+];
+function isolatedEnv() {
+  const env = { ...process.env };
+  for (const name of VENDOR_KEY_VARS) delete env[name];
+  return env;
+}
+
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
+    env: isolatedEnv(),
     // execFileSync sends child stderr to the parent's stderr unless stdio is
     // set, so without this the CLI's own notices print into the vitest report
     // and read as failures of the run rather than output of a fixture.
@@ -78,6 +92,7 @@ function runFail(args, opts = {}) {
     execFileSync("node", [CLI_PATH, "config", ...args], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
+      env: isolatedEnv(),
       stdio: "pipe",
       ...opts,
     });
@@ -166,13 +181,20 @@ beforeAll(() => {
 
 describe("n-dx config", () => {
   let tmpDir;
+  let savedNdxHome;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "ndx-config-e2e-"));
     await setupProject(tmpDir);
+    // A per-test ndx home: `llm.<vendor>.api_key` writes the credential store,
+    // which the Google preflight reads, so a key one test stores must not
+    // reach the next test's preflight through the worker's shared home.
+    savedNdxHome = process.env.N_DX_HOME;
+    process.env.N_DX_HOME = join(tmpDir, ".test-ndx-home");
   });
 
   afterEach(async () => {
+    process.env.N_DX_HOME = savedNdxHome;
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -768,6 +790,45 @@ describe("n-dx config", () => {
       const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
       expect(shared.web.auth).toBeUndefined();
       expect(shared.web.port).toBe(4000);
+    });
+
+    it("sets llm.<vendor>.auth in .n-dx.local.json and leaves the committed auth in .n-dx.json", async () => {
+      // A repository's committed auth is a supported team setting, not a
+      // stale copy: the user's local value overrides it, never deletes it.
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ llm: { vendor: "claude", claude: { auth: "cli" } } }, null, 2) + "\n",
+      );
+      const output = run(["llm.claude.auth", "api", tmpDir]);
+      expect(output).not.toContain("moved");
+
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.llm.claude.auth).toBe("api");
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.llm.claude.auth).toBe("cli");
+
+      const { loadLLMConfig } = await import("../../packages/llm-client/dist/public.js");
+      expect((await loadLLMConfig(tmpDir)).claude?.auth).toBe("api");
+    });
+
+    it("sets graview.allowNpx and graview.bin in .n-dx.local.json, as the graview install hint says", async () => {
+      // `ndx graview` names these two commands when no graview binary is found;
+      // in the shared file `bin` is a trust finding and `allowNpx` would opt every clone in.
+      await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify({ graview: { includeFiles: false } }, null, 2) + "\n");
+      expect(run(["graview.allowNpx", "true", tmpDir])).toContain("graview.allowNpx = true");
+      run(["graview.bin", join(tmpDir, "graview.cjs"), tmpDir]);
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.graview).toEqual({ allowNpx: true, bin: join(tmpDir, "graview.cjs") });
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.graview).toEqual({ includeFiles: false });
+    });
+
+    it("refuses a graview.allowNpx that is not true or false, which the reader would ignore", async () => {
+      for (const value of ["yes", "1"]) {
+        const result = spawnSync(process.execPath, [CLI_PATH, "config", "graview.allowNpx", value, tmpDir], { encoding: "utf-8", env: isolatedEnv(), timeout: DEFAULT_TIMEOUT });
+        expect(result.status, value).not.toBe(0);
+        expect(result.stderr, value).toContain("expected true or false");
+      }
     });
 
     it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
@@ -1399,6 +1460,48 @@ describe("n-dx config", () => {
         expect(await requests()).toEqual([{ host: "user-proxy.invalid", carriesKey: true }]);
         expect(output).toContain(`endpoint: ${USER_PROXY}`);
       });
+
+      describe("a key held in the credential store", () => {
+        // `claude.api_key` writes the store and leaves only
+        // `llm.claude.auth: api` in .n-dx.local.json, so the test must resolve
+        // the key the way the API provider does.
+        function config(args) {
+          return run([...args, tmpDir], { env: { ...process.env, NDX_HOME: ndxHome } });
+        }
+
+        function testConnectionFail() {
+          try {
+            testConnection();
+          } catch (err) {
+            return { stdout: err.stdout, stderr: err.stderr };
+          }
+          throw new Error("Expected --test-connection to fail");
+        }
+
+        it("tests the stored key under auth api", async () => {
+          config(["claude.api_key", SENTINEL_KEY]);
+          const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+          expect(local.llm?.claude?.api_key).toBeUndefined();
+          expect(local.llm?.claude?.auth).toBe("api");
+
+          const output = testConnection();
+
+          expect(await requests()).toEqual([{ host: "api.anthropic.com", carriesKey: true }]);
+          expect(output).toContain("Testing API key... ✓");
+          expect(output).not.toContain(SENTINEL_KEY);
+        });
+
+        it("does not test a stored key under auth cli", async () => {
+          config(["claude.api_key", SENTINEL_KEY]);
+          config(["llm.claude.auth", "cli"]);
+
+          const { stdout, stderr } = testConnectionFail();
+
+          expect(await requests()).toEqual([]);
+          expect(stderr).toContain("llm.claude.auth is \"cli\"");
+          expect(stdout + stderr).not.toContain(SENTINEL_KEY);
+        });
+      });
     });
   });
 
@@ -1748,6 +1851,8 @@ describe("n-dx config", () => {
       const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("exec");
       expect(args).toContain("--skip-git-repo-check");
+      // The check is a Codex agent run too: its commands get no Codex key.
+      expect(args).toContain("shell_environment_policy.set.OPENAI_API_KEY=''");
     });
 
     it("handles auth preflight failure with deterministic error path", async () => {

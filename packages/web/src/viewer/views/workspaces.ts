@@ -20,7 +20,8 @@
  * `/api/workspaces` (the registry's keys), `/api/worktrees` (git state and
  * run counts) and `/api/hench/memory` (the machine's memory, not a
  * worktree's). The per-workspace fetches are the execution status, the
- * concurrency count, and the PRD delta.
+ * concurrency count, the PRD delta, and — while `git.branchHealth` is on —
+ * each card's branch health strip (`workspace-branch-health.ts`).
  *
  * ## Why this view does not filter WebSocket frames
  *
@@ -41,6 +42,8 @@ import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
+import { useFeatureToggle } from "../hooks/index.js";
+import { BRANCH_HEALTH_FEATURE, BranchHealthStrip } from "./workspace-branch-health.js";
 import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
@@ -62,7 +65,13 @@ export interface WorktreeEntry {
   branch: string | null;
   dirty: boolean | null;
   dirtyFiles: number | null;
-  runs: { total: number; running: number; lastFinishedAt: string | null };
+  runs: {
+    total: number;
+    running: number;
+    lastFinishedAt: string | null;
+    /** The newest run; `claimLostTo` is the worktree root that took its task over. */
+    latest?: { claimLostTo: string | null } | null;
+  };
   server: { pidFile: boolean; pid: number | null; port: number | null };
 }
 
@@ -125,6 +134,8 @@ export interface WorkspaceCard {
   isCurrent: boolean;
   dirtyFiles: number | null;
   runs: { total: number; running: number; lastFinishedAt: string | null };
+  /** Name of the worktree that took the latest run's task over mid-run, or null. */
+  claimLostTo: string | null;
   /** Null for the anchor (there is nothing to compare it against) and until the delta loads. */
   delta: PrdDeltaCounts | null;
   /** The execution to show live, or null when nothing is running here. */
@@ -166,6 +177,12 @@ export function pickLiveExecution(executions: readonly ExecutionStatus[]): Execu
   return live.reduce((newest, e) => (Date.parse(e.startedAt) > Date.parse(newest.startedAt) ? e : newest));
 }
 
+/** A worktree root as the board names it: its workspace key, else the directory's name. */
+function worktreeLabel(root: string | null, keyByPath: ReadonlyMap<string, string>): string | null {
+  if (root === null) return null;
+  return keyByPath.get(root) ?? (root.split(/[\\/]/).filter(Boolean).pop() ?? root);
+}
+
 /**
  * Join the registry's workspaces with git state, PRD deltas and live runs.
  *
@@ -183,6 +200,7 @@ export function buildWorkspaceCards(
   currentKey: string | null,
 ): WorkspaceCard[] {
   const byPath = new Map(worktrees.map((w) => [w.path, w]));
+  const keyByPath = new Map(workspaces.map((ws) => [ws.path, ws.key]));
   const cards = workspaces.map((ws): WorkspaceCard => {
     const wt = byPath.get(ws.path);
     return {
@@ -193,6 +211,7 @@ export function buildWorkspaceCards(
       isCurrent: currentKey === null ? ws.isAnchor : ws.key === currentKey,
       dirtyFiles: wt?.dirtyFiles ?? null,
       runs: wt?.runs ?? { total: 0, running: 0, lastFinishedAt: null },
+      claimLostTo: worktreeLabel(wt?.runs.latest?.claimLostTo ?? null, keyByPath),
       delta: ws.isAnchor ? null : deltas.get(ws.key) ?? null,
       live: pickLiveExecution(executions.get(ws.key) ?? []),
       nextTask: nextTasks.get(ws.key) ?? null,
@@ -456,16 +475,23 @@ function LiveRun({ card, live, onStop, stopping }: {
   );
 }
 
-function WorkspaceCardView({ card, doFetch, onChanged }: {
+function WorkspaceCardView({ card, doFetch, onChanged, branchHealth, onAttachSidecar, attached }: {
   card: WorkspaceCard;
   doFetch: Fetcher;
   onChanged: () => void;
+  /** `git.branchHealth`: show the health strip. Off renders the card unchanged. */
+  branchHealth: boolean;
+  /** Attach this card to Sidecar; absent while Sidecar is off. */
+  onAttachSidecar?: (key: string | null) => void;
+  /** This card is the one attached to Sidecar. */
+  attached: boolean;
 }) {
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const status = cardStatus(card);
   const headingId = `workspace-card-${card.key}`;
   const since = formatSince(card.runs.lastFinishedAt);
+  const healthFetch = useCallback((path: string) => workspaceFetch(doFetch, card.key, path), [doFetch, card.key]);
 
   const stop = useCallback(async () => {
     if (!card.live) return;
@@ -509,6 +535,11 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
           since ? `Last run · ${since}` : "No runs recorded here yet",
         ),
 
+    card.claimLostTo
+      ? h("p", { class: "workspace-card-claim-lost", role: "status" },
+          `Task taken over by ${card.claimLostTo}`)
+      : null,
+
     error ? h("p", { class: "workspace-card-error", role: "alert" }, error) : null,
 
     h("div", { class: "workspace-card-chips" },
@@ -526,11 +557,29 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
         : null,
     ),
 
+    branchHealth
+      ? h(BranchHealthStrip, {
+          workspace: card.key,
+          branch: card.branch,
+          revision: `${card.runs.total}|${card.runs.lastFinishedAt ?? ""}`,
+          doFetch: healthFetch,
+        })
+      : null,
+
     h("div", { class: "workspace-card-actions" },
       h("a", {
         class: "workspace-card-open",
         href: workspaceViewUrl(card, "prd", currentPathname()),
       }, "Open workspace"),
+      onAttachSidecar
+        ? h("button", {
+            type: "button",
+            class: "workspace-card-sidecar",
+            "aria-pressed": attached,
+            onClick: () => onAttachSidecar(card.key),
+            "aria-label": `Ask Sidecar why ${card.key}'s branch fails CI or conflicts`,
+          }, attached ? "Attached to Sidecar" : "Ask Sidecar")
+        : null,
       card.live || !card.nextTask
         ? null
         : h(TaskStartControl, {
@@ -558,10 +607,19 @@ export interface WorkspacesViewProps {
   fetcher?: Fetcher;
   /** Injected for tests; defaults to a live WebSocket. */
   socketFactory?: (url: string) => WebSocket;
+  /**
+   * Attach a worktree card to Sidecar, whose Diagnose branch lens reads that
+   * worktree; null detaches. Absent while Sidecar is off: no card offers it.
+   */
+  onAttachSidecar?: (key: string | null) => void;
+  /** The card attached to Sidecar, by workspace key. */
+  attachedWorktree?: string | null;
 }
 
 /** Board of worktree cards under a machine strip. */
-export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) {
+export function WorkspacesView({ fetcher, socketFactory, onAttachSidecar, attachedWorktree = null }: WorkspacesViewProps) {
+  // The attachment is this page's: leaving it detaches the card.
+  useEffect(() => () => onAttachSidecar?.(null), [onAttachSidecar]);
   const [cards, setCards] = useState<WorkspaceCard[]>([]);
   const [stats, setStats] = useState<MachineStats>({
     agentsRunning: 0, memory: null, uncommittedTrees: 0, prdOnlyOnBranches: 0,
@@ -577,6 +635,7 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
     [fetcher],
   );
   const currentKey = getWorkspaceKey();
+  const branchHealth = useFeatureToggle(BRANCH_HEALTH_FEATURE, false);
   /**
    * Per-workspace state carried between loads, so a frame about one worktree
    * can refresh that worktree's four endpoints and leave the others' answers
@@ -691,9 +750,12 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
         card,
         doFetch,
         onChanged: () => void load(card.key),
+        branchHealth,
+        onAttachSidecar,
+        attached: attachedWorktree === card.key,
       })),
     );
-  }, [loading, error, cards, doFetch, load]);
+  }, [loading, error, cards, doFetch, load, branchHealth, onAttachSidecar, attachedWorktree]);
 
   return h("div", { class: "workspaces-container" },
     h("header", { class: "workspaces-header" },

@@ -131,6 +131,28 @@ describe("pre-run commit gate vs hench's own runtime artifacts", () => {
     expect(result).toBe("stop");
   });
 
+  it("names the source of a rename that leaves a non-planning path", async () => {
+    await mkdir(join(projectDir, "src"), { recursive: true });
+    await writeFile(join(projectDir, "src", "app.ts"), "export {};\n", "utf-8");
+    await execFile("git", ["add", "."], { cwd: projectDir });
+    await execFile("git", ["commit", "-m", "add app"], { cwd: projectDir });
+    await mkdir(join(projectDir, ".rex", "changes", "ch"), { recursive: true });
+    await execFile("git", ["mv", "src/app.ts", ".rex/changes/ch/app.ts"], { cwd: projectDir });
+
+    const result = await performPreRunCommitGateIfNeeded({
+      projectDir,
+      henchDir,
+      autonomous: true,
+      deps: { isTTY: false },
+    });
+
+    expect(result).toBe("stop");
+    const printed = [...vi.mocked(console.log).mock.calls, ...vi.mocked(console.error).mock.calls]
+      .flat()
+      .join("\n");
+    expect(printed).toContain("src/app.ts -> .rex/changes/ch/app.ts");
+  });
+
   it("does not count the lock directory in the change magnitude", async () => {
     await createLockDir();
     expect(await measureChangeMagnitude(projectDir)).toEqual({ files: 0, linesChanged: 0 });

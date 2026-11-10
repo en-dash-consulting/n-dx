@@ -7,6 +7,10 @@
 .live-container {
   max-width: 1200px;
   min-width: 0;
+  /* Centre in the free width: once #main-content outgrows the cap (wide
+     window, or the Sidecar drawer closed) the leftover space splits evenly
+     instead of sitting on the right as a gutter. */
+  margin-inline: auto;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
@@ -91,6 +95,15 @@
   white-space: nowrap;
 }
 .live-tile-detail { font-size: var(--font-sm); color: var(--text-dim); }
+.live-slots-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5, 6px);
+  margin-top: var(--space-1, 4px);
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
 
 /* ── Body ───────────────────────────────────────────────────────────── */
 
@@ -220,6 +233,21 @@
 .live-queue-item:hover .live-card-title { text-decoration: underline; }
 .live-worktree { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 .live-more { font-size: var(--font-sm); color: var(--accent); }
+
+/* Ready next (hench.readyNext): lanes from ndx work --plan-queue. */
+.live-ready { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.live-ready-lanes,
+.live-ready-lane ul,
+.live-ready-excluded ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.live-ready-lane { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.live-ready-command {
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.live-ready-worktree { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
+.live-ready-task { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.live-ready-excluded summary { cursor: pointer; font-size: var(--font-sm); }
 
 /* ── Idle ───────────────────────────────────────────────────────────── */
 
@@ -418,6 +446,7 @@
 .live-facts dd { margin: 0; overflow-wrap: anywhere; }
 .live-mono { font-family: var(--font-mono); }
 
+.live-task-tracker { margin: 0; font-size: var(--font-sm); }
 .live-task-desc { margin: 0; font-size: var(--font-sm); color: var(--text-dim); overflow-wrap: anywhere; }
 .live-criteria { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--font-sm); }
 .live-criterion { display: flex; gap: var(--space-2); min-width: 0; }
@@ -560,3 +589,29 @@
 
 .live-analyze-narration { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
 .live-analyze-stage-links { margin: 0; font-size: var(--font-sm); color: var(--text-muted); }
+
+/* ── Tracker activity ───────────────────────────────────────────────── */
+
+.live-tracker-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.live-tracker-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.live-tracker-row[data-result="card"] { border-color: var(--orange); }
+.live-tracker-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); font-size: var(--font-base); }
+.live-tracker-item, .live-tracker-call { overflow-wrap: anywhere; }
+.live-tracker-event { color: var(--text-dim); }
+.live-tracker-result { margin-left: auto; font-weight: var(--weight-semibold); }
+.live-tracker-result--refused, .live-tracker-result--card,
+.live-tracker-result--unavailable, .live-tracker-result--needs-sign-in,
+.live-tracker-state--unavailable, .live-tracker-state--needs-sign-in { color: var(--orange); }
+.live-tracker-result--would, .live-tracker-result--dismissed { color: var(--text-dim); }
+.live-tracker-problems { margin: 0; padding-left: var(--space-4); font-size: var(--font-sm); color: var(--text-dim); }
+.live-tracker-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.live-tracker-form { display: flex; flex-direction: column; gap: var(--space-2); }
+.live-tracker-signin { color: var(--accent); }

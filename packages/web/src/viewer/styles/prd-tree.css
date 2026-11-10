@@ -635,7 +635,10 @@
 
 /* Node title */
 .prd-node-title {
-  flex: 1;
+  /* Basis auto, not flex: 1's 0%: on a row too narrow for everything the
+     title shrinks alongside .prd-tag-list instead of collapsing to nothing
+     while the tags keep their width. */
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -788,7 +791,10 @@
 .prd-tag-list {
   display: flex;
   gap: var(--space-1);
-  flex-shrink: 0;
+  /* Shrinks and wraps its tags with the row, so a column narrowed by the
+     Sidecar drawer never pushes the row's actions past its right edge. */
+  flex: 0 1 auto;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
@@ -980,6 +986,22 @@
   border-top: 1px solid var(--border);
   padding-top: var(--space-2);
 }
+
+.task-run-verdict {
+  border-left: 3px solid var(--red);
+  padding-left: var(--space-2);
+}
+
+.task-run-verdict-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-run-verdict-class { font-weight: 600; }
+.task-run-verdict-attempt { color: var(--text-dim); }
+.task-run-verdict-summary,
+.task-run-verdict-action { margin: var(--space-1) 0 0; }
 
 .task-runs-list {
   display: flex;
@@ -1552,6 +1574,72 @@
   outline-offset: -1px;
 }
 
+/* Tracker links: the item's work refs, with Link and Unlink */
+.tracker-links-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+}
+
+.tracker-link-row,
+.tracker-link-input-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tracker-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.tracker-link {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+a.tracker-link {
+  color: var(--accent);
+}
+
+.tracker-unlink,
+.tracker-link-add,
+.tracker-link-confirm {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  padding: 1px var(--space-1-5);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.tracker-unlink:hover,
+.tracker-link-add:hover,
+.tracker-link-confirm:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tracker-link-input {
+  width: 160px;
+  padding: 2px var(--space-1-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.tracker-link-error {
+  flex-basis: 100%;
+  font-size: var(--font-sm);
+  color: var(--red);
+}
+
 .task-tag-confirm {
   background: none;
   border: none;
@@ -1687,6 +1775,8 @@
   font-size: var(--font-xs);
 }
 
+.cp-place-on-map { align-self: flex-start; }
+
 .cp-shortlist,
 .cp-relation {
   margin: 0;
@@ -1721,9 +1811,63 @@
   cursor: pointer;
 }
 
-.cp-target.is-checked {
+.cp-target.is-checked,
+.cp-card.is-checked {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Placement mode's wide panel: one card per candidate. */
+.cp-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.cp-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.cp-card-area,
+.cp-card-words,
+.cp-relation-effect {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-card-statement {
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.cp-card-effects {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-card-effects dt { font-weight: 600; }
+.cp-card-effects dd { margin: 0; }
+
+.cp-relation-body {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.cp-relation-question {
+  font-size: var(--font-sm);
+  font-weight: 600;
 }
 
 .cp-target-body {
@@ -1771,6 +1915,29 @@
 .cp-refusal-hint {
   margin-top: var(--space-1);
   color: var(--text);
+}
+
+/* The wide card's dry run of an amendment (WF5) */
+.cp-dry-run {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.cp-dry-run[data-check="ok"] { color: var(--green, var(--text)); }
+.cp-dry-run.is-refused { color: var(--red); }
+
+/* Apply… for a change awaiting apply (change-apply.ts) */
+.ca-effects {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-4);
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+.ca-effects-empty {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
 }
 
 .cp-search-input,
@@ -1829,6 +1996,11 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+.cp-homes { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cp-home { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); font-size: var(--font-sm); }
+.cp-home-text { overflow-wrap: anywhere; }
+.cp-model-mark { font-size: var(--font-xs); font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 var(--space-1); }
 
 .cp-placed-line {
   font-size: var(--font-sm);
@@ -6288,3 +6460,21 @@
   align-items: center;
   min-height: 24px;
 }
+
+/* Sidecar ghost rows (UX5): a waiting change-set card's proposed items. */
+.prd-node-row.prd-ghost-row {
+  opacity: 0.55;
+  font-style: italic;
+  cursor: default;
+  border-left: 2px dashed var(--border);
+}
+.prd-ghost-badge {
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 var(--space-1);
+  border: 1px dashed var(--border);
+  border-radius: 3px;
+}
+.prd-ghost-duplicate { font-size: 11px; color: var(--text-muted); }

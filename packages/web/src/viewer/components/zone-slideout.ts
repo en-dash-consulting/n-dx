@@ -8,6 +8,7 @@ import { meterClass } from "../visualization/metrics.js";
 import { basename } from "../utils.js";
 import type { NavigateTo } from "../types.js";
 import { GlossaryLine } from "./glossary-line.js";
+import { AskInSidecarButton } from "./ask-in-sidecar.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -115,6 +116,7 @@ export function ZoneSlideout({
           h("span", { class: "zone-slideout-dot", style: `background: ${color}`, "aria-hidden": "true" }),
           h("h3", { id: titleId }, zone.name),
         ),
+        h(AskInSidecarButton, { kind: "zone", itemId: zone.id }),
         h("button", {
           class: "zone-slideout-close",
           onClick: onClose,

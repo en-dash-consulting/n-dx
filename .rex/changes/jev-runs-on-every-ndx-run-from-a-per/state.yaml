@@ -1,5 +1,43 @@
 schema: "rex/v2"
 items:
+  "03dd62b9-6298-4938-b35e-70e3394c6b28":
+    status: "completed"
+    startedAt: "2026-11-04T22:11:00.255Z"
+    completedAt: "2026-11-04T22:22:13.282Z"
+    endedAt: "2026-11-04T22:22:13.282Z"
+    activeIntervals: [{"end":"2026-11-04T22:22:13.282Z","start":"2026-11-04T22:11:00.255Z"}]
+    lastModified: "2026-11-04T22:22:13.282Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "076f5980-a069-4a02-acb0-7d93094c1722":
+    status: "completed"
+    startedAt: "2026-11-06T00:43:03.481Z"
+    completedAt: "2026-11-06T00:51:27.204Z"
+    endedAt: "2026-11-06T00:51:27.204Z"
+    activeIntervals: [{"end":"2026-11-06T00:51:27.204Z","start":"2026-11-06T00:43:03.481Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "vendor-session-driver fresh Codex turn appends codexShellEnvFlags() unless the policy flags already end with them (compileCodexPolicyFlags output passes through unchanged, so hench's argv snapshot is unaffected)."
+    lastModified: "2026-11-06T00:51:27.204Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "09879815-d6cd-42b4-ab26-a156cdce8e61":
+    status: "completed"
+    startedAt: "2026-11-06T01:01:22.620Z"
+    completedAt: "2026-11-06T01:14:19.482Z"
+    endedAt: "2026-11-06T01:14:19.482Z"
+    activeIntervals: [{"end":"2026-11-06T01:14:19.482Z","start":"2026-11-06T01:01:22.620Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Tracked-file message now says the file's key is used instead of the store's until removed from that file; e2e asserts it."
+    lastModified: "2026-11-06T01:14:19.482Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0e7c49f6-104a-4db7-83f1-7c1397cc7ba7":
+    status: "completed"
+    startedAt: "2026-11-04T22:47:14.808Z"
+    completedAt: "2026-11-04T22:59:46.256Z"
+    endedAt: "2026-11-04T22:59:46.256Z"
+    activeIntervals: [{"end":"2026-11-04T22:59:46.256Z","start":"2026-11-04T22:47:14.808Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "importLocalApiKeys returns early (exit 1) naming storeProblem when any status entry has one; POSIX e2e covers 0644 store with a different file key."
+    lastModified: "2026-11-04T22:59:46.256Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
     status: "completed"
     startedAt: "2026-11-03T18:34:02.653Z"
@@ -7,6 +45,16 @@ items:
     endedAt: "2026-11-03T19:36:04.383Z"
     activeIntervals: [{"end":"2026-11-03T19:07:11.767Z","start":"2026-11-03T18:34:02.653Z"},{"end":"2026-11-03T19:36:04.383Z","start":"2026-11-03T19:36:04.383Z"}]
     lastModified: "2026-11-03T19:36:04.383Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0fa67da8-bc41-44c8-9584-7aabe786e413":
+    status: "completed"
+    startedAt: "2026-11-04T21:45:24.601Z"
+    completedAt: "2026-11-04T22:00:57.061Z"
+    endedAt: "2026-11-04T22:00:57.061Z"
+    activeIntervals: [{"end":"2026-11-04T22:00:57.061Z","start":"2026-11-04T21:45:24.601Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Init wizard checks the Google key store's exit code; a failed store sets InitStatus.credentialWarning (reason with the key cut out and redacted, plus the ndx config credentials.google hint) and the landing page shows it without redirecting."
+    lastModified: "2026-11-04T22:00:57.061Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "10730d82-59f1-4ea2-9594-667318da70d2":
     status: "completed"
@@ -25,6 +73,14 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "resolveJudgmentRoute (options: env/ndxHome) and askJev resolve the typesafe credential env-first then store; new configuredJudgmentRoute replaces sourcevision's fake-env probe; rex migrate-plan jevAvailable via resolver; messages and README name ndx config credentials.typesafe."
     lastModified: "2026-10-30T16:40:18.734Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1ef2f885-15d8-454a-839a-19c2a1f6422f":
+    status: "completed"
+    startedAt: "2026-11-04T17:51:03.417Z"
+    completedAt: "2026-11-04T18:00:18.416Z"
+    endedAt: "2026-11-04T18:00:18.416Z"
+    activeIntervals: [{"end":"2026-11-04T18:00:18.416Z","start":"2026-11-04T17:51:03.417Z"}]
+    lastModified: "2026-11-04T18:00:18.416Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "250e6c57-54a5-4d31-815c-720ea268e972":
     status: "completed"
@@ -66,9 +122,35 @@ items:
     resolutionDetail: "Helper backend in llm-client's credential store (setHelperCredential, shell-less runner, per-process cache, quiet failures); set-helper and status --check in the credentials CLI; ndx config --helper parsing with refusals; hench guard and Claude CLI deny rules for the Keychain read and helper commands via agentCredentialDenials (gateway count unchanged at 226)."
     lastModified: "2026-11-02T20:51:36.470Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "68b2709d-174e-4ec2-bf3f-163fdda6115c":
-    status: "deferred"
-    lastModified: "2026-10-30T14:44:19.737Z"
+  "5a0e4b05-12bc-46a3-ad63-36d74d54b9d3":
+    status: "completed"
+    startedAt: "2026-11-04T19:49:26.603Z"
+    completedAt: "2026-11-04T20:03:03.351Z"
+    endedAt: "2026-11-04T20:03:03.351Z"
+    activeIntervals: [{"end":"2026-11-04T20:03:03.351Z","start":"2026-11-04T19:49:26.603Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "importLocalApiKeys compares fingerprints: a matching stored key is only removed from .n-dx.local.json; a different one needs a terminal confirmation naming both fingerprints, else skipped. offerKeyImport refuses a tracked/untellable local file as repository config."
+    lastModified: "2026-11-04T20:03:03.351Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5f3e5940-8d9d-46ba-b1b3-f88fc4bb26cd":
+    status: "completed"
+    startedAt: "2026-11-04T23:00:01.038Z"
+    completedAt: "2026-11-04T23:06:46.952Z"
+    endedAt: "2026-11-04T23:06:46.952Z"
+    activeIntervals: [{"end":"2026-11-04T23:06:46.952Z","start":"2026-11-04T23:00:01.038Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sourcevision test drives exported finalizeTokenUsage with a real failing node helper in a temp NDX_HOME; catches both jevAvailability() and check:true regressions."
+    lastModified: "2026-11-04T23:06:46.952Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6c539e7a-ae0b-4a82-955d-313f596add75":
+    status: "completed"
+    startedAt: "2026-11-04T18:32:45.746Z"
+    completedAt: "2026-11-04T18:38:28.135Z"
+    endedAt: "2026-11-04T18:38:28.135Z"
+    activeIntervals: [{"end":"2026-11-04T18:38:28.135Z","start":"2026-11-04T18:32:45.746Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "handleTestConnection resolves the Claude key via llm-client resolveVendorAuth (store under auth api; nothing under cli or store-only auto); key never printed; e2e tests added."
+    lastModified: "2026-11-04T18:38:28.135Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6d70bab8-a6c6-4839-9520-08d407116c79":
     status: "completed"
@@ -86,9 +168,86 @@ items:
     activeIntervals: [{"end":"2026-10-30T18:32:00.867Z","start":"2026-10-30T18:21:31.342Z"}]
     lastModified: "2026-10-30T18:32:00.867Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "742cfeea-b375-443a-b72e-af34a87ef364":
+    status: "completed"
+    startedAt: "2026-11-04T17:37:59.568Z"
+    completedAt: "2026-11-04T17:50:46.336Z"
+    endedAt: "2026-11-04T17:50:46.336Z"
+    activeIntervals: [{"end":"2026-11-04T17:50:09.261Z","start":"2026-11-04T17:37:59.568Z"},{"end":"2026-11-04T17:50:46.336Z","start":"2026-11-04T17:50:46.336Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "fad4416e5 (run 857125af): the codex registry entry decides API vs CLI with resolveVendorAuth (helpers not run); Google mode detection uses the same decision; new hench failover-codex-auth integration test. Gate: root-policy, root-drift, graview, hench, llm-client, rex, sourcevision passed; web failed only throttle-controls.test.ts 'sends PUT request when concurrency slider changes' (known load-timing flake), which passes alone (14/14). Review: nothing to fix. Note: AC 'hench failover to codex succeeds' holds via the codex CLI provider; hench's API loop (initApiResources, loop.ts) still rejects non-Claude API providers, as on main."
+    lastModified: "2026-11-04T17:50:46.336Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7b397157-7309-4db5-913e-ac86d57f7f67":
+    status: "completed"
+    startedAt: "2026-11-06T01:14:57.465Z"
+    completedAt: "2026-11-06T01:35:07.762Z"
+    endedAt: "2026-11-06T01:35:07.762Z"
+    activeIntervals: [{"end":"2026-11-06T01:35:07.762Z","start":"2026-11-06T01:14:57.465Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Five #956 nits fixed with tests: landing setBusy(false) on credentialWarning; scrub report Claude-only and skips GitHub tokens; spawnCredentialsCli catches a refused spawn; non-terminal --import exits 1 on a differing key; terminal y replace tested via injected answer."
+    lastModified: "2026-11-06T01:35:07.762Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
+    status: "completed"
+    startedAt: "2026-11-07T02:13:09.852Z"
+    completedAt: "2026-11-07T02:13:09.852Z"
+    endedAt: "2026-11-07T02:13:09.852Z"
+    activeIntervals: [{"end":"2026-11-07T02:13:09.852Z","start":"2026-11-07T02:13:09.852Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "All 45 remaining tasks landed with N-DX-Item trailers (credential store PR 1, #942, merged 2026-11-03). Five open tasks and the deferred C10 moved to 350dbd5a so this change could close and add the Per-user credential store capability (2026-11-06 PRD audit, D5)."
+    appliedAt: "2026-11-07T02:13:09.852Z"
+    appliedAmendsHash: "7c41198fdba0640598b3e61583273fd28e18aec3ee7ba9cb373f0f6807fd7a2e"
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-03T20:34:37.959Z"
+    lastModified: "2026-11-07T02:13:09.852Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "82ff7e46-365c-4284-a74d-83753ed94067":
+    status: "completed"
+    startedAt: "2026-11-04T18:00:54.054Z"
+    completedAt: "2026-11-04T18:11:04.820Z"
+    endedAt: "2026-11-04T18:11:04.820Z"
+    activeIntervals: [{"end":"2026-11-04T18:11:04.820Z","start":"2026-11-04T18:00:54.054Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "resolveVendorCliEnv sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 (any casing replaced) whenever it writes the Claude key itself; the CLI keeps the key for its API calls. Docs state where keys enter child envs. Codex follow-up db3c0066."
+    lastModified: "2026-11-04T18:11:04.820Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8d2d9a84-b136-4c51-9532-9b169df13080":
+    status: "completed"
+    startedAt: "2026-11-04T18:20:28.447Z"
+    completedAt: "2026-11-04T18:25:54.210Z"
+    endedAt: "2026-11-04T18:25:54.210Z"
+    activeIntervals: [{"end":"2026-11-04T18:25:54.210Z","start":"2026-11-04T18:20:28.447Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-catalog.ts probeEnv: resolveVendorCliEnv under the project's own auth; on ClaudeClientError reason auth, retry with auth cli. #686 test passes unchanged; two new tests (api no key falls back; cli matches resolveVendorCliEnv)."
+    lastModified: "2026-11-04T18:25:54.210Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8f7cb2f8-9389-46e7-a092-384e3ccbc31a":
+    status: "completed"
+    startedAt: "2026-11-04T18:26:24.136Z"
+    completedAt: "2026-11-04T18:32:38.902Z"
+    endedAt: "2026-11-04T18:32:38.902Z"
+    activeIntervals: [{"end":"2026-11-04T18:32:38.902Z","start":"2026-11-04T18:26:24.136Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "assertNotCredentialCommand unescapes words as sh does and matches a prefix's tokens after the program anywhere among later words; Claude CLI gap documented"
+    lastModified: "2026-11-04T18:32:38.902Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94595998-4f73-4c75-af45-6a7d01e9c8ac":
+    status: "completed"
+    startedAt: "2026-11-06T00:26:46.781Z"
+    completedAt: "2026-11-06T00:41:11.929Z"
+    endedAt: "2026-11-06T00:41:11.929Z"
+    activeIntervals: [{"end":"2026-11-06T00:40:07.889Z","start":"2026-11-06T00:26:46.781Z"},{"end":"2026-11-06T00:41:11.929Z","start":"2026-11-06T00:41:11.929Z"}]
+    lastModified: "2026-11-06T00:41:11.929Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94a33e07-b483-4b90-9b37-34911b54f084":
+    status: "completed"
+    startedAt: "2026-11-04T18:11:11.183Z"
+    completedAt: "2026-11-04T18:26:07.463Z"
+    endedAt: "2026-11-04T18:26:07.463Z"
+    activeIntervals: [{"end":"2026-11-04T18:19:34.377Z","start":"2026-11-04T18:11:11.183Z"},{"end":"2026-11-04T18:26:07.463Z","start":"2026-11-04T18:26:07.463Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "f7dfc6c03 (run 2f87c032): under auth cli, and whenever n-dx sets the key, every casing of ANTHROPIC_AUTH_TOKEN / CODEX_API_KEY leaves the vendor CLI child. Its gate failed on web: the throttle-controls load flake plus routes-llm-catalog #686, a real consumer regression (the catalog probe forced auth cli). That was fixed by task 8d2d9a84 in 69018c0a3, whose full gate passed including web. Precedence rests on the vendors' docs, not a live CLI run."
+    lastModified: "2026-11-04T18:26:07.463Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
@@ -120,6 +279,36 @@ items:
     resolutionDetail: "Interpreter helpers deny argv through the script; scriptless interpreters refused at --helper; failed helpers retried after 60 s with one warning per streak."
     lastModified: "2026-11-02T21:20:50.706Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9f3391dc-0852-463d-b0a0-f89f23cfad68":
+    status: "completed"
+    startedAt: "2026-11-04T22:02:27.023Z"
+    completedAt: "2026-11-04T22:10:35.789Z"
+    endedAt: "2026-11-04T22:10:35.789Z"
+    activeIntervals: [{"end":"2026-11-04T22:10:35.789Z","start":"2026-11-04T22:02:27.023Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "The guard resolves a security subcommand the way SecurityTool does (getopt hilp:qvR, then the first table entry the word is a prefix of, with case folded), so every abbreviation of find-generic-password is refused."
+    lastModified: "2026-11-04T22:10:35.789Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "aba3a023-d594-4962-9d63-a0be5775bb20":
+    status: "completed"
+    startedAt: "2026-11-04T21:33:51.131Z"
+    completedAt: "2026-11-04T21:44:35.287Z"
+    endedAt: "2026-11-04T21:44:35.287Z"
+    activeIntervals: [{"end":"2026-11-04T21:44:35.287Z","start":"2026-11-04T21:33:51.131Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Codex quota and post-run token retrieval resolve the key via resolveVendorAuth (llm.codex.auth, store included); notice matches the auth mode."
+    lastModified: "2026-11-04T21:44:35.287Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "afd1638b-3f09-4e88-b50b-f09ecdd7b774":
+    status: "completed"
+    startedAt: "2026-11-04T20:25:52.274Z"
+    completedAt: "2026-11-04T21:04:02.242Z"
+    endedAt: "2026-11-04T21:04:02.242Z"
+    activeIntervals: [{"end":"2026-11-04T21:04:02.242Z","start":"2026-11-04T20:25:52.274Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "credentialStatus carries storeProblem; status prints it instead of 'not set'; core forwards success stderr via new spawnSyncCli; ndx status jev line names the refusal"
+    lastModified: "2026-11-04T21:04:02.242Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b52513b3-58a0-4a2b-9e36-d116bdcf6a54":
     status: "completed"
     startedAt: "2026-11-03T17:37:09.499Z"
@@ -136,6 +325,16 @@ items:
     activeIntervals: [{"end":"2026-10-30T15:44:38.472Z","start":"2026-10-30T15:40:16.396Z"}]
     lastModified: "2026-10-30T15:44:38.472Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bb93e6fd-fe6a-418e-975c-746b0afacbd0":
+    status: "completed"
+    startedAt: "2026-11-04T20:03:11.088Z"
+    completedAt: "2026-11-04T20:25:34.641Z"
+    endedAt: "2026-11-04T20:25:34.641Z"
+    activeIntervals: [{"end":"2026-11-04T20:25:34.641Z","start":"2026-11-04T20:03:11.088Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Stale-lock takeover in llm-client credential-store.ts now uses a per-lock O_EXCL guard file and removes the lock only if its identity (ino, mtime, content) is unchanged and it is still stale; a lock left empty is stale after 5 s."
+    lastModified: "2026-11-04T20:25:34.641Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfee741f-343a-4a2c-b12f-50aa262811ef":
     status: "completed"
     startedAt: "2026-11-03T16:24:28.530Z"
@@ -145,6 +344,16 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option A: importLocalApiKeys skips vendors whose store entry is a helper, keeps the file key, prints one line naming vendor and file."
     lastModified: "2026-11-03T16:29:52.353Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "db3c0066-8696-45bd-a77a-1c518bfe0221":
+    status: "completed"
+    startedAt: "2026-11-04T22:22:22.472Z"
+    completedAt: "2026-11-04T22:46:56.949Z"
+    endedAt: "2026-11-04T22:46:56.949Z"
+    activeIntervals: [{"end":"2026-11-04T22:46:56.949Z","start":"2026-11-04T22:22:22.472Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Every codex exec spawn passes -c shell_environment_policy.set.{OPENAI_API_KEY,CODEX_API_KEY,CODEX_ACCESS_TOKEN}='' (llm-client codexShellEnvFlags via compileCodexPolicyFlags; hench resume via {resume:true}; core reviewer + auth check via config.js loadCodexShellEnvFlags). Docs updated."
+    lastModified: "2026-11-04T22:46:56.949Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dbc9c046-3fcc-43bc-a290-87d7ab5f4565":
     status: "completed"
@@ -165,6 +374,56 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "ndx status jev line, jev {available, source} in get_capabilities and manifest lastAnalysis, llm.typesafe.required warn-once, credentials.typesafe --test via mocked fetch"
     lastModified: "2026-11-03T17:28:25.718Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e687795c-97ff-4bb5-8cd0-820e59b2d555":
+    status: "completed"
+    startedAt: "2026-11-06T00:12:12.312Z"
+    completedAt: "2026-11-06T00:25:16.930Z"
+    endedAt: "2026-11-06T00:25:16.930Z"
+    activeIntervals: [{"end":"2026-11-06T00:25:16.930Z","start":"2026-11-06T00:12:12.312Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lock and takeover guard are created filled via temp file + linkSync (EEXIST = held); guard records PID and is reclaimed only when that PID is dead; age rule kept only for a legacy empty lock; clock and pidAlive injectable."
+    lastModified: "2026-11-06T00:25:16.930Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e97d3394-f0a1-4199-935f-7c7ca4636a87":
+    status: "completed"
+    startedAt: "2026-11-04T18:38:34.143Z"
+    completedAt: "2026-11-04T18:55:11.296Z"
+    endedAt: "2026-11-04T18:55:11.296Z"
+    activeIntervals: [{"end":"2026-11-04T18:55:11.296Z","start":"2026-11-04T18:38:34.143Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runVendorAuthPreflight catches the auth-reason error and returns { ok: false, errorCode: NDX_<VENDOR>_PREFLIGHT_NO_KEY }; --version probes resolve auth api as cli (no key, no helper)."
+    lastModified: "2026-11-04T18:55:11.296Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ee87336f-2945-4507-a90d-c92f36923c31":
+    status: "completed"
+    startedAt: "2026-11-04T18:56:00.178Z"
+    completedAt: "2026-11-04T19:47:10.790Z"
+    endedAt: "2026-11-04T19:47:10.790Z"
+    activeIntervals: [{"end":"2026-11-04T19:19:51.589Z","start":"2026-11-04T18:56:00.178Z"},{"end":"2026-11-04T19:47:10.790Z","start":"2026-11-04T19:47:10.790Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "6a9c364ac (run f83bec8c): a committed llm.<vendor>.auth stays in .n-dx.json and the local value overrides it (SHARED_COPY_KEPT_SUFFIXES). Review: no findings. Gate failed only on root e2e files under load average 40-55 with two other ndx work gates running (cli-ci, cli-init-readme, cli-tool-resolution, mcp-transport, verify-script-ci-step, vitest-timeout-failure: timeouts and ndx ci exit 13). cli-ci's exit-13 cases fail identically with the pre-change config.js (377bc5687), so they are not caused by this change. tests/e2e/cli-config.test.js passes alone (227/227)."
+    lastModified: "2026-11-04T19:47:10.790Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f4a77d97-b2a2-4009-8784-3a3a779884f2":
+    status: "completed"
+    startedAt: "2026-11-06T00:52:03.128Z"
+    completedAt: "2026-11-06T01:00:13.013Z"
+    endedAt: "2026-11-06T01:00:13.013Z"
+    activeIntervals: [{"end":"2026-11-06T01:00:13.013Z","start":"2026-11-06T00:52:03.128Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "commandWords records a per-word over-approximating pattern for unquoted { * ? [ (POSIX only); a denied program's later word whose pattern could name a denied token (or a security abbreviation of it) is refused."
+    lastModified: "2026-11-06T01:00:13.013Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f5330af8-f470-4d06-bf27-55c21e9f2efc":
+    status: "completed"
+    startedAt: "2026-11-04T21:04:42.445Z"
+    completedAt: "2026-11-04T21:32:49.269Z"
+    endedAt: "2026-11-04T21:32:49.269Z"
+    activeIntervals: [{"end":"2026-11-04T21:32:49.269Z","start":"2026-11-04T21:04:42.445Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "jevAvailability reports an unrun helper as available:null; analyze records the run's cached helper result; status prints 'unverified'; manifest schema accepts null."
+    lastModified: "2026-11-04T21:32:49.269Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5efde56-48b6-4a78-a891-fcda1d312e46":
     status: "completed"

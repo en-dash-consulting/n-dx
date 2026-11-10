@@ -1,0 +1,76 @@
+schema: "rex/v2"
+items:
+  "0234dd78-a3b7-4385-beeb-80a5c139307a":
+    status: "completed"
+    startedAt: "2026-11-05T06:54:28.295Z"
+    completedAt: "2026-11-05T07:19:51.544Z"
+    endedAt: "2026-11-05T07:19:51.544Z"
+    activeIntervals: [{"end":"2026-11-05T07:19:51.544Z","start":"2026-11-05T06:54:28.295Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex core/apply-change.ts applyChange (preview or apply under withPrdModelTransaction, refusal as data) shared by MCP apply_change and new web routes POST /api/rex/changes/:id/apply[/preview]; detail panel Apply… section for awaiting-apply changes."
+    lastModified: "2026-11-05T07:19:51.544Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "26bd2722-39dc-474b-94e9-6329564f0449":
+    status: "completed"
+    startedAt: "2026-11-05T07:22:06.007Z"
+    completedAt: "2026-11-05T07:43:57.707Z"
+    endedAt: "2026-11-05T07:43:57.707Z"
+    activeIntervals: [{"end":"2026-11-05T07:38:20.325Z","start":"2026-11-05T07:22:06.007Z"},{"end":"2026-11-05T07:43:57.707Z","start":"2026-11-05T07:43:57.707Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (19):\n- sends PUT request when concurrency slider changes\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  TypeError: The \"path\" argument must be of type string or an instance of Buffer or URL. Received undefined\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 11 more"
+    lastModified: "2026-11-05T07:43:57.707Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "470bef87-90da-4345-932c-74e386314499":
+    status: "completed"
+    startedAt: "2026-11-05T13:39:45.607Z"
+    completedAt: "2026-11-05T14:00:55.648Z"
+    endedAt: "2026-11-05T14:00:55.648Z"
+    activeIntervals: [{"end":"2026-11-05T14:00:13.802Z","start":"2026-11-05T13:39:45.607Z"},{"end":"2026-11-05T14:00:55.648Z","start":"2026-11-05T14:00:55.648Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
+    lastModified: "2026-11-05T14:00:55.648Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "532ac6eb-1c9c-4780-9044-248e61af82fd":
+    status: "completed"
+    startedAt: "2026-11-05T14:01:29.092Z"
+    completedAt: "2026-11-05T14:21:04.057Z"
+    endedAt: "2026-11-05T14:21:04.057Z"
+    activeIntervals: [{"end":"2026-11-05T14:18:28.321Z","start":"2026-11-05T14:01:29.092Z"},{"end":"2026-11-05T14:21:04.057Z","start":"2026-11-05T14:21:04.057Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T14:21:04.057Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7441aa5c-1555-443d-8a95-5df1ac4903d1":
+    status: "completed"
+    startedAt: "2026-11-05T13:16:10.491Z"
+    completedAt: "2026-11-05T13:39:08.776Z"
+    endedAt: "2026-11-05T13:39:08.776Z"
+    activeIntervals: [{"end":"2026-11-05T13:37:01.833Z","start":"2026-11-05T13:16:10.491Z"},{"end":"2026-11-05T13:39:08.776Z","start":"2026-11-05T13:39:08.776Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (17):\n- tests/integration/feature-gate-enforcement.test.ts > feature gate enforcement through the real dispatcher\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-auth-token.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-daemon.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-extension-api.test.ts\n- tests/integration/hub-frame-keys.test.ts\n- tests/integration/hub-proxy.test.ts\n- tests/integration/hub-registry-heal.test.ts\n  Error: Stale build output: dist/ is not a full build of the current src.\n- tests/integration/hub-session-host-release.test.ts > the hub session host lock across two project servers\n  Error: Stale build output: dist/ is not a full build of the current src.\n… and 9 more"
+    lastModified: "2026-11-05T13:39:08.776Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9156347e-7193-4d2e-9108-635e9e3705ad":
+    status: "completed"
+    startedAt: "2026-11-05T06:36:57.615Z"
+    completedAt: "2026-11-05T06:53:00.972Z"
+    endedAt: "2026-11-05T06:53:00.972Z"
+    activeIntervals: [{"end":"2026-11-05T06:52:26.776Z","start":"2026-11-05T06:36:57.615Z"},{"end":"2026-11-05T06:53:00.972Z","start":"2026-11-05T06:53:00.972Z"}]
+    failureReason: "Test gate failed [command: npm run test]: web\nFailing tests (2):\n- shows field-level error styling after blur on empty title\n- tests/unit/viewer/add-item-form.test.ts > AddItemForm > shows field-level error styling after blur on empty title\n  AssertionError: expected false to be true // Object.is equality"
+    lastModified: "2026-11-05T06:53:00.972Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "956d3d04-73c2-4d25-b569-68b7a33f5e0e":
+    status: "completed"
+    startedAt: "2026-11-05T14:21:18.146Z"
+    completedAt: "2026-11-05T14:31:59.353Z"
+    endedAt: "2026-11-05T14:31:59.353Z"
+    activeIntervals: [{"end":"2026-11-05T14:31:59.353Z","start":"2026-11-05T14:21:18.146Z"}]
+    lastModified: "2026-11-05T14:31:59.353Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "99692891-d095-469e-aa09-1725b77e87de":
+    status: "completed"
+    startedAt: "2026-11-05T14:31:59.353Z"
+    completedAt: "2026-11-05T14:31:59.353Z"
+    endedAt: "2026-11-05T14:31:59.353Z"
+    activeIntervals: [{"end":"2026-11-05T14:31:59.353Z","start":"2026-11-05T14:31:59.353Z"}]
+    appliedAt: "2026-11-05T14:31:59.353Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.3"
+    lastModified: "2026-11-05T14:31:59.353Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

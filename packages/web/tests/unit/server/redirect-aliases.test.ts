@@ -26,6 +26,7 @@ const ASSETS: StaticAssets = {
   resolvedPackageRoot: "/nonexistent",
   getViewerHtml: () => "<html><body>viewer</body></html>",
   getLandingHtml: () => null,
+  getHubSessionHtml: () => null,
   findAssetPath: () => null,
 };
 
@@ -61,6 +62,17 @@ describe("redirect aliases: full dashboard (no scope)", () => {
       const res = await fetch(`${baseUrl}/rex-dashboard`, { redirect: "manual" });
       expect(res.status).toBe(302);
       expect(res.headers.get("location")).toBe("work");
+    } finally {
+      await close();
+    }
+  });
+
+  it("redirects /command-reference to the Reference tab of /commands", async () => {
+    const { baseUrl, close } = await startFor(baseCtx());
+    try {
+      const res = await fetch(`${baseUrl}/command-reference`, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("commands/reference");
     } finally {
       await close();
     }

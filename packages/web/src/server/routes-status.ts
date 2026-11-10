@@ -18,7 +18,7 @@ import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import {
   computeStats, collectCompletedIds, findNextTask, walkTree,
-  prdLayout, loadPrdModel, indexTree, isOpenChange, isAppliedChange, awaitsPlacement,
+  prdLayout, loadPrdModel, indexTree, isOpenChange, isAppliedChange, isInboxChange,
 } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import type { ReadinessScore, RepoIdentity, OutboundData, InfrastructureData } from "./domain-gateway.js";
@@ -125,6 +125,8 @@ export interface RexStatus {
   items: PRDItemAttribution[];
   /** Inbox counts. Present on a v2 tree only; omitted on v1. */
   inbox?: InboxCounts;
+  /** The PRD's layout, present when a PRD exists. A v1 tree has not been migrated. */
+  layout?: "v1" | "v2";
 }
 
 export interface HenchStatus {
@@ -453,7 +455,7 @@ async function countInbox(ctx: ServerContext): Promise<InboxCounts | undefined> 
     for (const { node, root } of index.entries) {
       if (root !== "changes" || node.type !== "change") continue;
       if (isOpenChange(node)) {
-        if (awaitsPlacement(index, node)) open++;
+        if (isInboxChange(node)) open++;
       } else if (isAppliedChange(node) && node.needsPlacement) {
         appliedUnplaced++;
       }
@@ -550,10 +552,12 @@ export function buildServerInfo(ctx: ServerContext): ServerInfo {
 
 async function buildProjectStatus(ctx: ServerContext): Promise<ProjectStatus> {
   const inbox = await readInboxCounts(ctx);
+  const rex = extractRexStatus(ctx);
+  const layout = rex.exists ? await prdLayout(ctx.rexDir) : undefined;
   return {
     projectDir: ctx.projectDir,
     sv: extractSvStatus(ctx),
-    rex: { ...extractRexStatus(ctx), ...(inbox ? { inbox } : {}) },
+    rex: { ...rex, ...(inbox ? { inbox } : {}), ...(layout ? { layout } : {}) },
     hench: extractHenchStatus(ctx),
     server: buildServerInfo(ctx),
     initialized: isProjectInitialized(ctx),

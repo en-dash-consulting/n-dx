@@ -168,6 +168,24 @@ describe("listWorktrees against real repositories", () => {
     ]);
   });
 
+  // The helper honours the host's git policy rather than overriding it. The
+  // Claude desktop Terminal panel exports this variable; tests/setup-session-env.js
+  // drops it so the test above sees git's default policy.
+  it("a bare repository lists nothing when the host sets safe.bareRepository=explicit", async () => {
+    const bare = join(tmpRoot, "bare-explicit.git");
+    mkdirSync(bare);
+    git(bare, "init", "--quiet", "--bare");
+
+    const prev = process.env.GIT_CONFIG_PARAMETERS;
+    process.env.GIT_CONFIG_PARAMETERS = "'safe.bareRepository=explicit'";
+    try {
+      expect(await listWorktrees(bare)).toEqual([]);
+    } finally {
+      if (prev === undefined) delete process.env.GIT_CONFIG_PARAMETERS;
+      else process.env.GIT_CONFIG_PARAMETERS = prev;
+    }
+  });
+
   it("returns [] outside a repository", async () => {
     expect(await listWorktrees(outside)).toEqual([]);
   });

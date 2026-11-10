@@ -10,35 +10,48 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { underMount } from "../dev/hub-mount.js";
 
 const BIN = resolve(import.meta.dirname, "../bin/serve.js");
 const MOUNT = "/x/graview-face/";
 
-function freePort(): Promise<number> {
+/**
+ * A port free on `host` a moment ago. Probed on the host serve.js will bind:
+ * `localhost` is `::1` on macOS, and a port free on 127.0.0.1 can be held
+ * there. macOS hands out ephemeral ports in sequence, so a 127.0.0.1 probe
+ * kept returning the very port an earlier serve.js had just taken on `::1`
+ * (CI runs 42170022634, 42149471914, 42135226016).
+ */
+function freePort(host: string): Promise<number> {
   return new Promise((done, fail) => {
     const probe = createServer();
     probe.once("error", fail);
-    probe.listen(0, "127.0.0.1", () => {
+    probe.listen(0, host, () => {
       const { port } = probe.address() as { port: number };
       probe.close(() => done(port));
     });
   });
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Resolves when serve.js prints its URL, which it does only after Vite's
- * listen() resolved; rejects if it exits first. No deadline of its own: the
- * beforeAll hook timeout is the hang guardrail.
+ * Resolves with the port serve.js prints in its URL on `host`, which it does
+ * only after Vite's listen() resolved; rejects if it exits first. No deadline
+ * of its own: the beforeAll hook timeout is the hang guardrail.
  */
-function listening(child: ChildProcess, host: string): Promise<void> {
+function listening(child: ChildProcess, host: string): Promise<number> {
   let output = "";
+  const url = new RegExp(`${escapeRegExp(host)}:(\\d+)`);
   return new Promise((done, fail) => {
     const onData = (chunk: Buffer) => {
       // Vite bolds the port, so drop the colour codes before matching.
       output += String(chunk).replace(/\x1b\[[0-9;]*m/g, "");
-      if (output.includes(host)) done();
+      const match = url.exec(output);
+      if (match) done(Number(match[1]));
     };
     child.stdout?.on("data", onData);
     child.stderr?.on("data", onData);
@@ -63,11 +76,14 @@ describe("the mount the hub serves the face at", () => {
   });
 });
 
-/** Starts serve.js with `env` and resolves with its origin once it listens on `host`. */
+/**
+ * Starts serve.js with `env` and resolves with its origin once it listens on
+ * `host`. The origin uses the port serve.js reports: by hand, an ambient
+ * `PORT` someone took in the meantime moves it to the next one.
+ */
 async function startServe(env: NodeJS.ProcessEnv, host: string): Promise<{ child: ChildProcess; origin: string }> {
-  const port = await freePort();
-  const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
-  await listening(child, `${host}:${port}`);
+  const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(await freePort(host)) }, stdio: ["pipe", "pipe", "pipe"] });
+  const port = await listening(child, host);
   return { child, origin: `http://${host}:${port}` };
 }
 
@@ -94,6 +110,77 @@ describe("bin/serve.js by hand, with an ambient PORT", () => {
     expect(await main.text()).toContain(`from "/src/app.ts"`);
     expect((await fetch(`${origin}/@vite/client`)).status).toBe(200);
   });
+});
+
+/**
+ * Holds a port on `localhost`, as another checkout's face would. The OS picks
+ * it, so there is no window between choosing the port and holding it.
+ */
+function hold(): Promise<{ server: ReturnType<typeof createServer>; port: number }> {
+  return new Promise((done, fail) => {
+    const server = createServer();
+    server.once("error", fail);
+    server.listen(0, "localhost", () => done({ server, port: (server.address() as { port: number }).port }));
+  });
+}
+
+/** Stops serve.js and waits for it to let go of its port. */
+function stop(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((done) => {
+    child.once("exit", () => done());
+    child.kill();
+  });
+}
+
+/** The port serve.js says it listens on, or the error it exits with. */
+function outcome(child: ChildProcess): Promise<{ port?: number; code?: number | null; output: string }> {
+  let output = "";
+  return new Promise((done) => {
+    const onData = (chunk: Buffer) => {
+      output += String(chunk).replace(/\x1b\[[0-9;]*m/g, "");
+      const match = /localhost:(\d+)/.exec(output);
+      if (match) done({ port: Number(match[1]), output });
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.once("exit", (code) => done({ code, output }));
+  });
+}
+
+describe("bin/serve.js when another checkout's face holds the port", () => {
+  const children: ChildProcess[] = [];
+  const held: Array<ReturnType<typeof createServer>> = [];
+  const env = { ...process.env };
+  delete env["NDX_EXTENSION_NAME"];
+  delete env["PORT"];
+
+  // Each test's serve.js and held port go before the next test starts, so
+  // one test's server can never be holding the port the next one picks.
+  afterEach(async () => {
+    await Promise.all(children.splice(0).map(stop));
+    await Promise.all(held.splice(0).map((server) => new Promise((done) => server.close(done))));
+  });
+
+  it("takes the next free port when the default one is held", async () => {
+    const { server, port } = await hold();
+    held.push(server);
+    // An ambient PORT is a starting point, like the 5188 default.
+    const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
+    children.push(child);
+    const result = await outcome(child);
+    expect(result.port, result.output).toBeGreaterThan(port);
+  }, 90_000);
+
+  it("refuses a port --port names when it is held, rather than serving somewhere else", async () => {
+    const { server, port } = await hold();
+    held.push(server);
+    const child = spawn(process.execPath, [BIN, "--port", String(port)], { env, stdio: ["pipe", "pipe", "pipe"] });
+    children.push(child);
+    const result = await outcome(child);
+    expect(result.port, result.output).toBeUndefined();
+    expect(result.code).not.toBe(0);
+  }, 90_000);
 });
 
 const sidecarFetch: typeof fetch = (input, init) => {
@@ -161,6 +248,26 @@ describe("bin/serve.js with an explicitly injected project projection", () => {
     expect(await document.json()).toEqual({ name: "hub-mounted" });
     const info = (await (await sidecarFetch(`${origin}/ndx/sync-info`)).json()) as { live: boolean };
     expect(info.live).toBe(true);
+  });
+
+  it("answers 404 for a code map the projection does not have, never the face's own page, and marks one it does", async () => {
+    for (const path of ["/data/iso-map.html", `${MOUNT}data/iso-map.html`]) {
+      const missing = await sidecarFetch(`${origin}${path}`);
+      expect(missing.status).toBe(404);
+      expect(await missing.text()).not.toContain("ndx-door");
+    }
+    writeFileSync(join(scratch, "iso-map.html"), '<!doctype html>\n<html lang="en" class="embed"><body>map</body></html>');
+    try {
+      const map = await sidecarFetch(`${origin}${MOUNT}data/iso-map.html`);
+      expect(map.status).toBe(200);
+      expect(map.headers.get("x-ndx-iso-map")).toBe("1");
+      // Framed by this origin only: the hub's DENY would otherwise stand, and no other site may frame it.
+      expect(map.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+      expect(map.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+      expect(await map.text()).toContain('class="embed"');
+    } finally {
+      rmSync(join(scratch, "iso-map.html"), { force: true });
+    }
   });
 
   it("hands POST /ndx/mcp to the MCP door, stripped or under the mount", async () => {

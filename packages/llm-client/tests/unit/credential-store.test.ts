@@ -6,22 +6,53 @@
  * library and lives in tests/e2e/credential-store-writers.test.ts.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { platform, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
+  EMPTY_LOCK_STALE_MS,
+  createFilled,
   credentialStatus,
   credentialStorePath,
+  inspectLock,
   parseIcaclsOutput,
+  takeOverStaleLock,
+  takeoverGuardPath,
   resolveCredential,
   restrictToOwnerWindows,
   setCredential,
   unsetCredential,
   type CredentialWriteOptions,
+  type LockFs,
 } from "../../src/credential-store.js";
+
+/** Pass-through fs spies: which paths were opened, and what each link carried. */
+const fsCalls = vi.hoisted(() => ({
+  opened: [] as string[],
+  linked: [] as { src: string; dst: string; contentAtLink: string }[],
+  /** When set, linkSync fails with this code, as on a volume without hard links. */
+  linkError: undefined as string | undefined,
+}));
+vi.mock("node:fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...fs,
+    openSync: (path: string, ...rest: unknown[]) => {
+      fsCalls.opened.push(String(path));
+      return (fs.openSync as (...a: unknown[]) => number)(path, ...rest);
+    },
+    linkSync: (src: string, dst: string) => {
+      fsCalls.linked.push({ src: String(src), dst: String(dst), contentAtLink: fs.readFileSync(src, "utf-8") });
+      if (fsCalls.linkError !== undefined) {
+        throw Object.assign(new Error(`${fsCalls.linkError}: link '${src}' -> '${dst}'`), { code: fsCalls.linkError });
+      }
+      return fs.linkSync(src, dst);
+    },
+  };
+});
 
 const isWindows = platform() === "win32";
 const PLACEHOLDER = "placeholder-file-key";
@@ -268,6 +299,7 @@ describe("credentialStatus", () => {
       helperResult: null,
       envVar: "TYPESAFE_API_KEY",
       storePath: storePath(),
+      storeProblem: null,
     });
     expect(JSON.stringify(status)).not.toContain(PLACEHOLDER);
   });
@@ -301,6 +333,357 @@ describe("cross-process lock", () => {
     setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000 });
     expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
     expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it("takes over an empty lock older than the threshold", () => {
+    writeFileSync(lockPath(), "");
+    const old = (Date.now() - EMPTY_LOCK_STALE_MS - 1_000) / 1_000;
+    utimesSync(lockPath(), old, old);
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000 });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it("waits for a fresh empty lock: its writer is still writing it", () => {
+    writeFileSync(lockPath(), "");
+    expect(() => setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 100 })).toThrow(/Timed out/);
+    expect(existsSync(lockPath())).toBe(true);
+  });
+
+  it("never removes a live lock that replaced the one judged stale", () => {
+    const dead = spawnSync(process.execPath, ["-e", ""]);
+    writeFileSync(lockPath(), JSON.stringify({ pid: dead.pid, token: "dead", since: "2026-01-01T00:00:00.000Z" }));
+    const judged = inspectLock(lockPath());
+    expect(judged).toBeDefined();
+    // Another writer takes the dead lock over and creates its own live lock.
+    expect(takeOverStaleLock(lockPath(), judged!)).toBe(true);
+    const live = JSON.stringify({ pid: process.pid, token: "live", since: "2026-01-01T00:00:00.000Z" });
+    writeFileSync(lockPath(), live, { flag: "wx" });
+    // A second writer acting on its earlier judgement leaves the live lock in place.
+    expect(takeOverStaleLock(lockPath(), judged!)).toBe(false);
+    expect(readFileSync(lockPath(), "utf-8")).toBe(live);
+    expect(readdirSync(dirname(lockPath())).filter((f) => f.endsWith(".takeover"))).toEqual([]);
+  });
+
+  it("waits while a live writer holds the takeover guard however old, and reclaims a dead holder's", () => {
+    const LIVE = 1001;
+    const DEAD = 1002;
+    const seams = { now: () => Date.now() + 365 * 24 * 3_600_000, pidAlive: (pid: number) => pid === LIVE };
+    writeFileSync(lockPath(), holder(DEAD));
+    const judged = inspectLock(lockPath())!;
+    const guard = takeoverGuardPath(lockPath(), judged);
+    writeFileSync(guard, holder(LIVE));
+    expect(takeOverStaleLock(lockPath(), judged, seams)).toBe(false);
+    expect(existsSync(guard)).toBe(true);
+    expect(existsSync(lockPath())).toBe(true);
+
+    writeFileSync(guard, holder(DEAD));
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, clock: seams.now, pidAlive: seams.pidAlive });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(existsSync(lockPath())).toBe(false);
+    expect(existsSync(guard)).toBe(false);
+  });
+
+  it("never removes a filled lock with a live PID, however old the clock says it is", () => {
+    const LIVE = 1001;
+    writeFileSync(lockPath(), holder(LIVE));
+    const farFuture = () => Date.now() + 365 * 24 * 3_600_000;
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: farFuture, pidAlive: (pid) => pid === LIVE,
+    })).toThrow(new RegExp(`held by PID ${LIVE}`));
+    expect(readFileSync(lockPath(), "utf-8")).toBe(holder(LIVE));
+  });
+
+  it("reclaims an older version's empty lock only once the injected clock passes the threshold", () => {
+    writeFileSync(lockPath(), "");
+    const created = statSync(lockPath()).mtimeMs;
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: () => created + EMPTY_LOCK_STALE_MS - 1,
+    })).toThrow(/Timed out/);
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, clock: () => created + EMPTY_LOCK_STALE_MS });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(existsSync(lockPath())).toBe(false);
+  });
+});
+
+describe("createFilled", () => {
+  const target = (): string => join(home, "x.lock");
+
+  it("links the file into place already filled and leaves no temp file", () => {
+    const content = holder(process.pid);
+    expect(createFilled(target(), content)).toBe(true);
+    expect(readFileSync(target(), "utf-8")).toBe(content);
+    expect(readdirSync(home)).toEqual(["x.lock"]);
+  });
+
+  it("counts a link that hits EEXIST as held, leaving the existing file untouched", () => {
+    writeFileSync(target(), "theirs");
+    expect(createFilled(target(), holder(process.pid))).toBe(false);
+    expect(readFileSync(target(), "utf-8")).toBe("theirs");
+    expect(readdirSync(home)).toEqual(["x.lock"]);
+  });
+
+  it("never opens the real path: it appears by linking a temp file already filled", () => {
+    fsCalls.opened.length = 0;
+    fsCalls.linked.length = 0;
+    const content = holder(process.pid);
+    createFilled(target(), content);
+    expect(fsCalls.opened).not.toContain(target());
+    expect(fsCalls.linked).toHaveLength(1);
+    expect(fsCalls.linked[0].dst).toBe(target());
+    expect(fsCalls.linked[0].src).toMatch(/^.+\/x\.lock\.[0-9a-f-]{36}\.tmp$|^.+\\x\.lock\.[0-9a-f-]{36}\.tmp$/);
+    expect(fsCalls.linked[0].contentAtLink).toBe(content);
+  });
+
+  it("takes the store lock and the takeover guard through a filled link", () => {
+    const DEAD = 1002;
+    writeFileSync(join(home, "credentials.json.lock"), holder(DEAD));
+    fsCalls.linked.length = 0;
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, pidAlive: () => false });
+    const linked = fsCalls.linked.map((l) => ({ dst: l.dst.slice(home.length + 1), pid: JSON.parse(l.contentAtLink).pid }));
+    // Lock (EEXIST: the dead holder's), guard, then lock again; every link filled.
+    expect(linked.map((l) => l.pid)).toEqual([process.pid, process.pid, process.pid]);
+    expect(linked[0].dst).toBe("credentials.json.lock");
+    expect(linked[1].dst).toMatch(/^credentials\.json\.lock\.[0-9a-f]{16}\.takeover$/);
+    expect(linked[2].dst).toBe("credentials.json.lock");
+  });
+});
+
+describe("an ndx home without hard links", () => {
+  const lockPath = (): string => `${storePath()}.lock`;
+  const ownerPath = (): string => join(lockPath(), "owner.json");
+  const farFuture = () => Date.now() + 365 * 24 * 3_600_000;
+
+  afterEach(() => {
+    fsCalls.linkError = undefined;
+  });
+
+  for (const code of ["ENOTSUP", "EOPNOTSUPP", "ENOSYS", "EPERM", "EXDEV"]) {
+    it(`writes and removes credentials when link fails with ${code}`, () => {
+      fsCalls.linkError = code;
+      setCredential("typesafe", PLACEHOLDER, options);
+      expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+      expect(unsetCredential("typesafe", options)).toBe(true);
+      expect(readdirSync(home).filter((f) => f !== "credentials.json")).toEqual([]);
+    });
+  }
+
+  it("publishes a directory lock whose owner file is complete when it appears", () => {
+    fsCalls.linkError = "ENOTSUP";
+    const content = holder(process.pid);
+    expect(createFilled(lockPath(), content)).toBe(true);
+    expect(statSync(lockPath()).isDirectory()).toBe(true);
+    expect(readFileSync(ownerPath(), "utf-8")).toBe(content);
+    expect(readdirSync(lockPath())).toEqual(["owner.json"]);
+    expect(inspectLock(lockPath())?.pid).toBe(process.pid);
+    // A second writer finds it held.
+    expect(createFilled(lockPath(), holder(1001))).toBe(false);
+    expect(readFileSync(ownerPath(), "utf-8")).toBe(content);
+    expect(readdirSync(home)).toEqual(["credentials.json.lock"]);
+  });
+
+  it("never judges an owner-less lock directory stale: its writer is about to rename the owner in", () => {
+    fsCalls.linkError = "ENOTSUP";
+    mkdirSync(lockPath());
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: farFuture, pidAlive: () => false,
+    })).toThrow(/Timed out/);
+    expect(existsSync(lockPath())).toBe(true);
+    expect(existsSync(storePath())).toBe(false);
+  });
+
+  it("waits for a live holder's directory lock however old", () => {
+    fsCalls.linkError = "ENOTSUP";
+    mkdirSync(lockPath());
+    writeFileSync(ownerPath(), holder(1001));
+    expect(() => setCredential("typesafe", PLACEHOLDER, {
+      ...options, lockTimeoutMs: 100, clock: farFuture, pidAlive: (pid) => pid === 1001,
+    })).toThrow(/held by PID 1001/);
+    expect(readFileSync(ownerPath(), "utf-8")).toBe(holder(1001));
+  });
+
+  it("takes over a dead holder's directory lock, through a directory guard", () => {
+    fsCalls.linkError = "ENOTSUP";
+    mkdirSync(lockPath());
+    writeFileSync(ownerPath(), holder(1002));
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, pidAlive: () => false });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("reclaims a dead holder's directory guard and waits on a live one's", () => {
+    fsCalls.linkError = "ENOTSUP";
+    const LIVE = 1001;
+    const DEAD = 1002;
+    const seams = { now: farFuture, pidAlive: (pid: number) => pid === LIVE };
+    mkdirSync(lockPath());
+    writeFileSync(ownerPath(), holder(DEAD));
+    const judged = inspectLock(lockPath())!;
+    const guard = takeoverGuardPath(lockPath(), judged);
+    mkdirSync(guard);
+    writeFileSync(join(guard, "owner.json"), holder(LIVE));
+    expect(takeOverStaleLock(lockPath(), judged, seams)).toBe(false);
+    expect(existsSync(guard)).toBe(true);
+    expect(existsSync(ownerPath())).toBe(true);
+
+    writeFileSync(join(guard, "owner.json"), holder(DEAD));
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000, clock: seams.now, pidAlive: seams.pidAlive });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("still fails on a link error that is not a missing capability", () => {
+    fsCalls.linkError = "EIO";
+    expect(() => setCredential("typesafe", PLACEHOLDER, options)).toThrow(/EIO/);
+    expect(readdirSync(home)).toEqual([]);
+  });
+});
+
+function holder(pid: number): string {
+  return JSON.stringify({ pid, token: `t${pid}`, since: "2026-01-01T00:00:00.000Z" });
+}
+
+describe("Windows delete-pending lock files", () => {
+  const lockPath = (): string => `${storePath()}.lock`;
+  /** icacls stand-in, so the win32 write path runs on any host. */
+  const icacls = ((_binary: string, args: string[]) => (args.length === 1 ? `${args[0]} alice:(F)` : "")) as unknown as
+    CredentialWriteOptions["execFileSyncImpl"];
+
+  /**
+   * Real fs whose `op` on `target` throws `code` the first `times` calls, as
+   * Windows does for a file another process is deleting.
+   */
+  function flakyLockFs(op: keyof LockFs, code: string, target: string | ((path: string) => boolean), times = 1) {
+    const state = { thrown: 0 };
+    const matches = typeof target === "string" ? (path: string) => path === target : target;
+    const fail = (which: keyof LockFs, path: string): void => {
+      if (which !== op || !matches(path) || state.thrown >= times) return;
+      state.thrown++;
+      throw Object.assign(new Error(`${code}: operation not permitted, ${op} '${path}'`), { code });
+    };
+    const fs: LockFs = {
+      stat: (p) => { fail("stat", p); return statSync(p); },
+      readFile: (p) => { fail("readFile", p); return readFileSync(p, "utf-8"); },
+      link: (a, b) => { fail("link", b); linkSync(a, b); },
+      rm: (p) => { fail("rm", p); rmSync(p, { force: true }); },
+    };
+    return { fs, state };
+  }
+
+  /** The lock's own temp files, not the store writer's. */
+  const lockTemp = (path: string): boolean => path.startsWith(`${lockPath()}.`) && path.endsWith(".tmp");
+  const lockTempsIn = (): string[] => readdirSync(home).filter((name) => lockTemp(join(home, name)));
+
+  const win32 = (lockFs: LockFs, extra: Partial<CredentialWriteOptions> = {}): CredentialWriteOptions => ({
+    ...options, platform: "win32", execFileSyncImpl: icacls, username: "alice", lockFs, lockTimeoutMs: 2_000, ...extra,
+  });
+
+  for (const [op, code] of [["stat", "EPERM"], ["stat", "EBUSY"], ["readFile", "EPERM"], ["readFile", "EACCES"]] as const) {
+    it(`retries when inspecting a dead holder's lock fails with ${code} on ${op}, and the update lands`, () => {
+      writeFileSync(lockPath(), holder(1002));
+      const { fs, state } = flakyLockFs(op, code, lockPath());
+      setCredential("typesafe", PLACEHOLDER, win32(fs, { pidAlive: () => false }));
+      expect(state.thrown).toBe(1);
+      expect(resolveCredential("typesafe", { ...options, platform: "win32" })?.value).toBe(PLACEHOLDER);
+      expect(readdirSync(home)).toEqual(["credentials.json"]);
+    });
+  }
+
+  it("retries a link onto a delete-pending lock without taking the no-hard-links path", () => {
+    const { fs, state } = flakyLockFs("link", "EPERM", lockPath());
+    setCredential("typesafe", PLACEHOLDER, win32(fs));
+    expect(state.thrown).toBe(1);
+    // The probe linked, so the retry linked the lock rather than making a directory.
+    expect(fsCalls.linked.filter((l) => l.dst.startsWith(`${lockPath()}.`) && l.dst.endsWith(".tmp.probe"))).toHaveLength(1);
+    expect(fsCalls.linked.filter((l) => l.dst === lockPath())).toHaveLength(1);
+    expect(resolveCredential("typesafe", { ...options, platform: "win32" })?.value).toBe(PLACEHOLDER);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("createFilled counts a delete-pending link target as held and leaves nothing behind", () => {
+    const { fs } = flakyLockFs("link", "EPERM", lockPath());
+    expect(createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs })).toBe(false);
+    expect(readdirSync(home)).toEqual([]);
+  });
+
+  it("still takes the directory path on Windows when the volume has no hard links", () => {
+    fsCalls.linkError = "EPERM";
+    try {
+      const lockFs: LockFs = {
+        stat: (p) => statSync(p), readFile: (p) => readFileSync(p, "utf-8"), link: (a, b) => linkSync(a, b), rm: (p) => rmSync(p, { force: true }),
+      };
+      expect(createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs: lockFs })).toBe(true);
+      expect(statSync(lockPath()).isDirectory()).toBe(true);
+      rmSync(lockPath(), { recursive: true });
+      setCredential("typesafe", PLACEHOLDER, win32(lockFs));
+      expect(resolveCredential("typesafe", { ...options, platform: "win32" })?.value).toBe(PLACEHOLDER);
+      expect(readdirSync(home)).toEqual(["credentials.json"]);
+    } finally {
+      fsCalls.linkError = undefined;
+    }
+  });
+
+  it("retries the release when reading its own lock fails, so a landed write never throws", () => {
+    // With no earlier lock, the first read of the lock file is the release's.
+    const { fs, state } = flakyLockFs("readFile", "EPERM", lockPath());
+    setCredential("typesafe", PLACEHOLDER, win32(fs));
+    expect(state.thrown).toBe(1);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("a persistent EPERM still ends in the lock timeout, carrying the error", () => {
+    writeFileSync(lockPath(), holder(1002));
+    const { fs } = flakyLockFs("stat", "EPERM", lockPath(), Infinity);
+    expect(() => setCredential("typesafe", PLACEHOLDER, win32(fs, { lockTimeoutMs: 100, pidAlive: () => false })))
+      .toThrow(/^Timed out waiting for the credential store lock .+ If no n-dx process is running, delete .+ Last error: EPERM/);
+    expect(readFileSync(lockPath(), "utf-8")).toBe(holder(1002));
+    expect(existsSync(storePath())).toBe(false);
+  });
+
+  it("off Windows the same EPERM is not contention: it throws at once", () => {
+    writeFileSync(lockPath(), holder(1002));
+    const { fs, state } = flakyLockFs("stat", "EPERM", lockPath());
+    expect(() => setCredential("typesafe", PLACEHOLDER, { ...options, platform: "linux", lockFs: fs, pidAlive: () => false }))
+      .toThrow(/^EPERM/);
+    expect(state.thrown).toBe(1);
+    expect(existsSync(storePath())).toBe(false);
+  });
+
+  for (const host of ["win32", "linux"] as const) {
+    // A real Windows file reports mode 0o666, which the linux read refuses.
+    it.skipIf(host === "linux" && isWindows)(`on ${host}, a temp file that will not go after the link still lets the writer hold, write and release the lock`, () => {
+      const { fs, state } = flakyLockFs("rm", "EPERM", lockTemp, Infinity);
+      setCredential("typesafe", PLACEHOLDER, win32(fs, { platform: host }));
+      expect(state.thrown).toBeGreaterThan(0);
+      expect(resolveCredential("typesafe", { ...options, platform: host })?.value).toBe(PLACEHOLDER);
+      expect(existsSync(lockPath())).toBe(false);
+      expect(lockTempsIn()).toHaveLength(1);
+
+      // The stranded temp file goes with the next lock call that can remove it.
+      unsetCredential("typesafe", win32(flakyLockFs("rm", "EPERM", () => false).fs, { platform: host }));
+      expect(readdirSync(home)).toEqual(["credentials.json"]);
+    });
+  }
+
+  it("a temp file that resists removal once is gone after the release", () => {
+    const { fs, state } = flakyLockFs("rm", "EBUSY", lockTemp);
+    setCredential("typesafe", PLACEHOLDER, win32(fs));
+    expect(state.thrown).toBe(1);
+    expect(readdirSync(home)).toEqual(["credentials.json"]);
+  });
+
+  it("createFilled returns the published lock when its temp file cannot be removed", () => {
+    const { fs } = flakyLockFs("rm", "EPERM", lockTemp, Infinity);
+    const content = holder(process.pid);
+    expect(createFilled(lockPath(), content, { now: Date.now, pidAlive: () => true, platform: "win32", fs })).toBe(true);
+    expect(readFileSync(lockPath(), "utf-8")).toBe(content);
+  });
+
+  it("a createFilled that throws leaves no lock behind", () => {
+    const { fs } = flakyLockFs("link", "EIO", lockPath());
+    expect(() => createFilled(lockPath(), holder(process.pid), { now: Date.now, pidAlive: () => true, platform: "win32", fs }))
+      .toThrow(/^EIO/);
+    expect(readdirSync(home)).toEqual([]);
   });
 });
 

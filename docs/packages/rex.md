@@ -48,7 +48,7 @@ rex remove <id> .                    # remove item and descendants
 rex reshape .                        # LLM-powered PRD restructuring
 rex prune .                          # remove completed subtrees
 rex restore .                        # list tree snapshots; --latest or --id=<snapshot> rolls back (v1)
-rex validate .                       # check PRD integrity
+rex validate .                       # check PRD integrity (v2: also warns on stale release plans)
 rex fix .                            # auto-fix common PRD issues
 rex usage .                          # token usage analytics
 rex report .                         # JSON health report for CI
@@ -60,6 +60,10 @@ rex reorganize .                     # detect and fix structural issues
 rex health .                         # PRD structure health score
 rex mcp .                            # start MCP server (stdio)
 ```
+
+## Stale release plans (v2)
+
+`rex validate`, `rex health` and the MCP `health` tool share one rule: an open change whose `plannedRelease` has shipped (some change carries `shippedIn` for it) or is older than the newest shipped release is stale. Validate reports it as a warning named `release plans`, which never fails CI, and each finding names the change and says to plan it for a coming release or clear `plannedRelease`. A change with no planned release is never flagged. The dashboard's Plan health panel reads the same check.
 
 ## Smart Add (v1)
 
@@ -88,6 +92,7 @@ rex product show .                                   # areas, capabilities, cons
 rex product show A1.1 .                              # one capability: statement, capability criteria, changes
 rex product edit A1.1 --capability-criterion="c3: A refund reaches the card" .     # revise it; drafts a change
 rex product edit A1.1 --statement="..." --editorial .                              # reword it; stays met
+rex change inbox .                                  # every change awaiting placement, with age and shortlist
 rex change place CH-2 .                              # the placement shortlist
 rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3: ..." .
 rex change place CH-2 --propose --type=capability --under=A1 --title="Refund by card" .   # nothing fits: propose a new node
@@ -106,6 +111,10 @@ When either side of `rex tree-diff` is a v2 tree, a product map section lists th
 `rex reshape`, `rex reorganize` and `rex prune` restructure the change layer as they do a v1 PRD, and never write under `product/`. On the product layer, `rex reshape` drafts its accepted proposals as one change with removed and added amendments (a move is a removal plus an added copy) for `rex change apply`. A move or split the copy would not carry whole is not drafted and the output says why: a node with tags, notes in its body outside History, or capability requirements or dependsOn, or one another node names in dependsOn or appliesTo. A body holding only the History section that `rex change apply` writes does not stop a move: the retired original keeps that History, and the copy's starts with a line naming the original's id. A merge is not drafted on the same grounds when a merged node has any of these (requirements, dependsOn or appliesTo included) or another node names it, since the survivor takes over only its capability criteria. Proposals are drafted one at a time, so one that `rex change apply` would refuse together with those before it (a move under an area another proposal removes, say) is not drafted either, with apply's reason, and the rest still are; `rex reorganize` only reports; `rex prune` does not apply, and keeps (reporting why) an applied change that carries removed or added amendments, because product status reads a node as retired only while that change exists. On the change layer, all three skip, with the reason, a merge that would fold away any applied change (its id is what N-DX-Item trailers, rex health and its shippedIn release refer to) and a split, delete or collapse that would remove a change prune keeps; the other accepted proposals still apply, and the change-layer store refuses any other write that removes such a change.
 
 On a v2 PRD, `rex health` runs the tree rules instead of scoring, and prints the reader's warnings and the landing check beside them; `--format=json` prints `{ treeRules, warnings, landings }`. It exits 1 when a tree rule reports an error or the reader skipped a node (a missing or invalid root `index.md`, a folder with no `index.md`, or invalid node intent), and 0 when there are only warnings. `ndx ci` fails its structure-health step on that exit code and shows the error, warning and skipped-node counts. On a v1 PRD, `rex health` prints the score and exits 0, and `ndx ci` fails the step below a score of 50.
+
+### Experimental public API: the v2 model
+
+`@n-dx/rex` exports the v2 PRD model for other tools to read: every export in `packages/rex/src/public.ts` from the "Store: the PRD model" section through the end of the "Migrations" section. That is the model reader (`loadPrdModel`, `prdLayout`), the v2 node types and tree index, change placement (`suggestPlacement`, `recordPlacement`, `draftChangePlacement`, `placementStrength`), the product edges, status, landings and reports (`computeEdges`, `computeRealizedBy`, `resolveNode`, `trailerIds`, `computeLandings`, `listReleaseTags`, `computeProductStatus`, `productReport`, `prdStatusReport` and their neighbours), and the migration plan's rules stage (`classifyV1Tree`, `capabilityCodeFiles`, `draftCapabilitySpecs`). They are **experimental**: like the rest of the rex TypeScript helpers they sit outside the declared freeze ([public surface](../architecture/public-surface.md)), so their TypeScript signatures may change in a patch release. Two things stay fixed: the node types are the soft-frozen `rex/v2` schema, and what `productReport`, `capabilityReport`, `prdStatusReport` and `suggestPlacement` return is the result of `get_product`, `get_capability`, `get_prd_status` and `place_change`, which the MCP freeze covers, so their output shapes change only as those results may. Inside n-dx, `@n-dx/web` and `@n-dx/hench` read them through their rex gateways, and `@n-dx/graview` through its own.
 
 ## Recommend
 

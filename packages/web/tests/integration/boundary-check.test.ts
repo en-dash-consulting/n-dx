@@ -13,27 +13,38 @@
  *
  * ## Known limitations of regex-based import extraction
  *
- * The `extractImportPaths()` function uses a regex to match static import/export
- * statements. This approach is intentionally lightweight (no AST parse) but has
- * blind spots:
+ * `extractModuleSpecifiers()` matches every `from "x"`, bare `import "x"` and
+ * `import("x")` (dynamic imports and inline `import("x").T` types alike), so it
+ * sees named, default, namespace, mixed, multi-line and `export *` forms. It is
+ * intentionally lightweight (no AST parse) and still has blind spots:
  *
- *   1. **Dynamic imports** — `await import("./path")` and `import("./path")` are
- *      not detected. Two critical dynamic import paths exist in the monorepo:
- *      `rex/src/cli/commands/analyze.ts` and `rex/src/cli/index.ts`. A separate
- *      dynamic-import-audit test in architecture-policy.test.js covers these.
- *   2. **Template-literal paths** — ``import(`./locales/${lang}`)`` is invisible.
- *   3. **Multiline import statements** — Imports split across lines may be missed
- *      if the `from "..."` portion is on a different line than the `import` keyword.
+ *   1. **Template-literal paths** — ``import(`./locales/${lang}`)`` is invisible.
+ *   2. **Comments and strings** — a specifier-shaped string in a comment counts.
  *
- * Any new enforcement assertion added to this file inherits these blind spots.
- * For boundary-critical dynamic imports, consider a separate grep-based check.
+ * The runtime variant drops whole `import type` / `export type` statements;
+ * inline `{ type X }` members still count, since the statement may load the module.
  */
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 const WEB_SRC = join(import.meta.dirname!, "..", "..", "src");
+
+/**
+ * The narrow Sidecar barrels that keep the hub session page (hub-session.ts)
+ * drawer-sized. The full hooks/ and components/ barrels pull zod and the
+ * loader, which esbuild cannot drop (the package is not side-effect free), so
+ * the drawer chain goes around them:
+ *   - `viewer/hooks/sidecar.ts` — only the hooks the drawer chain uses; the
+ *     one hooks/ import the hooks rule allows besides hooks/index.ts, and only
+ *     from SIDECAR_DRAWER_CHAIN.
+ *   - `viewer/sidecar/index.ts` — hooks/sidecar.ts plus HubSessionDrawer; the
+ *     one file the components rule lets import a component leaf.
+ * `hub-session-bundle.test.ts` fails if either barrel regrows the dashboard.
+ */
+const SIDECAR_BARREL = "viewer/sidecar/index.ts";
+const SIDECAR_DRAWER_CHAIN = ["viewer/components/", "viewer/sidecar/"];
 
 /**
  * Path of `file` relative to src/, always POSIX-style regardless of host OS.
@@ -64,38 +75,99 @@ function collectTsFiles(dir: string): string[] {
   return files;
 }
 
-/** Extract import paths from a TypeScript file. */
-function extractImportPaths(filePath: string): string[] {
-  const content = readFileSync(filePath, "utf-8");
-  const paths: string[] = [];
-  // Matches: import ... from "..." and import "..."
-  const re = /(?:import|export)\s+(?:type\s+)?(?:\{[^}]*\}\s+from\s+|[\w*]+\s+from\s+)?["']([^"']+)["']/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    paths.push(m[1]!);
-  }
-  return paths;
+/**
+ * Every module specifier in `source`: any `… from "x"` (named, default,
+ * namespace, mixed, `export * as`, multi-line), bare `import "x"`, and
+ * dynamic `import("x")`.
+ */
+function extractModuleSpecifiers(source: string): string[] {
+  const re = /\bfrom\s*["']([^"']+)["']|\bimport\s*\(?\s*["']([^"']+)["']/g;
+  return [...source.matchAll(re)].map((m) => (m[1] ?? m[2])!);
 }
 
 /**
- * Extract only runtime (non-type-only) import paths from a TypeScript file.
- * Skips `import type { ... }` and `export type { ... }` — those are erased
- * by the compiler and create no runtime coupling.
+ * Whole `import type …` / `export type …` statements. The compiler erases
+ * them, so they create no runtime coupling. Inline `{ type X }` members are
+ * not matched: such a statement can still load the module.
  */
-function extractRuntimeImportPaths(filePath: string): string[] {
-  const content = readFileSync(filePath, "utf-8");
-  const paths: string[] = [];
-  // Same as extractImportPaths but with a negative lookahead for `type\s`
-  // to exclude `import type` / `export type` forms.
-  const re = /(?:import|export)\s+(?!type\s)(?:\{[^}]*\}\s+from\s+|[\w*]+\s+from\s+)?["']([^"']+)["']/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    paths.push(m[1]!);
-  }
-  return paths;
+const TYPE_ONLY_STATEMENT =
+  /\b(?:import|export)\s+type\s+(?:\{[^}]*\}|\*\s+as\s+\w+|\*|\w+)\s*from\s*["'][^"']+["']/g;
+
+/** Runtime specifiers in `source`: every form above minus type-only statements. */
+function extractRuntimeModuleSpecifiers(source: string): string[] {
+  return extractModuleSpecifiers(source.replace(TYPE_ONLY_STATEMENT, ""));
 }
 
+/** Every module specifier in a TypeScript file, type-only ones included. */
+function extractImportPaths(filePath: string): string[] {
+  return extractModuleSpecifiers(readFileSync(filePath, "utf-8"));
+}
+
+/** Runtime (non-type-only) module specifiers in a TypeScript file. */
+function extractRuntimeImportPaths(filePath: string): string[] {
+  return extractRuntimeModuleSpecifiers(readFileSync(filePath, "utf-8"));
+}
+
+const EVERY_FORM_SOURCE = [
+  'import { a } from "./named.js";',
+  'import {\n  b,\n} from "./multi.js";',
+  'import * as ns from "./namespace.js";',
+  'import d, { e } from "./mixed.js";',
+  'import type { T } from "./type.js";',
+  'import "./bare.js";',
+  'const m = await import("./dynamic.js");',
+  'export { f } from "./reexport.js";',
+  'export * as g from "./star-as.js";',
+  'export * from "./star.js";',
+  'export type { U } from "./export-type.js";',
+  'import type V from "./type-default.js";',
+  'import type * as W from "./type-namespace.js";',
+].join("\n");
+
 describe("server/client boundary", () => {
+  it("extractModuleSpecifiers sees every import and re-export form", () => {
+    expect(extractModuleSpecifiers(EVERY_FORM_SOURCE)).toEqual([
+      "./named.js",
+      "./multi.js",
+      "./namespace.js",
+      "./mixed.js",
+      "./type.js",
+      "./bare.js",
+      "./dynamic.js",
+      "./reexport.js",
+      "./star-as.js",
+      "./star.js",
+      "./export-type.js",
+      "./type-default.js",
+      "./type-namespace.js",
+    ]);
+  });
+
+  it("extractRuntimeModuleSpecifiers drops only type-only statements", () => {
+    expect(extractRuntimeModuleSpecifiers(EVERY_FORM_SOURCE)).toEqual([
+      "./named.js",
+      "./multi.js",
+      "./namespace.js",
+      "./mixed.js",
+      "./bare.js",
+      "./dynamic.js",
+      "./reexport.js",
+      "./star-as.js",
+      "./star.js",
+    ]);
+  });
+
+  it("the file-level extractors read the same forms", () => {
+    // Pins extractImportPaths / extractRuntimeImportPaths to the
+    // source-level extractors every boundary rule below relies on.
+    const self = join(import.meta.dirname!, "boundary-check.test.ts");
+    const source = readFileSync(self, "utf-8");
+    expect(extractImportPaths(self)).toEqual(extractModuleSpecifiers(source));
+    expect(extractRuntimeImportPaths(self)).toEqual(
+      extractRuntimeModuleSpecifiers(source),
+    );
+  });
+
   it("no server file imports from viewer", () => {
     const serverDir = join(WEB_SRC, "server");
     const violations: string[] = [];
@@ -112,6 +184,31 @@ describe("server/client boundary", () => {
     } catch {
       // serverDir doesn't exist in test environment — pass
       return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("no hub file imports from server or viewer, or imports preact", () => {
+    // src/hub/AGENTS.md "Import surface": the hub daemon reaches project
+    // servers over HTTP and never loads their modules or the UI framework.
+    const hubDir = join(WEB_SRC, "hub");
+    const violations: string[] = [];
+
+    for (const file of collectTsFiles(hubDir)) {
+      const rel = relPosix(file);
+      for (const imp of extractImportPaths(file)) {
+        if (imp === "preact" || imp.startsWith("preact/")) {
+          violations.push(`${rel} imports "${imp}"`);
+        } else if (imp.startsWith(".")) {
+          const target = relative(WEB_SRC, resolve(dirname(file), imp))
+            .split(sep)
+            .join("/");
+          if (/^(server|viewer)(\/|$)/.test(target)) {
+            violations.push(`${rel} imports "${imp}"`);
+          }
+        }
+      }
     }
 
     expect(violations).toEqual([]);
@@ -307,6 +404,10 @@ describe("server/client boundary", () => {
 
         // Files inside components/ can import freely from siblings
         if (rel.startsWith("viewer/components/")) continue;
+
+        // The narrow Sidecar barrel re-exports the drawer on purpose: it is
+        // how hub-session.ts mounts it without the full components/ barrel.
+        if (rel === SIDECAR_BARREL) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const component of componentFiles) {
@@ -727,7 +828,12 @@ describe("server/client boundary", () => {
         // Files inside hooks/ can import from siblings freely
         if (rel.startsWith("viewer/hooks/")) continue;
 
+        // The Sidecar drawer chain imports hooks through the narrow
+        // hooks/sidecar.ts barrel, not the full one (see SIDECAR_BARREL).
+        const mayUseNarrowBarrel = SIDECAR_DRAWER_CHAIN.some((dir) => rel.startsWith(dir));
+
         for (const imp of extractImportPaths(file)) {
+          if (mayUseNarrowBarrel && /\/hooks\/sidecar(\.js)?$/.test(imp)) continue;
           for (const hook of hookLeafFiles) {
             // Match direct imports like "./hooks/use-polling" or "../hooks/use-polling.js"
             // but not "./hooks/index" or "./hooks"

@@ -365,11 +365,13 @@ const PersistedRuntimeEventSchema = z.object({
   toolCall: z.object({
     tool: z.string(),
     input: z.record(z.string(), z.unknown()),
+    id: z.string().optional(),
   }).optional(),
   toolResult: z.object({
     tool: z.string(),
     output: z.string(),
     durationMs: z.number(),
+    id: z.string().optional(),
   }).optional(),
   tokenUsage: TokenUsageSchema.optional(),
   failure: z.object({
@@ -555,6 +557,18 @@ export const RunRecordSchema = z.object({
   // followed by another one, so stripping this would loop.
   gateOnlyRetry: z
     .object({ sourceRunId: z.string(), base: z.string(), commits: z.array(RunCommitRecordSchema) })
+    .optional(),
+  // Passthrough with a bare-string class: a verdict written by a build that
+  // knows a tenth class must not cost the whole run.
+  diagnosis: z
+    .object({
+      class: z.string(),
+      summary: z.string(),
+      evidence: z.array(z.string()),
+      actions: z.array(z.object({ kind: z.string(), label: z.string() }).passthrough()),
+      attempt: z.object({ n: z.number(), of: z.number() }),
+    })
+    .passthrough()
     .optional(),
 });
 

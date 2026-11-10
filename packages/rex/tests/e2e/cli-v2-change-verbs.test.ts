@@ -71,6 +71,36 @@ describe("on a v2 tree", () => {
     expect(closed).toMatch(/"reason": "already applied at /);
   });
 
+  it("rex change inbox lists every change awaiting placement with age and a shortlist, in text and JSON", () => {
+    // The fixture's one change is placed; add two Inbox changes.
+    run(["add", "--title=Support refunds when paying by card", "--criterion=A refund reaches the card", tmp], tmp);
+    run(["add", "--title=Pay by card shows a receipt", tmp], tmp);
+
+    const json = JSON.parse(run(["change", "inbox", "--format=json", tmp], tmp));
+    expect(json).toMatchObject({ applicable: true, layout: "v2", count: 2 });
+    expect(json.changes.map((c: { title: string }) => c.title).sort()).toEqual(["Pay by card shows a receipt", "Support refunds when paying by card"]);
+    for (const row of json.changes) {
+      expect(row).toMatchObject({ id: expect.any(String), createdAt: expect.any(String), ageDays: 0, relation: expect.stringMatching(/^(touches|amends)$/) });
+      expect(row.shortlist.length).toBeGreaterThan(0);
+      expect(row.shortlist.length).toBeLessThanOrEqual(5);
+      expect(row.shortlist[0]).toMatchObject({ target: expect.any(String), score: expect.any(Number), reasons: expect.any(Array) });
+    }
+
+    const text = run(["change", "inbox", tmp], tmp);
+    expect(text).toContain("2 changes awaiting placement:");
+    expect(text).toMatch(/Support refunds when paying by card {2}\(0d old\)/);
+    expect(text).toMatch(/Shortlist \((touches|amends)/);
+    expect(text).toMatch(/1\. A1\.1 Pay by card {2}score \d+/);
+    // The same command works from the project dir, with no dir argument.
+    expect(run(["change", "inbox", "--format=json"], tmp)).toContain('"count": 2');
+    expect(run(["change", "inbox", "CH-1", tmp], tmp, true)).toMatch(/takes no change id/);
+  });
+
+  it("rex change inbox says so plainly when the Inbox is empty", () => {
+    expect(run(["change", "inbox", tmp], tmp)).toContain("The Inbox is empty");
+    expect(JSON.parse(run(["change", "inbox", "--format=json", tmp], tmp))).toMatchObject({ applicable: true, count: 0, changes: [] });
+  });
+
   it("rex product edit takes repeatable --capability-criterion", async () => {
     await completeFixtureTask(join(tmp, ".rex"));
     run(["change", "apply", "CH-1"], tmp);
@@ -117,5 +147,14 @@ describe("on a v1 tree", () => {
   it("rex product and rex change refuse, naming the v1 layout", () => {
     expect(run(["product", "show"], tmp, true)).toMatch(/v1 layout/);
     expect(run(["change", "place", "x"], tmp, true)).toMatch(/v1 layout/);
+  });
+
+  it("rex change inbox answers not applicable and exits 0, in text and JSON", () => {
+    expect(run(["change", "inbox", tmp], tmp)).toMatch(/^Not applicable: .*v1 layout/);
+    expect(JSON.parse(run(["change", "inbox", "--format=json", tmp], tmp))).toEqual({
+      applicable: false,
+      layout: "v1",
+      message: expect.stringMatching(/^Not applicable: .*v1 layout/),
+    });
   });
 });

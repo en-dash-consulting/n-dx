@@ -73,6 +73,13 @@ export interface RequestSecurityOptions {
    * token but no store, only the per-user token itself is accepted.
    */
   credentials?: CredentialStore | null;
+  /**
+   * A narrower credential accepted in place of the token: true when the
+   * request presents one that is valid for this exact request. The predicate
+   * owns the scope; the gate only lets it past the token rule. Used for a
+   * Sidecar session's broker (`sidecar/broker-credential.ts`).
+   */
+  scopedCredential?: (req: IncomingMessage) => boolean;
 }
 
 /** Requests the gate let through without a credential: the public shell only. */
@@ -86,6 +93,18 @@ const publicOnly = new WeakSet<object>();
  */
 export function isPublicOnlyRequest(req: object): boolean {
   return publicOnly.has(req);
+}
+
+/** Requests the gate passed on the per-user token itself (or on a server running without one). */
+const perUserToken = new WeakSet<object>();
+
+/**
+ * Whether the gate passed `req` on the per-user token itself: not a browser
+ * session, not a Sidecar broker credential. For a route only the operator's
+ * own tools (the hub, scripts) may call. False for a request the gate never saw.
+ */
+export function isPerUserTokenRequest(req: object): boolean {
+  return perUserToken.has(req);
 }
 
 /** Whether the request presents the per-user token in a header. */
@@ -182,7 +201,12 @@ export function handleRequestSecurity(
 
   const method = (req.method || "GET").toUpperCase();
   const route = authRouteOf(routePathOf(req.url ?? "/"));
-  const access: RequestAccess = requestAccess(req.headers, options.token, options.credentials);
+  // A scoped credential stands in for a session: past the token rule, never
+  // the per-user token itself.
+  const access: RequestAccess = options.token && options.scopedCredential?.(req)
+    ? "session"
+    : requestAccess(req.headers, options.token, options.credentials);
+  if (access === "token") perUserToken.add(req);
   if (access === "public" && route === null) {
     // No credential. A navigation still gets the public shell — it is what
     // signs itself in — so a safe method is passed on, marked; anything else

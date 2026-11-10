@@ -173,8 +173,13 @@ describe("AddItemForm", () => {
 
     const titleInput = root.querySelector("#add-form-title") as HTMLInputElement;
 
-    // Blur with empty value triggers field-level validation
-    titleInput.dispatchEvent(new Event("blur", { bubbles: true }));
+    // Blur with empty value triggers field-level validation. A real blur, not a
+    // dispatched "blur" event: the viewer loads preact/compat, so onBlur listens
+    // on focusout (tests/setup/preact-compat.ts), which jsdom fires on blur().
+    act(() => {
+      titleInput.focus();
+      titleInput.blur();
+    });
     await flush();
 
     // Input should have error class

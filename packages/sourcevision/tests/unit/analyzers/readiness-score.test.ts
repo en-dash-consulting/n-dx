@@ -16,7 +16,7 @@
  * @see src/analyzers/readiness-score.ts
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -483,6 +483,24 @@ describe("agentSafety dimension", () => {
     expect(dimension.score).toBe(Math.max(0, 100 - warnings * 25 - infos * 5));
     expect(dimension.gaps).toHaveLength(safety.findings.length);
     expect(dimension.gaps.map((g) => g.summary)).toEqual(safety.findings.map((f) => f.message));
+  });
+
+  it("records PRD run blocks as one directory path, never prose", async () => {
+    const item = (id: string) => `---\nid: "${id}"\nrun: {"tier":"light"}\n---\n`;
+    const root = project("prd-run-blocks", {
+      "package.json": JSON.stringify({ name: "x" }),
+      ".hench/config.json": JSON.stringify({ permissionMode: "bypassPermissions" }),
+      ".rex/changes/a/index.md": item("a"),
+      ".rex/changes/b/index.md": item("b"),
+      ".rex/changes/b/leaf.md": item("c"),
+    });
+
+    const evidence = computeReadinessScore(await buildSdlcProfile(root)).dimensions.agentSafety.evidence;
+    expect(evidence.map((e) => e.path)).toEqual([".hench/config.json", ".rex/changes/"]);
+    for (const { path } of evidence) {
+      expect(path).not.toMatch(/[*?()\s]/);
+      expect(existsSync(join(root, path!))).toBe(true);
+    }
   });
 
   it("takes an injected input so scoring needs no filesystem", () => {

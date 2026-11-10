@@ -15,6 +15,8 @@ import { readRequirements, releaseId, RELEASE_PREFIX } from "./sources/requireme
 import { readCode, FILE_PREFIX } from "./sources/code.js";
 import { readRuns } from "./sources/runs.js";
 import { byString } from "./canonical.js";
+import { loadDocument } from "./document.js";
+import { clampToCaps } from "./fit.js";
 import type { GraphSnapshot, SnapshotEdge, SnapshotNode, Warn } from "./types.js";
 
 export interface BuildSnapshotOptions {
@@ -246,6 +248,13 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     if (seen.has(key)) continue;
     seen.add(key);
     kept.push(edge);
+  }
+
+  // Rex, git and sourcevision set no length limits and Graview does: cut to its caps rather than fail `check`.
+  const cut = clampToCaps(loadDocument(), nodes.values());
+  if (cut.size > 0) {
+    const said = [...cut].map(([at, n]) => `${at} (${n})`).join(", ");
+    warn(`cut to Graview's length caps (a string 500 characters, a text 20,000, a list 200 items): ${said}`);
   }
 
   const sortedNodes = [...nodes.values()].sort((a, b) => byString(a.kind, b.kind) || byString(a.id, b.id));

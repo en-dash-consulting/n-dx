@@ -68,6 +68,7 @@ describe("rex public API contract", () => {
     { name: "loadPrdModel", type: "function" },
     { name: "productReport", type: "function" },
     { name: "capabilityReport", type: "function" },
+    { name: "computeEdges", type: "function" },
     { name: "indexTree", type: "function" },
     { name: "isOpenChange", type: "function" },
     { name: "isAppliedChange", type: "function" },
@@ -408,12 +409,15 @@ describe("hench → llm-client gateway contract", () => {
     "getAvailableMemory",
     "createAvailableMemoryReader",
     "resolveClaudeCliEffort",
+    "vendorSessionDriver",
+    "normalizeCodexResponse",
+    "parseMaybeJson",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "NDX_CONFIG_BLOCKED_PATHS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
-  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME"];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "NDX_CONFIG_BLOCKED_PATHS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW", "claudeSessionDriver", "codexSessionDriver"];
+  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME", "WINDOWS_STDIN_PROMPT_SEPARATOR"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -513,11 +517,16 @@ describe("web → rex gateway contract", () => {
     "loadPrdModel",
     "productReport",
     "capabilityReport",
+    // The area view's binding constraints (`boundBy`)
+    "computeEdges",
     "indexTree",
     "isOpenChange",
     "isAppliedChange",
     "specHash",
     "nodeSpec",
+    // trailer-commit evidence — the commits and files a Sidecar lens packet quotes
+    "loadTrailerCommits",
+    "loadCommitFiles",
     "countSubtree",
     "computeEpicStats",
     "computePriorityDistribution",
@@ -551,9 +560,10 @@ describe("web → rex gateway contract", () => {
     "parseApplyOn",
     "parsePlacementSettings",
     // v2 placement — the Inbox section and the detail panel place and propose
-    "suggestPlacement",
+    "suggestPlacements",
     "recordPlacement",
     "recordProposal",
+    "recordUnplacement",
     "ChangePlacementError",
     "placementStrength",
     "draftChangePlacement",
@@ -945,7 +955,10 @@ describe("gateway export auto-detection", () => {
         "resolveLayout", "detectLayoutMode", "relativeToRoot", "projectRootOf",
         // Available-memory reading. One reading for hench, the dashboard and
         // the hub admission floor, so they cannot disagree about the machine.
-        "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader"],
+        "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader",
+        // Vendor session drivers: hench's CLI adapters resume, fork and parse
+        // through the same drivers llm-client's resumable sessions use.
+        "vendorSessionDriver", "normalizeCodexResponse", "parseMaybeJson"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
@@ -957,7 +970,8 @@ describe("gateway export auto-detection", () => {
         "NDX_CONTAINER_DIRNAME",
         // The vendor-CLI invocation log's file name: the uncommitted-work gate
         // discounts n-dx's own output by the name the writer uses.
-        "CLI_LOG_FILENAME"],
+        "CLI_LOG_FILENAME",
+        "claudeSessionDriver", "codexSessionDriver", "WINDOWS_STDIN_PROMPT_SEPARATOR"],
       ...["DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"],
     ]);
 
@@ -989,11 +1003,12 @@ describe("gateway export auto-detection", () => {
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "validateChangesMerge", "mergeChanges",
-        "loadPrdModel", "productReport", "capabilityReport", "indexTree",
-        "isOpenChange", "isAppliedChange", "awaitsPlacement", "specHash", "nodeSpec",
-        "handleProductEdit", "ProductEditError", "withPrdModelTransaction",
+        "loadPrdModel", "productReport", "capabilityReport", "computeEdges", "indexTree",
+        "isOpenChange", "isAppliedChange", "isInboxChange", "awaitsPlacement", "specHash", "nodeSpec",
+        "loadTrailerCommits", "loadCommitFiles",
+        "handleProductEdit", "ProductEditError", "withPrdModelTransaction", "applyChange",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
-        "computeRequirementsSummary", "computeHealthScore",
+        "computeRequirementsSummary", "computeHealthScore", "checkStaleReleasePlans",
         "detectReorganizations", "applyProposals", "applyReshape",
         "reasonForReshape", "isPriority",
         "isRequirementCategory", "isValidationType",
@@ -1008,7 +1023,9 @@ describe("gateway export auto-detection", () => {
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
         "parseApplyOn", "parsePlacementSettings",
-        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength", "draftChangePlacement"],
+        "suggestPlacements", "recordPlacement", "recordProposal", "recordUnplacement", "ChangePlacementError", "placementStrength", "draftChangePlacement",
+        // The Sidecar change-set card flags proposed items with smart add's own matcher.
+        "findDuplicateItem"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);
