@@ -21,6 +21,8 @@ export type { TaskStartControlProps } from "./task-start-control.js";
 export { PrepareTaskModal } from "./prepare-task-modal.js";
 export type { PrepareTaskModalProps } from "./prepare-task-modal.js";
 export { ReadyToRun } from "./ready-to-run.js";
+export { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
+export type { ItemImpact, ImpactMap } from "./impact-tags.js";
 export type { ReadyToRunProps } from "./ready-to-run.js";
 
 // ── Banners ──────────────────────────────────────────────────────────

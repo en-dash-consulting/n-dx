@@ -28,6 +28,7 @@ import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
 import { placementTab } from "../../route-state.js";
+import { ImpactDetail, useItemImpacts } from "../impact-tags.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -329,13 +330,18 @@ function EditableTitle({
   }, title, h("span", { class: "task-edit-icon" }, "\u270e"));
 }
 
-/** Editable description — click to edit with textarea. */
+/** Editable description — click to edit with textarea. `noun` names it in the add button and tooltip. */
 function EditableDescription({
   description,
   onUpdate,
+  noun = "description",
+  addClass = "task-add-description-btn",
 }: {
   description?: string;
   onUpdate?: (description: string) => void;
+  noun?: string;
+  /** The "+ Add" button's class; the description's is what tests and styles look for. */
+  addClass?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(description ?? "");
@@ -380,15 +386,15 @@ function EditableDescription({
 
   if (!description) {
     return h("button", {
-      class: "task-add-description-btn",
+      class: addClass,
       onClick: () => { setDraft(""); setEditing(true); },
-    }, "+ Add description");
+    }, `+ Add ${noun}`);
   }
 
   return h("div", {
     class: "task-description editable",
     onClick: () => { setDraft(description ?? ""); setEditing(true); },
-    title: "Click to edit description",
+    title: `Click to edit ${noun}`,
     role: "button",
     tabIndex: 0,
     onKeyDown: (e: KeyboardEvent) => {
@@ -1122,6 +1128,7 @@ function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
 // ── Main component ───────────────────────────────────────────────────
 
 export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
+  const impacts = useItemImpacts();
   const [saving, setSaving] = useState(false);
   const [pendingFailStatus, setPendingFailStatus] = useState(false);
   const [failureReason, setFailureReason] = useState("");
@@ -1260,6 +1267,26 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Apply…: a change awaiting apply, previewed before it writes
     isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, item, onWritten: onPrdChanged }) : null,
+
+    // In plain terms: what the item does and why it matters, for readers who do not read code.
+    item.summary || onUpdate
+      ? h(
+          "div",
+          { class: "task-section task-summary-section" },
+          h("div", { class: "task-section-label" }, "In plain terms"),
+          h(EditableDescription, {
+            description: item.summary,
+            noun: "plain-language summary",
+            addClass: "task-add-summary-btn",
+            onUpdate: onUpdate
+              ? (summary: string) => onUpdate(item.id, { summary })
+              : undefined,
+          }),
+        )
+      : null,
+
+    // Impact: size, file kinds, security and essential flags, with the files behind them.
+    h(ImpactDetail, { impact: impacts[item.id] }),
 
     // Status selector
     h(

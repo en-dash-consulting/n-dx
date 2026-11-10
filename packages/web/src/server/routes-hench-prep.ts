@@ -44,7 +44,7 @@ import { collectHeldRuns, loadHenchConfig } from "./routes-hench.js";
 import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
-import { loadPRDSync } from "./prd-io.js";
+import { loadPRDSync, summaryField } from "./prd-io.js";
 import { checkSavedRun, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
 import { itemTypeOf } from "../shared/index.js";
 import {
@@ -114,6 +114,8 @@ export interface PrepWorkspace {
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Plain-language summary for non-coders; the row shows it in place of the title when present. */
+  summary?: string;
   status: string;
   priority: string | null;
   itemType: string;
@@ -543,6 +545,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     return {
       id: item.id,
       title: item.title,
+      ...summaryField(item),
       status: item.status,
       priority: item.priority ?? null,
       itemType: itemTypeOf(item),

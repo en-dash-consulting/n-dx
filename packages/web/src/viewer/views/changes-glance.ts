@@ -17,9 +17,13 @@ import {
   CreateInTrackerButton,
   DescribeInSidecarButton,
   GhostCardsContext,
+  ImpactTags,
   TrackerChip,
+  displayTitle,
   ghostChanges,
+  useItemImpacts,
   useTrackerChips,
+  type ItemImpact,
   type TrackerChipRead,
 } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
@@ -51,13 +55,15 @@ export function limitGroups(groups: readonly GlanceGroup[], limit: number = MAX_
   return { groups: kept, more: total - (limit - left) };
 }
 
-function Row({ change, navigateTo, tracker, onTrackerChanged }: { change: GlanceChange; navigateTo: NavigateTo; tracker: TrackerChipRead; onTrackerChanged: () => void }) {
+function Row({ change, navigateTo, tracker, onTrackerChanged, impact }: { change: GlanceChange; navigateTo: NavigateTo; tracker: TrackerChipRead; onTrackerChanged: () => void; impact?: ItemImpact }) {
   const gap = glanceGap(change);
   const done = change.taskCount === 0 ? 0 : Math.round((change.completedTaskCount / change.taskCount) * 100);
   return h("li", { class: "cg-row", "data-change": change.id },
-    h("button", { type: "button", class: "cg-open", onClick: () => navigateTo("prd", { taskId: change.id }) },
-      h("span", { class: "cg-title" }, change.title),
+    // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
+    h("button", { type: "button", class: "cg-open", title: change.summary ? change.title : undefined, onClick: () => navigateTo("prd", { taskId: change.id }) },
+      h("span", { class: "cg-title" }, displayTitle(change)),
     ),
+    h(ImpactTags, { impact }),
     // A task-less change runs as its own unit, so it has no progress to draw.
     change.taskCount === 0
       ? h("span", { class: "cg-progress cg-progress-none" }, "no tasks")
@@ -77,6 +83,7 @@ export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
   const load = useChangesSummary();
   const cards = useContext(GhostCardsContext);
   const { read: tracker, reload: reloadTracker } = useTrackerChips();
+  const impacts = useItemImpacts();
   // Placed changes only, like the real rows: an Inbox-bound one is noted on the strip's Inbox count.
   const ghosts = useMemo(() => ghostChanges(cards).filter((g) => g.target !== null), [cards]);
   if (load.state === "loading") return h("div", { class: "changes-glance", role: "status" }, "Loading...");
@@ -97,7 +104,7 @@ export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
     groups.map((group) =>
       h("section", { key: group.label, class: "cg-group", "aria-label": group.label },
         h("h4", { class: "cg-release" }, group.label),
-        h("ul", { class: "cg-rows" }, group.changes.map((change) => h(Row, { key: change.id, change, navigateTo, tracker, onTrackerChanged: reloadTracker }))),
+        h("ul", { class: "cg-rows" }, group.changes.map((change) => h(Row, { key: change.id, change, navigateTo, tracker, onTrackerChanged: reloadTracker, impact: impacts[change.id] }))),
       )),
     more > 0
       ? h("button", { type: "button", class: "cg-more", onClick: () => navigateTo("changes") }, `${more} more`)

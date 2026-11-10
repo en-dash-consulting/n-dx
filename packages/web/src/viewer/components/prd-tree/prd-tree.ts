@@ -40,6 +40,7 @@ import { getTaskDuration } from "./durations.js";
 import { formatTokensExact, formatDuration, formatUsd, newTokens, EMPTY_DASH } from "./format-usage.js";
 import { useLiveTick } from "./use-live-tick.js";
 import type { PRDGhostRow } from "./ghost-rows.js";
+import { ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../impact-tags.js";
 
 // ── Status rendering ────────────────────────────────────────────────
 
@@ -409,6 +410,8 @@ interface NodeRowProps {
   item: PRDItemData;
   /** Live cross-worktree claim on this task, if any (see hooks/use-claims.ts). */
   claim?: ClaimEntry;
+  /** At-a-glance impact (size, security, essential), if the server knows any. */
+  impact?: ItemImpact;
   taskUsage?: TaskUsageSummary;
   /**
    * Rolled-up token totals for this item (self + descendants + total).
@@ -487,6 +490,7 @@ class NodeRow extends Component<NodeRowProps> {
     if (p.isDeleting !== nextProps.isDeleting) return true;
     if (p.depth !== nextProps.depth) return true;
     if (p.claim !== nextProps.claim) return true;
+    if (p.impact !== nextProps.impact) return true;
     if (p.hasChildren !== nextProps.hasChildren) return true;
     if (p.canInlineAdd !== nextProps.canInlineAdd) return true;
     if (p.canDelete !== nextProps.canDelete) return true;
@@ -508,7 +512,7 @@ class NodeRow extends Component<NodeRowProps> {
   }
 
   render() {
-    const { item, claim, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel, inInbox } = this.props;
+    const { item, claim, impact, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel, inInbox } = this.props;
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;
@@ -576,9 +580,11 @@ class NodeRow extends Component<NodeRowProps> {
         ? h(BranchBadge, { branch: item.branch, sourceFile: item.sourceFile })
         : null,
       // Title (with search highlighting when query is active)
+      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
       h("span", { class: "prd-node-title", title: item.title },
-        ...(searchQuery ? highlightSearchText(item.title, searchQuery) : [item.title]),
+        ...(searchQuery ? highlightSearchText(displayTitle(item), searchQuery) : [displayTitle(item)]),
       ),
+      h(ImpactTags, { impact }),
       // Priority
       item.priority
         ? h(PriorityBadge, { priority: item.priority })
@@ -898,6 +904,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
 export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange, inboxIds, ghostRows, titleInfo, controls }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
+  const impacts = useItemImpacts();
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
 
   // Collect all IDs for expand-all
@@ -1223,6 +1230,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
           h(NodeRow as ComponentType<NodeRowProps>, {
             item,
             claim: claimsById?.[item.id],
+            impact: impacts[item.id],
             taskUsage: taskUsageById?.[item.id],
             usageRollup: rollupById?.[item.id],
             weeklyBudget,

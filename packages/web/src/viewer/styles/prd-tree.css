@@ -1300,7 +1300,8 @@
   margin-left: auto;
 }
 
-.task-add-description-btn {
+.task-add-description-btn,
+.task-add-summary-btn {
   padding: var(--space-1-5) var(--space-2-5);
   background: transparent;
   border: 1px dashed var(--border);
@@ -1312,7 +1313,8 @@
   text-align: left;
 }
 
-.task-add-description-btn:hover {
+.task-add-description-btn:hover,
+.task-add-summary-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

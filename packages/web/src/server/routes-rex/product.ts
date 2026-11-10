@@ -27,6 +27,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { appendLog } from "./rex-route-helpers.js";
+import { summaryField } from "../prd-io.js";
 import {
   prdLayout,
   loadPrdModel,
@@ -112,6 +113,8 @@ export interface ChangeRowWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Plain-language summary for non-coders, when the change has one. */
+  summary?: string;
   intent?: string;
   stage: ChangeStageWire;
   priority?: string;
@@ -157,6 +160,8 @@ export interface GlanceChangeWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Plain-language summary for non-coders; the viewer shows it in place of the title when present. */
+  summary?: string;
   stage: OpenChangeStageWire;
   priority?: string;
   plannedRelease?: string;
@@ -555,6 +560,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
       title: change.title,
+      ...summaryField(change),
       stage,
       ...(change.priority ? { priority: change.priority } : {}),
       ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
@@ -621,6 +627,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
         title: change.title,
+        ...summaryField(change),
         ...(change.intent ? { intent: change.intent } : {}),
         stage: stageOf(change),
         ...(change.priority ? { priority: change.priority } : {}),

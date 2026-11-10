@@ -21,6 +21,7 @@ vi.mock("../../../src/viewer/hooks/use-hench-runs-live-refresh.js", () => ({
 }));
 
 import { ReadyToRun, readyCommandLine } from "../../../src/viewer/components/ready-to-run.js";
+import { resetImpactCacheForTests } from "../../../src/viewer/components/impact-tags.js";
 
 const TASKS = [
   { id: "t-b", title: "Second by priority", status: "pending", priority: "high", parentChain: ["Epic", "Feature"], criteriaCount: 3, resume: false },
@@ -37,6 +38,7 @@ afterEach(() => {
   root = undefined;
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
+  resetImpactCacheForTests();
 });
 
 async function flush(): Promise<void> {
@@ -46,13 +48,16 @@ async function flush(): Promise<void> {
 async function mount(
   tasks: unknown[] = TASKS,
   execute: { status: number; body: unknown } = { status: 200, body: { ok: true } },
+  impact: Record<string, unknown> = {},
 ) {
   calls = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit = {}) => {
     calls.push({ url, method: init.method ?? "GET", body: typeof init.body === "string" ? JSON.parse(init.body) : null });
     const answer = url.startsWith("/api/hench/ready")
       ? { status: 200, body: { tasks, limit: 10, dir: "/work/my app" } }
-      : execute;
+      : url === "/api/rex/impact"
+        ? { status: 200, body: { items: impact } }
+        : execute;
     return { ok: answer.status < 300, status: answer.status, json: async () => answer.body };
   }));
   const props = { onPrepare: vi.fn(), onOpenLive: vi.fn(), onOpenPrd: vi.fn() };
@@ -203,6 +208,26 @@ describe("Ready to run", () => {
     expect(byText("Start now")).toBeTruthy();
     await click(byText("Show fewer"));
     expect(titles()).toEqual(["Task a", "Task b", "Task c"]);
+  });
+
+  it("leads with the plain-language summary, keeping the technical title as its tooltip", async () => {
+    await mount([{ ...TASKS[0], summary: "Lets team leads see the next work at a glance" }, TASKS[1]]);
+    const [first, second] = rows().map((r) => r.querySelector<HTMLButtonElement>(".ready-title")!);
+    expect(first!.textContent).toBe("Lets team leads see the next work at a glance");
+    expect(first!.title).toBe("Second by priority");
+    expect(second!.textContent).toBe("Stopped halfway");
+    expect(second!.title).toBe("");
+  });
+
+  it("tags a row with its impact: security, essential and size, files in the tooltip", async () => {
+    await mount(TASKS, undefined, {
+      "t-b": { basis: "expected", files: ["a.ts", "config/.env"], fileCount: 2, size: "small", kinds: { code: 1, config: 1 }, security: ["config/.env"], essential: [] },
+    });
+    const tags = () => Array.from(rows()[0].querySelectorAll<HTMLElement>(".impact-tag"));
+    expect(tags().map((t) => t.textContent)).toEqual(["Security", "Small · ~2 files"]);
+    expect(tags()[0].title).toContain("config/.env");
+    expect(tags()[1].title).toBe("Estimated from the files this item names:\na.ts\nconfig/.env");
+    expect(rows()[1].querySelector(".impact-tag")).toBeNull();
   });
 
   it("shows no toggle when three or fewer rows are ready", async () => {

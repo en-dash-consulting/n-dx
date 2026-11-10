@@ -7,6 +7,7 @@
  * sub-modules for each domain area:
  *
  *   reads.ts        — PRD read routes (prd, stats, dashboard, next, log)
+ *   impact.ts       — Per-item impact tags (size, file kinds, security, essential)
  *   product.ts      — v2 product reads (product, changes, capability) and the capability edit POST
  *   placement.ts    — v2 Inbox placement: a change's shortlist, place and propose
  *   apply.ts        — v2 Apply of a change awaiting apply: preview, then apply
@@ -26,6 +27,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 
 import { routePrdReads } from "./reads.js";
+import { routeImpact } from "./impact.js";
 import { routeProductReads, routeProductEdit } from "./product.js";
 import { routePlacement } from "./placement.js";
 import { routeApply } from "./apply.js";
@@ -72,6 +74,8 @@ export function handleRexRoute(
   // Try each sub-router in turn. The first to return non-false wins.
   const prdResult = routePrdReads(url, path, method, res, ctx);
   if (prdResult !== false) return prdResult;
+
+  if (routeImpact(path, method, res, ctx)) return true;
 
   const productResult = routeProductReads(path, method, res, ctx);
   if (productResult !== false) return productResult;

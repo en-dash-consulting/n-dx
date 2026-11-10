@@ -143,7 +143,7 @@ export function routeItems(
  */
 const PATCHABLE_FIELDS = new Set([
   "status", "failureReason", "priority", "tags", "title",
-  "description", "acceptanceCriteria", "requirements",
+  "summary", "description", "acceptanceCriteria", "requirements",
 ]);
 
 const isStringArray = (v: unknown): v is string[] =>
@@ -168,7 +168,7 @@ function validateItemPatch(body: unknown): string | null {
     && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
     return `Invalid priority: ${String(patch.priority)}`;
   }
-  for (const key of ["title", "description", "failureReason"] as const) {
+  for (const key of ["title", "summary", "description", "failureReason"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;

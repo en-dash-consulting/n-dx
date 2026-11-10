@@ -17,6 +17,7 @@ import { appUrl } from "../base-path.js";
 import { workCommandArgs } from "../external.js";
 import { shellWord } from "./prepare-task-model.js";
 import { QueuedNotice } from "./queued-notice.js";
+import { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
 
 const READY_LIMIT = 10;
@@ -33,6 +34,8 @@ export function shownReadyTasks<T>(tasks: readonly T[], expanded: boolean): T[] 
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Plain-language summary, shown in place of the title when present. */
+  summary?: string;
   status: string;
   priority: string | null;
   parentChain: string[];
@@ -105,6 +108,8 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
 
   useEffect(() => { void load(); }, [load]);
   useHenchRunsLiveRefresh(load);
+  // After the ready list's own load, so the list is the first request out.
+  const impacts = useItemImpacts();
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   // Escape closes an open menu.
@@ -175,8 +180,14 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
           return h("li", { key: task.id, class: "ready-row", "data-task-id": task.id },
             h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
             h("div", { class: "ready-main" },
-              h("button", { type: "button", class: "ready-title", onClick: () => onPrepare(task.id) },
-                task.title,
+              // The plain-language summary leads; the technical title is the tooltip and the modal's heading.
+              h("button", {
+                type: "button",
+                class: "ready-title",
+                title: task.summary ? task.title : undefined,
+                onClick: () => onPrepare(task.id),
+              },
+                displayTitle(task),
                 // A task that will not run on the project defaults says so
                 // before the modal is opened. The label carries the meaning:
                 // the dot alone is decoration to a screen reader.
@@ -189,6 +200,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
                 h("span", null, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
+                h(ImpactTags, { impact: impacts[task.id] }),
               ),
             ),
             h("div", { class: "ready-split" },

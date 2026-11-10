@@ -294,3 +294,13 @@ function walkMaxMtimeMs(dir: string): number {
   }
   return max;
 }
+
+/**
+ * `{ summary }` when a PRD item or v2 node carries a non-empty plain-language
+ * summary, else nothing — for spreading into a wire row. Rows show it in place
+ * of the technical title.
+ */
+export function summaryField(item: object): { summary?: string } {
+  const summary = (item as { summary?: unknown }).summary;
+  return typeof summary === "string" && summary.trim() ? { summary: summary.trim() } : {};
+}

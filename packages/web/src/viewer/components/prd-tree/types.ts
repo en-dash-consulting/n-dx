@@ -98,6 +98,8 @@ export interface PRDItemData {
   type?: string;
   /** @deprecated v1 spelling of {@link PRDItemData.type}; read via `itemTypeOf`. */
   level?: ItemLevel;
+  /** Plain-language summary for non-coders; rows show it in place of the title. */
+  summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;
