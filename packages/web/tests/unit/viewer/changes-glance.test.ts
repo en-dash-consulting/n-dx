@@ -29,7 +29,7 @@ describe("glance model", () => {
     const groups = groupGlanceByRelease(Array.from({ length: 15 }, (_, i) => change(`c${i}`, { plannedRelease: i < 10 ? "1.0" : undefined })));
     const { groups: kept, more } = limitGroups(groups);
     expect(kept.flatMap((g) => g.changes)).toHaveLength(MAX_GLANCE_ROWS);
-    expect(more).toBe(3);
+    expect(more).toBe(15 - MAX_GLANCE_ROWS);
   });
 });
 
@@ -56,9 +56,25 @@ describe("ChangesGlance", () => {
   });
 
   // Inbox exclusion is the summary route's job: routes-rex-product.test.ts asserts `open` omits held changes.
-  it("ends a long list in N more", async () => {
+  it("shows the first three, then links to all of them on the full list", async () => {
     await mount(Array.from({ length: 14 }, (_, i) => change(`c${i}`)));
-    expect(root.querySelectorAll(".cg-row")).toHaveLength(MAX_GLANCE_ROWS);
-    expect(root.querySelector(".cg-more")!.textContent).toBe("2 more");
+    expect(MAX_GLANCE_ROWS).toBe(3);
+    expect(root.querySelectorAll(".cg-row")).toHaveLength(3);
+    const more = root.querySelector<HTMLButtonElement>(".cg-more")!;
+    expect(more.textContent).toBe("See all 14 open changes →");
+    await act(async () => { more.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("changes");
+  });
+
+  it("still links to the full list when every change fits", async () => {
+    await mount([change("c1")]);
+    expect(root.querySelector(".cg-more")!.textContent).toBe("Open the full list →");
+  });
+
+  it("leads a row with the summary, the technical title as its tooltip", async () => {
+    await mount([change("c1", { summary: "Faster checkout for returning shoppers" })]);
+    const open = root.querySelector<HTMLButtonElement>(".cg-open")!;
+    expect(open.textContent).toBe("Faster checkout for returning shoppers");
+    expect(open.title).toBe("Change c1");
   });
 });

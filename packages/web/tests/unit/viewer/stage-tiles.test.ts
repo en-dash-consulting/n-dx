@@ -186,3 +186,47 @@ describe("TileGrid", () => {
     expect(dialog()!.className).not.toContain("--beside-detail");
   });
 });
+
+describe("a tile with more than it shows", () => {
+  /** Makes every tile body report `content` px of content in a `box` px box. */
+  function sizeBodies(content: number, box: number) {
+    const proto = HTMLElement.prototype;
+    const spies = [
+      vi.spyOn(proto, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains("stage-tile-body") ? content : 0;
+      }),
+      vi.spyOn(proto, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains("stage-tile-body") ? box : 0;
+      }),
+    ];
+    return () => spies.forEach((s) => s.mockRestore());
+  }
+
+  const settle = () => act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+
+  it("offers Open to see all over its fade, which opens the tile", async () => {
+    const restore = sizeBodies(600, 200);
+    try {
+      mount();
+      await settle();
+      const more = tile("files").querySelector<HTMLButtonElement>(".stage-tile-more")!;
+      expect(more.textContent).toContain("Open to see all");
+      expect(more.getAttribute("aria-label")).toBe("Open Files to see everything");
+      act(() => more.click());
+      expect(dialog()).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it("offers nothing when everything fits", async () => {
+    const restore = sizeBodies(150, 200);
+    try {
+      mount();
+      await settle();
+      expect(root.querySelector(".stage-tile-more")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});

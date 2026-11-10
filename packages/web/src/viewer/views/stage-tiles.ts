@@ -205,6 +205,31 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
 
 // ── Tile ───────────────────────────────────────────────────────
 
+/**
+ * Whether an element's content is taller than the element. Rechecked when the
+ * element resizes and when its content changes (a view that loads after
+ * mounting grows without resizing its tile).
+ */
+export function useOverflowing(ref: { current: HTMLElement | null }): boolean {
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let frame = 0;
+    const check = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setOverflowing(el.scrollHeight > el.clientHeight + 4));
+    };
+    check();
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    resize?.observe(el);
+    const mutation = typeof MutationObserver === "undefined" ? null : new MutationObserver(check);
+    mutation?.observe(el, { childList: true, subtree: true });
+    return () => { cancelAnimationFrame(frame); resize?.disconnect(); mutation?.disconnect(); };
+  }, [ref]);
+  return overflowing;
+}
+
 interface TileProps {
   grid: TileGridApi;
   stage: StageId;
@@ -222,6 +247,8 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   const span = `stage-tile--c${tile.cols ?? 4} stage-tile--r${tile.rows ?? 1}`;
   // Called before the chromeless return so the hook order never depends on the tile.
   const cliName = useCliName();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const overflowing = useOverflowing(bodyRef);
 
   if (tile.band && tile.panel) {
     return h("section", { class: "stage-band", "data-tile": key, "aria-label": title },
@@ -252,12 +279,21 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
       tile.panel ? null : h("span", { class: "stage-tile-blurb" }, resolveCliLabel(viewBlurb(tile.view), cliName)),
       h("span", { class: "stage-tile-open", "aria-hidden": "true" }, h(ActionIcon, { name: "expand" })),
     ),
-    h("div", { class: `stage-tile-body${summary === null && !tile.panel ? " stage-tile-body--view" : ""}` },
+    h("div", { class: `stage-tile-body${summary === null && !tile.panel ? " stage-tile-body--view" : ""}`, ref: bodyRef },
       summary !== null
         ? summary
         // A preview: the tile's own view only; its tabs are for full-screen.
         : h(TileContent, { grid, tile, opened: false, tabs: [], renderView, renderPanel, idBase }),
     ),
+    // More than the tile shows: say so over the fade, and open the whole view from there.
+    overflowing
+      ? h("button", {
+          type: "button",
+          class: "stage-tile-more",
+          onClick: (e: Event) => onOpen(e.currentTarget as HTMLElement),
+          "aria-label": `Open ${title} to see everything`,
+        }, "Open to see all ", h(ActionIcon, { name: "expand" }))
+      : null,
   );
 }
 

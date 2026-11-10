@@ -1,9 +1,10 @@
 /**
- * Plan's open-changes glance: placed open changes grouped by planned release
- * (newest first, Unscheduled last), each row with a progress bar, a stage chip
- * and at most one gap chip. A row opens the change's detail panel; a long list
- * ends in "N more", which opens the full Open changes list. Inbox changes are
- * not here — the summary counts them apart.
+ * Plan's open-changes glance: the first few placed open changes grouped by
+ * planned release (newest first, Unscheduled last), then a link to the full
+ * Open changes list. Each row reads in two lines: what the change is, then a
+ * quieter line with its progress, stage, at most one gap chip and its impact
+ * tags; the row's actions show on hover or focus. A row opens the change's
+ * detail panel. Inbox changes are not here — the summary counts them apart.
  *
  * Reads the summary the Plan grid's `ChangesSummaryProvider` loaded once, shared
  * with the lifecycle strip.
@@ -36,8 +37,8 @@ import {
   type GlanceGroup,
 } from "./product-model.js";
 
-/** Rows drawn before the rest fold into "N more". */
-export const MAX_GLANCE_ROWS = 12;
+/** Rows drawn before the rest are left to the full list: the next few, not the whole queue. */
+export const MAX_GLANCE_ROWS = 3;
 
 const GAP_LABELS = { blocked: "Blocked", "no-criteria": "No criteria" } as const;
 
@@ -59,23 +60,29 @@ function Row({ change, navigateTo, tracker, onTrackerChanged, impact }: { change
   const gap = glanceGap(change);
   const done = change.taskCount === 0 ? 0 : Math.round((change.completedTaskCount / change.taskCount) * 100);
   return h("li", { class: "cg-row", "data-change": change.id },
-    // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
-    h("button", { type: "button", class: "cg-open", title: change.summary ? change.title : undefined, onClick: () => navigateTo("prd", { taskId: change.id }) },
-      h("span", { class: "cg-title" }, displayTitle(change)),
-    ),
-    h(ImpactTags, { impact }),
-    // A task-less change runs as its own unit, so it has no progress to draw.
-    change.taskCount === 0
-      ? h("span", { class: "cg-progress cg-progress-none" }, "no tasks")
-      : h("span", { class: "cg-progress", title: `${change.completedTaskCount} of ${change.taskCount} tasks` },
-        h("progress", { class: "cg-bar", max: 100, value: done, "aria-label": `${change.completedTaskCount} of ${change.taskCount} tasks done` }),
-        h("span", { class: "cg-fraction" }, `${change.completedTaskCount}/${change.taskCount}`),
+    h("div", { class: "cg-line" },
+      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
+      h("button", { type: "button", class: "cg-open", title: change.summary ? change.title : undefined, onClick: () => navigateTo("prd", { taskId: change.id }) },
+        h("span", { class: "cg-title" }, displayTitle(change)),
       ),
-    h("span", { class: `cg-chip cg-stage cg-stage-${change.stage}` }, CHANGE_STAGE_LABELS[change.stage]),
-    gap ? h("span", { class: `cg-chip cg-gap cg-gap-${gap}` }, GAP_LABELS[gap]) : null,
-    h(TrackerChip, { changeId: change.id, read: tracker }),
-    h(DescribeInSidecarButton, { changeId: change.id, class: "cg-describe" }),
-    h(CreateInTrackerButton, { changeId: change.id, read: tracker, onCreated: onTrackerChanged }),
+      h("span", { class: `cg-chip cg-stage cg-stage-${change.stage}` }, CHANGE_STAGE_LABELS[change.stage]),
+    ),
+    h("div", { class: "cg-meta" },
+      // A task-less change runs as its own unit, so it has no progress to draw.
+      change.taskCount === 0
+        ? h("span", { class: "cg-progress cg-progress-none" }, "no tasks")
+        : h("span", { class: "cg-progress", title: `${change.completedTaskCount} of ${change.taskCount} tasks` },
+          h("progress", { class: "cg-bar", max: 100, value: done, "aria-label": `${change.completedTaskCount} of ${change.taskCount} tasks done` }),
+          h("span", { class: "cg-fraction" }, `${change.completedTaskCount}/${change.taskCount}`),
+        ),
+      gap ? h("span", { class: `cg-chip cg-gap cg-gap-${gap}` }, GAP_LABELS[gap]) : null,
+      h(ImpactTags, { impact }),
+      h(TrackerChip, { changeId: change.id, read: tracker }),
+      h("span", { class: "cg-actions" },
+        h(DescribeInSidecarButton, { changeId: change.id, class: "cg-describe" }),
+        h(CreateInTrackerButton, { changeId: change.id, read: tracker, onCreated: onTrackerChanged }),
+      ),
+    ),
   );
 }
 
@@ -106,8 +113,8 @@ export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
         h("h4", { class: "cg-release" }, group.label),
         h("ul", { class: "cg-rows" }, group.changes.map((change) => h(Row, { key: change.id, change, navigateTo, tracker, onTrackerChanged: reloadTracker, impact: impacts[change.id] }))),
       )),
-    more > 0
-      ? h("button", { type: "button", class: "cg-more", onClick: () => navigateTo("changes") }, `${more} more`)
-      : null,
+    // Always a way to the whole list; with more than the glance shows, say how many.
+    h("button", { type: "button", class: "cg-more", onClick: () => navigateTo("changes") },
+      more > 0 ? `See all ${load.data.open.length} open changes →` : "Open the full list →"),
   );
 }
