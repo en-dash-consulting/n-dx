@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-11-10T14:10:51.366Z
-- **Commit** — `e44befe88938`
-- **Content hash** — `e29f76796b91ba95` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-11-10T22:51:42.371Z
+- **Commit** — `fd4019bf88cd`
+- **Content hash** — `81b09dbb80cacab4` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
-- **Per-call total** — 23,609 tokens (what every surface costs, summed)
-- **Unique fixed text** — 15,104 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 24,238 tokens (what every surface costs, summed)
+- **Unique fixed text** — 15,190 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -77,24 +77,24 @@ so a jump is never mistaken for a regression or a win.
   same prompt already gave elsewhere and resolving a task-size contradiction (hours vs
   engineer-weeks). No instruction was removed from a prompt that did not still state it.
 
-## rex — 15,804 per-call / 7,782 unique, 21 surfaces
+## rex — 16,433 per-call / 7,868 unique, 21 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildFileImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a single source document. | 18 | 123 | 1,042 | 1,165 |
-| `buildScanImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a batch of scanner findings. | 40 | 400 | 1,257 | 1,657 |
-| `buildAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose new PRD items from a natural-language description. | 25 | 210 | 1,430 | 1,640 |
-| `buildMultiAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose items for several scan targets in one call. | 27 | 195 | 1,430 | 1,625 |
-| `buildBreakdownEnvelope` | `packages/rex/src/analyze/reason.ts` | Split proposals judged too large into child tasks. | 17 | 200 | 483 | 683 |
-| `buildConsolidateEnvelope` | `packages/rex/src/analyze/reason.ts` | Merge overlapping proposals before they enter the PRD. | 19 | 234 | 484 | 718 |
+| `buildFileImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a single source document. | 18 | 123 | 1,128 | 1,251 |
+| `buildScanImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a batch of scanner findings. | 40 | 400 | 1,343 | 1,743 |
+| `buildAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose new PRD items from a natural-language description. | 25 | 210 | 1,516 | 1,726 |
+| `buildMultiAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose items for several scan targets in one call. | 27 | 195 | 1,516 | 1,711 |
+| `buildBreakdownEnvelope` | `packages/rex/src/analyze/reason.ts` | Split proposals judged too large into child tasks. | 17 | 200 | 512 | 712 |
+| `buildConsolidateEnvelope` | `packages/rex/src/analyze/reason.ts` | Merge overlapping proposals before they enter the PRD. | 19 | 234 | 512 | 746 |
 | `buildAssessmentEnvelope` | `packages/rex/src/analyze/reason.ts` | Assess whether proposal tasks are at the right granularity. | 40 | 497 | — | 497 |
-| `buildIdeasEnvelope` | `packages/rex/src/analyze/reason.ts` | Extract proposals from free-form notes that local parsing missed. | 28 | 358 | 1,430 | 1,788 |
-| `buildConsolidationGuardEnvelope` | `packages/rex/src/analyze/consolidation-guard.ts` | Second-opinion check before a consolidation is applied. | 21 | 273 | 432 | 705 |
+| `buildIdeasEnvelope` | `packages/rex/src/analyze/reason.ts` | Extract proposals from free-form notes that local parsing missed. | 28 | 358 | 1,516 | 1,874 |
+| `buildConsolidationGuardEnvelope` | `packages/rex/src/analyze/consolidation-guard.ts` | Second-opinion check before a consolidation is applied. | 21 | 273 | 460 | 733 |
 | `buildDecompositionEnvelope` | `packages/rex/src/analyze/decompose.ts` | Decompose a task whose level-of-effort exceeds the threshold. | 23 | 270 | — | 270 |
-| `buildDisambiguationEnvelope` | `packages/rex/src/analyze/extract.ts` | Resolve an ambiguous extraction against existing PRD items. | 21 | 186 | 541 | 727 |
+| `buildDisambiguationEnvelope` | `packages/rex/src/analyze/extract.ts` | Resolve an ambiguous extraction against existing PRD items. | 21 | 186 | 599 | 785 |
 | `buildClarifyEnvelope` | `packages/rex/src/analyze/guided.ts` | Ask clarifying questions during guided PRD authoring. | 33 | 309 | — | 309 |
-| `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 432 | 582 |
-| `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 492 | 787 |
+| `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 460 | 610 |
+| `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 520 | 815 |
 | `buildGroupRenameEnvelope` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 27 | 214 | 29 | 243 |
 | `buildPlacementEnvelope` | `packages/rex/src/analyze/place-reason.ts` | Place a change on a shortlisted capability or constraint, or propose a new node. | 16 | 233 | — | 233 |
 | `buildSpecDraftEnvelope` | `packages/rex/src/analyze/spec-draft-reason.ts` | Redraft a capability spec in present tense, citing the source item of every criterion. | 22 | 354 | — | 354 |
@@ -142,10 +142,10 @@ it. This is the leverage ordering for a rewrite.
 
 | Constant | Package | Tokens | Used by | Per-call total |
 |---|---|---:|---:|---:|
-| `FEW_SHOT_EXAMPLE` | rex | 432 | 10 | 4,320 |
-| `PRD_SCHEMA` | rex | 333 | 6 | 1,998 |
+| `FEW_SHOT_EXAMPLE` | rex | 460 | 10 | 4,600 |
+| `PRD_SCHEMA` | rex | 343 | 6 | 2,058 |
+| `TASK_QUALITY_RULES` | rex | 204 | 6 | 1,224 |
 | `reshapeRoleContent` | rex | 1,054 | 1 | 1,054 |
-| `TASK_QUALITY_RULES` | rex | 156 | 6 | 936 |
 | `CONSOLIDATION_INSTRUCTION` | rex | 223 | 4 | 892 |
 | `formatProjectShape` | sourcevision | 393 | 2 | 786 |
 | `placementContent` | rex | 155 | 3 | 465 |
@@ -227,7 +227,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 3,162 | 791 | 82.6% |
 | `brief` | 668 | 167 | 17.4% |
 
-## Workflow skills — 25,567 tokens, 15 skills
+## Workflow skills — 25,685 tokens, 15 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -242,9 +242,9 @@ portability guards until this table gave them a number.
 |---|:-:|---:|---:|
 | `ndx-adversarial-review` | yes | 24,117 | 6,030 |
 | `ndx-reshape` | yes | 10,250 | 2,563 |
-| `ndx-capture` | yes | 9,023 | 2,256 |
+| `ndx-capture` | yes | 9,264 | 2,316 |
 | `iso-map` | — | 8,285 | 2,072 |
-| `ndx-plan` | yes | 8,027 | 2,007 |
+| `ndx-plan` | yes | 8,260 | 2,065 |
 | `ndx-work` | yes | 7,984 | 1,996 |
 | `ndx-release-notes` | — | 7,846 | 1,962 |
 | `triage` | — | 7,421 | 1,856 |
