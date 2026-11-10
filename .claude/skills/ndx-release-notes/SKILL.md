@@ -203,3 +203,12 @@ Write the summary to the path the operator names.
 longer prose. A patch summary in this bullet format is a different style. Ask
 before adding a patch file there, and before adding it to the docs nav in
 `docs/.vitepress/config.*`.
+
+## Done when
+
+- **Writing a changeset:** the file is in `.changeset/` and passes the
+  self-check above. This skill does not commit, push or open a PR; that belongs
+  to the work that needed the changeset.
+- **Summarizing a release:** the summary is at the path the operator named and
+  every verification item holds. Do not publish, post or announce it unless
+  asked; publishing is a separate step.
