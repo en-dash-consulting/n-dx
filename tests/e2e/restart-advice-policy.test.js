@@ -28,6 +28,9 @@ import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
 
+/** TESTING.md, Family 2: every absolute time budget is scaled through this. */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 /** Where user-facing strings live: core's own modules, and web's source. */
 const SCANNED = [
   { dir: "packages/core", recurse: false, ext: /\.(m|c)?js$/ },
@@ -267,9 +270,12 @@ describe("restart-advice policy", () => {
     // split ('=' as the joiner, or as the value's first character).
     for (const unit of ["\t=! -F", " =! -F"]) {
       const started = performance.now();
-      // 28 units take the old pattern seconds; a linear one, well under a millisecond.
+      // A hang guardrail, not a speed claim: nothing can count the engine's
+      // backtracking. Measured at 28 units: 5,699-7,075 ms with either
+      // ambiguous pattern (`[\s=]+\S+` and `(?:\s*=\s*|\s+)\S+`), at most
+      // 0.09 ms with the linear one, against a 500 ms default budget.
       expect(pnpm.test(`pnpm -F${unit.repeat(28)}`)).toBe(false);
-      expect(performance.now() - started, JSON.stringify(unit)).toBeLessThan(500);
+      expect(performance.now() - started, JSON.stringify(unit)).toBeLessThan(25 * BUDGET_MULTIPLIER);
     }
   });
 
