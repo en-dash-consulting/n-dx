@@ -107,6 +107,8 @@ The summary can merge related entries, but it cannot cleanly split a combined on
   `Action needed:` paragraph with an exact remedy?
 - Is the entry internal-only? If yes, is it marked `Internal:` or `Test-only:`?
 
+`tests/e2e/changeset-body-policy.test.js` enforces the mechanical parts: lead length and marker placement. Fix a failing body instead of adding it to the test's grandfather list.
+
 ---
 
 ## 2. Summarizing a release
