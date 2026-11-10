@@ -133,6 +133,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--level=<level>", description: "Item level (alternative to positional level)" },
       { flag: "--parent=<id>", description: "Parent item ID to nest under" },
       { flag: "--priority=<p>", description: "Priority: critical, high, medium, low" },
+      { flag: "--summary=\"...\"", description: "Plain-language summary for a non-coder: what the work does and why it is worth doing, manual mode only" },
       { flag: "--description=\"...\"", description: "Item description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion (done when) for this item, manual mode only (repeatable, one per flag); not a capability criterion" },
       { flag: "--type=<type>", description: "v2 only: change (default), task or subtask" },
@@ -253,12 +254,13 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, title, description, acceptance criteria, source, or assignee of a PRD item.\n" +
+      "Modify the status, priority, title, summary, description, acceptance criteria, source, or assignee of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
       { flag: "--priority=<p>", description: "New priority: critical, high, medium, low" },
       { flag: "--title=\"...\"", description: "New title" },
+      { flag: "--summary=\"...\"", description: "New plain-language summary (what the work does and why it is worth doing); --summary= removes it" },
       { flag: "--description=\"...\"", description: "New description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },
       { flag: "--source=\"...\"", description: "Where the item came from; --source= removes it" },

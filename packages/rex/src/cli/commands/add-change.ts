@@ -69,6 +69,7 @@ export async function cmdAddChange(
     type,
     title,
     ...(flags.parent ? { parentId: flags.parent } : {}),
+    ...(flags.summary?.trim() ? { summary: flags.summary.trim() } : {}),
     ...(flags.description ? { description: flags.description } : {}),
     ...(criteria.length ? { acceptanceCriteria: criteria } : {}),
     ...(flags.source ? { source: flags.source } : {}),

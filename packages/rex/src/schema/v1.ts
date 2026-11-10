@@ -389,6 +389,13 @@ export interface PRDItem {
   branch?: string;
   /** PRD source file the item originated from or was last written to. */
   sourceFile?: string;
+  /**
+   * One or two plain sentences for a reader who does not write code: what the
+   * work does and why it is worth doing. Shown in place of the title when
+   * present; replaces neither the title nor the description. Stored as intent
+   * on v2 change-layer nodes; on v1 it round-trips as an unknown field.
+   */
+  summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;

@@ -67,6 +67,7 @@ const STATUS_ENUM = z.enum(["pending", "completed"]).optional();
 
 const ProposalTaskSchema = z.object({
   title: z.string(),
+  summary: z.string().optional(),
   description: z.string().optional(),
   acceptanceCriteria: z.array(z.string()).optional(),
   priority: z.enum(["critical", "high", "medium", "low"]).optional(),
@@ -79,6 +80,7 @@ const ProposalTaskSchema = z.object({
 
 const ProposalFeatureSchema = z.object({
   title: z.string(),
+  summary: z.string().optional(),
   description: z.string().optional(),
   existingId: z.string().optional(),
   status: STATUS_ENUM,
@@ -293,6 +295,7 @@ function normalizeProposals(
     features: p.features.map((f) => ({
       title: f.title,
       source: "llm",
+      summary: f.summary,
       description: f.description,
       existingId: f.existingId,
       status: f.status,
@@ -300,6 +303,7 @@ function normalizeProposals(
         title: t.title,
         source: "llm",
         sourceFile: "",
+        summary: t.summary,
         description: t.description,
         acceptanceCriteria: t.acceptanceCriteria,
         priority: t.priority,
@@ -432,6 +436,7 @@ export function parseStructuredFile(
               .map((f) => ({
                 title: f.title,
                 source: "file-import",
+                summary: f.summary,
                 description: f.description,
                 tasks: f.tasks
                   .filter((t) => !existingTitles.has(normalizeTitle(t.title)))
@@ -439,6 +444,7 @@ export function parseStructuredFile(
                     title: t.title,
                     source: "file-import",
                     sourceFile: "",
+                    summary: t.summary,
                     description: t.description,
                     acceptanceCriteria: t.acceptanceCriteria,
                     priority: t.priority,
@@ -573,7 +579,7 @@ Guidelines:
  * "return minified JSON" is an instruction arguing with its own illustration.
  */
 export const FEW_SHOT_EXAMPLE = `Example output (for reference — do NOT include this example in your response):
-[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]`;
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","summary":"Lets people sign in with their Google or GitHub account, so they need no new password to get started.","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]`;
 
 // ── Scan result summarization + chunking ──
 

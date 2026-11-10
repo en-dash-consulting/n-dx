@@ -53,6 +53,7 @@ export interface DecompositionResult {
 
 const DecompositionChildSchema = z.object({
   title: z.string(),
+  summary: z.string().optional(),
   description: z.string().optional(),
   acceptanceCriteria: z.array(z.string()).optional(),
   priority: z.enum(["critical", "high", "medium", "low"]).optional(),

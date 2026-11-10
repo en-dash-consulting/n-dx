@@ -139,7 +139,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "add_item",
-    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked. On a v2 PRD pass type (default change; a change that neither amends nor touches lands in the Inbox needing placement); on a v1 PRD pass level.",
+    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked. Pass summary: one or two plain sentences for a non-coder on what the work does and why it is worth doing. On a v2 PRD pass type (default change; a change that neither amends nor touches lands in the Inbox needing placement); on a v1 PRD pass level.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -168,6 +168,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
         },
         "parentId": {
           "description": "Parent item ID",
+          "type": "string"
+        },
+        "summary": {
+          "description": "Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard",
           "type": "string"
         },
         "description": {
@@ -441,7 +445,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "edit_item",
-    "description": "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    "description": "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -451,6 +455,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
         },
         "title": {
           "description": "New title",
+          "type": "string"
+        },
+        "summary": {
+          "description": "New plain-language summary: 1-2 sentences for a non-coder on what the work does and why it is worth doing. An empty string removes it.",
           "type": "string"
         },
         "description": {

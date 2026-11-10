@@ -25,6 +25,7 @@ Analyze the codebase and propose PRD updates.
    - **v2 tree:** `type` — `change`, or `task` under a change; never pass `level`, which `add_item` refuses on v2. Create each change before its tasks, so they have its id
    - **v1 tree:** `parentId` — the epic or feature this belongs under. Never leave a proposal at root level
    - **v2 tree:** `parentId` — the change, for a task. A change takes none; pass `touches` (capability or constraint ids from `get_product` with `area`) so it is placed on creation. A change with neither `touches` nor `amends` lands in the Inbox with `needsPlacement`: show the user its shortlist from `place_change` (no `target`) and record the placement they pick
+   - `summary` — one or two plain sentences for a product owner or team lead who does not write code: what the work does and why it is worth doing, with no file paths or code identifiers. The dashboard shows it in place of the title
    - `description` — the rationale, including the finding or gap that motivated it
    - `acceptanceCriteria` — the array, one criterion per entry. Put them here rather than in `description`: `verify_criteria` (rex MCP) and the dashboard's requirements view read this field, so criteria written as prose can never be mapped to tests or checked later
    - `priority` — `critical`, `high`, `medium`, or `low`, inferred from the finding's severity and what it blocks

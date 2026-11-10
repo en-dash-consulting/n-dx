@@ -154,6 +154,8 @@ export async function cmdUpdate(
 
   if (flags.title) updates.title = flags.title;
   if (flags.description) updates.description = flags.description;
+  // Empty removes it (undefined is not serialized).
+  if (flags.summary !== undefined) updates.summary = flags.summary.trim() || undefined;
 
   if (flags.blockedBy !== undefined) {
     const raw = flags.blockedBy.trim();
@@ -223,7 +225,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
     );
   }
 

@@ -34,6 +34,8 @@ import type { Priority } from "./types.js";
 /** A proposed epic, feature or task, as the mapper needs it. */
 export interface ProposedWork {
   title: string;
+  /** Plain-language summary for a non-coder; carried onto the change or task. */
+  summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;
@@ -110,6 +112,7 @@ export function changeInputsFromProposals(work: readonly ProposedWork[]): Propos
 function workFields(node: ProposedWork, title: string, tags: readonly string[]) {
   return {
     title,
+    ...(node.summary?.trim() ? { summary: node.summary.trim() } : {}),
     ...(node.description ? { description: node.description } : {}),
     ...(node.acceptanceCriteria?.length ? { acceptanceCriteria: node.acceptanceCriteria } : {}),
     ...(node.priority ? { priority: node.priority } : {}),

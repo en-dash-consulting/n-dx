@@ -15,6 +15,8 @@ export async function handleEditItem(
   args: {
     id: string;
     title?: string;
+    /** Empty string removes it. */
+    summary?: string;
     description?: string;
     acceptanceCriteria?: string[];
     priority?: string;
@@ -41,6 +43,8 @@ export async function handleEditItem(
     const VALID_LEVELS = ["epic", "feature", "task", "subtask"];
     const updates: Partial<PRDItem> = {};
     if (args.title !== undefined) updates.title = args.title;
+    // Empty clears it, as assignee does.
+    if (args.summary !== undefined) updates.summary = args.summary.trim() || undefined;
     if (args.description !== undefined) updates.description = args.description;
     if (args.acceptanceCriteria !== undefined) updates.acceptanceCriteria = args.acceptanceCriteria;
     if (args.priority !== undefined) updates.priority = args.priority as Priority;
@@ -95,7 +99,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
+        "No fields to update. Provide at least one field (title, summary, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
         true,
       );
     }
@@ -125,10 +129,11 @@ export async function handleEditItem(
 
 export const editItemTool = defineTool({
   name: "edit_item",
-  description: "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+  description: "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
+    summary: z.string().optional().describe("New plain-language summary: 1-2 sentences for a non-coder on what the work does and why it is worth doing. An empty string removes it."),
     description: z.string().optional().describe("New description"),
     acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),

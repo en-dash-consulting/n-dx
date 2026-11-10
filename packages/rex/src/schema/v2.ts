@@ -32,14 +32,21 @@
  * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
  * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
  * |                                                  | links*                                       |
- * | change: intent, acceptanceCriteria, amends,      | assignee, ready, needsPlacement, createdAt   |
- * |   touches, plannedRelease, spike, fix, priority, | lastModified, lastModifiedBy                 |
+ * | change: summary, intent, acceptanceCriteria,     | assignee, ready, needsPlacement, createdAt   |
+ * |   amends, touches, plannedRelease, spike, fix,   | lastModified, lastModifiedBy                 |
+ * |   priority,                                      |                                              |
  * |   requirements, loe, loeRationale,               |                                              |
  * |   loeConfidence, effort*,                        |                                              |
  * |   discoveredFrom { item?, run? }, run            |                                              |
- * | task/subtask: description, acceptanceCriteria;   |                                              |
+ * | task/subtask: summary, description,              |                                              |
+ * |   acceptanceCriteria;                            |                                              |
  * |   task also requirements, priority, loe,         |                                              |
  * |   loeRationale, loeConfidence, effort*, run      |                                              |
+ *
+ * A change's, task's or subtask's `summary` is one or two plain sentences
+ * for a reader who does not write code: what the work does and why it is
+ * worth doing. The dashboard shows it in place of the title when present.
+ * It adds to the title and description and replaces neither.
  *
  * `*` reserved with no shape: `hypotheses` waits for the Hypothesis Layer,
  * `links` for the tracker bridge, `effort` for the task-prep recommender's
@@ -336,7 +343,13 @@ export interface ConstraintIntent extends BaseIntent {
   appliesTo?: "all" | string[];
 }
 
-export interface ChangeIntent extends BaseIntent, EffortIntent {
+/** Plain-language summary carried by every change-layer node; see the module doc. */
+interface SummaryIntent {
+  /** One or two sentences for a non-coder: what the work does and why it is worth doing. */
+  summary?: string;
+}
+
+export interface ChangeIntent extends BaseIntent, EffortIntent, SummaryIntent {
   type: "change";
   /** Why the change exists. */
   intent?: string;
@@ -371,7 +384,7 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   run?: SavedRunSettings;
 }
 
-export interface TaskIntent extends BaseIntent, EffortIntent {
+export interface TaskIntent extends BaseIntent, EffortIntent, SummaryIntent {
   type: "task";
   description?: string;
   acceptanceCriteria?: string[];
@@ -380,7 +393,7 @@ export interface TaskIntent extends BaseIntent, EffortIntent {
   run?: SavedRunSettings;
 }
 
-export interface SubtaskIntent extends BaseIntent {
+export interface SubtaskIntent extends BaseIntent, SummaryIntent {
   type: "subtask";
   description?: string;
   acceptanceCriteria?: string[];
@@ -435,6 +448,7 @@ export const ChangeIntentSchema = z
   .object({
     ...baseIntentShape,
     type: z.literal("change"),
+    summary: z.string().optional(),
     intent: z.string().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),
     amends: z.array(AmendmentSchema).optional(),
@@ -454,6 +468,7 @@ export const TaskIntentSchema = z
   .object({
     ...baseIntentShape,
     type: z.literal("task"),
+    summary: z.string().optional(),
     description: z.string().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),
     requirements: z.array(RequirementSchema).optional(),
@@ -467,6 +482,7 @@ export const SubtaskIntentSchema = z
   .object({
     ...baseIntentShape,
     type: z.literal("subtask"),
+    summary: z.string().optional(),
     description: z.string().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),
   })

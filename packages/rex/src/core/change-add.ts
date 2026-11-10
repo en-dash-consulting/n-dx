@@ -39,6 +39,8 @@ export interface AddChangeNodeInput {
   title: string;
   /** Id, display id or alias of the parent: a change for a change or task, a task for a subtask. */
   parentId?: string;
+  /** Plain-language summary for a reader who does not write code. */
+  summary?: string;
   /** A change's `intent`; a task's or subtask's `description`. */
   description?: string;
   acceptanceCriteria?: string[];
@@ -169,6 +171,7 @@ function refuseClosedChange(tree: V2Tree, parentId: string | undefined, type: Ch
 /** The intent fields `input` sets, named as `input.type` stores them, plus Inbox placement for an untargeted change. */
 function fields(input: AddChangeNodeInput): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  if (input.summary?.trim()) out.summary = input.summary.trim();
   if (input.description) out[input.type === "change" ? "intent" : "description"] = input.description;
   if (input.acceptanceCriteria?.length) out.acceptanceCriteria = input.acceptanceCriteria;
   if (input.tags?.length) out.tags = input.tags;
