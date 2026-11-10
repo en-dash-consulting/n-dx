@@ -184,6 +184,7 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       rollbackOnFailure: false,
       autoCommit: true,
       promptAgentToMarkInProgress: true,
+      projectSkills: ["ndx-release-notes"],
       commitMsgTimeoutMs: 0,
       "review.mode": "pair",
       "review.vendor": "codex",
