@@ -1,17 +1,76 @@
 schema: "rex/v2"
 items:
+  "188584c2-461d-4316-9893-a98b2081fcea":
+    status: "completed"
+    startedAt: "2026-11-10T20:55:22.139Z"
+    completedAt: "2026-11-10T20:55:22.139Z"
+    endedAt: "2026-11-10T20:55:22.139Z"
+    activeIntervals: [{"end":"2026-11-10T20:55:22.139Z","start":"2026-11-10T20:55:22.139Z"}]
+    lastModified: "2026-11-10T20:55:22.139Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "57b6a805-9a00-4fbe-bc70-f75a858baf4b":
+    status: "completed"
+    startedAt: "2026-11-10T20:55:43.897Z"
+    completedAt: "2026-11-10T20:55:43.897Z"
+    endedAt: "2026-11-10T20:55:43.897Z"
+    activeIntervals: [{"end":"2026-11-10T20:55:43.897Z","start":"2026-11-10T20:55:43.897Z"}]
+    lastModified: "2026-11-10T20:55:43.897Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "59d561f3-9cd5-49ff-b051-580e7756a71f":
-    lastModified: "2026-11-10T17:57:44.722Z"
+    status: "completed"
+    startedAt: "2026-11-10T20:54:14.788Z"
+    completedAt: "2026-11-10T20:54:14.788Z"
+    endedAt: "2026-11-10T20:54:14.788Z"
+    activeIntervals: [{"end":"2026-11-10T20:54:14.788Z","start":"2026-11-10T20:54:14.788Z"}]
+    lastModified: "2026-11-10T20:54:14.788Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "5c7d215d-f1c6-4e94-ac8c-9eae2e4ff074":
-    lastModified: "2026-11-10T17:58:00.801Z"
+    status: "completed"
+    startedAt: "2026-11-10T20:55:43.897Z"
+    completedAt: "2026-11-10T20:55:43.897Z"
+    endedAt: "2026-11-10T20:55:43.897Z"
+    activeIntervals: [{"end":"2026-11-10T20:55:43.897Z","start":"2026-11-10T20:55:43.897Z"}]
+    appliedAt: "2026-11-10T20:55:43.897Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-10T20:55:43.897Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "5e0b017a-67ef-4020-915b-06e8fdc08ab6":
-    lastModified: "2026-11-10T17:57:19.812Z"
+    status: "completed"
+    startedAt: "2026-11-10T20:53:10.080Z"
+    completedAt: "2026-11-10T20:53:10.080Z"
+    endedAt: "2026-11-10T20:53:10.080Z"
+    activeIntervals: [{"end":"2026-11-10T20:53:10.080Z","start":"2026-11-10T20:53:10.080Z"}]
+    lastModified: "2026-11-10T20:53:10.080Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "66179d54-2bb9-43c9-8ac0-5540edbcba50":
-    lastModified: "2026-11-10T17:57:34.396Z"
+    status: "completed"
+    startedAt: "2026-11-10T20:53:54.002Z"
+    completedAt: "2026-11-10T20:53:54.002Z"
+    endedAt: "2026-11-10T20:53:54.002Z"
+    activeIntervals: [{"end":"2026-11-10T20:53:54.002Z","start":"2026-11-10T20:53:54.002Z"}]
+    lastModified: "2026-11-10T20:53:54.002Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "7794c351-97e4-4e51-97ff-39affa409ee1":
-    lastModified: "2026-11-10T17:57:27.101Z"
+    status: "completed"
+    startedAt: "2026-11-10T20:53:31.251Z"
+    completedAt: "2026-11-10T20:53:31.251Z"
+    endedAt: "2026-11-10T20:53:31.251Z"
+    activeIntervals: [{"end":"2026-11-10T20:53:31.251Z","start":"2026-11-10T20:53:31.251Z"}]
+    lastModified: "2026-11-10T20:53:31.251Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "82926a66-b211-49bc-ad13-8e9d1c3e3462":
+    status: "completed"
+    startedAt: "2026-11-10T20:54:36.505Z"
+    completedAt: "2026-11-10T20:54:36.505Z"
+    endedAt: "2026-11-10T20:54:36.505Z"
+    activeIntervals: [{"end":"2026-11-10T20:54:36.505Z","start":"2026-11-10T20:54:36.505Z"}]
+    lastModified: "2026-11-10T20:54:36.505Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "de21ff76-ee2e-411f-9b3a-6006a9eba249":
+    status: "completed"
+    startedAt: "2026-11-10T20:54:58.876Z"
+    completedAt: "2026-11-10T20:54:58.876Z"
+    endedAt: "2026-11-10T20:54:58.876Z"
+    activeIntervals: [{"end":"2026-11-10T20:54:58.876Z","start":"2026-11-10T20:54:58.876Z"}]
+    lastModified: "2026-11-10T20:54:58.876Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
