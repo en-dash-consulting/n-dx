@@ -37,5 +37,8 @@
     "baseDelayMs": 2000,
     "maxDelayMs": 30000
   },
-  "fullTestTimeoutMs": 1800000
+  "fullTestTimeoutMs": 1800000,
+  "projectSkills": [
+    "ndx-release-notes"
+  ]
 }

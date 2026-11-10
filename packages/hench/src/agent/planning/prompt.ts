@@ -92,6 +92,16 @@ export function buildSystemPrompt(
   }
   lines.push("");
 
+  if (project.skills?.length) {
+    lines.push("## Project Skills");
+    lines.push("This project keeps instructions for some kinds of work in skill files. You cannot invoke a skill by name in this run: when your work matches one below, read its file first and follow it.");
+    for (const skill of project.skills) {
+      const description = skill.description ? `: ${skill.description}` : "";
+      lines.push(`- \`${skill.name}\` (\`${skill.path}\`)${description}`);
+    }
+    lines.push("");
+  }
+
   // Language-specific context (only when detected)
   if (config.language === "go") {
     lines.push(buildGoLanguageContext());

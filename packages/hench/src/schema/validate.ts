@@ -189,6 +189,7 @@ export const HenchConfigSchema = z.object({
     .boolean()
     .optional()
     .default(DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS),
+  projectSkills: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)).optional(),
   commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(0),
   git: z
     .object({

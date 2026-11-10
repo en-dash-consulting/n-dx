@@ -2335,6 +2335,11 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      already on disk. The completion step is unaffected — that
                                      call is a request rex parks on the task claim, and it
                                      carries the resolution hench applies after the test gate.
+  hench.projectSkills      array     Project skills, by directory name under .claude/skills or
+                                     .agents/skills, that every run's system prompt lists by path
+                                     so the agent reads one before the work it covers (agents
+                                     cannot invoke skills by name). Opt-in, default none: operator
+                                     workflows such as ndx-work live in the same directories.
 
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run

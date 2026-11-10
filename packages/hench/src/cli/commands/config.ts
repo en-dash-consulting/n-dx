@@ -165,6 +165,19 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
         : "Workflow omits the step; hench makes the in_progress transition itself before the agent starts",
   },
   {
+    path: "projectSkills",
+    label: "Project Skills",
+    description: "Project skills (directory names under .claude/skills or .agents/skills) the agent is told to read before the work they cover",
+    type: "array",
+    category: "execution",
+    impact: (v) => {
+      const names = (v as string[] | undefined) ?? [];
+      return names.length
+        ? `Agent is pointed at: ${names.join(", ")}`
+        : "No project skills are named in the system prompt";
+    },
+  },
+  {
     path: "maxSpawnsPerTask",
     label: "Max Spawns per Task",
     description: "Ceiling on vendor spawns for one task, counting retries and fallbacks",

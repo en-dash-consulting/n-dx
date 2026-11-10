@@ -74,6 +74,7 @@ export type {
   TaskBriefParent,
   TaskBriefSibling,
   TaskBriefProject,
+  TaskBriefProjectSkill,
   TaskBriefLogEntry,
   TaskBriefRequirement,
   TestGateResult,

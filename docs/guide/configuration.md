@@ -276,6 +276,12 @@ Configuration is stored in `.hench/config.json`.
 
 The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
 
+`hench.projectSkills` names project skills an agent should follow during `ndx work`, by directory name under `.claude/skills/` or `.agents/skills/`. A run cannot invoke a skill by name, so each run's system prompt lists the named skills by path and tells the agent to read the file before the work it covers. The setting is opt-in because those directories also hold operator workflows such as `ndx-work` that a running agent must not follow:
+
+```sh
+ndx config hench.projectSkills '["ndx-release-notes"]' .
+```
+
 ### Escalating a stuck task
 
 After `hench.maxFailedAttempts` consecutive failures a task is skipped as stuck. With escalation on, a task that keeps failing first gets an attempt on a stronger vendor or model:
