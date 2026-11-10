@@ -189,6 +189,27 @@ describe("Ready to run", () => {
     expect(calls.length).toBe(before + 1);
   });
 
+  it("shows the first three rows, and the rest in order behind Show N more", async () => {
+    const five = ["a", "b", "c", "d", "e"].map((id) => ({ ...TASKS[0], id: `t-${id}`, title: `Task ${id}` }));
+    await mount(five);
+    const titles = () => rows().map((r) => r.querySelector(".ready-title")!.textContent);
+    expect(titles()).toEqual(["Task a", "Task b", "Task c"]);
+    const more = byText("Show 2 more");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    await click(more);
+    expect(titles()).toEqual(["Task a", "Task b", "Task c", "Task d", "Task e"]);
+    // An expanded row keeps its run controls.
+    await openMenu(4);
+    expect(byText("Start now")).toBeTruthy();
+    await click(byText("Show fewer"));
+    expect(titles()).toEqual(["Task a", "Task b", "Task c"]);
+  });
+
+  it("shows no toggle when three or fewer rows are ready", async () => {
+    await mount();
+    expect(document.querySelector(".ready-more")).toBeNull();
+  });
+
   it("shows the empty state with a link to the PRD", async () => {
     const props = await mount([]);
     expect(document.querySelector(".ready-empty")!.textContent).toContain("Nothing ready to run");
