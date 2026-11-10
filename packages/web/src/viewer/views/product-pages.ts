@@ -226,6 +226,7 @@ export function ChangesPage({ navigateTo, area = null }: { navigateTo?: Navigate
       onSelectChange: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
       area,
       onClearArea: navigateTo ? () => navigateTo("changes") : undefined,
+      navigateTo,
     }),
   );
 }

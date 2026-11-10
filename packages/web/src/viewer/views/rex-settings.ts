@@ -47,16 +47,16 @@ interface ChoiceMeta {
 
 const APPLY_ON_META: Record<string, ChoiceMeta> = {
   complete: {
-    label: "On complete",
-    description: "A change applies to the product layer as soon as it completes on its branch.",
+    label: "Automatically, when a change is done",
+    description: "A change's amendments are applied to the product as soon as its work is complete. Nothing waits for a person.",
   },
   review: {
-    label: "On review",
-    description: "A completed change waits for a steward to apply it.",
+    label: "After someone applies it",
+    description: "A finished change waits in Open changes until someone applies it, one at a time or with Apply all.",
   },
   release: {
-    label: "On release",
-    description: "Completed changes apply together when a release is stamped.",
+    label: "When a release is stamped",
+    description: "Finished changes wait, then apply together when a release is stamped.",
   },
 };
 
@@ -306,7 +306,7 @@ export function RexSettingsSection({ form }: { form: RexSettingsForm }) {
       h(ChoiceField, {
         fieldKey: "rex.applyOn",
         title: "Apply amendments",
-        description: "A change amends the product map. This is the moment those amendments are written to it.",
+        description: "A change amends the product map. This is the moment those amendments are written to it. Changes already waiting when you switch to automatic stay until you use Apply all on Open changes.",
         meta: APPLY_ON_META,
         choices: data.choices.applyOn,
         saved: data.applyOn,

@@ -365,6 +365,26 @@ function changesOf(index: TreeIndex): ChangeRuleNode[] {
     .map(({ node }) => node as ChangeRuleNode);
 }
 
+/** A change that is done and waiting for its amendments to be applied, as Apply all lists it. */
+export interface AwaitingApplyRef {
+  id: string;
+  displayId?: string;
+  title: string;
+  summary?: string;
+}
+
+/** Every change in the "Done, waiting to apply" stage, in tree order. */
+export function awaitingApplyChanges(tree: V2Tree): AwaitingApplyRef[] {
+  return changesOf(indexTree(tree))
+    .filter((change) => stageOf(change) === "awaiting-apply")
+    .map((change) => ({
+      id: change.id,
+      ...(change.displayId ? { displayId: change.displayId } : {}),
+      title: change.title,
+      ...summaryField(change),
+    }));
+}
+
 const titleOf = (index: TreeIndex, ref: string): { id: string; title: string } => {
   const node = index.resolve(ref);
   return node ? { id: node.id, title: node.title } : { id: ref, title: ref };

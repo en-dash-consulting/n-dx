@@ -13,6 +13,8 @@
 
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
+import { ApplyAllBar } from "./apply-all.js";
+import type { NavigateTo } from "../types.js";
 import { BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
@@ -305,8 +307,10 @@ function AreaChip({ title, count, onRemove }: { title: string; count: number; on
 
 // ── View ─────────────────────────────────────────────────────────────
 
-export function ChangesView({ changes, onSelectChange, area = null, onClearArea }: {
+export function ChangesView({ changes, onSelectChange, area = null, onClearArea, navigateTo }: {
   changes: ChangeRow[];
+  /** Reaches Settings → Workflow from the Apply all bar. */
+  navigateTo?: NavigateTo;
   /** Opens a change. Omitted, titles render as plain text. */
   onSelectChange?: (id: string) => void;
   /** An area slug (`?area=`): the page lists only that area's open changes. */
@@ -351,6 +355,9 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea 
     ),
     h("p", { class: "section-sub" },
       "Work grouped by planned release and stage. A release is a field on a change, not a container."),
+
+    // Done and waiting to apply: one step for all of them, and the way to make it automatic.
+    h(ApplyAllBar, { waiting: changes.filter((c) => c.stage === "awaiting-apply").length, navigateTo }),
 
     groups.length === 0
       ? h("div", { class: "empty-state", role: "status" },

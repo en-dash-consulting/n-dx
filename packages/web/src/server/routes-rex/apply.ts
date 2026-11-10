@@ -16,6 +16,15 @@
  * and writes nothing: the operator approved a preview that is no longer what
  * would be applied. The pattern is the Inbox placement card's pinned dry run.
  *
+ * Apply all does the same for every change waiting to apply:
+ *
+ *   POST /api/rex/changes/apply-all/preview → { layout: "v2", changes: ApplyAllPreviewWire[] }
+ *                                             each waiting change's preview, or why it cannot apply
+ *   POST /api/rex/changes/apply-all  { hashes: { [id]: hash } } → { layout: "v2", results: ApplyAllResultWire[] }
+ *                                             applies only the changes named, each against its own
+ *                                             preview hash, one transaction each; a refusal skips
+ *                                             that change and the rest still apply
+ *
  * A missing hash answers 400, a v1 tree 409, a held PRD lock 409, and rex's
  * refusal 422 `{ error, problems }` with rex's own message. The wire types mirror
  * `viewer/views/product-model.ts`; `tests/unit/server/routes-rex-apply.test.ts`
@@ -28,7 +37,8 @@ import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "../response-utils.js";
 import { refreshPRDCache } from "../prd-io.js";
 import { appendLog } from "./rex-route-helpers.js";
-import { applyChange, prdLayout, resolveStore } from "../rex-gateway.js";
+import { applyChange, loadPrdModel, prdLayout, resolveStore } from "../rex-gateway.js";
+import { awaitingApplyChanges, type AwaitingApplyRef } from "./product.js";
 
 // ── Wire types (mirror viewer/views/product-model.ts) ────────────────
 
@@ -50,7 +60,21 @@ export interface ChangeApplyWire {
   hash: string;
 }
 
+/** One waiting change in Apply all's preview. */
+export type ApplyAllPreviewWire = AwaitingApplyRef & (
+  | { ok: true; applied: AppliedAmendmentWire[]; hash: string }
+  | { ok: false; error: string; problems: readonly string[] }
+);
+
+/** One change's outcome in Apply all. */
+export type ApplyAllResultWire = AwaitingApplyRef & (
+  | { ok: true; applied: AppliedAmendmentWire[] }
+  | { ok: false; error: string; moved?: true }
+);
+
 // ── Routes ───────────────────────────────────────────────────────────
+
+const APPLY_ALL_PATH = /^changes\/apply-all(\/preview)?$/;
 
 const APPLY_PATH = /^changes\/([^/]+)\/(apply|apply\/preview)$/;
 
@@ -64,8 +88,11 @@ export function routeApply(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
+  if (method !== "POST") return false;
+  const all = APPLY_ALL_PATH.exec(path);
+  if (all) return handleApplyAll(all[1] !== undefined, req, res, ctx, broadcast);
   const match = APPLY_PATH.exec(path);
-  if (!match || method !== "POST") return false;
+  if (!match) return false;
   return handleApply(decodeURIComponent(match[1]), match[2] === "apply/preview", req, res, ctx, broadcast);
 }
 
@@ -113,6 +140,84 @@ async function handleApply(changeRef: string, preview: boolean, req: IncomingMes
     }
     const body: ChangeApplyWire = { layout: "v2", change, appliedAt, applied, hash };
     jsonResponse(res, 200, body);
+  } catch (err) {
+    const message = errorMessage(err);
+    errorResponse(res, message.includes("Could not acquire PRD lock") ? 409 : 500, message);
+  }
+  return true;
+}
+
+const wireEffects = (applied: readonly { delta: AppliedAmendmentWire["delta"]; summary: string; node: AppliedAmendmentWire["node"]; under?: AppliedAmendmentWire["under"] }[]): AppliedAmendmentWire[] =>
+  applied.map(({ delta, summary, node, under }) => ({ delta, summary, node, ...(under ? { under } : {}) }));
+
+/** The apply-all body's `hashes`, or why the body is refused. */
+function approvedHashes(raw: string): { hashes: Record<string, string> } | { error: string } {
+  let body: unknown;
+  try {
+    body = JSON.parse(raw || "{}");
+  } catch {
+    return { error: "Request body must be JSON." };
+  }
+  const hashes = body && typeof body === "object" ? (body as { hashes?: unknown }).hashes : undefined;
+  if (!hashes || typeof hashes !== "object" || Array.isArray(hashes)) {
+    return { error: "Apply all needs the preview's hash for each change: preview first." };
+  }
+  const entries = Object.entries(hashes as Record<string, unknown>);
+  if (entries.length === 0 || !entries.every(([, v]) => typeof v === "string" && v)) {
+    return { error: "Apply all needs a non-empty hash for each change it applies." };
+  }
+  return { hashes: Object.fromEntries(entries) as Record<string, string> };
+}
+
+async function handleApplyAll(preview: boolean, req: IncomingMessage, res: ServerResponse, ctx: ServerContext, broadcast?: WebSocketBroadcaster): Promise<boolean> {
+  const raw = preview ? "" : await readBody(req, res);
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  const approved = preview ? null : approvedHashes(raw);
+  if (approved && "error" in approved) {
+    errorResponse(res, 400, approved.error);
+    return true;
+  }
+  try {
+    const waiting = awaitingApplyChanges((await loadPrdModel(ctx.rexDir)).tree as Parameters<typeof awaitingApplyChanges>[0]);
+    if (preview) {
+      const changes: ApplyAllPreviewWire[] = [];
+      for (const ref of waiting) {
+        const outcome = await applyChange(ctx.rexDir, ref.id, { preview: true });
+        changes.push(outcome.ok
+          ? { ...ref, ok: true, applied: wireEffects(outcome.applied), hash: outcome.hash }
+          : { ...ref, ok: false, error: outcome.message, problems: outcome.problems });
+      }
+      jsonResponse(res, 200, { layout: "v2", changes });
+      return true;
+    }
+    const hashes = (approved as { hashes: Record<string, string> }).hashes;
+    // Only changes still waiting and named in the approval; the order is the tree's.
+    const results: ApplyAllResultWire[] = [];
+    let wrote = false;
+    for (const ref of waiting.filter((r) => hashes[r.id] !== undefined)) {
+      const outcome = await applyChange(ctx.rexDir, ref.id, { expectHash: hashes[ref.id] });
+      if (!outcome.ok) {
+        results.push({ ...ref, ok: false, error: outcome.message, ...(outcome.moved ? { moved: true as const } : {}) });
+        continue;
+      }
+      const applied = wireEffects(outcome.applied);
+      wrote ||= outcome.written;
+      appendLog(ctx, {
+        timestamp: outcome.appliedAt,
+        event: "change_applied",
+        itemId: outcome.change,
+        detail: `${applied.length ? applied.map((a) => `${a.delta} ${a.node.id}`).join(", ") : "no amendments"} (via dashboard, apply all)`,
+      });
+      results.push({ ...ref, ok: true, applied });
+    }
+    if (wrote) {
+      refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
+      broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+    }
+    jsonResponse(res, 200, { layout: "v2", results });
   } catch (err) {
     const message = errorMessage(err);
     errorResponse(res, message.includes("Could not acquire PRD lock") ? 409 : 500, message);

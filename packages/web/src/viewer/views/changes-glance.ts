@@ -32,6 +32,7 @@ import {
 } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useChangesSummary } from "./changes-summary-context.js";
+import { ApplyAllBar } from "./apply-all.js";
 import {
   CHANGE_STAGE_LABELS,
   glanceGap,
@@ -126,6 +127,7 @@ export function ChangesGlance({ navigateTo }: { navigateTo: NavigateTo }) {
   if (groups.length === 0 && ghosts.length === 0) return h("div", { class: "changes-glance cg-empty" }, "No open changes.");
   const rows = groups.flatMap((group) => group.changes);
   return h("div", { class: "changes-glance" },
+    h(ApplyAllBar, { waiting: load.data.stages["awaiting-apply"] ?? 0, navigateTo }),
     h("table", { class: "cg-table" },
       h("thead", null,
         h("tr", null,

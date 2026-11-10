@@ -75,7 +75,7 @@ function allUses(css: string): string[] {
  * Stylesheets with no undefined-token backlog. Fallback-guarded uses are
  * checked here too; add a new sheet to this list rather than the allowlist.
  */
-const STRICT_SHEETS = ["prepare-task.css", "robot-wrangler.css", "impact-tags.css"];
+const STRICT_SHEETS = ["prepare-task.css", "robot-wrangler.css", "impact-tags.css", "apply-all.css"];
 
 /** Names that were undefined, are now replaced by theme tokens, and must stay gone. */
 const RETIRED = ["--text-secondary", "--danger"];
