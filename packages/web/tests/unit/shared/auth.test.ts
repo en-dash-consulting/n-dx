@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import {
   AUTH_ROUTES,
   CredentialStore,
@@ -215,5 +216,60 @@ describe("URL helpers", () => {
   it("authRouteOf names only the credential routes", () => {
     expect(authRouteOf(AUTH_ROUTES.wsTicket)).toBe("wsTicket");
     expect(authRouteOf("/api/auth/other")).toBeNull();
+  });
+});
+
+describe("CredentialStore session hand-over", () => {
+  const sha256 = (v: string): string => createHash("sha256").update(v).digest("hex");
+
+  it("hands over live sessions as digests only — never a nonce, a ticket or the credential", () => {
+    const store = new CredentialStore({ sha256 });
+    const { credential } = store.mintSession();
+    store.mintNonce();
+    store.mintTicket();
+    const handed = store.exportSessions();
+    expect(handed).toHaveLength(1);
+    expect(handed[0].sha256).toBe(sha256(credential));
+    expect(JSON.stringify(handed)).not.toContain(credential);
+  });
+
+  it("accepts the handed-over credential in the new store, compared by digest, and nothing else", () => {
+    const old = new CredentialStore({ sha256 });
+    const { credential } = old.mintSession();
+    const next = new CredentialStore({ sha256 });
+    expect(next.importSessions(old.exportSessions())).toBe(1);
+    expect(next.isSession(credential)).toBe(true);
+    expect(next.isSession(sha256(credential))).toBe(false);
+    expect(next.isSession("forged")).toBe(false);
+    // And it survives a second hand-over unchanged.
+    const third = new CredentialStore({ sha256 });
+    third.importSessions(next.exportSessions());
+    expect(third.isSession(credential)).toBe(true);
+    // revokeAll still ends it.
+    third.revokeAll();
+    expect(third.isSession(credential)).toBe(false);
+  });
+
+  it("drops malformed and expired entries, clamps expiries, keeps the cap, and takes nothing without a digest function", () => {
+    let now = 1_000_000;
+    const store = new CredentialStore({ sha256, now: () => now, sessionIdleTtlMs: 100, sessionMaxTtlMs: 1_000, maxEntries: 2 });
+    const good = { sha256: sha256("a"), expiresAt: now + 10_000, hardExpiresAt: now + 100_000 };
+    const taken = store.importSessions([
+      { sha256: "not-hex", expiresAt: now + 50, hardExpiresAt: now + 50 },
+      { sha256: sha256("b"), expiresAt: now - 1, hardExpiresAt: now + 50 },
+      null,
+      good,
+      { ...good, sha256: sha256("c") },
+      { ...good, sha256: sha256("d") },
+    ]);
+    expect(taken).toBe(2);
+    // Capped at two: only the newest two are taken.
+    expect(store.isSession("a")).toBe(false);
+    expect(store.isSession("d")).toBe(true);
+    // Clamped to this store's idle TTL.
+    now += 101;
+    expect(store.isSession("c")).toBe(false);
+    expect(new CredentialStore().importSessions([good])).toBe(0);
+    expect(new CredentialStore().exportSessions()).toEqual([]);
   });
 });

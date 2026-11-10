@@ -9,7 +9,8 @@
  * read from disk, the comparison with a running hub's, and the wording.
  *
  * @see packages/core/build-identity.mjs
- * @see packages/core/web.js — serverRefreshFix, noNonceNote, staleWebDistWarning, hubBuildMismatch, formatUnrecordedStatus
+ * @see packages/core/web.js — serverRefreshFix, noNonceNote, shouldRebuildForNonce, judgeHubBuild, formatUnrecordedStatus
+ * @see tests/unit/source-build.test.js — the rebuild a lagging dist/ gets before anything is spawned
  * @see tests/e2e/cli-start-stale-hub.test.js — the same, driven through `ndx start` against an older hub
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,13 +20,15 @@ import { join } from "node:path";
 import { BUILD_STAMP_FILE, isBuildCurrent, packageBuildIdentity, sourceHash } from "../../packages/core/build-identity.mjs";
 import { sourceHash as gateSourceHash } from "../../scripts/lib/stale-dist.mjs";
 import {
-  HUB_SERVER_COMMANDS,
   formatUnrecordedStatus,
   hereServerCommands,
-  hubBuildMismatch,
+  compareVersions,
+  judgeHubBuild,
+  afterRebuild,
+  rebuildFailedWarning,
   noNonceNote,
   serverRefreshFix,
-  staleWebDistWarning,
+  shouldRebuildForNonce,
 } from "../../packages/core/web.js";
 
 let root;
@@ -129,22 +132,15 @@ const published = { packageDir: "/n/node_modules/@n-dx/web", version: "1.2.3", s
 const here = hereServerCommands("start", false);
 
 describe("serverRefreshFix", () => {
-  it("leads with a rebuild of web and its dependencies when the dist/ on disk is stale — a restart alone respawns it", () => {
-    for (const server of [HUB_SERVER_COMMANDS, here]) {
-      const fix = serverRefreshFix(stale, server);
-      expect(fix).toMatch(/^run 'pnpm --filter "@n-dx\/web\.\.\." build' in /);
-      expect(fix).toContain(`'${server.stop}', then '${server.start}'`);
+  it("never tells a single-project server's user to run pnpm: a lagging dist/ was rebuilt before spawning", () => {
+    for (const web of [current, stale, watchBuilt]) {
+      const fix = serverRefreshFix(web, here);
+      expect(fix).not.toMatch(/pnpm/);
+      expect(fix).toContain("rebuilt");
     }
   });
 
-  it("restarts the hub when the build on disk is current, since a fresh hub runs it", () => {
-    for (const web of [current, watchBuilt, published]) {
-      expect(serverRefreshFix(web, HUB_SERVER_COMMANDS)).toBe("restart the hub: 'ndx hub stop', then 'ndx start'");
-    }
-  });
-
-  it("never offers a bare restart for a single-project server just spawned from that same build", () => {
-    expect(serverRefreshFix(current, here)).toMatch(/^run 'pnpm --filter/);
+  it("says reinstall for a published install, which has no source to rebuild", () => {
     expect(serverRefreshFix(published, here)).toBe("reinstall n-dx so @n-dx/web matches this ndx");
   });
 
@@ -152,7 +148,18 @@ describe("serverRefreshFix", () => {
     expect(hereServerCommands("start", false)).toMatchObject({ stop: "ndx start --here stop", start: "ndx start --here" });
     expect(hereServerCommands("start", true)).toMatchObject({ stop: "ndx start --preview stop", start: "ndx start --preview" });
     expect(hereServerCommands("web", false)).toMatchObject({ stop: "ndx web --here stop", start: "ndx web --here" });
-    expect(serverRefreshFix(stale, hereServerCommands("start", true))).toContain("'ndx start --preview stop', then 'ndx start --preview'");
+  });
+});
+
+describe("shouldRebuildForNonce", () => {
+  it("rebuilds and respawns once when a source-linked server just spawned has no nonce route", () => {
+    for (const status of [404, 405, 409]) expect(shouldRebuildForNonce(status, current, false)).toBe(true);
+    expect(shouldRebuildForNonce(404, current, true)).toBe(false);
+  });
+
+  it("does not for a published install, or for a failure that is not a missing route", () => {
+    expect(shouldRebuildForNonce(404, published, false)).toBe(false);
+    for (const status of [0, 401, 500]) expect(shouldRebuildForNonce(status, current, false)).toBe(false);
   });
 });
 
@@ -173,31 +180,86 @@ describe("noNonceNote", () => {
   });
 });
 
-describe("staleWebDistWarning", () => {
-  it("warns a source-linked install whose dist/ lags its source, naming the rebuild", () => {
-    const warning = staleWebDistWarning(stale, HUB_SERVER_COMMANDS);
-    expect(warning).toMatch(/^Warning: .*dist is older than its source/);
-    expect(warning).toContain(`pnpm --filter "@n-dx/web..." build`);
-  });
-
-  it("is silent for a current build, a watch build, and a published install", () => {
-    for (const web of [current, watchBuilt, published]) expect(staleWebDistWarning(web, HUB_SERVER_COMMANDS)).toBeNull();
+describe("compareVersions", () => {
+  it("orders major, minor, patch and prereleases as semver does", () => {
+    expect(compareVersions("0.10.2", "0.10.3")).toBeLessThan(0);
+    expect(compareVersions("0.11.0", "0.10.9")).toBeGreaterThan(0);
+    expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
+    expect(compareVersions("1.0.0-rc.1", "1.0.0")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-alpha.2", "1.0.0-alpha.10")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-alpha", "1.0.0-alpha.1")).toBeLessThan(0);
+    expect(compareVersions("workspace", "1.0.0")).toBeNull();
   });
 });
 
-describe("hubBuildMismatch", () => {
-  it("names a hub that reports no build identity as predating this ndx", () => {
-    expect(hubBuildMismatch(undefined, current)).toMatch(/predates this ndx/);
+describe("judgeHubBuild", () => {
+  const sameDir = (a, b) => a === b;
+  const here = current.packageDir;
+
+  it("replaces a hub that reports no build identity: it predates this ndx", () => {
+    expect(judgeHubBuild(undefined, current, sameDir)).toMatchObject({ action: "replace", text: expect.stringMatching(/predates this ndx/) });
   });
 
-  it("names a version or build that differs from what this ndx would start", () => {
-    expect(hubBuildMismatch({ version: "1.2.2", sourceHash: current.sourceHash }, current)).toMatch(/1\.2\.2.*1\.2\.3/);
-    expect(hubBuildMismatch({ version: "1.2.3", sourceHash: "b".repeat(64) }, current)).toMatch(/another build/);
+  it("replaces a hub of an older version", () => {
+    const judged = judgeHubBuild({ version: "1.2.2", sourceHash: current.sourceHash, packageRoot: "/elsewhere" }, current, sameDir);
+    expect(judged).toMatchObject({ action: "replace", text: expect.stringMatching(/1\.2\.2, older than the 1\.2\.3/) });
   });
 
-  it("accepts the same build, and does not compare hashes a published install does not have", () => {
-    expect(hubBuildMismatch({ version: "1.2.3", sourceHash: current.sourceHash }, current)).toBeNull();
-    expect(hubBuildMismatch({ version: "1.2.3", sourceHash: null }, published)).toBeNull();
+  it("never replaces a hub newer than this ndx: that would downgrade it", () => {
+    for (const build of [{ version: "1.2.4", sourceHash: null }, { version: "1.3.0", sourceHash: "b".repeat(64), packageRoot: here }]) {
+      const judged = judgeHubBuild(build, current, sameDir);
+      expect(judged.action).toBe("leave");
+      expect(judged.note).toMatch(/newer than this ndx's 1\.2\.3; it keeps serving\.$/);
+    }
+  });
+
+  it("replaces an equal version with another source hash only when the hub runs from this same checkout", () => {
+    const rebuilt = judgeHubBuild({ version: "1.2.3", sourceHash: "b".repeat(64), packageRoot: here }, current, sameDir);
+    expect(rebuilt).toMatchObject({ action: "replace", text: expect.stringMatching(/earlier build of this checkout/) });
+
+    const other = judgeHubBuild({ version: "1.2.3", sourceHash: "b".repeat(64), packageRoot: "/other/packages/web" }, current, sameDir);
+    expect(other).toEqual({ action: "leave", note: "The running n-dx hub was started from another checkout's @n-dx/web (/other/packages/web), not this ndx's; it keeps serving." });
+
+    // A hub too old to name its checkout is not assumed to be this one.
+    expect(judgeHubBuild({ version: "1.2.3", sourceHash: "b".repeat(64) }, current, sameDir).action).toBe("leave");
+  });
+
+  it("keeps the same build, and does not compare hashes a published install does not have", () => {
+    expect(judgeHubBuild({ version: "1.2.3", sourceHash: current.sourceHash, packageRoot: here }, current, sameDir)).toEqual({ action: "keep" });
+    expect(judgeHubBuild({ version: "1.2.3", sourceHash: null }, published, sameDir)).toEqual({ action: "keep" });
+  });
+
+  it("leaves a hub whose version cannot be ordered, and never prescribes anything", () => {
+    const judged = judgeHubBuild({ version: "not-a-version", sourceHash: null }, current, sameDir);
+    expect(judged.action).toBe("leave");
+    for (const build of [{ version: "1.2.4" }, { version: "1.2.3", sourceHash: "b".repeat(64), packageRoot: "/x" }, { version: "nope" }]) {
+      const note = judgeHubBuild(build, current, sameDir).note;
+      expect(note.split("\n")).toHaveLength(1);
+      expect(note).not.toMatch(/ndx hub stop|ndx start|restart|pnpm/i);
+    }
+  });
+});
+
+describe("afterRebuild", () => {
+  it("leaves an older hub serving when @n-dx/web could not be rebuilt: there is nothing newer to start", () => {
+    const older = judgeHubBuild({ version: "1.2.2" }, current, (a, b) => a === b);
+    expect(older.action).toBe("replace");
+    const kept = afterRebuild(older, true);
+    expect(kept.action).toBe("leave");
+    expect(kept.note).toMatch(/could not be rebuilt, so it keeps serving\.$/);
+    expect(kept.note).not.toMatch(/ndx start\b|ndx hub stop|restart|pnpm/i);
+    expect(afterRebuild(older, false)).toBe(older);
+    expect(afterRebuild({ action: "keep" }, true)).toEqual({ action: "keep" });
+  });
+});
+
+describe("rebuildFailedWarning", () => {
+  it("carries the build's output and says the command goes on with the existing build", () => {
+    const text = rebuildFailedWarning("The automatic rebuild of @n-dx/web in /c exited with code 2.\nerror TS2322", join("/c", "packages", "web", "dist", "cli", "index.js"));
+    expect(text).toMatch(/^Warning: The automatic rebuild/);
+    expect(text).toContain("error TS2322");
+    expect(text).toContain("Going on with the existing build");
+    expect(text).not.toMatch(/pnpm/);
   });
 });
 

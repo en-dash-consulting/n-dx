@@ -75,7 +75,18 @@ but the page shell).
 - **Browser sessions**, minted by the server the page is on and held in its
   memory (`CredentialStore`): 256-bit CSPRNG values, compared in constant
   time, distinct from and not derived from the token. A session ends after
-  12 hours idle or 7 days, and every session ends when that server restarts.
+  12 hours idle or 7 days, and every session ends when that server restarts —
+  except when `ndx start` replaces an older hub itself. Then, just before
+  stopping it, `ndx start` asks the old hub (token only, `POST
+  /api/hub/handover`) to write its live sessions to
+  `<ndx home>/hub-sessions.handover.json`: the SHA-256 digest of each with its
+  expiries, never the credential, a nonce, a ticket or the token, in a file
+  written owner-only the way `auth.token` is. The new hub deletes the file as
+  it starts and keeps the sessions only when the file is under two minutes old
+  and was written for the same home, port and token; it matches a presented
+  credential by digest, in constant time, under the same cap. The browser's
+  credential stays in `sessionStorage` for that one origin. `ndx hub stop`
+  removes any hand-over, so a stop still signs every tab out.
 
 **The landing exchange.** `ndx start` asks the server it just started or
 registered with — over a token-bearing request, after identifying the listener

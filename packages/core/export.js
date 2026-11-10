@@ -24,6 +24,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 // containing `&` or `^` breaks the command apart. win-spawn.js applies the
 // quoteWindowsToken/ArgvQuote rules and also handles `rex` being a .cmd shim.
 import { execFileSyncCli } from "./win-spawn.js";
+import { ensureSourceBuild } from "./source-build.js";
 import { buildCommitMessage } from "./commit-trailers.js";
 import { ensureGitignoreEntry, isGitTracked } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
@@ -708,9 +709,14 @@ export async function runExport(args) {
   console.log("[export] copying viewer assets...");
   const viewerDir = resolvePackagePath("packages/web", "@n-dx/web", "dist/viewer");
 
+  // A source-linked checkout builds the viewer here and carries on; an
+  // install without one is incomplete, and says so.
   if (!existsSync(join(viewerDir, "index.html"))) {
-    console.error("Error: Viewer not built. Run 'pnpm build' first.");
-    return 1;
+    const built = await ensureSourceBuild(join(viewerDir, "index.html"));
+    if (!built.ok) {
+      console.error(`Error: The dashboard viewer is not built. ${built.message}`);
+      return 1;
+    }
   }
 
   // Read and transform index.html

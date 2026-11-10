@@ -60,6 +60,20 @@ import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 import { localConfigIsRepositoryConfig } from "./claude-integration.js";
 import { packageBuildIdentity } from "./build-identity.mjs";
+import { ensureSourceBuild } from "./source-build.js";
+import {
+  countLiveHenchLocks,
+  deferredHubSignInFix,
+  formatReplacementResult,
+  hubAuthReason,
+  hubFaultReason,
+  changedHubNote,
+  hubReplacementNotice,
+  keptTokenHubNote,
+  liveWorkAnswer,
+  planHubReplacement,
+  spawnReplacementHub,
+} from "./hub-replacement.js";
 
 /**
  * Core's own CLI, beside this file. Not `join(__dir, "cli.js")`: callers pass
@@ -1053,6 +1067,18 @@ async function findOwnRunningHub(home, flagPort) {
 const HUB_DEFAULT_PORT = 3117;
 const HUB_REGISTRY_FILE = "hub.json";
 const HUB_PID_FILE = "hub.pid";
+/**
+ * The one-shot file a hub writes its live browser sessions to when this ndx
+ * replaces it, for the new hub to take at startup (packages/web/src/hub/
+ * session-handover.ts names it too). `ndx hub stop` removes it, so a plain
+ * stop still signs every tab out.
+ */
+export const SESSION_HANDOVER_FILE = "hub-sessions.handover.json";
+
+/** Remove any session hand-over in `home`; nothing to remove is fine. */
+async function discardSessionHandover(home) {
+  await unlink(join(home, SESSION_HANDOVER_FILE)).catch(() => {});
+}
 const HUB_CONFIG_FILE = "config.json";
 /** How long a freshly spawned hub gets to answer /api/hub/health. */
 const HUB_START_TIMEOUT_MS = 15_000;
@@ -1228,9 +1254,6 @@ function checkoutOf(web) {
  * @property {string} start         The command that starts it again as the same kind of server.
  */
 
-/** @type {ServerCommands} */
-export const HUB_SERVER_COMMANDS = { kind: "hub", stop: "ndx hub stop", start: "ndx start" };
-
 /**
  * The single-project or preview server `ndx <commandName>` started, by the
  * commands that address it again. `--here` is always named: a bare `ndx start`
@@ -1246,33 +1269,27 @@ export function hereServerCommands(commandName, isPreview) {
 }
 
 /**
- * The rebuild for a source-linked install: web and every workspace package it
- * depends on. Web alone type-checks against its dependencies' dist/ and runs
- * their dist/ at run time, so building only web fails or leaves them stale.
- */
-const WEB_REBUILD_COMMAND = `pnpm --filter "@n-dx/web..." build`;
-
-/**
  * The commands that bring a server back in line with this ndx. Pure, so the
  * wording is unit-tested.
  *
- * Restarting alone respawns whatever `dist/` is on disk, so when that is
- * itself older than its source (a source-linked install that was not rebuilt)
- * the fix starts with the rebuild — the advice this replaces, "restart the
- * server", could not work there.
+ * A source-linked `dist/` that lags its source is rebuilt before any server
+ * is spawned (source-build.js), so what is left is a server that is still
+ * older than this ndx: a hub kept running across a rebuild or upgrade, or a
+ * single-project server whose build is older even though it was just spawned.
+ * The second is rebuilt and respawned once by `ndx start` itself
+ * ({@link runWeb}); this names what remains when that did not help.
  *
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web  The web build this ndx spawns.
  * @param {ServerCommands} server  Which server, and how to stop and start it.
  * @returns {string}
  */
 export function serverRefreshFix(web, server) {
-  const restart = `'${server.stop}', then '${server.start}'`;
-  const rebuild = `run '${WEB_REBUILD_COMMAND}'${checkoutOf(web) ? ` in ${checkoutOf(web)}` : ""}`;
-  if (web.sourceLinked && web.lagging === true) return `${rebuild}, then ${restart}`;
-  if (server.kind === "hub") return `restart the hub: ${restart}`;
+  // A hub older than this ndx is replaced (runHubMode), not refreshed by hand.
   // A single-project server was just spawned from the dist/ on disk, so a
   // restart would start the same build again.
-  return web.sourceLinked ? `${rebuild}, then ${restart}` : "reinstall n-dx so @n-dx/web matches this ndx";
+  return web.sourceLinked
+    ? `it was rebuilt from ${checkoutOf(web) ?? "its checkout"} and started again, and still cannot; send the token from ${authTokenPath()} as X-Ndx-Token instead`
+    : "reinstall n-dx so @n-dx/web matches this ndx";
 }
 
 /**
@@ -1295,56 +1312,150 @@ export function noNonceNote(status, fix) {
 }
 
 /**
- * The warning for a source-linked install whose `@n-dx/web` `dist/` is not a
- * build of its current source, or null when there is nothing to warn about.
- * Pure, so the wording is unit-tested.
+ * The warning for a lagging `@n-dx/web` whose automatic rebuild failed: the
+ * build's own output, and that the command carries on with the build it has.
+ * Pure.
  *
- * Checked before the server is spawned or the hub is joined: a stale `dist/`
- * runs older code than this CLI, which surfaces later as routes the CLI
- * expects and the server lacks — first among them the landing nonce.
- *
- * Only a `dist/` that is `lagging` — last written before the newest source
- * edit — is warned about. A watch build (`pnpm dev`) never writes the build
- * stamp but keeps `dist/` current, and warning there on every start would
- * teach people to ignore the warning.
- *
- * @param {import("./build-identity.mjs").PackageBuildIdentity} web
- * @param {ServerCommands} server
- * @returns {string | null}
+ * @param {string} failure  {@link ensureSourceBuild}'s `failed` message, build output included.
+ * @param {string} webEntry
+ * @returns {string}
  */
-export function staleWebDistWarning(web, server) {
-  if (!web.sourceLinked || web.lagging !== true) return null;
-  return `Warning: ${join(web.packageDir, "dist")} is older than its source, so the server runs older code than this ndx.\n` +
-    `  To fix: ${serverRefreshFix(web, server)}.`;
+export function rebuildFailedWarning(failure, webEntry) {
+  return `Warning: ${failure}\n  Going on with the existing build in ${dirname(dirname(webEntry))}, which is older than its source.`;
 }
 
 /**
- * Why the running hub is not the build this ndx would start, or null when it
- * is (or when there is nothing to compare). Pure, so it is unit-tested.
+ * Whether a missing nonce from a single-project server this command just
+ * spawned is worth one forced rebuild and respawn: the route is missing (the
+ * build is older than this ndx), the install is source-linked (there is
+ * source to rebuild from), and this run has not already tried. Pure.
  *
- * `build` is `/api/hub/health`'s `build` field: `{ version, sourceHash }`. A
- * hub without one predates the field, and so this ndx. A version or source
- * hash that differs from the web package this ndx spawns means the hub was
- * started from another build and kept running across an upgrade or rebuild.
- * A hash is compared only when both sides have one; a published install
- * ships no build stamp.
+ * @param {number} status  What `POST /api/auth/nonce` answered.
+ * @param {import("./build-identity.mjs").PackageBuildIdentity} web
+ * @param {boolean} alreadyRebuilt
+ * @returns {boolean}
+ */
+export function shouldRebuildForNonce(status, web, alreadyRebuilt) {
+  return NONCE_ROUTE_MISSING.has(status) && web.sourceLinked && !alreadyRebuilt;
+}
+
+/**
+ * Order two package versions, `major.minor.patch[-prerelease]`: negative when
+ * `a` is older, positive when newer, 0 when equal, null when either cannot be
+ * read. A prerelease sorts before its release; prerelease identifiers compare
+ * numerically when both are numbers, as text otherwise (semver's rule). Pure.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number | null}
+ */
+export function compareVersions(a, b) {
+  const parse = (v) => {
+    const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(String(v).trim());
+    return m ? { core: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ? m[4].split(".") : [] } : null;
+  };
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return null;
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] - y.core[i];
+  if (x.pre.length === 0 || y.pre.length === 0) return y.pre.length - x.pre.length;
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const p = x.pre[i];
+    const q = y.pre[i];
+    if (p === undefined) return -1;
+    if (q === undefined) return 1;
+    if (p === q) continue;
+    const pn = /^\d+$/.test(p);
+    const qn = /^\d+$/.test(q);
+    if (pn && qn) return Number(p) - Number(q);
+    if (pn !== qn) return pn ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * One spelling of a directory, for telling whether two paths are the same
+ * checkout: symlinks resolved, and case folded where the filesystem folds it.
+ *
+ * @param {string} dir
+ * @returns {string}
+ */
+export function canonicalDir(dir) {
+  let real = resolve(dir);
+  try {
+    real = realpathSync.native(real);
+  } catch {
+    // Gone or unreadable: compared as given.
+  }
+  return process.platform === "win32" || process.platform === "darwin" ? real.toLowerCase() : real;
+}
+
+/**
+ * What to do about the running hub's build, given the `@n-dx/web` this ndx
+ * would start. Pure, so every branch is unit-tested.
+ *
+ * `build` is `/api/hub/health`'s `build` field: `{ version, sourceHash,
+ * packageRoot }`. The hub is replaced only when it is older than this ndx:
+ *
+ * - no build identity at all — it predates the field, and so this ndx;
+ * - an older `@n-dx/web` version;
+ * - the same version from a different build *of this same checkout*
+ *   (`packageRoot` is this ndx's own web package) — a rebuild since the hub
+ *   started.
+ *
+ * A newer hub is never replaced: that would downgrade it. A hub started from
+ * another checkout, or one too old to say which, is not either: two
+ * source-linked checkouts would otherwise take turns replacing each other,
+ * restarting every project server each time. Those get a note that says why
+ * the hub keeps serving, and asks nothing of the operator.
  *
  * @param {unknown} build
  * @param {import("./build-identity.mjs").PackageBuildIdentity} web
- * @returns {string | null}
+ * @param {(a: string, b: string) => boolean} [sameDir]  Whether two package roots are one directory.
+ * @returns {{ action: "keep" } | { action: "replace", text: string } | { action: "leave", note: string }}
  */
-export function hubBuildMismatch(build, web) {
+export function judgeHubBuild(build, web, sameDir = (a, b) => canonicalDir(a) === canonicalDir(b)) {
   if (!build || typeof build !== "object") {
-    return "the running n-dx hub predates this ndx (it reports no build identity)";
+    return { action: "replace", text: "the running n-dx hub predates this ndx (it reports no build identity)" };
   }
-  const { version, sourceHash } = /** @type {{ version?: unknown, sourceHash?: unknown }} */ (build);
+  const { version, sourceHash, packageRoot } = /** @type {{ version?: unknown, sourceHash?: unknown, packageRoot?: unknown }} */ (build);
   if (typeof version === "string" && web.version && version !== web.version) {
-    return `the running n-dx hub is @n-dx/web ${version}, and this ndx starts ${web.version}`;
+    const order = compareVersions(version, web.version);
+    if (order === null) {
+      return { action: "leave", note: `The running n-dx hub is @n-dx/web ${version}, which this ndx (${web.version}) cannot order against its own; it keeps serving.` };
+    }
+    if (order < 0) {
+      return { action: "replace", text: `the running n-dx hub is @n-dx/web ${version}, older than the ${web.version} this ndx starts` };
+    }
+    if (order > 0) {
+      return { action: "leave", note: `The running n-dx hub is @n-dx/web ${version}, newer than this ndx's ${web.version}; it keeps serving.` };
+    }
   }
   if (typeof sourceHash === "string" && web.sourceHash && sourceHash !== web.sourceHash) {
-    return `the running n-dx hub was started from another build of @n-dx/web (${sourceHash.slice(0, 12)}; on disk now: ${web.sourceHash.slice(0, 12)})`;
+    const builds = `(${sourceHash.slice(0, 12)}; on disk now: ${web.sourceHash.slice(0, 12)})`;
+    if (typeof packageRoot === "string" && web.packageDir && sameDir(packageRoot, web.packageDir)) {
+      return { action: "replace", text: `the running n-dx hub was started from an earlier build of this checkout's @n-dx/web ${builds}` };
+    }
+    const where = typeof packageRoot === "string" ? `another checkout's @n-dx/web (${packageRoot})` : "a build of @n-dx/web that does not say which checkout it came from";
+    return { action: "leave", note: `The running n-dx hub was started from ${where}, not this ndx's; it keeps serving.` };
   }
-  return null;
+  return { action: "keep" };
+}
+
+/**
+ * {@link judgeHubBuild}'s verdict once the automatic rebuild is known. When
+ * it failed, the build a replacement would start is the one that could not
+ * be rebuilt, so replacing would restart every project onto nothing newer:
+ * the hub keeps serving, and the note says why. Pure.
+ *
+ * @param {ReturnType<typeof judgeHubBuild>} judged
+ * @param {boolean} rebuildFailed
+ * @returns {ReturnType<typeof judgeHubBuild>}
+ */
+export function afterRebuild(judged, rebuildFailed) {
+  if (judged.action !== "replace" || !rebuildFailed) return judged;
+  return { action: "leave", note: `The running n-dx hub is older than this ndx (${judged.text}), but @n-dx/web could not be rebuilt, so it keeps serving.` };
 }
 
 /**
@@ -1805,54 +1916,147 @@ async function hubIsHealthy(port, home) {
  * "foreign" and gets no credentialed request.
  */
 export async function hubAuthState(port, probe = hubRequest, identify = identifyOwnHub) {
+  return (await hubAuthProbe(port, probe, identify)).state;
+}
+
+/**
+ * {@link hubAuthState}, with the pid of the hub that was judged: the one its
+ * health answer reports, or, when it holds another token, the one identified
+ * as this user's hub. A replacement acts only while that hub is still the one
+ * on the port ({@link replaceOrDeferHub}).
+ *
+ * @returns {Promise<{ state: "absent" | "open" | "token" | "mismatch" | "foreign", pid: number | null }>}
+ */
+export async function hubAuthProbe(port, probe = hubRequest, identify = identifyOwnHub) {
+  const pidOf = (n) => (Number.isInteger(n) ? n : null);
   const anonymous = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: false });
-  if (anonymous.status === 200 && anonymous.body?.ok === true) return "open";
-  if (anonymous.status !== 401) return "absent";
+  if (anonymous.status === 200 && anonymous.body?.ok === true) return { state: "open", pid: pidOf(anonymous.body.pid) };
+  if (anonymous.status !== 401) return { state: "absent", pid: null };
   const own = await identify(port);
-  if (!own.ok) return "foreign";
+  if (!own.ok) return { state: "foreign", pid: null };
   const credentialed = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
-  return credentialed.status === 200 && credentialed.body?.ok === true ? "token" : "mismatch";
+  return credentialed.status === 200 && credentialed.body?.ok === true
+    ? { state: "token", pid: pidOf(credentialed.body.pid) }
+    : { state: "mismatch", pid: pidOf(own.pid) };
 }
 
 /**
  * What to tell an operator whose hub does not match the mode this command
- * asked for. Pure, so the wording is unit-tested without a hub.
+ * asked for, when it cannot be replaced right now. Pure, so the wording is
+ * unit-tested without a hub.
+ *
+ * A mismatch with this user's own hub is resolved by replacing the hub in the
+ * requested mode ({@link replaceOrDeferHub}); this is what is said when that
+ * was deferred, because live work is on the hub, and this command cannot go
+ * ahead on the hub as it is. `deferred` is the deferral note, naming the work
+ * in the way, when the replacement happens and the flag that forces it.
+ *
+ * A port held by something that is not this user's hub is never touched.
+ *
+ * @param {"open" | "token" | "mismatch" | "foreign"} state  {@link hubAuthState}
+ * @param {"open" | "token"} wanted
+ * @param {number} port
+ * @param {string | null} tokenFile
+ * @param {string | null} [deferred]
+ * @returns {string}
  */
-export function hubAuthMismatchMessage(state, wanted, port, tokenFile) {
-  const stop = "Stop it first ('ndx hub stop'), then run this command again.";
-  if (state === "open" && wanted === "token") {
-    // The dangerous direction, and the reason this check exists: reusing the
-    // open hub would serve *this* project with no token at all.
-    return `The n-dx hub already running on port ${port} was started without authentication, so registering this project would serve it unauthenticated too.\n${stop}\nTo join the open hub as it is, pass --no-auth or set web.auth=false in .n-dx.local.json.`;
-  }
-  if (state === "token" && wanted === "open") {
-    return `The n-dx hub already running on port ${port} requires the per-user token, so --no-auth (or web.auth=false in .n-dx.local.json) cannot apply to it.\n${stop}`;
-  }
+export function hubAuthMismatchMessage(state, wanted, port, tokenFile, deferred = null) {
   if (state === "foreign") {
     // Not identified as this user's hub, so the token was never sent to it.
     return `Port ${port} is held by another process that is not this user's n-dx hub; nothing was sent to it.\n` +
       `Stop that process, or choose another hub port with --port=N or hub.port in ${join(hubHome(), HUB_CONFIG_FILE)}.`;
   }
-  return `The n-dx hub already running on port ${port} was started with a different token than ${tokenFile ?? "this user's"}.\n${stop}`;
+  const lead = deferred ?? `The n-dx hub on port ${port} was not replaced.`;
+  if (state === "open" && wanted === "token") {
+    // The dangerous direction, and the reason this check exists: reusing the
+    // open hub would serve *this* project with no token at all.
+    return `${lead}\nThis project was not registered: the hub on port ${port} runs without authentication and would serve it unauthenticated too. ` +
+      "To join it as it is, pass --no-auth or set web.auth=false in .n-dx.local.json.";
+  }
+  if (state === "token" && wanted === "open") {
+    return `${lead}\nUntil then, this project is served with the per-user token like the rest of that hub.`;
+  }
+  return `${lead}\nThis project was not registered: the hub on port ${port} does not accept the token in ${tokenFile ?? "this user's ndx home"}.`;
 }
 
 /**
- * Make sure a hub is answering on `port`, spawning one detached if not.
- * Same CLAUDECODE-stripping, detached, unref'd pattern as background mode.
+ * Make sure a hub that is the one this ndx would start is answering on
+ * `port`: spawn one when there is none, reuse one that matches, and replace
+ * one that does not ({@link replaceOrDeferHub}).
  *
  * A hub that is already up is only reused when its authentication matches what
  * this command asked for. First-writer-wins would otherwise decide the mode for
  * every later project: one `ndx start --no-auth` left the hub open, and the
  * next authenticated project silently joined it, token file and all.
+ *
+ * A token hub is kept for a command that asked for no token unless it also
+ * passed `--replace-hub`: one project's `--no-auth`, or its local
+ * `web.auth=false`, does not open the hub for every project on it. That
+ * project is served with the token (`servedWithToken`), and `authNote` says so.
+ *
+ * Each replacement acts only while the hub judged is still the one on the
+ * port; when another `ndx start` replaced it meanwhile, the hub now there is
+ * judged again, once ({@link replaceOrDeferHub}).
+ *
+ * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, note?: string, authNote?: string, servedWithToken?: boolean, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
  */
-async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
+async function ensureHub(port, options, attempt = 0) {
+  const { tools, __dir, home, web, force = false, rebuildFailed = false } = options;
+  let tokenFile = options.tokenFile ?? null;
   const wanted = tokenFile ? "token" : "open";
-  const state = await hubAuthState(port, hubRequest, (p) => identifyOwnHub(p, home));
-  if (state !== "absent") {
-    if (state === wanted) return { spawned: false, pid: null };
-    throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
+  const { state, pid: authPid } = await hubAuthProbe(port, hubRequest, (p) => identifyOwnHub(p, home));
+  if (state === "absent") return spawnHub(port, { tools, __dir, home, tokenFile });
+  if (state === "foreign") throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
+  // The hub judged was replaced by another ndx start before this one acted: judge the one there now.
+  const rejudge = () => (attempt < 1 ? ensureHub(port, options, attempt + 1) : { spawned: false, pid: null, note: changedHubNote(port) });
+
+  // A token hub, and this command asked for none, without --replace-hub: it
+  // stays a token hub, and any replacement for another reason keeps the token.
+  const keepToken = state === "token" && wanted === "open" && !force;
+  if (keepToken) tokenFile = authTokenPath(home);
+  const kept = keepToken ? { servedWithToken: true, authNote: keptTokenHubNote(port) } : {};
+  if (state !== wanted && !keepToken) {
+    // This user's hub, in the other mode: replace it in the one this command
+    // asked for. A token hub becomes an open one only because this command
+    // asked for no token (--no-auth, web.auth=false) and passed --replace-hub,
+    // and the notice says so.
+    const result = await replaceOrDeferHub(port, hubAuthReason(state, wanted, tokenFile), { tools, __dir, home, tokenFile, force, judgedPid: authPid });
+    if (result.changed) return rejudge();
+    if (!result.deferred) return result;
+    // Deferred. A token hub can still serve this project, with the token; an
+    // open hub, or one holding another token, cannot.
+    if (state === "token" && wanted === "open") {
+      return { ...result, servedWithToken: true, deferred: hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred) };
+    }
+    throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile, result.deferred));
   }
 
+  // A hub that kept running across an upgrade or rebuild serves older code
+  // than this CLI expects — first among it, no landing-nonce route.
+  const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
+  const judgedPid = health.status === 200 && Number.isInteger(health.body?.pid) ? health.body.pid : null;
+  const replace = async (reason) => {
+    const result = await replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force, judgedPid });
+    return result.changed ? rejudge() : { ...result, ...kept };
+  };
+  const judged = afterRebuild(health.status === 200 ? judgeHubBuild(health.body?.build, web) : { action: "keep" }, rebuildFailed);
+  if (judged.action === "replace") return replace({ kind: "build", text: judged.text });
+  // Newer, or another checkout's: it keeps serving, and the note says why.
+  const left = judged.action === "leave" ? { note: judged.note } : {};
+  // A current hub that cannot do part of its job — no n-dx binary for project
+  // servers, no CLI for extensions — is replaced by one given both.
+  const fault = health.status === 200 ? hubFaultReason(health.body?.faults) : null;
+  if (fault) return replace(fault);
+  return { spawned: false, pid: null, ...left, ...kept };
+}
+
+/**
+ * Spawn a hub on `port`, detached and unref'd, and wait for it to answer
+ * `/api/hub/health`. Same CLAUDECODE-stripping pattern as background mode.
+ *
+ * @returns {Promise<{ spawned: true, pid: number }>}
+ */
+async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
   const script = resolve(__dir, tools.web);
   const { CLAUDECODE: _cc, ...env } = process.env;
   // `--ndx-cli`: the hub asks this n-dx for each extension sidecar's launch
@@ -1874,7 +2078,13 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   let lastReason = null;
   while (Date.now() < deadline) {
     const healthy = await hubIsHealthy(port, home);
-    if (healthy.ok) return { spawned: true, pid: child.pid };
+    if (healthy.ok) {
+      // Two commands that both found the port free both spawn; the second's
+      // hub cannot bind, and the hub answering is the first's. Join it.
+      const own = await identifyOwnHub(port, home);
+      if (own.ok && own.pid !== child.pid) return joinedHub(port);
+      return { spawned: true, pid: child.pid };
+    }
     lastReason = healthy.reason ?? lastReason;
     if (!isProcessRunning(child.pid)) break;
     await new Promise((r) => setTimeout(r, 200));
@@ -1883,6 +2093,239 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   // credentialed; say why, rather than reporting it as never started.
   const why = lastReason ? `: ${lastReason}` : "";
   throw new Error(`n-dx hub did not start on port ${port} within ${HUB_START_TIMEOUT_MS}ms${why}`);
+}
+
+/**
+ * Replace the running hub on `port` with the one this ndx starts, unless that
+ * would interrupt live work ({@link planHubReplacement}).
+ *
+ * Only a hub identified as this user's own ({@link identifyOwnHub}) is ever
+ * stopped: its pid comes from this user's ndx home and is the one listener on
+ * the port. Anything else is left running and reported.
+ *
+ * `judgedPid` is the pid of the hub the decision was made about. When the hub
+ * on the port is now another one — a concurrent `ndx start` replaced it
+ * first — nothing is stopped, and `{ changed: true }` asks the caller to
+ * judge the hub that is there now. Without this the second command would stop
+ * the hub the first had just started, and every project would go down twice.
+ * The same holds when the other command stops the hub while this one reads
+ * its live work: projects that could not be asked because the hub itself went
+ * away ({@link hubGoingAway}) defer nothing, and the hub there next is judged.
+ *
+ * @param {number} port
+ * @param {import("./hub-replacement.js").HubReplacementReason} reason
+ */
+async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force, judgedPid = null }) {
+  const identified = await identifyOwnHub(port, home);
+  if (identified.ok && judgedPid !== null && identified.pid !== judgedPid) return { spawned: false, pid: null, changed: true };
+  // Never this process or the one that started it, whatever the pid file
+  // says: stopping either would end this command with the hub half-replaced.
+  const own = identified.ok && (identified.pid === process.pid || identified.pid === process.ppid)
+    ? { ok: false, reason: `the recorded hub pid (${identified.pid}) is this ndx process or its parent` }
+    : identified;
+  if (!own.ok) {
+    return {
+      spawned: false,
+      pid: null,
+      deferred: `The n-dx hub on port ${port} needs replacing: ${reason.text}. It was left running because it could not be identified as this user's hub (${own.reason}).`,
+    };
+  }
+  const projects = await readHubRegistry(home);
+  const liveWork = await gatherHubLiveWork(port, projects);
+  const plan = planHubReplacement({ reason, liveWork, force, port });
+  if (plan.action === "defer") {
+    // A concurrent `ndx start` stopping this same hub makes every project
+    // unanswerable: the hub closes its listener first. Unanswered is not live
+    // work, so when the hub itself has gone quiet, wait for the port to come
+    // free or the other command's hub to answer, and judge what is there.
+    if ((liveWork.unchecked?.length ?? 0) > 0 && (await hubGoingAway(port, own.pid))) {
+      const settled = await waitForPortFreeOrNewHub(port, own.pid, home, HUB_STOP_GRACE_MS + 5_000);
+      if (settled !== "held") return { spawned: false, pid: null, changed: true };
+    }
+    return { spawned: false, pid: null, deferred: plan.note };
+  }
+
+  console.error(hubReplacementNotice(reason, port, Object.keys(projects).length, plan.interrupts));
+  // Signed-in dashboard tabs stay signed in: the old hub writes its live
+  // sessions (digests only) for the new one to take at startup. A hub too old
+  // to have the route answers 404, and its tabs sign in again.
+  await hubRequest(port, "POST", "/api/hub/handover", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
+  // SIGTERM first and a long grace, as `ndx hub stop` does: the hub's handler
+  // stops every project server before exiting. hub.json is kept, and the new
+  // hub brings each project back from it under the same id.
+  await terminateTreeByPid(own.pid, { forceKillTimeoutMs: HUB_STOP_GRACE_MS });
+  const freed = await waitForPortFreeOrNewHub(port, own.pid, home, HUB_STOP_GRACE_MS + 5_000);
+  if (freed === "held") {
+    await discardSessionHandover(home);
+    throw new Error(`The old n-dx hub (PID ${own.pid}) did not release port ${port}; nothing was started in its place.`);
+  }
+  // Another ndx start replaced the same old hub first: its hub is this one's too.
+  // Every project is down until the new hub answers: a failed start is tried
+  // once more, and a second failure says the next ndx start brings them back.
+  const spawned = freed === "replaced"
+    ? joinedHub(port)
+    : await spawnReplacementHub(() => spawnHub(port, { tools, __dir, home, tokenFile }), { port, projects: Object.keys(projects).length });
+  const restored = await restoreHubProjects(port, projects, home);
+  return { ...spawned, restored };
+}
+
+/**
+ * Whether the hub identified as `pid` is no longer the one serving `port`:
+ * its process is gone, it no longer answers its own health route (a hub
+ * closes its listener first when stopped), or another pid answers there.
+ *
+ * @param {number} port
+ * @param {number} pid
+ * @returns {Promise<boolean>}
+ */
+async function hubGoingAway(port, pid) {
+  if (!isProcessRunning(pid)) return true;
+  const health = await hubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
+  if (health.status !== 200) return true;
+  const answering = health.body?.pid;
+  return Number.isInteger(answering) && answering !== pid;
+}
+
+/** What a command that found its replacement already done reports: no spawn of its own, and a note. */
+function joinedHub(port) {
+  return { spawned: false, pid: null, note: `Another ndx start replaced the n-dx hub on port ${port} at the same time; this one joins that hub.` };
+}
+
+/**
+ * Wait for the old hub's port after stopping it: "free" once nothing listens,
+ * "replaced" once this user's hub — another one than `oldPid` — answers there
+ * (a concurrent `ndx start` replaced the same hub first), "held" when
+ * neither happened within `timeoutMs`.
+ *
+ * @param {number} port
+ * @param {number} oldPid
+ * @param {string} home
+ * @param {number} timeoutMs
+ * @returns {Promise<"free" | "replaced" | "held">}
+ */
+async function waitForPortFreeOrNewHub(port, oldPid, home, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let nextIdentify = 0;
+  for (;;) {
+    if (!(await isPortInUse(port))) return "free";
+    // Identifying asks the process table, so not on every poll.
+    if (Date.now() >= nextIdentify) {
+      nextIdentify = Date.now() + 1_000;
+      const own = await identifyOwnHub(port, home);
+      if (own.ok && own.pid !== oldPid && (await hubIsHealthy(port, home)).ok) return "replaced";
+    }
+    if (Date.now() >= deadline) return "held";
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+/**
+ * Work a hub restart would interrupt: hench runs holding a lock in each
+ * registered project (an `ndx work` in a terminal holds one as much as a
+ * dashboard run), runs the project's server reports as executing, and what
+ * its `/api/live-work` reports — MCP sessions open on it through the hub,
+ * and Sidecar turns in progress, the hub-scope session's included.
+ *
+ * Only called once the hub has been identified as this user's own, so the
+ * token may go to it. A server too old to have the route (404), or a project
+ * with no running server, has none; any other failed answer — a timeout, a
+ * 5xx, a 401 from a hub holding another token — means it could not be told,
+ * and the project is listed in `unchecked`, which defers the replacement
+ * ({@link liveWorkAnswer}). hench's locks on disk count either way.
+ *
+ * @param {number} port
+ * @param {Record<string, { id: string, repoRoot: string, worktrees?: string[] }>} projects
+ * @returns {Promise<import("./hub-replacement.js").HubLiveWork>}
+ */
+async function gatherHubLiveWork(port, projects) {
+  const ask = (path) => hubRequest(port, "GET", path, undefined, PROBE_TIMEOUT_MS, { sendToken: true });
+  const entries = await Promise.all(Object.values(projects).map(async (record) => {
+    let locks = 0;
+    for (const dir of new Set([record.repoRoot, ...(record.worktrees ?? [])])) {
+      try {
+        locks += countLiveHenchLocks(resolveLayout(dir).henchDir);
+      } catch {
+        // A worktree that is gone holds no run.
+      }
+    }
+    let executions = 0;
+    let sessions = 0;
+    let turns = 0;
+    let hubTurns = 0;
+    const base = `/p/${encodeURIComponent(record.id)}`;
+    const [ex, live] = await Promise.all([ask(`${base}/api/hench/execute/status`), ask(`${base}/api/live-work`)]);
+    const exAnswer = liveWorkAnswer(ex);
+    const liveAnswer = liveWorkAnswer(live);
+    if (exAnswer === "known" && Array.isArray(ex.body?.executions)) {
+      executions = ex.body.executions.filter((e) => e?.status === "starting" || e?.status === "running").length;
+    }
+    // `/api/live-work`: MCP sessions, and Sidecar turns — the project's own,
+    // and the hub-scope session's when this server hosts it.
+    if (liveAnswer === "known") {
+      const count = (n) => (Number.isFinite(Number(n)) ? Math.max(0, Number(n)) : 0);
+      sessions = count(live.body.mcpSessions?.rex) + count(live.body.mcpSessions?.sourcevision);
+      turns = count(live.body.sidecarTurns?.worktree);
+      hubTurns = count(live.body.sidecarTurns?.hub);
+    }
+    // A dashboard run holds a hench lock too: the larger count, not the sum.
+    const unchecked = exAnswer === "unknown" || liveAnswer === "unknown";
+    return { project: record.id, runs: Math.max(locks, executions), sessions, turns, hubTurns, unchecked };
+  }));
+  entries.sort((x, y) => x.project.localeCompare(y.project));
+  return {
+    runs: entries.map((e) => ({ project: e.project, count: e.runs })),
+    mcpSessions: entries.map((e) => ({ project: e.project, count: e.sessions })),
+    sidecarTurns: entries.map((e) => ({ project: e.project, count: e.turns })),
+    hubSidecarTurns: entries.reduce((n, e) => n + e.hubTurns, 0),
+    unchecked: entries.filter((e) => e.unchecked).map((e) => e.project),
+  };
+}
+
+/**
+ * Bring every project the old hub served back on the new one, under the same
+ * id and so the same `/p/<id>/` URL. The new hub re-attaches them from
+ * `hub.json` on its own; any it does not list, or lists as stopped, is
+ * registered again from the record taken before the old hub was stopped.
+ * Waits until each is healthy, or the registration timeout runs out.
+ *
+ * @param {number} port
+ * @param {Record<string, { id: string, name?: string, repoRoot: string, worktrees?: string[] }>} projects
+ * @param {string} home
+ */
+async function restoreHubProjects(port, projects, home) {
+  const ids = Object.keys(projects);
+  const deadline = Date.now() + HUB_REGISTER_TIMEOUT_MS;
+  const registered = new Set();
+  let listed = new Map();
+  for (;;) {
+    const res = await credentialedHubRequest(port, "GET", "/api/hub/projects", undefined, PROBE_TIMEOUT_MS, { home });
+    listed = new Map((Array.isArray(res.body?.projects) ? res.body.projects : []).map((p) => [p.id, p]));
+    const absent = ids.filter((id) => !registered.has(id) && (!listed.has(id) || listed.get(id).status?.state === "stopped"));
+    await Promise.all(absent.map(async (id) => {
+      registered.add(id);
+      const record = projects[id];
+      for (const worktree of new Set([record.repoRoot, ...(record.worktrees ?? [])])) {
+        await credentialedHubRequest(
+          port,
+          "POST",
+          "/api/hub/projects",
+          { id, name: record.name, repoRoot: record.repoRoot, worktree },
+          HUB_REGISTER_TIMEOUT_MS,
+          { home },
+        );
+      }
+    }));
+    if (absent.length > 0) continue;
+    const pending = ids.filter((id) => listed.get(id)?.status?.state !== "healthy");
+    if (pending.length === 0 || Date.now() >= deadline) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const healthy = ids.filter((id) => listed.get(id)?.status?.state === "healthy").sort();
+  const unhealthy = ids
+    .filter((id) => listed.get(id)?.status?.state !== "healthy")
+    .sort()
+    .map((id) => ({ id, state: listed.get(id)?.status?.state ?? "not registered", lastError: listed.get(id)?.status?.lastError ?? null }));
+  return { healthy, unhealthy };
 }
 
 /**
@@ -2132,6 +2575,9 @@ export async function runHub(rest, { commandName = "hub" } = {}) {
   }
 
   if (subcommand === "stop") {
+    // A stop is not a replacement: a hand-over left by one that failed must
+    // not sign the next hub's tabs in.
+    await discardSessionHandover(home);
     const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
     const pid = typeof health.body?.pid === "number" ? health.body.pid : (await readHubPid(home));
     if (health.status !== 200 && !pid) {
@@ -2311,19 +2757,35 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // The token is created before the hub so this process and the hub agree on
   // it from the first probe; an existing file is reused, never rotated.
   const authEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"], home);
-  const { tokenFile, token } = resolveStartToken(authEnabled, home);
+  let { tokenFile, token } = resolveStartToken(authEnabled, home);
   // The web build this ndx would spawn. A source-linked install whose dist/
-  // lags its source starts a hub older than this CLI; say so before it does.
-  const web = packageBuildIdentity(resolve(__dir, tools.web));
-  const staleDist = staleWebDistWarning(web, HUB_SERVER_COMMANDS);
-  if (staleDist) console.error(staleDist);
+  // lags its source would start a hub older than this CLI, so it is rebuilt
+  // first.
+  const webEntry = resolve(__dir, tools.web);
+  const built = await ensureSourceBuild(webEntry, { checkLag: true });
+  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
+  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
+  else if (!built.ok) {
+    console.error(`Error: ${built.message}`);
+    return 1;
+  }
+  // A lagging build that could not be rebuilt still runs: say why it is older.
+  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
+  const web = packageBuildIdentity(webEntry);
   try {
-    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
+    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile, web, force: !!flags["replace-hub"], rebuildFailed: !!(built.ok && built.failed) });
   } catch (err) {
     console.error(err.message);
     return 1;
   }
+  if (hub.deferred) console.error(`Note: ${hub.deferred}`);
+  if (hub.note) console.error(`Note: ${hub.note}`);
+  if (hub.authNote) console.error(`Note: ${hub.authNote}`);
+  // Served by a token hub although this command asked for none: sign in, and
+  // name MCP's header, with the token that hub requires.
+  if (hub.servedWithToken && !token) ({ tokenFile, token } = resolveStartToken(true, home));
   if (hub.spawned) log(`n-dx hub started on http://127.0.0.1:${hubPort} (PID ${hub.pid}).`);
+  if (hub.restored) for (const line of formatReplacementResult(hub.restored, hubPort)) log(line);
 
   // `ndxBin` is still sent for older hubs; a current hub ignores it and
   // spawns its own CLI entry point.
@@ -2349,11 +2811,6 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // the pid file lets stop/status/refresh recognise a hub registration.
   const health = await credentialedHubRequest(hubPort, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
   const hubPid = typeof health.body?.pid === "number" ? health.body.pid : (hub.pid ?? process.pid);
-  // A hub that kept running across an upgrade or rebuild serves older code
-  // than this CLI expects. Only a reused hub can differ; one just spawned is
-  // the build on disk, which the stale-dist check above already judged.
-  const mismatch = !hub.spawned && health.status === 200 ? hubBuildMismatch(health.body?.build, web) : null;
-  if (mismatch) console.error(`Warning: ${mismatch}.\n  To fix: ${serverRefreshFix(web, HUB_SERVER_COMMANDS)}.`);
   try {
     await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
   } catch {
@@ -2370,7 +2827,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
   log(`  URL: ${dashboardUrl}`);
-  if (token && !nonce) log(noNonceNote(nonceStatus, serverRefreshFix(web, HUB_SERVER_COMMANDS)));
+  if (token && !nonce) log(noNonceNote(nonceStatus, hub.deferred ? deferredHubSignInFix() : "this ndx could not replace it"));
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");
@@ -2402,8 +2859,9 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
  * @param {Function} deps.exit               Shared exit request helper for synchronous command flow
  * @param {Function} deps.flushExit          Shared async exit helper for signal callbacks
  * @param {string} [deps.commandName="web"]  CLI command name for messaging ("start" or "web")
+ * @param {boolean} [deps.rebuiltForNonce]  Set on the one rerun after a forced rebuild ({@link shouldRebuildForNonce}).
  */
-export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web" }) {
+export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web", rebuiltForNonce = false }) {
   const absDir = resolve(dir);
 
   // Parse flags and detect subcommand
@@ -2612,12 +3070,20 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   if (flags.debug) serveArgs.push("--debug");
   else if (flags.verbose) serveArgs.push("--verbose");
 
-  // The web build about to be spawned; a source-linked dist/ that lags its
-  // source runs older code than this CLI.
-  const web = packageBuildIdentity(resolve(__dir, tools.web));
+  // The web build about to be spawned. A source-linked dist/ that lags its
+  // source would run older code than this CLI, so it is rebuilt first.
+  const webEntry = resolve(__dir, tools.web);
+  const built = await ensureSourceBuild(webEntry, { checkLag: true });
+  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
+  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
+  else if (!built.ok) {
+    console.error(`Error: ${built.message}`);
+    return 1;
+  }
+  // A lagging build that could not be rebuilt still runs: say why it is older.
+  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
+  const web = packageBuildIdentity(webEntry);
   const hereServer = hereServerCommands(commandName, isPreview);
-  const staleDist = staleWebDistWarning(web, hereServer);
-  if (staleDist) console.error(staleDist);
 
   // --- Background mode ---
   if (isBackground) {
@@ -2682,6 +3148,23 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     const { nonce: hereNonce, status: hereNonceStatus } = hereToken
       ? await mintNonceFromSpawnedServer(actualPort, child.pid)
       : { nonce: null, status: 0 };
+    // A server just spawned from this checkout that has no nonce route is a
+    // build older than this ndx even though its files are not older than its
+    // source (a stamp that does not match, a watch build mid-flight). Rebuild
+    // it and start again, once; the second run stops this server first.
+    if (hereToken && !hereNonce && shouldRebuildForNonce(hereNonceStatus, web, rebuiltForNonce)) {
+      log(`The server built from ${join(web.packageDir, "dist")} is older than this ndx; rebuilding @n-dx/web and starting it again…`);
+      const rebuilt = await ensureSourceBuild(webEntry, { force: true });
+      if (rebuilt.ok && rebuilt.failed) {
+        // Nothing newer to start: keep the server just started, without a sign-in link.
+        console.error(rebuildFailedWarning(rebuilt.failed, webEntry));
+      } else if (!rebuilt.ok) {
+        console.error(`Error: ${rebuilt.message}`);
+        return 1;
+      } else {
+        return runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName, rebuiltForNonce: true });
+      }
+    }
     log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
     if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, hereServer)));
 

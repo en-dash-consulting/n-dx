@@ -539,7 +539,7 @@ export { parseGitRemoteUrl, remoteToWebUrl, stripRemoteCredentials } from "./git
 export type { ParsedGitRemote, RemoteHostKind } from "./git-remote-url.js";
 
 // Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
-export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";
+export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken, writeOwnerOnlyFile } from "./auth-token.js";
 export type { AuthTokenPathOptions } from "./auth-token.js";
 
 // Per-user credential store (`<ndx home>/credentials.json`). The orchestration

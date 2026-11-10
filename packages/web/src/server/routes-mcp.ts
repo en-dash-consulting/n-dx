@@ -278,6 +278,17 @@ export async function handleMcpRoute(
 }
 
 /**
+ * Sessions open on each endpoint and active within the idle TTL — the ones
+ * a client is still using. Reported on `GET /api/live-work` (routes-live-work.ts). One the sweep has not yet closed but that has
+ * been idle past the TTL is about to go and is not counted.
+ */
+export function mcpSessionCounts(now = Date.now()): { rex: number; sourcevision: number } {
+  const live = (sessions: Map<string, McpSession>): number =>
+    Array.from(sessions.values()).filter((s) => now - s.lastActivityAt <= SESSION_TTL_MS).length;
+  return { rex: live(rexSessions), sourcevision: live(svSessions) };
+}
+
+/**
  * Close all active MCP sessions and stop the sweep timer.
  * Used for graceful shutdown.
  */

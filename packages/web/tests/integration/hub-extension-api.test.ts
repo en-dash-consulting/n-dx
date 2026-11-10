@@ -267,10 +267,11 @@ describe("GET /api/hub/extensions", () => {
   });
 
   it("is 503 with { error } when n-dx cannot be asked", async () => {
-    const h = await hub({ listExtensions: undefined });
+    const h = await hub({ listExtensions: undefined, ndxCli: null });
     const { status, body } = await api(h, "/api/hub/extensions");
     expect(status).toBe(503);
-    expect(body.error).toMatch(/without an n-dx CLI/);
+    expect(body.error).toMatch(/no n-dx CLI/);
+    expect(body.error).not.toMatch(/ndx hub stop|restart/i);
   });
 });
 

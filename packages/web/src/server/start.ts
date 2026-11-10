@@ -25,6 +25,7 @@ import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
+import { handleLiveWorkRoute } from "./routes-live-work.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
@@ -883,6 +884,7 @@ async function handleApiRoutes(
   }
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleWorkspacesRoute(req, res, registry)) return true;
+  if (handleLiveWorkRoute(req, res)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;

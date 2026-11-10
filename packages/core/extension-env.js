@@ -228,17 +228,59 @@ function isPidAlive(pid) {
   }
 }
 
-/** Stop this home's running sidecar before a management command reports success. */
-export async function stopExtensionSidecar(home, name) {
-  if (!name) return;
-  const hub = runningHub(home, nodeFs, isPidAlive);
-  if (!hub) return;
-  const token = hub.tokenFile ? nodeFs.readFileSync(hub.tokenFile, "utf8").trim() : "";
-  const response = await fetch(`${hub.url}/api/hub/extensions/${encodeURIComponent(name)}/stop`, {
-    method: "POST",
-    headers: { "X-Ndx-Token": token },
-    signal: AbortSignal.timeout(5_000),
-  });
+/**
+ * What a management command says when the hub did not confirm stopping a
+ * sidecar. Pure, so the wording is unit-tested.
+ *
+ * The command has already done its work on disk, and the hub does not need a
+ * restart to catch up: it asks n-dx for the sidecar's launch plan again on
+ * every request and on its idle sweep, and stops a sidecar whose extension is
+ * no longer enabled; one that ignores its stop signal is killed when the
+ * grace runs out. So this reports, rather than prescribes.
+ *
+ * @param {string} name
+ * @param {number | null} status  The hub's HTTP status, or null when it did not answer.
+ * @param {string} [error]        Why it did not answer.
+ * @returns {string}
+ */
+export function sidecarStopNote(name, status, error) {
+  const why = status === null ? (error ?? "no answer") : `HTTP ${status}`;
+  return `The hub did not confirm stopping the ${name} sidecar (${why}). ` +
+    "It re-checks every running sidecar's extension on its next request and within a minute on its own, and stops one that is no longer enabled.";
+}
+
+/**
+ * Stop this home's running sidecar before a management command reports
+ * success. Never throws for the hub's sake: a hub that is not running needs
+ * nothing stopped, and one that does not confirm the stop is reported with
+ * {@link sidecarStopNote} while the command's own result stands.
+ *
+ * @param {string} home
+ * @param {string | undefined} name
+ * @param {{ fetchImpl?: typeof fetch, fs?: ExtensionEnvFs, isAlive?: (pid: number) => boolean }} [deps]
+ * @returns {Promise<{ stopped: boolean, note?: string }>}
+ */
+export async function stopExtensionSidecar(home, name, { fetchImpl = fetch, fs = nodeFs, isAlive = isPidAlive } = {}) {
+  if (!name) return { stopped: false };
+  const hub = runningHub(home, fs, isAlive);
+  if (!hub) return { stopped: false };
+  let token = "";
+  try {
+    token = hub.tokenFile ? fs.readFileSync(hub.tokenFile, "utf8").trim() : "";
+  } catch {
+    // Unreadable: the hub refuses, and that is reported below.
+  }
+  let response;
+  try {
+    response = await fetchImpl(`${hub.url}/api/hub/extensions/${encodeURIComponent(name)}/stop`, {
+      method: "POST",
+      headers: { "X-Ndx-Token": token },
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (err) {
+    return { stopped: false, note: sidecarStopNote(name, null, /** @type {Error} */ (err).message) };
+  }
   await response.body?.cancel();
-  if (!response.ok) throw new Error(`Could not stop the ${name} sidecar (HTTP ${response.status}); restart the hub with ndx hub stop`);
+  if (!response.ok) return { stopped: false, note: sidecarStopNote(name, response.status) };
+  return { stopped: true };
 }

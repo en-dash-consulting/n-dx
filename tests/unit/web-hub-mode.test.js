@@ -14,6 +14,7 @@ import {
   deriveProjectId,
   ensureAuthTokenFile,
   hubAuthMismatchMessage,
+  hubAuthProbe,
   hubAuthState,
   hubDashboardUrl,
   judgeHubIdentity,
@@ -207,6 +208,15 @@ describe("hubAuthState", () => {
     // A 200 that is not the health payload is not a hub either.
     expect(await hubAuthState(3117, probe({ status: 200, body: null }, ok), own)).toBe("absent");
   });
+
+  it("reports the pid of the hub it judged, so a replacement stops only that hub", async () => {
+    const health = (pid) => ({ status: 200, body: { ok: true, pid } });
+    expect(await hubAuthProbe(3117, probe(health(11), ok), own)).toEqual({ state: "open", pid: 11 });
+    expect(await hubAuthProbe(3117, probe(unauthorized, health(12)), own)).toEqual({ state: "token", pid: 12 });
+    // Holding another token, its health cannot be read: the pid identified as this user's hub.
+    expect(await hubAuthProbe(3117, probe(unauthorized, unauthorized), own)).toEqual({ state: "mismatch", pid: 4242 });
+    expect(await hubAuthProbe(3117, probe(ok, ok), own)).toEqual({ state: "open", pid: null });
+  });
 });
 
 describe("judgeHubIdentity", () => {
@@ -337,24 +347,34 @@ describe("resolveAuthEnabled", () => {
 });
 
 describe("hubAuthMismatchMessage", () => {
-  it("names the exposure when an open hub would serve an authenticated project", () => {
-    const msg = hubAuthMismatchMessage("open", "token", 3117, "/home/u/.ndx/auth.token");
+  const deferred = "The n-dx hub on port 3117 needs replacing: … pass --replace-hub.";
+
+  it("refuses to join an open hub while its replacement is deferred, naming the exposure and the way to join it as it is", () => {
+    const msg = hubAuthMismatchMessage("open", "token", 3117, "/home/u/.ndx/auth.token", deferred);
+    expect(msg.startsWith(deferred)).toBe(true);
     expect(msg).toContain("without authentication");
-    expect(msg).toContain("ndx hub stop");
-    // The way out that does not require stopping anything is stated too.
+    expect(msg).toContain("not registered");
     expect(msg).toContain("--no-auth");
+    expect(msg).not.toContain("ndx hub stop");
   });
 
   it("explains the other direction without implying an exposure", () => {
-    const msg = hubAuthMismatchMessage("token", "open", 3117, null);
-    expect(msg).toContain("requires the per-user token");
-    expect(msg).toContain("ndx hub stop");
-    expect(msg).not.toContain("would serve this project unauthenticated");
+    const msg = hubAuthMismatchMessage("token", "open", 3117, null, deferred);
+    expect(msg).toContain("served with the per-user token");
+    expect(msg).not.toContain("would serve it unauthenticated");
+    expect(msg).not.toContain("ndx hub stop");
   });
 
   it("names the token file when the hub holds a different one", () => {
-    expect(hubAuthMismatchMessage("mismatch", "token", 3117, "/home/u/.ndx/auth.token"))
-      .toContain("/home/u/.ndx/auth.token");
+    const msg = hubAuthMismatchMessage("mismatch", "token", 3117, "/home/u/.ndx/auth.token", deferred);
+    expect(msg).toContain("/home/u/.ndx/auth.token");
+    expect(msg).not.toContain("ndx hub stop");
+  });
+
+  it("never touches a port held by something that is not this user's hub", () => {
+    const msg = hubAuthMismatchMessage("foreign", "token", 3117, null);
+    expect(msg).toContain("not this user's n-dx hub");
+    expect(msg).toContain("nothing was sent");
   });
 });
 

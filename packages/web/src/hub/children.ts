@@ -58,6 +58,14 @@ export interface ChildStatus {
   lastError: string | null;
 }
 
+/**
+ * Why a project server was not started: the hub has no n-dx binary to start
+ * it from. The hub looks again before every start and on every health check,
+ * and `ndx start` replaces a hub that reports it still has none.
+ */
+export const NO_NDX_BIN =
+  "the hub cannot tell which n-dx binary to run; it looks again before each start, and the next `ndx start` replaces a hub that still cannot";
+
 export interface SupervisorOptions {
   /**
    * The `@n-dx/web` CLI entry every child is spawned from — the hub's own
@@ -65,6 +73,12 @@ export interface SupervisorOptions {
    * starting a child fails with that reason instead of spawning anything.
    */
   ndxBin?: string;
+  /**
+   * Asked for the binary at each spawn instead of {@link ndxBin} when given:
+   * the hub looks for its own entry again when it had none, so a server it
+   * could not start before starts once the binary is there.
+   */
+  ndxBinOf?: () => string;
   /** How long to wait for the child to publish its port. */
   portFileTimeoutMs?: number;
   /** Per-request timeout for `GET /api/status`. */
@@ -78,7 +92,7 @@ export interface SupervisorOptions {
   token?: string | null;
 }
 
-const DEFAULTS: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin">> = {
+const DEFAULTS: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf">> = {
   portFileTimeoutMs: 20_000,
   healthTimeoutMs: 3_000,
   stopGraceMs: 5_000,
@@ -180,7 +194,7 @@ async function stopForeignPid(pid: number, graceMs: number): Promise<void> {
 /** Supervises the server process for one registered project. */
 export class ProjectSupervisor {
   readonly record: ProjectRecord;
-  private readonly opts: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin">> & Pick<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin">;
+  private readonly opts: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf">> & Pick<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf">;
 
   private handle: ManagedChild | null = null;
   private state: ChildState = "stopped";
@@ -294,12 +308,13 @@ export class ProjectSupervisor {
   private async spawnAndWait(): Promise<void> {
     if (this.state !== "stopped" && this.record.pid && isPidAlive(this.record.pid)) return;
 
-    if (!this.opts.ndxBin) {
+    const ndxBin = this.opts.ndxBinOf?.() ?? this.opts.ndxBin;
+    if (!ndxBin) {
       this.state = "stopped";
-      this.lastError = "the hub cannot tell which n-dx binary to run; restart it with `ndx start`";
+      this.lastError = NO_NDX_BIN;
       return;
     }
-    const { cmd, args } = buildServeCommand(this.opts.ndxBin, this.record.repoRoot, this.opts.tokenFile);
+    const { cmd, args } = buildServeCommand(ndxBin, this.record.repoRoot, this.opts.tokenFile);
     removePortFile(this.record.repoRoot);
     this.stopping = false;
     this.attached = false;

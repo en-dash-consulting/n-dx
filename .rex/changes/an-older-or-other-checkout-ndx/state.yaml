@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "bc7135ac-2396-44c3-af2c-24e966629d85":
+    status: "completed"
+    startedAt: "2026-11-09T14:05:36.229Z"
+    completedAt: "2026-11-09T14:05:36.229Z"
+    endedAt: "2026-11-09T14:05:36.229Z"
+    activeIntervals: [{"end":"2026-11-09T14:05:36.229Z","start":"2026-11-09T14:05:36.229Z"}]
+    appliedAt: "2026-11-09T14:05:36.229Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-09T13:58:33.349Z"
+    lastModified: "2026-11-09T14:05:36.229Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

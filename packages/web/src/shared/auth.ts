@@ -21,8 +21,11 @@
  * socket URL.
  *
  * Sessions, nonces and tickets live in the memory of the server that minted
- * them ({@link CredentialStore}): a restart revokes all of them. The reasoning
- * is in docs/architecture/web-server.md ("Authentication").
+ * them ({@link CredentialStore}): a restart revokes all of them. The one
+ * exception is a hub that `ndx start` replaces, which hands its live
+ * sessions — as SHA-256 digests, never nonces, tickets or the token — to the
+ * hub that takes its place ({@link CredentialStore.exportSessions}). The
+ * reasoning is in docs/architecture/web-server.md ("Authentication").
  *
  * Pure and framework-agnostic so the hub and the project server share one
  * definition, like `origin.ts`. Every comparison is constant-time.
@@ -118,10 +121,24 @@ export function randomCredential(): string {
 }
 
 interface Entry {
+  /** The credential itself, or for a handed-over session its SHA-256 digest (`digest`). */
   value: string;
   expiresAt: number;
   /** Sessions only: when the session ends however busy it is. */
   hardExpiresAt?: number;
+  /** `value` is the hex SHA-256 digest of the credential, not the credential. */
+  digest?: boolean;
+}
+
+/**
+ * A live browser session as a hub hands it to the hub replacing it: the
+ * credential's SHA-256 digest (hex), never the credential, so the file it
+ * travels in grants nothing to whoever reads it.
+ */
+export interface HandedOverSession {
+  sha256: string;
+  expiresAt: number;
+  hardExpiresAt: number;
 }
 
 /** Tuning for {@link CredentialStore}; tests shorten the clocks. */
@@ -134,6 +151,12 @@ export interface CredentialStoreOptions {
   sessionMaxTtlMs?: number;
   /** Cap per kind; the oldest entry is dropped past it. */
   maxEntries?: number;
+  /**
+   * Hex SHA-256 of a string, for sessions handed over from another server.
+   * Injected so this module stays free of `node:crypto`; without it, sessions
+   * can be handed over from this store but not into it.
+   */
+  sha256?: (value: string) => string;
 }
 
 /**
@@ -153,6 +176,7 @@ export class CredentialStore {
   private readonly sessionIdleTtlMs: number;
   private readonly sessionMaxTtlMs: number;
   private readonly maxEntries: number;
+  private readonly sha256: ((value: string) => string) | undefined;
   private nonces: Entry[] = [];
   private tickets: Entry[] = [];
   private sessions: Entry[] = [];
@@ -165,6 +189,7 @@ export class CredentialStore {
     this.sessionIdleTtlMs = options.sessionIdleTtlMs ?? SESSION_IDLE_TTL_MS;
     this.sessionMaxTtlMs = options.sessionMaxTtlMs ?? SESSION_MAX_TTL_MS;
     this.maxEntries = options.maxEntries ?? 256;
+    this.sha256 = options.sha256;
   }
 
   private add(list: Entry[], entry: Entry): void {
@@ -177,11 +202,17 @@ export class CredentialStore {
     return list.filter((e) => e.expiresAt > now);
   }
 
-  /** Walk every entry; return the index of the match, or -1. Constant work per entry. */
+  /**
+   * Walk every entry; return the index of the match, or -1. Constant work per
+   * entry: a handed-over session is matched by the candidate's digest, which
+   * is computed once, before the walk, whatever the list holds.
+   */
   private find(list: Entry[], candidate: string | null | undefined): number {
+    const digest = this.sha256 && typeof candidate === "string" && candidate.length > 0 ? this.sha256(candidate) : null;
     let found = -1;
     for (let i = 0; i < list.length; i++) {
-      if (tokensEqual(candidate, list[i].value) && found === -1) found = i;
+      const presented = list[i].digest ? digest : candidate;
+      if (tokensEqual(presented, list[i].value) && found === -1) found = i;
     }
     return found;
   }
@@ -242,6 +273,46 @@ export class CredentialStore {
     if (i === -1) return false;
     this.tickets.splice(i, 1);
     return true;
+  }
+
+  /**
+   * The live sessions, as {@link HandedOverSession}s for the hub replacing
+   * this one. Never a nonce or a ticket. Empty without {@link CredentialStoreOptions.sha256}.
+   */
+  exportSessions(): HandedOverSession[] {
+    if (!this.sha256) return [];
+    this.sessions = this.live(this.sessions);
+    return this.sessions.map((e) => ({
+      sha256: e.digest ? e.value : this.sha256!(e.value),
+      expiresAt: e.expiresAt,
+      hardExpiresAt: e.hardExpiresAt ?? e.expiresAt,
+    }));
+  }
+
+  /**
+   * Take over sessions another server handed over. Each keeps its expiries,
+   * clamped to what this store would have given a new session; malformed or
+   * expired entries are dropped, and the per-kind cap applies as to any
+   * session. Returns how many were taken. Without
+   * {@link CredentialStoreOptions.sha256} nothing can be matched, so nothing
+   * is taken.
+   */
+  importSessions(entries: readonly unknown[]): number {
+    if (!this.sha256 || !Array.isArray(entries)) return 0;
+    this.sessions = this.live(this.sessions);
+    const now = this.now();
+    let taken = 0;
+    for (const raw of entries.slice(-this.maxEntries)) {
+      const e = raw as Partial<HandedOverSession> | null;
+      if (!e || typeof e !== "object" || typeof e.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(e.sha256)) continue;
+      if (typeof e.expiresAt !== "number" || typeof e.hardExpiresAt !== "number") continue;
+      const hard = Math.min(e.hardExpiresAt, now + this.sessionMaxTtlMs);
+      const expiresAt = Math.min(e.expiresAt, now + this.sessionIdleTtlMs, hard);
+      if (!(expiresAt > now)) continue;
+      this.add(this.sessions, { value: e.sha256, expiresAt, hardExpiresAt: hard, digest: true });
+      taken++;
+    }
+    return taken;
   }
 
   /** Forget every nonce, session and ticket. */

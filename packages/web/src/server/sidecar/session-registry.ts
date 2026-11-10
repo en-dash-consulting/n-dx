@@ -271,6 +271,31 @@ function isRecord(value: unknown): value is SidecarSessionRecord {
     && typeof r.lastActivityAt === "string";
 }
 
+/**
+ * Every registry this process made, weakly held, so the turns in flight
+ * across all of them can be counted without any one owner keeping a list.
+ */
+const instances = new Set<WeakRef<SidecarSessionRegistry>>();
+
+/**
+ * Sidecar turns in progress in this process, by scope: a project's own
+ * sessions (`worktree`) and the hub-scope session this server hosts
+ * (`hub`). Replacing the hub stops this server, which would cut those turns
+ * off, so `ndx start` waits for them (`GET /api/live-work`).
+ */
+export function sidecarTurnsInFlight(): { worktree: number; hub: number } {
+  const counts = { worktree: 0, hub: 0 };
+  for (const ref of instances) {
+    const registry = ref.deref();
+    if (!registry) {
+      instances.delete(ref);
+      continue;
+    }
+    for (const scope of registry.turnScopes()) counts[scope]++;
+  }
+  return counts;
+}
+
 export class SidecarSessionRegistry {
   private readonly dir: string;
   private readonly connect: SidecarSessionConnect;
@@ -300,6 +325,12 @@ export class SidecarSessionRegistry {
     this.context = opts.context;
     this.onTurnSpend = opts.onTurnSpend;
     for (const record of this.readIndex()) this.records.set(record.id, record);
+    instances.add(new WeakRef(this));
+  }
+
+  /** The scope of each session with a turn in progress. */
+  turnScopes(): SidecarScope[] {
+    return [...this.turnOpen].map((id) => this.records.get(id)?.scope ?? "worktree");
   }
 
   create(input: CreateSidecarSessionInput): SidecarSessionRecord {

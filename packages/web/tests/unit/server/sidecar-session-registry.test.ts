@@ -18,8 +18,10 @@ import type { VendorSessionOptions } from "@n-dx/llm-client";
 import {
   DEFAULT_SIDECAR_TTL_MS,
   SidecarSessionRegistry,
+  sidecarTurnsInFlight,
   type SidecarSessionConnect,
 } from "../../../src/server/sidecar/session-registry.js";
+import { liveWorkReport } from "../../../src/server/routes-live-work.js";
 import { resolveSidecarSessionEnv } from "../../../src/server/sidecar/session-env.js";
 
 interface Spawned {
@@ -103,6 +105,22 @@ describe("restart", () => {
     await running;
     await reg.sendTurn(id, "two");
     expect(spends).toEqual([{ lens: "plan", input: 10 }, { lens: "describe", input: 10 }]);
+  });
+
+  it("counts its turns in flight by scope, which GET /api/live-work reports so a hub replacement waits", async () => {
+    const before = sidecarTurnsInFlight();
+    const reg = registry();
+    const project = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    const hub = reg.create({ scope: "hub", worktree: root, vendor: "claude" });
+
+    const projectTurn = reg.sendTurn(project.id, "one");
+    expect(sidecarTurnsInFlight()).toEqual({ worktree: before.worktree + 1, hub: before.hub });
+    const hubTurn = reg.sendTurn(hub.id, "one");
+    expect(sidecarTurnsInFlight()).toEqual({ worktree: before.worktree + 1, hub: before.hub + 1 });
+    expect(liveWorkReport().sidecarTurns).toEqual({ worktree: before.worktree + 1, hub: before.hub + 1 });
+
+    await Promise.all([projectTurn, hubTurn]);
+    expect(sidecarTurnsInFlight()).toEqual(before);
   });
 
   it("refuses a second turn while one runs", async () => {
