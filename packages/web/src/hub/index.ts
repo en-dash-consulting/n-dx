@@ -5,9 +5,9 @@
  * @module web/hub
  */
 
-export { startHub, Hub, DEFAULT_HUB_PORT, normalizeWorktree } from "./hub.js";
+export { startHub, Hub, DEFAULT_HUB_PORT, normalizeWorktree, resolveNdxCli } from "./hub.js";
 export type { HubOptions, HubHandle, CloseOptions, RegisterProjectInput, ProjectView, WorktreeRemoval } from "./hub.js";
-export { buildServeCommand, checkProjectHealth, ProjectSupervisor, MAX_RESPAWNS } from "./children.js";
+export { buildServeCommand, checkProjectHealth, ProjectSupervisor, MAX_RESPAWNS, NO_NDX_BIN } from "./children.js";
 export type { ChildState, ChildStatus, SupervisorOptions } from "./children.js";
 export {
   HUB_REGISTRY_VERSION,
@@ -63,6 +63,7 @@ export type {
 export {
   SidecarManager,
   ndxCliPlanner,
+  NO_NDX_CLI,
   SIDECAR_START_TIMEOUT_MS,
   SIDECAR_CRASH_LIMIT,
   SIDECAR_CRASH_WINDOW_MS,

@@ -16,7 +16,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
 
@@ -61,6 +61,33 @@ function repairTokenMode(path: string): void {
 }
 
 /**
+ * Write `content` to `path` readable by its owner only — the directory 0700,
+ * the file 0600 — the way the token itself is written. On Windows the modes
+ * are advisory and the per-user profile directory is the boundary, as for the
+ * token.
+ *
+ * Written to a sibling temporary name created exclusively (`wx`) with the
+ * mode set at creation, and renamed into place, so the file never exists with
+ * wider permissions or half its content.
+ */
+export function writeOwnerOnlyFile(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const temp = `${path}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+  writeFileSync(temp, content, { encoding: "utf-8", mode: 0o600, flag: "wx" });
+  try {
+    chmodSync(temp, 0o600);
+  } catch {
+    // Not every filesystem honours modes; the file still exists.
+  }
+  try {
+    renameSync(temp, path);
+  } catch (err) {
+    rmSync(temp, { force: true });
+    throw err;
+  }
+}
+
+/**
  * Read the token, creating it when absent. The directory is 0700 and the
  * file 0600; on Windows the modes are advisory and the profile directory is
  * the boundary. An existing token is never rotated here — every server that
@@ -72,15 +99,8 @@ export function ensureAuthToken(path: string): string {
     repairTokenMode(path);
     return existing;
   }
-  const dir = dirname(path);
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
   const token = randomBytes(32).toString("base64url");
-  writeFileSync(path, `${token}\n`, { encoding: "utf-8", mode: 0o600 });
-  try {
-    chmodSync(path, 0o600);
-  } catch {
-    // Not every filesystem honours modes; the file still exists.
-  }
+  writeOwnerOnlyFile(path, `${token}\n`);
   return token;
 }
 

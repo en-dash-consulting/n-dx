@@ -23,6 +23,8 @@ const FIXTURE = [
   `const mode = process.env.SIDECAR_MODE;`,
   `process.stdin.resume(); process.stdin.on("end", () => process.exit(0));`,
   `const admitted = (req) => req.headers["x-ndx-sidecar-secret"] === process.env.NDX_SIDECAR_SECRET;`,
+  // Ignores the stop request: only the force kill after the grace ends it.
+  `if (mode === "stubborn") process.on("SIGTERM", () => console.log("ignoring SIGTERM"));`,
   `if (mode === "crash") { console.log("crashing"); process.exit(3); }`,
   `if (mode === "never-healthy") { console.log("hanging"); setInterval(() => {}, 1000); }`,
   // Loses the port: binds only once another server holds it, then exits a moment after EADDRINUSE.
@@ -268,6 +270,22 @@ describe("SidecarManager", () => {
     expect(m.list()[0].state).toBe("running");
   });
 
+  it("kills a sidecar that does not answer its stop request, and starts a new one on the next request", async () => {
+    const { m } = manager("stubborn", { stopGraceMs: 500 });
+    expect((await m.ensure("recon")).ok).toBe(true);
+    const pid = m.list()[0].pid!;
+
+    // The caller gets its answer once the grace runs out and the kill lands.
+    expect(await m.stop("recon")).toBe(true);
+    // stop() resolves only after the escalation to a kill: the stop request
+    // was ignored, and the instance is gone from the manager either way.
+    expect(m.list()[0]).toMatchObject({ state: "stopped", recentCrashes: 0 });
+
+    const again = await m.ensure("recon");
+    expect(again.ok).toBe(true);
+    expect(m.list()[0].pid).not.toBe(pid);
+  });
+
   it("restarts a crashed sidecar on the next request", async () => {
     const exited = logGate("exited with code 1");
     const { m, asked } = manager("ok", { log: exited.log });
@@ -435,7 +453,7 @@ describe("SidecarManager", () => {
     });
 
     const blind = new SidecarManager({ plan: null, memoryFloorBytes: 0, freeMemory: () => null });
-    expect(await blind.ensure("recon")).toMatchObject({ ok: false, status: 503, error: expect.stringMatching(/without an n-dx CLI/) });
+    expect(await blind.ensure("recon")).toMatchObject({ ok: false, status: 503, error: expect.stringMatching(/no n-dx CLI/) });
     expect(await blind.ensure("Not_A_Name")).toMatchObject({ ok: false, status: 404 });
   });
 

@@ -2,8 +2,11 @@
  * `/api/hub/*` — the hub's own API, distinct from any project server's.
  *
  *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count,
- *                                     and the build it runs (version, build-stamp hash)
+ *                                     the build it runs (version, build-stamp hash, package root),
+ *                                     and `faults`: what it cannot do ("no-ndx-bin", "no-ndx-cli")
  *   GET    /api/hub/projects        — registered projects with live child status
+ *   POST   /api/hub/handover        — token only: write the live browser sessions for the hub
+ *                                     `ndx start` replaces this one with (session-handover.ts)
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
  *                                     (with ?hubSession=1, whether the hub session can run)
@@ -61,7 +64,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
-import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
+import { detectBasePath, projectIdFromBasePath, requestAccess, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
@@ -204,7 +207,7 @@ export function parseRegisterInput(body: unknown, selfBin: string): { input: Reg
   // by older `ndx start` versions) is ignored, so nothing a request carries
   // chooses what the hub executes.
   if (!selfBin || !isAcceptableNdxBin(selfBin)) {
-    return { problem: "The hub cannot tell which n-dx binary to run; restart it with `ndx start`." };
+    return { problem: "The hub cannot tell which n-dx binary to run, so it registered nothing; the next `ndx start` replaces a hub in this state." };
   }
   if (b.worktree !== undefined) {
     if (typeof b.worktree !== "string" || !isAbsolute(b.worktree)) {
@@ -302,7 +305,7 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
     return true;
   }
 
-  if (!hub.selfBin) {
+  if (!hub.repairSelfBin()) {
     error(res, 500, "The hub cannot tell which n-dx binary to run — register this folder with `ndx start` instead.");
     return true;
   }
@@ -468,7 +471,22 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
       // `ndx start` compares this with the build it would spawn, so a hub
       // left running from an older dist/ is named rather than misread.
       build: hubBuildIdentity(),
+      // What this hub cannot do — no n-dx binary for project servers, no
+      // n-dx CLI for extensions. `ndx start` replaces a hub that reports any.
+      faults: hub.faults(),
     });
+    return true;
+  }
+
+  // `ndx start`, just before it stops this hub to replace it: write the live
+  // browser sessions for the new hub. The per-user token only — a browser
+  // session can never ask a hub to write its sessions anywhere.
+  if (path === "/handover" && method === "POST" && scopedProjectId === null) {
+    if (requestAccess(req.headers, hub.token, hub.credentials) !== "token" || !hub.token) {
+      error(res, 403, "Only the per-user token can ask the hub to hand its sessions over");
+      return true;
+    }
+    json(res, 200, { written: hub.handOverSessions() });
     return true;
   }
 
@@ -557,6 +575,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
       error(res, 400, (err as Error).message);
       return true;
     }
+    hub.repairSelfBin();
     const parsed = parseRegisterInput(body, hub.selfBin);
     if ("problem" in parsed) {
       error(res, 400, parsed.problem);

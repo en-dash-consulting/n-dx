@@ -25,6 +25,12 @@ export interface HubBuildIdentity {
   version: string | null;
   /** The source hash its dist/ build stamp records; null without a stamp. */
   sourceHash: string | null;
+  /**
+   * The package root this hub runs from. `ndx start` replaces a hub of the
+   * same version but another source hash only when this is its own web
+   * package: a rebuild of the same checkout, not another checkout's build.
+   */
+  packageRoot: string;
 }
 
 /** File name of the stamp inside dist/ (scripts/lib/stale-dist.mjs, packages/core/build-identity.mjs). */
@@ -49,6 +55,7 @@ export function readBuildIdentity(packageRoot: string): HubBuildIdentity {
   return {
     version: typeof version === "string" ? version : null,
     sourceHash: typeof sourceHash === "string" ? sourceHash : null,
+    packageRoot,
   };
 }
 
