@@ -214,12 +214,13 @@ export function sizeText(impact: ItemImpact): string | null {
  * The chips for one item, or nothing when the item has no known impact.
  * `full` adds the file-kinds chip, for rows with room for it.
  */
-export function ImpactTags({ impact, full = false }: { impact: ItemImpact | undefined; full?: boolean }) {
-  if (!impact) return null;
-  const source = impact.basis === "actual" ? "Files changed by runs on this item" : "Estimated from the files this item names";
-  const size = sizeText(impact);
-  const kinds = kindsText(impact.kinds);
-  const chips = [
+function sourceOf(impact: ItemImpact): string {
+  return impact.basis === "actual" ? "Files changed by runs on this item" : "Estimated from the files this item names";
+}
+
+/** The Security and Essential chips, for a row with no room for the rest. */
+function flagChips(impact: ItemImpact) {
+  return [
     impact.security.length > 0
       ? h("span", {
           key: "security",
@@ -234,6 +235,28 @@ export function ImpactTags({ impact, full = false }: { impact: ItemImpact | unde
           title: `Changes files much of the project depends on:\n${fileList(impact.essential, impact.essential.length)}`,
         }, "Essential")
       : null,
+  ];
+}
+
+/** Only the Security and Essential flags, or nothing. */
+export function ImpactFlags({ impact }: { impact: ItemImpact | undefined }) {
+  const chips = impact ? flagChips(impact).filter(Boolean) : [];
+  return chips.length > 0 ? h("span", { class: "impact-tags" }, chips) : null;
+}
+
+/** The size in one word ("Large"), with the count and files in its tooltip — for a table cell. */
+export function sizeCell(impact: ItemImpact | undefined): { label: string; title: string | undefined } {
+  if (!impact?.size) return { label: "—", title: impact ? undefined : "No files known yet" };
+  return { label: SIZE_LABELS[impact.size], title: `${sizeText(impact)}\n${sourceOf(impact)}:\n${fileList(impact.files, impact.fileCount)}` };
+}
+
+export function ImpactTags({ impact, full = false }: { impact: ItemImpact | undefined; full?: boolean }) {
+  if (!impact) return null;
+  const source = sourceOf(impact);
+  const size = sizeText(impact);
+  const kinds = kindsText(impact.kinds);
+  const chips = [
+    ...flagChips(impact),
     size
       ? h("span", {
           key: "size",

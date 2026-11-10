@@ -1244,17 +1244,29 @@
 .cg-release { margin: var(--space-3) 0 var(--space-1); color: var(--text-dim); font-size: 12px; text-transform: uppercase; }
 .cg-group:first-child .cg-release { margin-top: 0; }
 .cg-rows { margin: 0; padding: 0; list-style: none; }
-.cg-row { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) 0; }
-.cg-row + .cg-row { border-top: 1px solid var(--border); }
-/* First line: what the change is, its stage at the end. */
-.cg-line { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
-.cg-line .cg-open { flex: 1; min-width: 0; }
-.cg-line .cg-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; }
-.cg-line .cg-stage { flex: none; }
-/* Second line: the details, quieter. */
-.cg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); font-size: 12px; color: var(--text-muted); }
+/* The glance is a table: change, size, progress, status, then hover-only actions. */
+.cg-table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 13px; }
+.cg-table th {
+  padding: 0 var(--space-2) var(--space-1); text-align: left; white-space: nowrap;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+.cg-table td { padding: var(--space-2); vertical-align: middle; border-bottom: 1px solid var(--border); }
+.cg-table th:first-child, .cg-table td:first-child { padding-left: 0; }
+.cg-table tbody tr:last-child td { border-bottom: none; }
+.cg-name { width: 100%; min-width: 0; }
+.cg-name .cg-open { display: inline; }
+.cg-name .cg-title { font-weight: 600; overflow-wrap: anywhere; }
+.cg-name .impact-tags { margin-left: var(--space-2); }
+.cg-size, .cg-pct, .cg-status { white-space: nowrap; color: var(--text-muted); cursor: default; }
+.cg-pct { font-variant-numeric: tabular-nums; text-align: right; }
+.cg-size-large { color: var(--orange); }
+.cg-status-in-progress { color: var(--accent); font-weight: 600; }
+.cg-status-waiting { color: var(--orange); font-weight: 600; }
+.cg-status-awaiting-apply { color: var(--green); }
 /* Row actions stay out of the way until the row is hovered or focused. */
-.cg-actions { display: inline-flex; gap: var(--space-3); opacity: 0; transition: opacity 0.12s; }
+.cg-actions { white-space: nowrap; opacity: 0; transition: opacity 0.12s; }
+.cg-actions > * + * { margin-left: var(--space-3); }
 .cg-row:hover .cg-actions, .cg-row:focus-within .cg-actions { opacity: 1; }
 @media (hover: none) { .cg-actions { opacity: 1; } }
 .cg-open {
@@ -1311,7 +1323,8 @@
 .sg-ready { color: var(--text-muted); font-size: 12px; }
 
 /* Sidecar ghosts (SP5): changes a waiting card proposes — dashed, dimmed, never counted. */
-.cg-ghost { opacity: 0.6; font-style: italic; border-left: 2px dashed var(--border); padding-left: var(--space-2); }
-.cg-ghost-chip { border: 1px dashed var(--border); background: none; font-style: normal; }
+.cg-ghost { opacity: 0.6; font-style: italic; }
+.cg-ghost .cg-name { border-left: 2px dashed var(--border); padding-left: var(--space-2); }
+.cg-ghost-chip { padding: 0 var(--space-2); border: 1px dashed var(--border); border-radius: 999px; background: none; font-style: normal; }
 .ls-also-in-stage { color: var(--text-dim); font-size: 12px; }
 .ls-waiting { color: var(--text-muted); font-size: 12px; font-style: italic; }

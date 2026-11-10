@@ -104,7 +104,7 @@ describe("the Plan surfaces", () => {
     await mount(h(ChangesGlance, { navigateTo }), [PLACED, INBOX], { summary: { ...SUMMARY, open: [] } });
     const rows = [...root.querySelectorAll(".cg-ghost")];
     expect(rows.map((r) => r.querySelector(".cg-title")?.textContent)).toEqual(["Add refunds"]);
-    expect(rows[0].textContent).toContain("proposed · on a card");
+    expect(rows[0].querySelector(".cg-status")?.textContent).toBe("On a card");
   });
 
   it("Open changes draws nothing extra once the card is gone", async () => {
