@@ -94,11 +94,22 @@ function filesSummary(data: LoadedData): ComponentChild {
     .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
+  // Bars, not chips: each role's share of the files, across the tile's width.
+  const total = summary.totalFiles || roles.reduce((n, [, c]) => n + c, 0);
   return h("div", null,
     h("p", { class: "tile-sum-headline" },
       h("strong", null, summary.totalFiles.toLocaleString()), " files · ",
       h("strong", null, `${Math.round(summary.totalLines / 1000).toLocaleString()}k`), " lines"),
-    chips(roles.map(([role, n]) => [role, n])),
+    h("ul", { class: "tile-sum-list tile-sum-bars", role: "list", "aria-label": "Files by role" },
+      roles.map(([role, n]) => {
+        const share = total > 0 ? n / total : 0;
+        return h("li", { key: role, class: "tile-sum-bar", title: `${n.toLocaleString()} ${role} files` },
+          h("span", { class: "tile-sum-bar-label" }, role),
+          h("span", { class: "tile-sum-bar-track", "aria-hidden": "true" },
+            h("span", { class: "tile-sum-bar-fill tile-sum-bar-fill--neutral", style: `width: ${Math.max(2, Math.round(share * 100))}%` })),
+          h("span", { class: "tile-sum-bar-value" }, n.toLocaleString()),
+        );
+      })),
   );
 }
 

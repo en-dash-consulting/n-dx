@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
+import { TileGrid, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
 import type { StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
@@ -228,5 +228,24 @@ describe("a tile with more than it shows", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("fitTracks", () => {
+  it("spans the 4px tracks a tile's chrome, content and 16px gap need", () => {
+    // 46px head and borders + 162px content + 16px gap = 224px = 56 tracks.
+    expect(fitTracks(46, 162, TRACKS_PER_ROW)).toBe(56);
+    // Rounds up: never clips its own content.
+    expect(fitTracks(46, 163, TRACKS_PER_ROW)).toBe(57);
+  });
+
+  it("keeps the configured size (null) once content reaches it, and when nothing is measured", () => {
+    expect(fitTracks(46, 232 - 46, TRACKS_PER_ROW)).toBeNull();
+    expect(fitTracks(46, 5000, TRACKS_PER_ROW * 2)).toBeNull();
+    expect(fitTracks(46, 0, TRACKS_PER_ROW)).toBeNull();
+  });
+
+  it("one configured row is 232px of tile plus the gap", () => {
+    expect(TRACKS_PER_ROW * 4 - 16).toBe(232);
   });
 });

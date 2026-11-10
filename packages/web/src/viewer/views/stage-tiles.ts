@@ -205,6 +205,72 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
 
 // ── Tile ───────────────────────────────────────────────────────
 
+/** The fine grid's track (`--tile-unit`) and the gap each tile keeps below itself, in px. */
+export const TILE_UNIT_PX = 4;
+export const TILE_GAP_PX = 16;
+/** Tracks one configured row takes: 232px of tile plus the gap. */
+export const TRACKS_PER_ROW = 62;
+
+/**
+ * Tracks a tile needs to show `contentPx` of body content under `chromePx` of
+ * header and border, or null when that reaches `maxTracks` (the configured
+ * size), which then stands and clips with its fade.
+ */
+export function fitTracks(chromePx: number, contentPx: number, maxTracks: number): number | null {
+  if (contentPx <= 0) return null;
+  const tracks = Math.ceil((chromePx + contentPx + TILE_GAP_PX) / TILE_UNIT_PX);
+  return tracks >= maxTracks ? null : tracks;
+}
+
+/**
+ * The tracks a tile should span to fit its content, or null to keep its
+ * configured size. Measured from the body's children (blocks keep their own
+ * height whatever the body's), and remeasured when they resize or change.
+ */
+export function useFitTracks(
+  tileRef: { current: HTMLElement | null },
+  bodyRef: { current: HTMLElement | null },
+  maxTracks: number,
+): number | null {
+  const [tracks, setTracks] = useState<number | null>(null);
+  useEffect(() => {
+    const tile = tileRef.current;
+    const body = bodyRef.current;
+    if (!tile || !body) return undefined;
+    let frame = 0;
+    const measure = () => {
+      const bodyBox = body.getBoundingClientRect();
+      if (bodyBox.height === 0) return;
+      const style = getComputedStyle(body);
+      let bottom = bodyBox.top + parseFloat(style.paddingTop);
+      for (const child of Array.from(body.children)) {
+        const box = child.getBoundingClientRect();
+        if (box.height === 0) continue;
+        bottom = Math.max(bottom, box.bottom + (parseFloat(getComputedStyle(child).marginBottom) || 0));
+      }
+      const content = bottom - bodyBox.top + parseFloat(style.paddingBottom);
+      const chrome = tile.getBoundingClientRect().height - bodyBox.height;
+      setTracks(fitTracks(chrome, content, maxTracks));
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    schedule();
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    const watchChildren = () => {
+      resize?.disconnect();
+      resize?.observe(body);
+      for (const child of Array.from(body.children)) resize?.observe(child);
+    };
+    watchChildren();
+    const mutation = typeof MutationObserver === "undefined" ? null : new MutationObserver(() => { watchChildren(); schedule(); });
+    mutation?.observe(body, { childList: true, subtree: true, characterData: true });
+    return () => { cancelAnimationFrame(frame); resize?.disconnect(); mutation?.disconnect(); };
+  }, [tileRef, bodyRef, maxTracks]);
+  return tracks;
+}
+
 /**
  * Whether an element's content is taller than the element. Rechecked when the
  * element resizes and when its content changes (a view that loads after
@@ -247,8 +313,10 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   const span = `stage-tile--c${tile.cols ?? 4} stage-tile--r${tile.rows ?? 1}`;
   // Called before the chromeless return so the hook order never depends on the tile.
   const cliName = useCliName();
+  const tileRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const overflowing = useOverflowing(bodyRef);
+  const fit = useFitTracks(tileRef, bodyRef, TRACKS_PER_ROW * (tile.rows ?? 1));
 
   if (tile.band && tile.panel) {
     return h("section", { class: "stage-band", "data-tile": key, "aria-label": title },
@@ -263,7 +331,14 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   }
 
   const summary = renderSummary(tile);
-  return h("section", { class: `stage-tile ${span}`, "data-tile": key, "aria-labelledby": `${idBase}-title` },
+  return h("section", {
+    class: `stage-tile ${span}${fit !== null ? " stage-tile--fit" : ""}`,
+    "data-tile": key,
+    "aria-labelledby": `${idBase}-title`,
+    ref: tileRef,
+    // Shorter than its configured size: span only the tracks its content needs.
+    style: fit !== null ? { gridRow: `span ${fit}` } : undefined,
+  },
     h("button", {
       type: "button",
       class: "stage-tile-head",

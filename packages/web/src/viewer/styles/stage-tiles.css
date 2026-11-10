@@ -6,17 +6,25 @@
  * full-screen. The full-screen layer sits between the top nav and the bottom
  * bar, like the Commands sheet. */
 
+/* Rows are a fine 4px track with no row gap: each tile spans as many as it
+   needs and keeps the 16px gap as its own bottom margin. A configured size
+   (r1 = 232px, r2 = 480px, r3 = 728px, each plus the gap) is the most a tile
+   takes; stage-tiles.ts shrinks one whose content is shorter
+   (`useFitRows`). Fixed px, not --space-4: the density toggle must not shift
+   the arithmetic. */
 .stage-tiles {
-  --tile-row: 232px;
+  --tile-unit: 4px;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: var(--tile-row);
+  grid-auto-rows: var(--tile-unit);
   grid-auto-flow: row dense;
-  gap: var(--space-4);
+  column-gap: var(--space-4);
+  row-gap: 0;
 }
 
 .stage-tile {
   position: relative;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -31,9 +39,9 @@
 .stage-tile--c6 { grid-column: span 6; }
 .stage-tile--c8 { grid-column: span 8; }
 .stage-tile--c12 { grid-column: span 12; }
-.stage-tile--r1 { grid-row: span 1; }
-.stage-tile--r2 { grid-row: span 2; }
-.stage-tile--r3 { grid-row: span 3; }
+.stage-tile--r1 { grid-row: span 62; }
+.stage-tile--r2 { grid-row: span 124; }
+.stage-tile--r3 { grid-row: span 186; }
 
 /* Two tiles a row on mid widths; the map takes the full row. */
 @media (max-width: 1180px) {
@@ -46,7 +54,7 @@
 @media (max-width: 700px) {
   .stage-tiles { grid-template-columns: minmax(0, 1fr); }
   .stage-tile--c4, .stage-tile--c6, .stage-tile--c8, .stage-tile--c12 { grid-column: auto; }
-  .stage-tile--r3 { grid-row: span 2; }
+  .stage-tile--r3 { grid-row: span 124; }
 }
 
 /* The codebase map draws its own card, header and full-screen, and fills
@@ -208,6 +216,18 @@
 }
 .stage-tile-more:hover { border-color: var(--accent); }
 .stage-tile-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A body's children keep their descendants' margins inside their own box, so
+   the height a tile fits to (useFitTracks) is the height its content takes. */
+.stage-tile-body > * {
+  display: flow-root;
+}
+
+/* Fitted to its content: nothing is cut off, so nothing fades. */
+.stage-tile--fit > .stage-tile-body {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
 
 /* A view in a tile is a preview: not interactive until opened. */
 .stage-tile-body--view {

@@ -234,9 +234,10 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
       { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       // The last check as lights; full-screen and "Open" show the whole Validation view.
-      { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 6 },
+      // Up to two rows: tiles shrink to their content, so this only lets the check's buttons show.
+      { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 4, rows: 2 },
       // Gaps in the open changes, each a link to the filtered list. Open changes is placed by its own tile.
-      { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 6, v2Only: true, requiresServer: true },
+      { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 4, v2Only: true, requiresServer: true },
     ],
     // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
     // Product stays, because its tablist is how a v1 project reaches Requirements.

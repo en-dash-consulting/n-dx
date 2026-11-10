@@ -507,7 +507,7 @@ describe("StagePage", () => {
     expect(sectionViews()).toEqual(["analysis"]);
     expect(planTiles()).toEqual(["inbox", "changes-glance", "plan-health", "spec-gaps"]);
     const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
-    expect(spans).toEqual(["stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c6 stage-tile--r1", "stage-tile--c6 stage-tile--r1"]);
+    expect(spans).toEqual(["stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r1"]);
     expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
   });
 
