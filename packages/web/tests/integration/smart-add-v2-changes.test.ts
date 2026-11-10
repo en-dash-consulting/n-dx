@@ -251,6 +251,29 @@ describe("Quick Add on a v2 PRD", () => {
     expect(args.some((a) => a.includes("Support refunds"))).toBe(false);
   });
 
+  it("asks the preview to draft a plain-language summary", async () => {
+    await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card" });
+    expect(execCalls[0].args).toContain("--summarize");
+  });
+
+  it("passes the preview's summary to rex on accept, as one --summary=value token", async () => {
+    mockExecResult = { stdout: JSON.stringify(V2_ACCEPTED), stderr: "", exitCode: 0, error: null };
+    await post(port, "/api/rex/smart-add-accept", {
+      text: "Support refunds when paying by card",
+      summary: "  -Shoppers get their money back\n without calling support.  ",
+    });
+    const { args } = execCalls[0];
+    // One token: a summary starting with "-" stays the flag's value.
+    expect(args).toContain("--summary=-Shoppers get their money back without calling support.");
+    expect(args).not.toContain("--summary");
+  });
+
+  it("sends no --summary when the accept carries none", async () => {
+    mockExecResult = { stdout: JSON.stringify(V2_ACCEPTED), stderr: "", exitCode: 0, error: null };
+    await post(port, "/api/rex/smart-add-accept", { text: "Support refunds when paying by card", summary: "   " });
+    expect(execCalls[0].args.some((a) => a.startsWith("--summary"))).toBe(false);
+  });
+
   it("deletes the description file once rex has answered", async () => {
     mockExecResult = { stdout: JSON.stringify(V2_ACCEPTED), stderr: "", exitCode: 0, error: null };
 

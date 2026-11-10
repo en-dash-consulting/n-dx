@@ -7,7 +7,10 @@
  *   acceptance criteria, as on v1.
  * - **Descriptions** (positional, `--description`, `--file`, stdin): each one
  *   becomes a change. No LLM decomposition: a change is one intent, and its
- *   tasks are written when it is picked up.
+ *   tasks are written when it is picked up. `--summary` sets the change's
+ *   plain-language summary; the JSON preview with `--summarize` drafts one per
+ *   change with the light-tier model (the dashboard's capture bar shows it, and
+ *   its accept passes it back as `--summary`). A draft that fails is left out.
  *
  * A new change lands in the Inbox with `needsPlacement`; the output names it
  * and the placement rules' shortlist, and `rex change place` records one.
@@ -27,6 +30,8 @@ import { info, result } from "../output.js";
 import { parseCsvList } from "../parse-utils.js";
 import { addProposedChanges, type ProposedChangeInput } from "../../recommend/changes-from-proposals.js";
 import { CAPABILITY_CRITERION_FLAG, REMOVE_CAPABILITY_CRITERION_FLAG, formatPlacementSuggestion, nodeLabel } from "./v2-cli.js";
+import { initializeSmartAddLLM, resolveLightSmartAddModel } from "./smart-add.js";
+import { spawnClaude } from "../../analyze/index.js";
 
 export const CHANGE_NODE_TYPES: readonly ChangeNodeType[] = ["change", "task", "subtask"];
 
@@ -95,11 +100,18 @@ export async function cmdAddChangesFromDescriptions(
   if (!texts.length) throw new CLIError("Missing description or --file flag.", 'Usage: rex add "<description>" or rex add --file=<path>');
   // Ranks each new change's placement among one area's capabilities and constraints.
   const area = flags.area?.trim() || undefined;
-  const inputs = texts.map((text): AddChangeNodeInput => {
+  const preview = flags.format === "json" && flags.accept !== "true";
+  const given = cleanSummary(flags.summary);
+  const drafted = preview && flags.summarize === "true" && !given
+    ? await draftSummaries(dir, texts, flags.model)
+    : texts.map(() => undefined);
+  const inputs = texts.map((text, i): AddChangeNodeInput => {
     const title = titleFrom(text);
+    const summary = given ?? drafted[i];
     return {
       type: "change",
       title,
+      ...(summary ? { summary } : {}),
       ...(text !== title ? { description: text } : {}),
       ...(flags.parent ? { parentId: flags.parent } : {}),
       ...(flags.priority ? { priority: flags.priority as Priority } : {}),
@@ -107,13 +119,62 @@ export async function cmdAddChangesFromDescriptions(
   });
   // `--format=json` without `--accept` is smart-add's preview contract (the
   // dashboard's Quick Add relies on it): report what would be created, write nothing.
-  if (flags.format === "json" && flags.accept !== "true") {
+  if (preview) {
     const { tree } = await loadPrdModel(resolveRexPaths(dir).rexDir);
     const rows = jsonRows(planChanges(tree, inputs, new Date(), area).added);
     // `proposals` and `qualityIssues` keep smart-add's preview keys, so a v1-shaped reader sees an empty preview, not a parse error.
     return result(JSON.stringify({ preview: true, changes: rows, proposals: [], qualityIssues: [] }, null, 2));
   }
   report(await addChanges(dir, inputs, area), flags.format === "json");
+}
+
+/** Longest summary kept: one or two sentences, not a description. */
+export const SUMMARY_MAX_CHARS = 400;
+
+/** A summary as stored: one line, trimmed, unquoted, at most {@link SUMMARY_MAX_CHARS}; undefined when empty. */
+export function cleanSummary(raw: string | undefined): string | undefined {
+  const text = (raw ?? "").replace(/\s+/g, " ").trim().replace(/^["'“”]+|["'“”]+$/g, "").trim();
+  if (!text) return undefined;
+  return text.length > SUMMARY_MAX_CHARS ? `${text.slice(0, SUMMARY_MAX_CHARS - 1).trimEnd()}…` : text;
+}
+
+/** The prompt that drafts a change's plain-language summary from the text that describes it. */
+export function summaryPrompt(text: string): string {
+  return [
+    "Write one or two plain sentences for a product owner or team lead who does not write code,",
+    "saying what this change does and why it is worth doing.",
+    "No file paths, code identifiers or jargon. Reply with the sentences only.",
+    "",
+    "Change:",
+    text,
+  ].join("\n");
+}
+
+/**
+ * Draft a summary per text with `complete` (one call each, in order). A call
+ * that fails or answers nothing leaves that text without one.
+ */
+export async function draftSummariesWith(
+  texts: readonly string[],
+  complete: (prompt: string) => Promise<string>,
+): Promise<Array<string | undefined>> {
+  const out: Array<string | undefined> = [];
+  for (const text of texts) {
+    try {
+      out.push(cleanSummary(await complete(summaryPrompt(text))));
+    } catch (err) {
+      process.stderr.write(`rex: could not draft a summary: ${err instanceof Error ? err.message : String(err)}\n`);
+      out.push(undefined);
+    }
+  }
+  return out;
+}
+
+/** {@link draftSummariesWith} on the project's light-tier model (an explicit `--model` wins). */
+async function draftSummaries(dir: string, texts: readonly string[], model?: string): Promise<Array<string | undefined>> {
+  await initializeSmartAddLLM(dir, "json", model);
+  const chosen = model ?? (await resolveLightSmartAddModel(dir));
+  return draftSummariesWith(texts, async (prompt) => (await spawnClaude(prompt, chosen, undefined, "light")).text);
 }
 
 /**
@@ -175,6 +236,7 @@ function jsonRows(added: Added[]) {
     id: node.id,
     type: node.type,
     title: node.title,
+    ...((node as { summary?: string }).summary ? { summary: (node as { summary?: string }).summary } : {}),
     // The text the title was cut from, so a preview can show it is kept.
     ...descriptionOf(node),
     ...(node.needsPlacement ? { needsPlacement: true } : {}),

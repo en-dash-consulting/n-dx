@@ -5,7 +5,7 @@
  * the changes they create.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -146,5 +146,50 @@ describe("summary from analyze proposals", () => {
     expect(input).toMatchObject({ type: "change", title: "Add Apple Pay button", summary: SUMMARY });
     expect(input.tasks?.[0]).toMatchObject({ type: "task", summary: "Connects the button to payments." });
     expect(input.tasks?.[1]).not.toHaveProperty("summary");
+  });
+});
+
+describe("summary from a description add (the dashboard's capture bar)", () => {
+  /** Run cmdAddChangesFromDescriptions and return what it printed. */
+  async function run(texts: string[], flags: Record<string, string>): Promise<string> {
+    const { cmdAddChangesFromDescriptions } = await import("../../src/cli/commands/add-change.js");
+    const out: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { out.push(args.map(String).join(" ")); });
+    try {
+      await cmdAddChangesFromDescriptions(tmp, texts, flags);
+    } finally {
+      spy.mockRestore();
+    }
+    return out.join("\n");
+  }
+
+  it("--summary sets the summary of the change it creates, and shows in the JSON preview", async () => {
+    const preview = JSON.parse(await run(["Add Apple Pay at checkout"], { format: "json", summary: `  "${SUMMARY}"  ` }));
+    expect(preview.changes[0].summary).toBe(SUMMARY);
+    await run(["Add Apple Pay at checkout"], { format: "json", accept: "true", summary: SUMMARY });
+    const model = await loadPrdModel(rexDir, quiet);
+    const created = indexTree(model.tree).entries.map((e) => e.node).find((n) => n.title === "Add Apple Pay at checkout");
+    expect((created as { summary?: string } | undefined)?.summary).toBe(SUMMARY);
+  });
+
+  it("drafts with the given completer, cleaned to one line, and skips a failed draft", async () => {
+    const { draftSummariesWith, summaryPrompt } = await import("../../src/cli/commands/add-change.js");
+    const prompts: string[] = [];
+    const drafts = await draftSummariesWith(["first change", "second change"], async (prompt) => {
+      prompts.push(prompt);
+      if (prompt.includes("second")) throw new Error("model down");
+      return "\n  \"Shoppers pay faster.\n It is worth it.\"  ";
+    });
+    expect(drafts).toEqual(["Shoppers pay faster. It is worth it.", undefined]);
+    expect(prompts[0]).toBe(summaryPrompt("first change"));
+    expect(prompts[0]).toContain("does not write code");
+  });
+
+  it("cleanSummary caps a long draft and treats blank as none", async () => {
+    const { cleanSummary, SUMMARY_MAX_CHARS } = await import("../../src/cli/commands/add-change.js");
+    expect(cleanSummary("   ")).toBeUndefined();
+    const long = cleanSummary("word ".repeat(200))!;
+    expect(long.length).toBe(SUMMARY_MAX_CHARS);
+    expect(long.endsWith("…")).toBe(true);
   });
 });

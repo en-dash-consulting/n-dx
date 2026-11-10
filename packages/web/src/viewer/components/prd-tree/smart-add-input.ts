@@ -104,6 +104,8 @@ export interface PreviewChange {
   id: string;
   type: string;
   title: string;
+  /** What the change does and why, drafted for a non-coder by the preview; Accept keeps it. */
+  summary?: string;
   /** The full text, when the title had to be cut from it. */
   description?: string;
   needsPlacement?: boolean;
@@ -446,10 +448,12 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
         },
         features: p.features.map((f) => ({
           title: f.title,
+          ...((f as { summary?: string }).summary ? { summary: (f as { summary?: string }).summary } : {}),
           description: f.description,
           ...(f.existingId ? { existingId: f.existingId } : {}),
           tasks: f.tasks.map((t) => ({
             title: t.title,
+            ...((t as { summary?: string }).summary ? { summary: (t as { summary?: string }).summary } : {}),
             description: t.description,
             ...(t.acceptanceCriteria && t.acceptanceCriteria.length > 0
               ? { acceptanceCriteria: t.acceptanceCriteria }
@@ -510,6 +514,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
           try {
             created = [...created, await postJson<{ id: string }>("/api/rex/items", {
               title: change.title,
+              ...(change.summary ? { summary: change.summary } : {}),
               ...(change.description ? { description: change.description } : {}),
               ...(target ? { touches: [target] } : {}),
             }, "Add failed")];
@@ -520,7 +525,13 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
           }
         }
       } else {
-        const accepted = await postJson<{ changes?: Array<{ id: string }> }>("/api/rex/smart-add-accept", previewed, "Accept failed");
+        // One text is one change: its drafted summary rides along so Accept writes what the card showed.
+        const summary = changes.length === 1 ? changes[0].summary : undefined;
+        const accepted = await postJson<{ changes?: Array<{ id: string }> }>(
+          "/api/rex/smart-add-accept",
+          summary ? { ...previewed, summary } : previewed,
+          "Accept failed",
+        );
         created = accepted.changes ?? [];
       }
 
@@ -929,6 +940,10 @@ function ChangePreviewCard({ change, name, choice, onChoose, map, mapError, area
     ),
 
     h("div", { class: "smart-add-preview-body" },
+      change.summary
+        ? h("p", { class: "smart-add-preview-summary" },
+            h("span", { class: "smart-add-preview-summary-label" }, "In plain terms: "), change.summary)
+        : null,
       change.description
         ? h("p", { class: "smart-add-preview-desc smart-add-preview-full-text" }, change.description)
         : null,

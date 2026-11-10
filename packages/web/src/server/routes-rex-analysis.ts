@@ -15,7 +15,7 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
-import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
+import { loadPRDSync, refreshPRDCache, summaryField } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { resolveOwnPackageCli } from "./own-cli.js";
 import { refuseWhileRestricted } from "./trust-gate.js";
@@ -87,6 +87,8 @@ interface RexChangeRow {
   id: string;
   type: string;
   title: string;
+  /** The plain-language summary the preview drafted (`--summarize`). */
+  summary?: string;
   needsPlacement?: boolean;
   placement?: unknown;
 }
@@ -192,6 +194,8 @@ function resolveParentId(ctx: ServerContext, requested: unknown): string | null 
 /** Edited proposal shape sent from the proposal editor. */
 interface EditedProposalTask {
   title: string;
+  /** Plain-language summary for a non-coder, as the model proposed it or the editor changed it. */
+  summary?: string;
   /** The proposal's own source, carried through unedited; absent from older editors. */
   source?: string;
   /** The proposal's LoE decomposition, carried through unedited. */
@@ -239,6 +243,7 @@ interface ProposalDecomposition {
   children: Array<{
     title: string;
     source?: string;
+    summary?: string;
     description?: string;
     acceptanceCriteria?: string[];
     priority?: string;
@@ -250,6 +255,7 @@ interface ProposalDecomposition {
 interface EditedProposalFeature {
   title: string;
   source?: string;
+  summary?: string;
   description?: string;
   /** If set, nest tasks under this existing feature instead of creating a new one. */
   existingId?: string;
@@ -790,6 +796,7 @@ function handleGetProposals(
 interface ProposalTaskFields {
   title: string;
   source?: string;
+  summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: string;
@@ -803,6 +810,7 @@ function proposedTask(t: ProposalTaskFields, source?: string): ProposedWork {
   const subtasks = t.decomposition?.children?.map((c) => proposedTask(c, c.source ?? source));
   return {
     title: t.title,
+    ...summaryField(t),
     ...(t.description ? { description: t.description } : {}),
     ...(t.acceptanceCriteria?.length ? { acceptanceCriteria: t.acceptanceCriteria } : {}),
     ...(t.priority && isPriority(t.priority) ? { priority: t.priority } : {}),
@@ -936,6 +944,7 @@ async function handleAcceptProposals(
         status: p.epic.status,
         children: p.features.map((f) => ({
           title: f.title,
+          ...summaryField(f),
           source: f.source,
           status: f.status,
           children: f.tasks.map((t) => proposedTask(t)),
@@ -966,6 +975,7 @@ async function handleAcceptProposals(
             status: "pending",
             source: f.source,
           };
+          Object.assign(featureItem, summaryField(f));
           if (f.description) featureItem.description = f.description;
           await store.addItem(featureItem, epicId);
           addedCount++;
@@ -979,6 +989,7 @@ async function handleAcceptProposals(
               status: "pending",
               source: t.source,
             };
+            Object.assign(taskItem, summaryField(t));
             if (t.description) taskItem.description = t.description;
             if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
             if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
@@ -1136,6 +1147,7 @@ async function handleAcceptEditedProposals(
             status: "pending",
             source: "web-proposal-editor",
           };
+          Object.assign(featureItem, summaryField(f));
           if (f.description?.trim()) featureItem.description = f.description.trim();
           await store.addItem(featureItem, epicId);
           knownIds.add(featureId);
@@ -1152,6 +1164,7 @@ async function handleAcceptEditedProposals(
             status: "pending",
             source: "web-proposal-editor",
           };
+          Object.assign(taskItem, summaryField(t));
           if (t.description?.trim()) taskItem.description = t.description.trim();
           if (t.acceptanceCriteria?.length) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
@@ -1230,6 +1243,7 @@ async function acceptEditedAsChanges(
     title: p.epic.title.trim(),
     children: p.features.filter((f) => f.selected).map((f) => ({
       title: f.title.trim(),
+      ...summaryField(f),
       children: f.tasks.filter((t) => t.selected).map((t) => proposedTask({
         ...t,
         title: t.title.trim(),
@@ -1317,7 +1331,9 @@ async function handleSmartAddPreview(
     // vendor's light tier (e.g. haiku) so the CLI provider completes well
     // within the timeout from a daemonized server. The user-driven CLI
     // `n-dx add` keeps the configured top-tier model.
-    const args = ["add", "--format=json", "--fast", "--description", description];
+    // `--summarize`: on a v2 tree, draft each change's plain-language summary
+    // (light tier); the card shows it and Accept sends it back. A v1 tree ignores it.
+    const args = ["add", "--format=json", "--fast", "--summarize", "--description", description];
     if (parentId !== undefined) args.push("--parent", parentId);
     // Rex ranks within the area, so its targets below the global top five still make the shortlist.
     if (area) args.push("--area", area.id);
@@ -1426,9 +1442,11 @@ async function handleSmartAddAccept(
 ): Promise<boolean> {
   try {
     const body = await readBody(req, res);
-    const input = JSON.parse(body) as { text: string; parentId?: string };
+    const input = JSON.parse(body) as { text: string; parentId?: string; summary?: string };
 
     const description = typeof input.text === "string" ? input.text.trim() : "";
+    // The preview's summary, as the card showed it: one line, capped like rex caps it.
+    const summary = typeof input.summary === "string" ? input.summary.replace(/\s+/g, " ").trim().slice(0, 400) : "";
     if (!description) {
       errorResponse(res, 400, "Text is required");
       return true;
@@ -1451,6 +1469,8 @@ async function handleSmartAddAccept(
       writeFileSync(descriptionFile, description, "utf-8");
 
       const args = ["add", "--format=json", "--accept", `--file=${descriptionFile}`];
+      // `--key=value` in one token: a summary starting with "-" stays a value.
+      if (summary) args.push(`--summary=${summary}`);
       if (parentId !== undefined) args.push("--parent", parentId);
       args.push(ctx.projectDir);
 

@@ -4870,6 +4870,17 @@ a.tracker-link {
   border-top: 1px solid var(--border);
 }
 
+/* The preview's plain-language summary: what the change does, ahead of the full text. */
+.smart-add-preview-summary {
+  margin: var(--space-2) 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  line-height: var(--leading-relaxed);
+}
+.smart-add-preview-summary-label {
+  font-weight: 600;
+}
+
 .smart-add-preview-desc {
   font-size: var(--font-sm);
   color: var(--text-dim);
