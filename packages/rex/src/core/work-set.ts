@@ -490,12 +490,14 @@ function unitInfo(node: RuleNode): UnitInfo {
 export interface AssignToBranchOptions extends Omit<AssignOptions, "earlier"> {
   /** The checkout `branch` is checked out in: its earlier use of the name ({@link earlierUseRows}) is read from it. */
   workspace?: string;
+  /** Transaction supplied by an enclosing PRD write session, when present. */
+  transaction?: typeof withPrdModelTransaction;
 }
 
 /** {@link planAssignToBranch} on the tree under `rexDir`, inside the PRD transaction. */
 export async function assignToBranch(rexDir: string, refs: readonly string[], branch: string, options: AssignToBranchOptions = {}): Promise<AssignReport> {
-  const { workspace, ...rest } = options;
-  const { result } = await withPrdModelTransaction(rexDir, ({ tree }) => {
+  const { workspace, transaction = withPrdModelTransaction, ...rest } = options;
+  const { result } = await transaction(rexDir, ({ tree }) => {
     const earlier = workspace === undefined ? null : earlierUseRows(workspace, branch, tree);
     const plan = planAssignToBranch(tree, refs, branch, earlier ? { ...rest, earlier } : rest);
     return { tree: plan.tree, result: plan.report };
@@ -504,8 +506,8 @@ export async function assignToBranch(rexDir: string, refs: readonly string[], br
 }
 
 /** {@link planUnassignFromBranch} on the tree under `rexDir`, inside the PRD transaction. */
-export async function unassignFromBranch(rexDir: string, refs: readonly string[], onBranch?: string): Promise<UnassignReport> {
-  const { result } = await withPrdModelTransaction(rexDir, ({ tree }) => {
+export async function unassignFromBranch(rexDir: string, refs: readonly string[], onBranch?: string, transaction = withPrdModelTransaction): Promise<UnassignReport> {
+  const { result } = await transaction(rexDir, ({ tree }) => {
     const plan = planUnassignFromBranch(tree, refs, onBranch);
     return { tree: plan.tree, result: plan.report };
   });

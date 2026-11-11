@@ -7,13 +7,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync, watchFile, unwatchFile, existsSync, unlinkSync, chmodSync, statSync } from "node:fs";
+import { Readable } from "node:stream";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { addChangeNode, indexTree, loadPrdModel, withPrdModelTransaction } from "../../src/server/rex-gateway.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ServerContext } from "../../src/server/types.js";
 import { handleRexRoute } from "../../src/server/routes-rex/index.js";
 import type { BranchStartOptionsWire } from "../../src/server/routes-rex/branch-start.js";
-import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
 const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
@@ -31,11 +33,23 @@ function git(cwd: string, ...args: string[]): string {
 describe("start a branch routes", () => {
   let root: string;
   let ctx: ServerContext;
-  let server: RouteTestServer;
   let frames: unknown[];
 
-  const post = (body: unknown) =>
-    fetch(`${server.baseUrl}/api/rex/branch/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  // Exercise the real dispatcher and streamed body without binding a socket.
+  async function request(method: string, body?: unknown): Promise<Response> {
+    const req = Object.assign(Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]), {
+      method, url: "/api/rex/branch/start", headers: {},
+    }) as IncomingMessage;
+    let status = 0;
+    let text = "";
+    const res = {
+      writeHead(code: number) { status = code; },
+      end(data: string) { text = data; },
+    } as unknown as ServerResponse;
+    expect(await handleRexRoute(req, res, ctx, (f) => { frames.push(f); })).toBe(true);
+    return new Response(text, { status });
+  }
+  const post = (body: unknown) => request("POST", body);
   const stateFile = () => join(ctx.rexDir, "changes", "add-apple-pay", "state.yaml");
   const head = () => git(root, "rev-parse", "--abbrev-ref", "HEAD");
   const branches = () => git(root, "branch", "--format=%(refname:short)").split("\n").sort();
@@ -52,16 +66,153 @@ describe("start a branch routes", () => {
     git(root, "add", ".");
     git(root, "commit", "--quiet", "-m", "root");
     ctx = { projectDir: root, svDir: join(root, ".sourcevision"), rexDir, dev: false };
-    server = await startRouteTestServer(async (req, res) => handleRexRoute(req, res, ctx, (f) => { frames.push(f); }));
   });
 
   afterEach(async () => {
-    await server.close();
     await removeTempDir(root);
   });
 
+  function heldCommit() {
+    const hooks = join(root, ".git", "held-hooks");
+    mkdirSync(hooks);
+    const enteredPath = join(hooks, "entered");
+    const releasePath = join(hooks, "release");
+    let entered!: () => void;
+    const ready = new Promise<void>((resolve) => { entered = resolve; });
+    watchFile(enteredPath, { interval: 10 }, () => { if (existsSync(enteredPath)) entered(); });
+    writeFileSync(join(hooks, "pre-commit"), `#!/usr/bin/env node
+const fs = require("node:fs");
+const release = ${JSON.stringify(releasePath)};
+fs.watchFile(release, { interval: 10 }, () => {
+  if (fs.existsSync(release)) { fs.unwatchFile(release); process.exit(1); }
+});
+fs.writeFileSync(${JSON.stringify(enteredPath)}, "ready");
+`, { mode: 0o755 });
+    git(root, "config", "core.hooksPath", hooks);
+    return {
+      ready,
+      release() { writeFileSync(releasePath, "fail"); unwatchFile(enteredPath); },
+    };
+  }
+
+  async function capture() {
+    return withPrdModelTransaction(ctx.rexDir, ({ tree }) => {
+      const added = addChangeNode(tree, { type: "change", title: "Concurrent capture" }, { now: new Date() });
+      return { tree: added.tree, result: added.node.id };
+    }, { lock: { acquireTimeoutMs: 100, retryDelayMs: 5 } });
+  }
+
+  it("holds the writer lock through a failing commit, then preserves a successful capture", async () => {
+    const hook = heldCommit();
+    const start = post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
+    try {
+      await Promise.race([hook.ready, start.then(async (res) => { throw new Error(`commit never reached its barrier: ${await res.clone().text()}`); })]);
+      await expect(capture()).rejects.toThrow("Could not acquire PRD lock");
+    } finally {
+      hook.release();
+      await start;
+    }
+    expect((await start).status).toBe(500);
+    expect(head()).toBe("main");
+    const { result: id, written } = await capture();
+    expect(indexTree((await loadPrdModel(ctx.rexDir)).tree).resolve(id)?.title).toBe("Concurrent capture");
+    const intent = written.written.find((path) => path.endsWith("index.md"));
+    expect(intent).toBeDefined();
+    expect(readFileSync(join(ctx.rexDir, intent!), "utf-8")).toContain(id);
+  });
+
+  it("preserves a successful foreign capture made during the failed commit", async () => {
+    const hook = heldCommit();
+    const start = post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
+    const id = "c0000000-0000-4000-8000-000000000099";
+    const path = join(ctx.rexDir, "changes", "foreign-capture", "index.md");
+    const text = `---\nid: "${id}"\ntype: "change"\ntitle: "Foreign capture"\nslug: "foreign-capture"\n---\n`;
+    try {
+      await Promise.race([hook.ready, start.then(async (res) => { throw new Error(`commit never reached its barrier: ${await res.clone().text()}`); })]);
+      // A manual editor bypasses the advisory PRD lock. Its successful save is
+      // still not owned by branch start, even though the checkout began clean.
+      mkdirSync(join(ctx.rexDir, "changes", "foreign-capture"));
+      writeFileSync(path, text);
+      expect(indexTree((await loadPrdModel(ctx.rexDir)).tree).resolve(id)?.title).toBe("Foreign capture");
+    } finally {
+      hook.release();
+      await start;
+    }
+    expect((await start).status).toBe(500);
+    expect(readFileSync(path, "utf-8")).toBe(text);
+    expect(indexTree((await loadPrdModel(ctx.rexDir)).tree).resolve(id)?.title).toBe("Foreign capture");
+    expect(await (await start).json()).toMatchObject({ error: expect.stringContaining("Other checkout changes remain") });
+    expect(head()).toBe("feat/a");
+  });
+
+  it("retains a foreign edit to an assignment file instead of restoring over it", async () => {
+    const hook = heldCommit();
+    const start = post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
+    let foreign = "";
+    try {
+      await Promise.race([hook.ready, start.then(async (res) => { throw new Error(`commit never reached its barrier: ${await res.clone().text()}`); })]);
+      foreign = readFileSync(stateFile(), "utf-8") + "# saved by another editor\n";
+      writeFileSync(stateFile(), foreign);
+    } finally {
+      hook.release();
+      await start;
+    }
+    const response = await start;
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Another writer changed") });
+    expect(readFileSync(stateFile(), "utf-8")).toBe(foreign);
+    expect(head()).toBe("feat/a");
+    expect(branches()).toEqual(["feat/a", "main"]);
+    expect(indexTree((await loadPrdModel(ctx.rexDir)).tree).resolve(TASK)?.delivery?.branch).toBe("feat/a");
+    expect(frames).toEqual([]);
+  });
+
+  it("retains a moved HEAD and its assignment files for recovery", async () => {
+    const hook = heldCommit();
+    const start = post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
+    let foreignTip = "";
+    let assigned = "";
+    try {
+      await Promise.race([hook.ready, start.then(async (res) => { throw new Error(`commit never reached its barrier: ${await res.clone().text()}`); })]);
+      assigned = readFileSync(stateFile(), "utf-8");
+      foreignTip = git(root, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "foreign commit");
+      git(root, "update-ref", "refs/heads/feat/a", foreignTip);
+    } finally {
+      hook.release();
+      await start;
+    }
+    const response = await start;
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("HEAD changed") });
+    expect(git(root, "rev-parse", "HEAD")).toBe(foreignTip);
+    expect(readFileSync(stateFile(), "utf-8")).toBe(assigned);
+    expect(branches()).toEqual(["feat/a", "main"]);
+  });
+
+  it("reports a failed switch-back and retains the recovery branch", async () => {
+    const original = readFileSync(stateFile(), "utf-8");
+    const hook = heldCommit();
+    const start = post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
+    try {
+      await Promise.race([hook.ready, start.then(async (res) => { throw new Error(`commit never reached its barrier: ${await res.clone().text()}`); })]);
+      git(root, "branch", "-D", "main");
+    } finally {
+      hook.release();
+      await start;
+    }
+    const response = await start;
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("git switch failed") });
+    expect(readFileSync(stateFile(), "utf-8")).toBe(original);
+    expect(head()).toBe("feat/a");
+    expect(branches()).toEqual(["feat/a"]);
+    // Recovery failure still releases the lock for a later supported capture.
+    const { result: id } = await capture();
+    expect(indexTree((await loadPrdModel(ctx.rexDir)).tree).resolve(id)).toBeDefined();
+  });
+
   it("offers the open changes with their slugs, and no stacking on the default branch", async () => {
-    const read = (await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire;
+    const read = (await (await request("GET")).json()) as BranchStartOptionsWire;
     expect(read).toEqual({
       branch: null,
       workSet: false,
@@ -69,7 +220,7 @@ describe("start a branch routes", () => {
       changes: [{ id: CHANGE, displayId: "CH-1", title: "Add Apple Pay", slug: "add-apple-pay" }],
     });
     git(root, "checkout", "--quiet", "-b", "feat/x");
-    expect(((await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire).branch).toBe("feat/x");
+    expect(((await (await request("GET")).json()) as BranchStartOptionsWire).branch).toBe("feat/x");
   });
 
   it("on a clean idle checkout cuts from the default branch, switches, assigns and commits with trailers", async () => {
@@ -151,7 +302,7 @@ describe("start a branch routes", () => {
     git(root, "add", ".");
     git(root, "commit", "--quiet", "-m", "first");
     const tip = git(root, "rev-parse", "HEAD");
-    const read = (await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire;
+    const read = (await (await request("GET")).json()) as BranchStartOptionsWire;
     expect(read).toMatchObject({ branch: "feat/first", workSet: true });
     const res = await post({ changeIds: [CHANGE], name: "feat/second", base: "current" });
     expect(res.status).toBe(200);
@@ -167,7 +318,7 @@ describe("start a branch routes", () => {
     expect(await stacked.json()).toMatchObject({ code: "NO_WORK_SET_BRANCH" });
     // A feature branch nothing is assigned to has no work set either.
     git(root, "checkout", "--quiet", "-b", "feat/empty");
-    const read = (await (await fetch(`${server.baseUrl}/api/rex/branch/start`)).json()) as BranchStartOptionsWire;
+    const read = (await (await request("GET")).json()) as BranchStartOptionsWire;
     expect(read).toMatchObject({ branch: "feat/empty", workSet: false });
     const emptyStacked = await post({ changeIds: [CHANGE], name: "feat/b", base: "current" });
     expect(emptyStacked.status).toBe(409);
@@ -188,19 +339,46 @@ describe("start a branch routes", () => {
     expect(branches()).toEqual(before);
   });
 
-  it("switches back and deletes the branch when the assignment fails", async () => {
+  it("recovers a refused assignment without writing or retaining the new branch", async () => {
+    const { result: id } = await capture();
+    git(root, "add", ".");
+    git(root, "commit", "--quiet", "-m", "capture in Inbox");
+    const original = git(root, "rev-parse", "HEAD");
+    const response = await post({ changeIds: [id], name: "feat/a", base: "default" });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("place") });
+    expect(head()).toBe("main");
+    expect(branches()).toEqual(["main"]);
+    expect(git(root, "rev-parse", "HEAD")).toBe(original);
+    expect(git(root, "status", "--porcelain")).toBe("");
+    expect(indexTree((await loadPrdModel(ctx.rexDir)).tree).resolve(id)).toBeDefined();
+  });
+
+  // Windows does not preserve POSIX executable bits.
+  it.each(["existing", "new", ...(process.platform === "win32" ? [] : ["executable"])])("restores %s assignment files and deletes the branch when commit fails", async (kind) => {
+    if (kind === "executable") {
+      chmodSync(stateFile(), 0o755);
+      git(root, "add", ".");
+      git(root, "commit", "--quiet", "-m", "executable state file");
+    }
+    if (kind === "new") {
+      unlinkSync(stateFile());
+      git(root, "add", ".");
+      git(root, "commit", "--quiet", "-m", "no prior state file");
+    }
     // A commit hook that refuses makes the step after the assignment fail.
     // core.hooksPath set here, so a global hooksPath cannot bypass it.
     const hooks = join(root, ".git", "refuse-hooks");
     mkdirSync(hooks, { recursive: true });
     writeFileSync(join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
     git(root, "config", "core.hooksPath", hooks);
-    const state = readFileSync(stateFile(), "utf-8");
+    const state = existsSync(stateFile()) ? readFileSync(stateFile(), "utf-8") : null;
     const res = await post({ changeIds: [CHANGE], name: "feat/a", base: "default" });
     expect(res.status).toBe(500);
     expect(head()).toBe("main");
     expect(branches()).toEqual(["main"]);
-    expect(readFileSync(stateFile(), "utf-8")).toBe(state);
+    expect(existsSync(stateFile()) ? readFileSync(stateFile(), "utf-8") : null).toBe(state);
+    if (kind === "executable") expect(statSync(stateFile()).mode & 0o777).toBe(0o755);
     expect(git(root, "status", "--porcelain")).toBe("");
   });
 });

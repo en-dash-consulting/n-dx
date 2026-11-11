@@ -23,6 +23,7 @@
  * @module rex/store/prd-model-transaction
  */
 
+import { resolve } from "node:path";
 import { withLock, type LockOptions } from "./file-lock.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "./prd-model-reader.js";
@@ -77,27 +78,63 @@ export async function withPrdModelTransaction<T>(
   mutate: (model: PrdModel) => PrdModelEdit<T> | Promise<PrdModelEdit<T>>,
   options: PrdModelTransactionOptions = {},
 ): Promise<PrdModelTransactionResult<T>> {
-  // Resolved before the lock: the first call in a process shells out to git.
+  return withPrdModelWriteSession(rexDir, (transaction) => transaction(rexDir, mutate, options), options.lock);
+}
+
+/**
+ * Hold the shared PRD lock across a larger operation (including commit and
+ * recovery). Use the supplied transaction instead of nesting lock acquisition.
+ * It is scoped to this directory and callback lifetime; concurrent calls are
+ * refused. Await each transaction before inspecting or recovering its writes.
+ */
+export async function withPrdModelWriteSession<T>(
+  rexDir: string,
+  run: (transaction: typeof withPrdModelTransaction) => Promise<T>,
+  lock?: LockOptions,
+): Promise<T> {
   const actor = await resolveActor();
-  return withLock(
-    prdLockPath(rexDir),
-    async () => {
-      const model = await loadPrdModel(rexDir, { ignoreSchemaSkew: false });
-      if (model.layout !== "v2") throw new PrdLayoutError(rexDir, model.layout);
-      // Signatured before `mutate` runs: a mutation may edit the loaded tree in place.
-      const before = signTree(model.tree);
-      const edit = await mutate(model);
-      stampChangedNodes(
-        edit.tree,
-        before,
-        { lastModified: (options.now?.() ?? new Date()).toISOString(), lastModifiedBy: actor },
-        edit.preserveAuthorFor,
-      );
-      const written = await writePrdModel(rexDir, { ...model, tree: edit.tree }, { removed: edit.removed, now: options.now });
-      return { result: edit.result, written };
-    },
-    options.lock,
+  return withLock(prdLockPath(rexDir), async () => {
+    let active = true;
+    let pending: Promise<unknown> | undefined;
+    const transaction: typeof withPrdModelTransaction = async (dir, mutate, options = {}) => {
+      if (!active || resolve(dir) !== resolve(rexDir)) throw new Error("PRD write session is closed or belongs to another workspace.");
+      if (pending) throw new Error("PRD write session transactions must be awaited sequentially.");
+      const write = transact(rexDir, mutate, options, actor);
+      pending = write;
+      try {
+        return await write;
+      } finally {
+        pending = undefined;
+      }
+    };
+    try {
+      return await run(transaction);
+    } finally {
+      active = false;
+      // A caller that forgot to await must not release the lock mid-write.
+      await pending;
+    }
+  }, lock);
+}
+
+async function transact<T>(
+  rexDir: string,
+  mutate: (model: PrdModel) => PrdModelEdit<T> | Promise<PrdModelEdit<T>>,
+  options: PrdModelTransactionOptions,
+  actor: string,
+): Promise<PrdModelTransactionResult<T>> {
+  const model = await loadPrdModel(rexDir, { ignoreSchemaSkew: false });
+  if (model.layout !== "v2") throw new PrdLayoutError(rexDir, model.layout);
+  // Signatured before mutate runs: a mutation may edit the tree in place.
+  const before = signTree(model.tree);
+  const edit = await mutate(model);
+  stampChangedNodes(
+    edit.tree, before,
+    { lastModified: (options.now?.() ?? new Date()).toISOString(), lastModifiedBy: actor },
+    edit.preserveAuthorFor,
   );
+  const written = await writePrdModel(rexDir, { ...model, tree: edit.tree }, { removed: edit.removed, now: options.now });
+  return { result: edit.result, written };
 }
 
 // ── Modification stamps ──────────────────────────────────────────

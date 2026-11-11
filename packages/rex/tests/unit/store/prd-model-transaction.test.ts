@@ -8,7 +8,7 @@ import { cp, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { withPrdModelTransaction } from "../../../src/store/prd-model-transaction.js";
+import { withPrdModelTransaction, withPrdModelWriteSession } from "../../../src/store/prd-model-transaction.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
 import { isLockHeld } from "../../../src/store/file-lock.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "../../../src/store/paths.js";
@@ -190,5 +190,48 @@ describe("withPrdModelTransaction", () => {
     ).rejects.toThrow(/v1 layout/);
     expect(ran).toBe(false);
     expect(existsSync(prdLockPath(v1Dir))).toBe(false);
+  });
+});
+
+
+describe("withPrdModelWriteSession", () => {
+  it("holds the shared lock after assignment and throughout failure recovery", async () => {
+    await expect(withPrdModelWriteSession(rexDir, async (transaction) => {
+      await transaction(rexDir, ({ tree }) => ({ tree: retitle(tree, CHANGE, "Assigned"), result: null }));
+      try {
+        await expect(withPrdModelTransaction(rexDir, ({ tree }) => ({ tree, result: null }), {
+          lock: { acquireTimeoutMs: 25 },
+        })).rejects.toThrow("Could not acquire PRD lock");
+        throw new Error("commit failed");
+      } catch (err) {
+        expect(isLockHeld(prdLockPath(rexDir))).toBe(true);
+        // Recovery uses the same explicit transaction, without reacquisition.
+        await transaction(rexDir, ({ tree }) => ({ tree: retitle(tree, CHANGE, "Recovered"), result: null }));
+        throw err;
+      }
+    })).rejects.toThrow("commit failed");
+    expect(await titleOf(rexDir, CHANGE)).toBe("Recovered");
+    await withPrdModelTransaction(rexDir, ({ tree }) => ({ tree: retitle(tree, CHANGE, "Later capture"), result: null }));
+    expect(await titleOf(rexDir, CHANGE)).toBe("Later capture");
+  });
+
+  it("refuses escaped, cross-workspace and overlapping session transactions", async () => {
+    let saved!: typeof withPrdModelTransaction;
+    const edit = ({ tree }: Awaited<ReturnType<typeof loadPrdModel>>) => ({ tree, result: null });
+    await withPrdModelWriteSession(rexDir, async (transaction) => {
+      saved = transaction;
+      await expect(transaction(join(tmp, "another-workspace"), edit)).rejects.toThrow("another workspace");
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const first = transaction(rexDir, async (model) => { await gate; return edit(model); });
+      try {
+        await expect(transaction(rexDir, edit)).rejects.toThrow("sequentially");
+      } finally {
+        release();
+        await first;
+      }
+    });
+    await expect(saved(rexDir, edit)).rejects.toThrow("closed");
+    expect(existsSync(prdLockPath(rexDir))).toBe(false);
   });
 });

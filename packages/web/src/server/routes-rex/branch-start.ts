@@ -16,9 +16,10 @@
  *
  * - **Clean checkout, no live run** — switch to it, assign the changes through
  *   rex's `handleAssignToBranch` (the MCP `assign_to_branch` handler, which acts
- *   on the checked-out branch), and commit the PRD roots it changed with one
+ *   on the checked-out branch), and commit the PRD files it changed with one
  *   `N-DX-Item` trailer per change. A failure after the branch exists switches
- *   back and deletes it, so nothing is left half-done.
+ *   back and deletes it when ownership is intact; conflicting edits retain
+ *   the branch and report the recovery needed.
  *   → `{ switched: true, branch, assigned }`
  * - **Dirty checkout or live run** — the branch is created and nothing else;
  *   an assignment is only ever recorded on the checked-out branch.
@@ -32,7 +33,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync } from "node:fs";
+import { chmod, lstat, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { exec } from "@n-dx/llm-client";
 import type { ServerContext } from "../types.js";
@@ -48,6 +49,8 @@ import {
   loadPrdModel,
   prdLayout,
   resolveStore,
+  type withPrdModelTransaction,
+  withPrdModelWriteSession,
   type V2Tree,
 } from "../rex-gateway.js";
 
@@ -216,65 +219,70 @@ async function handleStart(
   const cwd = ctx.projectDir;
 
   try {
-    if ((await prdLayout(ctx.rexDir)) !== "v2") {
-      return refuse(res, 409, "V1_LAYOUT", "This project's PRD uses the v1 layout, which keeps no work sets. Migrate it first.");
-    }
-    const { tree } = await loadPrdModel(ctx.rexDir);
-    const open = new Set(openChanges(tree).map((n) => n.id));
-    const closed = body.changeIds.filter((id) => !open.has(id));
-    if (closed.length > 0) return refuse(res, 409, "NOT_OPEN", `Not an open change: ${closed.join(", ")}.`);
-
-    const checked = await git(cwd, ["check-ref-format", "--branch", body.name]);
-    // `--branch` also expands `@{-1}` and the like; only a name that is its own expansion is a new branch name.
-    // Git allows `;` `$` and the rest, but the reply hands the name back inside a command the user pastes into a shell.
-    if (body.name.startsWith("-") || !SAFE_BRANCH_NAME.test(body.name) || !checked.ok || checked.stdout !== body.name) {
-      return refuse(res, 400, "INVALID_NAME", `"${body.name}" is not a valid branch name.`);
-    }
-    if (await refExists(cwd, `refs/heads/${body.name}`)) {
-      return refuse(res, 409, "NAME_TAKEN", `A branch named ${body.name} already exists.`);
-    }
-
-    const def = await resolveDefaultBranch(cwd);
-    let baseRef: string;
-    if (body.base === "current") {
-      const current = currentWorkSetBranch(cwd);
-      if (current === null || !branchHasWorkSet(tree, cwd)) {
-        return refuse(res, 409, "NO_WORK_SET_BRANCH", "Stacking needs a branch with a work set checked out; this checkout is on the default branch, a detached HEAD or a branch nothing is assigned to.");
+    return await withPrdModelWriteSession(ctx.rexDir, async (transaction) => {
+      if ((await prdLayout(ctx.rexDir)) !== "v2") {
+        return refuse(res, 409, "V1_LAYOUT", "This project's PRD uses the v1 layout, which keeps no work sets. Migrate it first.");
       }
-      baseRef = `refs/heads/${current}`;
-    } else {
-      if (!def) return refuse(res, 409, "NO_DEFAULT_BRANCH", "No default branch resolves: origin/HEAD is unset and there is no main or master.");
-      baseRef = def.ref;
-    }
-    if (def && body.name === def.name) {
-      return refuse(res, 409, "NAME_TAKEN", `${body.name} is the default branch, which holds no work set.`);
-    }
+      const { tree } = await loadPrdModel(ctx.rexDir);
+      const open = new Set(openChanges(tree).map((n) => n.id));
+      const closed = body.changeIds.filter((id) => !open.has(id));
+      if (closed.length > 0) return refuse(res, 409, "NOT_OPEN", `Not an open change: ${closed.join(", ")}.`);
 
-    // Decide before creating anything, so the answer matches what was done.
-    // `--untracked-files=all` overrides a `status.showUntrackedFiles=no` config, which would hide a
-    // just-captured change: the commit below would sweep it in, and a roll-back's `git clean` delete it.
-    const status = await git(cwd, ["status", "--porcelain", "--untracked-files=all"]);
-    if (!status.ok) throw new Error(`git status failed: ${status.stderr}`);
-    const { here } = await repositoryRunSlotUsage(ctx);
-    const reason = status.stdout !== "" ? "dirty" : here.length > 0 ? "run-active" : null;
+      const checked = await git(cwd, ["check-ref-format", "--branch", body.name]);
+      // `--branch` also expands `@{-1}` and the like; only a name that is its own expansion is a new branch name.
+      // Git allows `;` `$` and the rest, but the reply hands the name back inside a command the user pastes into a shell.
+      if (body.name.startsWith("-") || !SAFE_BRANCH_NAME.test(body.name) || !checked.ok || checked.stdout !== body.name) {
+        return refuse(res, 400, "INVALID_NAME", `"${body.name}" is not a valid branch name.`);
+      }
+      if (await refExists(cwd, `refs/heads/${body.name}`)) {
+        return refuse(res, 409, "NAME_TAKEN", `A branch named ${body.name} already exists.`);
+      }
 
-    const head = await currentHead(cwd);
-    if (!head) throw new Error("This checkout has no commit to branch from.");
+      const def = await resolveDefaultBranch(cwd);
+      let baseRef: string;
+      if (body.base === "current") {
+        const current = currentWorkSetBranch(cwd);
+        if (current === null || !branchHasWorkSet(tree, cwd)) {
+          return refuse(res, 409, "NO_WORK_SET_BRANCH", "Stacking needs a branch with a work set checked out; this checkout is on the default branch, a detached HEAD or a branch nothing is assigned to.");
+        }
+        baseRef = `refs/heads/${current}`;
+      } else {
+        if (!def) return refuse(res, 409, "NO_DEFAULT_BRANCH", "No default branch resolves: origin/HEAD is unset and there is no main or master.");
+        baseRef = def.ref;
+      }
+      if (def && body.name === def.name) {
+        return refuse(res, 409, "NAME_TAKEN", `${body.name} is the default branch, which holds no work set.`);
+      }
 
-    const created = await git(cwd, ["branch", "--no-track", body.name, baseRef]);
-    if (!created.ok) throw new Error(`git branch failed: ${created.stderr}`);
+      // Decide before creating anything, so the answer matches what was done.
+      // `--untracked-files=all` overrides `status.showUntrackedFiles=no`:
+      // a just-captured change must keep this a create-only start.
+      const status = await git(cwd, ["status", "--porcelain", "--untracked-files=all"]);
+      if (!status.ok) throw new Error(`git status failed: ${status.stderr}`);
+      const { here } = await repositoryRunSlotUsage(ctx);
+      const reason = status.stdout !== "" ? "dirty" : here.length > 0 ? "run-active" : null;
 
-    if (reason !== null) {
-      const reply: BranchStartReply = { switched: false, branch: body.name, reason, switchCommand: `git switch ${body.name}` };
+      const head = await currentHead(cwd);
+      if (!head) throw new Error("This checkout has no commit to branch from.");
+
+      const baseCommit = await git(cwd, ["rev-parse", "--verify", `${baseRef}^{commit}`]);
+      if (!baseCommit.ok) throw new Error(`git rev-parse failed: ${baseCommit.stderr}`);
+      const created = await git(cwd, ["branch", "--no-track", body.name, baseCommit.stdout]);
+      if (!created.ok) throw new Error(`git branch failed: ${created.stderr}`);
+
+      if (reason !== null) {
+        const reply: BranchStartReply = { switched: false, branch: body.name, reason, switchCommand: `git switch ${body.name}` };
+        jsonResponse(res, 200, reply);
+        return true;
+      }
+
+      const assigned = await switchAssignCommit(ctx, body.name, body.changeIds, head, baseCommit.stdout, transaction);
+      refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
+      broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      const reply: BranchStartReply = { switched: true, branch: body.name, assigned };
       jsonResponse(res, 200, reply);
       return true;
-    }
-
-    const assigned = await switchAssignCommit(ctx, body.name, body.changeIds, head);
-    refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
-    broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-    const reply: BranchStartReply = { switched: true, branch: body.name, assigned };
-    jsonResponse(res, 200, reply);
+    });
   } catch (err) {
     const message = errorMessage(err);
     jsonResponse(res, message.includes("Could not acquire PRD lock") ? 409 : 500, { error: message });
@@ -282,62 +290,162 @@ async function handleStart(
   return true;
 }
 
-/**
- * Switch to the new branch, assign the changes on it and commit the PRD roots
- * the assignment wrote. On any failure, discard what the assignment wrote,
- * switch back to `head` and delete the branch, then rethrow.
- */
+/** A regular file's bytes before and after the assignment, never a whole-root ownership claim. */
+interface FileImage { bytes: Buffer; mode: number }
+interface OwnedWrite { path: string; before: FileImage | null; after: FileImage | null }
+
+async function fileImage(path: string): Promise<FileImage | null> {
+  try {
+    const info = await lstat(path);
+    if (!info.isFile()) throw new Error(`Recovery requires a regular file: ${path}`);
+    return { bytes: await readFile(path), mode: info.mode & 0o777 };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+function sameImage(a: FileImage | null, b: FileImage | null): boolean {
+  return a === null || b === null ? a === b : a.mode === b.mode && a.bytes.equals(b.bytes);
+}
+
+/** Read-only baseline. Only paths the transaction reports writing can enter the journal. */
+async function snapshotRoots(rexDir: string): Promise<Map<string, FileImage>> {
+  const files = new Map<string, FileImage>();
+  async function walk(dir: string): Promise<void> {
+    let entries;
+    try { entries = await readdir(join(rexDir, dir), { withFileTypes: true }); }
+    catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw err;
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) await walk(path);
+      else {
+        const image = await fileImage(join(rexDir, path));
+        if (image) files.set(path.split(sep).join("/"), image);
+      }
+    }
+  }
+  await walk("changes");
+  await walk("product");
+  return files;
+}
+
+/** Switch, assign and commit inside the caller's PRD write session, including recovery. */
 async function switchAssignCommit(
   ctx: ServerContext,
   name: string,
   changeIds: string[],
   head: { branch: string } | { detached: string },
+  tip: string,
+  transaction: typeof withPrdModelTransaction,
 ): Promise<unknown[]> {
   const cwd = ctx.projectDir;
   const rexRel = relative(cwd, ctx.rexDir).split(sep).join("/") || ".";
-  // A pathspec that matches nothing fails `git add` and `git commit`: name only the roots this PRD has.
-  const roots = ["changes", "product"].filter((r) => existsSync(join(ctx.rexDir, r))).map((r) => `${rexRel}/${r}`);
   let switched = false;
+  let journal: OwnedWrite[] | null = [];
+  let staged = false;
   try {
     const sw = await git(cwd, ["switch", "--quiet", name]);
     if (!sw.ok) throw new Error(`git switch failed: ${sw.stderr}`);
     switched = true;
-
-    const result = await handleAssignToBranch(cwd, ctx.rexDir, { ids: changeIds });
+    const rev = await git(cwd, ["rev-parse", "HEAD"]);
+    if (!rev.ok) throw new Error(`git rev-parse failed: ${rev.stderr}`);
+    if (rev.stdout !== tip) throw new Error("The new branch changed before assignment.");
+    const before = await snapshotRoots(ctx.rexDir);
+    const record: typeof withPrdModelTransaction = async (dir, mutate, options) => {
+      // A partially failed write has no complete journal: retain it for recovery.
+      journal = null;
+      const result = await transaction(dir, mutate, options);
+      const writes: OwnedWrite[] = [];
+      for (const path of new Set([...result.written.written, ...result.written.deletedFiles])) {
+        writes.push({ path: `${rexRel}/${path}`, before: before.get(path) ?? null, after: await fileImage(join(dir, path)) });
+      }
+      journal = writes;
+      return result;
+    };
+    const result = await handleAssignToBranch(cwd, ctx.rexDir, { ids: changeIds }, record);
     const text = result.content[0]?.text ?? "";
     if (result.isError) throw new Error(text);
     const { assigned } = JSON.parse(text) as { assigned?: unknown[] };
-
-    const changed = await git(cwd, ["status", "--porcelain", "--untracked-files=all", "--", ...roots]);
-    if (!changed.ok) throw new Error(`git status failed: ${changed.stderr}`);
-    if (changed.stdout !== "") {
-      const added = await git(cwd, ["add", "--all", "--", ...roots]);
+    if (journal === null) throw new Error("Assignment did not return its write journal.");
+    const paths = journal.map((write) => write.path);
+    if (paths.length > 0) {
+      const added = await git(cwd, ["--literal-pathspecs", "add", "--all", "--", ...paths]);
       if (!added.ok) throw new Error(`git add failed: ${added.stderr}`);
+      staged = true;
       const trailers = changeIds.map((id) => `N-DX-Item: ${id}`).join("\n");
-      const committed = await git(cwd, ["commit", "--quiet", "-m", ASSIGN_COMMIT_SUBJECT, "-m", trailers, "--", ...roots]);
+      const committed = await git(cwd, ["--literal-pathspecs", "commit", "--quiet", "-m", ASSIGN_COMMIT_SUBJECT, "-m", trailers, "--", ...paths]);
       if (!committed.ok) throw new Error(`git commit failed: ${committed.stderr || committed.stdout}`);
     }
     return assigned ?? [];
   } catch (err) {
-    await rollBack(cwd, name, head, switched, roots);
+    try {
+      await rollBack(cwd, name, head, switched, tip, journal, staged);
+    } catch (recovery) {
+      throw new Error(`${errorMessage(err)} Recovery stopped; branch ${name} retained for manual recovery: ${errorMessage(recovery)}`);
+    }
     throw err;
   }
 }
 
-/** Undo a start that failed after the branch was created. The checkout was clean before, so the PRD roots hold only the assignment's writes. */
+/**
+ * Restore only journalled files that still contain our bytes. A foreign edit,
+ * index change, moved HEAD or incomplete write keeps the branch recoverable.
+ * No root reset/checkout/clean, and no forced switch over somebody else's work.
+ */
 async function rollBack(
   cwd: string,
   name: string,
   head: { branch: string } | { detached: string },
   switched: boolean,
-  roots: string[],
+  tip: string,
+  journal: OwnedWrite[] | null,
+  staged: boolean,
 ): Promise<void> {
-  if (switched) {
-    await git(cwd, ["reset", "--quiet", "--", ...roots]);
-    await git(cwd, ["checkout", "--quiet", "--", ...roots]);
-    await git(cwd, ["clean", "--quiet", "--force", "--", ...roots]);
-    const back = "branch" in head ? ["switch", "--quiet", head.branch] : ["switch", "--quiet", "--detach", head.detached];
-    await git(cwd, back);
+  async function checked(args: string[]): Promise<string> {
+    const result = await git(cwd, args);
+    if (!result.ok) throw new Error(`git ${args[0]} failed: ${result.stderr || result.stdout}`);
+    return result.stdout;
   }
-  await git(cwd, ["branch", "--quiet", "-D", name]);
+  if (switched) {
+    if ((await checked(["symbolic-ref", "--short", "HEAD"])) !== name ||
+        (await checked(["rev-parse", "HEAD"])) !== tip) throw new Error("HEAD changed during branch start.");
+    if (journal === null) {
+      if (await checked(["status", "--porcelain", "--untracked-files=all"])) {
+        throw new Error("Assignment may have partially written the PRD; its writes could not be verified.");
+      }
+      journal = [];
+    }
+    // Verify the entire journal before restoring any of it.
+    for (const write of journal) {
+      if (!sameImage(await fileImage(join(cwd, write.path)), write.after)) {
+        throw new Error(`Another writer changed ${write.path}.`);
+      }
+    }
+    const paths = journal.map((write) => write.path);
+    if (paths.length > 0) {
+      // Before staging the index must still match HEAD; afterwards it must
+      // match the journalled working files. Never reset a foreign index edit.
+      await checked(["--literal-pathspecs", "diff", ...(staged ? [] : ["--cached"]), "--quiet", "--", ...paths]);
+      await checked(["--literal-pathspecs", "reset", "--quiet", "--", ...paths]);
+      for (const write of journal) {
+        const path = join(cwd, write.path);
+        if (write.before) {
+          await writeFile(path, write.before.bytes, { mode: write.before.mode });
+          // writeFile's mode only applies when creating a file. Assignment's
+          // atomic replacement can have changed an existing file's mode too.
+          await chmod(path, write.before.mode);
+        } else if (write.after) await unlink(path);
+      }
+    }
+    if (await checked(["status", "--porcelain", "--untracked-files=all"])) {
+      throw new Error("Other checkout changes remain; they were preserved.");
+    }
+    await checked("branch" in head ? ["switch", "--quiet", head.branch] : ["switch", "--quiet", "--detach", head.detached]);
+  }
+  if ((await checked(["rev-parse", `refs/heads/${name}`])) !== tip) throw new Error("The new branch changed during recovery.");
+  await checked(["branch", "--quiet", "-D", name]);
 }

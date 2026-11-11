@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
 import {
   assignToBranch,
   describeUnits,
@@ -28,7 +29,7 @@ export interface AssignToBranchArgs {
   move?: boolean;
 }
 
-export async function handleAssignToBranch(projectDir: string, rexDir: string, args: AssignToBranchArgs): Promise<McpResult> {
+export async function handleAssignToBranch(projectDir: string, rexDir: string, args: AssignToBranchArgs, transaction = withPrdModelTransaction): Promise<McpResult> {
   try {
     if ((await prdLayout(rexDir)) !== "v2") return textResult(`${NO_PRODUCT_LAYER} Work sets are kept on a v2 PRD only.`, true);
     if (args.ids.length === 0) return textResult("ids is empty: name at least one change or task.", true);
@@ -36,13 +37,13 @@ export async function handleAssignToBranch(projectDir: string, rexDir: string, a
     const branch = requireWorkSetBranch(projectDir);
 
     if (args.remove) {
-      const report = await unassignFromBranch(rexDir, args.ids, branch);
+      const report = await unassignFromBranch(rexDir, args.ids, branch, transaction);
       const { tree } = await loadPrdModel(rexDir);
       const removed = describeUnits(tree, report.removed.map((r) => r.id));
       const inherited = inheritedUnits(tree, report.inherited);
       return textResult(JSON.stringify({ branch, removed, ...(inherited.length > 0 ? { inherited } : {}) }));
     }
-    const report = await assignToBranch(rexDir, args.ids, branch, { move: args.move, workspace: projectDir });
+    const report = await assignToBranch(rexDir, args.ids, branch, { move: args.move, workspace: projectDir, transaction });
     const { tree } = await loadPrdModel(rexDir);
     const from = new Map(report.moved.map((m) => [m.id, m.from]));
     const assigned = describeUnits(tree, report.assigned).map((u) => (from.has(u.id) ? { ...u, movedFrom: from.get(u.id) } : u));

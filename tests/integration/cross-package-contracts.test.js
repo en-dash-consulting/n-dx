@@ -1013,7 +1013,7 @@ describe("gateway export auto-detection", () => {
         "loadPrdModel", "productReport", "capabilityReport", "computeEdges", "indexTree",
         "isOpenChange", "isAppliedChange", "isInboxChange", "awaitsPlacement", "specHash", "nodeSpec",
         "loadTrailerCommits", "loadCommitFiles",
-        "handleProductEdit", "ProductEditError", "withPrdModelTransaction", "applyChange",
+        "handleProductEdit", "ProductEditError", "withPrdModelTransaction", "withPrdModelWriteSession", "applyChange",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore", "checkStaleReleasePlans",
         "detectReorganizations", "applyProposals", "applyReshape",

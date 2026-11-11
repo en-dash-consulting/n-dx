@@ -2,8 +2,8 @@ schema: "rex/v2"
 items:
   "31305bd0-32ee-46b0-b5dd-c686b869076d":
     startedAt: "2026-11-09T23:22:27.101Z"
-    activeIntervals: [{"end":"2026-11-09T23:24:06.316Z","start":"2026-11-09T23:22:27.101Z"}]
-    failureReason: "The run made no commits."
+    activeIntervals: [{"end":"2026-11-09T23:24:06.316Z","start":"2026-11-09T23:22:27.101Z"},{"end":"2026-11-10T17:47:48.555Z","start":"2026-11-10T17:43:34.806Z"},{"end":"2026-11-10T18:25:29.955Z","start":"2026-11-10T17:51:03.075Z"}]
+    failureReason: "Test gate failed [command: node scripts/run-all-tests.mjs affected b401df0cd7bf57514b3148d1d19d2fa8223fed4d]: `node scripts/run-all-tests.mjs affected b401df0cd7bf57514b3148d1d19d2fa8223fed4d` did not finish within 30m 0s and was killed; t…\nFailing tests (29):\n- filters async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {\n- filters async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {\n- returns mode=llm-review and passed=true when mock reviewer exits 0\n- returns mode=llm-review and passed=false when mock reviewer exits 1\n- invokes LLM even when no test command is configured\n- includes contextFiles in result when reviewer passes and contextFiles provided\n- uses 'exec -' subcommand (stdin) when reviewer is codex\n- includes feedback object in llm-review result\n… and 21 more"
     createdAt: "2026-11-09T22:00:50.227Z"
-    lastModified: "2026-11-10T02:48:15.715Z"
+    lastModified: "2026-11-10T18:25:30.546Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

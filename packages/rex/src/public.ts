@@ -708,7 +708,7 @@ export type {
 // repeated here, because a second re-export of a name is a duplicate export.
 
 // Reader and transaction
-export { withPrdModelTransaction, PrdLayoutError } from "./store/prd-model-transaction.js";
+export { withPrdModelTransaction, withPrdModelWriteSession, PrdLayoutError } from "./store/prd-model-transaction.js";
 export type { PrdModelEdit, PrdModelTransactionOptions, PrdModelTransactionResult } from "./store/prd-model-transaction.js";
 
 // Steward apply of an open change, or its preview (MCP apply_change, the dashboard's Apply)

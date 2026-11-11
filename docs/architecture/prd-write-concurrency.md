@@ -42,6 +42,24 @@ locks, backups and dashboard caches are separate artifacts. A transport
 bundle must be outside the resolved rex directory. Ordinary PRD mutations
 never produce legacy `prd.md`, `prd_*.md` or `prd.json` files.
 
+## Branch-start commit and recovery
+
+The dashboard's branch start holds `withPrdModelWriteSession` from its initial
+PRD read and clean-check through branch creation, assignment, Git commit and
+failure recovery. The session supplies the transaction used by assignment;
+it does not reacquire the lock. Other supported writers queue or fail with the
+normal lock-holder error, then can retry after recovery. Session transactions
+refuse another workspace, overlapping calls and use after the session ends.
+
+Rollback journals only paths the assignment transaction reports writing, with
+their before and after bytes. It checks HEAD, those bytes and their index state
+before restoring those files; it never cleans the PRD roots. A manual save that
+bypasses the advisory lock survives. Conflicting file edits, other checkout
+changes, partial writes and Git recovery failures retain a recoverable branch
+and return an error naming the problem. The operator inspects that branch and
+its changes before switching back. The PRD lock cannot serialize arbitrary
+editors or external Git commands; their detected conflicts require recovery.
+
 ## References
 
 - [Architecture Overview](overview.md) — the tier hierarchy these entry points sit in
