@@ -5,8 +5,11 @@
  * tooltip names the files behind it.
  *
  * Fed by `GET /api/rex/impact` (server/item-impact.ts), loaded once and shared
- * by every row on the page; a load older than {@link STALE_MS} is refreshed the
- * next time a row mounts.
+ * by every row on the page. While any row is mounted, one shared socket
+ * refetches it after a PRD write or a run change (`rex:prd-changed`,
+ * `hench:run-changed`), so an open page moves from expected to actual impact
+ * as runs land; a load older than {@link STALE_MS} is also refreshed the next
+ * time a row mounts.
  *
  * Also home to {@link displayTitle}: the plain-language summary a row shows in
  * place of an item's technical title.
@@ -16,6 +19,8 @@
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { acceptsFrame } from "../base-path.js";
+import { openWebSocket } from "../session.js";
 
 export type FileKind = "code" | "test" | "config" | "docs" | "other";
 
@@ -45,9 +50,20 @@ const SIZE_LABELS = { small: "Small", medium: "Medium", large: "Large" } as cons
 /** Files a tooltip lists before "and N more". */
 const TOOLTIP_FILES = 12;
 
+/** Frames after which an item's impact may have moved: a PRD write, or a run's files. */
+const REFRESH_FRAMES: ReadonlySet<string> = new Set(["rex:prd-changed", "hench:run-changed"]);
+/** A burst of frames (a bulk write, a run saving each turn) is one refetch per this window. */
+const REFRESH_WINDOW_MS = 1_000;
+/** A virtualized tree unmounts and mounts rows in one scroll: keep the socket across the gap. */
+const FEED_LINGER_MS = 1_000;
+
 let cache: { at: number; data: ImpactMap } | null = null;
 let pending: Promise<ImpactMap> | null = null;
+/** A change landed while a load was in flight: that load may predate it, so load again. */
+let changedWhileLoading = false;
 const listeners = new Set<(data: ImpactMap) => void>();
+let feed: { close: () => void } | null = null;
+let feedCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 function load(): Promise<ImpactMap> {
   pending ??= fetch("/api/rex/impact")
@@ -57,16 +73,84 @@ function load(): Promise<ImpactMap> {
       cache = { at: Date.now(), data };
       pending = null;
       for (const listener of listeners) listener(data);
+      if (changedWhileLoading) {
+        changedWhileLoading = false;
+        void load();
+      }
       return data;
     });
   return pending;
 }
 
-/** Forget the shared load. Tests only. */
+/** The impacts may have moved: refetch for the rows on screen, or forget the load when none are. */
+function invalidate(): void {
+  if (listeners.size === 0) {
+    cache = null;
+    return;
+  }
+  if (pending) {
+    changedWhileLoading = true;
+    return;
+  }
+  void load();
+}
+
+/** One socket for every mounted row; frames other than {@link REFRESH_FRAMES} are ignored. */
+function openFeed(): void {
+  if (feedCloseTimer) {
+    clearTimeout(feedCloseTimer);
+    feedCloseTimer = null;
+  }
+  if (feed) return;
+  let ws: WebSocket | null = null;
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    ws = openWebSocket();
+    ws.onmessage = (event: MessageEvent) => {
+      let frame: Record<string, unknown>;
+      try {
+        frame = JSON.parse(String(event.data)) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+      if (!REFRESH_FRAMES.has(String(frame.type)) || !acceptsFrame(frame)) return;
+      refreshTimer ??= setTimeout(() => {
+        refreshTimer = null;
+        invalidate();
+      }, REFRESH_WINDOW_MS);
+    };
+  } catch {
+    // No socket: rows still refresh a load older than STALE_MS when they mount.
+  }
+  feed = {
+    close: () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      try { ws?.close(); } catch { /* already closed */ }
+    },
+  };
+}
+
+function releaseFeed(): void {
+  if (listeners.size > 0 || !feed || feedCloseTimer) return;
+  feedCloseTimer = setTimeout(() => {
+    feedCloseTimer = null;
+    if (listeners.size === 0 && feed) {
+      feed.close();
+      feed = null;
+    }
+  }, FEED_LINGER_MS);
+}
+
+/** Forget the shared load and close the shared socket. Tests only. */
 export function resetImpactCacheForTests(): void {
   cache = null;
   pending = null;
+  changedWhileLoading = false;
   listeners.clear();
+  if (feedCloseTimer) clearTimeout(feedCloseTimer);
+  feedCloseTimer = null;
+  feed?.close();
+  feed = null;
 }
 
 /** Every item's impact, shared across rows. Empty until the first load answers. */
@@ -74,8 +158,14 @@ export function useItemImpacts(): ImpactMap {
   const [data, setData] = useState<ImpactMap>(cache?.data ?? {});
   useEffect(() => {
     listeners.add(setData);
+    openFeed();
     if (!cache || Date.now() - cache.at > STALE_MS) void load();
-    return () => { listeners.delete(setData); };
+    // The shared load may have answered between this row's first render and now.
+    else if (cache.data !== data) setData(cache.data);
+    return () => {
+      listeners.delete(setData);
+      releaseFeed();
+    };
   }, []);
   return data;
 }

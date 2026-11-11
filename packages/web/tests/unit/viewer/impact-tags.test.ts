@@ -5,10 +5,30 @@
  *
  * @see src/viewer/components/impact-tags.ts
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { ImpactDetail, ImpactTags, displayTitle, kindsText, sizeText, type ItemImpact } from "../../../src/viewer/components/impact-tags.js";
+import {
+  ImpactDetail,
+  ImpactTags,
+  displayTitle,
+  kindsText,
+  resetImpactCacheForTests,
+  sizeText,
+  useItemImpacts,
+  type ItemImpact,
+} from "../../../src/viewer/components/impact-tags.js";
+
+/** The shared live feed: each socket the module opens, so a test can send it frames. */
+const sockets = vi.hoisted(() => [] as { onmessage: ((e: { data: string }) => void) | null; close: () => void; closed: boolean }[]);
+vi.mock("../../../src/viewer/session.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../src/viewer/session.js")>(),
+  openWebSocket: vi.fn(() => {
+    const socket = { onmessage: null, closed: false, close() { socket.closed = true; } };
+    sockets.push(socket);
+    return socket;
+  }),
+}));
 
 const IMPACT: ItemImpact = {
   basis: "actual",
@@ -76,5 +96,97 @@ describe("ImpactDetail", () => {
     expect(el.querySelector(".impact-all-files summary")?.textContent).toBe("All 14 files");
     expect(el.querySelectorAll(".impact-all-files li")).toHaveLength(5);
     expect(el.textContent).toContain("…and 9 more");
+  });
+});
+
+describe("useItemImpacts on a page left open", () => {
+  const EXPECTED: ItemImpact = { ...IMPACT, basis: "expected", files: ["src/a.ts"], fileCount: 1, size: "small", kinds: { code: 1 }, security: [], essential: [] };
+  const ACTUAL: ItemImpact = { ...IMPACT, fileCount: 12 };
+
+  function Consumer({ id }: { id: string }) {
+    const impact = useItemImpacts().t1;
+    return h("span", { id }, impact ? `${impact.basis}:${impact.fileCount}` : "none");
+  }
+
+  const text = (id: string) => document.getElementById(id)?.textContent;
+  const send = (frame: Record<string, unknown>) => {
+    for (const socket of sockets.filter((s) => !s.closed)) socket.onmessage?.({ data: JSON.stringify(frame) });
+  };
+
+  afterEach(() => {
+    resetImpactCacheForTests();
+    sockets.length = 0;
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("moves a mounted row from expected to actual impact when a run lands, with one socket and one fetch per burst", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let served: ItemImpact = EXPECTED;
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ items: { t1: served } }) }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    mount(h("div", null, h(Consumer, { id: "a" }), h(Consumer, { id: "b" })));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(text("a")).toBe("expected:1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sockets).toHaveLength(1);
+
+    // A run finishes; well past the 30-second TTL, with nothing remounting.
+    served = ACTUAL;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    send({ type: "hench:run-changed" });
+    send({ type: "hench:run-changed" });
+    send({ type: "rex:prd-changed" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+
+    expect(text("a")).toBe("actual:12");
+    expect(text("b")).toBe("actual:12");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores frames that do not move impact, and closes the socket once no row is mounted", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ items: { t1: EXPECTED } }) }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    mount(h(Consumer, { id: "a" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    send({ type: "sv:analysis-changed" });
+    send({ type: "rex:prd-changed", workspace: "another-worktree" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => { render(null, root!); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(sockets[0]!.closed).toBe(true);
+  });
+
+  it("loads again when a change lands while a load is still in flight", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let served: ItemImpact = EXPECTED;
+    const fetchMock = vi.fn(async () => {
+      const body = { items: { t1: served } };
+      if (fetchMock.mock.calls.length === 2) await gate;
+      return { ok: true, json: async () => body };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    mount(h(Consumer, { id: "a" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    send({ type: "rex:prd-changed" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // The second load read the old impact; a run lands before it answers.
+    served = ACTUAL;
+    send({ type: "hench:run-changed" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    release();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(text("a")).toBe("actual:12");
   });
 });
