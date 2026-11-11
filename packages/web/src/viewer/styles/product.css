@@ -124,6 +124,7 @@
 }
 
 .pm-capability-link,
+.pm-area-link,
 .ch-change-link,
 .cap-back {
   background: none;
@@ -136,6 +137,7 @@
 }
 
 .pm-capability-link:hover,
+.pm-area-link:hover,
 .ch-change-link:hover,
 .cap-back:hover {
   text-decoration: underline;

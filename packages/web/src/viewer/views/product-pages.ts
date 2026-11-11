@@ -201,7 +201,12 @@ function ProductMapPage({ onCapabilityChange, initialTab = "map", navigateTo }: 
       ? h(RequirementsView, null)
       : h("div", null,
           h(StaleNotice, { message: load.refreshError }),
-          h(ProductView, { map: load.data, onSelectCapability: setCapabilityId }),
+          h(ProductView, {
+            map: load.data,
+            onSelectCapability: setCapabilityId,
+            // The area's own page: the only way to it now Plan has no area map.
+            ...(navigateTo ? { onOpenArea: (slug: string) => navigateTo("product", { tab: `area/${encodeURIComponent(slug)}` }) } : {}),
+          }),
         ),
   );
 }

@@ -328,3 +328,51 @@ describe("with the Sidecar on", () => {
     expect(root.querySelector(".area-plan-in")).toBeNull();
   });
 });
+
+describe("from the Product page", () => {
+  const productPage = (navigateTo: ReturnType<typeof vi.fn>, selectedTab?: string) =>
+    h("div", null, renderActiveView("product", {
+      navigateTo,
+      validViews: buildValidViews(null),
+      data: {},
+      isFeatureDisabled: () => false,
+      ...(selectedTab ? { selectedTab } : {}),
+    } as never));
+  const areaLink = (id: string) =>
+    root.querySelector<HTMLButtonElement>(`#product-area-${id} .pm-area-link`);
+
+  it("an area's heading opens its page, and that address shows the area", async () => {
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
+    });
+    const navigateTo = vi.fn();
+    await mount(productPage(navigateTo));
+    await vi.waitFor(() => expect(areaLink(AREA_DETAIL_FIXTURE.slug)).not.toBeNull());
+    expect(areaLink(AREA_DETAIL_FIXTURE.slug)!.textContent).toBe(AREA_DETAIL_FIXTURE.title);
+
+    act(() => areaLink(AREA_DETAIL_FIXTURE.slug)!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${AREA_DETAIL_FIXTURE.slug}` });
+
+    // The route the click asked for renders the area's own view.
+    const [, { tab }] = navigateTo.mock.calls[0] as [string, { tab: string }];
+    await mount(productPage(navigateTo, tab));
+    await vi.waitFor(() => expect(root.querySelector(".area-head")).not.toBeNull());
+    expect(root.querySelector(".area-head .area-steward")?.textContent).toBe("steward: Sterling H");
+  });
+
+  it("encodes a hand-authored slug in the tab", async () => {
+    const slug = "café #1";
+    const map = {
+      ...PRODUCT_MAP_FIXTURE,
+      areas: PRODUCT_MAP_FIXTURE.areas.map((a) => (a.id === AREA_DETAIL_FIXTURE.id ? { ...a, slug } : a)),
+    };
+    stubRoutes({ "/api/rex/product": { layout: "v2", map } });
+    const navigateTo = vi.fn();
+    await mount(productPage(navigateTo));
+    const link = () => root.querySelector<HTMLButtonElement>(`[aria-label="${AREA_DETAIL_FIXTURE.title}"] .pm-area-link`);
+    await vi.waitFor(() => expect(link()).not.toBeNull());
+    act(() => link()!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${encodeURIComponent(slug)}` });
+  });
+});
