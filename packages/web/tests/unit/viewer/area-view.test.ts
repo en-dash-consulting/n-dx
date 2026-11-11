@@ -31,8 +31,13 @@ function stubRoutes(routes: Record<string, unknown>): void {
   }));
 }
 
+/**
+ * Let the stubbed reads answer, inside act(): a commit they cause outside it
+ * arms preact's 35 ms frame fallback, which the frame-leak guard fails the
+ * file for when the last test ends before it fires.
+ */
 async function settle(): Promise<void> {
-  await new Promise((r) => setTimeout(r, 10));
+  await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
   await act(async () => {});
 }
 
@@ -348,8 +353,7 @@ describe("from the Product page", () => {
     });
     const navigateTo = vi.fn();
     await mount(productPage(navigateTo));
-    await vi.waitFor(() => expect(areaLink(AREA_DETAIL_FIXTURE.slug)).not.toBeNull());
-    expect(areaLink(AREA_DETAIL_FIXTURE.slug)!.textContent).toBe(AREA_DETAIL_FIXTURE.title);
+    expect(areaLink(AREA_DETAIL_FIXTURE.slug)?.textContent).toBe(AREA_DETAIL_FIXTURE.title);
 
     act(() => areaLink(AREA_DETAIL_FIXTURE.slug)!.click());
     expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${AREA_DETAIL_FIXTURE.slug}` });
@@ -357,7 +361,6 @@ describe("from the Product page", () => {
     // The route the click asked for renders the area's own view.
     const [, { tab }] = navigateTo.mock.calls[0] as [string, { tab: string }];
     await mount(productPage(navigateTo, tab));
-    await vi.waitFor(() => expect(root.querySelector(".area-head")).not.toBeNull());
     expect(root.querySelector(".area-head .area-steward")?.textContent).toBe("steward: Sterling H");
   });
 
@@ -371,7 +374,7 @@ describe("from the Product page", () => {
     const navigateTo = vi.fn();
     await mount(productPage(navigateTo));
     const link = () => root.querySelector<HTMLButtonElement>(`[aria-label="${AREA_DETAIL_FIXTURE.title}"] .pm-area-link`);
-    await vi.waitFor(() => expect(link()).not.toBeNull());
+    expect(link()).not.toBeNull();
     act(() => link()!.click());
     expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${encodeURIComponent(slug)}` });
   });
