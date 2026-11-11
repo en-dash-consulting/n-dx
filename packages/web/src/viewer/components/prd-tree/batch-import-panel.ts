@@ -229,9 +229,12 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
         epic: { title: p.epic.title, description: p.epic.description },
         features: p.features.map((f) => ({
           title: f.title,
+          // The analysis drafts a plain-language summary; accept keeps it.
+          summary: f.summary,
           description: f.description,
           tasks: f.tasks.map((t) => ({
             title: t.title,
+            summary: t.summary,
             description: t.description,
             priority: t.priority,
             tags: t.tags,

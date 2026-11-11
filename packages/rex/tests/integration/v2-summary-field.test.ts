@@ -185,6 +185,23 @@ describe("summary from a description add (the dashboard's capture bar)", () => {
     expect(prompts[0]).toContain("does not write code");
   });
 
+  it("cleanSummary takes off only a pair of quotes around the whole summary", async () => {
+    const { cleanSummary } = await import("../../src/cli/commands/add-change.js");
+    expect(cleanSummary('Adds a button labelled "Undo"')).toBe('Adds a button labelled "Undo"');
+    expect(cleanSummary("Saves the admins'")).toBe("Saves the admins'");
+    expect(cleanSummary("'Wrapped once'")).toBe("Wrapped once");
+    expect(cleanSummary(' "“Wrapped twice”" ')).toBe("Wrapped twice");
+    expect(cleanSummary('""')).toBeUndefined();
+  });
+
+  it("--summary keeps a long summary the user typed whole, and is refused for several changes", async () => {
+    const long = "word ".repeat(120).trim();
+    const preview = JSON.parse(await run(["Add Apple Pay at checkout"], { format: "json", summary: long }));
+    expect(preview.changes[0].summary).toBe(long);
+    await expect(run(["Refunds", "Gift cards"], { format: "json", summary: "Shoppers get money back" }))
+      .rejects.toThrow(/one change's summary/);
+  });
+
   it("cleanSummary caps a long draft and treats blank as none", async () => {
     const { cleanSummary, SUMMARY_MAX_CHARS } = await import("../../src/cli/commands/add-change.js");
     expect(cleanSummary("   ")).toBeUndefined();

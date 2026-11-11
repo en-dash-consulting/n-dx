@@ -101,7 +101,14 @@ export async function cmdAddChangesFromDescriptions(
   // Ranks each new change's placement among one area's capabilities and constraints.
   const area = flags.area?.trim() || undefined;
   const preview = flags.format === "json" && flags.accept !== "true";
-  const given = cleanSummary(flags.summary);
+  // Text the user typed is kept whole: no cap, only a surrounding pair of quotes comes off.
+  const given = cleanSummary(flags.summary, Number.POSITIVE_INFINITY);
+  if (given && texts.length > 1) {
+    throw new CLIError(
+      "--summary names one change's summary, but this adds " + texts.length + " changes.",
+      "Add one description with --summary, or leave it out and draft one per change with --summarize.",
+    );
+  }
   const drafted = preview && flags.summarize === "true" && !given
     ? await draftSummaries(dir, texts, flags.model)
     : texts.map(() => undefined);
@@ -131,11 +138,27 @@ export async function cmdAddChangesFromDescriptions(
 /** Longest summary kept: one or two sentences, not a description. */
 export const SUMMARY_MAX_CHARS = 400;
 
-/** A summary as stored: one line, trimmed, unquoted, at most {@link SUMMARY_MAX_CHARS}; undefined when empty. */
-export function cleanSummary(raw: string | undefined): string | undefined {
-  const text = (raw ?? "").replace(/\s+/g, " ").trim().replace(/^["'“”]+|["'“”]+$/g, "").trim();
+/** Quote pairs a model (or a shell) wraps a whole summary in. */
+const QUOTE_PAIRS: ReadonlyArray<readonly [string, string]> = [['"', '"'], ["'", "'"], ["“", "”"], ["‘", "’"]];
+
+/**
+ * A summary as stored: one line, trimmed, without quotes wrapped around the
+ * whole of it, at most `maxChars`; undefined when empty. Only a matching pair
+ * comes off, so `labelled "Undo"` and `the admins'` keep their quote.
+ */
+export function cleanSummary(raw: string | undefined, maxChars = SUMMARY_MAX_CHARS): string | undefined {
+  let text = (raw ?? "").replace(/\s+/g, " ").trim();
+  for (let wrapped = true; wrapped;) {
+    wrapped = false;
+    for (const [open, close] of QUOTE_PAIRS) {
+      if (text.length >= 2 && text.startsWith(open) && text.endsWith(close)) {
+        text = text.slice(open.length, -close.length).trim();
+        wrapped = true;
+      }
+    }
+  }
   if (!text) return undefined;
-  return text.length > SUMMARY_MAX_CHARS ? `${text.slice(0, SUMMARY_MAX_CHARS - 1).trimEnd()}…` : text;
+  return text.length > maxChars ? `${text.slice(0, maxChars - 1).trimEnd()}…` : text;
 }
 
 /** The prompt that drafts a change's plain-language summary from the text that describes it. */
