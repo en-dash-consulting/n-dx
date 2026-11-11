@@ -23,7 +23,10 @@
  *   POST /api/rex/changes/apply-all  { hashes: { [id]: hash } } → { layout: "v2", results: ApplyAllResultWire[] }
  *                                             applies only the changes named, each against its own
  *                                             preview hash, one transaction each; a refusal skips
- *                                             that change and the rest still apply
+ *                                             that change and the rest still apply. A held PRD lock
+ *                                             stops the batch: the changes not yet tried answer
+ *                                             ok: false with the lock's message, and those already
+ *                                             applied are still reported, refreshed and broadcast
  *
  * A missing hash answers 400, a v1 tree 409, a held PRD lock 409, and rex's
  * refusal 422 `{ error, problems }` with rex's own message. The wire types mirror
@@ -197,8 +200,23 @@ async function handleApplyAll(preview: boolean, req: IncomingMessage, res: Serve
     // Only changes still waiting and named in the approval; the order is the tree's.
     const results: ApplyAllResultWire[] = [];
     let wrote = false;
+    let stoppedBy: string | null = null;
     for (const ref of waiting.filter((r) => hashes[r.id] !== undefined)) {
-      const outcome = await applyChange(ctx.rexDir, ref.id, { expectHash: hashes[ref.id] });
+      if (stoppedBy) {
+        results.push({ ...ref, ok: false, error: `Not applied: ${stoppedBy}` });
+        continue;
+      }
+      // Each apply commits on its own, so a throw must not lose the ones before it.
+      let outcome: Awaited<ReturnType<typeof applyChange>>;
+      try {
+        outcome = await applyChange(ctx.rexDir, ref.id, { expectHash: hashes[ref.id] });
+      } catch (err) {
+        const message = errorMessage(err);
+        results.push({ ...ref, ok: false, error: message });
+        // Another writer holds the PRD: the rest would only wait on the same lock.
+        if (message.includes("Could not acquire PRD lock")) stoppedBy = message;
+        continue;
+      }
       if (!outcome.ok) {
         results.push({ ...ref, ok: false, error: outcome.message, ...(outcome.moved ? { moved: true as const } : {}) });
         continue;
@@ -214,7 +232,11 @@ async function handleApplyAll(preview: boolean, req: IncomingMessage, res: Serve
       results.push({ ...ref, ok: true, applied });
     }
     if (wrote) {
-      refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
+      try {
+        refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
+      } catch {
+        // The changes are written; the cache rebuilds on the next read, and the broadcast still goes.
+      }
       broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
     }
     jsonResponse(res, 200, { layout: "v2", results });
