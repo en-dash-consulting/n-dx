@@ -215,6 +215,18 @@ describe("buildV2Tree", () => {
     expect(byId(tree, "t5")!.links).toBeUndefined();
   });
 
+  it("keeps an epic's plain-language summary as its area's summary, and its description as the body", async () => {
+    const summarised = TREE.map((top) => top.id !== "e1" ? top : { ...top, summary: "Where pages are kept.", description: "Storage internals: cache and eviction." });
+    const { tree } = buildV2Tree(summarised, await planOf(summarised));
+    expect(byId(tree, "e1")).toMatchObject({ type: "area", summary: "Where pages are kept.", body: "Storage internals: cache and eviction." });
+
+    // With no plain summary, the description is the area's summary, as before.
+    const described = TREE.map((top) => top.id !== "e1" ? top : { ...top, description: "Storage internals." });
+    const plain = buildV2Tree(described, await planOf(described)).tree;
+    expect(byId(plain, "e1")).toMatchObject({ type: "area", summary: "Storage internals." });
+    expect(byId(plain, "e1")!.body).toBeUndefined();
+  });
+
   it("stamps a release umbrella's plannedRelease and keeps a review-sourced epic as an area", async () => {
     const { tree } = buildV2Tree(TREE, await planOf(TREE));
     expect(byId(tree, "f5")!.plannedRelease).toBe("0.9.0");
