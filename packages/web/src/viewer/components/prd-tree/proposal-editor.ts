@@ -30,6 +30,8 @@ export interface RawProposal {
 interface RawProposalFeature {
   title: string;
   source: string;
+  /** Plain-language summary; rows show it in place of the title once accepted. */
+  summary?: string;
   description?: string;
   /** If present, accept-edited nests new tasks under this existing feature. */
   existingId?: string;
@@ -40,6 +42,8 @@ interface RawProposalTask {
   title: string;
   source: string;
   sourceFile: string;
+  /** Plain-language summary; rows show it in place of the title once accepted. */
+  summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: string;
@@ -62,6 +66,8 @@ interface EditableTask {
   decomposition?: RawProposalTask["decomposition"];
   /** Carried verbatim, so a baseline task is not accepted as open work. */
   status?: string;
+  /** Carried verbatim from the proposal; not shown or edited here. */
+  summary?: string;
   description: string;
   priority: string;
   tags: string;
@@ -77,6 +83,8 @@ interface EditableTask {
 /** Internal editable state for a feature. */
 interface EditableFeature {
   title: string;
+  /** Carried verbatim from the proposal; not shown or edited here. */
+  summary?: string;
   description: string;
   /** Carried from RawProposal for smart-placement nesting on accept. */
   existingId?: string;
@@ -114,6 +122,7 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
     expanded: true,
     features: p.features.map((f) => ({
       title: f.title,
+      ...(f.summary ? { summary: f.summary } : {}),
       description: f.description ?? "",
       ...(f.existingId ? { existingId: f.existingId } : {}),
       selected: true,
@@ -123,6 +132,7 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
         ...(t.source ? { source: t.source } : {}),
         ...(t.decomposition ? { decomposition: t.decomposition } : {}),
         ...(t.status ? { status: t.status } : {}),
+        ...(t.summary ? { summary: t.summary } : {}),
         description: t.description ?? "",
         priority: t.priority ?? "",
         tags: (t.tags ?? []).join(", "),
@@ -324,6 +334,7 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
           },
           features: p.features.map((f) => ({
             title: f.title,
+            summary: f.summary,
             description: f.description || undefined,
             ...(f.existingId ? { existingId: f.existingId } : {}),
             tasks: f.tasks.map((t) => ({
@@ -331,6 +342,7 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
               source: t.source,
               decomposition: t.decomposition,
               status: t.status,
+              summary: t.summary,
               description: t.description || undefined,
               acceptanceCriteria: t.acceptanceCriteria.length > 0 ? t.acceptanceCriteria : undefined,
               priority: t.priority || undefined,

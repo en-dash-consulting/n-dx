@@ -316,6 +316,30 @@ describe("ProposalEditor", () => {
     });
   });
 
+  describe("summary pass-through", () => {
+    it("posts the plain-language summaries of the features and tasks it accepts", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const proposal = makeProposal("E", [{ tasks: [{ title: "Refactor order.ts" }, { title: "Add a test" }] }]);
+      Object.assign(proposal.features[0], { summary: "Shoppers check out faster." });
+      Object.assign(proposal.features[0].tasks[0], { summary: "One step at checkout." });
+      renderEditor([proposal]);
+
+      await act(async () => {
+        root.querySelector<HTMLButtonElement>(".proposal-editor-btn-accept")!.click();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith("/api/rex/proposals/accept-edited", expect.anything());
+      const feature = JSON.parse(fetchSpy.mock.calls[0][1].body).proposals[0].features[0];
+      expect(feature.summary).toBe("Shoppers check out faster.");
+      expect(feature.tasks[0].summary).toBe("One step at checkout.");
+      // A task the proposal gave no summary sends none.
+      expect(feature.tasks[1].summary).toBeUndefined();
+    });
+  });
+
   // ─── Expand/collapse ──────────────────────────────────────────────
 
   describe("expand/collapse", () => {
