@@ -39,6 +39,18 @@ describe("spendLines", () => {
   it("says nothing about a budget or a period it was not given", () => {
     expect(spendLines({})).toEqual({ total: "$0.00", latest: null, budget: null, top: [] });
   });
+
+  it("names the budget in the worst state, with that budget's colour", () => {
+    const budget = {
+      severity: "exceeded" as const,
+      cost: { used: 1, budget: 10, percent: 10, severity: "ok" as const },
+      tokens: { used: 120, budget: 100, percent: 120, severity: "exceeded" as const },
+    };
+    expect(spendLines({ budget }).budget).toEqual({ label: "120% of the token budget used", tone: "exceeded" });
+    // Both fine: cost leads.
+    expect(spendLines({ budget: { ...budget, severity: "ok", tokens: { ...budget.tokens, percent: 5, severity: "ok" } } }).budget)
+      .toEqual({ label: "10% of the cost budget used", tone: "ok" });
+  });
 });
 
 describe("SpendSummary", () => {

@@ -22,9 +22,27 @@ export interface SpendReply {
   commands?: Array<{ command: string; package: string; inputTokens?: number; outputTokens?: number; cacheCreationTokens?: number; cacheReadTokens?: number }>;
   budget?: {
     severity?: "ok" | "warning" | "exceeded";
-    cost?: { used: number; budget: number; percent: number };
-    tokens?: { used: number; budget: number; percent: number };
+    cost?: BudgetDim;
+    tokens?: BudgetDim;
   };
+}
+
+type BudgetSeverity = "ok" | "warning" | "exceeded";
+interface BudgetDim { used: number; budget: number; percent: number; severity?: BudgetSeverity }
+const SEVERITY_RANK: Record<BudgetSeverity, number> = { ok: 0, warning: 1, exceeded: 2 };
+
+/**
+ * The budget the chip names: the one in the worst state, cost on a tie. Its
+ * text and its colour must describe the same budget; a token budget over its
+ * limit is not "10% of the cost budget used" in red.
+ */
+function chipBudget(budget: SpendReply["budget"]): { kind: "cost" | "token"; dim: BudgetDim; tone: BudgetSeverity } | null {
+  const dims = ([["cost", budget?.cost], ["token", budget?.tokens]] as const)
+    .filter((d): d is readonly ["cost" | "token", BudgetDim] => d[1] !== undefined)
+    // A reply without per-budget severity has only the overall one to go by.
+    .map(([kind, dim]) => ({ kind, dim, tone: dim.severity ?? budget?.severity ?? "ok" }));
+  if (dims.length === 0) return null;
+  return dims.reduce((worst, d) => (SEVERITY_RANK[d.tone] > SEVERITY_RANK[worst.tone] ? d : worst));
 }
 
 const SPEND_POLL_KEY = "spend-tile-summary";
@@ -48,17 +66,14 @@ export function spendLines(reply: SpendReply): {
   top: Array<{ label: string; share: number; tokens: string }>;
 } {
   const latest = reply.trend?.at(-1);
-  const dim = reply.budget?.cost ?? reply.budget?.tokens;
+  const chip = chipBudget(reply.budget);
   const commands = [...(reply.commands ?? [])].sort((a, b) => tokensOf(b) - tokensOf(a));
   const all = commands.reduce((n, c) => n + tokensOf(c), 0);
   return {
     total: reply.cost?.total ?? "$0.00",
     latest: latest?.estimatedCost?.total ? { period: latest.period, total: latest.estimatedCost.total } : null,
-    budget: dim
-      ? {
-          label: `${Math.round(dim.percent)}% of the ${reply.budget?.cost ? "cost" : "token"} budget used`,
-          tone: reply.budget?.severity ?? "ok",
-        }
+    budget: chip
+      ? { label: `${Math.round(chip.dim.percent)}% of the ${chip.kind} budget used`, tone: chip.tone }
       : null,
     top: commands.slice(0, TOP_COMMANDS).filter((c) => tokensOf(c) > 0).map((c) => ({
       label: `${PKG_LABELS[c.package] ?? c.package}: ${c.command}`,

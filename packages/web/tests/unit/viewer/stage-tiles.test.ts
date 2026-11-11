@@ -2,6 +2,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { TileGrid, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
 import type { StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
@@ -247,5 +249,14 @@ describe("fitTracks", () => {
 
   it("one configured row is 232px of tile plus the gap", () => {
     expect(TRACKS_PER_ROW * 4 - 16).toBe(232);
+  });
+
+  it("the stylesheet's row spans are TRACKS_PER_ROW per configured row", () => {
+    const css = readFileSync(resolve(__dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf-8");
+    // The first rule per size is the wide layout's; a narrow-screen override may shrink r3.
+    for (const rows of [1, 2, 3]) {
+      const span = new RegExp(String.raw`\.stage-tile--r${rows}\s*\{\s*grid-row:\s*span\s+(\d+)`).exec(css);
+      expect(Number(span?.[1]), `r${rows}`).toBe(TRACKS_PER_ROW * rows);
+    }
   });
 });

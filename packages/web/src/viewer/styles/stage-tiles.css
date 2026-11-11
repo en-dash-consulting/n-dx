@@ -10,7 +10,7 @@
    needs and keeps the 16px gap as its own bottom margin. A configured size
    (r1 = 232px, r2 = 480px, r3 = 728px, each plus the gap) is the most a tile
    takes; stage-tiles.ts shrinks one whose content is shorter
-   (`useFitRows`). Fixed px, not --space-4: the density toggle must not shift
+   (`useFitTracks`). Fixed px, not --space-4: the density toggle must not shift
    the arithmetic. */
 .stage-tiles {
   --tile-unit: 4px;
