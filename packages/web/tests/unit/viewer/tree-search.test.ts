@@ -79,6 +79,21 @@ describe("searchTree", () => {
     expect(result.matchCount).toBe(1);
   });
 
+  it("finds an item by the summary its row shows, and still by its technical title and description", () => {
+    const item = makeItem({
+      id: "s1",
+      level: "task",
+      status: "pending",
+      title: "Refactor order.ts",
+      summary: "Faster checkout for shoppers.",
+      description: "Extract the event handler.",
+    });
+    expect(searchTree([item], "checkout").matchIds).toEqual(new Set(["s1"]));
+    expect(searchTree([item], "order.ts").matchIds).toEqual(new Set(["s1"]));
+    expect(searchTree([item], "event handler").matchIds).toEqual(new Set(["s1"]));
+    expect(searchTree([item], "invoice").matchCount).toBe(0);
+  });
+
   it("includes ancestors of matches in visibleIds", () => {
     const result = searchTree(tree, "login form");
     expect(result.matchIds.has("t1")).toBe(true);

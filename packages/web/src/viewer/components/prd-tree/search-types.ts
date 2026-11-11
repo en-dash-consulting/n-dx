@@ -19,6 +19,8 @@ export interface SearchablePRDItem {
   id: string;
   title: string;
   status: SearchItemStatus;
+  /** Plain-language summary; rows show it in place of the title. */
+  summary?: string;
   description?: string;
   tags?: string[];
   /** @see packages/rex/src/schema/v1.ts — PRDItem.branch */
