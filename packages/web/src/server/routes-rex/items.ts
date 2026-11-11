@@ -257,6 +257,8 @@ async function handleItemPatch(
     const completing = updates.status === "completed" && isChangeLayerStore(store);
     const fieldUpdates = { ...updates };
     if (completing) delete fieldUpdates.status;
+    // A cleared summary is removed, as `rex update --summary=` and edit_item remove it.
+    if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
