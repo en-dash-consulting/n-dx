@@ -210,6 +210,20 @@ describe("Ready to run", () => {
     expect(document.querySelector(".ready-more")).toBeNull();
   });
 
+  it("shows exactly three ready rows with no toggle", async () => {
+    const tasks = (n: number) => Array.from({ length: n }, (_, i) => ({ ...TASKS[0], id: `t-${i}`, title: `Task ${i}` }));
+    await mount(tasks(3));
+    expect(rows()).toHaveLength(3);
+    expect(document.querySelector(".ready-more")).toBeNull();
+  });
+
+  it("puts a fourth ready row behind Show 1 more", async () => {
+    const four = Array.from({ length: 4 }, (_, i) => ({ ...TASKS[0], id: `t-${i}`, title: `Task ${i}` }));
+    await mount(four);
+    expect(rows()).toHaveLength(3);
+    expect(byText("Show 1 more")).toBeTruthy();
+  });
+
   it("shows the empty state with a link to the PRD", async () => {
     const props = await mount([]);
     expect(document.querySelector(".ready-empty")!.textContent).toContain("Nothing ready to run");

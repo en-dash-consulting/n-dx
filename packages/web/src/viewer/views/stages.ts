@@ -223,8 +223,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
   },
   plan: {
     id: "plan",
-    // The capture bar, then tiles. Product leads at full width (PP15); the
-    // Inbox sits beside Open changes, which carries the PRD tree as a tab.
+    // The capture bar, then tiles: the Inbox beside Open changes, which carries
+    // the PRD tree and the Product page as tabs.
     sections: [{ view: "analysis", plain: true }],
     tiles: [
       // On both layouts: a v1 tree reads Pending, In progress and Next.
