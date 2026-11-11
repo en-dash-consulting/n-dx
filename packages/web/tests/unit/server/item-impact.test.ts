@@ -16,8 +16,16 @@ import {
   impactSize,
   isSecurityPath,
   mentionedPaths,
+  runFilePath,
   securityTerms,
 } from "../../../src/server/item-impact.js";
+import type { ItemImpact as ServerItemImpact } from "../../../src/server/item-impact.js";
+import type { ItemImpact as ViewerItemImpact } from "../../../src/viewer/components/impact-tags.js";
+
+// The viewer's mirror must accept what the route sends, and the reverse (checked by tsc).
+const serverToViewer = (w: ServerItemImpact): ViewerItemImpact => w;
+const viewerToServer = (v: ViewerItemImpact): ServerItemImpact => v;
+void serverToViewer; void viewerToServer;
 
 describe("fileKind", () => {
   it("reads tests first, then docs, config and code", () => {
@@ -56,12 +64,24 @@ describe("security", () => {
     expect(securityTerms("Impact tags", "flag files with secrets, keys or credentials")).toEqual([]);
     expect(securityTerms("Show token usage per task", "count tokens per run")).toEqual([]);
   });
+
+  it("does not read a token count acted on as a credential", () => {
+    expect(securityTerms("Top-level Token Usage Navigation", "Expose Token Usage as a first-class dashboard destination")).toEqual([]);
+    expect(securityTerms("Spend", "Never leak token totals or token-count estimates")).toEqual([]);
+    // A real credential still counts.
+    expect(securityTerms("Logs", "We expose the auth tokens in debug logs")).toEqual(["expose the auth tokens"]);
+    expect(securityTerms("Logs", "Stop leaking tokens to stdout")).toEqual(["leaking tokens"]);
+  });
 });
 
 describe("mentionedPaths", () => {
   it("picks file paths and file names out of prose, skipping URLs and non-files", () => {
     const text = "Edit `packages/web/src/viewer/components/ready-to-run.ts` and .n-dx.json, e.g. per https://example.com/a.ts. Bump v1.2 and docs/x.md.";
     expect(mentionedPaths(text).sort()).toEqual([".n-dx.json", "docs/x.md", "packages/web/src/viewer/components/ready-to-run.ts"]);
+  });
+
+  it("does not read a product name as a file", () => {
+    expect(mentionedPaths("Silence the Node.js warning in cli.js; works on Next.js and Vue.js")).toEqual(["cli.js"]);
   });
 });
 
@@ -92,6 +112,26 @@ describe("computeImpacts", () => {
   });
 });
 
+describe("runFilePath", () => {
+  const root = "C:\\Users\\dev\\proj";
+
+  it("makes an absolute Windows path project-relative with forward slashes", () => {
+    expect(runFilePath("C:\\Users\\dev\\proj\\packages\\llm-client\\src\\config.ts", root)).toBe("packages/llm-client/src/config.ts");
+    expect(runFilePath("c:/users/dev/proj/src/a.ts", root)).toBe("src/a.ts");
+    expect(runFilePath("/home/dev/proj/src/a.ts", "/home/dev/proj/")).toBe("src/a.ts");
+    expect(runFilePath("./src/a.ts", root)).toBe("src/a.ts");
+  });
+
+  it("drops tool state and paths outside the project", () => {
+    for (const p of [".rex/changes/x/state.yaml", ".sourcevision/zones/a.json", ".git/COMMIT_MSG_TMP.txt", ".hench/runs/r.json", ".ndx/rex/product/a.md", "C:\\Users\\dev\\other\\a.ts", "   "]) {
+      expect(runFilePath(p, root), p).toBeNull();
+    }
+    // Without a project root an absolute path cannot be placed.
+    expect(runFilePath("/abs/a.ts")).toBeNull();
+    expect(runFilePath("src/.rex-like.ts")).toBe("src/.rex-like.ts");
+  });
+});
+
 describe("RunFilesCache", () => {
   it("groups filesChanged by task and re-reads a file only when it changes", () => {
     const dir = mkdtempSync(join(tmpdir(), "impact-runs-"));
@@ -106,6 +146,29 @@ describe("RunFilesCache", () => {
       const later = new Date(Date.now() + 5000);
       utimesSync(join(dir, "r2.json"), later, later);
       expect(cache.byTask()).toEqual(new Map([["t1", ["a.ts"]], ["t2", ["c.ts"]]]));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("serves an unchanged file from cache, forgets a deleted one, and counts a file once however a run spells it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "impact-runs-"));
+    try {
+      const run = (taskId: string, files: string[]) => JSON.stringify({ taskId, structuredSummary: { filesChanged: files } });
+      const fixed = new Date(Date.now() - 60_000);
+      writeFileSync(join(dir, "r1.json"), run("t1", ["a.ts"]));
+      utimesSync(join(dir, "r1.json"), fixed, fixed);
+      writeFileSync(join(dir, "r2.json"), run("t2", ["/proj/src/b.ts", "src/b.ts", ".rex/x.yaml"]));
+      const cache = new RunFilesCache(dir, "/proj");
+      expect(cache.byTask()).toEqual(new Map([["t1", ["a.ts"]], ["t2", ["src/b.ts"]]]));
+
+      // New content, same mtime: the cached read stands.
+      writeFileSync(join(dir, "r1.json"), run("t1", ["changed.ts"]));
+      utimesSync(join(dir, "r1.json"), fixed, fixed);
+      expect(cache.byTask().get("t1")).toEqual(["a.ts"]);
+
+      rmSync(join(dir, "r2.json"));
+      expect(cache.byTask()).toEqual(new Map([["t1", ["a.ts"]]]));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

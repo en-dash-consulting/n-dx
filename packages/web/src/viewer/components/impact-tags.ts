@@ -6,10 +6,11 @@
  *
  * Fed by `GET /api/rex/impact` (server/item-impact.ts), loaded once and shared
  * by every row on the page. While any row is mounted, one shared socket
- * refetches it after a PRD write or a run change (`rex:prd-changed`,
- * `hench:run-changed`), so an open page moves from expected to actual impact
- * as runs land; a load older than {@link STALE_MS} is also refreshed the next
- * time a row mounts.
+ * refetches it after a PRD write, a run change or a new analysis
+ * (`rex:prd-changed`, `hench:run-changed`, `sv:data-changed`), so an open page
+ * moves from expected to actual impact as runs land; a load older than
+ * {@link STALE_MS} is also refreshed the next time a row mounts. A refetch that
+ * fails keeps the impacts already shown.
  *
  * Also home to {@link displayTitle}: the plain-language summary a row shows in
  * place of an item's technical title.
@@ -50,10 +51,14 @@ const SIZE_LABELS = { small: "Small", medium: "Medium", large: "Large" } as cons
 /** Files a tooltip lists before "and N more". */
 const TOOLTIP_FILES = 12;
 
-/** Frames after which an item's impact may have moved: a PRD write, or a run's files. */
-const REFRESH_FRAMES: ReadonlySet<string> = new Set(["rex:prd-changed", "hench:run-changed"]);
-/** A burst of frames (a bulk write, a run saving each turn) is one refetch per this window. */
-const REFRESH_WINDOW_MS = 1_000;
+/** Frames after which an item's impact may have moved: a PRD write, a run's files, the import graph. */
+const REFRESH_FRAMES: ReadonlySet<string> = new Set(["rex:prd-changed", "hench:run-changed", "sv:data-changed"]);
+/**
+ * A burst of frames (a bulk write, a run saving each turn) is one refetch per
+ * this window. The server recomputes every item's impact per request, so a run
+ * saving every second must not cost a recompute every second per open tab.
+ */
+const REFRESH_WINDOW_MS = 3_000;
 /** A virtualized tree unmounts and mounts rows in one scroll: keep the socket across the gap. */
 const FEED_LINGER_MS = 1_000;
 
@@ -67,17 +72,20 @@ let feedCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 function load(): Promise<ImpactMap> {
   pending ??= fetch("/api/rex/impact")
-    .then(async (res) => (res.ok ? ((await res.json()) as { items?: ImpactMap }).items ?? {} : {}))
-    .catch(() => ({}))
-    .then((data) => {
-      cache = { at: Date.now(), data };
+    .then(async (res) => (res.ok ? ((await res.json()) as { items?: ImpactMap }).items ?? {} : null))
+    .catch(() => null)
+    .then((loaded) => {
       pending = null;
-      for (const listener of listeners) listener(data);
+      // A failed read keeps what rows already show, and stays stale so the next mount retries.
+      if (loaded) {
+        cache = { at: Date.now(), data: loaded };
+        for (const listener of listeners) listener(loaded);
+      }
       if (changedWhileLoading) {
         changedWhileLoading = false;
         void load();
       }
-      return data;
+      return loaded ?? cache?.data ?? {};
     });
   return pending;
 }

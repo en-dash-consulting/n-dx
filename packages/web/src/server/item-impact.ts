@@ -88,10 +88,11 @@ const SECURITY_TITLE = new RegExp(String.raw`\b(?:key rotation|${SECRET_NOUN})\b
 /**
  * Body text has to act on one: rotate, revoke, leak, expose, encrypt or
  * hard-code a secret, key or token. A description that merely mentions
- * credentials (or a feature that flags them) is not flagged.
+ * credentials (or a feature that flags them) is not flagged, and neither is
+ * a token that is a count: "expose token usage", "leak token totals".
  */
 const SECURITY_ACTION = new RegExp(
-  String.raw`\b(?:key rotation|(?:rotat|revok|leak|expos|encrypt|hard-?cod)\w*\s+(?:[\w-]+\s+){0,3}?(?:${SECRET_NOUN}|keys?|tokens?))\b`,
+  String.raw`\b(?:key rotation|(?:rotat|revok|leak|expos|encrypt|hard-?cod)\w*\s+(?:[\w-]+\s+){0,3}?(?:${SECRET_NOUN}|keys?|tokens?))\b(?![\s-]+(?:usage|counts?|budgets?|totals?|spend|costs?|limits?|estimates?|per)\b)`,
   "gi",
 );
 
@@ -118,6 +119,9 @@ const ROOT_ESSENTIAL = /^(?:package\.json|pnpm-lock\.yaml|package-lock\.json|yar
  * (`packages/web/src/x.ts`), or a bare file name with a known extension
  * (`ready-to-run.ts`, `.n-dx.json`). URLs are skipped.
  */
+/** Product names that read as a file name: "Node.js", "Vue.js". */
+const NOT_A_FILE = /^(?:node|next|nuxt|vue|react|express|deno|bun|d3|three|chart|ember|backbone|angular|svelte|solid|alpine)\.js$/i;
+
 export function mentionedPaths(text: string): string[] {
   const out = new Set<string>();
   const withoutUrls = text.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ");
@@ -127,6 +131,7 @@ export function mentionedPaths(text: string): string[] {
     // A bare word with a dot (e.g. "e.g", "v1.2") is not a file unless its extension is one we classify.
     if (fileKind(candidate) === "other") continue;
     if (/^\d/.test(candidate) && !candidate.includes("/")) continue;
+    if (NOT_A_FILE.test(candidate)) continue;
     out.add(candidate);
   }
   return [...out];
@@ -243,9 +248,27 @@ export function computeImpacts(
  * is well tested, not one much of the product depends on.
  */
 export function importFanIn(svDir: string): Map<string, number> {
+  const path = join(svDir, "imports.json");
+  let mtimeMs = -1;
+  try {
+    mtimeMs = statSync(path).mtimeMs;
+  } catch {
+    // No analysis yet: nothing counts as essential by fan-in.
+  }
+  const cached = fanInCache.get(svDir);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.fanIn;
+  const fanIn = readFanIn(path);
+  fanInCache.set(svDir, { mtimeMs, fanIn });
+  return fanIn;
+}
+
+/** The last fan-in per sourcevision dir, kept until its `imports.json` changes. */
+const fanInCache = new Map<string, { mtimeMs: number; fanIn: Map<string, number> }>();
+
+function readFanIn(path: string): Map<string, number> {
   const importers = new Map<string, Set<string>>();
   try {
-    const data = JSON.parse(readFileSync(join(svDir, "imports.json"), "utf-8")) as { edges?: Array<{ from?: unknown; to?: unknown }> };
+    const data = JSON.parse(readFileSync(path, "utf-8")) as { edges?: Array<{ from?: unknown; to?: unknown }> };
     for (const e of data.edges ?? []) {
       if (typeof e.from !== "string" || typeof e.to !== "string" || fileKind(e.from) === "test") continue;
       let set = importers.get(e.to);
@@ -260,6 +283,27 @@ export function importFanIn(svDir: string): Map<string, number> {
 
 interface CachedRun { mtimeMs: number; taskId: string | null; files: string[] }
 
+/** Tool state a run writes beside the work: never part of the item's size. */
+const TOOL_STATE = /^\.(?:git|rex|ndx|hench|sourcevision)(?:\/|$)/i;
+
+/**
+ * A run's `filesChanged` entry as a project-relative, forward-slash path, or
+ * null for tool state and for an absolute path outside `projectDir`. Older
+ * runs list a file twice, once absolute with backslashes, so both forms must
+ * land on the same path.
+ */
+export function runFilePath(raw: string, projectDir?: string): string | null {
+  let path = raw.trim().replace(/\\/g, "/");
+  if (/^(?:[A-Za-z]:)?\//.test(path)) {
+    const root = projectDir ? `${projectDir.replace(/\\/g, "/").replace(/\/+$/, "")}/` : null;
+    if (!root || !path.toLowerCase().startsWith(root.toLowerCase())) return null;
+    path = path.slice(root.length);
+  }
+  path = path.replace(/^(?:\.\/)+/, "");
+  if (!path || TOOL_STATE.test(path)) return null;
+  return path;
+}
+
 /**
  * `filesChanged` per task across a runs directory. Each run file is parsed once
  * and re-read only when its mtime moves, so a repeat request costs one stat per
@@ -268,7 +312,7 @@ interface CachedRun { mtimeMs: number; taskId: string | null; files: string[] }
 export class RunFilesCache {
   private readonly runs = new Map<string, CachedRun>();
 
-  constructor(private readonly runsDir: string) {}
+  constructor(private readonly runsDir: string, private readonly projectDir?: string) {}
 
   byTask(): Map<string, string[]> {
     let names: string[];
@@ -307,7 +351,9 @@ export class RunFilesCache {
       entry = {
         mtimeMs,
         taskId: typeof run.taskId === "string" ? run.taskId : null,
-        files: Array.isArray(files) ? files.filter((f): f is string => typeof f === "string") : [],
+        files: Array.isArray(files)
+          ? [...new Set(files.flatMap((f) => (typeof f === "string" ? [runFilePath(f, this.projectDir)] : [])).filter((f): f is string => f !== null))]
+          : [],
       };
     } catch {
       // A run file mid-write: try again on the next request.

@@ -11,7 +11,6 @@
 .impact-size-large { color: var(--orange); border-color: var(--orange); }
 .impact-size-medium { color: var(--text); }
 /* A row's technical title, under its plain-language summary. */
-.item-tech-title { display: block; color: var(--text-muted); font-size: var(--font-xs); font-weight: 400; }
 /* The detail panel's Impact section. */
 .impact-detail .impact-tags { margin-bottom: var(--space-1); }
 .impact-source { margin: var(--space-1) 0; color: var(--text-muted); font-size: var(--font-xs); }

@@ -19,7 +19,7 @@ const caches = new Map<string, RunFilesCache>();
 function runFiles(projectDir: string): Map<string, string[]> {
   const runsDir = join(henchDirIn(projectDir), "runs");
   let cache = caches.get(runsDir);
-  if (!cache) caches.set(runsDir, (cache = new RunFilesCache(runsDir)));
+  if (!cache) caches.set(runsDir, (cache = new RunFilesCache(runsDir, projectDir)));
   return cache.byTask();
 }
 

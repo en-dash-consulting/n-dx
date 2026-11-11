@@ -138,7 +138,7 @@ describe("useItemImpacts on a page left open", () => {
     send({ type: "hench:run-changed" });
     send({ type: "hench:run-changed" });
     send({ type: "rex:prd-changed" });
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
 
     expect(text("a")).toBe("actual:12");
     expect(text("b")).toBe("actual:12");
@@ -154,12 +154,37 @@ describe("useItemImpacts on a page left open", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     send({ type: "sv:analysis-changed" });
     send({ type: "rex:prd-changed", workspace: "another-worktree" });
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     act(() => { render(null, root!); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
     expect(sockets[0]!.closed).toBe(true);
+  });
+
+  it("keeps the impacts already shown when a refetch fails", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let fail = false;
+    const fetchMock = vi.fn(async () => (fail
+      ? { ok: false, status: 500, json: async () => ({ error: "boom" }) }
+      : { ok: true, json: async () => ({ items: { t1: EXPECTED } }) }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    mount(h(Consumer, { id: "a" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(text("a")).toBe("expected:1");
+
+    fail = true;
+    send({ type: "rex:prd-changed" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(text("a")).toBe("expected:1");
+
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+    send({ type: "sv:data-changed" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(text("a")).toBe("expected:1");
   });
 
   it("loads again when a change lands while a load is still in flight", async () => {
@@ -177,13 +202,13 @@ describe("useItemImpacts on a page left open", () => {
     mount(h(Consumer, { id: "a" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     send({ type: "rex:prd-changed" });
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // The second load read the old impact; a run lands before it answers.
     served = ACTUAL;
     send({ type: "hench:run-changed" });
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
     release();
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(fetchMock).toHaveBeenCalledTimes(3);
