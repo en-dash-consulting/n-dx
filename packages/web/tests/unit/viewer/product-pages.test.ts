@@ -369,7 +369,9 @@ describe("on a v2 project", () => {
     stubRoutes({ "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } });
     await mount(h(ChangesPage, null));
     await flushFrames("hench:run-changed");
-    expect(fetched).toEqual(["/api/rex/changes"]);
+    // Only the list's own read counts: the rows' shared impact map may load
+    // after paint, sooner or later depending on the runner.
+    expect(fetched.filter((url) => url === "/api/rex/changes")).toEqual(["/api/rex/changes"]);
   });
 
   it("says what failed when a read errors", async () => {
