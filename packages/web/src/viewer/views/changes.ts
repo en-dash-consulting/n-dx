@@ -357,7 +357,8 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea,
       "Work grouped by planned release and stage. A release is a field on a change, not a container."),
 
     // Done and waiting to apply: one step for all of them, and the way to make it automatic.
-    h(ApplyAllBar, { waiting: changes.filter((c) => c.stage === "awaiting-apply").length, navigateTo }),
+    // Held in the Inbox, a change is placed before it applies: Apply all leaves it out.
+    h(ApplyAllBar, { waiting: changes.filter((c) => c.stage === "awaiting-apply" && !c.awaitsPlacement).length, navigateTo }),
 
     groups.length === 0
       ? h("div", { class: "empty-state", role: "status" },

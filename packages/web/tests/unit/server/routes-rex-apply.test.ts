@@ -23,7 +23,9 @@ const viewerToWire = (v: ChangeApply): ChangeApplyWire => v;
 const amendmentWire = (w: AppliedAmendmentWire): AppliedAmendment => w;
 const allPreviewToViewer = (w: ApplyAllPreviewWire): ApplyAllPreview => w;
 const allResultToViewer = (w: ApplyAllResultWire): ApplyAllResult => w;
-void wireToViewer; void viewerToWire; void amendmentWire; void allPreviewToViewer; void allResultToViewer;
+const allPreviewToWire = (v: ApplyAllPreview): ApplyAllPreviewWire => v;
+const allResultToWire = (v: ApplyAllResult): ApplyAllResultWire => v;
+void wireToViewer; void viewerToWire; void amendmentWire; void allPreviewToViewer; void allResultToViewer; void allPreviewToWire; void allResultToWire;
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
@@ -190,6 +192,16 @@ describe("apply routes on a v2 project", () => {
     const [only] = changes;
     expect(only!.ok && only!.applied.map((a) => a.node.id)).toEqual([CAPABILITY_ID]);
     expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  it("apply all leaves out a done change still held in the Inbox: it is placed first", async () => {
+    finishChange();
+    const state = join(rexDir, "changes", "add-apple-pay", "state.yaml");
+    edit(state, `    prs: [`, `    needsPlacement: true\n    prs: [`);
+    const { changes } = (await (await post("changes/apply-all/preview")).json()) as { changes: unknown[] };
+    expect(changes).toEqual([]);
+    const { results } = (await (await post("changes/apply-all", { hashes: { [CHANGE_ID]: "x" } })).json()) as { results: unknown[] };
+    expect(results).toEqual([]);
   });
 
   it("apply all lists nothing when no change is waiting", async () => {

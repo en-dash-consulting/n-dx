@@ -23,10 +23,11 @@
  *   POST /api/rex/changes/apply-all  { hashes: { [id]: hash } } → { layout: "v2", results: ApplyAllResultWire[] }
  *                                             applies only the changes named, each against its own
  *                                             preview hash, one transaction each; a refusal skips
- *                                             that change and the rest still apply. A held PRD lock
- *                                             stops the batch: the changes not yet tried answer
- *                                             ok: false with the lock's message, and those already
- *                                             applied are still reported, refreshed and broadcast
+ *                                             that change and the rest still apply. A throw (a held
+ *                                             PRD lock, a failed write) stops the batch: the changes
+ *                                             not yet tried answer ok: false with its message, and
+ *                                             those already applied are still reported, refreshed
+ *                                             and broadcast
  *
  * A missing hash answers 400, a v1 tree 409, a held PRD lock 409, and rex's
  * refusal 422 `{ error, problems }` with rex's own message. The wire types mirror
@@ -213,8 +214,11 @@ async function handleApplyAll(preview: boolean, req: IncomingMessage, res: Serve
       } catch (err) {
         const message = errorMessage(err);
         results.push({ ...ref, ok: false, error: message });
-        // Another writer holds the PRD: the rest would only wait on the same lock.
-        if (message.includes("Could not acquire PRD lock")) stoppedBy = message;
+        // A held lock would only make the rest wait on it; a failed write may have
+        // left the tree half-written, so nothing more is written on top of it.
+        stoppedBy = message;
+        // A throw after the write still changed the PRD: refresh and broadcast either way.
+        wrote = true;
         continue;
       }
       if (!outcome.ok) {

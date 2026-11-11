@@ -1,7 +1,8 @@
 /**
  * Apply all when an apply throws partway: each change commits on its own, so
- * the ones already applied are still reported, refreshed and broadcast, a held
- * PRD lock stops the batch, and the changes not yet tried say so.
+ * the ones already applied are still reported, refreshed and broadcast; any
+ * throw (a held PRD lock, a failed write) stops the batch, and the changes not
+ * yet tried say so.
  *
  * rex's apply is replaced so C1 commits and C2 throws; the v2 route test
  * (routes-rex-apply.test.ts) covers the real apply on a fixture tree.
@@ -106,15 +107,24 @@ describe("apply all with a failure partway", () => {
     expect(frames.filter((f) => f.type === "rex:prd-changed")).toHaveLength(1);
   });
 
-  it("keeps going past another kind of failure", async () => {
+  it("stops at a failed write too, writing nothing on top of a tree it may have left half-written", async () => {
     gateway.applyChange.mockImplementation(async (_dir: string, id: string) => {
-      if (id === "c2") throw new Error("disk full");
+      if (id === "c2") throw new Error("ENOSPC: no space left on device");
       return applied(id);
     });
 
     const { results } = (await (await applyAll()).json()) as { results: ApplyAllResultWire[] };
-    expect(results.map((r) => [r.id, r.ok])).toEqual([["c1", true], ["c2", false], ["c3", true]]);
-    expect(results[1]).toMatchObject({ error: "disk full" });
+    expect(results.map((r) => [r.id, r.ok])).toEqual([["c1", true], ["c2", false], ["c3", false]]);
+    expect(results[2]).toMatchObject({ error: "Not applied: ENOSPC: no space left on device" });
+    expect(gateway.applyChange.mock.calls.map((c) => c[1])).toEqual(["c1", "c2"]);
+    expect(frames.filter((f) => f.type === "rex:prd-changed")).toHaveLength(1);
+  });
+
+  it("refreshes and broadcasts when the only change threw, since the throw may follow its write", async () => {
+    gateway.applyChange.mockImplementation(async () => { throw new Error("write failed after commit"); });
+    const { results } = (await (await applyAll()).json()) as { results: ApplyAllResultWire[] };
+    expect(results.every((r) => !r.ok)).toBe(true);
+    expect(refreshPRDCache).toHaveBeenCalledOnce();
     expect(frames.filter((f) => f.type === "rex:prd-changed")).toHaveLength(1);
   });
 

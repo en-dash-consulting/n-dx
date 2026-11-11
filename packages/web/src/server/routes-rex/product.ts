@@ -375,8 +375,10 @@ export interface AwaitingApplyRef {
 
 /** Every change in the "Done, waiting to apply" stage, in tree order. */
 export function awaitingApplyChanges(tree: V2Tree): AwaitingApplyRef[] {
-  return changesOf(indexTree(tree))
-    .filter((change) => stageOf(change) === "awaiting-apply")
+  const index = indexTree(tree);
+  // A change held in the Inbox is not counted in the stage either (summary below): placing it comes first.
+  return changesOf(index)
+    .filter((change) => stageOf(change) === "awaiting-apply" && !awaitsPlacement(index, change))
     .map((change) => ({
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),

@@ -84,6 +84,26 @@ describe("ApplyAllBar", () => {
     expect(root!.textContent).toContain("edited since the preview: apply it again");
   });
 
+  it("says a change refused as moved after an earlier one applied may have been moved by it", async () => {
+    await mount({}, [
+      { id: "c0", title: "Edit Pay", ok: true, applied: [] },
+      { id: "c1", title: "Add Apple Pay", ok: false, error: "moved", moved: true },
+    ]);
+    await click("Apply all…");
+    await click("Apply 1");
+    expect(root!.textContent).toContain("possibly by a change applied before it: Apply all again to preview it");
+  });
+
+  it("names an approved change the server no longer had waiting", async () => {
+    await mount({}, []);
+    await click("Apply all…");
+    await click("Apply 1");
+    expect(root!.textContent).toContain("Applied 0 changes. 1 change was skipped.");
+    const items = [...root!.querySelectorAll(".aa-list li")].map((li) =>
+      [li.querySelector(".aa-name")!.textContent, li.querySelector(".aa-effect")!.textContent]);
+    expect(items).toEqual([["Shoppers can pay with Apple Pay", "no longer waiting to apply"]]);
+  });
+
   it("links to the Workflow settings that apply changes automatically", async () => {
     const navigateTo = vi.fn();
     await mount({ navigateTo });

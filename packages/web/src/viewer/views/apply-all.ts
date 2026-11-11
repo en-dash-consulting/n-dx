@@ -58,6 +58,18 @@ async function post<T>(path: string, body?: unknown): Promise<{ ok: true; data: 
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/**
+ * Why a change refused as moved was skipped. Results come back in apply order,
+ * so a change applied ahead of it in this batch may be what moved it: two
+ * changes amending the same capability each preview against the old spec.
+ */
+function movedText(result: ApplyAllResult, results: readonly ApplyAllResult[]): string {
+  const earlier = results.slice(0, results.indexOf(result)).some((r) => r.ok);
+  return earlier
+    ? "changed since the preview, possibly by a change applied before it: Apply all again to preview it"
+    : "edited since the preview: apply it again";
+}
+
 /** "adds 2, edits 1" for a change's amendments; "no product changes" for none. */
 export function effectText(applied: readonly AppliedAmendment[]): string {
   if (applied.length === 0) return "no product changes";
@@ -97,8 +109,22 @@ export function ApplyAllBar({ waiting, navigateTo, onApplied }: {
       setState({ step: "error", message: answer.message });
       return;
     }
-    setState({ step: "done", results: answer.data.results ?? [] });
-    if ((answer.data.results ?? []).some((r) => r.ok)) onApplied?.();
+    const results = answer.data.results ?? [];
+    // An approved change the server no longer had waiting (applied in another tab,
+    // reopened by a run) gets no result: say so rather than leave it out of the count.
+    const answered = new Set(results.map((r) => r.id));
+    const gone: ApplyAllResult[] = changes
+      .filter((c) => c.ok && !answered.has(c.id))
+      .map(({ id, displayId, title, summary }) => ({
+        id,
+        ...(displayId ? { displayId } : {}),
+        title,
+        ...(summary ? { summary } : {}),
+        ok: false as const,
+        error: "no longer waiting to apply",
+      }));
+    setState({ step: "done", results: [...results, ...gone] });
+    if (results.some((r) => r.ok)) onApplied?.();
   };
 
   const settingsLink = navigateTo
@@ -155,7 +181,7 @@ export function ApplyAllBar({ waiting, navigateTo, onApplied }: {
           ? h("ul", { class: "aa-list" }, skipped.map((r) =>
               h("li", { key: r.id, class: "aa-refused" },
                 h("span", { class: "aa-name" }, displayTitle(r)),
-                h("span", { class: "aa-effect" }, r.ok ? "" : r.moved ? "edited since the preview: apply it again" : r.error))))
+                h("span", { class: "aa-effect" }, r.ok ? "" : r.moved ? movedText(r, state.results) : r.error))))
           : null,
         h("div", { class: "aa-row" }, close),
       );
