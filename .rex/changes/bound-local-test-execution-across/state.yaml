@@ -196,10 +196,14 @@ items:
     lastModified: "2026-11-12T18:29:10.211Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "92b189a1-8d77-463f-b524-a29b015eb6f9":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-12T18:54:53.413Z"
-    activeIntervals: [{"start":"2026-11-12T18:54:53.413Z"}]
-    lastModified: "2026-11-12T18:54:54.085Z"
+    completedAt: "2026-11-12T19:08:41.728Z"
+    endedAt: "2026-11-12T19:08:41.728Z"
+    activeIntervals: [{"end":"2026-11-12T19:08:41.728Z","start":"2026-11-12T18:54:53.413Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added scripts/bench/validation-bench.mjs with pure helpers in scripts/bench/lib/ (plan, samples, gate-output, summary). It covers cases A–D and five fixtures, with A–C passing --no-slot and D holding the slot through hench's dist module so the runner nests. The dry run prints the matrix, the fixture files and an estimate, and creates nothing. Other parts: a preflight refusal, 2 s samples, JSONL plus summary.md output, and worktree cleanup on exit, signal and error. scripts/lib/workspace-manifests.mjs is now shared with run-all-tests.mjs. There are 24 unit tests and a TESTING.md section."
+    lastModified: "2026-11-12T19:08:41.728Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96357e8a-d040-477a-9f0d-d75fea4656ef":
     status: "completed"
