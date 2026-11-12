@@ -22,19 +22,27 @@ const V2_STATUS = {
   initialized: true,
 };
 
-afterEach(() => { vi.unstubAllGlobals(); });
+let mountedRoot: HTMLDivElement | undefined;
+afterEach(() => {
+  const root = mountedRoot;
+  if (root) act(() => { render(null, root); });
+  mountedRoot = undefined;
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("useStatusLayout", () => {
   it("reads the layout from one status fetch and opens no WebSocket however many readers mount", async () => {
+    vi.useFakeTimers();
     const fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => V2_STATUS }));
     vi.stubGlobal("fetch", fetch);
     const root = document.createElement("div");
+    mountedRoot = root;
     act(() => { render(h("div", null, h(Probe, null), h(Probe, null), h(Probe, null), h(Probe, null)), root); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 
     expect([...root.querySelectorAll(".probe")].map((e) => e.textContent)).toEqual(["v2", "v2", "v2", "v2"]);
     expect(openWebSocket).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledTimes(1);
-    act(() => { render(null, root); });
   });
 });

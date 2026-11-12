@@ -10,11 +10,13 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { h } from "preact";
 import { act } from "preact/test-utils";
-import { startOffer } from "../../../src/viewer/components/prepare-task-model.js";
+import { defaultsRunBlockOf, startOffer } from "../../../src/viewer/components/prepare-task-model.js";
 import { TaskStartControl } from "../../../src/viewer/components/task-start-control.js";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
+import { prepFixture } from "../../helpers/prep-fixture.js";
+import { savedPrep, stubStartFetch } from "../../helpers/start-task-fetch.js";
 
 describe("startOffer", () => {
   it("starts pending and deferred tasks", () => {
@@ -98,6 +100,8 @@ describe("TaskDetail start control", () => {
   afterEach(() => {
     if (root) cleanupRenderedDiv(root);
     root = undefined;
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -114,35 +118,79 @@ describe("TaskDetail start control", () => {
     expect(root.querySelector(".task-execute-btn")).toBeNull();
   });
 
-  /** Live answers with no runs; execute answers 200. Every call is recorded. */
-  function stubServer(): ReturnType<typeof vi.fn> {
-    const fetchMock = vi.fn(async (url: string) => ({
-      ok: true,
-      status: 200,
-      json: async () => (String(url).includes("/api/hench/execute")
-        ? { ok: true }
-        : { runs: [], jobs: [], counts: { running: 0, stale: 0, jobs: 0 } }),
-    }));
-    vi.stubGlobal("fetch", fetchMock);
-    return fetchMock;
+  /** Give the detail panel its Live snapshot and Start its real prep shape. */
+  function stubServer(prep = prepFixture()) {
+    const stub = stubStartFetch({ prep });
+    const startFetch = stub.fetch.getMockImplementation()!;
+    stub.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/live") return {
+        ok: true,
+        status: 200,
+        json: async () => ({ runs: [], jobs: [], counts: { running: 0, stale: 0, jobs: 0 } }),
+      };
+      if (url === "/api/rex/changes") return {
+        ok: true, status: 200, json: async () => ({ changes: [] }),
+      };
+      if (!url.startsWith("/api/hench/")) return {
+        ok: false, status: 404, json: async () => ({ error: "Not available in this fixture" }),
+      };
+      return startFetch(url, init);
+    });
+    return stub;
   }
 
-  it("starts a change the server flags as running as one task", async () => {
-    const fetchMock = stubServer();
+  it.each([false, true])("starts a change the server flags as running as one task in one click (saved settings: %s)", async (saved) => {
+    vi.useFakeTimers();
     const item = { id: "solo", title: "Solo", status: "pending", type: "change", runsAsOneTask: true } as const;
-    root = renderToDiv(h(TaskDetail, { item: { ...item }, allItems: [{ ...item }] }));
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-
-    expect(root.querySelector(".start-task-primary")).not.toBeNull();
-    act(() => { root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click(); });
+    const task = { id: item.id, title: item.title, status: item.status, itemType: item.type };
+    const prep = saved ? savedPrep({ task }) : prepFixture({ task });
+    const stub = stubServer(prep);
     await act(async () => {
-      root!.querySelector<HTMLButtonElement>('.ready-menu [role="menuitem"]')!.click();
-      await new Promise((r) => setTimeout(r, 0));
+      root = renderToDiv(h(TaskDetail, { item: { ...item }, allItems: [{ ...item }] }));
+      await vi.advanceTimersByTimeAsync(0);
     });
 
-    const execute = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/hench/execute"));
-    expect(execute).toBeDefined();
-    expect(JSON.parse((execute![1] as RequestInit).body as string)).toMatchObject({ taskId: "solo" });
+    expect(root!.querySelector(".start-task-primary")!.textContent).toBe("Start");
+    await act(async () => {
+      root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(stub.saves()).toHaveLength(0);
+    expect(stub.calls.filter((c) => c.url.startsWith("/api/hench/prep/")).map((c) => `${c.method} ${c.url}`))
+      .toEqual(["GET /api/hench/prep/solo"]);
+    expect(stub.executes().map((c) => c.body)).toEqual([saved
+      ? { taskId: "solo" }
+      : { taskId: "solo", saveRun: { run: defaultsRunBlockOf(prep), version: "none" } }]);
+  });
+
+  it("opens a task-less change's settings directly from the arrow without starting or saving", async () => {
+    vi.useFakeTimers();
+    const item = { id: "solo", title: "Solo", status: "pending", type: "change", runsAsOneTask: true } as const;
+    const stub = stubServer(prepFixture({
+      task: { id: item.id, title: item.title, status: item.status, itemType: item.type },
+    }));
+    await act(async () => {
+      root = renderToDiv(h(TaskDetail, { item: { ...item }, allItems: [{ ...item }] }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // Opening mounts the modal; flush the prep read its mount effect starts.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.querySelector(".prep-task-title")!.textContent).toBe("Solo");
+    expect(dialog!.querySelector(".prep-loading")).toBeNull();
+    expect(stub.calls.filter((c) => c.url.startsWith("/api/hench/prep/")).map((c) => `${c.method} ${c.url}`))
+      .toEqual(["GET /api/hench/prep/solo"]);
+    expect(stub.executes()).toHaveLength(0);
+    expect(stub.saves()).toHaveLength(0);
   });
 
   it("offers no start for a change with tasks", async () => {

@@ -24,7 +24,8 @@ import { refreshPRDCache } from "./prd-io.js";
 import { errorMessage } from "./response-utils.js";
 import { findItem, resolveStore, updateInTree, validateRunSettings } from "./rex-gateway.js";
 import type { RunSettings } from "./rex-gateway.js";
-import { isWorkItemType, itemTypeOf } from "../shared/index.js";
+import { itemTypeOf } from "../shared/index.js";
+import { isRunnableUnit } from "./runnable-units.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 /**
@@ -243,7 +244,7 @@ export async function writeTaskRun(
 
   let conflict: { saved: RunSettings | null; version: string } | null = null;
   let missing = false;
-  let notAWorkItem = false;
+  let notRunnable: string | null = null;
   let updatedDoc;
   try {
     const store = await resolveStore(ctx.rexDir);
@@ -253,8 +254,10 @@ export async function writeTaskRun(
         missing = true;
         return doc;
       }
-      if (!isWorkItemType(itemTypeOf(entry.item))) {
-        notAWorkItem = true;
+      if (!isRunnableUnit(entry.item)) {
+        notRunnable = itemTypeOf(entry.item) === "change"
+          ? `Change "${taskId}" does not run as one task; n-dx work runs its tasks, so save run settings on those tasks`
+          : `Item "${taskId}" is not a task or subtask, so it cannot carry run settings`;
         return doc;
       }
       const current = entry.item.run as RunSettings | undefined;
@@ -275,11 +278,11 @@ export async function writeTaskRun(
   }
 
   if (missing) return { ok: false, status: 404, body: { error: `Task "${taskId}" not found` } };
-  if (notAWorkItem) {
+  if (notRunnable) {
     return {
       ok: false,
       status: 400,
-      body: { error: `Item "${taskId}" is not a task or subtask, so it cannot carry run settings` },
+      body: { error: notRunnable },
     };
   }
   if (conflict) {
