@@ -1745,42 +1745,45 @@ interface AuthCheckResult {
 }
 
 /**
- * Cached `ndx auth` result and the check currently in flight, if any.
+ * Cached `n-dx auth` results and checks currently in flight, by context.
  *
  * The check spawns a subprocess with a 60s budget, and the settings page
  * mounts its chip on every navigation — without a cache, each visit costs a
  * spawn and rapid Re-checks stack processes. What the check reports only
  * changes when credentials or LLM config change, so the result is cached for
- * the server's lifetime, keyed by the effective vendor config
+ * the server's lifetime, keyed by workspace and effective vendor config
  * ({@link authCheckKey}) and dropped on dashboard LLM config saves
  * ({@link invalidateAuthCheckCache}); `?refresh=true` forces a fresh run.
- * Concurrent requests share the in-flight check instead of spawning again.
+ * Concurrent requests for the same context share the in-flight check.
  */
-let authCheckCache: { key: string; result: AuthCheckResult } | null = null;
-let authCheckInFlight: Promise<AuthCheckResult> | null = null;
+const authCheckCache = new Map<string, AuthCheckResult>();
+const authCheckInFlight = new Map<string, Promise<AuthCheckResult>>();
 
 /**
- * What the credential check depends on: the effective vendor and that vendor's
- * `llm.<vendor>` block (CLI path, auth mode, key, endpoint, model — everything
- * `ndx auth`'s preflight reads). A verdict is a hit only for the key it was made
- * under, so a change made outside the dashboard (`ndx config`, a hand edit, a
- * branch switch) is a miss — no watcher, and no save path has to remember to
- * call {@link invalidateAuthCheckCache}. Hashed so no API key is held as a key.
+ * Context tracked by the cache: the workspace, effective vendor and that
+ * vendor's `llm.<vendor>` block (CLI path, auth mode, key, endpoint, model).
+ * Identical vendor config in two workspaces can still use different
+ * workspace-local CLI configuration. Changes to the effective vendor block
+ * made outside the dashboard (`n-dx config`, a hand edit, a branch switch)
+ * produce a different key without a watcher or explicit invalidation.
+ * Hashed so no API key is held as a key.
  */
 function authCheckKey(projectDir: string): string {
   const llm = (readEffectiveNdxConfig(projectDir)["llm"] ?? {}) as Record<string, unknown>;
   const vendor = typeof llm["vendor"] === "string" && llm["vendor"] ? llm["vendor"] : "claude";
-  return createHash("sha256").update(JSON.stringify([vendor, llm[vendor] ?? null])).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify([resolve(projectDir), vendor, llm[vendor] ?? null]))
+    .digest("hex");
 }
 
 /** The cached verdict when it was made under the config now in effect. */
 function currentAuthVerdict(projectDir: string): AuthCheckResult | null {
-  return authCheckCache && authCheckCache.key === authCheckKey(projectDir) ? authCheckCache.result : null;
+  return authCheckCache.get(authCheckKey(projectDir)) ?? null;
 }
 
 /** Drop the cached credential-check result (call when LLM config changes). */
 export function invalidateAuthCheckCache(): void {
-  authCheckCache = null;
+  authCheckCache.clear();
 }
 
 async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
@@ -1820,23 +1823,26 @@ async function handleAuth(
   const refresh = new URL(req.url || "/", "http://localhost")
     .searchParams.get("refresh") === "true";
 
-  const verdict = refresh ? null : currentAuthVerdict(ctx.projectDir);
+  const key = authCheckKey(ctx.projectDir);
+  const verdict = refresh ? null : authCheckCache.get(key);
   if (verdict) {
     jsonResponse(res, 200, { ...verdict, cached: true });
     return true;
   }
 
-  // Whoever asks while a check runs gets that check's answer — a forced
-  // refresh included, since the in-flight result is just as fresh.
-  if (!authCheckInFlight) {
-    const key = authCheckKey(ctx.projectDir);
-    authCheckInFlight = runAuthCheck(ctx).then((result) => {
-      authCheckCache = { key, result };
-      authCheckInFlight = null;
-      return result;
-    });
+  // Only requests for this workspace/config share the answer, including a
+  // forced refresh. Other contexts can check independently.
+  let check = authCheckInFlight.get(key);
+  if (!check) {
+    check = runAuthCheck(ctx)
+      .then((result) => {
+        authCheckCache.set(key, result);
+        return result;
+      })
+      .finally(() => { authCheckInFlight.delete(key); });
+    authCheckInFlight.set(key, check);
   }
-  const result = await authCheckInFlight;
+  const result = await check;
   jsonResponse(res, 200, { ...result, cached: false });
   return true;
 }
