@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
 import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
+import { testMaxWorkers } from "../../tests/test-max-workers.mjs";
 
 const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
@@ -28,6 +29,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // NDX_TEST_MAX_WORKERS caps workers for every project; unset keeps vitest's default.
+    maxWorkers: testMaxWorkers(),
     setupFiles: [
       "../../tests/setup-color-env.js",
       "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
