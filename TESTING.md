@@ -315,6 +315,25 @@ a comment near the top of the file. This annotation is machine-verified by
 `tests/e2e/architecture-policy.test.js` to prevent silent removal of required test
 coverage.
 
+## Capping Test Workers
+
+`NDX_TEST_MAX_WORKERS` caps the workers every vitest suite in the repository
+starts (root and each package). The root and package `vitest.config` files read
+it through one helper, `tests/test-max-workers.mjs` (`testMaxWorkers()`).
+
+- **Unset or empty:** vitest keeps its default (one worker per core), so a solo
+  run behaves as it always did.
+- **A positive integer:** the cap for that run, e.g. `NDX_TEST_MAX_WORKERS=2`.
+- **Anything else** (`0`, negative, `50%`, text): ignored with a one-line
+  warning; the run uses vitest's default.
+
+A developer running several worktrees at once can export it in the shell
+profile (`export NDX_TEST_MAX_WORKERS=2`) so their suites together do not claim
+several times the machine. Hench sets it for the commands it runs from
+`hench.testGate.maxWorkers` (see
+[Configuration](docs/guide/configuration.md#hench-configuration)); a new vitest
+config must read it with `testMaxWorkers()` at the top level of `test`.
+
 ## Timeout Guardrails
 
 Timeouts are allowed only as **guardrails against hangs**, not as a way to turn an
