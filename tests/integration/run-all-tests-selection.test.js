@@ -83,6 +83,7 @@ describe("run-all-tests.mjs affected gate on a stale build", () => {
     "scripts/lib/select-suites.mjs",
     "scripts/lib/stale-dist.mjs",
     "scripts/lib/validation-slot.mjs",
+    "scripts/lib/workspace-manifests.mjs",
     "packages/core/layout.js",
     "packages/core/build-identity.mjs",
     "packages/core/win-spawn.js",

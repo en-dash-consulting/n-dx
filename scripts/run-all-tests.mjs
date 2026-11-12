@@ -57,7 +57,7 @@
  * not hench config.
  */
 
-import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
+import { mkdirSync, createWriteStream } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,6 +65,7 @@ import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
 import { ROOT_LABEL, ROOT_SUBSET_LABELS, ROOT_SUBSET_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
 
 import { staleChangedPackages, staleDistMessage } from "./lib/stale-dist.mjs";
+import { readWorkspaceManifests } from "./lib/workspace-manifests.mjs";
 import {
   ValidationSlotAbortedError,
   acquireValidationSlot,
@@ -164,35 +165,6 @@ function runSuite(label, binary, args) {
       resolvePromise(code === 0);
     });
   });
-}
-
-/** Every workspace package manifest, in a stable order, with its directory name. */
-function readManifests() {
-  const packagesDir = join(ROOT, "packages");
-  if (!existsSync(packagesDir)) return [];
-
-  const manifests = [];
-  for (const entry of readdirSync(packagesDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!entry.isDirectory()) continue;
-    const manifestPath = join(packagesDir, entry.name, "package.json");
-    if (!existsSync(manifestPath)) continue;
-
-    let manifest;
-    try {
-      manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-    } catch {
-      continue;
-    }
-    if (!manifest?.name) continue;
-    manifests.push({
-      dir: entry.name,
-      name: manifest.name,
-      hasTest: Boolean(manifest.scripts?.test),
-      dependencies: manifest.dependencies,
-      devDependencies: manifest.devDependencies,
-    });
-  }
-  return manifests;
 }
 
 /** The runnable suite for a canonical short label. */
@@ -349,7 +321,7 @@ async function takeSlot() {
   }
 }
 
-const manifests = readManifests();
+const manifests = readWorkspaceManifests(ROOT);
 const args = process.argv.slice(2);
 const listOnly = args.includes("--list");
 const noSlot = args.includes("--no-slot");
