@@ -418,6 +418,8 @@ cases, so only these settings differ:
 | D | 3, started together | 2 | host slot, held by the bench around each run (the runner nests in it) |
 
 A and C are the behaviour before the cap and the slot; with both unset nothing changes.
+Only D's runs take the slot. A, B and C never touch it, so C's runs share the
+machine, and `--dry-run` says per case whether the slot is taken.
 
 ```sh
 node scripts/bench/validation-bench.mjs --dry-run --out /tmp/bench   # the plan, the fixture files, an estimate; creates nothing
@@ -439,10 +441,15 @@ node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the defa
   `ndx work` process is running, or while the 1-minute load average exceeds
   the core count. Run it on a quiet machine from a plain terminal, not from an
   agent session: the default matrix runs for one to two hours.
+- **Keep the machine idle for the whole run.** That check runs once, at
+  start. The benchmark does not stop if a hench run, `ndx work` or a test
+  suite starts later; that run's load lands in the numbers. It prints this
+  warning when it starts.
 - **Output** (`--out`, which must be outside the repository):
   - `runs.jsonl`: one line per run, with wall-clock, exit code, timeout,
-    per-suite pass/fail and duration, and for case D the queue and execution
-    time.
+    per-suite pass/fail and duration, the case's `slot` setting, and
+    `slotTaken`, whether this run actually held the slot. Queue and execution
+    time are recorded only when it did (case D).
   - `samples.jsonl`: every 2 s, the load, free memory, swap in use, the
     page-out counter, and the summed RSS of every process under the runs. It
     reads `vm_stat` and `sysctl vm.swapusage` on macOS, `/proc` on Linux, and
@@ -454,7 +461,8 @@ node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the defa
   with A for what the cap costs one run, and D with C for what the cap and
   the slot buy parallel work: peak RSS, peak swap, minimum free memory,
   page-outs and failures should fall, while total batch time shows what the
-  queueing costs. Median wall time for D includes its queue wait.
+  queueing costs. Median wall time for D includes its queue wait. The median
+  queue and exec columns count only runs with `slotTaken`, so A–C show `–`.
 
 ## Timeout Guardrails
 

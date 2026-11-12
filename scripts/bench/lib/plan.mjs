@@ -74,9 +74,16 @@ const CAPPED_FACTOR = 1.3;
 /** How much one of several uncapped parallel runs is assumed to slow down, for the estimate. */
 const CONTENDED_FACTOR = 1.8;
 
+/** Printed at start and in the usage text: the idle check runs only once. */
+export const IDLE_WARNING =
+  "Keep this machine idle for the whole run. The check for other test runs happens only at start;\n" +
+  "the benchmark does not stop if a hench run, ndx work or a test suite starts later, and its numbers are then wrong.";
+
 export const USAGE = `Usage: node scripts/bench/validation-bench.mjs --out <dir> [options]
 
 Replays the affected test gate under four settings on one commit.
+
+${IDLE_WARNING}
 
   --out <dir>          where results go (required; outside the repository)
   --cases A,B,C,D      cases to run (default all)
@@ -243,7 +250,8 @@ export function formatPlan(plan, options) {
   lines.push("Cases:");
   for (const c of plan.cases) {
     const env = c.maxWorkers === null ? "NDX_TEST_MAX_WORKERS unset" : `NDX_TEST_MAX_WORKERS=${c.maxWorkers}`;
-    lines.push(`  ${c.id}  ${c.worktrees} worktree${c.worktrees === 1 ? " " : "s"}  ${env.padEnd(26)}  ${(c.slot ? "host slot" : "no slot").padEnd(9)}  (${c.label})`);
+    const slot = c.slot ? "takes the host slot around each run" : "never takes the host slot (--no-slot)";
+    lines.push(`  ${c.id}  ${c.worktrees} worktree${c.worktrees === 1 ? " " : "s"}  ${env.padEnd(26)}  ${slot.padEnd(38)}  (${c.label})`);
   }
   lines.push("", "Fixtures (a comment appended to each file, committed on top of HEAD):");
   for (const f of plan.fixtures) {

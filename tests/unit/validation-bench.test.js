@@ -19,9 +19,13 @@ import {
 } from "../../scripts/bench/lib/samples.mjs";
 import { createLineCollector, parseGateOutput } from "../../scripts/bench/lib/gate-output.mjs";
 import { counterRise, median, renderSummaryMarkdown, summarize } from "../../scripts/bench/lib/summary.mjs";
+import { runBatch } from "../../scripts/bench/lib/batch.mjs";
 import {
   BenchUsageError,
+  CASES,
   DEFAULT_FIXTURES,
+  IDLE_WARNING,
+  USAGE,
   FIXTURES,
   buildPlan,
   caseEnv,
@@ -189,11 +193,12 @@ describe("summary arithmetic", () => {
     { batchId: "3", caseId: "D", fixture: "web", repeat: 2, startMs: 1_700_000, endMs: 2_500_000 },
   ];
   const runs = [
-    { batchId: "1", wallMs: 500_000, exitCode: 1, timedOut: false, testTimeouts: 2, queueMs: null, execMs: null },
-    { batchId: "1", wallMs: 600_000, exitCode: 0, timedOut: false, testTimeouts: 0, queueMs: null, execMs: null },
-    { batchId: "2", wallMs: 300_000, exitCode: 0, timedOut: false, testTimeouts: 0, queueMs: 0, execMs: 300_000 },
-    { batchId: "2", wallMs: 900_000, exitCode: 0, timedOut: false, testTimeouts: 0, queueMs: 600_000, execMs: 300_000 },
-    { batchId: "3", wallMs: 800_000, exitCode: null, timedOut: true, testTimeouts: 0, queueMs: 400_000, execMs: 400_000 },
+    // A C record as the first real run wrote it: queue figures from a slot the case never asked for.
+    { batchId: "1", wallMs: 500_000, exitCode: 1, timedOut: false, testTimeouts: 2, slotTaken: false, queueMs: 125_000, execMs: 375_000 },
+    { batchId: "1", wallMs: 600_000, exitCode: 0, timedOut: false, testTimeouts: 0, slotTaken: false, queueMs: null, execMs: null },
+    { batchId: "2", wallMs: 300_000, exitCode: 0, timedOut: false, testTimeouts: 0, slotTaken: true, queueMs: 0, execMs: 300_000 },
+    { batchId: "2", wallMs: 900_000, exitCode: 0, timedOut: false, testTimeouts: 0, slotTaken: true, queueMs: 600_000, execMs: 300_000 },
+    { batchId: "3", wallMs: 800_000, exitCode: null, timedOut: true, testTimeouts: 0, slotTaken: true, queueMs: 400_000, execMs: 400_000 },
   ];
   const samples = [
     { batchId: "1", rssBytes: 9e9, swapUsedBytes: 2e9, freeBytes: 1e8, load1: 20, pageouts: 100 },
@@ -254,6 +259,85 @@ describe("batch settling", () => {
   });
 });
 
+describe("batch slot use", () => {
+  // A manual clock: a run advances it by RUN_MS when it finishes, so start
+  // times are exact and a run that waited behind another starts RUN_MS later.
+  const RUN_MS = 100;
+
+  /** A host slot that admits one holder at a time and counts every call. */
+  function fakeSlotApi(now) {
+    const calls = { acquire: 0, release: 0 };
+    let tail = Promise.resolve();
+    return {
+      calls,
+      slotDir: "/fake/slot",
+      async acquireValidationSlot() {
+        calls.acquire++;
+        const asked = now();
+        let free;
+        const previous = tail;
+        tail = new Promise((r) => { free = r; });
+        await previous;
+        return {
+          nested: false,
+          queueWaitMs: now() - asked,
+          childEnv: (e) => ({ ...e, NDX_VALIDATION_SLOT: "fake-token" }),
+          recordChild: async () => {},
+          release: async () => { calls.release++; free(); },
+        };
+      },
+    };
+  }
+
+  async function run(caseId, { withSlot = true } = {}) {
+    let t = 0;
+    const now = () => t;
+    const slotApi = withSlot ? fakeSlotApi(now) : null;
+    const launched = [];
+    const records = await runBatch({
+      batch: { caseId, fixture: "hench", repeat: 1, batchId: `1-${caseId}`, worktrees: CASES[caseId].concurrent ? 3 : 1 },
+      worktrees: ["/wt/1", "/wt/2", "/wt/3"],
+      slotApi,
+      baseEnv: { PATH: "/bin" },
+      now,
+      launch: async ({ worker, env, lease }) => {
+        launched.push({ worker, env, lease, args: runnerArgs(caseId, "abc") });
+        await new Promise((r) => setImmediate(r));
+        t += RUN_MS;
+        return { exitCode: 0 };
+      },
+    });
+    return { records, launched, calls: slotApi?.calls };
+  }
+
+  it("never acquires in A, B or C, which still pass --no-slot", async () => {
+    for (const caseId of ["A", "B", "C"]) {
+      const { records, launched, calls } = await run(caseId);
+      expect(calls).toEqual({ acquire: 0, release: 0 });
+      expect(launched.every((l) => l.lease === null && l.args.includes("--no-slot") && !("NDX_VALIDATION_SLOT" in l.env))).toBe(true);
+      expect(records.every((r) => r.slot === false && r.slotTaken === false && r.queueMs === null && r.execMs === null)).toBe(true);
+    }
+  });
+
+  it("starts C's runs together", async () => {
+    const { records } = await run("C");
+    expect(records.map((r) => r.startedAt)).toEqual([0, 0, 0]);
+  });
+
+  it("acquires and releases once per run in D, nesting the runner in the lease", async () => {
+    const { records, launched, calls } = await run("D");
+    expect(calls).toEqual({ acquire: 3, release: 3 });
+    expect(launched.every((l) => l.lease !== null && !l.args.includes("--no-slot") && l.env.NDX_VALIDATION_SLOT === "fake-token")).toBe(true);
+    expect(records.every((r) => r.slot === true && r.slotTaken === true && r.slotNested === false)).toBe(true);
+    // The slot serialises D: each run queues behind the ones before it.
+    expect(records.map((r) => [r.startedAt, r.queueMs, r.execMs])).toEqual([[0, 0, RUN_MS], [RUN_MS, RUN_MS, RUN_MS], [2 * RUN_MS, 2 * RUN_MS, RUN_MS]]);
+  });
+
+  it("refuses to run D without a slot module", async () => {
+    await expect(run("D", { withSlot: false })).rejects.toThrow(/takes the host slot/);
+  });
+});
+
 describe("plan and flags", () => {
   const parse = (argv) => parseBenchArgs(argv, { repoRoots: [REPO], cwd: "/home/u" });
 
@@ -294,9 +378,17 @@ describe("plan and flags", () => {
 
     const text = formatPlan(plan, options);
     expect(text).toContain(`touches  ${FIXTURES.web.files[0]}`);
-    expect(text).toMatch(/D {2}3 worktrees {2}NDX_TEST_MAX_WORKERS=2 +host slot/);
+    expect(text).toMatch(/A {2}1 worktree {3}NDX_TEST_MAX_WORKERS unset +never takes the host slot \(--no-slot\)/);
+    expect(text).toMatch(/C {2}3 worktrees {2}NDX_TEST_MAX_WORKERS unset +never takes the host slot \(--no-slot\)/);
+    expect(text).toMatch(/D {2}3 worktrees {2}NDX_TEST_MAX_WORKERS=2 +takes the host slot around each run/);
     expect(text).toMatch(/Estimate \(rough\): setup ~\d+ min, runs ~\d+ min, total ~\d+ min/);
     expect(text).toContain("Dry run: nothing was created.");
+  });
+
+  it("tells the operator in the usage text to keep the machine idle for the whole run", () => {
+    expect(USAGE).toContain(IDLE_WARNING);
+    expect(IDLE_WARNING).toMatch(/idle for the whole run/);
+    expect(IDLE_WARNING).toMatch(/does not stop/);
   });
 
   it("plans the docs fixture as an empty selection and needs one worktree for solo cases", () => {
