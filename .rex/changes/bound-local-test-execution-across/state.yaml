@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-12T17:28:27.063Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "31f28b1c-8b8b-4c05-9379-9366fac04223":
-    lastModified: "2026-11-12T18:33:39.246Z"
+    status: "completed"
+    startedAt: "2026-11-12T18:38:44.457Z"
+    completedAt: "2026-11-12T18:41:18.200Z"
+    endedAt: "2026-11-12T18:41:18.200Z"
+    activeIntervals: [{"end":"2026-11-12T18:41:18.200Z","start":"2026-11-12T18:38:44.457Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: validation-slot.ts remembers tokens whose release failed; this process's next acquire reclaims such a record instead of waiting on itself."
+    lastModified: "2026-11-12T18:41:18.200Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "391a5838-082d-4b5d-928e-7759329ad87a":
     lastModified: "2026-11-12T17:57:26.059Z"
