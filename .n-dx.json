@@ -320,7 +320,8 @@
   "hench": {
     "testGate": {
       "command": "node scripts/run-all-tests.mjs affected {base}",
-      "rerunCommand": "node scripts/run-all-tests.mjs {suites}"
+      "rerunCommand": "node scripts/run-all-tests.mjs {suites}",
+      "maxWorkers": 2
     }
   }
 }
