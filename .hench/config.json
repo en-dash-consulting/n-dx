@@ -3,7 +3,7 @@
   "provider": "cli",
   "model": "opus",
   "permissionMode": "acceptEdits",
-  "maxTurns": 50,
+  "maxTurns": 200,
   "maxTokens": 8192,
   "rexDir": ".rex",
   "apiKeyEnv": "ANTHROPIC_API_KEY",
