@@ -40,6 +40,10 @@
  *   only in the Codex child's environment and blanked in every command the
  *   agent runs, so the broker credential is in neither argv (which is
  *   logged) nor an MCP config file. With no endpoint, no broker flag.
+ * - `mcp_servers.ndx-sidecar.default_tools_approval_mode="approve"`: only
+ *   the broker bypasses CLI approval. Its own operator cards still decide
+ *   each write; otherwise `approval_policy=never` refuses the tool before
+ *   it can reach a card. Shell approval and the sandbox stay unchanged.
  * - for every server a repository's own `.codex/config.toml` declares, from
  *   the session's checkout up to the repository root, re-read for each turn
  *   ({@link sidecarCodexProjectFlags}): `-c mcp_servers.<name>.enabled=false`
@@ -216,6 +220,7 @@ export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, i
     configFlags.push(
       "-c", `${server}.url=${tomlString(endpoint.url)}`,
       "-c", `${server}.required=true`,
+      "-c", `${server}.default_tools_approval_mode="approve"`,
       "-c", `${server}.startup_timeout_sec=${SIDECAR_CODEX_STARTUP_TIMEOUT_SEC}`,
       "-c", `${server}.tool_timeout_sec=${Math.max(1, Math.ceil(idleMs / 1000))}`,
       "-c", `${server}.env_http_headers={${headerVars.join(", ")}}`,

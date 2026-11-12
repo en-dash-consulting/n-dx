@@ -252,6 +252,7 @@ describe("Codex spawn", () => {
         "features.shell_snapshot=false",
         `mcp_servers.ndx-sidecar.url="${URL}"`,
         "mcp_servers.ndx-sidecar.required=true",
+        'mcp_servers.ndx-sidecar.default_tools_approval_mode="approve"',
         "mcp_servers.ndx-sidecar.startup_timeout_sec=30",
         // The idle window, 2 h, in whole seconds.
         "mcp_servers.ndx-sidecar.tool_timeout_sec=7200",
@@ -263,7 +264,14 @@ describe("Codex spawn", () => {
       expect(args.join(" ")).not.toContain(KEY);
       expect(env?.[KEY_VAR]).toBe(KEY);
       expect(env?.[WORKSPACE_VAR]).toBe("main");
+      expect(overrides(args).filter((value) => value.includes("approval_mode"))).toEqual([
+        'mcp_servers.ndx-sidecar.default_tools_approval_mode="approve"',
+      ]);
+      expect(args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
     }
+    expect(flagValue(fresh.args, "--sandbox")).toBe("read-only");
+    expect(overrides(fresh.args)).toContain("approval_policy=never");
+    expect(overrides(resumed.args)).toEqual(expect.arrayContaining(['sandbox_mode="read-only"', 'approval_policy="never"']));
     expect(process.env[KEY_VAR]).toBeUndefined();
 
     // The MCP config file a Codex session could read names no server.
@@ -312,6 +320,11 @@ describe("Codex spawn", () => {
       "mcp_servers.rex.enabled=false", 'mcp_servers.rex.command="ndx-sidecar-disabled"',
       "mcp_servers.docs.enabled=false", 'mcp_servers.docs.url="http://127.0.0.1:9/ndx-sidecar-disabled"',
     ]);
+    for (const { args } of spawned) {
+      expect(overrides(args).filter((value) => value.includes("approval_mode"))).toEqual([
+        'mcp_servers.ndx-sidecar.default_tools_approval_mode="approve"',
+      ]);
+    }
     // The broker's own entry is untouched: its url is the session endpoint.
     expect(overrides(spawned[0].args)).toContain(`mcp_servers.ndx-sidecar.url="${URL}"`);
     expect(overrides(spawned[0].args).filter((o) => o.startsWith("mcp_servers.ndx-sidecar.enabled"))).toEqual([]);
