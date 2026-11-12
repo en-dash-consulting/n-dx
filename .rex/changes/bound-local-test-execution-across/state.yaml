@@ -216,7 +216,14 @@ items:
     lastModified: "2026-11-12T18:10:08.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee944d3b-6829-4cac-901a-427b91170c79":
-    lastModified: "2026-11-12T17:54:26.294Z"
+    status: "completed"
+    startedAt: "2026-11-12T18:43:21.415Z"
+    completedAt: "2026-11-12T18:52:16.095Z"
+    endedAt: "2026-11-12T18:52:16.095Z"
+    activeIntervals: [{"end":"2026-11-12T18:52:16.095Z","start":"2026-11-12T18:43:21.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench's protocol v1; run-all-tests.mjs takes the slot before rebuild, releases after summary or on SIGINT/SIGTERM after the suite exits, nests on a live holder's token, --list/--no-slot skip it; parity drift test in ROOT_DRIFT_TEST_FILES."
+    lastModified: "2026-11-12T18:52:16.095Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2aa9f8c-556b-453f-bc9d-7fa9af4fa7a2":
     status: "completed"

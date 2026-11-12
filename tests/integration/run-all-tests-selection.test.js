@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { acquireValidationSlot } from "../../scripts/lib/validation-slot.mjs";
 
 const SCRIPT = join(import.meta.dirname, "../../scripts/run-all-tests.mjs");
 
@@ -81,6 +82,8 @@ describe("run-all-tests.mjs affected gate on a stale build", () => {
     "scripts/run-all-tests.mjs",
     "scripts/lib/select-suites.mjs",
     "scripts/lib/stale-dist.mjs",
+    "scripts/lib/validation-slot.mjs",
+    "packages/core/layout.js",
     "packages/core/build-identity.mjs",
     "packages/core/win-spawn.js",
     "packages/core/cli-log.js",
@@ -130,7 +133,12 @@ import { join } from "node:path";
 import { writeBuildStamp } from ${JSON.stringify(pathToFileURL(join(root, "scripts/lib/stale-dist.mjs")).href)};
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(join(root, "pnpm-calls.log"))}, JSON.stringify(args) + "\\n");
-if (!args.includes("build")) process.exit(0);
+if (!args.includes("build")) {
+  // A suite that runs until it is stopped, after saying so and naming the slot token it got.
+  if (!process.env.FAKE_SUITE_MARKER) process.exit(0);
+  appendFileSync(process.env.FAKE_SUITE_MARKER, process.env.NDX_VALIDATION_SLOT ?? "");
+  setInterval(() => {}, 1000);
+} else {
 if (process.env.FAKE_PNPM === "fail") { console.error("tsc: boom"); process.exit(1); }
 if (process.env.FAKE_PNPM === "build") {
   args.forEach((a, i) => {
@@ -140,6 +148,7 @@ if (process.env.FAKE_PNPM === "build") {
     mkdirSync(dist, { recursive: true });
     writeBuildStamp(join(${JSON.stringify(root)}, "packages", dir, "src"), dist);
   });
+}
 }
 `,
       0,
@@ -156,15 +165,26 @@ if (process.env.FAKE_PNPM === "build") {
       return [];
     }
   };
-  const gate = (mode = "noop", extra = []) =>
+  /**
+   * The runner's environment. A suite run by a hench gate inherits the gate's
+   * slot token; the runner under test must see only the token a test gives it.
+   */
+  const gateEnv = (mode, extraEnv = {}) => {
+    const { NDX_VALIDATION_SLOT: _inherited, ...base } = process.env;
+    return {
+      ...base,
+      FAKE_PNPM: mode,
+      PATH: `${installFakePnpm()}${delimiter}${process.env.PATH}`,
+      ...extraEnv,
+    };
+  };
+  const gate = (mode = "noop", extra = [], extraEnv = {}) =>
     spawnSync(process.execPath, [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD", ...extra], {
       cwd: root,
       encoding: "utf-8",
-      env: {
-        ...process.env,
-        FAKE_PNPM: mode,
-        PATH: `${installFakePnpm()}${delimiter}${process.env.PATH}`,
-      },
+      env: gateEnv(mode, extraEnv),
+      // A runner that waits for a slot it should not take fails here, not at the test timeout.
+      timeout: 60_000,
     });
   const editSource = () => write("packages/llm-client/src/config.ts", "export const MODEL = 'new';\n", 0);
 
@@ -209,5 +229,123 @@ if (process.env.FAKE_PNPM === "build") {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("test-gate: selected-suites=");
     expect(pnpmCalls()).toEqual([]);
+  });
+
+  describe("host validation slot", () => {
+    let home;
+    let slotDir;
+    let held;
+    beforeEach(() => {
+      home = mkdtempSync(join(tmpdir(), "runner-slot-home-"));
+      slotDir = join(home, "validation-slot");
+      // The fake pnpm and the logs a run writes are untracked files that would
+      // select root; ignored, an unedited tree selects no suite and the run exits 0.
+      write(".gitignore", "fakebin/\npnpm-calls.log\nsuite-started\nclaude_commands.log\n.test-logs/\n", 0);
+      git("add", ".gitignore");
+      git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "ignore");
+    });
+    afterEach(async () => {
+      await held?.release();
+      held = undefined;
+      rmSync(home, { recursive: true, force: true });
+    });
+
+    /** Hold the slot from this test process, as a hench gate or another runner would. */
+    const hold = async () => {
+      held = await acquireValidationSlot({ slotDir, projectDir: "/elsewhere", env: {} });
+      return held;
+    };
+    const holderFile = () => join(slotDir, "holder.json");
+    const readHolderRecord = () => JSON.parse(readFileSync(holderFile(), "utf-8"));
+    // tests/setup-ndx-home.js clears NDX_HOME, so N_DX_HOME decides the ndx home.
+    const homeEnv = (extra = {}) => ({ N_DX_HOME: home, ...extra });
+
+    /** Start the runner without waiting for it; `output()` is what it has printed so far. */
+    const startGate = (mode, extraEnv = {}) => {
+      let stdout = "";
+      let stderr = "";
+      const child = spawn(process.execPath, [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD"], {
+        cwd: root,
+        env: gateEnv(mode, homeEnv(extraEnv)),
+        windowsHide: true,
+      });
+      child.stdout.on("data", (chunk) => (stdout += chunk));
+      child.stderr.on("data", (chunk) => (stderr += chunk));
+      const done = new Promise((resolvePromise) =>
+        child.on("close", (code, signal) => resolvePromise({ code, signal, stdout, stderr })),
+      );
+      return { child, done, output: () => stdout };
+    };
+
+    it("waits while another process holds the slot, names the holder, and reports the queue time", async () => {
+      await hold();
+      const run = startGate("noop");
+      await vi.waitFor(
+        () => expect(run.output()).toContain(`Waiting for the validation slot held by pid ${process.pid} in /elsewhere since `),
+        { timeout: 30_000, interval: 50 },
+      );
+      expect(run.output()).not.toContain("selected-suites=");
+      await held.release();
+      const result = await run.done;
+      expect(result.code).toBe(0);
+      expect(result.stdout).toMatch(/Validation slot: queued \d+\.\ds/);
+      expect(existsSync(holderFile())).toBe(false);
+    });
+
+    it("runs inside the holder's slot when NDX_VALIDATION_SLOT names that live holder", async () => {
+      const lease = await hold();
+      const result = gate("noop", [], homeEnv(lease.childEnv({})));
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Validation slot: ran inside the slot of the process that started this runner");
+      expect(readHolderRecord().token).toBe(lease.token);
+    });
+
+    it("runs without the slot under --no-slot, and --list never takes it", async () => {
+      await hold();
+      const unslotted = gate("noop", ["--no-slot"], homeEnv());
+      expect(unslotted.status).toBe(0);
+      expect(unslotted.stdout).toContain("Validation slot: not taken (--no-slot)");
+      expect(gate("noop", ["--list"], homeEnv()).status).toBe(0);
+      await held.release();
+
+      rmSync(slotDir, { recursive: true, force: true });
+      expect(gate("noop", ["--list"], homeEnv()).status).toBe(0);
+      expect(existsSync(slotDir)).toBe(false);
+    });
+
+    // Windows has no catchable SIGTERM: kill() ends the runner outright.
+    it.skipIf(process.platform === "win32")(
+      "rebuilds only once it holds the slot, hands the suites its token, and gives it back on SIGTERM after the suite exits",
+      async () => {
+        editSource();
+        await hold();
+        const marker = join(root, "suite-started");
+        const run = startGate("build", { FAKE_SUITE_MARKER: marker });
+        await vi.waitFor(() => expect(run.output()).toContain("Waiting for the validation slot"), {
+          timeout: 30_000,
+          interval: 50,
+        });
+        expect(pnpmCalls()).toEqual([]);
+        await held.release();
+
+        await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 30_000, interval: 50 });
+        await vi.waitFor(() => expect(readHolderRecord().child?.pid).toBeGreaterThan(0), {
+          timeout: 30_000,
+          interval: 50,
+        });
+        const record = readHolderRecord();
+        expect(record.pid).toBe(run.child.pid);
+        expect(readFileSync(marker, "utf-8")).toBe(record.token);
+        expect(pnpmCalls().filter((a) => a.includes("build"))).toEqual([["--filter", "@n-dx/llm-client", "run", "build"]]);
+
+        run.child.kill("SIGTERM");
+        const result = await run.done;
+        expect(result.code).toBe(143);
+        expect(result.stderr).toContain("Stopped by SIGTERM");
+        expect(existsSync(holderFile())).toBe(false);
+        // The suite was stopped before the slot was given back.
+        expect(() => process.kill(record.child.pid, 0)).toThrow();
+      },
+    );
   });
 });

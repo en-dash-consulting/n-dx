@@ -1,0 +1,403 @@
+/**
+ * The host-wide validation slot, for the repository's own test runner.
+ *
+ * A plain-JS implementation of the on-disk protocol (version 1) documented in
+ * the header of packages/hench/src/process/validation-slot.ts. Scripts cannot
+ * import hench, so the protocol is implemented twice; the two must agree
+ * byte for byte on the files they write and read.
+ * tests/e2e/validation-slot-parity.test.js runs a holder through one
+ * implementation against a contender through the other, both ways round,
+ * and is in ROOT_DRIFT_TEST_FILES so a change to either selects it.
+ *
+ * Change the protocol in hench's header first, then here.
+ */
+
+import { randomUUID } from "node:crypto";
+import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { uptime } from "node:os";
+import { join } from "node:path";
+import { resolveNdxHome } from "../../packages/core/layout.js";
+
+/** The environment variable a holder exports its token to children under. */
+export const VALIDATION_SLOT_ENV = "NDX_VALIDATION_SLOT";
+
+const VALIDATION_SLOT_DIRNAME = "validation-slot";
+const HOLDER_FILE = "holder.json";
+const RECLAIM_FILE = "reclaim.lock";
+const PROTOCOL_VERSION = 1;
+
+const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const MIN_POLL_INTERVAL_MS = 10;
+const MAX_POLL_INTERVAL_MS = 10_000;
+const DEFAULT_REPORT_INTERVAL_MS = 30_000;
+/** Two boot-time readings this close name one boot (see hench's module). */
+const BOOT_TIME_TOLERANCE_MS = 5 * 60_000;
+/** Rename retries for Windows, where a reader holding the file open blocks a replace. */
+const RENAME_ATTEMPTS = 5;
+
+/**
+ * @typedef {{ pid: number, group: boolean }} ValidationSlotChild
+ * @typedef {{
+ *   version: number, token: string, pid: number, child: ValidationSlotChild | null,
+ *   startedAt: string, bootedAt: number, projectDir: string,
+ * }} ValidationSlotHolder
+ * @typedef {{ holder: ValidationSlotHolder, holderAlive: boolean, waitedMs: number }} ValidationSlotWait
+ * @typedef {{
+ *   slotDir: string, token: string, nested: boolean, queueWaitMs: number,
+ *   childEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv,
+ *   recordChild(pid: number, options?: { group?: boolean }): Promise<void>,
+ *   release(): Promise<void>,
+ * }} ValidationSlotLease
+ */
+
+/** Thrown when the abort signal fires while waiting for the slot. */
+export class ValidationSlotAbortedError extends Error {
+  /**
+   * @param {number} queueWaitMs
+   * @param {unknown} reason
+   */
+  constructor(queueWaitMs, reason) {
+    super(`Gave up waiting for the validation slot after ${queueWaitMs} ms`, { cause: reason });
+    this.name = "ValidationSlotAbortedError";
+    this.queueWaitMs = queueWaitMs;
+  }
+}
+
+/** Thrown when a holder finds its record replaced or gone. */
+export class ValidationSlotLostError extends Error {
+  /** @param {string} slotDir */
+  constructor(slotDir) {
+    super(`This process no longer holds the validation slot in ${slotDir}`);
+    this.name = "ValidationSlotLostError";
+  }
+}
+
+/** The slot directory under the ndx home `env` resolves to: hench's `resolveValidationSlotDir`. */
+export function resolveValidationSlotDir(env = process.env) {
+  return join(resolveNdxHome({ env }), VALIDATION_SLOT_DIRNAME);
+}
+
+// Liveness (rule 4)
+
+function signalZero(target) {
+  try {
+    process.kill(target, 0);
+    return true;
+  } catch (err) {
+    // EPERM: the process exists but belongs to someone else.
+    return err?.code === "EPERM";
+  }
+}
+
+const isPositiveInt = (value) => typeof value === "number" && Number.isInteger(value) && value > 0;
+
+/** Whether a process with this pid exists. */
+export function isPidAlive(pid) {
+  return isPositiveInt(pid) && signalZero(pid);
+}
+
+function currentBootTimeMs() {
+  return Math.round(Date.now() - uptime() * 1000);
+}
+
+function isChildAlive(child) {
+  if (child.group && process.platform !== "win32") return isPositiveInt(child.pid) && signalZero(-child.pid);
+  return isPidAlive(child.pid);
+}
+
+// Records
+
+/**
+ * A holder record from `raw`, or null when it is not a valid version-1 record.
+ * @returns {ValidationSlotHolder | null}
+ */
+function parseHolder(raw) {
+  let r;
+  try {
+    r = JSON.parse(raw);
+  } catch {
+    return null; // Not JSON: the caller treats it as stale (rule 5).
+  }
+  if (typeof r !== "object" || r === null) return null;
+  if (r.version !== PROTOCOL_VERSION) return null;
+  if (typeof r.token !== "string" || r.token === "") return null;
+  if (!isPositiveInt(r.pid)) return null;
+  if (typeof r.startedAt !== "string" || typeof r.projectDir !== "string") return null;
+  if (typeof r.bootedAt !== "number" || !Number.isFinite(r.bootedAt)) return null;
+  let child = null;
+  if (r.child !== null && r.child !== undefined) {
+    const c = r.child;
+    if (typeof c !== "object" || !isPositiveInt(c.pid) || typeof c.group !== "boolean") return null;
+    child = { pid: c.pid, group: c.group };
+  }
+  return {
+    version: PROTOCOL_VERSION,
+    token: r.token,
+    pid: r.pid,
+    child,
+    startedAt: r.startedAt,
+    bootedAt: r.bootedAt,
+    projectDir: r.projectDir,
+  };
+}
+
+/** Whether a record no longer occupies the slot (rule 5). */
+function isStale(holder) {
+  if (Math.abs(holder.bootedAt - currentBootTimeMs()) > BOOT_TIME_TOLERANCE_MS) return true;
+  if (isPidAlive(holder.pid)) return false;
+  return holder.child === null || !isChildAlive(holder.child);
+}
+
+// Files
+
+const holderPath = (slotDir) => join(slotDir, HOLDER_FILE);
+const scratchPath = (slotDir) => join(slotDir, `.${randomUUID()}.tmp`);
+
+async function readIfExists(path) {
+  try {
+    return await readFile(path, "utf-8");
+  } catch (err) {
+    if (err?.code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+async function unlinkIfExists(path) {
+  try {
+    await unlink(path);
+    return true;
+  } catch (err) {
+    if (err?.code === "ENOENT") return false;
+    throw err;
+  }
+}
+
+/** Create `target` holding `content`, atomically; false when it already exists (rule 1). */
+async function createExclusive(slotDir, target, content) {
+  const scratch = scratchPath(slotDir);
+  await writeFile(scratch, content, "utf-8");
+  try {
+    await link(scratch, target);
+    return true;
+  } catch (err) {
+    if (err?.code === "EEXIST") return false;
+    throw err;
+  } finally {
+    await unlinkIfExists(scratch);
+  }
+}
+
+/** Replace `target` with `content` atomically (rule 2). */
+async function replaceAtomically(slotDir, target, content) {
+  const scratch = scratchPath(slotDir);
+  await writeFile(scratch, content, "utf-8");
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await rename(scratch, target);
+      return;
+    } catch (err) {
+      const transient = err?.code === "EPERM" || err?.code === "EBUSY" || err?.code === "EACCES";
+      if (!transient || attempt >= RENAME_ATTEMPTS) {
+        await unlinkIfExists(scratch);
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20 * attempt));
+    }
+  }
+}
+
+async function readHolder(slotDir) {
+  const raw = await readIfExists(holderPath(slotDir));
+  if (raw === null) return null;
+  return { raw, holder: parseHolder(raw) };
+}
+
+/**
+ * The slot's current holder, or null when it is free or its record does not parse.
+ * @returns {Promise<ValidationSlotHolder | null>}
+ */
+export async function readValidationSlotHolder(slotDir) {
+  return (await readHolder(slotDir))?.holder ?? null;
+}
+
+/**
+ * Remove `holder.json` if it still holds exactly `staleRaw` (rule 5). False
+ * when another process holds the reclaim lock, so the caller waits a poll.
+ */
+async function reclaimStale(slotDir, staleRaw) {
+  const lockPath = join(slotDir, RECLAIM_FILE);
+  const lock = JSON.stringify({ pid: process.pid, token: randomUUID(), startedAt: new Date().toISOString() });
+  if (!(await createExclusive(slotDir, lockPath, lock))) {
+    // Another process is reclaiming. If it died doing so, clear its lock.
+    const raw = await readIfExists(lockPath);
+    if (raw === null) return true;
+    let pid;
+    try {
+      pid = JSON.parse(raw)?.pid;
+    } catch {
+      pid = undefined; // An unreadable lock has no live owner.
+    }
+    if (!isPositiveInt(pid) || !isPidAlive(pid)) {
+      await unlinkIfExists(lockPath);
+      return true;
+    }
+    return false;
+  }
+  try {
+    const current = await readIfExists(holderPath(slotDir));
+    if (current === staleRaw) await unlinkIfExists(holderPath(slotDir));
+  } finally {
+    await unlinkIfExists(lockPath);
+  }
+  return true;
+}
+
+// Waiting
+
+function clampPollInterval(ms) {
+  if (ms === undefined || !Number.isFinite(ms)) return DEFAULT_POLL_INTERVAL_MS;
+  return Math.min(MAX_POLL_INTERVAL_MS, Math.max(MIN_POLL_INTERVAL_MS, ms));
+}
+
+function sleep(ms, signal) {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+// Leases
+
+const withToken = (base, token) => ({ ...base, [VALIDATION_SLOT_ENV]: token });
+
+/** @returns {ValidationSlotLease} */
+function nestedLease(slotDir, token) {
+  return {
+    slotDir,
+    token,
+    nested: true,
+    queueWaitMs: 0,
+    childEnv: (base) => withToken(base, token),
+    // The enclosing holder owns the record and its child.
+    recordChild: async () => {},
+    release: async () => {},
+  };
+}
+
+/** Tokens of this process's leases whose release failed (rule 5a). */
+const orphanedTokens = new Set();
+
+/** @returns {ValidationSlotLease} */
+function heldLease(slotDir, record, queueWaitMs) {
+  let released = false;
+  return {
+    slotDir,
+    token: record.token,
+    nested: false,
+    queueWaitMs,
+    childEnv: (base) => withToken(base, record.token),
+    async recordChild(pid, options = {}) {
+      if (released) throw new ValidationSlotLostError(slotDir);
+      const current = await readValidationSlotHolder(slotDir);
+      if (current?.token !== record.token) throw new ValidationSlotLostError(slotDir);
+      const updated = { ...current, child: { pid, group: options.group ?? false } };
+      await replaceAtomically(slotDir, holderPath(slotDir), JSON.stringify(updated));
+    },
+    async release() {
+      if (released) return;
+      released = true;
+      try {
+        const current = await readValidationSlotHolder(slotDir);
+        if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
+      } catch (err) {
+        // The record may still be on disk naming this live process (rule 5a).
+        orphanedTokens.add(record.token);
+        throw err;
+      }
+    },
+  };
+}
+
+/**
+ * Take the host's validation slot, waiting while another process holds it.
+ *
+ * Returns at once as a nested lease when `env` carries the token of this
+ * slot's live holder (rule 6). Otherwise waits until the slot is free or
+ * stale, takes it, and reports the time spent waiting as `queueWaitMs`.
+ *
+ * @param {{
+ *   slotDir: string, projectDir: string, env?: NodeJS.ProcessEnv, signal?: AbortSignal,
+ *   pollIntervalMs?: number, reportIntervalMs?: number,
+ *   onWait?: (wait: ValidationSlotWait) => void, now?: () => number,
+ * }} options
+ * @returns {Promise<ValidationSlotLease>}
+ * @throws {ValidationSlotAbortedError} when `signal` fires while waiting.
+ */
+export async function acquireValidationSlot(options) {
+  const { slotDir, projectDir, signal, onWait } = options;
+  const env = options.env ?? process.env;
+  const now = options.now ?? Date.now;
+  const pollIntervalMs = clampPollInterval(options.pollIntervalMs);
+  const reportIntervalMs = options.reportIntervalMs ?? DEFAULT_REPORT_INTERVAL_MS;
+  const started = now();
+
+  await mkdir(slotDir, { recursive: true });
+
+  const inherited = env[VALIDATION_SLOT_ENV];
+  if (inherited) {
+    const current = await readValidationSlotHolder(slotDir);
+    if (current?.token === inherited && isPidAlive(current.pid)) return nestedLease(slotDir, inherited);
+  }
+
+  const record = {
+    version: PROTOCOL_VERSION,
+    token: randomUUID(),
+    pid: process.pid,
+    child: null,
+    startedAt: new Date(started).toISOString(),
+    bootedAt: currentBootTimeMs(),
+    projectDir,
+  };
+
+  let lastReport;
+  for (;;) {
+    if (signal?.aborted) throw new ValidationSlotAbortedError(now() - started, signal.reason);
+
+    record.startedAt = new Date(now()).toISOString();
+    if (await createExclusive(slotDir, holderPath(slotDir), JSON.stringify(record))) {
+      return heldLease(slotDir, { ...record }, now() - started);
+    }
+
+    const observed = await readHolder(slotDir);
+    if (observed === null) continue; // Released between the create and the read.
+    const { holder } = observed;
+    const orphaned = holder !== null && holder.pid === process.pid && orphanedTokens.has(holder.token);
+    if (holder === null || orphaned || isStale(holder)) {
+      if (await reclaimStale(slotDir, observed.raw)) continue;
+      await sleep(pollIntervalMs, signal);
+      continue;
+    }
+
+    const waitedMs = now() - started;
+    if (onWait && (lastReport === undefined || waitedMs - lastReport >= reportIntervalMs)) {
+      lastReport = waitedMs;
+      onWait({ holder, holderAlive: isPidAlive(holder.pid), waitedMs });
+    }
+    await sleep(pollIntervalMs, signal);
+  }
+}
+
+/** The line printed while waiting; the same words as hench's `describeValidationSlotWait`. */
+export function describeValidationSlotWait(wait) {
+  const { holder } = wait;
+  const who = wait.holderAlive ? `pid ${holder.pid}` : `pid ${holder.pid} (exited; its tests still run)`;
+  return `Waiting for the validation slot held by ${who} in ${holder.projectDir} since ${holder.startedAt}`;
+}
