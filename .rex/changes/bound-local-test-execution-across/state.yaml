@@ -3,6 +3,9 @@ items:
   "115f26b3-76f5-4714-b171-160e12c2bcab":
     lastModified: "2026-11-12T17:28:27.063Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "31f28b1c-8b8b-4c05-9379-9366fac04223":
+    lastModified: "2026-11-12T18:33:39.246Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "391a5838-082d-4b5d-928e-7759329ad87a":
     lastModified: "2026-11-12T17:57:26.059Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -60,7 +63,14 @@ items:
     lastModified: "2026-11-14T05:03:31.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "823880dc-c2ca-4221-8fae-5a413a0eed80":
-    lastModified: "2026-11-12T18:26:29.996Z"
+    status: "completed"
+    startedAt: "2026-11-12T18:29:50.033Z"
+    completedAt: "2026-11-12T18:34:10.491Z"
+    endedAt: "2026-11-12T18:34:10.491Z"
+    activeIntervals: [{"end":"2026-11-12T18:34:10.491Z","start":"2026-11-12T18:29:50.033Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runInValidationSlot turns acquire failures into ok:false and release failures into a warning; commit 5186679f7"
+    lastModified: "2026-11-12T18:34:10.491Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "85839d4a-3b74-4e79-bb93-838726de17cf":
     status: "completed"

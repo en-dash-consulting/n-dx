@@ -332,6 +332,59 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
     expect(slotHeld()).toBe(false);
   });
 
+  /** A slot directory that cannot be created: its parent is a regular file. */
+  const unwritableSlot = () => slot({ slotDir: join(projectDir, "src", "a.ts", "slot") });
+  const writesRan = `node -e "require('fs').writeFileSync('ran', '')"`;
+
+  it("reports a slot that cannot be taken as a gate that did not run, without throwing", async () => {
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan, validationSlot: unwritableSlot(),
+    });
+    expect(result.ran).toBe(false);
+    expect(result.passed).toBe(false);
+    expect(result.error).toMatch(/could not take the validation slot/);
+    expect(existsSync(join(projectDir, "ran"))).toBe(false);
+  });
+
+  it("reports a slot that cannot be taken from post-task tests and the completion check", async () => {
+    const post = await runPostTaskTests({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan, validationSlot: unwritableSlot(),
+    });
+    expect(post.ran).toBe(false);
+    expect(post.error).toMatch(/could not take the validation slot/);
+
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
+    git("init", "-q");
+    git("add", "src");
+    git("commit", "-qm", "init");
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
+    const completion = await validateCompletion(projectDir, { testCommand: writesRan, validationSlot: unwritableSlot() });
+    expect(completion.valid).toBe(false);
+    expect(completion.testsRan).toBe(false);
+    expect(completion.reason).toMatch(/could not take the validation slot/);
+    expect(existsSync(join(projectDir, "ran"))).toBe(false);
+  });
+
+  it("keeps the command's result when the slot cannot be released, and warns", async () => {
+    // The command replaces the slot directory with a file, so release fails with ENOTDIR.
+    await writeFile(
+      join(projectDir, "break-slot.cjs"),
+      `const fs = require("fs");\n` +
+        `fs.rmSync(${JSON.stringify(slotDir)}, { recursive: true, force: true });\n` +
+        `fs.writeFileSync(${JSON.stringify(slotDir)}, "");\n`,
+    );
+    const warnings: string[] = [];
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: `node ${JSON.stringify(join(projectDir, "break-slot.cjs"))}`,
+      validationSlot: slot({ onWarning: (w) => warnings.push(w) }),
+    });
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/could not release the validation slot/);
+  });
+
   it("without a slot, takes none and records no timing", async () => {
     const result = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "process.exit(0)"` });
     expect(result.passed).toBe(true);
