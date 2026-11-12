@@ -169,6 +169,7 @@ One definition, duplicated across a tier boundary where neither side may import 
 | `tests/e2e/run-options-contract.test.js` | `web/src/shared/run-options.ts` vs hench's run-option table (and rex's `RUN_SETTING_KEYS`) |
 | `tests/e2e/catalog-runtime-contract.test.js` | `core/llm-model-catalog.js` vs llm-client's `DEFAULT_CLAUDE_MODEL` / `DEFAULT_CODEX_MODEL` |
 | `tests/e2e/run-liveness-parity.test.js` | `hench/src/process/run-liveness.ts` vs `web/src/server/run-liveness.ts` |
+| `tests/e2e/validation-slot-parity.test.js` | `hench/src/process/validation-slot.ts` vs `scripts/lib/validation-slot.mjs` |
 | `tests/integration/layout-resolver-contract.test.js` | `core/layout.js`, `llm-client/src/layout.ts`, sourcevision's iso bundle, web's `state-paths.ts` |
 | `tests/integration/task-class-sync.test.js` | `core/config.js`'s task-class list vs llm-client's `DEFAULT_ROUTES` |
 | `tests/integration/task-class-registry.test.js` | every package's `src/` task-class literals vs `DEFAULT_ROUTES` |

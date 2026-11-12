@@ -419,6 +419,7 @@ describe("root subset test files", () => {
       "tests/e2e/run-options-contract.test.js",
       "tests/e2e/catalog-runtime-contract.test.js",
       "tests/e2e/run-liveness-parity.test.js",
+      "tests/e2e/validation-slot-parity.test.js",
       "tests/integration/layout-resolver-contract.test.js",
       "tests/integration/task-class-sync.test.js",
       "tests/integration/task-class-registry.test.js",

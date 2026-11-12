@@ -35,19 +35,36 @@
  *   node scripts/run-all-tests.mjs rex,web   # named suites (root, or a package dir name)
  *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
  *   add --list to print the selection and exit without running anything
+ *   add --no-slot to run without the host validation slot (a deliberate parallel run)
  *
  * Selection rules live in scripts/lib/select-suites.mjs. Besides the human
  * summary, the run prints `test-gate: …` lines (selected, reasons, failed) for
  * hench to parse.
+ *
+ * HOST VALIDATION SLOT. A run takes the per-user validation slot hench's gates
+ * take (scripts/lib/validation-slot.mjs), so whole-suite runs across worktrees
+ * queue instead of loading the machine together. It is taken before the
+ * stale-package rebuild and given back after the summary, or on SIGINT/SIGTERM
+ * once the running suite has exited. A runner a slot holder spawned (its
+ * `NDX_VALIDATION_SLOT` names the live holder) runs inside that holder's slot.
+ * `--list` never takes it. Always on here: the runner is repository tooling,
+ * not hench config.
  */
 
 import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
+import { constants as osConstants } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
 import { ROOT_LABEL, ROOT_SUBSET_LABELS, ROOT_SUBSET_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
 
 import { staleChangedPackages, staleDistMessage } from "./lib/stale-dist.mjs";
+import {
+  ValidationSlotAbortedError,
+  acquireValidationSlot,
+  describeValidationSlotWait,
+  resolveValidationSlotDir,
+} from "./lib/validation-slot.mjs";
 
 /** Human-readable name for each root-subset suite, shown in the per-suite summary. */
 const ROOT_SUBSET_NAMES = {
@@ -100,7 +117,11 @@ function runSuite(label, binary, args) {
     const child = spawnCli(binary, args, {
       cwd: ROOT,
       stdio: ["inherit", "pipe", "pipe"],
+      env: slot ? slot.childEnv(process.env) : process.env,
     });
+    runningChild = child;
+    // A runner killed outright must not free the slot under a suite still running.
+    if (child.pid) slot?.recordChild(child.pid).catch((err) => warnSlot("record the running suite in", err));
 
     for (const [stream, sink] of [
       [child.stdout, process.stdout],
@@ -122,6 +143,7 @@ function runSuite(label, binary, args) {
     });
 
     child.on("close", (code) => {
+      runningChild = null;
       log.end();
       resolvePromise(code === 0);
     });
@@ -208,10 +230,10 @@ function changedFilesSince(baseRef) {
 }
 
 /** Names the stale packages on stderr plus the `stale-dist` protocol line, then exits 1. */
-function failStale(stale, detail) {
+async function failStale(stale, detail) {
   console.error(`${staleDistMessage(stale)}\n\n${detail}`);
   console.log(`test-gate: stale-dist=${stale.map((s) => s.dir).join(",")}`);
-  process.exit(1);
+  await finish(1);
 }
 
 /**
@@ -219,7 +241,7 @@ function failStale(stale, detail) {
  * build of it: one pnpm call with a --filter per package, so pnpm orders them
  * by dependency. Never a full build, never a package the stale check did not name.
  */
-function rebuildStalePackages(changed) {
+async function rebuildStalePackages(changed) {
   const stale = staleChangedPackages(ROOT, changed, manifests);
   if (stale.length === 0) return;
   console.log(`test-gate: rebuilding stale packages: ${stale.map((s) => s.name).join(", ")}`);
@@ -230,17 +252,74 @@ function rebuildStalePackages(changed) {
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (err) {
-    failStale(stale, `Build failed:\n${[err.stdout, err.stderr, err.message].filter(Boolean).join("\n")}`);
+    await failStale(stale, `Build failed:\n${[err.stdout, err.stderr, err.message].filter(Boolean).join("\n")}`);
   }
   const stillStale = staleChangedPackages(ROOT, changed, manifests);
-  if (stillStale.length > 0) failStale(stillStale, "Still stale after the build above.");
+  if (stillStale.length > 0) await failStale(stillStale, "Still stale after the build above.");
   for (const s of stale) console.log(`test-gate: rebuilt ${s.name}`);
+}
+
+/** The held (or nested) validation slot; null before it is taken, with --list, or with --no-slot. */
+let slot = null;
+/** The suite running now, so SIGTERM can be passed on to it. */
+let runningChild = null;
+/** The signal that stopped this run, if one did. */
+let interruptedBy = null;
+
+function warnSlot(action, err) {
+  console.warn(`WARNING: could not ${action} the validation slot: ${err?.message ?? err}`);
+}
+
+/** Give the slot back, then exit. Every exit after the slot is taken goes through here. */
+async function finish(code) {
+  if (slot) await slot.release().catch((err) => warnSlot("release", err));
+  process.exit(code);
+}
+
+const seconds = (ms) => `${(ms / 1000).toFixed(1)}s`;
+const signalExitCode = (signal) => 128 + osConstants.signals[signal];
+
+/**
+ * Take the host validation slot, printing one line while another run holds it.
+ * SIGINT/SIGTERM while waiting gives up. Once it is held they stop the run
+ * after the running suite exits: Ctrl-C reaches the suite through the
+ * terminal already, and SIGTERM is passed on to it.
+ */
+async function takeSlot() {
+  const controller = new AbortController();
+  const onSignal = (signal) => {
+    interruptedBy ??= signal;
+    controller.abort(signal);
+    if (signal === "SIGTERM") runningChild?.kill("SIGTERM");
+  };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+  const slotDir = resolveValidationSlotDir();
+  try {
+    return await acquireValidationSlot({
+      slotDir,
+      projectDir: ROOT,
+      signal: controller.signal,
+      onWait: (wait) => console.log(describeValidationSlotWait(wait)),
+    });
+  } catch (err) {
+    if (err instanceof ValidationSlotAbortedError) {
+      console.error(`Stopped waiting for the validation slot after ${seconds(err.queueWaitMs)} (${interruptedBy}).`);
+      process.exit(signalExitCode(interruptedBy));
+    }
+    console.error(`Could not take the validation slot in ${slotDir}: ${err?.message ?? err}`);
+    console.error("Pass --no-slot to run without it.");
+    process.exit(1);
+  }
 }
 
 const manifests = readManifests();
 const args = process.argv.slice(2);
 const listOnly = args.includes("--list");
-const positional = args.filter((a) => a !== "--list");
+const noSlot = args.includes("--no-slot");
+const positional = args.filter((a) => a !== "--list" && a !== "--no-slot");
+/** The affected gate's changed files, rebuilt for once the slot is held. */
+let changedForRebuild = null;
 
 /** @type {string[]} */
 let labels;
@@ -250,7 +329,7 @@ let reasons = null;
 if (positional[0] === "affected") {
   const baseRef = positional[1];
   if (!baseRef) {
-    console.error("Usage: run-all-tests.mjs affected <baseRef>");
+    console.error("Usage: run-all-tests.mjs affected <baseRef> [--list] [--no-slot]");
     process.exit(2);
   }
   const changed = changedFilesSince(baseRef);
@@ -263,8 +342,9 @@ if (positional[0] === "affected") {
     // Root tests read packages through dist/. Against a stale build they pass on
     // a change they should fail, so build exactly the stale packages first and
     // re-check the stamps; a build that fails or leaves a package stale fails
-    // the gate. (--list runs nothing, so it never builds.)
-    if (!listOnly) rebuildStalePackages(changed);
+    // the gate. It builds inside the slot, below: a build loads the machine as
+    // a suite does. (--list runs nothing, so it never builds.)
+    if (!listOnly) changedForRebuild = changed;
   }
 } else {
   const resolved = resolveLabels(positional.length > 0 ? positional : ["all"], manifests);
@@ -272,12 +352,16 @@ if (positional[0] === "affected") {
     console.error(
       `Unknown suite "${resolved.unknown.join('", "')}". ` +
       `Valid: all | packages | ${resolved.valid.join(" | ")} ` +
-      `(comma- or space-separated; @n-dx/<name> also accepted), or: affected <baseRef>`,
+      `(comma- or space-separated; @n-dx/<name> also accepted), or: affected <baseRef>. ` +
+      `Options: --list (print the selection, run nothing), --no-slot (skip the host validation slot)`,
     );
     process.exit(2);
   }
   labels = resolved.labels;
 }
+
+if (!listOnly && !noSlot) slot = await takeSlot();
+if (changedForRebuild) await rebuildStalePackages(changedForRebuild);
 
 // Machine-readable protocol lines: hench parses these.
 console.log(`test-gate: selected-suites=${labels.join(",")}`);
@@ -294,6 +378,7 @@ mkdirSync(LOG_DIR, { recursive: true });
 
 const results = [];
 for (const suite of suites) {
+  if (interruptedBy) break;
   console.log(`\n──────── ${suite.label} ────────\n`);
   // Keep going even when one fails: the whole point is that one red suite must
   // not hide the rest.
@@ -317,5 +402,12 @@ console.log(
   (failed.length > 0 ? ` — failed: ${failed.map((f) => f.label).join(", ")}` : ""),
 );
 console.log(`test-gate: failed-suites=${failed.map((f) => f.short).join(",")}`);
+if (!slot) console.log("Validation slot: not taken (--no-slot)");
+else if (slot.nested) console.log("Validation slot: ran inside the slot of the process that started this runner");
+else console.log(`Validation slot: queued ${seconds(slot.queueWaitMs)}`);
 
-process.exit(failed.length > 0 ? 1 : 0);
+if (interruptedBy) {
+  console.error(`Stopped by ${interruptedBy} after ${results.length}/${suites.length} suites.`);
+  await finish(signalExitCode(interruptedBy));
+}
+await finish(failed.length > 0 ? 1 : 0);
