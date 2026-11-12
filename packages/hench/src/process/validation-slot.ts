@@ -20,11 +20,14 @@
  *   ```json
  *   { "version": 1, "token": "<uuid>", "pid": 123,
  *     "child": null | { "pid": 456, "group": true },
- *     "startedAt": "<ISO-8601>", "projectDir": "/abs/project" }
+ *     "startedAt": "<ISO-8601>", "bootedAt": 1762900000000,
+ *     "projectDir": "/abs/project" }
  *   ```
  *   `pid` is the holding process. `child` is the validation command it
  *   launched, once launched; `group: true` means `pid` is a POSIX process
  *   group id (the child was spawned detached), `false` a plain pid.
+ *   `bootedAt` is the host's boot time in epoch milliseconds when the record
+ *   was written (`Date.now() - os.uptime() * 1000`).
  * - `reclaim.lock` — present only while some process removes a stale
  *   `holder.json`. JSON object `{ "pid": 123, "token": "<uuid>", "startedAt": "<ISO-8601>" }`.
  * - `.<random>.tmp` — scratch files for the writes below. Never read; a
@@ -46,7 +49,9 @@
  * 5. **Stale recovery.** A record is stale when its `pid` is dead AND its
  *    `child` is absent or dead; a record that does not parse is stale too. A
  *    dead holder whose child still runs is NOT stale: its tests still load
- *    the machine. To reclaim, create `reclaim.lock` as in rule 1 (if it
+ *    the machine. A record whose `bootedAt` differs from the current boot
+ *    time by more than five minutes was written before a reboot and is stale
+ *    whatever its pids say: they may since have been reused. To reclaim, create `reclaim.lock` as in rule 1 (if it
  *    exists and its pid is dead, unlink it and retry later), re-read
  *    `holder.json`, unlink it only if its bytes equal the stale bytes
  *    observed, then unlink `reclaim.lock`.
@@ -64,6 +69,7 @@
 
 import { randomUUID } from "node:crypto";
 import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { uptime } from "node:os";
 import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -90,6 +96,14 @@ const MIN_POLL_INTERVAL_MS = 10;
 const MAX_POLL_INTERVAL_MS = 10_000;
 const DEFAULT_REPORT_INTERVAL_MS = 30_000;
 
+/**
+ * How far two boot-time readings may drift apart and still name one boot.
+ * The reading follows the wall clock, so a clock correction moves it; five
+ * minutes absorbs those, and a reboot only slips under it when the previous
+ * boot was younger than that when its record was written.
+ */
+const BOOT_TIME_TOLERANCE_MS = 5 * 60_000;
+
 /** Rename retries for Windows, where a reader holding the file open blocks a replace. */
 const RENAME_ATTEMPTS = 5;
 
@@ -111,6 +125,8 @@ export interface ValidationSlotHolder {
   pid: number;
   child: ValidationSlotChild | null;
   startedAt: string;
+  /** The host's boot time, epoch ms, when the record was written. */
+  bootedAt: number;
   projectDir: string;
 }
 
@@ -197,6 +213,11 @@ export function isPidAlive(pid: number): boolean {
   return Number.isInteger(pid) && pid > 0 && signalZero(pid);
 }
 
+/** This boot's start, epoch ms. */
+export function currentBootTimeMs(): number {
+  return Math.round(Date.now() - uptime() * 1000);
+}
+
 function isChildAlive(child: ValidationSlotChild): boolean {
   if (child.group && process.platform !== "win32") {
     return Number.isInteger(child.pid) && child.pid > 0 && signalZero(-child.pid);
@@ -226,6 +247,7 @@ export function parseValidationSlotHolder(raw: string): ValidationSlotHolder | n
   if (typeof r.token !== "string" || r.token === "") return null;
   if (!isPositiveInt(r.pid)) return null;
   if (typeof r.startedAt !== "string" || typeof r.projectDir !== "string") return null;
+  if (typeof r.bootedAt !== "number" || !Number.isFinite(r.bootedAt)) return null;
   let child: ValidationSlotChild | null = null;
   if (r.child !== null && r.child !== undefined) {
     const c = r.child as Record<string, unknown>;
@@ -238,12 +260,18 @@ export function parseValidationSlotHolder(raw: string): ValidationSlotHolder | n
     pid: r.pid,
     child,
     startedAt: r.startedAt,
+    bootedAt: r.bootedAt,
     projectDir: r.projectDir,
   };
 }
 
-/** Whether a record still occupies the slot (rule 5). */
-export function isValidationSlotHolderStale(holder: ValidationSlotHolder): boolean {
+/** Whether a record no longer occupies the slot (rule 5). */
+export function isValidationSlotHolderStale(
+  holder: ValidationSlotHolder,
+  bootTimeMs: number = currentBootTimeMs(),
+): boolean {
+  // Written before a reboot: its pids may belong to unrelated processes now.
+  if (Math.abs(holder.bootedAt - bootTimeMs) > BOOT_TIME_TOLERANCE_MS) return true;
   if (isPidAlive(holder.pid)) return false;
   return holder.child === null || !isChildAlive(holder.child);
 }
@@ -466,6 +494,7 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
     pid: process.pid,
     child: null,
     startedAt: new Date(started).toISOString(),
+    bootedAt: currentBootTimeMs(),
     projectDir,
   };
 
