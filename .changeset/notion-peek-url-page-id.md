@@ -2,4 +2,6 @@
 "@n-dx/web": patch
 ---
 
-A Notion peek URL pasted from a board view now reads back as its page id (the `p=` parameter), not the database id, so its tracker move is no longer refused.
+Board-view Notion peek URLs now resolve to the page id.
+
+The `p=` parameter takes precedence over the database id in the path, so the tracker move is no longer refused.
