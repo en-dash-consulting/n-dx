@@ -404,6 +404,58 @@ commands are not serialized; only the worker cap bounds those.
   (`hench`, `ndx work`, `run-all-tests.mjs`), then delete the `holder.json`
   named in the wait message.
 
+### Validation benchmark
+
+`scripts/bench/validation-bench.mjs` measures what the worker cap and the slot
+change on your machine. It replays the affected gate on one commit under four
+cases, so only these settings differ:
+
+| Case | Worktrees | `NDX_TEST_MAX_WORKERS` | Slot |
+|------|-----------|------------------------|------|
+| A | 1 | unset | none (`--no-slot`) |
+| B | 1 | 2 | none |
+| C | 3, started together | unset | none |
+| D | 3, started together | 2 | host slot, held by the bench around each run (the runner nests in it) |
+
+A and C are the behaviour before the cap and the slot; with both unset nothing changes.
+
+```sh
+node scripts/bench/validation-bench.mjs --dry-run --out /tmp/bench   # the plan, the fixture files, an estimate; creates nothing
+node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the default matrix
+```
+
+- **Fixtures** (`--fixtures`, default `hench,llm-client,web`; also `core-cli`
+  and `docs`) append a comment to one file and commit it in each bench
+  worktree. Selection depends only on changed paths, so this produces the
+  workload a real edit would. They are listed in `scripts/bench/lib/plan.mjs`.
+- **Other flags.** `--cases A,B,C,D`, `--repeat N`, `--concurrency N` (the
+  worktrees in C and D), `--timeout-min N` per run (default 60), and `--keep`,
+  which leaves the worktrees in place for inspection.
+- **Before the clock.** The bench adds detached worktrees of `HEAD` under
+  `~/.cache/ndx-bench/<run id>/`, then installs and builds each one. Each
+  fixture rebuilds the packages it touches, so no measured run pays a
+  stale-dist rebuild. The worktrees are removed on exit, on Ctrl-C and on error.
+- **It refuses to start** while a `hench … run`, `run-all-tests`, `vitest` or
+  `ndx work` process is running, or while the 1-minute load average exceeds
+  the core count. Run it on a quiet machine from a plain terminal, not from an
+  agent session: the default matrix runs for one to two hours.
+- **Output** (`--out`, which must be outside the repository):
+  - `runs.jsonl`: one line per run, with wall-clock, exit code, timeout,
+    per-suite pass/fail and duration, and for case D the queue and execution
+    time.
+  - `samples.jsonl`: every 2 s, the load, free memory, swap in use, the
+    page-out counter, and the summed RSS of every process under the runs. It
+    reads `vm_stat` and `sysctl vm.swapusage` on macOS, `/proc` on Linux, and
+    `ps` on both.
+  - `batches.jsonl` and `meta.json`, which records the commit and machine.
+  - `logs/`: each run's output, plus `.test-logs/` copies for failed runs.
+  - `summary.md`.
+- **Reading `summary.md`.** There is one row per fixture and case. Compare B
+  with A for what the cap costs one run, and D with C for what the cap and
+  the slot buy parallel work: peak RSS, peak swap, minimum free memory,
+  page-outs and failures should fall, while total batch time shows what the
+  queueing costs. Median wall time for D includes its queue wait.
+
 ## Timeout Guardrails
 
 Timeouts are allowed only as **guardrails against hangs**, not as a way to turn an
