@@ -2,4 +2,6 @@
 "@n-dx/web": patch
 ---
 
-A Sidecar status card approved to completed while a hench run holds the item's completion now says the completion is recorded and the run applies it after its test gate, instead of "Status written."
+A `Sidecar` status card explains when a completion is recorded but held by a running hench session.
+
+After completion is approved, the card says the run applies it after its test gate, instead of "Status written."
