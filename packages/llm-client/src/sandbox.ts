@@ -43,7 +43,7 @@
  * `realpathSync` output.
  */
 
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { buildShellInvocation, execFileSyncCli, isExecutableOnPath } from "./exec.js";
 import { NDX_CONTAINER_DIRNAME, detectLayoutMode, resolveLayout, resolveNdxHome } from "./layout.js";
@@ -83,8 +83,10 @@ export interface SandboxPolicy {
   /**
    * Real path of ndx home. Denied whole to tool children and hooks; the vendor
    * CLI loses only the dashboard token in it, because the MCP servers it
-   * starts read the user config and trust store there. Defaults to
-   * `resolveNdxHome` under {@link homeDir}.
+   * starts read the user config and trust store there. Tool children and the
+   * vendor CLI still read and write its `validation-slot/` directory
+   * ({@link validationSlotDirFor}). Defaults to `resolveNdxHome` under
+   * {@link homeDir}.
    */
   ndxHome?: string;
   /**
@@ -414,6 +416,30 @@ function readOnlyRootsFor(policy: SandboxPolicy): string[] {
   return roots.filter((r) => r !== "/" && !(home && isWithin(r, home)));
 }
 
+/** The ndx home a policy denies: {@link SandboxPolicy.ndxHome}, else the one resolved under its home directory. */
+function ndxHomeFor(policy: SandboxPolicy): string | undefined {
+  return policy.ndxHome ?? (policy.homeDir ? realOr(resolveNdxHome({ home: policy.homeDir })) : undefined);
+}
+
+/** Name of the host-wide validation slot's directory under ndx home; hench's and the test runner's slot use the same. */
+export const VALIDATION_SLOT_DIRNAME = "validation-slot";
+
+/**
+ * The one directory inside ndx home a confined process may read and write:
+ * the host-wide validation slot, `<ndx home>/validation-slot/`. A test gate
+ * or an agent shell runs `scripts/run-all-tests.mjs`, which takes the slot
+ * (or, nested under a holder, reads its record), so without it every
+ * confined run of the repository's own runner fails. The directory holds only
+ * pids, tokens, timestamps and project paths: no credential. Granted to tool
+ * children and the vendor CLI (whose Bash children run the same runner), not
+ * to git hooks. Undefined when the policy has no ndx home.
+ */
+export function validationSlotDirFor(policy: SandboxPolicy): string | undefined {
+  if (policy.kind === "git-hook") return undefined;
+  const ndxHome = ndxHomeFor(policy);
+  return ndxHome ? join(ndxHome, VALIDATION_SLOT_DIRNAME) : undefined;
+}
+
 /**
  * Credential paths denied to every confined process: the home directory's
  * credential files ({@link HOME_SECRET_DIRS}) and ndx home. The vendor CLI
@@ -428,7 +454,7 @@ function homeSecretPaths(policy: SandboxPolicy): string[] {
     const dirs = policy.kind === "vendor-cli" ? HOME_SECRET_DIRS.filter((d) => d !== "Library/Keychains") : HOME_SECRET_DIRS;
     paths.push(...dirs.map((r) => resolve(policy.homeDir!, r)));
   }
-  const ndxHome = policy.ndxHome ?? (policy.homeDir ? realOr(resolveNdxHome({ home: policy.homeDir })) : undefined);
+  const ndxHome = ndxHomeFor(policy);
   if (ndxHome) {
     // An ndx home that holds the project or the scratch directory (a test's
     // NDX_HOME, say) cannot be denied whole without denying those too.
@@ -575,6 +601,12 @@ export function buildSeatbeltProfile(policy: SandboxPolicy): string {
     lines.push("; masked: project state and credentials (last so they win)");
     lines.push(`(deny file-read* file-write* ${masked.map((m) => `(subpath ${sbplString(m)}) (literal ${sbplString(m)})`).join(" ")})`);
   }
+  const slotDir = validationSlotDirFor(policy);
+  if (slotDir) {
+    // After the ndx-home denial, so it wins for this one subtree only.
+    lines.push("; the host validation slot: the one ndx-home directory a confined process may use");
+    lines.push(`(allow file-read* file-write* (subpath ${sbplString(slotDir)}))`);
+  }
   return lines.join("\n") + "\n";
 }
 
@@ -674,6 +706,11 @@ function planBwrap(policy: SandboxPolicy, kindOf: (p: string) => SandboxPathKind
     if (kind === "dir") args.push("--tmpfs", secret);
     else if (kind === "file") args.push("--ro-bind", "/dev/null", secret);
   }
+  // After the ndx-home mask, so the bind sits on top of it. Only an existing
+  // directory: bwrap cannot bind a path the host lacks ({@link wrapInSandbox}
+  // creates it first).
+  const slotDir = validationSlotDirFor(policy);
+  if (slotDir && kindOf(slotDir) === "dir") args.push("--bind", slotDir, slotDir);
   // Only `none` can be enforced: bubblewrap either keeps the host network or
   // drops it, so `vendor` is the host network on Linux, unrestricted.
   if (policy.network === "none") args.push("--unshare-net");
@@ -723,6 +760,23 @@ export function removeSandboxPlaceholders(paths: readonly string[] | undefined):
   }
 }
 
+/**
+ * Create the validation slot directory on the host before a spawn. Inside the
+ * sandbox its parent (ndx home) is denied, so a child could not create it, and
+ * bubblewrap cannot bind a path that does not exist. Best effort: a host that
+ * cannot create it (a read-only home) gets a profile without a usable slot,
+ * and the test runner then names the slot directory and the sandbox itself.
+ */
+function ensureValidationSlotDir(policy: SandboxPolicy): void {
+  const slotDir = validationSlotDirFor(policy);
+  if (!slotDir) return;
+  try {
+    mkdirSync(slotDir, { recursive: true });
+  } catch {
+    // Reported by the runner that needs it; the spawn itself does not.
+  }
+}
+
 export interface SandboxedInvocation {
   file: string;
   args: string[];
@@ -750,6 +804,7 @@ export function wrapInSandbox(
   if (!backend.available) {
     throw new Error(`sandbox backend unavailable: ${backend.reason ?? backend.name}`);
   }
+  ensureValidationSlotDir(policy);
   if (backend.name === "seatbelt") {
     return {
       file: "/usr/bin/sandbox-exec",

@@ -13,6 +13,8 @@ import {
   readOnlyProjectPathsFor,
   removeSandboxPlaceholders,
   resolveSandboxSetting,
+  validationSlotDirFor,
+  VALIDATION_SLOT_DIRNAME,
   wrapInSandbox,
   wrapShellInSandbox,
   type SandboxPolicy,
@@ -537,6 +539,107 @@ posixOnly("bubblewrap absent paths", () => {
   it("binds the resolver's run directory read-only for a networked child", () => {
     expect(buildBwrapArgs({ ...policy, network: "vendor" }, absent).join(" ")).toContain("--ro-bind-try /run/systemd/resolve /run/systemd/resolve");
     expect(buildBwrapArgs(policy, absent).join(" ")).not.toContain("/run/systemd/resolve");
+  });
+});
+
+posixOnly("the validation slot inside ndx home", () => {
+  const ndxHome = "/Users/op/.ndx";
+  const slot = `${ndxHome}/validation-slot`;
+  const confined: SandboxPolicy = { ...policy, ndxHome };
+  const vendor: SandboxPolicy = { ...confined, kind: "vendor-cli", network: "vendor" };
+
+  /** Every line of the profile that allows anything under ndx home. */
+  const ndxHomeGrants = (profile: string) => profile.split("\n").filter((l) => l.startsWith("(allow") && l.includes(ndxHome));
+
+  it("resolves to <ndx home>/validation-slot for tool children and the vendor CLI, and to nothing for hooks", () => {
+    expect(validationSlotDirFor(confined)).toBe(slot);
+    expect(validationSlotDirFor(vendor)).toBe(slot);
+    expect(validationSlotDirFor({ ...confined, kind: "git-hook" })).toBeUndefined();
+    expect(VALIDATION_SLOT_DIRNAME).toBe("validation-slot");
+  });
+
+  it.each([["tool", confined], ["vendor-cli", vendor]] as const)(
+    "Seatbelt (%s): grants exactly the slot directory, after the ndx-home denial, and still denies the token and credential store",
+    (_kind, p) => {
+      const profile = buildSeatbeltProfile(p);
+      expect(ndxHomeGrants(profile)).toEqual([`(allow file-read* file-write* (subpath "${slot}"))`]);
+      const lines = profile.split("\n");
+      const deny = lines.findIndex((l) => l.startsWith("(deny file-read* file-write*"));
+      const grant = lines.findIndex((l) => l.includes(`(subpath "${slot}")`));
+      // Later rules win: the grant must follow the denial it carves into.
+      expect(grant).toBeGreaterThan(deny);
+      // Tool children lose ndx home whole; the vendor CLI at least the token.
+      expect(lines[deny]).toContain(p.kind === "tool" ? `(subpath "${ndxHome}")` : `(literal "${ndxHome}/auth.token")`);
+      // Neither the token nor the credential store sits under the grant.
+      for (const secret of ["auth.token", "credentials.json", "credentials.json.lock"]) {
+        expect(`${ndxHome}/${secret}`.startsWith(`${slot}/`)).toBe(false);
+      }
+      expect(profile).not.toMatch(/\(allow[^\n]*credentials\.json/);
+      expect(profile).not.toMatch(/\(allow[^\n]*auth\.token/);
+    },
+  );
+
+  it("Seatbelt: gives a git hook no slot grant, so all of ndx home stays denied", () => {
+    expect(ndxHomeGrants(buildSeatbeltProfile({ ...confined, kind: "git-hook" }))).toEqual([]);
+  });
+
+  it.each([["tool", confined], ["vendor-cli", vendor]] as const)(
+    "bubblewrap (%s): binds exactly the slot directory over the ndx-home mask, and never the token or credential store",
+    (_kind, p) => {
+      const exists = (q: string) => q === "/usr" || q === ndxHome || q === `${ndxHome}/auth.token` || q === slot;
+      const isDir = (q: string) => q !== `${ndxHome}/auth.token`;
+      const args = buildBwrapArgs(p, exists, isDir);
+      const joined = args.join(" ");
+      const grants = args.flatMap((a, i) => (a === "--bind" || a === "--bind-try") && args[i + 1].startsWith(ndxHome) ? [args[i + 1]] : []);
+      expect(grants).toEqual([slot]);
+      const mask = p.kind === "tool" ? `--tmpfs ${ndxHome}` : `--ro-bind /dev/null ${ndxHome}/auth.token`;
+      expect(joined).toContain(mask);
+      expect(joined.indexOf(`--bind ${slot} ${slot}`)).toBeGreaterThan(joined.indexOf(mask));
+      expect(joined).not.toContain("credentials.json");
+    },
+  );
+
+  it("bubblewrap: binds nothing for a slot directory the host lacks, and nothing for a git hook", () => {
+    const noSlot = (q: string) => q === "/usr" || q === ndxHome;
+    expect(buildBwrapArgs(confined, noSlot).join(" ")).not.toContain(slot);
+    expect(buildBwrapArgs({ ...confined, kind: "git-hook" }, () => true).join(" ")).not.toContain(slot);
+  });
+
+  it("creates the slot directory on the host before a spawn, since the child could not create it in denied ndx home", () => {
+    const home = realTemp("sbx-slot-home-");
+    const p: SandboxPolicy = { ...policy, projectDir: realTemp("sbx-slot-proj-"), tmpDir: realTemp("sbx-slot-tmp-"), ndxHome: home };
+    wrapInSandbox("true", [], p, { name: "seatbelt", available: true });
+    expect(existsSync(join(home, "validation-slot"))).toBe(true);
+    const hookHome = realTemp("sbx-slot-hook-home-");
+    wrapInSandbox("true", [], { ...p, kind: "git-hook", ndxHome: hookHome }, { name: "seatbelt", available: true });
+    expect(existsSync(join(hookHome, "validation-slot"))).toBe(false);
+  });
+
+  const host = detectSandboxBackend();
+  it.skipIf(!host.available)(`${host.name}: a confined child reads and writes the slot, and cannot read the token or credential store`, () => {
+    const home = realTemp("sbx-slot-live-home-");
+    writeFileSync(join(home, "auth.token"), "secret");
+    writeFileSync(join(home, "credentials.json"), "{}");
+    const project = realTemp("sbx-slot-live-proj-");
+    const p: SandboxPolicy = { ...policy, projectDir: project, tmpDir: realTemp("sbx-slot-live-tmp-"), ndxHome: home, readOnlyRoots: nodeToolchainRoots().map((r) => realpathSync(r)) };
+    const probe = [
+      "const fs = require('fs');",
+      "const tryIt = (f) => { try { f(); return 'ok'; } catch (e) { return e.code; } };",
+      `const slot = ${JSON.stringify(join(home, "validation-slot"))};`,
+      "console.log(JSON.stringify({",
+      "  write: tryIt(() => fs.writeFileSync(slot + '/holder.json', 'x')),",
+      "  read: tryIt(() => fs.readFileSync(slot + '/holder.json')),",
+      `  token: tryIt(() => fs.readFileSync(${JSON.stringify(join(home, "auth.token"))})),`,
+      `  store: tryIt(() => fs.readFileSync(${JSON.stringify(join(home, "credentials.json"))})),`,
+      "}));",
+    ].join("\n");
+    const inv = wrapInSandbox(process.execPath, ["-e", probe], p, host);
+    const out = spawnSync(inv.file, inv.args, { cwd: project, encoding: "utf-8", env: { ...process.env, ...inv.env } });
+    const seen = JSON.parse(out.stdout.trim());
+    expect(seen.write).toBe("ok");
+    expect(seen.read).toBe("ok");
+    expect(seen.token).not.toBe("ok");
+    expect(seen.store).not.toBe("ok");
   });
 });
 

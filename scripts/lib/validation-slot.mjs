@@ -349,13 +349,15 @@ export async function acquireValidationSlot(options) {
   const reportIntervalMs = options.reportIntervalMs ?? DEFAULT_REPORT_INTERVAL_MS;
   const started = now();
 
-  await mkdir(slotDir, { recursive: true });
-
+  // Nesting first, by a read alone: a nested acquire needs no write access to
+  // the slot directory (rule 6).
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
     const current = await readValidationSlotHolder(slotDir);
     if (current?.token === inherited && isPidAlive(current.pid)) return nestedLease(slotDir, inherited);
   }
+
+  await mkdir(slotDir, { recursive: true });
 
   const record = {
     version: PROTOCOL_VERSION,
@@ -393,6 +395,29 @@ export async function acquireValidationSlot(options) {
     }
     await sleep(pollIntervalMs, signal);
   }
+}
+
+/**
+ * The lines the runner prints when it cannot take the slot. A permission
+ * error almost always means a sandbox that does not grant the slot directory:
+ * n-dx's own sandbox grants it (packages/llm-client/src/sandbox.ts), a
+ * vendor's or an operator's may not.
+ * @param {unknown} err
+ * @param {string} slotDir
+ * @returns {string[]}
+ */
+export function describeValidationSlotFailure(err, slotDir) {
+  const code = /** @type {{ code?: unknown }} */ (err)?.code;
+  const message = /** @type {{ message?: unknown }} */ (err)?.message ?? err;
+  const lines = [`Could not take the validation slot in ${slotDir}: ${message}`];
+  if (code === "EPERM" || code === "EACCES") {
+    lines.push(
+      `This process may not read or write ${slotDir}. If it runs inside a sandbox ` +
+        "(an n-dx tool or agent sandbox, or the vendor CLI's own), that sandbox must grant this directory read and write access.",
+    );
+  }
+  lines.push("Pass --no-slot to run without it.");
+  return lines;
 }
 
 /** The line printed while waiting; the same words as hench's `describeValidationSlotWait`. */

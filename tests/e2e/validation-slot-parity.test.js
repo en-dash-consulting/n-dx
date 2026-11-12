@@ -17,7 +17,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +25,7 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import * as hench from "../../packages/hench/dist/process/validation-slot.js";
 import * as scripts from "../../scripts/lib/validation-slot.mjs";
+import * as sandbox from "../../packages/llm-client/dist/sandbox.js";
 
 const HENCH_MODULE = pathToFileURL(join(import.meta.dirname, "../../packages/hench/dist/process/validation-slot.js")).href;
 const SCRIPTS_MODULE = pathToFileURL(join(import.meta.dirname, "../../scripts/lib/validation-slot.mjs")).href;
@@ -39,11 +40,32 @@ process.stdin.resume();
 `;
 
 const DIRECTIONS = [
-  { name: "hench holds, the runner contends", holderModule: HENCH_MODULE, contender: scripts },
-  { name: "the runner holds, hench contends", holderModule: SCRIPTS_MODULE, contender: hench },
+  { name: "hench holds, the runner contends", holderModule: HENCH_MODULE, contender: scripts, contenderModule: SCRIPTS_MODULE },
+  { name: "the runner holds, hench contends", holderModule: SCRIPTS_MODULE, contender: hench, contenderModule: HENCH_MODULE },
 ];
 
-describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, contender }) => {
+/** Acquires nested through the module at argv[1] on the token at argv[3]; exits 0 only when nested. */
+const NESTED_SCRIPT = `
+const { acquireValidationSlot } = await import(process.argv[1]);
+const lease = await acquireValidationSlot({ slotDir: process.argv[2], projectDir: "/nested", env: { NDX_VALIDATION_SLOT: process.argv[3] } });
+process.exit(lease.nested ? 0 : 3);
+`;
+
+/**
+ * Preload that makes every write either implementation could make fail with
+ * EPERM, as a sandbox that grants only read access would. Both import these
+ * as named bindings from node:fs/promises; syncBuiltinESMExports carries the
+ * replacement to those bindings.
+ */
+const DENY_WRITES = `data:text/javascript,${encodeURIComponent(`
+import fsp from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
+const deny = (name) => async (path) => { throw Object.assign(new Error("EPERM: " + name + " denied: " + path), { code: "EPERM" }); };
+for (const name of ["mkdir", "writeFile", "link", "rename", "unlink"]) fsp[name] = deny(name);
+syncBuiltinESMExports();
+`)}`;
+
+describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, contender, contenderModule }) => {
   let home;
   let slotDir;
   let holder;
@@ -102,6 +124,9 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
   it("resolves the same slot directory from one ndx home", () => {
     const env = { N_DX_HOME: home };
     expect(scripts.resolveValidationSlotDir(env)).toBe(join(home, hench.VALIDATION_SLOT_DIRNAME));
+    // The one ndx-home directory the OS sandbox grants must be this one.
+    expect(sandbox.validationSlotDirFor({ kind: "tool", projectDir: "/p", tmpDir: "/t", network: "none", ndxHome: home }))
+      .toBe(join(home, hench.VALIDATION_SLOT_DIRNAME));
     expect(scripts.VALIDATION_SLOT_ENV).toBe(hench.VALIDATION_SLOT_ENV);
   });
 
@@ -131,6 +156,19 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
     expect(lease.queueWaitMs).toBe(0);
     await lease.release();
     expect((await hench.readValidationSlotHolder(slotDir))?.token).toBe(token);
+    expect((await scripts.readValidationSlotHolder(slotDir))?.token).toBe(token);
+  });
+
+  // A process that may read the slot but not write it (rule 6): the nesting
+  // check reads holder.json before anything creates or writes there.
+  it("runs nested where every write to the filesystem fails", async () => {
+    const { token } = await startHolder();
+    const nested = spawnSync(
+      process.execPath,
+      ["--import", DENY_WRITES, "--input-type=module", "-e", NESTED_SCRIPT, contenderModule, slotDir, token],
+      { encoding: "utf-8", timeout: 30_000, windowsHide: true },
+    );
+    expect(nested.status, nested.stderr).toBe(0);
     expect((await scripts.readValidationSlotHolder(slotDir))?.token).toBe(token);
   });
 
