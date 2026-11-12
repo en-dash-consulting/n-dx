@@ -273,7 +273,13 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
     : null;
 
   const more = !filtering && total > READY_TOP_ROWS
-    ? h("button", { type: "button", class: "ready-more", onClick: () => { if (!expanded) engage(); setExpanded(!expanded); } },
+    ? h("button", {
+        type: "button",
+        class: "ready-more",
+        "aria-expanded": String(expanded),
+        "aria-controls": "ready-to-run-list",
+        onClick: () => { if (!expanded) engage(); setExpanded(!expanded); },
+      },
         expanded ? `Show top ${READY_TOP_ROWS}` : `Show all ${total}`)
     : null;
 
@@ -289,7 +295,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
         )
       : shown.length === 0
         ? h("p", { class: "ready-empty" }, "No ready task matches.")
-        : h("ul", { class: "ready-list" }, shown.map((task) => {
+        : h("ul", { class: "ready-list", id: "ready-to-run-list" }, shown.map((task) => {
           const status = STATUS_ICON[task.status] ?? { icon: "○", label: task.status };
           const menuId = `ready-menu-${task.id}`;
           return h("li", { key: task.id, class: "ready-row", "data-task-id": task.id },

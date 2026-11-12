@@ -261,10 +261,21 @@ describe("Ready to run: every task, search and filters", () => {
   };
   const titles = () => rows().map((r) => r.querySelector(".ready-title")!.textContent);
 
-  it("shows the top rows, then every task, low priority included, with Show all N", async () => {
+  it("exposes collapsed, expanded and collapsed disclosure state for the controlled ready list", async () => {
     await mount(MANY);
+    const toggle = byText("Show all 120");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    const controlledId = toggle.getAttribute("aria-controls");
+    expect(controlledId).toBeTruthy();
+    const list = document.getElementById(controlledId!);
+    expect(list).toBe(document.querySelector(".ready-list"));
+    expect(list!.querySelectorAll(".ready-row")).toHaveLength(10);
     expect(rows()).toHaveLength(10);
-    await click(byText("Show all 120"));
+    await click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.textContent).toBe("Show top 10");
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBe(list);
+    expect(list!.querySelectorAll(".ready-row")).toHaveLength(120);
     expect(rows()).toHaveLength(120);
     expect(titles()).toContain("Task number 119");
     expect(rows().some((r) => r.textContent!.includes("low"))).toBe(true);
@@ -273,7 +284,11 @@ describe("Ready to run: every task, search and filters", () => {
       "/api/hench/ready?limit=50&offset=0",
       "/api/hench/ready?all=1",
     ]);
-    await click(byText("Show top 10"));
+    await click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toBe("Show all 120");
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBe(list);
+    expect(list!.querySelectorAll(".ready-row")).toHaveLength(10);
     expect(rows()).toHaveLength(10);
   });
 
