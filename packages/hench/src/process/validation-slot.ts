@@ -90,6 +90,8 @@
  *    parent's slot even when its own directory would resolve differently. A
  *    token for a dead holder, or for a holder in another directory, is
  *    ignored: the acquire takes its own directory's slot.
+ *    The check reads `holder.json` before anything creates or writes in the
+ *    directory, so a nested acquire needs read access only.
  * 7. **Waiting.** Poll at a bounded interval; report the holder (pid,
  *    project directory, since when, and the `holder.json` path) on the first
  *    wait and then periodically. Only the caller's abort signal stops a
@@ -561,8 +563,8 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
   const reportIntervalMs = options.reportIntervalMs ?? DEFAULT_REPORT_INTERVAL_MS;
   const started = now();
 
-  await mkdir(slotDir, { recursive: true });
-
+  // Nesting first, by a read alone: a nested acquire needs no write access to
+  // the slot directory (rule 6).
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
     const inheritedDir = env[VALIDATION_SLOT_DIR_ENV];
@@ -570,6 +572,8 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
     const current = await readValidationSlotHolder(parentDir);
     if (current?.token === inherited && isHolderProcessAlive(current)) return nestedLease(parentDir, inherited);
   }
+
+  await mkdir(slotDir, { recursive: true });
 
   const record: ValidationSlotHolder = {
     version: VALIDATION_SLOT_PROTOCOL_VERSION,

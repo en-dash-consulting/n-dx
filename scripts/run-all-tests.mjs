@@ -62,6 +62,7 @@ import { staleChangedPackages, staleDistMessage } from "./lib/stale-dist.mjs";
 import {
   ValidationSlotAbortedError,
   acquireValidationSlot,
+  describeValidationSlotFailure,
   describeValidationSlotWait,
   resolveValidationSlotDir,
 } from "./lib/validation-slot.mjs";
@@ -307,8 +308,7 @@ async function takeSlot() {
       console.error(`Stopped waiting for the validation slot after ${seconds(err.queueWaitMs)} (${interruptedBy}).`);
       process.exit(signalExitCode(interruptedBy));
     }
-    console.error(`Could not take the validation slot in ${slotDir}: ${err?.message ?? err}`);
-    console.error("Pass --no-slot to run without it.");
+    for (const line of describeValidationSlotFailure(err, slotDir)) console.error(line);
     process.exit(1);
   }
 }

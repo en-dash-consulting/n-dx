@@ -61,6 +61,9 @@ items:
     resolutionDetail: "Documented NDX_TEST_MAX_WORKERS (TESTING.md) and hench.testGate.maxWorkers (configuration.md, packages/hench.md); added patch changeset for @n-dx/hench."
     lastModified: "2026-11-12T17:53:30.628Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3f564624-cbee-4520-b9f6-247ccfc8e92a":
+    lastModified: "2026-11-12T22:14:33.584Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "40b7cd84-8bcc-4175-8bd0-92b8ea8ea290":
     status: "completed"
     startedAt: "2026-11-12T17:55:08.873Z"
@@ -191,7 +194,10 @@ items:
     lastModified: "2026-11-12T17:37:23.271Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d8a7343d-275f-4a4d-a782-c06c1a08f585":
-    lastModified: "2026-11-12T21:30:17.305Z"
+    status: "in_progress"
+    startedAt: "2026-11-12T21:30:37.432Z"
+    activeIntervals: [{"start":"2026-11-12T21:30:37.432Z"}]
+    lastModified: "2026-11-12T21:30:38.250Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "de29498f-6556-4355-b68b-d5c4b3c11129":
     status: "completed"

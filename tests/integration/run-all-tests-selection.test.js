@@ -300,6 +300,25 @@ if (process.env.FAKE_PNPM === "build") {
       expect(readHolderRecord().token).toBe(lease.token);
     });
 
+    // A home it may not write stands in for a sandbox that does not grant the
+    // slot. POSIX permission bits, and root ignores them.
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "names the slot directory and the sandbox when it may not use the slot",
+      () => {
+        chmodSync(home, 0o500);
+        try {
+          const result = gate("noop", [], homeEnv());
+          expect(result.status).toBe(1);
+          expect(result.stderr).toContain(`Could not take the validation slot in ${slotDir}`);
+          expect(result.stderr).toContain(`This process may not read or write ${slotDir}`);
+          expect(result.stderr).toContain("sandbox must grant this directory read and write access");
+          expect(result.stderr).toContain("Pass --no-slot to run without it.");
+        } finally {
+          chmodSync(home, 0o700);
+        }
+      },
+    );
+
     it("runs without the slot under --no-slot, and --list never takes it", async () => {
       await hold();
       const unslotted = gate("noop", ["--no-slot"], homeEnv());
