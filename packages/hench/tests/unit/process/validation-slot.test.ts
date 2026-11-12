@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   acquireValidationSlot,
+  currentBootTimeMs,
   readValidationSlotHolder,
   ValidationSlotAbortedError,
   VALIDATION_SLOT_ENV,
@@ -60,6 +61,7 @@ async function writeHolder(record: Partial<ValidationSlotHolder>): Promise<strin
     pid: deadPid(),
     child: null,
     startedAt: "2026-11-12T00:00:00.000Z",
+    bootedAt: currentBootTimeMs(),
     projectDir: "/elsewhere",
     ...record,
   };
@@ -212,6 +214,30 @@ describe("acquireValidationSlot — stale recovery", () => {
       throw new Error("should not wait");
     } });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
+    await lease.release();
+  });
+
+  it("reclaims a record written before a reboot, even when its pids are now in use", async () => {
+    // After a crash and reboot the old pid can belong to an unrelated live
+    // process; the record must not hold the slot forever.
+    const live = liveChild();
+    await writeHolder({
+      pid: process.pid,
+      child: { pid: live.pid!, group: false },
+      bootedAt: currentBootTimeMs() - 24 * 60 * 60_000,
+    });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: () => {
+      throw new Error("a record from a previous boot must not be waited on");
+    } });
+    expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
+    await lease.release();
+  });
+
+  it("records this boot's time in the holder record", async () => {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {} });
+    const holder = await readValidationSlotHolder(slotDir);
+    // Two readings of one boot agree to well within the five-minute tolerance.
+    expect(Math.abs(holder!.bootedAt - currentBootTimeMs())).toBeLessThan(60_000);
     await lease.release();
   });
 

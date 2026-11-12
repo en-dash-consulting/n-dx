@@ -36,6 +36,9 @@ items:
     resolutionDetail: "finalizeRun-level maxWorkers cases in test-gate-flaky-rerun.test.ts (mutation-checked against both shared.ts sites); resolveSessionCliEnv extracted to store/project-config.ts with unit tests; test-worker-cap.test.ts header now points at them."
     lastModified: "2026-11-14T05:08:30.435Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "51f1f218-d1e0-4a74-8a98-e3b5a1a9d8d7":
+    lastModified: "2026-11-12T18:09:39.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
     status: "completed"
     startedAt: "2026-11-14T05:08:40.369Z"
@@ -85,10 +88,14 @@ items:
     lastModified: "2026-11-12T17:37:23.271Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed2f3d51-97a5-4f5b-8b98-2ff2e2667a10":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-12T17:58:48.316Z"
-    activeIntervals: [{"start":"2026-11-12T17:58:48.316Z"}]
-    lastModified: "2026-11-12T17:58:48.978Z"
+    completedAt: "2026-11-12T18:10:08.166Z"
+    endedAt: "2026-11-12T18:10:08.166Z"
+    activeIntervals: [{"end":"2026-11-12T18:10:08.166Z","start":"2026-11-12T17:58:48.316Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New packages/hench/src/process/validation-slot.ts (protocol documented in header) + validation-slot-dir.ts; 18 tests incl. two real processes contending."
+    lastModified: "2026-11-12T18:10:08.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee944d3b-6829-4cac-901a-427b91170c79":
     lastModified: "2026-11-12T17:54:26.294Z"
