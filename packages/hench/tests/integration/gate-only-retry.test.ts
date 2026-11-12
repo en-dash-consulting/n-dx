@@ -35,6 +35,7 @@ function git(cwd: string, ...args: string[]): string {
 interface GateCall {
   filesChanged: string[];
   testCommand?: string;
+  validationSlot?: { slotDir: string; signal?: AbortSignal };
 }
 
 describe("gate-only retry", () => {
@@ -70,7 +71,7 @@ describe("gate-only retry", () => {
     vi.doMock("../../src/tools/test-runner.js", async (importOriginal) => ({
       ...(await importOriginal<typeof import("../../src/tools/test-runner.js")>()),
       runTestGate: async (o: GateCall) => {
-        gateCalls.push({ filesChanged: [...o.filesChanged], testCommand: o.testCommand });
+        gateCalls.push({ filesChanged: [...o.filesChanged], testCommand: o.testCommand, validationSlot: o.validationSlot });
         return {
           ran: true,
           passed: gatePasses,
@@ -144,10 +145,11 @@ describe("gate-only retry", () => {
     };
   };
 
-  async function runLoop(extra: { reviewPass?: boolean } = {}) {
+  async function runLoop(extra: { reviewPass?: boolean; abortSignal?: AbortSignal } = {}, hostSlot?: boolean) {
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
     const config = await loadConfig(henchDir);
+    if (hostSlot !== undefined) config.testGate = { ...config.testGate, hostSlot };
     const store = createStore("file", rexDir);
     try {
       const result = await cliLoop({
@@ -203,6 +205,25 @@ describe("gate-only retry", () => {
     expect(subjects).toEqual(source.commits!.map((c) => c.subject));
     expect(execFileSync("git", ["show", "--name-only", "--format=", "HEAD"], { cwd: projectDir, encoding: "utf-8" }))
       .toContain("prd_tree");
+  });
+
+  it("runs the retried gate inside the validation slot, stoppable by the run's interrupt, when hostSlot is on", async () => {
+    await seedGateFailure();
+    const controller = new AbortController();
+
+    await runLoop({ abortSignal: controller.signal }, true);
+
+    expect(cli.invocations).toHaveLength(0);
+    expect(gateCalls).toHaveLength(1);
+    expect(gateCalls[0]!.validationSlot?.slotDir).toMatch(/validation-slot$/);
+    expect(gateCalls[0]!.validationSlot?.signal).toBe(controller.signal);
+  });
+
+  it("takes no validation slot for the retried gate when hostSlot is unset", async () => {
+    await seedGateFailure();
+    await runLoop();
+    expect(gateCalls).toHaveLength(1);
+    expect(gateCalls[0]!.validationSlot).toBeUndefined();
   });
 
   it("fails when the gate fails again, and the next retry runs the agent (loop guard)", async () => {

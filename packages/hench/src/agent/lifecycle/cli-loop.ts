@@ -33,6 +33,7 @@ import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { createVendorCliSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
 import { trackVendorProcess, terminateTrackedVendorProcess, describeAbortReason } from "../../process/run-interrupt.js";
+import { validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
 import { createSpendGate, priceRunUsd } from "./spend-cap.js";
 import type { SpendCapExceeded, SpendGate } from "./spend-cap.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
@@ -2216,6 +2217,8 @@ interface SuccessContext {
   testCommand?: string;
   /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
   testMaxWorkers?: number;
+  /** `hench.testGate.hostSlot`: the completion check's test run takes the validation slot. */
+  validationSlot?: ValidationSlotRunOptions;
   tokenBudget?: number;
   /** Show the diff and prompt for approval before finalizing (`--approve-diff`). */
   approveDiff?: boolean;
@@ -2285,6 +2288,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     startingHead: ctx.startingHead,
     selfHeal: ctx.selfHeal,
     testMaxWorkers: ctx.testMaxWorkers,
+    validationSlot: ctx.validationSlot,
     baselineUntracked: ctx.baselineUntracked,
     finalizeReadyParent,
   });
@@ -2325,6 +2329,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
             startingHead: ctx.startingHead,
             selfHeal: ctx.selfHeal,
             testMaxWorkers: ctx.testMaxWorkers,
+            validationSlot: ctx.validationSlot,
             baselineUntracked: ctx.baselineUntracked,
             finalizeReadyParent,
           }),
@@ -2800,6 +2805,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
                   startingHead: base,
                   selfHeal: config.selfHeal,
                   testMaxWorkers: config.testGate?.maxWorkers,
+                  validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
                   baselineUntracked,
                 }),
             });
@@ -2822,6 +2828,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         baselineDirectories,
         baselineDirty,
         reviewOptional: opts.reviewOptional,
+        // Stops a retried gate still queued for the validation slot.
+        abortSignal: opts.abortSignal,
       },
     });
     return { run };
@@ -3399,6 +3407,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           store, taskId, projectDir, startingHead,
           testCommand: brief.project.testCommand,
           testMaxWorkers: config.testGate?.maxWorkers,
+          validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
           tokenBudget: config.tokenBudget,
           approveDiff: opts.approveDiff,
           reviewPass: reviewPassContext,
@@ -3519,6 +3528,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     startingHead,
     reviewOptional: opts.reviewOptional,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
   });
 
   // Retry overhead, recorded whatever the outcome: a task that took four

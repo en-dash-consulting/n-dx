@@ -314,6 +314,12 @@ export interface TestGateConfig {
    * check's test run and the agent session's shell. Absent sets nothing.
    */
   maxWorkers?: number;
+  /**
+   * Run the gate, its re-run, post-task tests and the completion check's test
+   * run inside the host-wide validation slot: one at a time per OS user across
+   * every hench process and worktree. Absent or false takes no slot.
+   */
+  hostSlot?: boolean;
 }
 
 /** Values for {@link ReviewConfig.mode}. */
@@ -1115,6 +1121,10 @@ export interface PostRunTestRecord {
   targetedFiles: string[];
   /** Error message if tests couldn't be run. */
   error?: string;
+  /** Milliseconds spent waiting for the validation slot. Set only when `hench.testGate.hostSlot` is on. */
+  queueMs?: number;
+  /** Milliseconds the command ran inside the validation slot. Set only when `hench.testGate.hostSlot` is on. */
+  executionMs?: number;
 }
 
 export interface RunSummaryData {
@@ -1189,6 +1199,13 @@ export interface TestGateResult {
   command?: string;
   /** Total elapsed time (ms) */
   totalDurationMs?: number;
+  /**
+   * Milliseconds spent waiting for the validation slot, summed over the gate
+   * and its re-run. Set only when `hench.testGate.hostSlot` is on.
+   */
+  queueMs?: number;
+  /** Milliseconds the gate and its re-run ran inside the slot. Set only when `hench.testGate.hostSlot` is on. */
+  executionMs?: number;
   /** Why the gate could not produce a verdict (never launched, or timed out) */
   error?: string;
   /**

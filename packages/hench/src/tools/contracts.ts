@@ -3,6 +3,7 @@ import type { SystemMemoryMonitor } from "../process/memory-monitor.js";
 import type { ToolSandbox } from "../guard/sandbox.js";
 import type { PolicyEngine } from "../guard/policy.js";
 import type { ConfigBackstop } from "../guard/config-backstop.js";
+import type { ValidationSlotRunOptions } from "../process/validation-run.js";
 
 /**
  * Minimal guard contract required by tool handlers.
@@ -67,6 +68,8 @@ export interface ToolContext {
   selfHeal?: boolean;
   /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
   testMaxWorkers?: number;
+  /** `hench.testGate.hostSlot`: the completion check's test run takes the validation slot. */
+  validationSlot?: ValidationSlotRunOptions;
   /**
    * The run's snapshot of n-dx's own config files. `dispatchTool` puts back
    * whatever a call changed before the next call can read it.

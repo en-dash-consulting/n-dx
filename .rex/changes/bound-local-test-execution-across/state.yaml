@@ -59,6 +59,9 @@ items:
     resolutionDetail: "HENCH_VALIDATORS gains testGate.maxWorkers (requirePositiveInteger, now isSafeInteger); withTestMaxWorkers keeps the lower of config and a valid inherited cap; docs, TESTING.md, changesets updated."
     lastModified: "2026-11-14T05:03:31.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "823880dc-c2ca-4221-8fae-5a413a0eed80":
+    lastModified: "2026-11-12T18:26:29.996Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "85839d4a-3b74-4e79-bb93-838726de17cf":
     lastModified: "2026-11-12T17:28:05.138Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -70,11 +73,18 @@ items:
     activeIntervals: [{"end":"2026-11-12T17:41:46.505Z","start":"2026-11-12T17:37:34.236Z"},{"end":"2026-11-12T17:51:36.753Z","start":"2026-11-12T17:43:23.296Z"}]
     lastModified: "2026-11-12T17:51:39.396Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a4ee4cda-49d7-4ea3-8df5-f3953da19093":
+    lastModified: "2026-11-12T18:26:37.859Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adb92a12-af68-4f9a-b28b-310fb0ea9980":
+    status: "completed"
     startedAt: "2026-11-12T18:10:17.703Z"
-    activeIntervals: [{"end":"2026-11-12T18:14:06.702Z","start":"2026-11-12T18:10:17.703Z"}]
-    failureReason: "The run timed out before finishing."
-    lastModified: "2026-11-12T18:14:49.663Z"
+    completedAt: "2026-11-12T18:27:05.493Z"
+    endedAt: "2026-11-12T18:27:05.493Z"
+    activeIntervals: [{"end":"2026-11-12T18:14:06.702Z","start":"2026-11-12T18:10:17.703Z"},{"end":"2026-11-12T18:27:05.493Z","start":"2026-11-12T18:15:09.764Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench.testGate.hostSlot wires the host validation slot around each gate attempt/re-run, post-task tests and the completion test run (commit 0f03d9652); queueMs/executionMs on run records and in hench show."
+    lastModified: "2026-11-12T18:27:08.200Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     createdAt: "2026-11-12T17:26:37.734Z"

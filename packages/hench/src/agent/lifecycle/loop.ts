@@ -11,6 +11,7 @@ import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
@@ -125,6 +126,7 @@ async function rejectUnvalidatedCompletion(args: {
   testCommand?: string;
   selfHeal?: boolean;
   testMaxWorkers?: number;
+  validationSlot?: ValidationSlotRunOptions;
 }): Promise<void> {
   const { run, store, taskId, projectDir } = args;
   if (run.status !== "completed") return;
@@ -134,6 +136,7 @@ async function rejectUnvalidatedCompletion(args: {
     startingHead: args.startingHead,
     selfHeal: args.selfHeal,
     testMaxWorkers: args.testMaxWorkers,
+    validationSlot: args.validationSlot,
     baselineUntracked: args.baselineUntracked,
     finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
   });
@@ -350,6 +353,7 @@ async function initApiResources(
     memoryMonitor,
     selfHeal: config.selfHeal,
     testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
     configBackstop,
   };
 
@@ -586,6 +590,7 @@ function initGoogleApiResources(
     memoryMonitor,
     selfHeal: config.selfHeal,
     testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
     configBackstop,
   };
 }
@@ -1003,6 +1008,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -1848,6 +1854,7 @@ async function runLocalToolLoop(params: {
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -2331,6 +2338,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand: brief.project.testCommand, selfHeal: config.selfHeal,
     testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
   });
 
   // Shared: review gate

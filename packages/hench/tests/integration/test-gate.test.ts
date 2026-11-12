@@ -2,8 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runTestGate } from "../../src/tools/test-runner.js";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { runPostTaskTests, runTestGate } from "../../src/tools/test-runner.js";
 import type { TestGateResult } from "../../src/schema/v1.js";
+import { validateCompletion } from "../../src/validation/completion.js";
+import {
+  acquireValidationSlot,
+  VALIDATION_SLOT_ENV,
+  VALIDATION_SLOT_HOLDER_FILE,
+} from "../../src/process/validation-slot.js";
+import { describeValidationSlotWait, type ValidationSlotRunOptions } from "../../src/process/validation-run.js";
+import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
 
 describe("Test Suite Gate Integration", () => {
   let projectDir: string;
@@ -178,5 +188,155 @@ describe("Test Suite Gate Integration", () => {
       expect(result.ran).toBe(true);
       expect(result.passed).toBe(true);
     });
+  });
+});
+
+/**
+ * `hench.testGate.hostSlot`: each validation command takes the host-wide slot
+ * for itself, sees its token as NDX_VALIDATION_SLOT, and gives it back
+ * afterwards whatever the outcome. Uses a temp slot directory, never the
+ * real ndx home.
+ */
+describeNeedsPosixShell("validation commands inside the host slot", () => {
+  let projectDir: string;
+  let slotDir: string;
+  let probe: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-gate-slot-"));
+    slotDir = join(projectDir, ".slot");
+    await mkdir(join(projectDir, "src"));
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 1;\n");
+    // Exits 0 only when it runs as the slot's holder: holder.json exists and
+    // its token is the one in NDX_VALIDATION_SLOT.
+    const holderFile = JSON.stringify(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
+    await writeFile(
+      join(projectDir, "probe.cjs"),
+      [
+        `const fs = require("fs");`,
+        `const token = process.env.${VALIDATION_SLOT_ENV};`,
+        `let holder = null;`,
+        `try { holder = JSON.parse(fs.readFileSync(${holderFile}, "utf-8")); } catch (err) { process.exit(6); }`,
+        `process.exit(token && holder.token === token ? 0 : 5);`,
+      ].join("\n"),
+    );
+    probe = `node ${JSON.stringify(join(projectDir, "probe.cjs"))}`;
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  const slot = (extra: Partial<ValidationSlotRunOptions> = {}): ValidationSlotRunOptions =>
+    ({ slotDir, projectDir, pollIntervalMs: 20, ...extra });
+  const slotHeld = () => existsSync(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
+  /** Hold the slot as another holder would, for `ms`. */
+  async function holdSlotFor(ms: number): Promise<void> {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/elsewhere", env: {} });
+    setTimeout(() => void lease.release(), ms);
+  }
+
+  it("runs the gate inside the slot, records queue and execution time, and releases it", async () => {
+    const result = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: probe, validationSlot: slot() });
+    expect(result.passed).toBe(true);
+    expect(result.queueMs).toBeGreaterThanOrEqual(0);
+    expect(result.executionMs).toBeGreaterThanOrEqual(0);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("takes the slot again for the re-run and records both commands' time", async () => {
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/a.ts"],
+      testCommand: `node -e "console.log('test-gate: failed-suites=root'); process.exit(1)"`,
+      rerunTemplate: `${probe} {suites}`,
+      validationSlot: slot(),
+    });
+    expect(result.rerun?.passed).toBe(true);
+    expect(result.executionMs).toBeGreaterThanOrEqual(0);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("releases the slot after a failing gate", async () => {
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "process.exit(1)"`, validationSlot: slot(),
+    });
+    expect(result.passed).toBe(false);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("releases the slot after a timeout, once the command has been stopped", async () => {
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "setTimeout(() => {}, 30000)"`,
+      timeout: 300, validationSlot: slot(),
+    });
+    expect(result.passed).toBe(false);
+    expect(result.error).toMatch(/did not finish within/);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("starts the gate's timeout after admission: queue wait does not count", async () => {
+    await holdSlotFor(1_000);
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: probe, timeout: 800, validationSlot: slot(),
+    });
+    expect(result.passed).toBe(true);
+    expect(result.queueMs).toBeGreaterThanOrEqual(900);
+  });
+
+  it("reports the holder while waiting", async () => {
+    await holdSlotFor(300);
+    const waits: string[] = [];
+    await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: probe,
+      validationSlot: slot({ onWait: (w) => waits.push(describeValidationSlotWait(w)) }),
+    });
+    expect(waits[0]).toMatch(/^Waiting for the validation slot held by pid \d+ in \/elsewhere since /);
+  });
+
+  it("stops waiting when the run is interrupted, and runs nothing", async () => {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/elsewhere", env: {} });
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new Error("interrupted")), 100);
+      const result = await runTestGate({
+        projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "require('fs').writeFileSync('ran', '')"`,
+        validationSlot: slot({ signal: controller.signal }),
+      });
+      expect(result.ran).toBe(false);
+      expect(result.error).toMatch(/validation slot.*interrupted/);
+      expect(result.queueMs).toBeGreaterThanOrEqual(50);
+      expect(existsSync(join(projectDir, "ran"))).toBe(false);
+    } finally {
+      await lease.release();
+    }
+  });
+
+  it("runs post-task tests inside the slot", async () => {
+    const result = await runPostTaskTests({ projectDir, filesChanged: ["src/a.ts"], testCommand: probe, validationSlot: slot() });
+    expect(result.passed).toBe(true);
+    expect(result.queueMs).toBeGreaterThanOrEqual(0);
+    expect(result.executionMs).toBeGreaterThanOrEqual(0);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("runs the completion check's test run inside the slot", async () => {
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
+    git("init", "-q");
+    git("add", "src");
+    git("commit", "-qm", "init");
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
+    const result = await validateCompletion(projectDir, { testCommand: probe, validationSlot: slot() });
+    expect(result.testsPassed).toBe(true);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("without a slot, takes none and records no timing", async () => {
+    const result = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "process.exit(0)"` });
+    expect(result.passed).toBe(true);
+    expect(result).not.toHaveProperty("queueMs");
+    expect(result).not.toHaveProperty("executionMs");
+    expect(existsSync(slotDir)).toBe(false);
   });
 });
