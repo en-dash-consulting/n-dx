@@ -280,6 +280,12 @@ Configuration is stored in `.hench/config.json`.
 
 The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
 
+`hench.testGate.maxWorkers` (a positive integer) caps the vitest workers of the test commands hench runs. Unset by default, which changes nothing. When set, hench passes it as `NDX_TEST_MAX_WORKERS` to the test gate and its re-run, the post-task tests, the completion test run and the agent's shell, so a suite the agent starts is capped too. It only helps in a project whose vitest configs read that variable (n-dx's do). An invalid value is refused by `ndx config`.
+
+```sh
+ndx config hench.testGate.maxWorkers 2 .
+```
+
 `hench.projectSkills` names project skills an agent should follow during `ndx work`, by directory name under `.claude/skills/` or `.agents/skills/`. A run cannot invoke a skill by name, so each run's system prompt lists the named skills by path and tells the agent to read the file before the work it covers. The setting is opt-in because those directories also hold operator workflows such as `ndx-work` that a running agent must not follow:
 
 ```sh
