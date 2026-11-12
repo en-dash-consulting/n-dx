@@ -2547,7 +2547,9 @@ export async function shouldStopForUncommittedWork(
   // `--allow-dirty` is the operator saying "go, but do not touch my tree".
   // Honour it here as the pre-run gate does, or fail-forward would commit at
   // the first boundary the very work they told it to leave alone.
-  if (!allowDirty && isFailForwardEnabled(projectDir)) {
+  // Display paths cannot scope an automatic commit of a rename. Let the
+  // refusal explain recovery of the pair instead of landing its deletion.
+  if (!allowDirty && !leftover.renames?.length && isFailForwardEnabled(projectDir)) {
     const result = await commitFailForward(projectDir, leftover.paths, "loop-leftover");
     if (result.committed) {
       info(colorSuccess(
@@ -2569,7 +2571,7 @@ export async function shouldStopForUncommittedWork(
   info(`\n${colorWarn(formatLoopRefusal(
     leftover.paths,
     deleted,
-    await prepareRecoveryPathspecs(projectDir, leftover.paths, deleted),
+    await prepareRecoveryPathspecs(projectDir, leftover.paths, deleted, leftover.renames),
   ))}`);
   process.exitCode = 1;
   return true;

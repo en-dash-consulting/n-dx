@@ -3803,9 +3803,9 @@ async function keepAppliedCompletion(
   // Dirty before the run is the operator's, not the task's: listed apart, so
   // the commit commands cannot sweep it under the task's trailer (WM2048).
   const preexisting = new Set(baselineDirty);
-  const found = (await findUncommittedWork({ projectDir })).paths;
-  const paths = found.filter((p) => !preexisting.has(p));
-  const preRun = found.filter((p) => preexisting.has(p));
+  const found = await findUncommittedWork({ projectDir });
+  const paths = found.paths.filter((p) => !preexisting.has(p));
+  const preRun = found.paths.filter((p) => preexisting.has(p));
   const deleted = deletedAmong(projectDir, paths);
   run.error = formatAppliedCompletionKept({
     cause: reason,
@@ -3813,7 +3813,7 @@ async function keepAppliedCompletion(
     taskId,
     paths,
     deleted,
-    files: await prepareRecoveryPathspecs(projectDir, paths, deleted),
+    files: await prepareRecoveryPathspecs(projectDir, paths, deleted, found.renames),
     preRun,
   });
   info(`\n${run.error}`);
@@ -4823,7 +4823,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       uncommittedWorkRefused = true;
       run.status = "failed";
       const leakedDeleted = deletedAmong(projectDir, leaked.paths);
-      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted);
+      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted, leaked.renames);
       run.error = repairCommitError
         ? formatReviewRepairsUncommittedRefusal(
             leaked.paths,

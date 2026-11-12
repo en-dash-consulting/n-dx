@@ -1,11 +1,23 @@
 schema: "rex/v2"
 items:
   "637b25c8-9fed-47d1-b1ef-5a0289a6e0cb":
-    lastModified: "2026-11-12T18:57:35.161Z"
+    status: "completed"
+    startedAt: "2026-11-12T19:44:50.913Z"
+    completedAt: "2026-11-12T20:20:33.307Z"
+    endedAt: "2026-11-12T20:20:33.307Z"
+    activeIntervals: [{"end":"2026-11-12T20:04:46.742Z","start":"2026-11-12T19:44:50.913Z"},{"end":"2026-11-12T20:20:33.307Z","start":"2026-11-12T20:06:39.132Z"}]
+    lastModified: "2026-11-12T20:20:35.938Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8d253019-c622-43e0-94b6-705aaa49655d":
+    status: "completed"
+    startedAt: "2026-11-12T20:20:33.307Z"
+    completedAt: "2026-11-12T20:20:33.307Z"
+    endedAt: "2026-11-12T20:20:33.307Z"
+    activeIntervals: [{"end":"2026-11-12T20:20:33.307Z","start":"2026-11-12T20:20:33.307Z"}]
+    appliedAt: "2026-11-12T20:20:33.307Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-12T18:57:31.245Z"
-    lastModified: "2026-11-12T18:57:35.161Z"
+    lastModified: "2026-11-12T20:20:33.307Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eec4aad9-ae82-4196-978f-6dffb44c2a5e":
     status: "completed"

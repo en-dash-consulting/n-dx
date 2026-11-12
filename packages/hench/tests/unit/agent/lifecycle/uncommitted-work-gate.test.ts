@@ -114,7 +114,10 @@ describe("findUncommittedWork", () => {
     const result = await findUncommittedWork(
       withDirty(['R  "src/a -> b.ts" -> .rex/changes/x/b.ts'], { discountPaths: [...PRD_COMMIT_PATHS] }),
     );
-    expect(result).toEqual({ clean: false, paths: ["src/a -> b.ts"] });
+    expect(result).toEqual({
+      clean: false, paths: ["src/a -> b.ts"],
+      renames: [{ source: "src/a -> b.ts", target: ".rex/changes/x/b.ts" }],
+    });
   });
 
   it("does not count the PRD paths the completion commit still covers", async () => {
