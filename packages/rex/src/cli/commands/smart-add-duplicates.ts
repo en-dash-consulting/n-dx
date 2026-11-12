@@ -172,6 +172,7 @@ export function attachDuplicateReasonsToProposals(
         return {
           title: feature.title,
           source: feature.source,
+          ...(feature.summary ? { summary: feature.summary } : {}),
           description: feature.description,
           ...(feature.existingId ? { existingId: feature.existingId } : {}),
           ...(featureReason ? { duplicateReason: featureReason } : {}),
@@ -182,6 +183,7 @@ export function attachDuplicateReasonsToProposals(
               title: task.title,
               source: task.source,
               sourceFile: task.sourceFile,
+              ...(task.summary ? { summary: task.summary } : {}),
               description: task.description,
               acceptanceCriteria: task.acceptanceCriteria,
               priority: task.priority,

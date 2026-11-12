@@ -27,6 +27,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { appendLog } from "./rex-route-helpers.js";
+import { summaryField } from "../prd-io.js";
 import {
   prdLayout,
   loadPrdModel,
@@ -112,6 +113,8 @@ export interface ChangeRowWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Plain-language summary for non-coders, when the change has one. */
+  summary?: string;
   intent?: string;
   stage: ChangeStageWire;
   priority?: string;
@@ -157,6 +160,8 @@ export interface GlanceChangeWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Plain-language summary for non-coders; the viewer shows it in place of the title when present. */
+  summary?: string;
   stage: OpenChangeStageWire;
   priority?: string;
   plannedRelease?: string;
@@ -360,6 +365,28 @@ function changesOf(index: TreeIndex): ChangeRuleNode[] {
     .map(({ node }) => node as ChangeRuleNode);
 }
 
+/** A change that is done and waiting for its amendments to be applied, as Apply all lists it. */
+export interface AwaitingApplyRef {
+  id: string;
+  displayId?: string;
+  title: string;
+  summary?: string;
+}
+
+/** Every change in the "Done, waiting to apply" stage, in tree order. */
+export function awaitingApplyChanges(tree: V2Tree): AwaitingApplyRef[] {
+  const index = indexTree(tree);
+  // A change held in the Inbox is not counted in the stage either (summary below): placing it comes first.
+  return changesOf(index)
+    .filter((change) => stageOf(change) === "awaiting-apply" && !awaitsPlacement(index, change))
+    .map((change) => ({
+      id: change.id,
+      ...(change.displayId ? { displayId: change.displayId } : {}),
+      title: change.title,
+      ...summaryField(change),
+    }));
+}
+
 const titleOf = (index: TreeIndex, ref: string): { id: string; title: string } => {
   const node = index.resolve(ref);
   return node ? { id: node.id, title: node.title } : { id: ref, title: ref };
@@ -555,6 +582,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
       title: change.title,
+      ...summaryField(change),
       stage,
       ...(change.priority ? { priority: change.priority } : {}),
       ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
@@ -621,6 +649,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
         title: change.title,
+        ...summaryField(change),
         ...(change.intent ? { intent: change.intent } : {}),
         stage: stageOf(change),
         ...(change.priority ? { priority: change.priority } : {}),

@@ -1,0 +1,21 @@
+/* Impact tags (components/impact-tags.ts): size, file kinds, security, essential. */
+.impact-tags { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; vertical-align: middle; }
+.impact-tag {
+  display: inline-flex; align-items: center; padding: 0 var(--space-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: var(--font-xs); line-height: 1.6; white-space: nowrap;
+  color: var(--text-muted); cursor: help;
+}
+.impact-security { color: var(--red); border-color: var(--red); font-weight: 600; }
+.impact-essential { color: var(--purple); border-color: var(--purple); font-weight: 600; }
+.impact-size-large { color: var(--orange); border-color: var(--orange); }
+.impact-size-medium { color: var(--text); }
+/* A row's technical title, under its plain-language summary. */
+/* The detail panel's Impact section. */
+.impact-detail .impact-tags { margin-bottom: var(--space-1); }
+.impact-source { margin: var(--space-1) 0; color: var(--text-muted); font-size: var(--font-xs); }
+.impact-list-label { margin-top: var(--space-2); font-size: var(--font-sm); font-weight: 600; }
+.impact-files { margin: var(--space-1) 0 0; padding-left: var(--space-4); font-size: var(--font-xs); }
+.impact-files code { overflow-wrap: anywhere; }
+.impact-all-files { margin-top: var(--space-2); font-size: var(--font-sm); }
+.impact-all-files summary { cursor: pointer; color: var(--accent); }

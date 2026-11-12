@@ -199,6 +199,22 @@ describe("proposal accept routes on a v2 project", () => {
     expect((await roots()).some((i) => i.title === "Deselected")).toBe(false);
   });
 
+  it("POST /proposals/accept-edited carries each task's plain-language summary onto its change", async () => {
+    const summary = "Shoppers get their money back on the card they paid with.";
+    const edited = {
+      epic: { title: PROPOSAL.epic.title },
+      features: [{
+        title: "Refunds",
+        selected: true,
+        tasks: [{ ...PROPOSAL.features[0].tasks[0], summary: `  ${summary}  `, selected: true }],
+      }],
+      selected: true,
+    };
+    expect((await send("proposals/accept-edited", { proposals: [edited] })).status).toBe(200);
+    const refund = (await roots()).find((i) => i.title === "Refund to the card") as Node & { summary?: string };
+    expect(refund.summary).toBe(summary);
+  });
+
   it("POST /proposals/accept-edited falls back to web-proposal-editor when the editor sent no source", async () => {
     const res = await send("proposals/accept-edited", { proposals: [{
       epic: { title: "Billing" },

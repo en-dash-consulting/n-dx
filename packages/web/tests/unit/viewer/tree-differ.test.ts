@@ -247,6 +247,20 @@ describe("diffDocument", () => {
     expect(result.items[1]).not.toBe(b);
   });
 
+  it("returns a new document when only an item's summary changes, or is cleared", () => {
+    // A summary set by `rex update --summary` or MCP edit_item arrives only through this diff.
+    const prev = makeDoc([makeItem({ id: "a", summary: "Faster checkout" }), makeItem({ id: "b" })]);
+
+    const changed = diffDocument(prev, makeDoc([makeItem({ id: "a", summary: "Checkout in one step" }), makeItem({ id: "b" })]));
+    expect(changed).not.toBe(prev);
+    expect(changed.items[0].summary).toBe("Checkout in one step");
+    expect(changed.items[1]).toBe(prev.items[1]);
+
+    const cleared = diffDocument(prev, makeDoc([makeItem({ id: "a" }), makeItem({ id: "b" })]));
+    expect(cleared).not.toBe(prev);
+    expect(cleared.items[0].summary).toBeUndefined();
+  });
+
   it("returns next when prev is null", () => {
     const next = makeDoc([makeItem({ id: "a" })]);
     expect(diffDocument(null, next)).toBe(next);

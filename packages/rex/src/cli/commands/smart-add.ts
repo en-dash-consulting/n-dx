@@ -854,6 +854,7 @@ async function acceptProposals(
               level: "feature",
               status: "pending",
               source: "smart-add",
+              ...(f.summary ? { summary: f.summary } : {}),
               description: f.description,
               ...(featureMarker ? { overrideMarker: featureMarker } : {}),
             },
@@ -881,6 +882,7 @@ async function acceptProposals(
               level: "task",
               status: "pending",
               source: "smart-add",
+              ...(t.summary ? { summary: t.summary } : {}),
               description: t.description,
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
@@ -913,6 +915,7 @@ async function acceptProposals(
               level: "feature",
               status: "pending",
               source: "smart-add",
+              ...(f.summary ? { summary: f.summary } : {}),
               description: f.description,
               ...(featureMarker ? { overrideMarker: featureMarker } : {}),
             },
@@ -940,6 +943,7 @@ async function acceptProposals(
               level: "task",
               status: "pending",
               source: "smart-add",
+              ...(t.summary ? { summary: t.summary } : {}),
               description: t.description,
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
@@ -975,6 +979,7 @@ async function acceptProposals(
               level: "task",
               status: "pending",
               source: "smart-add",
+              ...(t.summary ? { summary: t.summary } : {}),
               description: t.description,
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
@@ -1009,6 +1014,7 @@ async function acceptProposals(
               level: "subtask",
               status: "pending",
               source: "smart-add",
+              ...(t.summary ? { summary: t.summary } : {}),
               description: t.description,
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
@@ -1150,7 +1156,7 @@ function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): 
   return "default";
 }
 
-async function initializeSmartAddLLM(
+export async function initializeSmartAddLLM(
   dir: string,
   format?: string,
   requestedModel?: string,
@@ -1235,7 +1241,7 @@ function emitPrdPaths(prdPaths: string[]): void {
  * gpt-5.6-luna for codex) for `--fast`/preview smart-add runs where
  * generation latency matters more than top-tier proposal quality.
  */
-async function resolveLightSmartAddModel(dir: string): Promise<string | undefined> {
+export async function resolveLightSmartAddModel(dir: string): Promise<string | undefined> {
   try {
     const rexDir = resolveRexPaths(dir).rexDir;
     const llmConfig = await loadLLMConfig(rexDir);

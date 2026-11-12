@@ -2,10 +2,10 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23609,
-    "uniqueTokens": 15104,
+    "perCallTokens": 24238,
+    "uniqueTokens": 15190,
     "skills": 15,
-    "skillTokens": 25567
+    "skillTokens": 25685
   },
   "skills": [
     {
@@ -26,8 +26,8 @@
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 9023,
-      "tokens": 2256
+      "chars": 9264,
+      "tokens": 2316
     },
     {
       "name": "iso-map",
@@ -40,8 +40,8 @@
       "name": "ndx-plan",
       "file": "packages/core/assistant-assets/skills/ndx-plan.md",
       "shipped": true,
-      "chars": 8027,
-      "tokens": 2007
+      "chars": 8260,
+      "tokens": 2065
     },
     {
       "name": "ndx-work",
@@ -117,8 +117,8 @@
   "byPackage": {
     "rex": {
       "surfaces": 21,
-      "perCallTokens": 15804,
-      "uniqueTokens": 7782
+      "perCallTokens": 16433,
+      "uniqueTokens": 7868
     },
     "sourcevision": {
       "surfaces": 7,
@@ -140,7 +140,7 @@
     {
       "pkg": "rex",
       "name": "FEW_SHOT_EXAMPLE",
-      "tokens": 432,
+      "tokens": 460,
       "usedBy": [
         "buildFileImportEnvelope",
         "buildScanImportEnvelope",
@@ -157,7 +157,20 @@
     {
       "pkg": "rex",
       "name": "PRD_SCHEMA",
-      "tokens": 333,
+      "tokens": 343,
+      "usedBy": [
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope",
+        "buildDisambiguationEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "TASK_QUALITY_RULES",
+      "tokens": 204,
       "usedBy": [
         "buildFileImportEnvelope",
         "buildScanImportEnvelope",
@@ -173,19 +186,6 @@
       "tokens": 1054,
       "usedBy": [
         "buildReshapeEnvelope"
-      ]
-    },
-    {
-      "pkg": "rex",
-      "name": "TASK_QUALITY_RULES",
-      "tokens": 156,
-      "usedBy": [
-        "buildFileImportEnvelope",
-        "buildScanImportEnvelope",
-        "buildAddEnvelope",
-        "buildMultiAddEnvelope",
-        "buildIdeasEnvelope",
-        "buildDisambiguationEnvelope"
       ]
     },
     {
@@ -394,16 +394,16 @@
       "inline": false,
       "literals": 18,
       "constants": {
-        "PRD_SCHEMA": 333,
-        "FEW_SHOT_EXAMPLE": 432,
-        "TASK_QUALITY_RULES": 156,
+        "PRD_SCHEMA": 343,
+        "FEW_SHOT_EXAMPLE": 460,
+        "TASK_QUALITY_RULES": 204,
         "ANTI_PATTERNS": 61,
         "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 123,
-      "fixedChars": 4659,
-      "fixedTokens": 1165
+      "fixedChars": 5003,
+      "fixedTokens": 1251
     },
     {
       "pkg": "rex",
@@ -413,16 +413,16 @@
       "inline": false,
       "literals": 40,
       "constants": {
-        "PRD_SCHEMA": 333,
-        "FEW_SHOT_EXAMPLE": 432,
+        "PRD_SCHEMA": 343,
+        "FEW_SHOT_EXAMPLE": 460,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 156,
+        "TASK_QUALITY_RULES": 204,
         "ANTI_PATTERNS": 61,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 400,
-      "fixedChars": 6625,
-      "fixedTokens": 1657
+      "fixedChars": 6969,
+      "fixedTokens": 1743
     },
     {
       "pkg": "rex",
@@ -432,10 +432,10 @@
       "inline": false,
       "literals": 25,
       "constants": {
-        "PRD_SCHEMA": 333,
-        "FEW_SHOT_EXAMPLE": 432,
+        "PRD_SCHEMA": 343,
+        "FEW_SHOT_EXAMPLE": 460,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 156,
+        "TASK_QUALITY_RULES": 204,
         "ANTI_PATTERNS": 61,
         "placementContent": 155,
         "projectContextContent": 10,
@@ -443,8 +443,8 @@
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 210,
-      "fixedChars": 6559,
-      "fixedTokens": 1640
+      "fixedChars": 6903,
+      "fixedTokens": 1726
     },
     {
       "pkg": "rex",
@@ -454,10 +454,10 @@
       "inline": false,
       "literals": 27,
       "constants": {
-        "PRD_SCHEMA": 333,
-        "FEW_SHOT_EXAMPLE": 432,
+        "PRD_SCHEMA": 343,
+        "FEW_SHOT_EXAMPLE": 460,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 156,
+        "TASK_QUALITY_RULES": 204,
         "ANTI_PATTERNS": 61,
         "placementContent": 155,
         "projectContextContent": 10,
@@ -465,8 +465,8 @@
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 195,
-      "fixedChars": 6498,
-      "fixedTokens": 1625
+      "fixedChars": 6842,
+      "fixedTokens": 1711
     },
     {
       "pkg": "rex",
@@ -476,12 +476,12 @@
       "inline": false,
       "literals": 17,
       "constants": {
-        "FEW_SHOT_EXAMPLE": 432,
+        "FEW_SHOT_EXAMPLE": 460,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 200,
-      "fixedChars": 2732,
-      "fixedTokens": 683
+      "fixedChars": 2846,
+      "fixedTokens": 712
     },
     {
       "pkg": "rex",
@@ -491,12 +491,12 @@
       "inline": false,
       "literals": 19,
       "constants": {
-        "FEW_SHOT_EXAMPLE": 432,
+        "FEW_SHOT_EXAMPLE": 460,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 234,
-      "fixedChars": 2870,
-      "fixedTokens": 718
+      "fixedChars": 2984,
+      "fixedTokens": 746
     },
     {
       "pkg": "rex",
@@ -518,10 +518,10 @@
       "inline": false,
       "literals": 28,
       "constants": {
-        "PRD_SCHEMA": 333,
-        "FEW_SHOT_EXAMPLE": 432,
+        "PRD_SCHEMA": 343,
+        "FEW_SHOT_EXAMPLE": 460,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 156,
+        "TASK_QUALITY_RULES": 204,
         "ANTI_PATTERNS": 61,
         "placementContent": 155,
         "projectContextContent": 10,
@@ -529,8 +529,8 @@
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 358,
-      "fixedChars": 7151,
-      "fixedTokens": 1788
+      "fixedChars": 7495,
+      "fixedTokens": 1874
     },
     {
       "pkg": "rex",
@@ -540,11 +540,11 @@
       "inline": false,
       "literals": 21,
       "constants": {
-        "FEW_SHOT_EXAMPLE": 432
+        "FEW_SHOT_EXAMPLE": 460
       },
       "ownTokens": 273,
-      "fixedChars": 2817,
-      "fixedTokens": 705
+      "fixedChars": 2931,
+      "fixedTokens": 733
     },
     {
       "pkg": "rex",
@@ -566,13 +566,13 @@
       "inline": false,
       "literals": 21,
       "constants": {
-        "PRD_SCHEMA": 333,
-        "TASK_QUALITY_RULES": 156,
+        "PRD_SCHEMA": 343,
+        "TASK_QUALITY_RULES": 204,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 186,
-      "fixedChars": 2908,
-      "fixedTokens": 727
+      "fixedChars": 3138,
+      "fixedTokens": 785
     },
     {
       "pkg": "rex",
@@ -594,11 +594,11 @@
       "inline": false,
       "literals": 22,
       "constants": {
-        "FEW_SHOT_EXAMPLE": 432
+        "FEW_SHOT_EXAMPLE": 460
       },
       "ownTokens": 150,
-      "fixedChars": 2325,
-      "fixedTokens": 582
+      "fixedChars": 2439,
+      "fixedTokens": 610
     },
     {
       "pkg": "rex",
@@ -608,12 +608,12 @@
       "inline": false,
       "literals": 29,
       "constants": {
-        "FEW_SHOT_EXAMPLE": 432,
+        "FEW_SHOT_EXAMPLE": 460,
         "ANTI_PATTERNS": 61
       },
       "ownTokens": 295,
-      "fixedChars": 3146,
-      "fixedTokens": 787
+      "fixedChars": 3260,
+      "fixedTokens": 815
     },
     {
       "pkg": "rex",
@@ -1081,8 +1081,8 @@
       }
     ]
   },
-  "contentHash": "e29f76796b91ba95",
-  "recordedAt": "2026-11-10T14:10:51.366Z",
-  "commit": "e44befe88938",
+  "contentHash": "81b09dbb80cacab4",
+  "recordedAt": "2026-11-10T22:51:42.371Z",
+  "commit": "fd4019bf88cd",
   "dirty": false
 }

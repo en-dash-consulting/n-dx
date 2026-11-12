@@ -27,6 +27,8 @@ export interface ProposalTask {
   title: string;
   source: string;
   sourceFile: string;
+  /** Plain-language summary for a non-coder: what the work does and why it is worth doing. */
+  summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: string;
@@ -81,6 +83,7 @@ export interface TaskDecomposition {
 export interface ProposalFeature {
   title: string;
   source: string;
+  summary?: string;
   description?: string;
   /** Status override — used in baseline mode to mark existing work as completed. */
   status?: ItemStatus;

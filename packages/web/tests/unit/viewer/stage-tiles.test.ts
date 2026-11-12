@@ -2,7 +2,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { TileGrid, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
 import type { StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
@@ -184,5 +186,77 @@ describe("TileGrid", () => {
     mount();
     act(() => head("files").click());
     expect(dialog()!.className).not.toContain("--beside-detail");
+  });
+});
+
+describe("a tile with more than it shows", () => {
+  /** Makes every tile body report `content` px of content in a `box` px box. */
+  function sizeBodies(content: number, box: number) {
+    const proto = HTMLElement.prototype;
+    const spies = [
+      vi.spyOn(proto, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains("stage-tile-body") ? content : 0;
+      }),
+      vi.spyOn(proto, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains("stage-tile-body") ? box : 0;
+      }),
+    ];
+    return () => spies.forEach((s) => s.mockRestore());
+  }
+
+  const settle = () => act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+
+  it("offers Open to see all over its fade, which opens the tile", async () => {
+    const restore = sizeBodies(600, 200);
+    try {
+      mount();
+      await settle();
+      const more = tile("files").querySelector<HTMLButtonElement>(".stage-tile-more")!;
+      expect(more.textContent).toContain("Open to see all");
+      expect(more.getAttribute("aria-label")).toBe("Open Files to see everything");
+      act(() => more.click());
+      expect(dialog()).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it("offers nothing when everything fits", async () => {
+    const restore = sizeBodies(150, 200);
+    try {
+      mount();
+      await settle();
+      expect(root.querySelector(".stage-tile-more")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("fitTracks", () => {
+  it("spans the 4px tracks a tile's chrome, content and 16px gap need", () => {
+    // 46px head and borders + 162px content + 16px gap = 224px = 56 tracks.
+    expect(fitTracks(46, 162, TRACKS_PER_ROW)).toBe(56);
+    // Rounds up: never clips its own content.
+    expect(fitTracks(46, 163, TRACKS_PER_ROW)).toBe(57);
+  });
+
+  it("keeps the configured size (null) once content reaches it, and when nothing is measured", () => {
+    expect(fitTracks(46, 232 - 46, TRACKS_PER_ROW)).toBeNull();
+    expect(fitTracks(46, 5000, TRACKS_PER_ROW * 2)).toBeNull();
+    expect(fitTracks(46, 0, TRACKS_PER_ROW)).toBeNull();
+  });
+
+  it("one configured row is 232px of tile plus the gap", () => {
+    expect(TRACKS_PER_ROW * 4 - 16).toBe(232);
+  });
+
+  it("the stylesheet's row spans are TRACKS_PER_ROW per configured row", () => {
+    const css = readFileSync(resolve(__dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf-8");
+    // The first rule per size is the wide layout's; a narrow-screen override may shrink r3.
+    for (const rows of [1, 2, 3]) {
+      const span = new RegExp(String.raw`\.stage-tile--r${rows}\s*\{\s*grid-row:\s*span\s+(\d+)`).exec(css);
+      expect(Number(span?.[1]), `r${rows}`).toBe(TRACKS_PER_ROW * rows);
+    }
   });
 });

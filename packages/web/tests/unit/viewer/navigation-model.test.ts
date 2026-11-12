@@ -390,7 +390,7 @@ describe("rendered surfaces take their labels from the model", () => {
       act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
     }
     expect(opened).toEqual(views);
-    expect(opened).toEqual(expect.arrayContaining(["changes", "product", "validation"]));
+    expect(opened).toEqual(expect.arrayContaining(["changes", "validation"]));
   });
 
   it("Tune shows the Your tooling tile on a server and omits it from a static export", async () => {
@@ -539,15 +539,16 @@ describe("the Analysis stage is a tile dashboard", () => {
   });
 
   it("marks the server-built views so static exports hide them", () => {
-    // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Product,
-    // Changes, Inbox and Workspaces by `requiresServer` (Product, Changes and
-    // Inbox read rex's v2 model per request). A panel that only links to its
-    // view (the lifecycle strip) is not that view's placement.
+    // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Changes, Inbox
+    // and Workspaces by `requiresServer` (Changes and Inbox read rex's v2 model
+    // per request; Product, a tab of Open changes, goes with its tile). A panel
+    // that only links to its view (the lifecycle strip) is not that view's
+    // placement.
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
       ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
     ]);
-    expect(serverBuilt.sort()).toEqual(["ask", "changes", "inbox", "product", "workspaces"]);
+    expect(serverBuilt.sort()).toEqual(["ask", "changes", "inbox", "workspaces"]);
   });
 });
 

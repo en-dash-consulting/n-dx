@@ -1,7 +1,8 @@
 /**
  * Pure search/filter functions for the PRD tree.
  *
- * Provides case-insensitive substring matching against item titles and
+ * Provides case-insensitive substring matching against item titles,
+ * plain-language summaries (what a row shows in place of the title) and
  * descriptions, with optional tag and status facet filters that narrow
  * results further. Returns both the set of matching item IDs and their
  * ancestor IDs (to preserve tree context in filtered views).
@@ -20,7 +21,7 @@ import { h } from "preact";
 // ── Search result types ─────────────────────────────────────────────────────
 
 export interface TreeSearchResult {
-  /** IDs of items whose title or description matched the query. */
+  /** IDs of items whose title, summary or description matched the query. */
   matchIds: Set<string>;
   /** IDs of ancestor nodes that should remain visible for tree context. */
   ancestorIds: Set<string>;
@@ -63,7 +64,7 @@ function itemPassesFacets(item: SearchablePRDItem, facets: SearchFacets): boolea
  * Search the PRD tree for items matching a query string and/or facet filters.
  *
  * Matching rules:
- * - Case-insensitive substring match against title and description
+ * - Case-insensitive substring match against title, summary and description
  * - Tag facets narrow results to items having ALL selected tags (AND)
  * - Status facets narrow results to items matching ANY selected status (OR)
  * - Text query and facets combine with AND logic
@@ -107,10 +108,14 @@ export function searchTree(
       let textMatch = true;
       if (hasTextQuery) {
         const titleMatch = item.title.toLowerCase().includes(trimmed);
+        // The row shows the summary in place of the title, so its words must find it.
+        const summaryMatch = item.summary
+          ? item.summary.toLowerCase().includes(trimmed)
+          : false;
         const descMatch = item.description
           ? item.description.toLowerCase().includes(trimmed)
           : false;
-        textMatch = titleMatch || descMatch;
+        textMatch = titleMatch || summaryMatch || descMatch;
       }
 
       // Facet matching

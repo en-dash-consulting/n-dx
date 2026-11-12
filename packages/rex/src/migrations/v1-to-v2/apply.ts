@@ -543,7 +543,12 @@ function toNode(p: Placed, slug: string, cutAt: string): RuleNode {
   const criteria = acceptanceCriteria?.length ? acceptanceCriteria : undefined;
   switch (type) {
     case "area":
-      if (description !== undefined) node.summary = description;
+      // A v1 plain-language summary already says what the area is: it leads,
+      // and the description is kept as the area's body rather than overwriting it.
+      if (description !== undefined) {
+        if (typeof node.summary === "string" && node.summary.trim()) node.body = description;
+        else node.summary = description;
+      }
       if (criteria) node.acceptanceCriteria = criteria;
       break;
     case "capability": {

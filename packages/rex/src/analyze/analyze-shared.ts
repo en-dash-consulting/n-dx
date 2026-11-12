@@ -381,7 +381,7 @@ export function repairTruncatedJson(text: string): string | null {
 
 export const PRD_SCHEMA = `Each element must be an object with:
 - "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
-- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+- "features": array of { "title": string, "summary"?: string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "summary"?: string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
 The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
 The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
 
@@ -409,6 +409,7 @@ Include all three LoE fields on every task.`;
 export const TASK_QUALITY_RULES = `Task quality:
 - Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Give every task and feature a "summary": 1-2 plain sentences for a product owner who does not write code, saying what it does and why it is worth doing. No file paths or code identifiers.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.`;

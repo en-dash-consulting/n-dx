@@ -81,7 +81,8 @@ describe("analyzeTileSummary", () => {
   it("summarises Files by totals and roles", () => {
     const el = show({ view: "files" }, data());
     expect(el.querySelector(".tile-sum-headline")?.textContent).toBe("1,766 files · 412k lines");
-    expect([...el.querySelectorAll(".tile-sum-chip")].map((c) => c.textContent)).toEqual(["1,500 source", "200 test", "66 config"]);
+    const bars = [...el.querySelectorAll(".tile-sum-bar")].map((b) => [b.querySelector(".tile-sum-bar-label")?.textContent, b.querySelector(".tile-sum-bar-value")?.textContent]);
+    expect(bars).toEqual([["source", "1,500"], ["test", "200"], ["config", "66"]]);
   });
 
   it("leaves panels and views without a summary to the tile", () => {

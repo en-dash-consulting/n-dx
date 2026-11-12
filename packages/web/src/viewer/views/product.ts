@@ -94,9 +94,10 @@ function CapabilityRowCells({ row, onSelect }: {
   );
 }
 
-function Area({ area, onSelectCapability }: {
+function Area({ area, onSelectCapability, onOpenArea }: {
   area: AreaSection;
   onSelectCapability?: (id: string) => void;
+  onOpenArea?: (slug: string) => void;
 }) {
   return h("section", {
     id: `product-area-${area.slug}`,
@@ -104,7 +105,14 @@ function Area({ area, onSelectCapability }: {
     "aria-label": area.title,
   },
     h("h3", { class: "section-header" },
-      area.title,
+      onOpenArea
+        ? h("button", {
+            type: "button",
+            class: "pm-area-link",
+            title: `Open ${area.title}: its capabilities and the changes on them`,
+            onClick: () => onOpenArea(area.slug),
+          }, area.title)
+        : area.title,
       area.displayId ? h("span", { class: "pm-display-id" }, area.displayId) : null,
     ),
     area.summary ? h("p", { class: "section-sub" }, area.summary) : null,
@@ -174,10 +182,12 @@ function Constraints({ constraints }: { constraints: ConstraintRow[] }) {
 
 // ── View ─────────────────────────────────────────────────────────────
 
-export function ProductView({ map, onSelectCapability }: {
+export function ProductView({ map, onSelectCapability, onOpenArea }: {
   map: ProductMap;
   /** Opens the capability page. Omitted, titles render as plain text. */
   onSelectCapability?: (id: string) => void;
+  /** Opens an area's page (`/product/area/<slug>`). Omitted, area headings are plain text. */
+  onOpenArea?: (slug: string) => void;
 }) {
   const totals = productTotals(map);
   const empty = map.areas.length === 0 && map.constraints.length === 0;
@@ -219,7 +229,7 @@ export function ProductView({ map, onSelectCapability }: {
             ),
           ),
           map.areas.map((area) =>
-            h(Area, { key: area.id, area, onSelectCapability })),
+            h(Area, { key: area.id, area, onSelectCapability, onOpenArea })),
           h(Constraints, { constraints: map.constraints }),
         ),
   );

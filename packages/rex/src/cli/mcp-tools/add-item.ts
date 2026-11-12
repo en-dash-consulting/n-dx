@@ -37,6 +37,8 @@ export interface AddItemArgs {
   /** v2; on v1 only a type with a v1 level. */
   type?: string;
   parentId?: string;
+  /** Plain-language summary for a non-coder: what the work does and why it is worth doing. */
+  summary?: string;
   description?: string;
   priority?: string;
   acceptanceCriteria?: string[];
@@ -112,6 +114,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
         type,
         title: args.title,
         parentId: args.parentId,
+        summary: args.summary,
         description: args.description,
         acceptanceCriteria: args.acceptanceCriteria,
         tags: args.tags,
@@ -159,6 +162,7 @@ async function addV1(
     level: args.level,
     status: "pending",
   };
+  if (args.summary?.trim()) item.summary = args.summary.trim();
   if (args.description) item.description = args.description;
   if (args.priority) item.priority = args.priority as Priority;
   if (args.acceptanceCriteria) item.acceptanceCriteria = args.acceptanceCriteria;
@@ -203,12 +207,14 @@ export const addItemTool = defineTool({
   name: "add_item",
   description:
     "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked. " +
+    "Pass summary: one or two plain sentences for a non-coder on what the work does and why it is worth doing. " +
     "On a v2 PRD pass type (default change; a change that neither amends nor touches lands in the Inbox needing placement); on a v1 PRD pass level.",
   schema: {
     title: z.string().describe("Item title"),
     type: z.enum(ADD_TYPES).optional().describe("v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"),
     level: z.enum(getAllLevels() as [string, ...string[]]).optional().describe("v1 only: item level. Refused on a v2 PRD, which takes type"),
     parentId: z.string().optional().describe("Parent item ID"),
+    summary: z.string().optional().describe("Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard"),
     description: z.string().optional().describe("Item description (a v2 change's intent)"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),
     acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"),

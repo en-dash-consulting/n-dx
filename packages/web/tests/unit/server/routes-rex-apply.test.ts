@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
-import type { AppliedAmendmentWire, ChangeApplyWire } from "../../../src/server/routes-rex/apply.js";
+import type { AppliedAmendmentWire, ApplyAllPreviewWire, ApplyAllResultWire, ChangeApplyWire } from "../../../src/server/routes-rex/apply.js";
+import type { ApplyAllPreview, ApplyAllResult } from "../../../src/viewer/views/apply-all.js";
 import type { AppliedAmendment, ChangeApply } from "../../../src/viewer/views/product-model.js";
 import { indexTree, loadPrdModel } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -20,7 +21,11 @@ import { closeRouteTestServer } from "../../helpers/server-route-test-support.js
 const wireToViewer = (w: ChangeApplyWire): ChangeApply => w;
 const viewerToWire = (v: ChangeApply): ChangeApplyWire => v;
 const amendmentWire = (w: AppliedAmendmentWire): AppliedAmendment => w;
-void wireToViewer; void viewerToWire; void amendmentWire;
+const allPreviewToViewer = (w: ApplyAllPreviewWire): ApplyAllPreview => w;
+const allResultToViewer = (w: ApplyAllResultWire): ApplyAllResult => w;
+const allPreviewToWire = (v: ApplyAllPreview): ApplyAllPreviewWire => v;
+const allResultToWire = (v: ApplyAllResult): ApplyAllResultWire => v;
+void wireToViewer; void viewerToWire; void amendmentWire; void allPreviewToViewer; void allResultToViewer; void allPreviewToWire; void allResultToWire;
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
@@ -175,6 +180,69 @@ describe("apply routes on a v2 project", () => {
     const res = await post(`changes/CH-1/apply`, { hash });
     expect(res.status).toBe(422);
     expect((await res.json()).error).toContain("already applied");
+  });
+
+  it("apply all previews every change waiting to apply, and writes nothing", async () => {
+    finishChange();
+    const before = snapshot(rexDir);
+    const res = await post("changes/apply-all/preview");
+    expect(res.status).toBe(200);
+    const { changes } = (await res.json()) as { changes: ApplyAllPreviewWire[] };
+    expect(changes.map((c) => [c.id, c.displayId, c.ok])).toEqual([[CHANGE_ID, "CH-1", true]]);
+    const [only] = changes;
+    expect(only!.ok && only!.applied.map((a) => a.node.id)).toEqual([CAPABILITY_ID]);
+    expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  it("apply all leaves out a done change still held in the Inbox: it is placed first", async () => {
+    finishChange();
+    const state = join(rexDir, "changes", "add-apple-pay", "state.yaml");
+    edit(state, `    prs: [`, `    needsPlacement: true\n    prs: [`);
+    const { changes } = (await (await post("changes/apply-all/preview")).json()) as { changes: unknown[] };
+    expect(changes).toEqual([]);
+    const { results } = (await (await post("changes/apply-all", { hashes: { [CHANGE_ID]: "x" } })).json()) as { results: unknown[] };
+    expect(results).toEqual([]);
+  });
+
+  it("apply all lists nothing when no change is waiting", async () => {
+    const res = await post("changes/apply-all/preview");
+    expect(((await res.json()) as { changes: unknown[] }).changes).toEqual([]);
+  });
+
+  it("apply all applies the approved changes, logs each and broadcasts once", async () => {
+    finishChange();
+    const preview = (await (await post("changes/apply-all/preview")).json()) as { changes: Array<ApplyAllPreviewWire & { hash?: string }> };
+    const hashes = Object.fromEntries(preview.changes.map((c) => [c.id, c.hash!]));
+    const res = await post("changes/apply-all", { hashes });
+    expect(res.status).toBe(200);
+    const { results } = (await res.json()) as { results: ApplyAllResultWire[] };
+    expect(results.map((r) => [r.id, r.ok])).toEqual([[CHANGE_ID, true]]);
+    const model = await loadPrdModel(rexDir);
+    const change = model.layout === "v2" ? indexTree(model.tree).resolve(CHANGE_ID) : undefined;
+    expect((change as { appliedAt?: string } | undefined)?.appliedAt).toBeTruthy();
+    expect(readFileSync(join(rexDir, "execution-log.jsonl"), "utf-8")).toContain("apply all");
+    expect(frames).toHaveLength(1);
+    // Applied, it no longer waits.
+    const again = (await (await post("changes/apply-all/preview")).json()) as { changes: unknown[] };
+    expect(again.changes).toEqual([]);
+  });
+
+  it("apply all skips a change edited since its preview and applies nothing else unasked", async () => {
+    finishChange();
+    const res = await post("changes/apply-all", { hashes: { [CHANGE_ID]: "0".repeat(64) } });
+    const { results } = (await res.json()) as { results: ApplyAllResultWire[] };
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ id: CHANGE_ID, ok: false, moved: true });
+    expect(frames).toEqual([]);
+    // A change not named in the approval is never applied.
+    const none = (await (await post("changes/apply-all", { hashes: { "not-waiting": "x" } })).json()) as { results: unknown[] };
+    expect(none.results).toEqual([]);
+  });
+
+  it("apply all refuses a body without hashes", async () => {
+    finishChange();
+    expect((await post("changes/apply-all", {})).status).toBe(400);
+    expect((await post("changes/apply-all", { hashes: {} })).status).toBe(400);
   });
 
   it("GET is not an apply route", async () => {

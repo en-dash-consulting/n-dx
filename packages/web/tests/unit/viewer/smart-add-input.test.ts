@@ -751,6 +751,26 @@ describe("SmartAddInput on a v2 PRD", () => {
     expect(onPrdChanged).toHaveBeenCalled();
   });
 
+  it("shows the preview's plain-language summary and accepts with it", async () => {
+    const summary = "Shoppers get their money back on the card they paid with.";
+    const withSummary = { ...v2Preview, changes: [{ ...v2Preview.changes[0], summary }] };
+    fetchSpy.mockImplementation(async (url: string) =>
+      url === "/api/rex/smart-add-accept"
+        ? { ok: true, json: () => Promise.resolve({ ok: true, changes: withSummary.changes }) }
+        : { ok: true, json: () => Promise.resolve(withSummary) },
+    );
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    await generate(root);
+    expect(root.querySelector(".smart-add-preview-summary")?.textContent).toBe(`In plain terms: ${summary}`);
+
+    root.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!.click();
+    await vi.runAllTimersAsync();
+    await flush();
+    const call = fetchSpy.mock.calls.find((c) => c[0] === "/api/rex/smart-add-accept");
+    expect(JSON.parse(call![1].body)).toEqual({ text: "Support refunds when paying by card", summary });
+  });
+
   it("says the text becomes an Inbox change, not generated proposals", () => {
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2" }));
 

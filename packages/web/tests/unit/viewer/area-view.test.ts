@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 /**
- * The area view: its header, its own page at `/product/area/<slug>`, and the
- * in-place opening from Plan's product map that names the area in the address
- * bar and gives Plan's address back on close.
+ * The area view: its header and its own page at `/product/area/<slug>`.
  *
  * @see src/viewer/views/area.ts
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { AreaInPlace, AreaView, areaCapabilityPath, areaCountLabels, areaPath, stewardLabel } from "../../../src/viewer/views/area.js";
+import { AreaView, areaCapabilityPath, areaCountLabels, areaPath, stewardLabel } from "../../../src/viewer/views/area.js";
 import { PlanWithSidecarContext, type PlanWithSidecar } from "../../../src/viewer/components/plan-with-sidecar.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -24,13 +22,6 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
 
 const AREA_URL = `/api/rex/product/area/${AREA_DETAIL_FIXTURE.slug}`;
 
-/** A valid v2 status: Plan mounts its v2-only tiles (the Product map) only once a layout is known. */
-const V2_STATUS = {
-  initialized: true,
-  sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 0, modulesComplete: 0, modulesTotal: 0 },
-  rex: { exists: true, layout: "v2", percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
-  hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
-};
 let root: HTMLDivElement;
 
 function stubRoutes(routes: Record<string, unknown>): void {
@@ -40,8 +31,13 @@ function stubRoutes(routes: Record<string, unknown>): void {
   }));
 }
 
+/**
+ * Let the stubbed reads answer, inside act(): a commit they cause outside it
+ * arms preact's 35 ms frame fallback, which the frame-leak guard fails the
+ * file for when the last test ends before it fires.
+ */
 async function settle(): Promise<void> {
-  await new Promise((r) => setTimeout(r, 10));
+  await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
   await act(async () => {});
 }
 
@@ -137,109 +133,6 @@ describe("AreaView", () => {
   });
 });
 
-describe("AreaInPlace", () => {
-  it("names the area in the address bar while open and gives the old address back on close", async () => {
-    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
-    history.replaceState({ view: "plan" }, "", "/plan?x=1");
-    await mount(h(AreaInPlace, { slug: AREA_DETAIL_FIXTURE.slug, onOpenPage: vi.fn() }));
-    expect(location.pathname).toBe(`/product/area/${AREA_DETAIL_FIXTURE.slug}`);
-    // The entry is still Plan's, so Back and popstate read it as Plan.
-    expect((history.state as { view: string }).view).toBe("plan");
-    act(() => { render(null, root); });
-    expect(`${location.pathname}${location.search}`).toBe("/plan?x=1");
-    expect(history.state).toEqual({ view: "plan" });
-  });
-
-  it("leaves a navigation made while open alone", async () => {
-    stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
-    const onOpenPage = vi.fn(() => history.pushState({ view: "product" }, "", `/product/area/${AREA_DETAIL_FIXTURE.slug}`));
-    await mount(h(AreaInPlace, { slug: AREA_DETAIL_FIXTURE.slug, onOpenPage }));
-    act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
-    expect(onOpenPage).toHaveBeenCalledOnce();
-    act(() => { render(null, root); });
-    expect(location.pathname).toBe(`/product/area/${AREA_DETAIL_FIXTURE.slug}`);
-    expect(history.state).toEqual({ view: "product" });
-  });
-});
-
-describe("from Plan's product map", () => {
-  it("opens the area in the Product tile's full-screen, and Esc or the trail returns to Plan", async () => {
-    stubRoutes({
-      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
-      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
-      "/api/status": V2_STATUS,
-    });
-    const navigateTo = vi.fn();
-    await mount(h("div", null, renderActiveView("plan", {
-      navigateTo,
-      validViews: buildValidViews(null),
-      data: {},
-      isFeatureDisabled: () => false,
-    } as never)));
-    const block = () => root.querySelector<HTMLButtonElement>(`[data-tile="product-map"] .pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)!;
-    await vi.waitFor(() => expect(block()).not.toBeNull());
-
-    act(() => block().click());
-    await settle();
-    const dialog = root.querySelector<HTMLElement>(".stage-tile-fullscreen [role=dialog]")!;
-    expect(dialog.getAttribute("aria-label")).toBe(AREA_DETAIL_FIXTURE.title);
-    expect([...dialog.querySelectorAll(".stage-tile-trail button, .stage-tile-trail h2")].map((el) => el.textContent))
-      .toEqual(["← Plan", "Product", AREA_DETAIL_FIXTURE.title]);
-    expect(dialog.querySelector(".area-head .area-steward")?.textContent).toBe("steward: Sterling H");
-    expect(location.pathname).toBe(`/product/area/${AREA_DETAIL_FIXTURE.slug}`);
-    expect(navigateTo).not.toHaveBeenCalled();
-
-    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
-    expect(root.querySelector(".stage-tile-fullscreen")).toBeNull();
-    expect(location.pathname).toBe("/plan");
-
-    act(() => block().click());
-    await settle();
-    act(() => root.querySelector<HTMLButtonElement>(".stage-tile-trail-back")!.click());
-    expect(root.querySelector(".stage-tile-fullscreen")).toBeNull();
-    expect(location.pathname).toBe("/plan");
-  });
-
-  it("'Open on Product page' goes to the area's own route", async () => {
-    stubRoutes({
-      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
-      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
-      "/api/status": V2_STATUS,
-    });
-    const navigateTo = vi.fn();
-    await mount(h("div", null, renderActiveView("plan", {
-      navigateTo, validViews: buildValidViews(null), data: {}, isFeatureDisabled: () => false,
-    } as never)));
-    await vi.waitFor(() => expect(root.querySelector(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)).not.toBeNull());
-    act(() => root.querySelector<HTMLButtonElement>(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)!.click());
-    await settle();
-    act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
-    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${AREA_DETAIL_FIXTURE.slug}` });
-  });
-
-  it("'Open on Product page' encodes a hand-authored slug in the tab", async () => {
-    const slug = "café #1";
-    const map = {
-      ...PRODUCT_MAP_FIXTURE,
-      areas: PRODUCT_MAP_FIXTURE.areas.map((a) => (a.id === AREA_DETAIL_FIXTURE.id ? { ...a, slug } : a)),
-    };
-    stubRoutes({
-      "/api/rex/product": { layout: "v2", map },
-      [`/api/rex/product/area/${encodeURIComponent(slug)}`]: { layout: "v2", area: { ...AREA_DETAIL_FIXTURE, slug } },
-      "/api/status": V2_STATUS,
-    });
-    const navigateTo = vi.fn();
-    await mount(h("div", null, renderActiveView("plan", {
-      navigateTo, validViews: buildValidViews(null), data: {}, isFeatureDisabled: () => false,
-    } as never)));
-    await vi.waitFor(() => expect(root.querySelector(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)).not.toBeNull());
-    act(() => root.querySelector<HTMLButtonElement>(`.pam-block[data-block="${AREA_DETAIL_FIXTURE.id}"]`)!.click());
-    await settle();
-    act(() => root.querySelector<HTMLButtonElement>(".area-open-page")!.click());
-    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${encodeURIComponent(slug)}` });
-  });
-});
-
 describe("a selected capability", () => {
   const CAP_ID = AREA_DETAIL_FIXTURE.capabilities[0]!.id;
   const CAP_URL = `/api/rex/product/capability/${CAP_ID}`;
@@ -320,21 +213,6 @@ describe("a selected capability", () => {
     expect(root.querySelector(".area-cards")).not.toBeNull();
     expect(location.pathname).toBe(areaPath(AREA_DETAIL_FIXTURE.slug));
     expect(onDocumentEscape).not.toHaveBeenCalled();
-  });
-
-  it("closing the area on Plan with a capability selected gives Plan its address back", async () => {
-    stubRoutes({
-      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
-      [CAP_URL]: { layout: "v2", capability: DETAIL },
-    });
-    history.replaceState({ view: "plan" }, "", "/plan?x=1");
-    await mount(h(AreaInPlace, { slug: AREA_DETAIL_FIXTURE.slug, onOpenPage: vi.fn() }));
-    act(() => block().click());
-    await settle();
-    expect(location.pathname).toBe(areaCapabilityPath(AREA_DETAIL_FIXTURE.slug, CAP_ID));
-    act(() => { render(null, root); });
-    expect(`${location.pathname}${location.search}`).toBe("/plan?x=1");
-    expect(history.state).toEqual({ view: "plan" });
   });
 
   it("opened at the capability's address, selects it, and Esc goes back to the area's address", async () => {
@@ -453,5 +331,51 @@ describe("with the Sidecar on", () => {
     stubRoutes({ [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE } });
     await mount(h(AreaView, { slug: AREA_DETAIL_FIXTURE.slug }));
     expect(root.querySelector(".area-plan-in")).toBeNull();
+  });
+});
+
+describe("from the Product page", () => {
+  const productPage = (navigateTo: ReturnType<typeof vi.fn>, selectedTab?: string) =>
+    h("div", null, renderActiveView("product", {
+      navigateTo,
+      validViews: buildValidViews(null),
+      data: {},
+      isFeatureDisabled: () => false,
+      ...(selectedTab ? { selectedTab } : {}),
+    } as never));
+  const areaLink = (id: string) =>
+    root.querySelector<HTMLButtonElement>(`#product-area-${id} .pm-area-link`);
+
+  it("an area's heading opens its page, and that address shows the area", async () => {
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+      [AREA_URL]: { layout: "v2", area: AREA_DETAIL_FIXTURE },
+    });
+    const navigateTo = vi.fn();
+    await mount(productPage(navigateTo));
+    expect(areaLink(AREA_DETAIL_FIXTURE.slug)?.textContent).toBe(AREA_DETAIL_FIXTURE.title);
+
+    act(() => areaLink(AREA_DETAIL_FIXTURE.slug)!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${AREA_DETAIL_FIXTURE.slug}` });
+
+    // The route the click asked for renders the area's own view.
+    const [, { tab }] = navigateTo.mock.calls[0] as [string, { tab: string }];
+    await mount(productPage(navigateTo, tab));
+    expect(root.querySelector(".area-head .area-steward")?.textContent).toBe("steward: Sterling H");
+  });
+
+  it("encodes a hand-authored slug in the tab", async () => {
+    const slug = "café #1";
+    const map = {
+      ...PRODUCT_MAP_FIXTURE,
+      areas: PRODUCT_MAP_FIXTURE.areas.map((a) => (a.id === AREA_DETAIL_FIXTURE.id ? { ...a, slug } : a)),
+    };
+    stubRoutes({ "/api/rex/product": { layout: "v2", map } });
+    const navigateTo = vi.fn();
+    await mount(productPage(navigateTo));
+    const link = () => root.querySelector<HTMLButtonElement>(`[aria-label="${AREA_DETAIL_FIXTURE.title}"] .pm-area-link`);
+    expect(link()).not.toBeNull();
+    act(() => link()!.click());
+    expect(navigateTo).toHaveBeenCalledWith("product", { tab: `area/${encodeURIComponent(slug)}` });
   });
 });

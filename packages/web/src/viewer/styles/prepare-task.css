@@ -203,6 +203,11 @@
 .ready-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--text-muted); font-size: var(--font-sm); }
 .ready-resume { color: var(--accent); }
 .ready-empty { color: var(--text-muted); margin: 0; }
+.ready-more {
+  all: unset; cursor: pointer; margin-top: var(--space-2);
+  color: var(--accent); font-size: var(--font-sm);
+}
+.ready-more:hover, .ready-more:focus-visible { text-decoration: underline; }
 .ready-split { position: relative; display: flex; }
 .ready-primary { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .ready-caret { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-color: var(--bg); }

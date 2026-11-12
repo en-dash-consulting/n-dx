@@ -2,11 +2,8 @@
  * The area view: one area of the product map, addressed at
  * `/product/area/<slug>` by its frozen v2 slug.
  *
- * It opens two ways. From a block on Plan's product map it fills the Product
- * tile's full-screen in place (`AreaInPlace`): the address bar names the area
- * while it is open and returns to Plan's when it closes, so Plan keeps its
- * scroll and a reload lands on the area. Loaded directly, it is the Product
- * page's own content (`AreaPage`), with a way back to the map.
+ * It is the Product page's own content (`AreaPage`), with a way back to the
+ * map.
  *
  * Reads `GET /api/rex/product/area/<slug>`; the server computes every count.
  *
@@ -215,10 +212,4 @@ export function AreaView({ slug, onOpenPage, onBack, navigateTo, initialCapabili
           }),
     ),
   );
-}
-
-/** The area in Plan's Product tile: the address names it while it is open. */
-export function AreaInPlace({ slug, onOpenPage, navigateTo }: { slug: string; onOpenPage: () => void; navigateTo?: NavigateTo }) {
-  useInPlaceAddress(areaPath(slug));
-  return h(AreaView, { slug, onOpenPage, navigateTo });
 }

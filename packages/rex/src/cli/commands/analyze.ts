@@ -312,6 +312,7 @@ export async function buildAcceptedItems(proposals: Proposal[]): Promise<{
           level: "task",
           status: taskStatus,
           source: t.source,
+          ...(t.summary ? { summary: t.summary } : {}),
           description: t.description,
           acceptanceCriteria: t.acceptanceCriteria,
           priority: t.priority as PRDItem["priority"],
@@ -329,6 +330,7 @@ export async function buildAcceptedItems(proposals: Proposal[]): Promise<{
         level: "feature",
         status: featureStatus,
         source: f.source,
+        ...(f.summary ? { summary: f.summary } : {}),
         description: f.description,
         ...(featureStatus === "completed" && { completedAt: new Date().toISOString() }),
         ...(tasks.length > 0 && { children: tasks }),
@@ -468,11 +470,13 @@ async function acceptProposalsAsChanges(
     source: p.epic.source,
     children: p.features.map((f) => ({
       title: f.title,
+      summary: f.summary,
       description: f.description,
       status: f.status,
       source: f.source,
       children: f.tasks.map((t) => ({
         title: t.title,
+        summary: t.summary,
         description: t.description,
         acceptanceCriteria: t.acceptanceCriteria,
         priority: t.priority as ProposedWork["priority"],
@@ -482,6 +486,7 @@ async function acceptProposalsAsChanges(
         // An oversized task's decomposition: tasks under the change it makes.
         subtasks: t.decomposition?.children.map((c) => ({
           title: c.title,
+          summary: c.summary,
           description: c.description,
           acceptanceCriteria: c.acceptanceCriteria,
           priority: c.priority as ProposedWork["priority"],

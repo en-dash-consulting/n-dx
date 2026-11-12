@@ -15,7 +15,7 @@ import {
   findItemById, updateInTree,
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
-import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
 import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
@@ -143,7 +143,7 @@ export function routeItems(
  */
 const PATCHABLE_FIELDS = new Set([
   "status", "failureReason", "priority", "tags", "title",
-  "description", "acceptanceCriteria", "requirements",
+  "summary", "description", "acceptanceCriteria", "requirements",
 ]);
 
 const isStringArray = (v: unknown): v is string[] =>
@@ -168,7 +168,7 @@ function validateItemPatch(body: unknown): string | null {
     && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
     return `Invalid priority: ${String(patch.priority)}`;
   }
-  for (const key of ["title", "description", "failureReason"] as const) {
+  for (const key of ["title", "summary", "description", "failureReason"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
@@ -257,6 +257,8 @@ async function handleItemPatch(
     const completing = updates.status === "completed" && isChangeLayerStore(store);
     const fieldUpdates = { ...updates };
     if (completing) delete fieldUpdates.status;
+    // A cleared summary is removed, as `rex update --summary=` and edit_item remove it.
+    if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
@@ -418,6 +420,8 @@ async function handleItemAdd(
       type?: string;
       level?: string;
       parentId?: string;
+      /** Plain-language summary for a non-coder. */
+      summary?: string;
       description?: string;
       priority?: string;
       tags?: string[];
@@ -521,6 +525,7 @@ async function handleItemAdd(
       level,
     };
 
+    Object.assign(item, summaryField(input));
     if (input.description) item.description = input.description;
     if (input.priority && isPriority(input.priority)) item.priority = input.priority;
     if (input.tags && Array.isArray(input.tags)) item.tags = input.tags;
@@ -569,7 +574,7 @@ async function addInboxChange(
   res: ServerResponse,
   ctx: ServerContext,
   store: Parameters<typeof completeV2Work>[0],
-  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches?: unknown },
+  input: { title: string; summary?: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches?: unknown },
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   if (input.touches !== undefined) {
@@ -582,6 +587,7 @@ async function addInboxChange(
   }
   const id = randomUUID();
   const item = { id, title: input.title, status: "pending", level: "epic", type: "change", needsPlacement: true } as PRDItem;
+  Object.assign(item, summaryField(input));
   if (input.description) item.description = input.description;
   if (input.priority && isPriority(input.priority)) item.priority = input.priority;
   if (Array.isArray(input.tags)) item.tags = input.tags;
@@ -609,7 +615,7 @@ async function addPlacedChange(
   res: ServerResponse,
   ctx: ServerContext,
   store: Parameters<typeof completeV2Work>[0],
-  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches: string[] },
+  input: { title: string; summary?: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches: string[] },
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   let node: { id: string; title: string };
@@ -621,6 +627,7 @@ async function addPlacedChange(
           type: "change",
           title: input.title,
           touches: input.touches.map((t) => t.trim()),
+          ...summaryField(input),
           description: input.description || undefined,
           acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
           tags: Array.isArray(input.tags) ? input.tags : undefined,
@@ -703,6 +710,7 @@ async function addV2Child(
           type,
           title: input.title,
           parentId: parent.id,
+          ...summaryField(input),
           description: input.description || undefined,
           acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
           tags: Array.isArray(input.tags) ? input.tags : undefined,

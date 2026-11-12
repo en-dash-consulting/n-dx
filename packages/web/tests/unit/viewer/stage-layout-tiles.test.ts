@@ -51,8 +51,8 @@ afterEach(() => {
 });
 
 describe("Plan tiles before the first status", () => {
-  // Tiles are keyed by panel when they have one (Product map, Open changes glance).
-  const V2_ONLY = ["product-map", "inbox", "changes-glance"];
+  // Tiles are keyed by panel when they have one (Open changes glance).
+  const V2_ONLY = ["inbox", "changes-glance"];
 
   it("mounts no v2-only tile with null status, then a v1 status", () => {
     status = null;

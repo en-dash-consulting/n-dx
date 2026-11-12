@@ -6,16 +6,25 @@
  * full-screen. The full-screen layer sits between the top nav and the bottom
  * bar, like the Commands sheet. */
 
+/* Rows are a fine 4px track with no row gap: each tile spans as many as it
+   needs and keeps the 16px gap as its own bottom margin. A configured size
+   (r1 = 232px, r2 = 480px, r3 = 728px, each plus the gap) is the most a tile
+   takes; stage-tiles.ts shrinks one whose content is shorter
+   (`useFitTracks`). Fixed px, not --space-4: the density toggle must not shift
+   the arithmetic. */
 .stage-tiles {
-  --tile-row: 232px;
+  --tile-unit: 4px;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: var(--tile-row);
+  grid-auto-rows: var(--tile-unit);
   grid-auto-flow: row dense;
-  gap: var(--space-4);
+  column-gap: var(--space-4);
+  row-gap: 0;
 }
 
 .stage-tile {
+  position: relative;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -30,9 +39,9 @@
 .stage-tile--c6 { grid-column: span 6; }
 .stage-tile--c8 { grid-column: span 8; }
 .stage-tile--c12 { grid-column: span 12; }
-.stage-tile--r1 { grid-row: span 1; }
-.stage-tile--r2 { grid-row: span 2; }
-.stage-tile--r3 { grid-row: span 3; }
+.stage-tile--r1 { grid-row: span 62; }
+.stage-tile--r2 { grid-row: span 124; }
+.stage-tile--r3 { grid-row: span 186; }
 
 /* Two tiles a row on mid widths; the map takes the full row. */
 @media (max-width: 1180px) {
@@ -45,7 +54,7 @@
 @media (max-width: 700px) {
   .stage-tiles { grid-template-columns: minmax(0, 1fr); }
   .stage-tile--c4, .stage-tile--c6, .stage-tile--c8, .stage-tile--c12 { grid-column: auto; }
-  .stage-tile--r3 { grid-row: span 2; }
+  .stage-tile--r3 { grid-row: span 124; }
 }
 
 /* The codebase map draws its own card, header and full-screen, and fills
@@ -186,6 +195,38 @@
   padding: var(--space-3) var(--space-4);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+/* Content past the tile's bottom: a pill over the fade that opens the whole view. */
+.stage-tile-more {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2-5);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.stage-tile-more:hover { border-color: var(--accent); }
+.stage-tile-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A body's children keep their descendants' margins inside their own box, so
+   the height a tile fits to (useFitTracks) is the height its content takes. */
+.stage-tile-body > * {
+  display: flow-root;
+}
+
+/* Fitted to its content: nothing is cut off, so nothing fades. */
+.stage-tile--fit > .stage-tile-body {
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
 /* A view in a tile is a preview: not interactive until opened. */
@@ -533,6 +574,7 @@
 .tile-sum-bar-fill--good { background: var(--green); }
 .tile-sum-bar-fill--fair { background: var(--orange); }
 .tile-sum-bar-fill--poor { background: var(--red); }
+.tile-sum-bar-fill--neutral { background: var(--accent); }
 
 .tile-sum-bar-value {
   text-align: right;
@@ -1222,7 +1264,31 @@
 .cg-release { margin: var(--space-3) 0 var(--space-1); color: var(--text-dim); font-size: 12px; text-transform: uppercase; }
 .cg-group:first-child .cg-release { margin-top: 0; }
 .cg-rows { margin: 0; padding: 0; list-style: none; }
-.cg-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); padding: var(--space-1) 0; }
+/* The glance is a table: change, size, progress, status, then hover-only actions. */
+.cg-table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 13px; }
+.cg-table th {
+  padding: 0 var(--space-2) var(--space-1); text-align: left; white-space: nowrap;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+.cg-table td { padding: var(--space-2); vertical-align: middle; border-bottom: 1px solid var(--border); }
+.cg-table th:first-child, .cg-table td:first-child { padding-left: 0; }
+.cg-table tbody tr:last-child td { border-bottom: none; }
+.cg-name { width: 100%; min-width: 0; }
+.cg-name .cg-open { display: inline; }
+.cg-name .cg-title { font-weight: 600; overflow-wrap: anywhere; }
+.cg-name .impact-tags { margin-left: var(--space-2); }
+.cg-size, .cg-pct, .cg-status { white-space: nowrap; color: var(--text-muted); cursor: default; }
+.cg-pct { font-variant-numeric: tabular-nums; text-align: right; }
+.cg-size-large { color: var(--orange); }
+.cg-status-in-progress { color: var(--accent); font-weight: 600; }
+.cg-status-waiting { color: var(--orange); font-weight: 600; }
+.cg-status-awaiting-apply { color: var(--green); }
+/* Row actions stay out of the way until the row is hovered or focused. */
+.cg-actions { white-space: nowrap; opacity: 0; transition: opacity 0.12s; }
+.cg-actions > * + * { margin-left: var(--space-3); }
+.cg-row:hover .cg-actions, .cg-row:focus-within .cg-actions { opacity: 1; }
+@media (hover: none) { .cg-actions { opacity: 1; } }
 .cg-open {
   flex: 1 1 200px; min-width: 0; padding: 0; border: none; background: none;
   color: var(--accent); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere;
@@ -1277,7 +1343,8 @@
 .sg-ready { color: var(--text-muted); font-size: 12px; }
 
 /* Sidecar ghosts (SP5): changes a waiting card proposes — dashed, dimmed, never counted. */
-.cg-ghost { opacity: 0.6; font-style: italic; border-left: 2px dashed var(--border); padding-left: var(--space-2); }
-.cg-ghost-chip { border: 1px dashed var(--border); background: none; font-style: normal; }
+.cg-ghost { opacity: 0.6; font-style: italic; }
+.cg-ghost .cg-name { border-left: 2px dashed var(--border); padding-left: var(--space-2); }
+.cg-ghost-chip { padding: 0 var(--space-2); border: 1px dashed var(--border); border-radius: 999px; background: none; font-style: normal; }
 .ls-also-in-stage { color: var(--text-dim); font-size: 12px; }
 .ls-waiting { color: var(--text-muted); font-size: 12px; font-style: italic; }

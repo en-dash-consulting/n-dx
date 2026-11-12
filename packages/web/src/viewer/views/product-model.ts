@@ -199,6 +199,8 @@ export interface ChangeRow {
   id: string;
   displayId?: string;
   title: string;
+  /** Plain-language summary for non-coders; shown in place of the title when present. */
+  summary?: string;
   intent?: string;
   stage: ChangeStage;
   priority?: string;
@@ -248,6 +250,8 @@ export interface GlanceChange {
   id: string;
   displayId?: string;
   title: string;
+  /** Plain-language summary for non-coders; shown in place of the title when present. */
+  summary?: string;
   stage: OpenChangeStage;
   priority?: string;
   plannedRelease?: string;

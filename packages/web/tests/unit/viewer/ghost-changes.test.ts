@@ -10,12 +10,11 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { GhostCardsContext, ghostChanges, ghostCountsByTarget, ghostStripCounts } from "../../../src/viewer/components/ghost-changes.js";
 import type { GhostSource } from "../../../src/viewer/components/prd-tree/ghost-rows.js";
-import { areaBlocks } from "../../../src/viewer/views/product-area-map.js";
+import { areaBlock } from "../../../src/viewer/views/product-area-map.js";
 import { ChangesGlance } from "../../../src/viewer/views/changes-glance.js";
 import { LifecycleStrip, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
-import { ProductAreaMap } from "../../../src/viewer/views/product-area-map.js";
-import type { AreaSection, ChangeSummary, ProductMap } from "../../../src/viewer/views/product-model.js";
+import type { AreaSection, ChangeSummary } from "../../../src/viewer/views/product-model.js";
 
 vi.mock("../../../src/viewer/hooks/use-project-status.js", async (orig) => ({ ...(await orig<object>()), useProjectStatus: () => null }));
 
@@ -75,7 +74,8 @@ describe("ghost helpers", () => {
   });
 
   it("puts waiting counts on map blocks through an area or its capabilities", () => {
-    const blocks = areaBlocks([AREA("a1", ["cap-1", "cap-9"]), AREA("a2", ["cap-2"])], ghostCountsByTarget([PLACED]));
+    const counts = ghostCountsByTarget([PLACED]);
+    const blocks = [AREA("a1", ["cap-1", "cap-9"]), AREA("a2", ["cap-2"])].map((a) => areaBlock(a, counts));
     expect(blocks.map((b) => b.ghosts)).toEqual([2, 0]);
   });
 
@@ -104,7 +104,7 @@ describe("the Plan surfaces", () => {
     await mount(h(ChangesGlance, { navigateTo }), [PLACED, INBOX], { summary: { ...SUMMARY, open: [] } });
     const rows = [...root.querySelectorAll(".cg-ghost")];
     expect(rows.map((r) => r.querySelector(".cg-title")?.textContent)).toEqual(["Add refunds"]);
-    expect(rows[0].textContent).toContain("proposed · on a card");
+    expect(rows[0].querySelector(".cg-status")?.textContent).toBe("On a card");
   });
 
   it("Open changes draws nothing extra once the card is gone", async () => {
@@ -123,11 +123,4 @@ describe("the Plan surfaces", () => {
     expect(root.querySelector('[data-stage="proposed"] .ls-number')?.textContent).toBe("4");
   });
 
-  it("the map marks the block a waiting item targets", async () => {
-    const map: ProductMap = { areas: [AREA("a1", ["cap-1"]), AREA("a2", ["cap-2"])], constraints: [] };
-    await mount(h(ProductAreaMap, { onOpenArea: vi.fn() }), [PLACED], { map });
-    expect(root.querySelector('[data-block="a1"] .pam-ghost-mark')?.textContent).toBe("+2");
-    expect(root.querySelector('[data-block="a2"] .pam-ghost-mark')).toBeNull();
-    expect(root.querySelector('[data-block="a1"] .pam-open')).toBeNull();
-  });
 });

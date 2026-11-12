@@ -1,7 +1,8 @@
 /**
  * Ready to run — the tasks `ndx work --auto` would pick next, at the top of Work.
  *
- * Fed by `GET /api/hench/ready?limit=10`, shown in the order returned. Each row
+ * Fed by `GET /api/hench/ready?limit=10`, shown in the order returned: the first
+ * three by default, the rest behind a "Show N more" toggle. Each row
  * opens the Prepare task modal (the primary button and the title); the split
  * button's menu starts the task at once with no options, or copies the terminal
  * command. A start shows a toast: started (with a link to Live), queued (with its
@@ -16,15 +17,25 @@ import { appUrl } from "../base-path.js";
 import { workCommandArgs } from "../external.js";
 import { shellWord } from "./prepare-task-model.js";
 import { QueuedNotice } from "./queued-notice.js";
+import { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
 
 const READY_LIMIT = 10;
+/** Rows shown before "Show N more": the next few picks, not the whole queue. */
+export const READY_SHOWN = 3;
 const TOAST_MS = 8000;
+
+/** The rows to render: the first READY_SHOWN, or all of them once expanded. Order is kept. */
+export function shownReadyTasks<T>(tasks: readonly T[], expanded: boolean): T[] {
+  return expanded ? [...tasks] : tasks.slice(0, READY_SHOWN);
+}
 
 /** One row of the `/api/hench/ready` reply (the server's `ReadyTask`). */
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Plain-language summary, shown in place of the title when present. */
+  summary?: string;
   status: string;
   priority: string | null;
   parentChain: string[];
@@ -71,6 +82,8 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  /** The rows past the first READY_SHOWN are shown. */
+  const [expanded, setExpanded] = useState(false);
   /** Start now runs the hub queued, until dismissed. */
   const [queued, setQueued] = useState<Array<{ taskId: string; reply: QueuedReply }>>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -95,6 +108,8 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
 
   useEffect(() => { void load(); }, [load]);
   useHenchRunsLiveRefresh(load);
+  // After the ready list's own load, so the list is the first request out.
+  const impacts = useItemImpacts();
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   // Escape closes an open menu.
@@ -159,14 +174,20 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
             onClick: (e: MouseEvent) => { e.preventDefault(); onOpenPrd(); },
           }, "Open the PRD"),
         )
-      : h("ul", { class: "ready-list" }, tasks.map((task) => {
+      : h("ul", { class: "ready-list", id: "ready-list" }, shownReadyTasks(tasks, expanded).map((task) => {
           const status = STATUS_ICON[task.status] ?? { icon: "○", label: task.status };
           const menuId = `ready-menu-${task.id}`;
           return h("li", { key: task.id, class: "ready-row", "data-task-id": task.id },
             h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
             h("div", { class: "ready-main" },
-              h("button", { type: "button", class: "ready-title", onClick: () => onPrepare(task.id) },
-                task.title,
+              // The plain-language summary leads; the technical title is the tooltip and the modal's heading.
+              h("button", {
+                type: "button",
+                class: "ready-title",
+                title: task.summary ? task.title : undefined,
+                onClick: () => onPrepare(task.id),
+              },
+                displayTitle(task),
                 // A task that will not run on the project defaults says so
                 // before the modal is opened. The label carries the meaning:
                 // the dot alone is decoration to a screen reader.
@@ -179,6 +200,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
                 h("span", null, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
+                h(ImpactTags, { impact: impacts[task.id] }),
               ),
             ),
             h("div", { class: "ready-split" },
@@ -207,9 +229,21 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
           );
         }));
 
+  const hidden = tasks ? Math.max(0, tasks.length - READY_SHOWN) : 0;
+  const toggle = hidden > 0
+    ? h("button", {
+        type: "button",
+        class: "ready-more",
+        "aria-expanded": String(expanded),
+        "aria-controls": "ready-list",
+        onClick: () => setExpanded(!expanded),
+      }, expanded ? "Show fewer" : `Show ${hidden} more`)
+    : null;
+
   return h("section", { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" },
     h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
     body,
+    toggle,
     queued.map((q) => h(QueuedNotice, {
       key: q.taskId,
       reply: q.reply,

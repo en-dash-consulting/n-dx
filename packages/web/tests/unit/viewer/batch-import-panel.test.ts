@@ -303,13 +303,13 @@ describe("BatchImportPanel", () => {
   // ── LoE pass-through ──────────────────────────────────────────────
 
   describe("accepting proposals", () => {
-    it("posts loe, loeRationale and loeConfidence from the proposal", async () => {
+    it("posts loe, loeRationale, loeConfidence and the summaries from the proposal", async () => {
       const proposals = [{
         epic: { title: "E", source: "batch", description: "d" },
         features: [{
-          title: "F", source: "batch", description: "d",
+          title: "F", source: "batch", description: "d", summary: "Shoppers check out faster.",
           tasks: [{
-            title: "T", source: "batch", sourceFile: "", description: "d",
+            title: "T", source: "batch", sourceFile: "", description: "d", summary: "One step at checkout.",
             priority: "high", tags: [],
             loe: 1.5, loeRationale: "Two providers, one callback", loeConfidence: "medium",
           }],
@@ -336,7 +336,10 @@ describe("BatchImportPanel", () => {
 
       const call = fetchSpy.mock.calls.find((c) => c[0] === "/api/rex/proposals/accept-edited");
       expect(call).toBeTruthy();
-      const task = JSON.parse(call![1].body).proposals[0].features[0].tasks[0];
+      const feature = JSON.parse(call![1].body).proposals[0].features[0];
+      expect(feature.summary).toBe("Shoppers check out faster.");
+      const task = feature.tasks[0];
+      expect(task.summary).toBe("One step at checkout.");
       expect(task.loe).toBe(1.5);
       expect(task.loeRationale).toBe("Two providers, one callback");
       expect(task.loeConfidence).toBe("medium");

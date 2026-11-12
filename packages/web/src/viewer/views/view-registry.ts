@@ -74,11 +74,10 @@ import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
-import { ProductAreaMap, openAreaChanges } from "./product-area-map.js";
-import { AreaInPlace } from "./area.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
+import { SpendSummary } from "./spend-summary.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 import { areaCapabilityOfTab, areaSlugOfTab, placeChangeOfTab } from "../route-state.js";
@@ -162,6 +161,11 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
   return ctx.validViews ?? buildValidViewsForScope(null);
 }
 
+/** Tune's folded tiles: Spend shows its essentials; the rest preview their view. */
+function tuneTileSummary(tile: StageTile): ComponentChild | null {
+  return tile.view === "token-usage" && !tile.panel ? h(SpendSummary, null) : null;
+}
+
 /** A stage page, rendering each of its sections and tiles through this registry. */
 function stage(id: StageId): ViewRenderer {
   const page: ViewRenderer = (ctx) => h(StagePage, {
@@ -176,7 +180,9 @@ function stage(id: StageId): ViewRenderer {
         ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
         : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
-    renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
+    renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data)
+      : id === "tune" ? tuneTileSummary
+      : undefined,
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
@@ -198,20 +204,6 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
     case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
-    // A block opens its area in the tile's full-screen; the folded block, the whole map.
-    case "product-map": {
-      if (!opened) {
-        return h(ProductAreaMap, {
-          onOpenArea: (slug: string | null, title: string) =>
-            grid.openTile("product-map", slug ? { id: slug, label: title } : undefined),
-          onOpenChanges: (areaSlug: string | null) => openAreaChanges(ctx.navigateTo, areaSlug),
-        });
-      }
-      const slug = grid.focus?.id;
-      return slug
-        ? h(AreaInPlace, { slug, onOpenPage: () => ctx.navigateTo("product", { tab: `area/${encodeURIComponent(slug)}` }), navigateTo: ctx.navigateTo })
-        : h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo });
-    }
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);

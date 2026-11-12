@@ -160,6 +160,7 @@ export async function cmdAdd(
     level: resolvedLevel as ItemLevel,
   };
 
+  if (flags.summary?.trim()) item.summary = flags.summary.trim();
   if (flags.description) item.description = flags.description;
   if (flags.priority) item.priority = flags.priority as Priority;
   if (flags.source) item.source = flags.source;

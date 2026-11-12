@@ -13,7 +13,9 @@
 
 import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
-import { BrandedHeader, DescribeInSidecarButton } from "../components/index.js";
+import { ApplyAllBar } from "./apply-all.js";
+import type { NavigateTo } from "../types.js";
+import { BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
@@ -100,9 +102,10 @@ function Intent({ intent }: { intent: string }) {
   );
 }
 
-function Change({ change, onSelect }: {
+function Change({ change, onSelect, impact }: {
   change: ChangeRow;
   onSelect?: (id: string) => void;
+  impact?: ItemImpact;
 }) {
   return h("li", {
     class: "ch-change",
@@ -111,13 +114,15 @@ function Change({ change, onSelect }: {
   },
     h("div", { class: "ch-change-head" },
       change.displayId ? h("span", { class: "ch-display-id" }, change.displayId) : null,
+      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
       onSelect
         ? h("button", {
             type: "button",
             class: "ch-change-link",
+            title: change.summary ? change.title : undefined,
             onClick: () => onSelect(change.id),
-          }, change.title)
-        : h("span", { class: "ch-change-title" }, change.title),
+          }, displayTitle(change))
+        : h("span", { class: "ch-change-title", title: change.summary ? change.title : undefined }, displayTitle(change)),
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),
@@ -127,6 +132,7 @@ function Change({ change, onSelect }: {
     h(MapLinks, { change }),
     h("div", { class: "ch-change-meta" },
       h(TaskProgress, { change }),
+      h(ImpactTags, { impact, full: true }),
       change.loe !== undefined ? h("span", { class: "ch-loe" }, `${change.loe}w`) : null,
       change.assignee ? h("span", { class: "ch-assignee" }, change.assignee) : null,
       change.shippedIn ? h("span", { class: "tag ch-shipped-in" }, `shipped in ${change.shippedIn}`) : null,
@@ -138,6 +144,7 @@ function Stage({ stage, onSelectChange }: {
   stage: StageGroup;
   onSelectChange?: (id: string) => void;
 }) {
+  const impacts = useItemImpacts();
   return h("div", { class: "ch-stage", "data-stage": stage.stage },
     h("h4", { class: "ch-stage-header" },
       CHANGE_STAGE_LABELS[stage.stage],
@@ -145,7 +152,7 @@ function Stage({ stage, onSelectChange }: {
     ),
     h("ul", { class: "ch-change-list" },
       stage.changes.map((change) =>
-        h(Change, { key: change.id, change, onSelect: onSelectChange })),
+        h(Change, { key: change.id, change, onSelect: onSelectChange, impact: impacts[change.id] })),
     ),
   );
 }
@@ -300,8 +307,10 @@ function AreaChip({ title, count, onRemove }: { title: string; count: number; on
 
 // ── View ─────────────────────────────────────────────────────────────
 
-export function ChangesView({ changes, onSelectChange, area = null, onClearArea }: {
+export function ChangesView({ changes, onSelectChange, area = null, onClearArea, navigateTo }: {
   changes: ChangeRow[];
+  /** Reaches Settings → Workflow from the Apply all bar. */
+  navigateTo?: NavigateTo;
   /** Opens a change. Omitted, titles render as plain text. */
   onSelectChange?: (id: string) => void;
   /** An area slug (`?area=`): the page lists only that area's open changes. */
@@ -346,6 +355,10 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea 
     ),
     h("p", { class: "section-sub" },
       "Work grouped by planned release and stage. A release is a field on a change, not a container."),
+
+    // Done and waiting to apply: one step for all of them, and the way to make it automatic.
+    // Held in the Inbox, a change is placed before it applies: Apply all leaves it out.
+    h(ApplyAllBar, { waiting: changes.filter((c) => c.stage === "awaiting-apply" && !c.awaitsPlacement).length, navigateTo }),
 
     groups.length === 0
       ? h("div", { class: "empty-state", role: "status" },

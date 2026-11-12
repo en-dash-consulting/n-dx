@@ -205,6 +205,21 @@ describe("Rex API routes", () => {
     expect(task2.startedAt).toBeDefined();
   });
 
+  it("PATCH /api/rex/items/:id sets a summary, and an empty one removes it", async () => {
+    const patch = (summary: string) => fetch(`http://127.0.0.1:${port}/api/rex/items/task-2`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ summary }),
+    });
+    const read = async () => (await (await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2`)).json()) as Record<string, unknown>;
+
+    expect((await patch("Shoppers check out faster.")).status).toBe(200);
+    expect((await read()).summary).toBe("Shoppers check out faster.");
+
+    expect((await patch("   ")).status).toBe(200);
+    expect("summary" in (await read())).toBe(false);
+  });
+
   it("PATCH /api/rex/items/:id sets completedAt for completed status", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1`, {
       method: "PATCH",
