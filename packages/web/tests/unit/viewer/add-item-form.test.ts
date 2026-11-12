@@ -248,20 +248,64 @@ describe("AddItemForm", () => {
       expect(onSubmit.mock.calls[0][0].acceptanceCriteria).toEqual(["keep"]);
     });
 
-    it("Enter adds a criterion, but not while an IME composition is open", () => {
-      const { root, input } = setup();
+    // Synthetic jsdom events exercise the handler, not native Safari/WebKit IME behavior.
+    it.each([
+      { isComposing: true, keyCode: 13 },
+      { isComposing: false, keyCode: 229 },
+    ])("ignores IME Enter with isComposing=$isComposing and keyCode=$keyCode", async ({ isComposing, keyCode }) => {
+      const { root, onSubmit, input, submit } = setup();
+      type(input("add-form-title"), "Ship it");
       const field = input("add-form-criterion");
-      const press = (isComposing: boolean) => act(() => {
-        field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing, bubbles: true }));
+      const onFormSubmit = vi.fn();
+      root.querySelector("form")!.addEventListener("submit", onFormSubmit);
+
+      type(field, "日本語の入力を保持する");
+      act(() => {
+        field.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "Enter", isComposing, keyCode, bubbles: true, cancelable: true,
+        }));
       });
 
-      type(field, "日本");
-      press(true);
+      expect(field.value).toBe("日本語の入力を保持する");
       expect(root.querySelectorAll(".rex-add-form-criterion")).toHaveLength(0);
+      expect(onFormSubmit).not.toHaveBeenCalled();
+      expect(onSubmit).not.toHaveBeenCalled();
 
-      press(false);
+      const add = root.querySelector(".rex-add-form-criterion-add") as HTMLButtonElement;
+      expect(add.disabled).toBe(false);
+      act(() => { add.click(); });
+      expect(field.value).toBe("");
+      expect(Array.from(root.querySelectorAll(".rex-add-form-criterion-text"), (el) => el.textContent))
+        .toEqual(["日本語の入力を保持する"]);
+      expect(onSubmit).not.toHaveBeenCalled();
+
+      await submit();
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][0].acceptanceCriteria).toEqual(["日本語の入力を保持する"]);
+    });
+
+    it("ordinary Enter adds exactly one criterion and prevents form submission", async () => {
+      const { root, onSubmit, input, submit } = setup();
+      type(input("add-form-title"), "Ship it");
+      const field = input("add-form-criterion");
+      type(field, "  Enter adds one criterion  ");
+      const onFormSubmit = vi.fn();
+      root.querySelector("form")!.addEventListener("submit", onFormSubmit);
+      const enter = new KeyboardEvent("keydown", {
+        key: "Enter", isComposing: false, keyCode: 13, bubbles: true, cancelable: true,
+      });
+      act(() => { field.dispatchEvent(enter); });
+
+      expect(enter.defaultPrevented).toBe(true);
+      expect(field.value).toBe("");
       const items = root.querySelectorAll(".rex-add-form-criterion-text");
-      expect(Array.from(items).map((el) => el.textContent)).toEqual(["日本"]);
+      expect(Array.from(items).map((el) => el.textContent)).toEqual(["Enter adds one criterion"]);
+      expect(onFormSubmit).not.toHaveBeenCalled();
+      expect(onSubmit).not.toHaveBeenCalled();
+
+      await submit();
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][0].acceptanceCriteria).toEqual(["Enter adds one criterion"]);
     });
 
     it("omits criteria and tags when none are given", async () => {
