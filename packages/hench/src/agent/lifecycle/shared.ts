@@ -312,7 +312,8 @@ export interface SharedLoopOptions {
   /**
    * Aborted when the operator interrupts the run (SIGINT/SIGTERM). The CLI
    * loop passes it to every vendor spawn, which terminates the vendor's
-   * process tree; the run is then recorded as cancelled.
+   * process tree; the run is then recorded as cancelled. Both loops pass it to
+   * every wait for the host validation slot (`hench.testGate.hostSlot`).
    */
   abortSignal?: AbortSignal;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */

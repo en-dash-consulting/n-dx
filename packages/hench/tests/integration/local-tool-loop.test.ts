@@ -201,6 +201,9 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     livelockThreshold?: number;
     provider?: "api";
     retry?: { maxRetries: number; baseDelayMs: number; maxDelayMs: number };
+    /** Run the full test gate with this command inside the host validation slot. */
+    hostSlotGate?: string;
+    abortSignal?: AbortSignal;
   } = {}) {
     const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -214,14 +217,55 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     if (overrides.livelockThreshold !== undefined) {
       config.livelockThreshold = overrides.livelockThreshold;
     }
+    if (overrides.hostSlotGate) {
+      config.skipFullTestGate = false;
+      config.testGate = { ...config.testGate, command: overrides.hostSlotGate, hostSlot: true };
+    }
     const store = createStore("file", join(projectDir, ".rex"));
 
     const result = await agentLoop({
       config, store, projectDir, henchDir,
       model: "qwen-test", yes: true, autonomous: true,
+      ...(overrides.abortSignal ? { abortSignal: overrides.abortSignal } : {}),
     });
     return { result, store };
   }
+
+  /** Write a file, stage it, leave the commit message, then claim completion. */
+  const writeAndComplete: ScriptedTurn[] = [
+    { tool_calls: [{ id: "call-1", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: "local-output.ts", content: "export const source = 'local';\n" }) } }] },
+    { tool_calls: [{ id: "call-2", type: "function", function: { name: "git", arguments: JSON.stringify({ subcommand: "add", args: "local-output.ts" }) } }] },
+    { tool_calls: [{ id: "call-3", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: ".hench-commit-msg.txt", content: "feat: write local output\n" }) } }] },
+    { content: "Done — the file is written." },
+  ];
+
+  it("stops a gate queued behind another validation-slot holder when the run's signal aborts", async () => {
+    mockLocalProvider();
+    stubChatEndpoint(writeAndComplete);
+    const { acquireValidationSlot } = await import("../../src/process/validation-slot.js");
+    const { resolveValidationSlotDir } = await import("../../src/process/validation-slot-dir.js");
+    const lease = await acquireValidationSlot({ slotDir: resolveValidationSlotDir(), projectDir: "/elsewhere", env: {} });
+    // The first Ctrl-C: run.ts aborts the run's signal. It fires here as soon
+    // as the gate reports that it is waiting, and nothing else stops the wait.
+    const controller = new AbortController();
+    const log = console.log;
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      if (String(args[0]).includes("Waiting for the validation slot")) controller.abort(new Error("interrupted"));
+      log(...args);
+    });
+    try {
+      const { result } = await runLoop({
+        hostSlotGate: `node -e "require('fs').writeFileSync('gate-ran', '')"`,
+        abortSignal: controller.signal,
+      });
+      expect(controller.signal.aborted).toBe(true);
+      expect(existsSync(join(projectDir, "gate-ran"))).toBe(false);
+      expect(result.run.testGate?.ran).toBe(false);
+      expect(result.run.status).not.toBe("completed");
+    } finally {
+      await lease.release();
+    }
+  });
 
   it("dispatches tool calls even when finish_reason is 'stop'", async () => {
     mockLocalProvider();

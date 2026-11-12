@@ -1738,6 +1738,7 @@ async function runOne(
         ...(loop ? { loop } : {}),
         claims,
         wouldResetIds,
+        ...(abortSignal ? { abortSignal } : {}),
         configBackstop,
         ...(runEscalation ? { vendorOverride: escalationPlan!.vendor, escalation: runEscalation } : {}),
       });
