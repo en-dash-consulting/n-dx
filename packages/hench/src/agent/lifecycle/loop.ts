@@ -258,7 +258,7 @@ async function callWithFailover(
         // Only the client is taken; the loop's own tool context keeps its backstop.
         const apiResources = await initApiResources(
           provider, config, henchDir, projectDir, store, taskId,
-          testCommand, startingHead, undefined,
+          testCommand, startingHead, undefined, undefined,
         );
         client = apiResources.client;
         currentVendor = apiResources.vendor;
@@ -309,6 +309,7 @@ async function initApiResources(
   testCommand: string | undefined,
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
+  abortSignal: AbortSignal | undefined,
 ): Promise<ApiResources> {
   const vendor = provider.info.vendor;
 
@@ -353,7 +354,7 @@ async function initApiResources(
     memoryMonitor,
     selfHeal: config.selfHeal,
     testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
   };
 
@@ -573,6 +574,7 @@ function initGoogleApiResources(
   testCommand: string | undefined,
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
+  abortSignal: AbortSignal | undefined,
 ): ToolContext {
   const guard = new GuardRails(projectDir, config.guard, {
     sandbox: createToolSandbox(projectDir),
@@ -590,7 +592,7 @@ function initGoogleApiResources(
     memoryMonitor,
     selfHeal: config.selfHeal,
     testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
   };
 }
@@ -882,7 +884,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       stream(formatModelLabel(model), completionResult.text ?? "");
     } else {
       const toolCtx = initGoogleApiResources(
-        config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
+        config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop, opts.abortSignal,
       );
       auditedGuard = toolCtx.guard;
       const tools = [{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }];
@@ -1008,7 +1010,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -1028,6 +1030,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
     run,
     henchDir,
     projectDir,
@@ -1553,7 +1556,7 @@ async function runLocalToolLoop(params: {
   process.on("SIGINT", handleSignal);
 
   const toolCtx = initGoogleApiResources(
-    config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
+    config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop, opts.abortSignal,
   );
 
   const messages: OpenAiMessage[] = [];
@@ -1854,7 +1857,7 @@ async function runLocalToolLoop(params: {
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -1873,6 +1876,7 @@ async function runLocalToolLoop(params: {
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
     run,
     henchDir,
     projectDir,
@@ -2074,7 +2078,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   const { client, vendor, toolCtx } = await initApiResources(
     provider, config, henchDir, projectDir, store, taskId,
-    brief.project.testCommand, startingHead, opts.configBackstop,
+    brief.project.testCommand, startingHead, opts.configBackstop, opts.abortSignal,
   );
 
   // Shared: initialize run record + capture start memory snapshot
@@ -2359,6 +2363,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
     run,
     henchDir,
     projectDir,
