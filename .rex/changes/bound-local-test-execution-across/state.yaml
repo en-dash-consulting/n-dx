@@ -20,7 +20,14 @@ items:
     lastModified: "2026-11-12T17:28:42.360Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d34d2902-408a-4b05-9de9-7b2932aae778":
-    lastModified: "2026-11-12T17:26:51.437Z"
+    status: "completed"
+    startedAt: "2026-11-12T17:32:11.607Z"
+    completedAt: "2026-11-12T17:37:23.271Z"
+    endedAt: "2026-11-12T17:37:23.271Z"
+    activeIntervals: [{"end":"2026-11-12T17:37:23.271Z","start":"2026-11-12T17:32:11.607Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tests/test-max-workers.mjs reads NDX_TEST_MAX_WORKERS; root and every package vitest config (rex bench excepted) sets test.maxWorkers from it; unit + config policy tests added."
+    lastModified: "2026-11-12T17:37:23.271Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed2f3d51-97a5-4f5b-8b98-2ff2e2667a10":
     lastModified: "2026-11-12T17:27:28.479Z"

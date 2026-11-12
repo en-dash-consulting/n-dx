@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
+import { testMaxWorkers } from "../../tests/test-max-workers.mjs";
 
 export default defineConfig({
   resolve: {
@@ -11,6 +12,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // NDX_TEST_MAX_WORKERS caps workers for every project; unset keeps vitest's default.
+    maxWorkers: testMaxWorkers(),
     // Console output is kept for failing tests and dropped for passing ones.
     // A green run of the monorepo printed 7500 lines from hench and 5300 from
     // rex (run 38193308009), every one of them from a test that passed; the
