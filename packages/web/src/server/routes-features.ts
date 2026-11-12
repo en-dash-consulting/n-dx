@@ -52,33 +52,6 @@ interface FeatureDefinition {
 const FEATURE_REGISTRY: FeatureDefinition[] = [
   // ── SourceVision ──────────────────────────────────────────────────
   {
-    key: "sourcevision.callGraph",
-    label: "Call Graph Analysis",
-    description: "Enable call graph extraction during analysis. Traces function calls across files to build a dependency graph at the function level.",
-    impact: "Increases analysis time and memory usage. Large codebases may see significant slowdown.",
-    package: "sourcevision",
-    stability: "experimental",
-    defaultValue: false,
-  },
-  {
-    key: "sourcevision.enrichment",
-    label: "AI Enrichment Passes",
-    description: "Enable AI-powered enrichment that adds architectural insights, problem detection, and improvement suggestions to the analysis.",
-    impact: "Requires an API key or CLI access. Each enrichment pass uses token budget.",
-    package: "sourcevision",
-    stability: "stable",
-    defaultValue: true,
-  },
-  {
-    key: "sourcevision.componentCatalog",
-    label: "React Component Catalog",
-    description: "Extract React/Preact component metadata including props, hooks usage, and component hierarchy.",
-    impact: "Only useful for React/Preact projects. Adds a small amount of analysis time.",
-    package: "sourcevision",
-    stability: "stable",
-    defaultValue: true,
-  },
-  {
     key: "sourcevision.prMarkdown",
     label: "PR Markdown Page",
     description: "Show the SourceVision PR Markdown page in navigation.",
@@ -98,28 +71,10 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
   },
   // ── Rex ────────────────────────────────────────────────────────────
   {
-    key: "rex.autoComplete",
-    label: "Auto-Complete Parent Items",
-    description: "Automatically mark parent items (features, epics) as complete when all children are done.",
-    impact: "Parent items transition to 'completed' without manual intervention. Disable if you prefer explicit completion.",
-    package: "rex",
-    stability: "stable",
-    defaultValue: true,
-  },
-  {
     key: "rex.showTokenBudget",
     label: "Show Token Budget",
     description: "Display token budget information on Rex task line items and in the detail side panel. When disabled, only non-zero token usage badges are shown.",
     impact: "Adds budget percentage and remaining capacity indicators to task views. No performance impact.",
-    package: "rex",
-    stability: "stable",
-    defaultValue: false,
-  },
-  {
-    key: "rex.budgetEnforcement",
-    label: "Budget Enforcement",
-    description: "Enforce token and cost budgets during rex analyze operations. When exceeded, operations are blocked or warned.",
-    impact: "When enabled, analysis operations may be interrupted if budget limits are reached.",
     package: "rex",
     stability: "stable",
     defaultValue: false,
@@ -134,33 +89,6 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     defaultValue: false,
   },
   // ── Hench ─────────────────────────────────────────────────────────
-  {
-    key: "hench.autoRetry",
-    label: "Automatic Retry on Failure",
-    description: "Automatically retry failed task runs with exponential backoff when transient errors occur.",
-    impact: "May consume additional tokens when retrying. Useful for flaky API connections.",
-    package: "hench",
-    stability: "stable",
-    defaultValue: true,
-  },
-  {
-    key: "hench.guardRails",
-    label: "Guard Rails",
-    description: "Enforce security boundaries: blocked file paths, allowed commands, size limits, and timeouts.",
-    impact: "When disabled, the agent has unrestricted file and command access. Keep enabled for safety.",
-    package: "hench",
-    stability: "stable",
-    defaultValue: true,
-  },
-  {
-    key: "hench.adaptiveWorkflow",
-    label: "Adaptive Workflow Adjustment",
-    description: "Allow the agent to dynamically adjust its workflow based on task complexity and past performance.",
-    impact: "May change execution parameters between runs. Provides better results but less predictable behavior.",
-    package: "hench",
-    stability: "experimental",
-    defaultValue: false,
-  },
   {
     key: "hench.runVerdict",
     label: "Run verdict banner",
@@ -261,7 +189,7 @@ function buildToggles(projectDir: string): FeatureToggle[] {
   const features = (config.features ?? {}) as Record<string, unknown>;
 
   return FEATURE_REGISTRY.map((def) => {
-    // Key in features section is relative (e.g., "sourcevision.callGraph")
+    // Key in features section is relative (e.g., "rex.showTokenBudget")
     const stored = getConfigValue(features, def.key);
     const enabled = typeof stored === "boolean" ? stored : def.defaultValue;
 

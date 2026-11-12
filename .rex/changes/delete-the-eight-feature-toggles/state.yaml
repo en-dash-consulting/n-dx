@@ -1,9 +1,21 @@
 schema: "rex/v2"
 items:
   "e7b79cc6-d9ad-4e84-bb39-786d615f7ca9":
-    lastModified: "2026-11-12T16:15:54.665Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-11-12T21:51:19.238Z"
+    completedAt: "2026-11-12T21:54:18.978Z"
+    endedAt: "2026-11-12T21:54:18.978Z"
+    activeIntervals: [{"end":"2026-11-12T21:54:18.978Z","start":"2026-11-12T21:51:19.238Z"}]
+    lastModified: "2026-11-12T21:54:18.978Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "fbc4c752-bc1d-44e0-8815-a618d18eced1":
+    status: "completed"
+    startedAt: "2026-11-12T21:54:18.978Z"
+    completedAt: "2026-11-12T21:54:18.978Z"
+    endedAt: "2026-11-12T21:54:18.978Z"
+    activeIntervals: [{"end":"2026-11-12T21:54:18.978Z","start":"2026-11-12T21:54:18.978Z"}]
+    appliedAt: "2026-11-12T21:54:18.978Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-12T16:15:41.870Z"
-    lastModified: "2026-11-12T16:15:54.665Z"
+    lastModified: "2026-11-12T21:54:18.978Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
