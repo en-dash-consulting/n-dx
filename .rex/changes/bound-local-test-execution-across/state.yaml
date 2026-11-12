@@ -37,7 +37,14 @@ items:
     lastModified: "2026-11-12T17:57:54.099Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4b090e30-2142-4219-b274-fd8ba3a56b7e":
-    lastModified: "2026-11-12T21:16:55.368Z"
+    status: "completed"
+    startedAt: "2026-11-12T21:17:43.038Z"
+    completedAt: "2026-11-12T21:25:16.093Z"
+    endedAt: "2026-11-12T21:25:16.093Z"
+    activeIntervals: [{"end":"2026-11-12T21:25:16.093Z","start":"2026-11-12T21:17:43.038Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "exec gains optional onSpawn; runInValidationSlot hands callers withSlot(options), which sets the slot env and records the spawned child (group on POSIX) via lease.recordChild before release; gate, re-run, post-task and completion paths use it. Cross-process crash test + per-path holder.json tests."
+    lastModified: "2026-11-12T21:25:16.093Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4cabcef6-50cd-46b6-b78a-334e047774cb":
     status: "completed"

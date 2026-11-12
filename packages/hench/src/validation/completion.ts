@@ -147,10 +147,10 @@ export async function validateCompletion(
   if (options?.testCommand) {
     const testCommand = options.testCommand;
     // Agent-written tests: confined like the agent's own run_command.
-    const slotRun = await runInValidationSlot(options.validationSlot, (withSlotEnv) =>
+    const slotRun = await runInValidationSlot(options.validationSlot, (withSlot) =>
       execRepoShellCmd(
         testCommand,
-        { cwd: projectDir, timeout, env: withSlotEnv(withTestMaxWorkers(repoCommandEnv(projectDir), options.testMaxWorkers)) },
+        withSlot({ cwd: projectDir, timeout, env: withTestMaxWorkers(repoCommandEnv(projectDir), options.testMaxWorkers) }),
       ));
     // Fails closed, like a command that never launched: nothing was tested.
     if (!slotRun.ok) {

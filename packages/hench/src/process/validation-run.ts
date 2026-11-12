@@ -8,7 +8,10 @@
  * admission, because the caller starts it inside `fn`; waiting stops only
  * when the run's abort signal fires. `fn` resolves after `exec` has stopped
  * the command's process tree (on timeout and on a forwarded Ctrl-C alike), so
- * the slot is released after the tree is gone.
+ * the slot is released after the tree is gone. The command's child is
+ * recorded in the holder record as soon as it spawns (its process group on
+ * POSIX), so if this process dies first, the slot stays held until the child
+ * has exited too.
  *
  * @module hench/process/validation-run
  */
@@ -45,23 +48,38 @@ export interface ValidationSlotTiming {
 }
 
 export type ValidationSlotRunOutcome<T> =
-  | { ok: true; value: T; timing?: ValidationSlotTiming; releaseWarning?: string }
+  | { ok: true; value: T; timing?: ValidationSlotTiming; slotWarning?: string }
   | { ok: false; queueMs: number; error: string };
+
+/** The exec options a validation command adds when it runs inside the slot. */
+export interface ValidationSlotExecOptions {
+  env: NodeJS.ProcessEnv;
+  onSpawn?: (child: { pid: number; group: boolean }) => void;
+}
+
+/**
+ * Puts a command's exec options inside the slot: `NDX_VALIDATION_SLOT` into
+ * its environment, and an `onSpawn` that records the spawned child in
+ * `holder.json`, so a holder that crashes while the child runs does not free
+ * the slot under it.
+ */
+export type WithValidationSlot = <O extends ValidationSlotExecOptions>(options: O) => O;
 
 /**
  * Run `fn` inside the slot, or directly when `slot` is undefined. `fn` gets
- * the function that puts `NDX_VALIDATION_SLOT` into the command's environment;
- * apply it after sanitizing, as `withTestMaxWorkers` is. `timing` is set only
+ * `withSlot`; pass every validation command's exec options through it, after
+ * sanitizing the environment, as `withTestMaxWorkers` is. `timing` is set only
  * when the slot was used. The slot itself never makes this throw: a wait
- * given up on, or a slot that could not be taken, is `ok: false`; a slot that
- * could not be released is `releaseWarning` beside the command's result.
- * Only an error `fn` throws propagates.
+ * given up on, or a slot that could not be taken, is `ok: false`; a child
+ * that could not be recorded, or a slot that could not be released, is
+ * `slotWarning` beside the command's result. Only an error `fn` throws
+ * propagates.
  */
 export async function runInValidationSlot<T>(
   slot: ValidationSlotRunOptions | undefined,
-  fn: (withSlotEnv: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv) => Promise<T>,
+  fn: (withSlot: WithValidationSlot) => Promise<T>,
 ): Promise<ValidationSlotRunOutcome<T>> {
-  if (!slot) return { ok: true, value: await fn((env) => env) };
+  if (!slot) return { ok: true, value: await fn((options) => options) };
 
   let lease: ValidationSlotLease;
   const queueStarted = Date.now();
@@ -90,23 +108,62 @@ export async function runInValidationSlot<T>(
     };
   }
 
+  // Records run in spawn order; release waits for them, so a late record
+  // cannot recreate holder.json after the slot was given back.
+  let recording: Promise<string[]> = Promise.resolve([]);
+  const withSlot: WithValidationSlot = (options) => ({
+    ...options,
+    env: lease.childEnv(options.env),
+    onSpawn: (child) => {
+      options.onSpawn?.(child);
+      recording = recording.then(async (warnings) => {
+        const warning = await recordChildReportingFailure(lease, slot, child);
+        return warning ? [...warnings, warning] : warnings;
+      });
+    },
+  });
+
   const started = Date.now();
   let value: T;
   try {
-    value = await fn((env) => lease.childEnv(env));
+    value = await fn(withSlot);
   } catch (err) {
-    // The command's own error wins; a release failure beside it is a warning.
+    // The command's own error wins; a slot failure beside it is a warning.
+    await recording;
     await releaseReportingFailure(lease, slot);
     throw err;
   }
   const executionMs = Date.now() - started;
+  const recordWarnings = await recording;
   const releaseWarning = await releaseReportingFailure(lease, slot);
+  const slotWarning = [...recordWarnings, releaseWarning].filter(Boolean).join("; ");
   return {
     ok: true,
     value,
     timing: { queueMs: lease.queueWaitMs, executionMs },
-    ...(releaseWarning ? { releaseWarning } : {}),
+    ...(slotWarning ? { slotWarning } : {}),
   };
+}
+
+/**
+ * Record the spawned validation command in `holder.json`. A failure is
+ * returned (and passed to `onWarning`) rather than thrown: the command is
+ * already running, and the slot is still held while this process lives; only
+ * a crash during the run would free it early.
+ */
+async function recordChildReportingFailure(
+  lease: ValidationSlotLease,
+  slot: ValidationSlotRunOptions,
+  child: { pid: number; group: boolean },
+): Promise<string | undefined> {
+  try {
+    await lease.recordChild(child.pid, { group: child.group });
+    return undefined;
+  } catch (err) {
+    const warning = `could not record the validation command (pid ${child.pid}) in ${slot.slotDir}: ${describeReason(err)}`;
+    slot.onWarning?.(warning);
+    return warning;
+  }
 }
 
 /**
