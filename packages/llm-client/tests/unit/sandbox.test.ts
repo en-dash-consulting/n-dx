@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -568,6 +568,10 @@ posixOnly("the validation slot inside ndx home", () => {
       const grant = lines.findIndex((l) => l.includes(`(subpath "${slot}")`));
       // Later rules win: the grant must follow the denial it carves into.
       expect(grant).toBeGreaterThan(deny);
+      // ...and the directory entry itself is pinned after the grant, so it
+      // cannot be swapped for a symlink that unconfined hench would follow.
+      const pin = lines.indexOf(`(deny file-write* (literal "${slot}"))`);
+      expect(pin).toBeGreaterThan(grant);
       // Tool children lose ndx home whole; the vendor CLI at least the token.
       expect(lines[deny]).toContain(p.kind === "tool" ? `(subpath "${ndxHome}")` : `(literal "${ndxHome}/auth.token")`);
       // Neither the token nor the credential store sits under the grant.
@@ -629,6 +633,10 @@ posixOnly("the validation slot inside ndx home", () => {
       "console.log(JSON.stringify({",
       "  write: tryIt(() => fs.writeFileSync(slot + '/holder.json', 'x')),",
       "  read: tryIt(() => fs.readFileSync(slot + '/holder.json')),",
+      "  unlink: tryIt(() => fs.unlinkSync(slot + '/holder.json')),",
+      // Empty now, so only the pin on the directory entry stops the removal
+      // that would let a symlink take its place.
+      "  rmdir: tryIt(() => fs.rmdirSync(slot)),",
       `  token: tryIt(() => fs.readFileSync(${JSON.stringify(join(home, "auth.token"))})),`,
       `  store: tryIt(() => fs.readFileSync(${JSON.stringify(join(home, "credentials.json"))})),`,
       "}));",
@@ -638,6 +646,9 @@ posixOnly("the validation slot inside ndx home", () => {
     const seen = JSON.parse(out.stdout.trim());
     expect(seen.write).toBe("ok");
     expect(seen.read).toBe("ok");
+    expect(seen.unlink).toBe("ok");
+    expect(seen.rmdir).not.toBe("ok");
+    expect(statSync(join(home, "validation-slot")).isDirectory()).toBe(true);
     expect(seen.token).not.toBe("ok");
     expect(seen.store).not.toBe("ok");
   });
