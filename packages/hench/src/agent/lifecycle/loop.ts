@@ -2342,7 +2342,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand: brief.project.testCommand, selfHeal: config.selfHeal,
     testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { print: info }),
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
   });
 
   // Shared: review gate

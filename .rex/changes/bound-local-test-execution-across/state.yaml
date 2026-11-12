@@ -159,5 +159,12 @@ items:
     lastModified: "2026-11-12T17:54:26.294Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "feb4f772-7b1a-4273-8365-a618fb1bdf8e":
-    lastModified: "2026-11-12T21:17:06.040Z"
+    status: "completed"
+    startedAt: "2026-11-12T21:25:38.434Z"
+    completedAt: "2026-11-12T21:29:20.445Z"
+    endedAt: "2026-11-12T21:29:20.445Z"
+    activeIntervals: [{"end":"2026-11-12T21:29:20.445Z","start":"2026-11-12T21:25:38.434Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Claude API completion check passes opts.abortSignal to its validation-slot wait; new integration test covers it."
+    lastModified: "2026-11-12T21:29:20.445Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
