@@ -427,6 +427,14 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     impact: (v) => `An unattended gate failure will re-run its failed suites once with "${v}"`,
   },
   {
+    path: "testGate.maxWorkers",
+    label: "Test Worker Cap",
+    description: "Sets NDX_TEST_MAX_WORKERS for the gate, post-task tests, the completion check and the agent's shell. Unset sets nothing",
+    type: "number",
+    category: "test-gate",
+    impact: (v) => `Test commands hench runs get NDX_TEST_MAX_WORKERS=${v}`,
+  },
+  {
     path: "fullTestTimeoutMs",
     label: "Full Test Timeout (ms)",
     description: "How long the test gate may run before it is killed. 0 means no limit",

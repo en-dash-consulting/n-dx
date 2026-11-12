@@ -124,6 +124,7 @@ async function rejectUnvalidatedCompletion(args: {
   baselineUntracked?: string[];
   testCommand?: string;
   selfHeal?: boolean;
+  testMaxWorkers?: number;
 }): Promise<void> {
   const { run, store, taskId, projectDir } = args;
   if (run.status !== "completed") return;
@@ -132,6 +133,7 @@ async function rejectUnvalidatedCompletion(args: {
     testCommand: args.testCommand,
     startingHead: args.startingHead,
     selfHeal: args.selfHeal,
+    testMaxWorkers: args.testMaxWorkers,
     baselineUntracked: args.baselineUntracked,
     finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
   });
@@ -332,7 +334,10 @@ async function initApiResources(
   }
   const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
 
-  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
+  const guard = new GuardRails(projectDir, config.guard, {
+    sandbox: createToolSandbox(projectDir),
+    testMaxWorkers: config.testGate?.maxWorkers,
+  });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   const toolCtx: ToolContext = {
@@ -344,6 +349,7 @@ async function initApiResources(
     startingHead,
     memoryMonitor,
     selfHeal: config.selfHeal,
+    testMaxWorkers: config.testGate?.maxWorkers,
     configBackstop,
   };
 
@@ -564,7 +570,10 @@ function initGoogleApiResources(
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
 ): ToolContext {
-  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
+  const guard = new GuardRails(projectDir, config.guard, {
+    sandbox: createToolSandbox(projectDir),
+    testMaxWorkers: config.testGate?.maxWorkers,
+  });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   return {
@@ -576,6 +585,7 @@ function initGoogleApiResources(
     startingHead,
     memoryMonitor,
     selfHeal: config.selfHeal,
+    testMaxWorkers: config.testGate?.maxWorkers,
     configBackstop,
   };
 }
@@ -992,7 +1002,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   // Same completion standard as the CLI loop: a claim with no changes fails.
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand, selfHeal: config.selfHeal,
+    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -1837,7 +1847,7 @@ async function runLocalToolLoop(params: {
   // Same completion standard as the CLI loop: a claim with no changes fails.
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand, selfHeal: config.selfHeal,
+    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -2320,6 +2330,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand: brief.project.testCommand, selfHeal: config.selfHeal,
+    testMaxWorkers: config.testGate?.maxWorkers,
   });
 
   // Shared: review gate

@@ -23,6 +23,8 @@ export interface UpdateStatusOptions {
   startingHead?: string;
   /** When true, reject doc-only completions. */
   selfHeal?: boolean;
+  /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
+  testMaxWorkers?: number;
   /**
    * Set on the agent's own tool call, never on hench's internal writes: a
    * completion that passes validation is recorded on the run's claim for the
@@ -52,6 +54,7 @@ export async function toolRexUpdateStatus(
       testCommand: options.testCommand,
       startingHead: options.startingHead,
       selfHeal: options.selfHeal,
+      testMaxWorkers: options.testMaxWorkers,
       finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
     });
 
@@ -360,6 +363,7 @@ export const rexToolHandlers: RexToolHandlers = {
         testCommand: ctx.testCommand,
         startingHead: ctx.startingHead,
         selfHeal: ctx.selfHeal,
+        testMaxWorkers: ctx.testMaxWorkers,
         holdCompletionForRun: true,
       },
     ),

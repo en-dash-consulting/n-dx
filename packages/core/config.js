@@ -2370,6 +2370,11 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      "node scripts/run-all-tests.mjs {suites}". A pass counts and
                                      is recorded as testGate.flakyRerun; a failure fails the run.
                                      No re-run after a timeout or on an interactive terminal.
+  hench.testGate.maxWorkers
+                           number    Test worker cap (positive integer). Hench sets
+                                     NDX_TEST_MAX_WORKERS to it for the gate and its re-run,
+                                     post-task tests, the completion check's test run and the
+                                     agent session's shell. Unset sets nothing.
   hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
                                      run fails (default: 900000 — 15 minutes; 0 means no limit).
                                      Raise it for a large monorepo: the gate runs while an agent
