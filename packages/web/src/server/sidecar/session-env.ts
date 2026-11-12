@@ -15,7 +15,7 @@
  * not be able to hand its own vendor session the user's credentials.
  */
 
-import { evaluateRepoTrust, mergeWithOverrides, parseLLMConfig } from "@n-dx/llm-client";
+import { evaluateRepoTrust, loadLLMConfig, mergeWithOverrides } from "@n-dx/llm-client";
 import type { EnvPolicyConfig, LLMConfig } from "@n-dx/llm-client";
 import { readConfigSnapshot } from "../effective-agent-config.js";
 
@@ -35,7 +35,7 @@ function asStrings(value: unknown): string[] | undefined {
 }
 
 /** Read the project's env policy and LLM config for a Sidecar session in `projectDir`. */
-export function resolveSidecarSessionEnv(projectDir: string): SidecarSessionEnv {
+export async function resolveSidecarSessionEnv(projectDir: string): Promise<SidecarSessionEnv> {
   const snapshot = readConfigSnapshot(projectDir);
   const hench = mergeWithOverrides(snapshot.hench, asRecord(snapshot.ndx["hench"]));
   const env = asRecord(asRecord(hench["guard"])["env"]);
@@ -43,5 +43,5 @@ export function resolveSidecarSessionEnv(projectDir: string): SidecarSessionEnv 
   let allow = asStrings(env["allow"]);
   if (allow?.length && evaluateRepoTrust(projectDir).restricted) allow = undefined;
   const envPolicy = deny || allow ? { ...(deny && { deny }), ...(allow && { allow }) } : undefined;
-  return { envPolicy, llmConfig: parseLLMConfig(snapshot.ndx) };
+  return { envPolicy, llmConfig: await loadLLMConfig(projectDir) };
 }

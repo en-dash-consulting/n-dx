@@ -20,7 +20,9 @@
 
 import { resolveVendorCliEnv } from "./child-env.js";
 import type { EnvPolicyConfig } from "./child-env.js";
-import { spawnCli } from "./exec.js";
+import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
+import { resolveCliPath } from "./config.js";
+import { resolveCodexCliPath } from "./codex-cli-provider.js";
 import type { LLMConfig } from "./llm-types.js";
 import type { SpawnCliOptions } from "./exec.js";
 import { terminateProcessTree } from "./process-tree.js";
@@ -64,7 +66,7 @@ export interface VendorSessionOptions {
   readonly systemPrompt?: string;
   /** Model override for every turn. */
   readonly model?: string;
-  /** CLI binary path; defaults to the driver's (`claude`, `codex`). */
+  /** CLI binary override; otherwise uses llmConfig's vendor cli_path, then PATH. */
   readonly binary?: string;
   /**
    * Child environment. When omitted, the parent's is filtered through
@@ -74,7 +76,7 @@ export interface VendorSessionOptions {
   readonly env?: NodeJS.ProcessEnv;
   /** The project's `guard.env` policy, applied when {@link env} is omitted. */
   readonly envPolicy?: EnvPolicyConfig;
-  /** LLM config supplying a configured API key when {@link env} is omitted. */
+  /** Trusted LLM config supplying the vendor CLI path and, without {@link env}, authentication. */
   readonly llmConfig?: LLMConfig;
   /**
    * Named variables added to the child environment after it is resolved —
@@ -168,6 +170,10 @@ function createSession(
   initial: SessionResume | undefined,
 ): VendorSession {
   const spawnImpl = opts.spawn ?? spawnCli;
+  const binary = opts.binary ?? (driver.vendor === "codex"
+    ? resolveCodexCliPath(opts.llmConfig?.codex)
+    : resolveCliPath(opts.llmConfig?.claude ?? {}));
+  const cliPathKey = `llm.${driver.vendor}.cli_path`;
   const baseEnv = opts.env
     ?? resolveVendorCliEnv({ ...opts.llmConfig, vendor: driver.vendor }, opts.envPolicy);
   const env = opts.extraEnv ? { ...baseEnv, ...opts.extraEnv } : baseEnv;
@@ -249,7 +255,7 @@ function createSession(
         if (usage) emit(usage);
       };
 
-      const proc = spawnImpl(opts.binary ?? spawnSpec.binary, spawnSpec.args, {
+      const proc = spawnImpl(binary, spawnSpec.args, {
         cwd: opts.cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
@@ -296,7 +302,8 @@ function createSession(
             : "completed";
         const error = status === "failed"
           ? spawnError ?? failure ??
-            (stderr.trim() || `${driver.vendor} exited with code ${exitCode}`)
+            (diagnoseCliNotFound(stderr.trim(), binary, cliPathKey)
+              ?? (stderr.trim() || `${driver.vendor} exited with code ${exitCode}`))
           : undefined;
 
         resolve({
@@ -313,7 +320,7 @@ function createSession(
 
       proc.on("error", (err) => {
         spawnError = (err as NodeJS.ErrnoException).code === "ENOENT"
-          ? `${driver.vendor} CLI not found (${opts.binary ?? spawnSpec.binary})`
+          ? `${driver.vendor} CLI not found: ${diagnoseCliInvocation(binary, cliPathKey).message}`
           : err.message;
         finish(null);
       });

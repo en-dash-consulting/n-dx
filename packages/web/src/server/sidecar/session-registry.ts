@@ -139,9 +139,10 @@ export interface UpdateSidecarSessionInput {
 }
 
 /** Session options the registry does not own: env policy, LLM config, binary. */
+type SidecarConnectionOptions = Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
 export type SidecarSessionConnect = (
   record: SidecarSessionRecord,
-) => Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
+) => SidecarConnectionOptions | Promise<SidecarConnectionOptions>;
 
 /** What a session needs to checkpoint at its context ceiling and start cold. */
 export interface SidecarContextOptions {
@@ -242,7 +243,7 @@ export function sidecarSessionConnect(
   envDir?: string,
   idleMs: SidecarRegistryOptions["ttlMs"] = DEFAULT_SIDECAR_TTL_MS,
 ): SidecarSessionConnect {
-  return (record) => {
+  return async (record) => {
     // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
     const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
     if (refusal) throw new Error(refusal);
@@ -250,7 +251,7 @@ export function sidecarSessionConnect(
     const isCodex = record.vendor === "codex";
     const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
     return {
-      ...resolveSidecarSessionEnv(envDir ?? record.worktree),
+      ...await resolveSidecarSessionEnv(envDir ?? record.worktree),
       ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),
       ...(isCodex && Object.keys(codex.env).length > 0 && { extraEnv: codex.env }),
     };
@@ -486,7 +487,13 @@ export class SidecarSessionRegistry {
     // A turn that opens a vendor session (the first, or after a restart without
     // a resume id or the TTL) knows nothing yet, so it carries the packet.
     const fresh = !this.live.has(record.id) && !record.resumeId;
-    const live = this.liveSession(record);
+    let live: LiveSession | undefined;
+    // Capture before asynchronous connection setup: a re-lens applies to the next turn.
+    const ranAs = { ...record };
+    const interrupted = (): SessionTurnResult => ({
+      turn: this.live.get(record.id)?.session.turns ?? 0,
+      status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null,
+    });
 
     this.reconcileCursor(record);
     // The packet and the ledger open a fresh vendor session and the turn after
@@ -523,7 +530,7 @@ export class SidecarSessionRegistry {
         // Stopped while the packet was built: settle without spawning. The
         // session stays marked, so its next turn starts cold again.
         if (this.stopRequested.has(record.id)) {
-          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+          return interrupted();
         }
       }
 
@@ -532,9 +539,12 @@ export class SidecarSessionRegistry {
         const ledger = renderLedger(context.ledger(record)).text;
         if (packet || ledger) vendorPrompt = composeOpeningPrompt({ packet, ledger, notes, prompt });
         if (this.stopRequested.has(record.id)) {
-          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+          return interrupted();
         }
       }
+
+      live = await this.liveSession(ranAs, signal);
+      if (!live || signal.aborted) return interrupted();
 
       // The context the turn ended with: what its last call sent in.
       let ended = 0;
@@ -545,8 +555,6 @@ export class SidecarSessionRegistry {
         guard.observe(event);
       };
       const before = record.tokens;
-      // The session as the turn ran: a lens changed mid-turn applies to the next one.
-      const ranAs = { ...record };
       let result = guard.settle(await live.session.sendTurn(vendorPrompt));
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
@@ -566,7 +574,7 @@ export class SidecarSessionRegistry {
       // An opening turn that failed or was stopped may never have reached
       // the model: the next turn carries the packet again.
       if (opening && !delivered) record.packetDue = true;
-      live.sink = undefined;
+      if (live) live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
       // After the persist, so the turn is saved whatever the hook does.
@@ -744,11 +752,13 @@ export class SidecarSessionRegistry {
   }
 
   /** The open vendor session, resuming the stored id when there is none — after a restart or the TTL. */
-  private liveSession(record: SidecarSessionRecord): LiveSession {
+  private async liveSession(record: SidecarSessionRecord, signal: AbortSignal): Promise<LiveSession | undefined> {
     const existing = this.live.get(record.id);
     if (existing) return existing;
+    const connection = await this.connect(record);
+    if (signal.aborted) return undefined;
     const options: VendorSessionOptions = {
-      ...this.connect(record),
+      ...connection,
       vendor: record.vendor,
       cwd: record.worktree,
       ...(record.model && { model: record.model }),

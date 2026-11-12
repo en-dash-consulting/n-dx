@@ -280,7 +280,7 @@ function debugLog(message: string): void {
   }
 }
 
-function resolveCodexCliPath(codexConfig?: CodexConfig): string {
+export function resolveCodexCliPath(codexConfig?: CodexConfig): string {
   return codexConfig?.cli_path ?? DEFAULT_CODEX_BINARY;
 }
 

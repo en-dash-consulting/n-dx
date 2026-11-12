@@ -195,6 +195,8 @@ describe("recordFileRead / flushFileReads", () => {
 
   afterEach(async () => {
     await closeActiveRunEvents();
+    // Replacement leaves the original fixture writer open; close it too.
+    await writer.close();
     await rm(henchDir, { recursive: true, force: true });
   });
 
@@ -283,6 +285,7 @@ describe("recordFileRead / flushFileReads", () => {
     await closeActiveRunEvents();
 
     expect(await eventsIn(second.path)).toEqual([]);
+    expect(await eventsIn(writer.path)).toEqual([]);
   });
 });
 

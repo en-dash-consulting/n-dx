@@ -72,6 +72,7 @@ import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CodexProjectConfigError, codexProjectMcpDisableFlags, codexUserConfigPath, codexUserModelProvider, compileCodexPolicyFlags } from "@n-dx/llm-client";
 import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy, RuntimeEvent } from "@n-dx/llm-client";
+import { errorMessage } from "../response-utils.js";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -105,7 +106,7 @@ export function codexUserProviderRefusal(env: NodeJS.ProcessEnv = process.env): 
   try {
     provider = codexUserModelProvider(env);
   } catch (error) {
-    return `A Codex Sidecar session cannot start: ${file} could not be read (${error instanceof Error ? error.message : String(error)}), so its model provider is unknown. Fix the file, or use Claude for the Sidecar.`;
+    return `A Codex Sidecar session cannot start: ${file} could not be read (${errorMessage(error)}), so its model provider is unknown. Fix the file, or use Claude for the Sidecar.`;
   }
   if (provider === undefined || provider === "openai") return null;
   return `A Codex Sidecar session cannot start: ${file} selects model provider ${JSON.stringify(provider)}, but Codex Sidecar sessions skip the user's Codex config, so that provider would not apply. Use Claude for the Sidecar, or the default OpenAI provider.`;
