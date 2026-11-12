@@ -126,6 +126,7 @@ node scripts/run-all-tests.mjs root-docs             # docs-page tests only (~2 
 node scripts/run-all-tests.mjs root-extensions       # the fixture extension through the CLI and hub (~10 s)
 node scripts/run-all-tests.mjs affected <baseRef>    # only suites the change since <baseRef> touches
 node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection and why; run nothing
+node scripts/run-all-tests.mjs root-policy --no-slot # skip the host validation slot (deliberate parallel run)
 ```
 
 `affected` compares the working tree to `<baseRef>` (committed, staged, unstaged and untracked files). Rules live in `scripts/lib/select-suites.mjs`:
@@ -142,13 +143,20 @@ node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection
 - Machine-written state (`.rex/prd_tree/`, `.hench/`, `.sourcevision/`) selects nothing.
 - **Stale builds fail the gate.** Several root tests read a package through `dist/` (`catalog-runtime-contract`, `layout-resolver-contract`, …), so against an old build they pass on a source change they should fail. Freshness is judged by content, not mtimes. A package's full build (`build` script) ends with `scripts/write-build-stamp.mjs`, which writes `dist/.build-stamp.json` holding a hash of the `src/` it compiled. When a changed file is under `packages/<dir>/src/` and that stamp is missing or differs from the current source hash, `affected` runs nothing: it exits 1 naming the package and `pnpm --filter <name> build`, and prints `test-gate: stale-dist=<dirs>`. Build the packages you changed and re-run. Consequences: a partial build (web `build:landing`) never writes the stamp, so it cannot mask stale compiled code; a source rewritten with identical content needs no rebuild (the hash is unchanged, even though incremental `tsc` emits nothing). Any new package build that produces `dist/` must end with the stamp step. `--list` runs nothing and skips the check. (The e2e `verify-build.js` still only warns locally outside CI; it shares the same check, `scripts/lib/stale-dist.mjs`.)
 
+**Host validation slot.** The runner takes the same per-user slot hench's gates take (see [Running Several Worktrees at Once](#running-several-worktrees-at-once)), always, whatever `hench.testGate.hostSlot` says: it is repository tooling, not hench config. A selected run waits for the slot before the stale-package rebuild, prints `Waiting for the validation slot held by pid <n> …` while it queues, and gives the slot back after the summary (or on SIGINT/SIGTERM, once the running suite has exited; a signal during the wait just aborts it). The summary ends with a `Validation slot:` line: `queued <n>s`, `ran inside the slot of the process that started this runner`, or `not taken (--no-slot)`.
+
+- **Nesting.** A runner started by a slot holder (a hench gate sets `NDX_VALIDATION_SLOT` to the holder's token while the holder is alive) runs inside that holder's slot and does not wait, so a hench gate that calls `run-all-tests.mjs` cannot deadlock on itself. A token naming a dead holder is ignored, and the runner queues normally.
+- **`--list` never waits.** It prints the selection and exits without taking the slot or rebuilding.
+- **Opt-out.** `--no-slot` runs without the slot, for a deliberate parallel run (for example two worktrees on a machine with the cores to spare). Nothing else skips it.
+- **Two copies of the protocol.** The runner's `scripts/lib/validation-slot.mjs` is plain JS because the runner cannot import hench; `tests/e2e/validation-slot-parity.test.js` (in `root-drift`) fails if it and `packages/hench/src/process/validation-slot.ts` disagree on exclusion, release, token nesting or stale-holder reclaim. Change both together.
+
 The runner prints `test-gate: selected-suites=…` and, on failure, `test-gate: failed-suites=…`. Hench reads these for `hench.testGate.command` / `rerunCommand` (see [`docs/packages/hench.md`](docs/packages/hench.md)). This repo opts in through `.n-dx.json`. CI still runs everything.
 
 ### Root-drift membership
 
 **Admission rule.** A root test belongs in `root-drift` when it reads a package source — or two packages' definitions of one thing — and fails on a *mismatch*. A root test that drives a package through its public API and asserts *behaviour* does not: those regressions are the package suite's job, and running them all here would be running `root`.
 
-Measured together: **~14 s** for the nineteen files below (`prompt-census` alone is ~12 s of it; the other eighteen fill the remaining workers beside it). `root-policy` is ~2 s for seven.
+Measured together: **~14 s** for the twenty-one files in `ROOT_DRIFT_TEST_FILES` (`prompt-census` alone is ~12 s of it; the other twenty fill the remaining workers beside it). `root-policy` is ~2 s for seven.
 
 A checked-in artifact generated from a package source:
 
@@ -350,6 +358,8 @@ With `hench.testGate.hostSlot` on (default off), the test gate (each attempt and
 the re-run), the post-task tests and the completion test run each take one slot
 per OS user, shared by every hench process on the host. An agent's own shell
 commands are not serialized; only the worker cap bounds those.
+`scripts/run-all-tests.mjs` takes the same slot unconditionally (see
+[Running a subset of suites](#running-a-subset-of-suites)).
 
 - **Is a run waiting?** It prints `Waiting for the validation slot held by pid
   <n> in <project> since <time> (<path to holder.json>)`, repeated about every
