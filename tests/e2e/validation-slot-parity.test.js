@@ -18,7 +18,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -30,10 +30,15 @@ import * as sandbox from "../../packages/llm-client/dist/sandbox.js";
 const HENCH_MODULE = pathToFileURL(join(import.meta.dirname, "../../packages/hench/dist/process/validation-slot.js")).href;
 const SCRIPTS_MODULE = pathToFileURL(join(import.meta.dirname, "../../scripts/lib/validation-slot.mjs")).href;
 
-/** Takes the slot through the module at argv[1], prints its token, releases when stdin closes. */
+/**
+ * Takes the slot through the module at argv[1], prints its token, releases
+ * when stdin closes. argv[3] and argv[4], when given, are the /proc it reads
+ * its PID namespace from and its NDX_OUTER_PID_NAMESPACES.
+ */
 const HOLDER_SCRIPT = `
 const { acquireValidationSlot } = await import(process.argv[1]);
-const lease = await acquireValidationSlot({ slotDir: process.argv[2], projectDir: "/holder", env: {} });
+const env = process.argv[4] ? { NDX_OUTER_PID_NAMESPACES: process.argv[4] } : {};
+const lease = await acquireValidationSlot({ slotDir: process.argv[2], projectDir: "/holder", env, procRoot: process.argv[3] || undefined });
 process.stdout.write(JSON.stringify({ token: lease.token }) + "\\n");
 process.stdin.on("end", async () => { await lease.release(); process.stdout.write("released\\n"); });
 process.stdin.resume();
@@ -81,9 +86,9 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
   });
 
   /** Start the holder process; resolves once it holds the slot. */
-  const startHolder = () =>
+  const startHolder = (procRoot = "", outer = "") =>
     new Promise((resolvePromise, reject) => {
-      const child = spawn(process.execPath, ["--input-type=module", "-e", HOLDER_SCRIPT, holderModule, slotDir], {
+      const child = spawn(process.execPath, ["--input-type=module", "-e", HOLDER_SCRIPT, holderModule, slotDir, procRoot, outer], {
         stdio: ["pipe", "pipe", "inherit"],
         windowsHide: true,
       });
@@ -98,7 +103,7 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
     });
 
   /** Contend until the first wait report, then give up; resolves with that report. */
-  const contendUntilWait = async (env = {}) => {
+  const contendUntilWait = async (env = {}, procRoot = undefined) => {
     const controller = new AbortController();
     let reported;
     const error = await contender
@@ -106,6 +111,7 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
         slotDir,
         projectDir: "/contender",
         env,
+        procRoot,
         signal: controller.signal,
         pollIntervalMs: 10,
         onWait: (wait) => {
@@ -128,6 +134,73 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
     expect(sandbox.validationSlotDirFor({ kind: "tool", projectDir: "/p", tmpDir: "/t", network: "none", ndxHome: home }))
       .toBe(join(home, hench.VALIDATION_SLOT_DIRNAME));
     expect(scripts.VALIDATION_SLOT_ENV).toBe(hench.VALIDATION_SLOT_ENV);
+    // The variable bubblewrap sets for a confined child is the one both read (rule 4a).
+    expect(scripts.OUTER_PID_NAMESPACES_ENV).toBe(hench.OUTER_PID_NAMESPACES_ENV);
+    expect(sandbox.OUTER_PID_NAMESPACES_ENV).toBe(hench.OUTER_PID_NAMESPACES_ENV);
+  });
+
+  // Rule 4a against fake /proc trees: OUTER is the host, INNER a bubblewrap
+  // sandbox inside it. A holder killed after taking the slot leaves a record
+  // whose pid is dead, which only its namespace keeps from reading as stale.
+  // The fake trees use symlinks, which Windows reserves to administrators.
+  describe.skipIf(process.platform === "win32")("PID namespaces (rule 4a)", () => {
+    const OUTER = "pid:[4026531836]";
+    const INNER = "pid:[4026532001]";
+
+    /** A fake /proc whose own namespace is `ns`, listing `procs` as [entry, ns, pid]. */
+    const fakeProc = (ns, procs = []) => {
+      const root = join(home, `proc-${ns.replace(/\D/g, "")}-${procs.length}`);
+      mkdirSync(join(root, "self", "ns"), { recursive: true });
+      symlinkSync(ns, join(root, "self", "ns", "pid"));
+      for (const [entry, entryNs, pid] of procs) {
+        mkdirSync(join(root, String(entry), "ns"), { recursive: true });
+        symlinkSync(entryNs, join(root, String(entry), "ns", "pid"));
+        writeFileSync(join(root, String(entry), "status"), `NSpid:\t${entry}\t${pid}\nNSpgid:\t${entry}\t${pid}\n`);
+      }
+      return root;
+    };
+
+    /** A holder that took the slot in `ns` and was then killed; resolves with its token. */
+    const deadHolderIn = async (procRoot, outer = "") => {
+      const { child, token } = await startHolder(procRoot, outer);
+      const exited = new Promise((r) => child.once("exit", r));
+      child.kill("SIGKILL");
+      await exited;
+      holder = undefined;
+      return { token, raw: readFileSync(join(slotDir, "holder.json"), "utf-8") };
+    };
+
+    it("inside a sandbox, nests on the token of a holder outside it", async () => {
+      const { token, raw } = await deadHolderIn(fakeProc(OUTER));
+      const lease = await contender.acquireValidationSlot({
+        slotDir,
+        projectDir: "/contender",
+        env: { NDX_VALIDATION_SLOT: token, NDX_OUTER_PID_NAMESPACES: OUTER },
+        procRoot: fakeProc(INNER),
+      });
+      expect(lease.nested).toBe(true);
+      expect(readFileSync(join(slotDir, "holder.json"), "utf-8")).toBe(raw);
+    });
+
+    it("inside a sandbox, waits for a holder outside it and never reclaims its record", async () => {
+      const { raw } = await deadHolderIn(fakeProc(OUTER));
+      const wait = await contendUntilWait({ NDX_OUTER_PID_NAMESPACES: OUTER }, fakeProc(INNER));
+      expect(wait.holderAlive).toBe(true);
+      expect(readFileSync(join(slotDir, "holder.json"), "utf-8")).toBe(raw);
+    });
+
+    it("outside a sandbox, reads a holder inside it by its pid there", async () => {
+      const { raw } = await deadHolderIn(fakeProc(INNER), OUTER);
+      const record = JSON.parse(raw);
+      expect(record).toMatchObject({ pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+      // Still running inside the sandbox: waited for.
+      const wait = await contendUntilWait({}, fakeProc(OUTER, [[9001, INNER, record.pid]]));
+      expect(wait.holderAlive).toBe(true);
+      // Gone from the sandbox: reclaimed.
+      const lease = await contender.acquireValidationSlot({ slotDir, projectDir: "/contender", env: {}, procRoot: fakeProc(OUTER) });
+      expect(lease.nested).toBe(false);
+      await lease.release();
+    });
   });
 
   it("excludes the other implementation while it holds, and admits it once released", async () => {

@@ -43,7 +43,7 @@
  * `realpathSync` output.
  */
 
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { buildShellInvocation, execFileSyncCli, isExecutableOnPath } from "./exec.js";
 import { NDX_CONTAINER_DIRNAME, detectLayoutMode, resolveLayout, resolveNdxHome } from "./layout.js";
@@ -441,6 +441,35 @@ export function validationSlotDirFor(policy: SandboxPolicy): string | undefined 
 }
 
 /**
+ * The variable naming the PID namespaces that enclose a confined process,
+ * comma-separated, outermost first. bubblewrap's `--unshare-pid` gives the
+ * child a namespace of its own, where the slot holder's pid outside means
+ * nothing; the slot reads this to tell a holder it cannot see from a dead one
+ * (rule 4a in hench's `process/validation-slot.ts`).
+ */
+export const OUTER_PID_NAMESPACES_ENV = "NDX_OUTER_PID_NAMESPACES";
+
+const PID_NAMESPACE_PATTERN = /^pid:\[\d+\]$/;
+
+/**
+ * The value of {@link OUTER_PID_NAMESPACES_ENV} for a child given a PID
+ * namespace of its own: the namespaces enclosing this process (from `env`),
+ * then this process's own (from `procRoot`). Undefined when this process's
+ * namespace cannot be read.
+ */
+export function outerPidNamespacesForChild(env: NodeJS.ProcessEnv = process.env, procRoot = "/proc"): string | undefined {
+  let own: string;
+  try {
+    own = readlinkSync(join(procRoot, "self", "ns", "pid"));
+  } catch {
+    return undefined; // No procfs: the child's slot reader falls back to plain pid checks.
+  }
+  if (!PID_NAMESPACE_PATTERN.test(own)) return undefined;
+  const outer = (env[OUTER_PID_NAMESPACES_ENV] ?? "").split(",").filter((ns) => PID_NAMESPACE_PATTERN.test(ns));
+  return [...outer, own].join(",");
+}
+
+/**
  * Credential paths denied to every confined process: the home directory's
  * credential files ({@link HOME_SECRET_DIRS}) and ndx home. The vendor CLI
  * keeps access to the macOS keychain, because that is where it stores its own
@@ -718,6 +747,10 @@ function planBwrap(policy: SandboxPolicy, kindOf: (p: string) => SandboxPathKind
   // Only `none` can be enforced: bubblewrap either keeps the host network or
   // drops it, so `vendor` is the host network on Linux, unrestricted.
   if (policy.network === "none") args.push("--unshare-net");
+  // The child's own PID namespace (`--unshare-pid`) hides every pid outside
+  // it, the slot holder's included; say which namespaces those are.
+  const outerPidNamespaces = slotDir ? outerPidNamespacesForChild() : undefined;
+  if (outerPidNamespaces) args.push("--setenv", OUTER_PID_NAMESPACES_ENV, outerPidNamespaces);
   args.push("--setenv", "TMPDIR", policy.tmpDir);
   args.push("--chdir", policy.projectDir);
   return { args, placeholders: [...placeholders] };

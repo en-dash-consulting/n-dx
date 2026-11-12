@@ -15,10 +15,12 @@
  * NDX_SANDBOX (the suite's setup turns it off): the gate case runs in a child
  * process given NDX_SANDBOX=on, the agent-shell case passes the setting.
  *
- * Seatbelt only for now: bubblewrap gives the child its own PID namespace, so
- * a holder's pid outside it reads as dead and the runner cannot recognise
- * nesting there. Skipped where no usable backend exists (Windows, a Linux
- * host without bwrap, a harness that is itself sandboxed).
+ * Runs under Seatbelt and bubblewrap. bubblewrap gives the child its own PID
+ * namespace, where the holder's pid outside reads as dead to `kill(pid, 0)`;
+ * the slot recognises such a holder by its namespace instead (rule 4a), so
+ * the gate case proves nesting and the queue case proves no reclaim there.
+ * Skipped where no usable backend exists (Windows, a Linux host without
+ * bwrap, a harness that is itself sandboxed).
  *
  * Uses the per-worker temp ndx home (tests/setup-ndx-home.js), never the
  * real one. The gate case runs the built hench (`dist/`).
@@ -71,7 +73,7 @@ process.exit(lease.nested === (process.argv[2] === "nested") ? 0 : 3);
 `;
 
 const host = detectSandboxBackend();
-const live = host.name === "seatbelt" && host.available;
+const live = host.available && (host.name === "seatbelt" || host.name === "bwrap");
 
 describe.skipIf(!live)("the test runner's validation slot inside hench's sandbox", () => {
   let project: string;

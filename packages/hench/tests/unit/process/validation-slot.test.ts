@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile, access } from "node:fs/promises";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   acquireValidationSlot,
   currentBootTimeMs,
+  OUTER_PID_NAMESPACES_ENV,
+  parseValidationSlotHolder,
   readValidationSlotHolder,
   ValidationSlotAbortedError,
   VALIDATION_SLOT_DIR_ENV,
@@ -72,6 +74,8 @@ async function writeHolder(record: Partial<ValidationSlotHolder>): Promise<strin
     startedAt: "2026-11-12T00:00:00.000Z",
     bootedAt: currentBootTimeMs(),
     projectDir: "/elsewhere",
+    pidNamespace: null,
+    outerPidNamespaces: [],
     ...record,
   };
   const raw = JSON.stringify(full);
@@ -438,6 +442,170 @@ describe("acquireValidationSlot — nesting", () => {
     });
     expect(inner).toMatchObject({ nested: true, slotDir });
     await outer.release();
+  });
+});
+
+/**
+ * Rule 4a against a fake `/proc`: `self/ns/pid` and `<n>/ns/pid` are symlinks
+ * naming a namespace, `<n>/status` carries `NSpid`/`NSpgid`. The namespaces:
+ * OUTER encloses INNER (a bubblewrap sandbox) and SIBLING (another one).
+ * Symlinks need administrator rights on Windows, which has no namespaces anyway.
+ */
+describe.skipIf(process.platform === "win32")("acquireValidationSlot — PID namespaces (rule 4a)", () => {
+  const OUTER = "pid:[4026531836]";
+  const INNER = "pid:[4026532001]";
+  const SIBLING = "pid:[4026532002]";
+  let proc: string;
+
+  beforeEach(async () => {
+    proc = join(root, "proc");
+    await mkdir(join(proc, "self", "ns"), { recursive: true });
+  });
+
+  async function setOwnNamespace(ns: string): Promise<void> {
+    await symlink(ns, join(proc, "self", "ns", "pid"));
+  }
+
+  /** A process `entry` visible in the fake /proc, in `ns`, with `pid`/`pgid` there. */
+  async function addProcess(entry: number, ns: string, pid: number, pgid = pid): Promise<void> {
+    await mkdir(join(proc, String(entry), "ns"), { recursive: true });
+    await symlink(ns, join(proc, String(entry), "ns", "pid"));
+    await writeFile(join(proc, String(entry), "status"), `Name:\tnode\nNSpid:\t${entry}\t${pid}\nNSpgid:\t${entry}\t${pgid}\n`);
+  }
+
+  function waitThenAbortIn(env: NodeJS.ProcessEnv): Promise<{ waits: ValidationSlotWait[]; error: unknown }> {
+    const controller = new AbortController();
+    const waits: ValidationSlotWait[] = [];
+    return acquireValidationSlot({
+      slotDir,
+      projectDir: "/here",
+      env,
+      procRoot: proc,
+      signal: controller.signal,
+      pollIntervalMs: 10,
+      onWait: (wait) => {
+        waits.push(wait);
+        controller.abort();
+      },
+    }).then(
+      () => ({ waits, error: undefined }),
+      (error: unknown) => ({ waits, error }),
+    );
+  }
+
+  const inside = { [OUTER_PID_NAMESPACES_ENV]: OUTER };
+
+  it("records the writer's namespace and the enclosing ones", async () => {
+    await setOwnNamespace(INNER);
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: inside, procRoot: proc });
+    expect(await readValidationSlotHolder(slotDir)).toMatchObject({ pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+    await lease.release();
+  });
+
+  it("reads a record without namespace fields as written in no known namespace", async () => {
+    const raw = JSON.stringify({
+      version: 1, token: "t", pid: 4242, child: null, startedAt: "x", bootedAt: currentBootTimeMs(), projectDir: "/p",
+    });
+    expect(parseValidationSlotHolder(raw)).toMatchObject({ pidNamespace: null, outerPidNamespaces: [] });
+    expect(parseValidationSlotHolder(raw.replace("}", ',"pidNamespace":7}'))).toBeNull();
+  });
+
+  it("inside a sandbox, nests on the token of a holder outside it, whose pid it cannot see", async () => {
+    await setOwnNamespace(INNER);
+    const raw = await writeHolder({ token: "gate", pidNamespace: OUTER });
+    const lease = await acquireValidationSlot({
+      slotDir,
+      projectDir: "/proj",
+      env: { ...inside, [VALIDATION_SLOT_ENV]: "gate" },
+      procRoot: proc,
+      onWait: () => {
+        throw new Error("a nested acquire must not wait");
+      },
+    });
+    expect(lease).toMatchObject({ nested: true, token: "gate" });
+    await lease.release();
+    expect(await holderRaw()).toBe(raw);
+  });
+
+  it("inside a sandbox, waits for a holder outside it and never reclaims its record", async () => {
+    await setOwnNamespace(INNER);
+    const raw = await writeHolder({ pidNamespace: OUTER });
+    const { waits, error } = await waitThenAbortIn(inside);
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(waits[0].holderAlive).toBe(true);
+    expect(await holderRaw()).toBe(raw);
+  });
+
+  it("waits for a holder in a sibling sandbox", async () => {
+    await setOwnNamespace(INNER);
+    const raw = await writeHolder({ pidNamespace: SIBLING, outerPidNamespaces: [OUTER] });
+    const { error } = await waitThenAbortIn(inside);
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(await holderRaw()).toBe(raw);
+  });
+
+  it("outside a sandbox, waits for a holder inside it that is still running", async () => {
+    await setOwnNamespace(OUTER);
+    await addProcess(9001, INNER, 3);
+    const raw = await writeHolder({ pid: 3, pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+    const { waits, error } = await waitThenAbortIn({});
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(waits[0].holderAlive).toBe(true);
+    expect(await holderRaw()).toBe(raw);
+  });
+
+  it("outside a sandbox, reclaims the record of a holder inside it that has gone", async () => {
+    await setOwnNamespace(OUTER);
+    // The sandbox still runs something, but not the holder.
+    await addProcess(9001, INNER, 2);
+    await writeHolder({ pid: 3, pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, procRoot: proc });
+    expect(lease.nested).toBe(false);
+    await lease.release();
+  });
+
+  it("outside a sandbox, keeps a record whose holder is gone but whose child group still runs inside it", async () => {
+    await setOwnNamespace(OUTER);
+    await addProcess(9002, INNER, 7, 5);
+    const raw = await writeHolder({
+      pid: 3, child: { pid: 5, group: true }, pidNamespace: INNER, outerPidNamespaces: [OUTER],
+    });
+    const { waits, error } = await waitThenAbortIn({});
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(waits[0].holderAlive).toBe(false);
+    expect(await holderRaw()).toBe(raw);
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "outside a sandbox, counts a process it cannot inspect as the holder",
+    async () => {
+      await setOwnNamespace(OUTER);
+      await addProcess(9003, INNER, 2);
+      await chmod(join(proc, "9003"), 0o000);
+      try {
+        const raw = await writeHolder({ pid: 3, pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+        const { error } = await waitThenAbortIn({});
+        expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+        expect(await holderRaw()).toBe(raw);
+      } finally {
+        await chmod(join(proc, "9003"), 0o755);
+      }
+    },
+  );
+
+  it("judges a reclaim lock left from inside a sandbox by the same rule", async () => {
+    await setOwnNamespace(OUTER);
+    await addProcess(9004, INNER, 4);
+    await writeHolder({});
+    const lock = JSON.stringify({ pid: 4, token: "l", startedAt: "x", pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+    await writeFile(join(slotDir, "reclaim.lock"), lock);
+    // A stale holder behind a lock is waited out without a report, so the wait ends on a timer.
+    const error = await acquireValidationSlot({
+      slotDir, projectDir: "/here", env: {}, procRoot: proc, pollIntervalMs: 10, signal: AbortSignal.timeout(300),
+    }).then(() => undefined, (err: unknown) => err);
+    // The live reclaimer is waited out, never cleared.
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(await readFile(join(slotDir, "reclaim.lock"), "utf-8")).toBe(lock);
   });
 });
 

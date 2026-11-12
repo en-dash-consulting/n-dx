@@ -13,6 +13,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { uptime } from "node:os";
 import { join } from "node:path";
@@ -20,6 +21,9 @@ import { resolveNdxHome } from "../../packages/core/layout.js";
 
 /** The environment variable a holder exports its token to children under. */
 export const VALIDATION_SLOT_ENV = "NDX_VALIDATION_SLOT";
+
+/** The PID namespaces enclosing this process, outermost first (rule 4a). */
+export const OUTER_PID_NAMESPACES_ENV = "NDX_OUTER_PID_NAMESPACES";
 
 const VALIDATION_SLOT_DIRNAME = "validation-slot";
 const HOLDER_FILE = "holder.json";
@@ -40,7 +44,10 @@ const RENAME_ATTEMPTS = 5;
  * @typedef {{
  *   version: number, token: string, pid: number, child: ValidationSlotChild | null,
  *   startedAt: string, bootedAt: number, projectDir: string,
+ *   pidNamespace: string | null, outerPidNamespaces: string[],
  * }} ValidationSlotHolder
+ * @typedef {{ pidNamespace: string | null, outerPidNamespaces: string[] }} PidNamespacePlace
+ * @typedef {PidNamespacePlace & { procRoot: string }} PidNamespaceView
  * @typedef {{ holder: ValidationSlotHolder, holderAlive: boolean, waitedMs: number }} ValidationSlotWait
  * @typedef {{
  *   slotDir: string, token: string, nested: boolean, queueWaitMs: number,
@@ -105,6 +112,79 @@ function isChildAlive(child) {
   return isPidAlive(child.pid);
 }
 
+// PID namespaces (rule 4a)
+
+const PID_NAMESPACE_PATTERN = /^pid:\[\d+\]$/;
+
+function readPidNamespace(procRoot, entry) {
+  try {
+    const ns = readlinkSync(join(procRoot, entry, "ns", "pid"));
+    return PID_NAMESPACE_PATTERN.test(ns) ? ns : null;
+  } catch {
+    return null; // No procfs here (not Linux, or not mounted): rule 4 applies.
+  }
+}
+
+/**
+ * This process's place: its namespace from `procRoot`, the enclosing ones from `env`.
+ * @returns {PidNamespaceView}
+ */
+export function pidNamespaceView(env = process.env, procRoot = process.platform === "linux" ? "/proc" : undefined) {
+  const outerPidNamespaces = (env[OUTER_PID_NAMESPACES_ENV] ?? "").split(",").filter((ns) => PID_NAMESPACE_PATTERN.test(ns));
+  return {
+    procRoot: procRoot ?? "",
+    pidNamespace: procRoot === undefined ? null : readPidNamespace(procRoot, "self"),
+    outerPidNamespaces,
+  };
+}
+
+function lastStatusEntry(status, field) {
+  const line = status.split("\n").find((l) => l.startsWith(`${field}:`));
+  const last = line?.slice(field.length + 1).trim().split(/\s+/).pop();
+  return last ? Number(last) : null;
+}
+
+/** Whether a process inside `ns`, visible below the reader's, has `pid` there; an unreadable entry counts as alive. */
+function isAliveInInnerNamespace(procRoot, ns, pid, group) {
+  let entries;
+  try {
+    entries = readdirSync(procRoot);
+  } catch {
+    return true; // Cannot look: unknown, so alive.
+  }
+  const field = group && process.platform !== "win32" ? "NSpgid" : "NSpid";
+  let unreadable = false;
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue;
+    let status;
+    try {
+      if (readlinkSync(join(procRoot, entry, "ns", "pid")) !== ns) continue;
+      status = readFileSync(join(procRoot, entry, "status"), "utf-8");
+    } catch (err) {
+      if (err?.code !== "ENOENT") unreadable = true; // Exited mid-scan is the only safe miss.
+      continue;
+    }
+    if (lastStatusEntry(status, field) === pid) return true;
+  }
+  return unreadable;
+}
+
+/** Whether `pid`, recorded at `place`, is alive as seen from `view` (rules 4 and 4a). */
+function isRecordedPidAlive(place, pid, group, view) {
+  const recorded = place.pidNamespace;
+  const own = view.pidNamespace;
+  if (recorded === null || own === null || recorded === own) {
+    return group ? isChildAlive({ pid, group }) : isPidAlive(pid);
+  }
+  if (!isPositiveInt(pid)) return false;
+  // The record's namespace lies inside the reader's, so its processes are visible.
+  if (place.outerPidNamespaces.includes(own)) return isAliveInInnerNamespace(view.procRoot, recorded, pid, group);
+  // Outside the reader's namespace, or beside it: invisible, so never judged dead.
+  return true;
+}
+
+const isHolderAlive = (holder, view) => isRecordedPidAlive(holder, holder.pid, false, view);
+
 // Records
 
 /**
@@ -130,6 +210,8 @@ function parseHolder(raw) {
     if (typeof c !== "object" || !isPositiveInt(c.pid) || typeof c.group !== "boolean") return null;
     child = { pid: c.pid, group: c.group };
   }
+  const place = parsePidNamespacePlace(r);
+  if (place === null) return null;
   return {
     version: PROTOCOL_VERSION,
     token: r.token,
@@ -138,14 +220,27 @@ function parseHolder(raw) {
     startedAt: r.startedAt,
     bootedAt: r.bootedAt,
     projectDir: r.projectDir,
+    ...place,
   };
 }
 
+/**
+ * The namespace fields of a record or lock; absent reads as null and `[]`, malformed as null.
+ * @returns {PidNamespacePlace | null}
+ */
+function parsePidNamespacePlace(r) {
+  const ns = r.pidNamespace ?? null;
+  const outer = r.outerPidNamespaces ?? [];
+  if (ns !== null && typeof ns !== "string") return null;
+  if (!Array.isArray(outer) || !outer.every((o) => typeof o === "string")) return null;
+  return { pidNamespace: ns, outerPidNamespaces: outer };
+}
+
 /** Whether a record no longer occupies the slot (rule 5). */
-function isStale(holder) {
+function isStale(holder, view) {
   if (Math.abs(holder.bootedAt - currentBootTimeMs()) > BOOT_TIME_TOLERANCE_MS) return true;
-  if (isPidAlive(holder.pid)) return false;
-  return holder.child === null || !isChildAlive(holder.child);
+  if (isHolderAlive(holder, view)) return false;
+  return holder.child === null || !isRecordedPidAlive(holder, holder.child.pid, holder.child.group, view);
 }
 
 // Files
@@ -224,20 +319,28 @@ export async function readValidationSlotHolder(slotDir) {
  * Remove `holder.json` if it still holds exactly `staleRaw` (rule 5). False
  * when another process holds the reclaim lock, so the caller waits a poll.
  */
-async function reclaimStale(slotDir, staleRaw) {
+async function reclaimStale(slotDir, staleRaw, view) {
   const lockPath = join(slotDir, RECLAIM_FILE);
-  const lock = JSON.stringify({ pid: process.pid, token: randomUUID(), startedAt: new Date().toISOString() });
+  const lock = JSON.stringify({
+    pid: process.pid,
+    token: randomUUID(),
+    startedAt: new Date().toISOString(),
+    pidNamespace: view.pidNamespace,
+    outerPidNamespaces: view.outerPidNamespaces,
+  });
   if (!(await createExclusive(slotDir, lockPath, lock))) {
     // Another process is reclaiming. If it died doing so, clear its lock.
     const raw = await readIfExists(lockPath);
     if (raw === null) return true;
-    let pid;
+    let owner = {};
     try {
-      pid = JSON.parse(raw)?.pid;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null) owner = parsed;
     } catch {
-      pid = undefined; // An unreadable lock has no live owner.
+      // An unreadable lock has no live owner.
     }
-    if (!isPositiveInt(pid) || !isPidAlive(pid)) {
+    const place = parsePidNamespacePlace(owner);
+    if (place === null || !isPositiveInt(owner.pid) || !isRecordedPidAlive(place, owner.pid, false, view)) {
       await unlinkIfExists(lockPath);
       return true;
     }
@@ -336,7 +439,7 @@ function heldLease(slotDir, record, queueWaitMs) {
  * @param {{
  *   slotDir: string, projectDir: string, env?: NodeJS.ProcessEnv, signal?: AbortSignal,
  *   pollIntervalMs?: number, reportIntervalMs?: number,
- *   onWait?: (wait: ValidationSlotWait) => void, now?: () => number,
+ *   onWait?: (wait: ValidationSlotWait) => void, now?: () => number, procRoot?: string,
  * }} options
  * @returns {Promise<ValidationSlotLease>}
  * @throws {ValidationSlotAbortedError} when `signal` fires while waiting.
@@ -348,13 +451,14 @@ export async function acquireValidationSlot(options) {
   const pollIntervalMs = clampPollInterval(options.pollIntervalMs);
   const reportIntervalMs = options.reportIntervalMs ?? DEFAULT_REPORT_INTERVAL_MS;
   const started = now();
+  const view = pidNamespaceView(env, options.procRoot);
 
   // Nesting first, by a read alone: a nested acquire needs no write access to
   // the slot directory (rule 6).
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
     const current = await readValidationSlotHolder(slotDir);
-    if (current?.token === inherited && isPidAlive(current.pid)) return nestedLease(slotDir, inherited);
+    if (current?.token === inherited && isHolderAlive(current, view)) return nestedLease(slotDir, inherited);
   }
 
   await mkdir(slotDir, { recursive: true });
@@ -367,6 +471,8 @@ export async function acquireValidationSlot(options) {
     startedAt: new Date(started).toISOString(),
     bootedAt: currentBootTimeMs(),
     projectDir,
+    pidNamespace: view.pidNamespace,
+    outerPidNamespaces: view.outerPidNamespaces,
   };
 
   let lastReport;
@@ -382,8 +488,8 @@ export async function acquireValidationSlot(options) {
     if (observed === null) continue; // Released between the create and the read.
     const { holder } = observed;
     const orphaned = holder !== null && holder.pid === process.pid && orphanedTokens.has(holder.token);
-    if (holder === null || orphaned || isStale(holder)) {
-      if (await reclaimStale(slotDir, observed.raw)) continue;
+    if (holder === null || orphaned || isStale(holder, view)) {
+      if (await reclaimStale(slotDir, observed.raw, view)) continue;
       await sleep(pollIntervalMs, signal);
       continue;
     }
@@ -391,7 +497,7 @@ export async function acquireValidationSlot(options) {
     const waitedMs = now() - started;
     if (onWait && (lastReport === undefined || waitedMs - lastReport >= reportIntervalMs)) {
       lastReport = waitedMs;
-      onWait({ holder, holderAlive: isPidAlive(holder.pid), waitedMs });
+      onWait({ holder, holderAlive: isHolderAlive(holder, view), waitedMs });
     }
     await sleep(pollIntervalMs, signal);
   }

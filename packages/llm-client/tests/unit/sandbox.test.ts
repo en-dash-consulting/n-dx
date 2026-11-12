@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +10,8 @@ import {
   gitControlPathsFor,
   maskedProjectPathsFor,
   nodeToolchainRoots,
+  OUTER_PID_NAMESPACES_ENV,
+  outerPidNamespacesForChild,
   readOnlyProjectPathsFor,
   removeSandboxPlaceholders,
   resolveSandboxSetting,
@@ -608,6 +610,28 @@ posixOnly("the validation slot inside ndx home", () => {
     expect(buildBwrapArgs(confined, noSlot).join(" ")).not.toContain(slot);
     expect(buildBwrapArgs({ ...confined, kind: "git-hook" }, () => true).join(" ")).not.toContain(slot);
   });
+
+  it("names the enclosing PID namespaces for a child given its own: the inherited ones, then this process's", () => {
+    const proc = realTemp("sbx-pidns-proc-");
+    mkdirSync(join(proc, "self", "ns"), { recursive: true });
+    expect(outerPidNamespacesForChild({}, proc)).toBeUndefined();
+    symlinkSync("pid:[4026532001]", join(proc, "self", "ns", "pid"));
+    expect(outerPidNamespacesForChild({}, proc)).toBe("pid:[4026532001]");
+    expect(outerPidNamespacesForChild({ [OUTER_PID_NAMESPACES_ENV]: "pid:[4026531836],junk" }, proc))
+      .toBe("pid:[4026531836],pid:[4026532001]");
+  });
+
+  it.runIf(process.platform === "linux" && existsSync("/proc/self/ns/pid"))(
+    "bubblewrap: tells a child with a slot directory which PID namespaces enclose it, and a git hook nothing",
+    () => {
+      const exists = (q: string) => q === "/usr" || q === ndxHome || q === slot;
+      const args = buildBwrapArgs(confined, exists);
+      const at = args.indexOf(OUTER_PID_NAMESPACES_ENV);
+      expect(args[at - 1]).toBe("--setenv");
+      expect(args[at + 1]).toBe(outerPidNamespacesForChild());
+      expect(buildBwrapArgs({ ...confined, kind: "git-hook" }, exists)).not.toContain(OUTER_PID_NAMESPACES_ENV);
+    },
+  );
 
   it("creates the slot directory on the host before a spawn, since the child could not create it in denied ndx home", () => {
     const home = realTemp("sbx-slot-home-");
