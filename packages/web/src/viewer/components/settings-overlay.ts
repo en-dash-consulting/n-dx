@@ -5,12 +5,17 @@
  * the overlay is what those routes look like. The page underneath stays
  * mounted, so closing returns to exactly where you were. The configuration
  * summary that used to sit in the sidebar footer heads the settings list.
+ *
+ * A page with sections lists them under its own entry in the nav
+ * (`useSettingsSections`). The highlighted section follows the content's
+ * scroll, and choosing one scrolls to it and focuses its heading. The page
+ * stays one scroll, so it keeps one SettingsFrame and one leave guard.
  */
 
-import { h } from "preact";
+import { createContext, h } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
-import { useEffect, useMemo } from "preact/hooks";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ViewId } from "../api.js";
 import { SETTINGS_ENTRIES, useCliName, useStatusLayout, viewLabelFor, viewGlyph, viewPixelIcon } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
@@ -31,9 +36,61 @@ export interface SettingsOverlayProps {
   children?: ComponentChildren;
 }
 
+/** One section of a settings page, as the nav lists it. */
+export interface SettingsSection {
+  id: string;
+  title: string;
+}
+
+/** The element id a section's `<section>` carries, which the nav scrolls to. */
+export const settingsSectionAnchor = (id: string): string => `settings-section-${id}`;
+
+const SectionsContext = createContext<((sections: readonly SettingsSection[] | null) => void) | null>(null);
+
+/**
+ * List the page's sections in the overlay nav, under its entry, for as long as
+ * the page is mounted. Each section's element must carry
+ * `settingsSectionAnchor(id)` as its id. Outside the overlay it does nothing.
+ */
+export function useSettingsSections(sections: readonly SettingsSection[]): void {
+  const publish = useContext(SectionsContext);
+  const signature = sections.map((s) => `${s.id}\u0000${s.title}`).join("\u0001");
+  useEffect(() => {
+    if (!publish) return undefined;
+    publish(sections);
+    return () => publish(null);
+    // `signature` stands for `sections`: a new array with the same entries is no change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publish, signature]);
+}
+
+/** A section is current once its top is this close to the top of the content. */
+const SPY_OFFSET_PX = 96;
+
+/** The section the reader is in: the last one whose top has reached the offset line. */
+function currentSection(content: HTMLElement, sections: readonly SettingsSection[]): string | null {
+  if (sections.length === 0) return null;
+  if (content.scrollTop <= 0) return sections[0]!.id;
+  // Scrolled to the bottom, the last section is current even if its top never reaches the line.
+  const scrollable = content.scrollHeight > content.clientHeight;
+  if (scrollable && content.scrollTop + content.clientHeight >= content.scrollHeight - 2) {
+    return sections[sections.length - 1]!.id;
+  }
+  const line = content.getBoundingClientRect().top + SPY_OFFSET_PX;
+  let current = sections[0]!.id;
+  for (const section of sections) {
+    const el = document.getElementById(settingsSectionAnchor(section.id));
+    if (el && el.getBoundingClientRect().top <= line) current = section.id;
+  }
+  return current;
+}
+
 export function SettingsOverlay({ view, validViews, onNavigate, onClose, server = null, children }: SettingsOverlayProps) {
   const cliName = useCliName();
   const layout = useStatusLayout();
+  const [sections, setSections] = useState<readonly SettingsSection[] | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const entries = useMemo(() => SETTINGS_ENTRIES
     .filter((e) => validViews.has(e.view))
@@ -51,6 +108,36 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // The highlight follows the content's scroll, at most once a frame.
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || !sections || sections.length === 0) {
+      setActiveSection(null);
+      return undefined;
+    }
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setActiveSection(currentSection(content, sections));
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    update();
+    content.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      content.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [sections]);
+
+  const jumpTo = useCallback((id: string) => {
+    const el = document.getElementById(settingsSectionAnchor(id));
+    if (!el) return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    el.scrollIntoView?.({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
+    el.querySelector<HTMLElement>("h2, h3")?.focus({ preventScroll: true });
+    setActiveSection(id);
+  }, []);
 
   return h("section", {
     class: "settings-overlay",
@@ -78,7 +165,7 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     h("div", { class: "settings-overlay-body" },
       h("nav", { class: "settings-overlay-nav", "aria-label": "Settings pages" },
         h("div", { class: "settings-overlay-summary" }, h(ConfigFooter, { server })),
-        entries.map((e) =>
+        entries.map((e) => [
           h("button", {
             key: e.view,
             type: "button",
@@ -90,13 +177,28 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
               e.pixelIcon ? h(PixelIcon, { name: e.pixelIcon, variant: "glyph", size: 22 }) : e.glyph),
             e.label,
           ),
-        ),
+          e.view === view && sections && sections.length > 0
+            ? h("ul", { key: `${e.view}-sections`, class: "settings-overlay-sections", "aria-label": `${e.label} sections` },
+                sections.map((s) =>
+                  h("li", { key: s.id },
+                    h("button", {
+                      type: "button",
+                      class: `settings-overlay-section${s.id === activeSection ? " active" : ""}`,
+                      "aria-current": s.id === activeSection ? "location" : undefined,
+                      onClick: () => jumpTo(s.id),
+                    }, s.title),
+                  )),
+              )
+            : null,
+        ]),
         h("div", { class: "settings-overlay-density" },
           h("span", { class: "settings-overlay-density-label" }, "Density"),
           h(SidebarDensitySelector, null),
         ),
       ),
-      h("div", { class: "settings-overlay-content" }, children),
+      h("div", { class: "settings-overlay-content", ref: contentRef },
+        h(SectionsContext.Provider, { value: setSections }, children),
+      ),
     ),
   );
 }

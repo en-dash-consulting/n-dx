@@ -135,7 +135,9 @@ describe("Workflow Sidecar section", () => {
     const section = sidecar()!;
     expect(section).toBeDefined();
     const fields = [...section.querySelectorAll<HTMLElement>(".ct-field")].map((f) => f.dataset.field);
-    expect(fields).toEqual(["allowList", "mode", "contextCeiling.worktree", "contextCeiling.hub", "idle", "githubReads"]);
+    expect(fields).toEqual(["allowList", "mode", "contextCeiling.worktree", "contextCeiling.hub", "idle"]);
+    // GitHub reads moved to Project › Connections.
+    expect(section.querySelector('input[aria-label="GitHub reads"]')).toBeNull();
     expect(input("Worktree context ceiling in tokens").value).toBe("100000");
     expect(input("Hub context ceiling in tokens").value).toBe("40000");
     expect(input("Idle window in minutes").value).toBe("120");
@@ -153,7 +155,6 @@ describe("Workflow Sidecar section", () => {
     await mount();
     await type(input("Worktree context ceiling in tokens"), "150000");
     await type(input("Idle window in minutes"), "30");
-    await click(input("GitHub reads"));
     await type(input("Command to allow"), "ndx rex status .");
     await click(button("Add"));
     await settle();
@@ -166,7 +167,7 @@ describe("Workflow Sidecar section", () => {
       { method: "DELETE", url: "/api/sidecar/allow-list", body: RULE },
       {
         method: "PUT", url: "/api/sidecar/settings",
-        body: { contextCeiling: { worktree: 150_000 }, idleMs: 1_800_000, githubReads: true },
+        body: { contextCeiling: { worktree: 150_000 }, idleMs: 1_800_000 },
       },
     ]);
   });

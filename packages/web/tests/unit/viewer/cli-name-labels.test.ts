@@ -91,14 +91,13 @@ describe("dashboard labels use the project CLI name", () => {
     expect(root.textContent).not.toContain("{cli}");
   });
 
-  it("Project page names the analyze and plan commands with the resolved name", async () => {
+  it("Project page names its commands with the resolved name", async () => {
     stubProject("myapp", { otherApisFail: true });
     act(() => {
       render(h(ProjectView, null), root);
     });
     await settle();
-    expect(root.querySelector(".project-header-subtitle")!.textContent).toContain("myapp analyze");
-    expect(root.querySelector(".project-header-subtitle")!.textContent).toContain("myapp plan");
+    expect(root.querySelector(".project-header-subtitle")!.textContent).toContain("myapp config");
     expect(root.textContent).not.toMatch(/\bndx\b/);
   });
 

@@ -781,6 +781,50 @@ describe.skipIf(!axeRun)("[a11y] Project — axe audit", () => {
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
+
+  /** Every section with a row, each row's info open: the state carrying the most controls. */
+  async function renderLoaded() {
+    const toggle = (key: string, group: string, extra: Record<string, unknown> = {}) => ({
+      key, label: key, description: `${key} description`, impact: `${key} impact`,
+      package: key.split(".")[0], group, stability: "experimental", enabled: false, defaultValue: false, ...extra,
+    });
+    const bodies: Record<string, unknown> = {
+      "/api/project-settings": { port: 4000, language: "go", sourcevisionMergeThreshold: 5, sourcevisionPins: { "src/a.ts": "web" } },
+      "/api/features": {
+        toggles: [
+          toggle("git.failForward", "git", { stability: "stable" }),
+          toggle("rex.showTokenBudget", "display", { stability: "stable", enabled: true }),
+          toggle("sourcevision.ask", "optional", { costsTokens: true }),
+          toggle("web.sidecar", "connections"),
+        ],
+      },
+    };
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const body = bodies[String(input)] ?? {};
+      return { ok: true, status: 200, json: async () => body } as Response;
+    }) as typeof fetch;
+    const { ProjectView } = await import("../../../src/viewer/views/project.js");
+    root = renderToDiv(h(ProjectView, {}));
+    for (let i = 0; i < 4; i++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    for (const info of root.querySelectorAll<HTMLButtonElement>("button.srow-info")) {
+      await act(async () => { info.click(); });
+    }
+    expect(root.querySelectorAll(".srow").length).toBeGreaterThan(4);
+  }
+
+  it("has zero critical/serious violations (light theme, loaded, details open)", async () => {
+    cleanup = setTheme("light");
+    await renderLoaded();
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero critical/serious violations (dark theme, loaded, details open)", async () => {
+    cleanup = setTheme("dark");
+    await renderLoaded();
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
 });
 
 // ── [a11y] WorkspacesView (loaded board) ─────────────────────────────────────

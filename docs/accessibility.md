@@ -52,7 +52,7 @@ packages/web/tests/unit/viewer/axe-audit.test.ts
 | Hench Monitor (`hench-runs`) | HenchRunsView loading state |
 | Workflow settings (`workflow`) | WorkflowView loading state (work settings, CLI timeouts and templates) |
 | Ask (`ask`) | AskView idle state, plus the deployed-mode unavailable state |
-| Project settings (`project`) | ProjectView loading state (analyze and plan settings, feature flags) |
+| Project settings (`project`) | ProjectView loading state, and loaded with every row's details open |
 
 Each route is tested in **both light and dark themes** to catch theme-specific structural regressions (missing ARIA labels that only appear in one theme, dynamic class applications, etc.).
 

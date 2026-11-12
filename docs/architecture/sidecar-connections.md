@@ -324,8 +324,9 @@ wire name, after the broker's own tools. A hub session gets none.
 
 ## Settings and sign-in
 
-`routes-connections.ts` serves Settings > Project, which shows a Connections
-section (`viewer/views/connections.ts`) only while `web.sidecar` is on:
+`routes-connections.ts` serves Settings > Project, whose Connections section
+shows the MCP servers row (`viewer/views/connections.ts`) and the GitHub reads
+switch only while `web.sidecar` is on:
 
 | Route | Answer |
 |-------|--------|

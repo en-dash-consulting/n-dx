@@ -1,39 +1,41 @@
 // @vitest-environment jsdom
 /**
- * Project: analyze and plan settings and feature flags on one SettingsFrame.
+ * Project: every setting is one row, in a section named for what it changes,
+ * all on one SettingsFrame.
  *
- * The page is dirty when any section differs from its saved values. One Save
- * sends each dirty section to its own endpoint; a section that saves becomes
- * clean, one whose write fails stays dirty and the frame names it. Feature
- * flags save on Save, not on click, and are announced only after their write
- * succeeds.
+ * The page is dirty when any form differs from its saved values. One Save
+ * sends each dirty form to its own endpoint; a form that saves becomes clean,
+ * one whose write fails stays dirty and the frame names it. Feature flags save
+ * on Save, not on click, and are announced only after their write succeeds.
+ * A search box filters the rows; the Settings overlay lists the sections.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+// The Sidecar toggle is read through a hook that resolves after a fetch; it is
+// served synchronously here so the Connections rows render deterministically.
+const sidecar = vi.hoisted(() => ({ on: false }));
+vi.mock("../../../src/viewer/hooks/use-feature-toggle.js", () => ({
+  useFeatureToggle: (key: string, fallback: boolean) => (key === "web.sidecar" ? sidecar.on : fallback),
+}));
+
 import { ProjectView } from "../../../src/viewer/views/project.js";
+import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { guardedLeave } from "../../../src/viewer/hooks/use-leave-guard.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import type { FeatureToggle } from "../../../src/shared/features.js";
+import type { ViewId } from "../../../src/viewer/types.js";
 
 type Json = Record<string, unknown>;
 
 interface Request { method: string; url: string; body: Json | null }
 
-interface Toggle {
-  key: string;
-  label: string;
-  description: string;
-  impact: string;
-  package: "sourcevision" | "rex" | "hench";
-  stability: "experimental" | "stable";
-  enabled: boolean;
-  defaultValue: boolean;
-}
-
-function toggle(key: string, label: string, pkg: Toggle["package"], enabled = false): Toggle {
+function toggle(key: string, label: string, group: FeatureToggle["group"], extra: Partial<FeatureToggle> = {}): FeatureToggle {
   return {
-    key, label, package: pkg, stability: "experimental", enabled, defaultValue: false,
+    key, label, package: key.split(".")[0] as FeatureToggle["package"], group,
+    stability: "experimental", enabled: false, defaultValue: false,
     description: `${label} description`, impact: `${label} impact`,
+    ...extra,
   };
 }
 
@@ -41,13 +43,23 @@ function toggle(key: string, label: string, pkg: Toggle["package"], enabled = fa
  * Serves every API the page reads. `failures` turns a write to that URL into a
  * 500 with that message.
  */
-function stubApi(opts: { failures?: Record<string, string> } = {}) {
+function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; pins?: Record<string, string> } = {}) {
+  sidecar.on = opts.sidecar ?? false;
   const requests: Request[] = [];
-  const settings = { port: null as number | null, language: null as string | null, sourcevisionMergeThreshold: null as number | null, sourcevisionPins: {} as Record<string, string> };
+  const settings = {
+    port: null as number | null,
+    language: null as string | null,
+    sourcevisionMergeThreshold: null as number | null,
+    sourcevisionPins: opts.pins ?? {} as Record<string, string>,
+  };
   const toggles = [
-    toggle("sourcevision.ask", "Ask", "sourcevision"),
-    toggle("rex.placementDraft", "Draft placement", "rex"),
+    toggle("sourcevision.ask", "Ask", "optional", { costsTokens: true }),
+    toggle("rex.placementDraft", "Draft placement", "optional", { costsTokens: true }),
+    toggle("git.failForward", "Fail-forward mode", "git", { stability: "stable" }),
+    toggle("rex.showTokenBudget", "Show Token Budget", "display", { stability: "stable", enabled: true }),
+    toggle("web.sidecar", "Sidecar", "connections", { enabled: opts.sidecar ?? false }),
   ];
+  let githubReads = false;
   const respond = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
@@ -71,6 +83,13 @@ function stubApi(opts: { failures?: Record<string, string> } = {}) {
           if (t) t.enabled = enabled;
         }
         return respond({ applied: [] });
+      case "GET /api/sidecar/settings":
+        return respond({ githubReads });
+      case "PUT /api/sidecar/settings":
+        githubReads = (body as { githubReads: boolean }).githubReads;
+        return respond({ githubReads });
+      case "GET /api/connections":
+        return respond({ connections: [] });
       default:
         return respond({});
     }
@@ -116,6 +135,12 @@ describe("ProjectView", () => {
   const frameError = () => root.querySelector(".settings-frame-error")?.textContent ?? null;
   const portInput = () => root.querySelector<HTMLInputElement>("#ps-port")!;
   const flag = (label: string) => root.querySelector<HTMLInputElement>(`input[aria-label="Toggle ${label}"]`)!;
+  const row = (key: string) => root.querySelector<HTMLElement>(`.srow[data-key="${key}"]`);
+  const keysIn = (title: string) => {
+    const section = [...root.querySelectorAll("section.project-section")].find((s) => s.querySelector("h2")?.textContent === title);
+    return [...(section?.querySelectorAll<HTMLElement>(".srow") ?? [])].map((r) => r.dataset.key);
+  };
+  const search = () => root.querySelector<HTMLInputElement>("#project-search")!;
 
   async function type(input: HTMLInputElement, value: string) {
     await act(async () => {
@@ -124,12 +149,12 @@ describe("ProjectView", () => {
     });
   }
 
-  async function flip(input: HTMLInputElement) {
-    await act(async () => { input.click(); });
+  async function click(el: HTMLElement) {
+    await act(async () => { el.click(); });
   }
 
   async function clickSave() {
-    await act(async () => { saveButton().click(); });
+    await click(saveButton());
     await settle();
   }
 
@@ -154,11 +179,25 @@ describe("ProjectView", () => {
     expect(root.querySelector(".ps-toast, .ft-toast")).toBeNull();
   });
 
-  it("shows analyze and plan settings and feature flags, and nothing else", async () => {
+  it("groups settings by what they change, not by package", async () => {
     stubApi();
     await mount();
 
-    expect(titles()).toEqual(["Analyze and plan", "Feature flags"]);
+    expect(titles()).toEqual(["Analysis", "Dashboard", "Git and commits", "Display", "Optional features", "Connections"]);
+    expect(keysIn("Analysis")).toEqual(["language", "sourcevision.zones.mergeThreshold", "sourcevision.zones.pins"]);
+    expect(keysIn("Dashboard")).toEqual(["web.port"]);
+    expect(keysIn("Git and commits")).toEqual(["features.git.failForward"]);
+    expect(keysIn("Display")).toEqual(["features.rex.showTokenBudget"]);
+    expect(keysIn("Optional features")).toEqual(["features.sourcevision.ask", "features.rex.placementDraft"]);
+    // With the Sidecar off, Connections holds only its switch.
+    expect(keysIn("Connections")).toEqual(["features.web.sidecar"]);
+  });
+
+  it("drops the stats bar and the stability legend", async () => {
+    stubApi();
+    await mount();
+    expect(root.querySelector(".ft-stats, .ft-legend")).toBeNull();
+    expect(root.textContent).not.toContain("Stability Levels");
   });
 
   it("does not render the export and refresh panels — they stay on Commands", async () => {
@@ -168,6 +207,159 @@ describe("ProjectView", () => {
     const buttons = [...root.querySelectorAll("button")].map((b) => b.textContent ?? "");
     expect(buttons.filter((t) => /\b(refresh|export)\b/i.test(t))).toEqual([]);
     expect(titles()).not.toContain("Commands");
+  });
+
+  // ── Rows ──────────────────────────────────────────────────────────
+
+  it("shows each row's label, description, config key and tags, with cost and impact behind the info button", async () => {
+    stubApi();
+    await mount();
+
+    const ask = row("features.sourcevision.ask")!;
+    expect(ask.querySelector(".srow-label")!.textContent).toBe("Ask");
+    expect(ask.querySelector(".srow-desc")!.textContent).toBe("Ask description");
+    expect(ask.querySelector("code.srow-key")!.textContent).toBe("features.sourcevision.ask");
+    expect([...ask.querySelectorAll(".srow-tag")].map((t) => t.textContent)).toEqual(["Tokens", "Experimental"]);
+    expect(ask.textContent).not.toContain("Ask impact");
+
+    const info = ask.querySelector<HTMLButtonElement>("button.srow-info")!;
+    expect(info.getAttribute("aria-label")).toBe("More about Ask");
+    await click(info);
+    expect(info.getAttribute("aria-expanded")).toBe("true");
+    expect(ask.querySelector(".srow-details")!.textContent).toContain("Ask impact");
+
+    expect([...row("web.port")!.querySelectorAll(".srow-tag")].map((t) => t.textContent)).toEqual(["Restart"]);
+  });
+
+  it("shows fail-forward and the token budget as ordinary settings, not experiments", async () => {
+    stubApi();
+    await mount();
+    for (const key of ["features.git.failForward", "features.rex.showTokenBudget"]) {
+      expect(row(key)!.querySelector(".srow-tag--experimental"), key).toBeNull();
+    }
+  });
+
+  it("names every control for assistive technology and reaches it by keyboard", async () => {
+    stubApi();
+    await mount();
+
+    for (const el of root.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")) {
+      const named = el.getAttribute("aria-label")
+        ?? (el.id ? root.querySelector(`label[for="${el.id}"]`)?.textContent : null);
+      expect(named, el.outerHTML).toBeTruthy();
+      expect(el.tabIndex, el.outerHTML).toBeGreaterThanOrEqual(0);
+    }
+    expect(flag("Ask").getAttribute("role")).toBe("switch");
+  });
+
+  it("collapses zone pins to a count and opens the table in place", async () => {
+    stubApi({ pins: { "src/a.ts": "web", "src/b.ts": "core" } });
+    await mount();
+
+    const pins = row("sourcevision.zones.pins")!;
+    expect(pins.querySelector(".srow-value")!.textContent).toBe("2 pins");
+    expect(pins.querySelector(".ps-pin-table")).toBeNull();
+
+    const edit = pins.querySelector<HTMLButtonElement>("button.srow-button")!;
+    await click(edit);
+    expect(edit.textContent).toBe("Done");
+    expect(pins.querySelectorAll(".ps-pin-table tbody tr")).toHaveLength(2);
+  });
+
+  it("resets a setting to its default, which Save then writes", async () => {
+    const { writes } = stubApi();
+    await mount();
+
+    // The token budget column is on; its default is off.
+    await click(row("features.rex.showTokenBudget")!.querySelector<HTMLButtonElement>("button.srow-reset")!);
+    expect(flag("Show Token Budget").checked).toBe(false);
+    expect(indicator()).toBe("Unsaved changes");
+    expect(row("features.rex.showTokenBudget")!.querySelector("button.srow-reset")).toBeNull();
+    // A setting already at its default offers no reset.
+    expect(row("features.sourcevision.ask")!.querySelector("button.srow-reset")).toBeNull();
+
+    await clickSave();
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/features", body: { changes: { "rex.showTokenBudget": false } } }]);
+  });
+
+  // ── Search ────────────────────────────────────────────────────────
+
+  it("filters rows by label, description or config key and hides empty sections", async () => {
+    stubApi();
+    await mount();
+
+    await type(search(), "port");
+    expect(titles()).toEqual(["Dashboard"]);
+
+    await type(search(), "failForward");
+    expect(titles()).toEqual(["Git and commits"]);
+
+    await type(search(), "draft description");
+    expect(keysIn("Optional features")).toEqual(["features.rex.placementDraft"]);
+
+    await type(search(), "");
+    expect(titles()).toHaveLength(6);
+  });
+
+  it("says so when nothing matches", async () => {
+    stubApi();
+    await mount();
+
+    await type(search(), "zzz-nothing");
+    expect(titles()).toEqual([]);
+    expect(root.querySelector('.project-search-status[role="status"]')!.textContent).toBe("No settings match “zzz-nothing”.");
+  });
+
+  it("keeps an edit made before a search, and Save still writes it", async () => {
+    const { writes } = stubApi();
+    await mount();
+
+    await type(portInput(), "4000");
+    await type(search(), "ask");
+    expect(row("web.port")).toBeNull();
+    expect(indicator()).toBe("Unsaved changes");
+
+    await clickSave();
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { port: 4000 } }]);
+  });
+
+  // ── Connections ───────────────────────────────────────────────────
+
+  it("shows GitHub reads and the MCP servers under Connections while the Sidecar is on", async () => {
+    stubApi({ sidecar: true });
+    await mount();
+    expect(keysIn("Connections")).toEqual(["features.web.sidecar", "web.sidecarGithubReads", "connections"]);
+  });
+
+  it("asks nothing of the Sidecar routes while the Sidecar is off", async () => {
+    const { requests } = stubApi();
+    await mount();
+    expect(requests.some((r) => r.url.startsWith("/api/sidecar") || r.url.startsWith("/api/connections"))).toBe(false);
+  });
+
+  it("saves GitHub reads to the Sidecar settings route on Save", async () => {
+    const { writes } = stubApi({ sidecar: true });
+    await mount();
+
+    await click(flag("GitHub reads"));
+    expect(indicator()).toBe("Unsaved changes");
+    expect(writes()).toEqual([]);
+
+    await clickSave();
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } }]);
+    expect(indicator()).toBe("All changes saved");
+  });
+
+  it("saves GitHub reads before a Save that turns the Sidecar off closes its route", async () => {
+    const { writes } = stubApi({ sidecar: true });
+    await mount();
+
+    await click(flag("GitHub reads"));
+    await click(flag("Sidecar"));
+    await clickSave();
+
+    expect(writes().map((w) => w.url)).toEqual(["/api/sidecar/settings", "/api/features"]);
+    expect(frameError()).toBeNull();
   });
 
   // ── Dirty state ───────────────────────────────────────────────────
@@ -186,33 +378,35 @@ describe("ProjectView", () => {
     await type(portInput(), "4000");
     expect(indicator()).toBe("Unsaved changes");
     expect(saveButton().disabled).toBe(false);
+    expect(row("web.port")!.querySelector(".srow-dot")).not.toBeNull();
 
     await type(portInput(), "");
     expect(indicator()).toBe("All changes saved");
+    expect(row("web.port")!.querySelector(".srow-dot")).toBeNull();
   });
 
   it("is dirty when a feature flag is flipped, and clean again when it is flipped back", async () => {
     stubApi();
     await mount();
 
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
     expect(indicator()).toBe("Unsaved changes");
-    expect(root.textContent).toContain("unsaved");
+    expect(row("features.sourcevision.ask")!.textContent).toContain("unsaved");
 
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
     expect(indicator()).toBe("All changes saved");
   });
 
-  it("stays dirty while any one section is dirty", async () => {
+  it("stays dirty while any one form is dirty", async () => {
     stubApi();
     await mount();
 
     await type(portInput(), "4000");
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
     await type(portInput(), "");
     expect(indicator()).toBe("Unsaved changes");
 
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
     expect(indicator()).toBe("All changes saved");
   });
 
@@ -222,20 +416,20 @@ describe("ProjectView", () => {
     const { writes } = stubApi();
     await mount();
 
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
     expect(writes()).toEqual([]);
 
     await clickSave();
     expect(writes()).toEqual([{ method: "PUT", url: "/api/features", body: { changes: { "sourcevision.ask": true } } }]);
   });
 
-  it("sends each dirty section to its own endpoint and ends clean", async () => {
+  it("sends each dirty form to its own endpoint and ends clean", async () => {
     const { writes } = stubApi();
     const { events, stop } = recordToggleEvents();
     try {
       await mount();
       await type(portInput(), "4000");
-      await flip(flag("Ask"));
+      await click(flag("Ask"));
 
       await clickSave();
 
@@ -253,7 +447,7 @@ describe("ProjectView", () => {
     }
   });
 
-  it("writes only the sections that are dirty", async () => {
+  it("writes only the forms that are dirty", async () => {
     const { writes } = stubApi();
     await mount();
 
@@ -263,13 +457,13 @@ describe("ProjectView", () => {
     expect(writes().map((w) => w.url)).toEqual(["/api/project-settings"]);
   });
 
-  it("leaves the sections that saved clean, keeps the failed one dirty, and names it in the frame", async () => {
+  it("leaves the forms that saved clean, keeps the failed one dirty, and names it in the frame", async () => {
     const { writes } = stubApi({ failures: { "/api/features": "Features are locked" } });
     const { events, stop } = recordToggleEvents();
     try {
       await mount();
       await type(portInput(), "4000");
-      await flip(flag("Ask"));
+      await click(flag("Ask"));
 
       await clickSave();
 
@@ -277,8 +471,8 @@ describe("ProjectView", () => {
       expect(indicator()).toBe("Unsaved changes");
       expect(frameError()).toContain("feature flags");
       expect(frameError()).not.toContain("project settings");
-      expect(root.textContent).toContain("Features are locked");
-      // The saved section is clean: Save would now write only the flag.
+      expect(root.querySelector('.project-alert[role="alert"]')!.textContent).toBe("Features are locked");
+      // The saved form is clean: Save would now write only the flag.
       expect(portInput().value).toBe("4000");
       expect(flag("Ask").checked).toBe(true);
       // A flag that did not persist is never announced.
@@ -291,13 +485,13 @@ describe("ProjectView", () => {
     }
   });
 
-  it("names every section that failed", async () => {
+  it("names every form that failed", async () => {
     stubApi({
       failures: { "/api/project-settings": "Config is read-only", "/api/features": "Features are locked" },
     });
     await mount();
     await type(portInput(), "4000");
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
 
     await clickSave();
 
@@ -316,24 +510,126 @@ describe("ProjectView", () => {
     expect(writes()).toEqual([]);
     expect(frameError()).toContain("project settings");
     expect(indicator()).toBe("Unsaved changes");
+    expect(portInput().getAttribute("aria-describedby")).toBe("ps-port-error");
   });
 
   // ── Discard ───────────────────────────────────────────────────────
 
-  it("restores every section when the leave prompt's Discard is chosen", async () => {
-    stubApi();
+  it("restores every form when the leave prompt's Discard is chosen", async () => {
+    stubApi({ sidecar: true });
     await mount();
     await type(portInput(), "4000");
-    await flip(flag("Ask"));
+    await click(flag("Ask"));
+    await click(flag("GitHub reads"));
 
     const leave = vi.fn();
     await act(async () => { guardedLeave(leave); });
     expect(leave).not.toHaveBeenCalled();
-    await act(async () => { root.querySelector<HTMLButtonElement>(".leave-guard-discard-btn")!.click(); });
+    await click(root.querySelector<HTMLButtonElement>(".leave-guard-discard-btn")!);
 
     expect(leave).toHaveBeenCalledTimes(1);
     expect(indicator()).toBe("All changes saved");
     expect(portInput().value).toBe("");
     expect(flag("Ask").checked).toBe(false);
+    expect(flag("GitHub reads").checked).toBe(false);
+  });
+});
+
+// ── Section nav in the Settings overlay ─────────────────────────────
+
+describe("Project sections in the Settings overlay nav", () => {
+  let root: HTMLDivElement;
+
+  beforeEach(() => {
+    clearProjectMetadataCache();
+    root = document.createElement("div");
+    document.body.appendChild(root);
+  });
+
+  afterEach(() => {
+    act(() => { render(null, root); });
+    root.remove();
+    vi.unstubAllGlobals();
+  });
+
+  async function mountInOverlay() {
+    const views = new Set<ViewId>(["robot-wrangler", "project", "workflow", "commands"]);
+    act(() => {
+      render(h(SettingsOverlay, { view: "project", validViews: views, onNavigate: () => {}, onClose: () => {} },
+        h(ProjectView, null)), root);
+    });
+    await settle();
+  }
+
+  const navSections = () => [...root.querySelectorAll<HTMLButtonElement>(".settings-overlay-section")];
+
+  it("lists Project's sections under its entry, the first current", async () => {
+    stubApi();
+    await mountInOverlay();
+
+    expect(navSections().map((b) => b.textContent)).toEqual(
+      ["Analysis", "Dashboard", "Git and commits", "Display", "Optional features", "Connections"]);
+    expect(navSections()[0]!.getAttribute("aria-current")).toBe("location");
+    // The list sits right under the Project entry.
+    const projectEntry = [...root.querySelectorAll(".settings-overlay-item")].find((b) => b.textContent?.includes("Project"))!;
+    expect(projectEntry.nextElementSibling?.classList.contains("settings-overlay-sections")).toBe(true);
+  });
+
+  it("scrolls to a section and focuses its heading when it is chosen", async () => {
+    stubApi();
+    await mountInOverlay();
+    const scrolled: string[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.id); };
+
+    const git = navSections().find((b) => b.textContent === "Git and commits")!;
+    await act(async () => { git.click(); });
+
+    expect(scrolled).toEqual(["settings-section-git"]);
+    expect(document.activeElement?.id).toBe("project-git-title");
+    expect(git.getAttribute("aria-current")).toBe("location");
+  });
+
+  it("moves the highlight as the content scrolls", async () => {
+    stubApi();
+    await mountInOverlay();
+    const content = root.querySelector<HTMLElement>(".settings-overlay-content")!;
+    Object.defineProperty(content, "scrollTop", { value: 300, configurable: true });
+    // Sections from Display down have scrolled past the top of the content.
+    const passed = new Set(["settings-section-analysis", "settings-section-dashboard", "settings-section-git", "settings-section-display"]);
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const top = passed.has(this.id) ? -50 : this === content ? 0 : 400;
+      return { top, bottom: top + 10, left: 0, right: 0, width: 0, height: 10, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+    };
+    // The overlay reads positions once a frame; run the frame at once.
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    try {
+      act(() => { content.dispatchEvent(new Event("scroll")); });
+      expect(navSections().find((b) => b.getAttribute("aria-current") === "location")!.textContent).toBe("Display");
+    } finally {
+      Element.prototype.getBoundingClientRect = original;
+    }
+  });
+
+  it("lists only the sections a search leaves", async () => {
+    stubApi();
+    await mountInOverlay();
+    const input = root.querySelector<HTMLInputElement>("#project-search")!;
+    await act(async () => {
+      input.value = "commit";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(navSections().map((b) => b.textContent)).toEqual(["Git and commits"]);
+  });
+
+  it("drops the list when another page is open", async () => {
+    stubApi();
+    const views = new Set<ViewId>(["robot-wrangler", "project", "workflow", "commands"]);
+    act(() => {
+      render(h(SettingsOverlay, { view: "workflow", validViews: views, onNavigate: () => {}, onClose: () => {} },
+        h("div", null, "workflow page")), root);
+    });
+    await settle();
+    expect(navSections()).toEqual([]);
   });
 });

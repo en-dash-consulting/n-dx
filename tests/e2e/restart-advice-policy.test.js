@@ -72,11 +72,6 @@ export const EXCEPTIONS = [
     includes: "without a PID file — restarting it…",
     reason: "Progress: `ndx start --here` restarting this directory's own untracked server itself, as its contract says; nothing is asked of the operator.",
   },
-  {
-    file: "packages/web/src/viewer/views/project-settings.ts",
-    includes: "Change takes effect after restarting the server (",
-    reason: "Describes when a changed dashboard port applies — a listener cannot move to another port while it runs. It is a setting's effect, not the fix for a fault.",
-  },
 ];
 
 /** Every source file under one scanned root. */

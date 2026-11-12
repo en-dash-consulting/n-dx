@@ -1,6 +1,6 @@
 /**
- * Project settings section — the project-level n-dx settings the Project page
- * renders: language, zone analysis (`analyze` / `plan`) and the dashboard port.
+ * Project settings — the project-level n-dx settings the Project page renders
+ * as rows: language and zone analysis under Analysis, the port under Dashboard.
  *
  * Surfaces the following fields from `.n-dx.json`:
  * - web.port           — dashboard server port (numeric, 1–65535)
@@ -11,13 +11,15 @@
  * Data comes from GET /api/project-settings (read) and
  * PUT /api/project-settings (update). The page owns the frame and the Save
  * button; this module owns the form state (`useProjectSettingsForm`) and the
- * fields (`ProjectSettingsSection`).
+ * rows (`projectSettingRows`).
  */
 
 import { h } from "preact";
+import type { ComponentChildren } from "preact";
 import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { useCliName } from "../hooks/index.js";
+import { SettingRow, type SettingRowSpec } from "./setting-row.js";
+import type { ProjectSectionId } from "./project-sections.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -255,7 +257,7 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
 
 function PinEditor({ form }: { form: ProjectSettingsForm }) {
   const { pinRows } = form;
-  return h("div", { class: "ps-pin-editor" },
+  return h("div", { class: "ps-pin-editor", id: "ps-pin-editor" },
     pinRows.length === 0
       ? h("p", { class: "ps-pin-empty" }, "No zone pins configured. Add a pin to override zone detection for a specific file.")
       : h("table", { class: "ps-pin-table" },
@@ -311,143 +313,109 @@ function PinEditor({ form }: { form: ProjectSettingsForm }) {
   );
 }
 
-// ── Section ───────────────────────────────────────────────────────────
+// ── Rows ──────────────────────────────────────────────────────────────
 
-/** A fresh vnode per use: one vnode object must not be mounted in two places. */
-const dirtyMark = () => h("span", { class: "ps-dirty-indicator" }, " •");
+const PINS_KEY = "sourcevision.zones.pins";
 
-export function ProjectSettingsSection({ form }: { form: ProjectSettingsForm }) {
-  const cliName = useCliName();
+/** Zone pins collapse to a count; Edit opens the table in place. */
+function PinsRow({ form }: { form: ProjectSettingsForm }) {
+  const [open, setOpen] = useState(false);
+  const count = form.pinRows.filter((r) => r.filePath).length;
+  return h(SettingRow, {
+    configKey: PINS_KEY,
+    label: "Zone pins",
+    description: "Pin a file to a named zone when zone detection keeps placing it wrong.",
+    unsaved: form.pinsDirty,
+    control: h("span", { class: "srow-inline" },
+      h("span", { class: "srow-value" }, count === 1 ? "1 pin" : `${count} pins`),
+      h("button", {
+        type: "button",
+        class: "srow-button",
+        "aria-expanded": String(open),
+        "aria-controls": "ps-pin-editor",
+        onClick: () => setOpen(!open),
+      }, open ? "Done" : "Edit"),
+    ),
+  }, open ? h(PinEditor, { form }) : null);
+}
 
-  if (form.loading) {
-    return h("div", { class: "loading" }, "Loading project settings…");
-  }
-
-  if (form.loadError && !form.data) {
-    return h("div", { class: "ps-error-state" }, h("p", null, form.loadError));
-  }
-
+/**
+ * The project settings as rows: language, merge threshold and zone pins under
+ * Analysis, the port under Dashboard.
+ */
+export function projectSettingRows(form: ProjectSettingsForm, cliName: string): SettingRowSpec<ProjectSectionId>[] {
+  if (!form.data) return [];
   const { portRaw, mergeThreshold, portError, mergeError } = form;
+  const spec = (section: ProjectSectionId, configKey: string, label: string, description: string, node: ComponentChildren): SettingRowSpec<ProjectSectionId> =>
+    ({ section, configKey, searchText: `${label} ${description} ${configKey}`, node });
 
-  return h("div", { class: "ps-sections" },
-    form.saveError ? h("div", { class: "ps-error-banner", role: "alert" }, form.saveError) : null,
+  const languageDesc = `The project's language, when auto-detection gets it wrong. Analysis, hench's guard defaults and ${cliName} init use it.`;
+  const mergeDesc = "Zones with fewer files than this merge into their closest neighbour. Higher means fewer, larger zones.";
+  const portDesc = `The port ${cliName} start serves the dashboard on.`;
 
-    // ── General (affects all commands)
-    h("section", { class: "ps-section" },
-      h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "⚙"),
-        "General",
-        h("span", { class: "ps-section-cmd" }, "all commands"),
+  return [
+    spec("analysis", "language", "Project language", languageDesc, h(SettingRow, {
+      key: "language",
+      configKey: "language",
+      label: "Project language",
+      description: languageDesc,
+      controlId: "ps-language",
+      unsaved: form.langDirty,
+      onReset: form.language !== "auto" ? () => form.setLanguage("auto") : undefined,
+      control: h("select", {
+        id: "ps-language",
+        class: "ps-select",
+        value: form.language,
+        onChange: (e: Event) => form.setLanguage((e.target as HTMLSelectElement).value),
+      }, LANGUAGE_OPTIONS.map((opt) => h("option", { key: opt.value, value: opt.value }, opt.label))),
+    })),
+    spec("analysis", "sourcevision.zones.mergeThreshold", "Merge threshold", mergeDesc, h(SettingRow, {
+      key: "merge",
+      configKey: "sourcevision.zones.mergeThreshold",
+      label: "Merge threshold",
+      description: mergeDesc,
+      controlId: "ps-merge-threshold",
+      unsaved: form.mergeDirty,
+      onReset: mergeThreshold !== "" ? () => form.setMergeThreshold("") : undefined,
+      control: h("input", {
+        id: "ps-merge-threshold",
+        type: "number",
+        class: `ps-number-input${mergeError ? " ps-input-error" : ""}`,
+        value: mergeThreshold,
+        min: 0,
+        step: 1,
+        placeholder: "3",
+        "aria-describedby": mergeError ? "ps-merge-error" : undefined,
+        onInput: (e: Event) => form.setMergeThreshold((e.target as HTMLInputElement).value),
+      }),
+    }, mergeError ? h("p", { id: "ps-merge-error", class: "ps-field-error" }, mergeError) : null)),
+    spec("analysis", PINS_KEY, "Zone pins", "Pin a file to a named zone when zone detection keeps placing it wrong.",
+      h(PinsRow, { key: "pins", form })),
+    spec("dashboard", "web.port", "Dashboard port", portDesc, h(SettingRow, {
+      key: "port",
+      configKey: "web.port",
+      label: "Dashboard port",
+      description: portDesc,
+      tags: ["Restart"],
+      info: h("p", null,
+        `Takes effect when the server restarts (`,
+        h("code", null, `${cliName} start stop && ${cliName} start`),
+        `). Empty uses ${DEFAULT_PORT}.`,
       ),
-      h("div", { class: "ps-field" },
-        h("label", { class: "ps-field-label", htmlFor: "ps-language" },
-          "Project language",
-          form.langDirty ? dirtyMark() : null,
-        ),
-        h("p", { class: "ps-field-desc" },
-          "Override the auto-detected project language. Used by sourcevision analysis, ",
-          `hench guard defaults, and ${cliName} init. Leave as Auto-detect for most projects.`,
-        ),
-        h("select", {
-          id: "ps-language",
-          class: "ps-select",
-          value: form.language,
-          onChange: (e: Event) => form.setLanguage((e.target as HTMLSelectElement).value),
-        },
-          LANGUAGE_OPTIONS.map((opt) =>
-            h("option", { key: opt.value, value: opt.value }, opt.label),
-          ),
-        ),
-      ),
-    ),
-
-    // ── ndx analyze / plan
-    h("section", { class: "ps-section" },
-      h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "▣"),
-        `${cliName} analyze / plan`,
-      ),
-      h("p", { class: "ps-section-desc" },
-        "Zone detection settings for ",
-        h("code", null, `${cliName} analyze`),
-        " and ",
-        h("code", null, `${cliName} plan`),
-        ".",
-      ),
-      h("div", { class: "ps-field" },
-        h("label", { class: "ps-field-label", htmlFor: "ps-merge-threshold" },
-          "Merge threshold",
-          form.mergeDirty ? dirtyMark() : null,
-        ),
-        h("p", { class: "ps-field-desc" },
-          "Minimum zone size in files: zones with fewer files are merged into ",
-          "their closest neighbor by import affinity. Higher values produce fewer, ",
-          "larger zones. Default: 3.",
-        ),
-        h("div", { class: "ps-field-row" },
-          h("input", {
-            id: "ps-merge-threshold",
-            type: "number",
-            class: `ps-number-input${mergeError ? " ps-input-error" : ""}`,
-            value: mergeThreshold,
-            min: 0,
-            step: 1,
-            placeholder: "3",
-            onInput: (e: Event) => form.setMergeThreshold((e.target as HTMLInputElement).value),
-          }),
-          mergeThreshold === "" && !form.mergeDirty
-            ? h("span", { class: "ps-field-default" }, "Using default (3)")
-            : null,
-        ),
-        mergeError ? h("p", { class: "ps-field-error" }, mergeError) : null,
-      ),
-      h("div", { class: "ps-field" },
-        h("span", { class: "ps-field-label" },
-          "Zone pins",
-          form.pinsDirty ? dirtyMark() : null,
-        ),
-        h("p", { class: "ps-field-desc" },
-          "Pin specific files to named zones, overriding Louvain community detection. ",
-          "Useful when a file is repeatedly misclassified.",
-        ),
-        h(PinEditor, { form }),
-      ),
-    ),
-
-    // ── ndx start
-    h("section", { class: "ps-section" },
-      h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "🌐"),
-        `${cliName} start`,
-      ),
-      h("div", { class: "ps-field" },
-        h("label", { class: "ps-field-label", htmlFor: "ps-port" },
-          "Dashboard port",
-          form.portDirty ? dirtyMark() : null,
-        ),
-        h("p", { class: "ps-field-desc" },
-          `Port the web dashboard listens on. Default: ${DEFAULT_PORT}. `,
-          "Change takes effect after restarting the server (",
-          h("code", null, `${cliName} start stop && ${cliName} start`),
-          ").",
-        ),
-        h("div", { class: "ps-field-row" },
-          h("input", {
-            id: "ps-port",
-            type: "number",
-            class: `ps-number-input${portError ? " ps-input-error" : ""}`,
-            value: portRaw,
-            min: 1,
-            max: 65535,
-            placeholder: String(DEFAULT_PORT),
-            onInput: (e: Event) => form.setPortRaw((e.target as HTMLInputElement).value),
-          }),
-          portRaw === "" && !form.portDirty
-            ? h("span", { class: "ps-field-default" }, `Using default (${DEFAULT_PORT})`)
-            : null,
-        ),
-        portError ? h("p", { class: "ps-field-error" }, portError) : null,
-      ),
-    ),
-  );
+      controlId: "ps-port",
+      unsaved: form.portDirty,
+      onReset: portRaw !== "" ? () => form.setPortRaw("") : undefined,
+      control: h("input", {
+        id: "ps-port",
+        type: "number",
+        class: `ps-number-input${portError ? " ps-input-error" : ""}`,
+        value: portRaw,
+        min: 1,
+        max: 65535,
+        placeholder: String(DEFAULT_PORT),
+        "aria-describedby": portError ? "ps-port-error" : undefined,
+        onInput: (e: Event) => form.setPortRaw((e.target as HTMLInputElement).value),
+      }),
+    }, portError ? h("p", { id: "ps-port-error", class: "ps-field-error" }, portError) : null)),
+  ];
 }

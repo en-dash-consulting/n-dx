@@ -134,15 +134,15 @@ test("project: a feature toggle saved here unhides the Ask tile on the Analysis 
 
   const overlay = await openSettings(page, "Project");
   // The input is visually hidden behind its switch label; the label is the click target.
-  const askToggle = overlay.getByRole("checkbox", { name: "Toggle Ask Panel" });
+  const askToggle = overlay.getByRole("switch", { name: "Toggle Ask Panel" });
   await expect(askToggle).toHaveCount(1, { timeout: 10_000 });
   await expect(askToggle).not.toBeChecked();
   await overlay
-    .locator("label.ft-toggle-switch")
-    .filter({ has: page.getByRole("checkbox", { name: "Toggle Ask Panel" }) })
+    .locator("label.srow-switch")
+    .filter({ has: page.getByRole("switch", { name: "Toggle Ask Panel" }) })
     .click();
   await expect(askToggle).toBeChecked();
-  await expect(overlay.locator(".ft-badge-unsaved").first()).toBeVisible();
+  await expect(overlay.locator('.srow[data-key="features.sourcevision.ask"] .srow-dot')).toBeVisible();
   await saveAndExpectClean(page);
   // The registry lists every key whatever its value, so read the entry itself.
   const features = (await (await fetch(`${dashboard.baseUrl}/api/features`)).json()) as { toggles?: Array<{ key: string; enabled?: boolean }> };
@@ -152,6 +152,8 @@ test("project: a feature toggle saved here unhides the Ask tile on the Analysis 
   await expect(askTile).toHaveCount(1, { timeout: 10_000 });
 
   await openSettings(page, "Project");
+  // Zone pins open in place from their row.
+  await overlay.locator('.srow[data-key="sourcevision.zones.pins"] button.srow-button').click();
   await overlay.locator("button.ps-pin-add").click();
   const pinPath = overlay.getByRole("textbox", { name: "Pinned file path" }).last();
   await expect(pinPath).toBeVisible();

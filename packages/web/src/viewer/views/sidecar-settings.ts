@@ -3,7 +3,8 @@
  * cards like the rest of that page and shown only while `web.sidecar` is on.
  *
  * Fields: the allow-list editor (the broker's allow-list file), mode, the
- * context ceilings, the idle window and the GitHub reads toggle. Nothing is
+ * context ceilings and the idle window. GitHub reads, saved by the same
+ * route, is on Settings › Project › Connections (github-reads.ts). Nothing is
  * written until the page's Save: `useSidecarSettingsForm` holds the edits,
  * `save` sends them and refuses an invalid value with a message first.
  *
@@ -20,7 +21,6 @@ interface SettingsResponse {
   mode: "ask";
   contextCeiling: { worktree: number; hub: number };
   idleMs: number;
-  githubReads: boolean;
   defaults: { contextCeiling: { worktree: number; hub: number }; idleMs: number };
   configFile: string;
 }
@@ -66,7 +66,6 @@ export interface SidecarSettingsForm {
   /** Raw edits by field; absent means untouched. */
   ceilingEdit: { worktree?: string; hub?: string };
   idleMinutesEdit: string | null;
-  githubReadsEdit: boolean | null;
   /** Commands staged to add, and rules staged to remove, until Save. */
   added: string[];
   removed: Rule[];
@@ -74,7 +73,6 @@ export interface SidecarSettingsForm {
   dirty: boolean;
   onCeilingChange: (scope: "worktree" | "hub", raw: string) => void;
   onIdleChange: (raw: string) => void;
-  onGithubReadsChange: (on: boolean) => void;
   /** Ask the server first, stage the command if allowed; resolves to the refusal, else null. */
   onAddRule: (command: string) => Promise<string | null>;
   onUnstageAdd: (command: string) => void;
@@ -116,14 +114,12 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [ceilingEdit, setCeilingEdit] = useState<{ worktree?: string; hub?: string }>({});
   const [idleMinutesEdit, setIdleMinutesEdit] = useState<string | null>(null);
-  const [githubReadsEdit, setGithubReadsEdit] = useState<boolean | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [removed, setRemoved] = useState<Rule[]>([]);
 
   const reset = useCallback(() => {
     setCeilingEdit({});
     setIdleMinutesEdit(null);
-    setGithubReadsEdit(null);
     setAdded([]);
     setRemoved([]);
     setSaveError(null);
@@ -165,7 +161,7 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
   }, [ceilingEdit, idleMinutesEdit]);
 
   const hasErrors = Object.values(errors).some((e) => e !== null);
-  const dirty = Object.keys(ceilingEdit).length > 0 || idleMinutesEdit !== null || githubReadsEdit !== null
+  const dirty = Object.keys(ceilingEdit).length > 0 || idleMinutesEdit !== null
     || added.length > 0 || removed.length > 0;
 
   const save = useCallback(async (): Promise<boolean> => {
@@ -214,7 +210,6 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
       if (idleMinutesEdit !== null && Number(idleMinutesEdit) * MS_PER_MINUTE !== settings.idleMs) {
         patch.idleMs = Number(idleMinutesEdit) * MS_PER_MINUTE;
       }
-      if (githubReadsEdit !== null && githubReadsEdit !== settings.githubReads) patch.githubReads = githubReadsEdit;
       if (Object.keys(patch).length > 0) {
         const res = await fetch("/api/sidecar/settings", {
           method: "PUT",
@@ -228,7 +223,7 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
     }
     await load();
     return true;
-  }, [dirty, settings, hasErrors, added, removed, ceilingEdit, idleMinutesEdit, githubReadsEdit, load]);
+  }, [dirty, settings, hasErrors, added, removed, ceilingEdit, idleMinutesEdit, load]);
 
   return {
     settings,
@@ -238,14 +233,12 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
     saveError,
     ceilingEdit,
     idleMinutesEdit,
-    githubReadsEdit,
     added,
     removed,
     errors,
     dirty,
     onCeilingChange: (scope, raw) => setCeilingEdit((prev) => ({ ...prev, [scope]: raw })),
     onIdleChange: setIdleMinutesEdit,
-    onGithubReadsChange: setGithubReadsEdit,
     onAddRule: async (command) => {
       const trimmed = command.trim().replace(/\s+/g, " ");
       if (!trimmed) return null;
@@ -376,7 +369,6 @@ export function SidecarSettingsSection({ form }: { form: SidecarSettingsForm }) 
 
   const ceilingValue = (scope: "worktree" | "hub") => form.ceilingEdit[scope] ?? String(settings.contextCeiling[scope]);
   const idleValue = form.idleMinutesEdit ?? String(settings.idleMs / MS_PER_MINUTE);
-  const githubReads = form.githubReadsEdit ?? settings.githubReads;
 
   return h("div", { class: "ct-container sidecar-settings" },
     form.saveError ? h("div", { class: "ct-error-banner", role: "alert" }, form.saveError) : null,
@@ -428,18 +420,5 @@ export function SidecarSettingsSection({ form }: { form: SidecarSettingsForm }) 
       error: form.errors.idle,
       onInput: form.onIdleChange,
     })),
-    h(Card, {
-      field: "githubReads",
-      title: "GitHub reads",
-      description: "Allow the Sidecar to read issues, pull requests and checks without a card. Saved now; nothing uses it until the GitHub lens ships.",
-    }, h("label", { class: "ct-control-row" },
-      h("input", {
-        type: "checkbox",
-        checked: githubReads,
-        "aria-label": "GitHub reads",
-        onChange: (e: Event) => form.onGithubReadsChange((e.target as HTMLInputElement).checked),
-      }),
-      " Allow GitHub reads",
-    )),
   );
 }

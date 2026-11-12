@@ -1,6 +1,6 @@
 /**
- * Feature flags section — experimental and stable feature flags, organised by
- * package (sourcevision, rex, hench), as the Project page renders them.
+ * Feature toggles on Settings › Project: the form state, and one row per
+ * toggle in the section its registry `group` names.
  *
  * A toggle is an edit, not an action: flipping one changes the form, and Save
  * writes every changed flag in one request. Only after that request succeeds
@@ -13,51 +13,11 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 // ── Types (canonical definitions in src/shared/features.ts) ──────────
 import type { FeatureToggle, FeaturesResponse } from "../external.js";
-
-// ── Package metadata ─────────────────────────────────────────────────
-
-export const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
-  sourcevision: {
-    label: "{cli} analyze / plan",
-    icon: "▣",
-    description: "Static analysis, file inventory, import graph, and zone detection",
-  },
-  rex: {
-    label: "{cli} work",
-    icon: "▨",
-    description: "PRD management, task tracking, and analysis proposals",
-  },
-  hench: {
-    label: "{cli} work",
-    icon: "▶",
-    description: "Autonomous agent execution, retry policies, and guard rails",
-  },
-  git: {
-    label: "Version control",
-    icon: "◈",
-    description: "How n-dx commits the files it generates",
-  },
-  web: {
-    label: "{cli} start",
-    icon: "◧",
-    description: "Dashboard surfaces that run work from the browser",
-  },
-};
-
-// Order the settings page renders package sections in. A package missing
-// from this list is silently dropped by the filter below, so every key in
-// PACKAGE_META belongs here — that omission is what hid the git toggles.
-export const PACKAGE_ORDER = ["sourcevision", "rex", "hench", "git", "web"];
-
-const STABILITY_META: Record<string, { label: string; class: string }> = {
-  experimental: { label: "Experimental", class: "ft-badge-experimental" },
-  stable:       { label: "Stable",       class: "ft-badge-stable" },
-  deprecated:   { label: "Deprecated",   class: "ft-badge-deprecated" },
-};
+import { SettingRow, Switch, type SettingRowSpec, type SettingTag } from "./setting-row.js";
+import type { ProjectSectionId } from "./project-sections.js";
 
 // ── Form state ───────────────────────────────────────────────────────
 
@@ -166,176 +126,44 @@ export function useFeatureTogglesForm(): FeatureTogglesForm {
   return { toggles, loading, loadError, saveError, unsaved, dirty, toggle, save, discard };
 }
 
-// ── Toggle item component ────────────────────────────────────────────
+// ── Rows ─────────────────────────────────────────────────────────────
 
-function ToggleItem({ toggle, isUnsaved, onToggle }: {
-  toggle: FeatureToggle;
-  /** True when the flag was flipped and not yet saved. */
-  isUnsaved: boolean;
-  onToggle: (key: string, enabled: boolean) => void;
-}) {
-  const isNonDefault = toggle.enabled !== toggle.defaultValue;
-  const stability = STABILITY_META[toggle.stability] ?? STABILITY_META.stable;
-  // Collapsed by default: the long form is for a toggle whose effects reach
-  // outside the dashboard, and it would crowd the page if always open.
-  const [showDetails, setShowDetails] = useState(false);
-  const detailsId = `ft-details-${toggle.key.replace(/[^a-zA-Z0-9]/g, "-")}`;
+function tagsOf(toggle: FeatureToggle): SettingTag[] {
+  const tags: SettingTag[] = [];
+  if (toggle.costsTokens) tags.push("Tokens");
+  if (toggle.stability === "experimental") tags.push("Experimental");
+  if (toggle.stability === "deprecated") tags.push("Deprecated");
+  return tags;
+}
 
-  const handleChange = useCallback(() => {
-    onToggle(toggle.key, !toggle.enabled);
-  }, [toggle.key, toggle.enabled, onToggle]);
-
-  return h("div", { class: `ft-toggle-item${isNonDefault ? " ft-toggle-modified" : ""}` },
-    h("div", { class: "ft-toggle-header" },
-      h("div", { class: "ft-toggle-title-row" },
-        h("span", { class: "ft-toggle-label" }, toggle.label),
-        h("span", { class: `ft-badge ${stability.class}` }, stability.label),
-        isNonDefault
-          ? h("span", { class: "ft-badge ft-badge-modified" }, "modified")
-          : null,
-        isUnsaved
-          ? h("span", { class: "ft-badge ft-badge-unsaved" }, "unsaved")
-          : null,
-        toggle.details
-          ? h("button", {
-              type: "button",
-              class: `ft-toggle-info${showDetails ? " ft-toggle-info--open" : ""}`,
-              onClick: () => setShowDetails(!showDetails),
-              "aria-expanded": String(showDetails),
-              "aria-controls": detailsId,
-              "aria-label": `More about ${toggle.label}`,
-              title: `More about ${toggle.label}`,
-            }, "\u24d8")
-          : null,
-      ),
-      h("label", { class: "ft-toggle-switch" },
-        h("input", {
-          type: "checkbox",
+/** One row per toggle, in registry order, each in its group's section. */
+export function featureToggleRows(form: FeatureTogglesForm): SettingRowSpec<ProjectSectionId>[] {
+  return form.toggles.map((toggle) => {
+    const configKey = `features.${toggle.key}`;
+    return {
+      section: toggle.group,
+      configKey,
+      searchText: `${toggle.label} ${toggle.description} ${configKey}`,
+      node: h(SettingRow, {
+        key: configKey,
+        configKey,
+        label: toggle.label,
+        description: toggle.description,
+        tags: tagsOf(toggle),
+        info: h("div", null,
+          h("p", null, toggle.impact),
+          toggle.details ? h("p", { class: "srow-details-long" }, toggle.details) : null,
+        ),
+        unsaved: form.unsaved.has(toggle.key),
+        onReset: toggle.enabled !== toggle.defaultValue
+          ? () => form.toggle(toggle.key, toggle.defaultValue)
+          : undefined,
+        control: h(Switch, {
           checked: toggle.enabled,
-          onChange: handleChange,
-          "aria-label": `Toggle ${toggle.label}`,
+          label: `Toggle ${toggle.label}`,
+          onChange: (next) => form.toggle(toggle.key, next),
         }),
-        h("span", { class: "ft-toggle-slider" }),
-        h("span", { class: "ft-toggle-status" }, toggle.enabled ? "Enabled" : "Disabled"),
-      ),
-    ),
-    h("p", { class: "ft-toggle-desc" }, toggle.description),
-    h("div", { class: "ft-toggle-impact" },
-      h("span", { class: "ft-toggle-impact-icon", "aria-hidden": "true" }, "⚠"),
-      h("span", null, toggle.impact),
-    ),
-    toggle.details && showDetails
-      ? h("div", { class: "ft-toggle-details", id: detailsId }, toggle.details)
-      : null,
-  );
-}
-
-// ── Package section component ────────────────────────────────────────
-
-function PackageSection({ pkg, toggles, unsaved, onToggle }: {
-  pkg: string;
-  toggles: FeatureToggle[];
-  unsaved: ReadonlySet<string>;
-  onToggle: (key: string, enabled: boolean) => void;
-}) {
-  const cliName = useCliName();
-  const rawMeta = PACKAGE_META[pkg] ?? { label: pkg, icon: "•", description: "" };
-  const meta = { ...rawMeta, label: resolveCliLabel(rawMeta.label, cliName) };
-
-  return h("div", { class: "ft-package-section" },
-    h("div", { class: `ft-package-header ft-package-${pkg}` },
-      h("span", { class: "ft-package-icon" }, meta.icon),
-      h("div", null,
-        h("h3", { class: "ft-package-title" }, meta.label),
-        h("p", { class: "ft-package-desc" }, meta.description),
-      ),
-    ),
-    h("div", { class: "ft-toggle-list" },
-      ...toggles.map((toggle) =>
-        h(ToggleItem, {
-          key: toggle.key,
-          toggle,
-          isUnsaved: unsaved.has(toggle.key),
-          onToggle,
-        }),
-      ),
-    ),
-  );
-}
-
-// ── Stats bar ────────────────────────────────────────────────────────
-
-function StatsBar({ toggles }: { toggles: FeatureToggle[] }) {
-  const total = toggles.length;
-  const enabled = toggles.filter((t) => t.enabled).length;
-  const experimental = toggles.filter((t) => t.stability === "experimental").length;
-  const modified = toggles.filter((t) => t.enabled !== t.defaultValue).length;
-
-  return h("div", { class: "ft-stats" },
-    h("div", { class: "ft-stat" },
-      h("span", { class: "ft-stat-value" }, String(enabled)),
-      h("span", { class: "ft-stat-label" }, `of ${total} enabled`),
-    ),
-    h("div", { class: "ft-stat" },
-      h("span", { class: "ft-stat-value" }, String(experimental)),
-      h("span", { class: "ft-stat-label" }, "experimental"),
-    ),
-    h("div", { class: "ft-stat" },
-      h("span", { class: "ft-stat-value" }, String(modified)),
-      h("span", { class: "ft-stat-label" }, "modified from defaults"),
-    ),
-  );
-}
-
-// ── Section ──────────────────────────────────────────────────────────
-
-export function FeatureTogglesSection({ form }: { form: FeatureTogglesForm }) {
-  const cliName = useCliName();
-  const { toggles } = form;
-
-  if (form.loading) {
-    return h("div", { class: "loading" }, "Loading feature toggles...");
-  }
-
-  if (form.loadError && toggles.length === 0) {
-    return h("div", { class: "ft-error-state" },
-      h("p", null, form.loadError),
-      h("p", { class: "ft-error-hint" },
-        "Make sure the n-dx server is running. Run ",
-        h("code", null, `${cliName} start .`),
-        " to start it.",
-      ),
-    );
-  }
-
-  const byPackage = new Map<string, FeatureToggle[]>();
-  for (const toggle of toggles) {
-    if (!byPackage.has(toggle.package)) byPackage.set(toggle.package, []);
-    byPackage.get(toggle.package)!.push(toggle);
-  }
-
-  return h("div", { class: "ft-sections" },
-    form.saveError ? h("div", { class: "ft-error-banner", role: "alert" }, form.saveError) : null,
-    h(StatsBar, { toggles }),
-    ...PACKAGE_ORDER
-      .filter((pkg) => byPackage.has(pkg))
-      .map((pkg) =>
-        h(PackageSection, {
-          key: pkg,
-          pkg,
-          toggles: byPackage.get(pkg)!,
-          unsaved: form.unsaved,
-          onToggle: form.toggle,
-        }),
-      ),
-    h("div", { class: "ft-legend" },
-      h("span", { class: "ft-legend-title" }, "Stability Levels:"),
-      h("span", { class: "ft-badge ft-badge-stable" }, "Stable"),
-      h("span", { class: "ft-legend-sep" }, "— Production-ready features"),
-      h("span", { class: "ft-badge ft-badge-experimental" }, "Experimental"),
-      h("span", { class: "ft-legend-sep" }, "— May change or have rough edges"),
-      h("span", { class: "ft-badge ft-badge-deprecated" }, "Deprecated"),
-      h("span", { class: "ft-legend-sep" }, "— Will be removed in a future version"),
-    ),
-  );
+      }),
+    };
+  });
 }
