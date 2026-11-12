@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runPostTaskTests, runTestGate } from "../../src/tools/test-runner.js";
 import { validateCompletion } from "../../src/validation/completion.js";
+import { createCommandExecutor } from "../../src/tools/rex.js";
 import { GuardRails } from "../../src/guard/index.js";
 import { DEFAULT_HENCH_CONFIG } from "../../src/schema/v1.js";
 import { TEST_MAX_WORKERS_ENV } from "../../src/process/test-workers.js";
@@ -77,7 +78,14 @@ describeNeedsPosixShell("test commands receive the worker cap", () => {
     expect(result.testsPassed).toBe(true);
   });
 
+  it("a requirement's validation command", async () => {
+    const result = await createCommandExecutor(projectDir, CAP)(probe(String(CAP)));
+    expect(result.exitCode).toBe(0);
+  });
+
   it("an unset cap changes nothing", async () => {
+    const requirement = await createCommandExecutor(projectDir)(probe(INHERITED));
+    expect(requirement.exitCode).toBe(0);
     const gate = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: probe(INHERITED) });
     const post = await runPostTaskTests({ projectDir, filesChanged: ["src/a.ts"], testCommand: probe(INHERITED) });
     expect(gate.passed).toBe(true);
