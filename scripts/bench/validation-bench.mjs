@@ -19,7 +19,10 @@
  * Case D takes the host slot around each run through hench's built slot
  * module, the way a hench gate does, and passes its token on; the runner
  * finds the token and runs inside that slot (nesting rule) instead of
- * acquiring again. Cases A–C pass `--no-slot`, the pre-wave-1 behaviour.
+ * acquiring again. Cases A–C never touch the slot and pass `--no-slot`, the
+ * pre-wave-1 behaviour (./lib/batch.mjs).
+ *
+ * The idle check runs once, at start: a run started later is not detected.
  *
  * Every worktree it created is removed on exit, on SIGINT/SIGTERM and on
  * error, unless `--keep`.
@@ -37,13 +40,14 @@ import {
   CASES,
   COOLDOWN_MS,
   FIXTURES,
+  IDLE_WARNING,
   USAGE,
   buildPlan,
-  caseEnv,
   formatPlan,
   parseBenchArgs,
   runnerArgs,
 } from "./lib/plan.mjs";
+import { runBatch } from "./lib/batch.mjs";
 import {
   ancestorPids,
   findBusyProcesses,
@@ -56,7 +60,6 @@ import {
 } from "./lib/samples.mjs";
 import { createLineCollector, parseGateOutput } from "./lib/gate-output.mjs";
 import { renderSummaryMarkdown, summarize } from "./lib/summary.mjs";
-import { settleAll } from "./lib/settle.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SAMPLE_INTERVAL_MS = 2_000;
@@ -300,38 +303,18 @@ async function applyFixture(path, base, fixtureName, logPath) {
 // ---------------------------------------------------------------------------
 
 /**
- * One measured gate run. Case D takes the host slot first and hands the token
- * to the runner, which then runs nested inside it.
+ * Spawn one measured gate run for `runBatch`. A slot case's `lease` is held
+ * already; its token is in `env`, so the runner runs nested inside it.
  */
-async function measuredRun({ batch, worker, worktree, base, slotApi, out, timeoutMs }) {
-  const env = caseEnv(batch.caseId, process.env);
-  const runKey = `${batch.caseId}-${batch.fixture}-r${batch.repeat}-w${worker}`;
+async function launchRun({ batch, worktree, runKey, env, lease, base, out, timeoutMs }) {
   const logPath = join(out, "logs", `${runKey}.log`);
-  const record = {
-    caseId: batch.caseId,
-    fixture: batch.fixture,
-    repeat: batch.repeat,
-    worker,
-    batchId: batch.batchId,
-    maxWorkers: env.NDX_TEST_MAX_WORKERS ?? null,
-    slot: CASES[batch.caseId].slot,
-    requestedAt: Date.now(),
-  };
-
-  let lease = null;
-  if (slotApi) {
-    lease = await slotApi.acquireValidationSlot({ slotDir: slotApi.slotDir, projectDir: worktree, env, signal: abort.signal });
-    record.queueMs = lease.queueWaitMs;
-    record.slotNested = lease.nested;
-  }
   rmSync(join(worktree, ".test-logs"), { recursive: true, force: true });
 
-  const startedAt = Date.now();
   const collector = createLineCollector();
   const result = await new Promise((resolvePromise) => {
     const child = spawnCli(process.execPath, runnerArgs(batch.caseId, base), {
       cwd: worktree,
-      env: lease ? lease.childEnv(env) : env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
       // Its own process group, so a timeout or Ctrl-C stops the whole tree.
       detached: process.platform !== "win32",
@@ -367,18 +350,8 @@ async function measuredRun({ batch, worker, worktree, base, slotApi, out, timeou
       resolvePromise({ exitCode: code, signal, timedOut });
     });
   });
-  const endedAt = Date.now();
-  if (lease) {
-    await lease.release().catch((err) => console.error(`WARNING: could not release the validation slot after ${runKey}: ${err.message}`));
-  }
-
   const gate = parseGateOutput(collector.lines);
-  Object.assign(record, {
-    startedAt,
-    endedAt,
-    wallMs: endedAt - record.requestedAt,
-    execMs: lease ? endedAt - startedAt : null,
-    queueMs: record.queueMs ?? null,
+  const record = {
     exitCode: result.exitCode,
     signal: result.signal,
     timedOut: result.timedOut,
@@ -388,7 +361,7 @@ async function measuredRun({ batch, worker, worktree, base, slotApi, out, timeou
     suites: gate.suites,
     testTimeouts: gate.testTimeouts,
     log: logPath,
-  });
+  };
   if (result.exitCode !== 0 && existsSync(join(worktree, ".test-logs"))) {
     const kept = join(out, "logs", `${runKey}-test-logs`);
     cpSync(join(worktree, ".test-logs"), kept, { recursive: true });
@@ -472,6 +445,7 @@ async function main() {
   writeFileSync(join(out, "meta.json"), `${JSON.stringify(meta, null, 2)}\n`);
   console.log(formatPlan(plan, options).replace(/\nDry run: nothing was created\.$/, ""));
   console.log(`\nCommit ${base}; bench worktrees under ${benchDir}; setup output in ${setupLog}`);
+  console.log(`\n${IDLE_WARNING}\n`);
 
   const worktrees = [];
   for (let i = 1; i <= plan.worktrees; i++) {
@@ -499,11 +473,14 @@ async function main() {
           console.log(`Batch ${batchNo}/${plan.batches.length}: case ${batch.caseId}, ${batch.fixture}, ${batch.worktrees} run(s)…`);
           batch.startMs = Date.now();
           await sampler.begin(batch.batchId);
-          // Every run must have exited before an error reaches cleanup, which removes their worktrees.
-          const records = await settleAll(
-            worktrees.slice(0, batch.worktrees).map((worktree, i) =>
-              measuredRun({ batch, worker: i + 1, worktree, base, slotApi, out, timeoutMs: options.timeoutMs })),
-          );
+          const records = await runBatch({
+            batch,
+            worktrees,
+            slotApi,
+            signal: abort.signal,
+            baseEnv: process.env,
+            launch: (run) => launchRun({ ...run, batch, base, out, timeoutMs: options.timeoutMs }),
+          });
           sampler.end();
           batch.endMs = Date.now();
           for (const record of records) {

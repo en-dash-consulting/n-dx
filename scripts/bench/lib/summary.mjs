@@ -8,6 +8,7 @@
  *   its last exit.
  * - peaks and page-outs: over the samples taken during the group's batches;
  *   page-outs are the counter's rise within each batch, summed.
+ * - median queue and exec: over the runs whose record says `slotTaken`.
  */
 
 /** Median of the finite numbers in `values`; null when there are none. */
@@ -51,6 +52,7 @@ export function summarize({ runs, batches, samples }) {
   for (const group of groups.values()) {
     const ids = new Set(group.batches.map((b) => b.batchId));
     const groupRuns = runs.filter((r) => ids.has(r.batchId));
+    const slotRuns = groupRuns.filter((r) => r.slotTaken === true);
     const groupSamples = samples.filter((s) => ids.has(s.batchId));
     const pageoutRises = group.batches
       .map((b) => counterRise(groupSamples.filter((s) => s.batchId === b.batchId), "pageouts"))
@@ -69,8 +71,9 @@ export function summarize({ runs, batches, samples }) {
       failures: groupRuns.filter((r) => r.exitCode !== 0).length,
       timeouts: groupRuns.filter((r) => r.timedOut).length,
       testTimeouts: groupRuns.reduce((sum, r) => sum + (r.testTimeouts ?? 0), 0),
-      medianQueueMs: median(groupRuns.map((r) => r.queueMs)),
-      medianExecMs: median(groupRuns.map((r) => r.execMs)),
+      // Only a run that took the slot has a queue; any other queue figure is an artefact.
+      medianQueueMs: median(slotRuns.map((r) => r.queueMs)),
+      medianExecMs: median(slotRuns.map((r) => r.execMs)),
     });
   }
   return rows.sort((a, b) => a.fixture.localeCompare(b.fixture) || a.caseId.localeCompare(b.caseId));
@@ -101,7 +104,7 @@ export function renderSummaryMarkdown(rows, meta) {
   }
   lines.push(
     "",
-    "Peak RSS sums every process under the batch's runs. Page-outs are pages written out during the batch. Queue and exec apply to case D only. Raw data: `runs.jsonl`, `batches.jsonl`, `samples.jsonl`.",
+    "Peak RSS sums every process under the batch's runs. Page-outs are pages written out during the batch. Queue and exec count only runs that took the host slot (`slotTaken` in `runs.jsonl`, case D); other rows show –. Raw data: `runs.jsonl`, `batches.jsonl`, `samples.jsonl`.",
     "",
   );
   return lines.join("\n");
