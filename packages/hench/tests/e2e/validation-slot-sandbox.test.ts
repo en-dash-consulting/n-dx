@@ -23,9 +23,9 @@
  * Uses the per-worker temp ndx home (tests/setup-ndx-home.js), never the
  * real one. The gate case runs the built hench (`dist/`).
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -45,7 +45,7 @@ const on = { mode: "on" as const, toolNetwork: "none" as const, source: "env" as
  * held as `argv[2]` says and the token and credential store stayed unreadable.
  */
 const TAKE_SLOT = `
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { acquireValidationSlot, describeValidationSlotFailure, resolveValidationSlotDir } from "./scripts/lib/validation-slot.mjs";
 import { resolveNdxHome } from "./packages/core/layout.js";
@@ -56,7 +56,11 @@ if (!unreadable("auth.token") || !unreadable("credentials.json")) { console.erro
 const slotDir = resolveValidationSlotDir();
 let lease;
 try {
-  lease = await acquireValidationSlot({ slotDir, projectDir: process.cwd(), pollIntervalMs: 20 });
+  // A marker in the project (writable) once it queues behind another holder.
+  lease = await acquireValidationSlot({
+    slotDir, projectDir: process.cwd(), pollIntervalMs: 20,
+    onWait: () => writeFileSync("waiting", ""),
+  });
 } catch (err) {
   for (const line of describeValidationSlotFailure(err, slotDir)) console.error(line);
   process.exit(4);
@@ -141,13 +145,18 @@ describe.skipIf(!live)("the test runner's validation slot inside hench's sandbox
     expect(await readValidationSlotHolder(slotDir)).toBeNull();
   });
 
-  it("queues a confined runner behind a live holder rather than failing", async () => {
+  it("queues a confined runner behind a live holder, neither failing nor reclaiming its record", async () => {
     const holder = await acquireValidationSlot({ slotDir, projectDir: "/elsewhere", env: {} });
     try {
       const env: NodeJS.ProcessEnv = { ...process.env };
       delete env[VALIDATION_SLOT_ENV];
       const pending = execRepoShellCmd("node take-slot.mjs held", { cwd: project, timeout: 60_000, env }, { setting: on });
-      setTimeout(() => void holder.release(), 300);
+      // Release only once the runner reports it is waiting: a runner that
+      // judged the live holder stale would take the slot without waiting,
+      // never write the marker, and leave the holder's record replaced.
+      await vi.waitFor(() => expect(existsSync(join(project, "waiting"))).toBe(true), { timeout: 30_000, interval: 20 });
+      expect((await readValidationSlotHolder(slotDir))?.token).toBe(holder.token);
+      await holder.release();
       const result = await pending;
       expect(result.exitCode, `${result.stdout}\n${result.stderr}`).toBe(0);
     } finally {

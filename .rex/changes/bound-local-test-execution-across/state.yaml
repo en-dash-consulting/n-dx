@@ -194,10 +194,14 @@ items:
     lastModified: "2026-11-12T17:37:23.271Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d8a7343d-275f-4a4d-a782-c06c1a08f585":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-12T21:30:37.432Z"
-    activeIntervals: [{"start":"2026-11-12T21:30:37.432Z"}]
-    lastModified: "2026-11-12T21:30:38.250Z"
+    completedAt: "2026-11-12T22:18:22.009Z"
+    endedAt: "2026-11-12T22:18:22.009Z"
+    activeIntervals: [{"end":"2026-11-12T22:18:22.009Z","start":"2026-11-12T21:30:37.432Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sandbox grants exactly <ndx home>/validation-slot/ (Seatbelt allow after the ndx-home deny; bwrap bind over the mask) for tool and vendor-cli kinds, creates it before spawn; nested acquire reads before any write in both slot implementations; runner names sandbox and slot dir on EPERM/EACCES. Live Seatbelt tests cover gate nesting and no-token take/release. Linux PID-namespace liveness split into its own task."
+    lastModified: "2026-11-12T22:18:22.009Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "de29498f-6556-4355-b68b-d5c4b3c11129":
     status: "completed"

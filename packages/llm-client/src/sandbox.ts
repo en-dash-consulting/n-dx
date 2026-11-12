@@ -606,6 +606,10 @@ export function buildSeatbeltProfile(policy: SandboxPolicy): string {
     // After the ndx-home denial, so it wins for this one subtree only.
     lines.push("; the host validation slot: the one ndx-home directory a confined process may use");
     lines.push(`(allow file-read* file-write* (subpath ${sbplString(slotDir)}))`);
+    // The directory entry itself stays unwritable: otherwise the child could
+    // remove it and put a symlink in its place, and hench, which is not
+    // confined, would create and unlink its slot files wherever that points.
+    lines.push(`(deny file-write* (literal ${sbplString(slotDir)}))`);
   }
   return lines.join("\n") + "\n";
 }
