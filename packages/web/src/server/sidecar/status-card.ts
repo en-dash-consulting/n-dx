@@ -13,6 +13,7 @@
 
 import {
   handleUpdateTaskStatus,
+  isChangeLayerStore,
   openClaimsStore,
   resolveClaimHolder,
   resolveStore,
@@ -25,8 +26,8 @@ import { findItemByRef } from "../tracker/item-links.js";
 import type { SidecarStatusChange } from "../../shared/index.js";
 import type { CarryOutResult } from "./carry-out.js";
 
-/** The statuses a call may propose, as `update_task_status` lists them. */
-export const PROPOSABLE_STATUSES = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled", "deleted"] as const;
+/** Ordinary status moves only: rex's `deleted` removes the item's whole subtree. */
+export const PROPOSABLE_STATUSES = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled"] as const;
 
 const isStatus = (value: unknown): value is SidecarStatusChange["to"] => (PROPOSABLE_STATUSES as readonly unknown[]).includes(value);
 
@@ -36,7 +37,8 @@ export async function readStatusCall(rexDir: string, input: Record<string, unkno
   if (!itemId) return "a status change names the item (id)";
   if (!isStatus(input.status)) return `status must be one of ${PROPOSABLE_STATUSES.join(", ")}`;
   if (input.reason !== undefined && typeof input.reason !== "string") return "reason must be a string";
-  const item = findItemByRef((await (await resolveStore(rexDir)).loadDocument()).items, itemId);
+  const store = await resolveStore(rexDir);
+  const item = findItemByRef((await store.loadDocument()).items, itemId);
   if (!item) return `no item ${itemId}`;
   if (item.status === input.status) return `${item.id} is already ${item.status}`;
   const transition = validateTransition(item.status, input.status);
@@ -45,6 +47,7 @@ export async function readStatusCall(rexDir: string, input: Record<string, unkno
     itemTitle: item.title,
     from: item.status,
     to: input.status,
+    ...(input.status === "completed" && isChangeLayerStore(store) && { completionPolicy: "v2" as const }),
     ...(input.reason?.trim() && { reason: input.reason.trim() }),
     rule: transition.allowed ? { allowed: true } : { allowed: false, message: transition.message ?? "rex refuses this transition" },
   };
@@ -61,6 +64,8 @@ function completionHeld(reply: string): boolean {
 
 /** An approved status card's write through rex's `update_task_status`. Never throws. */
 export async function writeStatusCard(ctx: { rexDir: string; projectDir: string }, change: SidecarStatusChange): Promise<CarryOutResult> {
+  // Also refuse cards persisted by an older server that offered deletion.
+  if (!isStatus(change.to)) return { ok: false, text: `Nothing was written: status must be one of ${PROPOSABLE_STATUSES.join(", ")}.` };
   try {
     const store = await resolveStore(ctx.rexDir);
     const item = findItemByRef((await store.loadDocument()).items, change.itemId);

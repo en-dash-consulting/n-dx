@@ -49,6 +49,7 @@ import {
   type SidecarActions,
 } from "./carry-out.js";
 import { readChoiceCall } from "./choice-card.js";
+import { PROPOSABLE_STATUSES } from "./status-card.js";
 import { buildExternalCall, callProblems } from "./external-call.js";
 import { BRANCH_HEALTH_OFF_READ, CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 import { LEDGER_ENTRY_MAX_CHARS, type LedgerEntryType } from "./ledger.js";
@@ -162,12 +163,12 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
   propose_status: {
     description: [
       "Propose changing an existing PRD item's status (what rex update_task_status does). Always waits for the operator's status card, which shows the current and proposed status and rex's own transition rule; nothing is written before Approve, and never allow-listed.",
-      "Approval runs rex's own path, never forced: a move rex refuses (for example completed to pending) comes back as an error with rex's message, and completing an item runs rex's checks.",
+      "Approval runs rex's own path, never forced: a move rex refuses (for example completed to pending) comes back as an error with rex's message. V2 completion cards disclose enclosing-change completion and product amendment apply policy. Deletion is not a status-card action.",
       "Refused with no card when the item does not exist or already has the status. Fields other than status are edited with propose_item_edit.",
     ].join(" "),
     input: {
       id: z.string().min(1).describe("The change, task or subtask (id or display id)"),
-      status: z.enum(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled", "deleted"]).describe("The proposed status"),
+      status: z.enum(PROPOSABLE_STATUSES).describe("The proposed status"),
       reason: z.string().optional().describe("Why the status changes; shown on the card, and the failure reason when status is failing"),
     },
   },

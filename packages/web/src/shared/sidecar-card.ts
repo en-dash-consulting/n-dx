@@ -128,6 +128,8 @@ export interface SidecarStatusChange {
   itemTitle: string;
   from: SidecarItemStatus;
   to: SidecarItemStatus;
+  /** Conditional policy disclosure, not a dry run or a promise that completion/apply will succeed. */
+  completionPolicy?: "v2";
   reason?: string;
   rule: { allowed: true } | { allowed: false; message: string };
 }

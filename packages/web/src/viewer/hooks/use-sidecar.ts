@@ -168,6 +168,7 @@ export interface SidecarStatusChange {
   itemTitle: string;
   from: string;
   to: string;
+  completionPolicy?: "v2";
   reason?: string;
   rule: { allowed: true } | { allowed: false; message: string };
 }

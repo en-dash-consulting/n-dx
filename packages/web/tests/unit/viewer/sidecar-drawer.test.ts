@@ -1386,6 +1386,27 @@ describe("permission cards", () => {
       expect(root.querySelector(".sidecar-status-refused")?.textContent).toBe('Rex refuses this move: Cannot move from "completed" to "pending".');
     });
 
+    it("discloses enclosing-change completion and conditional product apply before approval", async () => {
+      const pending = status({ allowed: true }, "completed");
+      pending.statusChange!.completionPolicy = "v2";
+      await openWith([pending]);
+      const effects = root.querySelector(".sidecar-status-effects")?.textContent;
+      expect(effects).toContain("enclosing pending changes");
+      expect(effects).toContain("all their live work is complete");
+      expect(effects).toContain('rex.applyOn is "complete" (the default)');
+      expect(effects).toContain("apply their product amendments");
+      expect(effects).toContain('"review" or "release"');
+      expect(effects).toContain("unapplied");
+      expect(effects).toContain("test gate");
+      expect(decisions()).toEqual([]);
+      expect(root.querySelector(".sidecar-card-approve")).not.toBeNull();
+    });
+
+    it("does not describe v2 apply effects for an ordinary status move", async () => {
+      await openWith([status({ allowed: true })]);
+      expect(root.querySelector(".sidecar-status-effects")).toBeNull();
+    });
+
     const noteOf = (carriedOut: NonNullable<SidecarCard["carriedOut"]>): string | null | undefined => {
       const decided = { ...status({ allowed: true }, "completed"), status: "approved" as const, carriedOut };
       act(() => { render(h(StatusBody, { card: decided }), root); });

@@ -25,6 +25,13 @@ export function StatusBody({ card }: { card: SidecarCard }) {
     change.rule.allowed
       ? h("p", { class: "sidecar-status-rule" }, "Rex allows this move without force.")
       : h("p", { class: "sidecar-status-rule sidecar-status-refused", role: "note" }, `Rex refuses this move: ${change.rule.message}`),
+    change.to === "completed" && change.completionPolicy === "v2"
+      ? h("div", { class: "sidecar-status-effects", role: "note" },
+        h("p", null, "Completing this item may also complete enclosing pending changes when all their live work is complete. Enclosing changes in progress do not auto-complete."),
+        h("p", null, 'If rex.applyOn is "complete" (the default), completed changes may apply their product amendments as part of this approval. With "review" or "release", completion leaves amendments unapplied. Rex still checks placement and apply requirements.'),
+        h("p", null, "If a hench run holds completion, approval only records the request; completion and any apply wait for its test gate to pass."),
+      )
+      : null,
     h("p", { class: "sidecar-status-note" }, written
       ? (written.held ? "Recorded; the hench run applies it after its test gate." : written.ok ? "Status written." : "Nothing was written; the agent was told why.")
       : change.rule.allowed
