@@ -62,10 +62,14 @@ items:
     lastModified: "2026-11-12T17:53:30.628Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3f564624-cbee-4520-b9f6-247ccfc8e92a":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-12T22:19:06.222Z"
-    activeIntervals: [{"start":"2026-11-12T22:19:06.222Z"}]
-    lastModified: "2026-11-12T22:19:07.538Z"
+    completedAt: "2026-11-12T22:31:03.630Z"
+    endedAt: "2026-11-12T22:31:03.630Z"
+    activeIntervals: [{"end":"2026-11-12T22:31:03.630Z","start":"2026-11-12T22:19:06.222Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot protocol rule 4a: records carry the writer's PID namespace and enclosing chain; the bwrap sandbox sets NDX_OUTER_PID_NAMESPACES; both implementations judge foreign-namespace pids by namespace, so nesting and waiting work under bubblewrap."
+    lastModified: "2026-11-12T22:31:03.630Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "40b7cd84-8bcc-4175-8bd0-92b8ea8ea290":
     status: "completed"
