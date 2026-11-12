@@ -4,7 +4,8 @@
  * `hench.testGate.maxWorkers` becomes `NDX_TEST_MAX_WORKERS`, which every
  * vitest config in a project that opts in reads (see `tests/test-max-workers.mjs`
  * in the n-dx repository). Hench sets it on the gate and its re-run, post-task
- * tests, the completion check's test run and the agent session's shell.
+ * tests, the completion check's test run, requirement validation commands and
+ * the agent session's shell.
  *
  * Applied after the environment is sanitized, so a `guard.env` deny glob
  * cannot drop it. That is safe to take from repository config: the value can
