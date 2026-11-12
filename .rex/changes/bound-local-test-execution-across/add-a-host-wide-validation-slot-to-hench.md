@@ -11,6 +11,7 @@ acceptanceCriteria:
   - "Waiting stops promptly on abort and reports queue wait in milliseconds"
   - "The on-disk protocol is documented in the module header"
 priority: "high"
+run: {"maxTurns":150}
 tags:
   - "validation-gate"
   - "wave-1"

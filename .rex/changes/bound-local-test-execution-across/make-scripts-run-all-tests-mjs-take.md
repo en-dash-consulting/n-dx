@@ -11,6 +11,7 @@ acceptanceCriteria:
   - "The slot is released after the summary and on SIGINT/SIGTERM once child suites have exited"
   - "A root drift test proves the hench and scripts implementations exclude each other and honour each other's token, and it is listed in ROOT_DRIFT_TEST_FILES"
 priority: "high"
+run: {"maxTurns":150}
 tags:
   - "validation-gate"
   - "wave-1"
