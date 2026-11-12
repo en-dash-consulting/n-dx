@@ -65,7 +65,8 @@ async function mount(
       ? { status: 200, body: readyPage(tasks, url) }
       : url === "/api/rex/impact"
         ? { status: 200, body: { items: impact } }
-        : execute;
+        : url === "/api/hench/execute" ? execute
+          : { status: 404, body: { error: `Unexpected route: ${url}` } };
     return { ok: answer.status < 300, status: answer.status, json: async () => answer.body };
   }));
   const props = { onPrepare: vi.fn(), onOpenLive: vi.fn(), onOpenPrd: vi.fn() };
@@ -84,7 +85,8 @@ describe("Ready to run", () => {
   it("asks for the first page and lists rows in the order returned, resume rows labelled", async () => {
     await mount();
     expect(calls[0].url).toBe("/api/hench/ready?limit=50&offset=0");
-    expect(calls).toHaveLength(1);
+    expect(calls.filter((c) => c.url.startsWith("/api/hench/ready"))).toHaveLength(1);
+    expect(calls.filter((c) => c.url === "/api/rex/impact")).toHaveLength(1);
     expect(rows().map((r) => r.querySelector(".ready-title")!.textContent)).toEqual(["Second by priority", "Stopped halfway"]);
     const first = rows()[0].textContent!;
     expect(first).toContain("Epic › Feature");
@@ -150,10 +152,12 @@ describe("Ready to run", () => {
       entries: [], running: 1, freeMemoryBytes: null, limits: { maxSessions: 2, memoryFloorBytes: 0 }, memoryPaused: false, ...extra,
     };
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-      const body = url.startsWith("/api/hench/ready") ? { tasks: TASKS, limit: 10, dir: "/w" }
-        : url === "/api/hub/queue" ? hub
-        : { queued: true, position: 5, reason: "at-capacity" };
-      return { ok: true, status: url === "/api/hench/execute" ? 202 : 200, json: async () => body };
+      const answer = url.startsWith("/api/hench/ready") ? { status: 200, body: readyPage(TASKS, url) }
+        : url === "/api/rex/impact" ? { status: 200, body: { items: {} } }
+        : url === "/api/hub/queue" ? { status: 200, body: hub }
+        : url === "/api/hench/execute" ? { status: 202, body: { queued: true, position: 5, reason: "at-capacity" } }
+        : { status: 404, body: { error: `Unexpected route: ${url}` } };
+      return { ok: answer.status < 300, status: answer.status, json: async () => answer.body };
     }));
     root = renderToDiv(h(ReadyToRun, { onPrepare: vi.fn(), onOpenLive: vi.fn(), onOpenPrd: vi.fn() }));
     await flush();
@@ -283,6 +287,87 @@ describe("Ready to run: every task, search and filters", () => {
     expect(rows()).toHaveLength(120);
   });
 
+  it("retries an incomplete queue when Show all is reopened after a failed fetch, then reuses the complete snapshot", async () => {
+    await mount(MANY);
+    const fetchReady = vi.mocked(fetch);
+    fetchReady.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await click(byText("Show all 120"));
+    expect(rows()).toHaveLength(50);
+    await click(byText("Show top 10"));
+    expect(rows()).toHaveLength(10);
+    expect(fetchReady.mock.calls.filter(([url]) => String(url).startsWith("/api/hench/ready"))).toHaveLength(2);
+    await click(byText("Show all 120"));
+    expect(rows()).toHaveLength(120);
+    expect(titles()).toContain("Task number 119");
+    // The rejected request bypasses mount's route recorder, but still counts here.
+    const readyUrls = () => fetchReady.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith("/api/hench/ready"));
+    expect(readyUrls()).toEqual([
+      "/api/hench/ready?limit=50&offset=0", "/api/hench/ready?all=1", "/api/hench/ready?all=1",
+    ]);
+    await type(document.querySelector<HTMLInputElement>(".ready-search")!, "number 119");
+    expect(titles()).toEqual(["Task number 119"]);
+    await click(byText("Clear"));
+    await click(byText("Show top 10"));
+    await click(byText("Show all 120"));
+    expect(rows()).toHaveLength(120);
+    expect(readyUrls()).toHaveLength(3);
+  });
+
+  it("retries an incomplete search on the next input after a failed full-queue fetch", async () => {
+    await mount(MANY);
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const search = document.querySelector<HTMLInputElement>(".ready-search")!;
+    await type(search, "number 119");
+    expect(rows()).toHaveLength(0);
+    await type(search, "119");
+    expect(titles()).toEqual(["Task number 119"]);
+    expect(document.querySelector(".ready-count")!.textContent).toBe("1 of 120 match");
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === "/api/hench/ready?all=1")).toHaveLength(2);
+  });
+
+  it("shares an in-flight full-queue attempt across controls", async () => {
+    await mount(MANY);
+    let resolveFull!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveFull = resolve; }));
+    await click(byText("Show all 120"));
+    await type(document.querySelector<HTMLInputElement>(".ready-search")!, "number 119");
+    await choose("Any priority", "low");
+    expect(rows()).toHaveLength(0);
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === "/api/hench/ready?all=1")).toHaveLength(1);
+    await act(async () => { resolveFull(new Response(JSON.stringify(readyPage(MANY, "/api/hench/ready?all=1")))); });
+    await flush();
+    expect(titles()).toEqual(["Task number 119"]);
+    expect(document.querySelector(".ready-count")!.textContent).toBe("1 of 120 match");
+  });
+
+  it.each(["expand", "search"])("loads the full queue when a pending page outgrows the cached queue during %s", async (control) => {
+    const tasks = MANY.slice(0, 30);
+    await mount(tasks);
+    tasks.push(...MANY.slice(30));
+    const respond = vi.mocked(fetch).getMockImplementation()!;
+    let allowFull!: () => void;
+    const fullGate = new Promise<void>((resolve) => { allowFull = resolve; });
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      // Keep any full reply behind the older page so this tests the skipped
+      // upgrade, independently of out-of-order response handling.
+      if (url === "/api/hench/ready?all=1") await fullGate;
+      return respond(url, init);
+    });
+    let resolvePage!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise<Response>((resolve) => { resolvePage = resolve; }));
+    await act(async () => { live.refresh!(); });
+    await flush();
+    if (control === "expand") await click(byText("Show all 30"));
+    else await type(document.querySelector<HTMLInputElement>(".ready-search")!, "number 119");
+    await act(async () => { resolvePage(new Response(JSON.stringify(readyPage(tasks, "/api/hench/ready?limit=50&offset=0")))); });
+    await flush();
+    await act(async () => { allowFull(); });
+    await flush();
+    expect(titles()).toContain("Task number 119");
+    expect(rows()).toHaveLength(control === "expand" ? 120 : 1);
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === "/api/hench/ready?all=1")).toHaveLength(1);
+  });
+
   it("names each row's change", async () => {
     await mount([{ ...MANY[1], parentChain: [] }]);
     expect(rows()[0].querySelector(".ready-change")!.textContent).toBe("Change 1");
@@ -326,6 +411,63 @@ describe("Ready to run: every task, search and filters", () => {
     await click(byText("Start now"));
     const post = calls.find((c) => c.method === "POST")!;
     expect(post.body).toEqual({ taskId: "t115" });
+  });
+
+  it("searches visible summaries across the full queue and retains technical titles, change identity and impacts", async () => {
+    const tasks = MANY.map((t) => ({ ...t, summary: `Readable work ${t.id}`, change: { ...t.change!, title: "Same change title" } }));
+    const impact = {
+      t119: { basis: "expected", files: ["config/.env", "core.ts"], fileCount: 2, size: "small", kinds: { config: 1, code: 1 }, security: ["config/.env"], essential: ["core.ts"] },
+    };
+    const props = await mount(tasks, undefined, impact);
+    expect(rows()).toHaveLength(10);
+    expect(rows()[0].querySelector<HTMLButtonElement>(".ready-title")!.title).toBe("Task number 0");
+    await type(document.querySelector<HTMLInputElement>(".ready-search")!, "Readable work t119");
+    expect(titles()).toEqual(["Readable work t119"]);
+    const row = rows()[0];
+    expect(row.dataset.taskId).toBe("t119");
+    expect(row.querySelector<HTMLButtonElement>(".ready-title")!.title).toBe("Task number 119");
+    expect(Array.from(row.querySelectorAll<HTMLElement>(".impact-tag")).map((t) => t.textContent)).toEqual(["Security", "Essential", "Small · ~2 files"]);
+    expect(row.querySelector<HTMLElement>(".impact-security")!.title).toContain("config/.env");
+    expect(document.querySelector(".ready-count")!.textContent).toBe("1 of 120 match");
+    await click(row.querySelector(".ready-primary")!);
+    await click(row.querySelector(".ready-title")!);
+    expect(props.onPrepare.mock.calls).toEqual([["t119"], ["t119"]]);
+    await openMenu(0);
+    expect(Array.from(document.querySelectorAll('[role="menuitem"]')).map((el) => el.textContent)).toEqual(["Start now", "Copy terminal command"]);
+    expect(calls.filter((c) => c.method !== "GET")).toEqual([]);
+    await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    // The technical title remains searchable even though the summary is displayed.
+    await type(document.querySelector<HTMLInputElement>(".ready-search")!, "Task number 119");
+    expect(titles()).toEqual(["Readable work t119"]);
+    // Equal change titles still filter by identity, including rows beyond the first page.
+    await choose("Any change", "c2");
+    expect(rows()).toHaveLength(0);
+    await choose("Any change", "c3");
+    await choose("Any priority", "low");
+    expect(titles()).toEqual(["Readable work t119"]);
+    await click(byText("Clear"));
+    await click(byText("Show all 120"));
+    expect(rows()).toHaveLength(120);
+    expect(rows()[119].querySelector(".impact-essential")).not.toBeNull();
+    expect(calls.filter((c) => c.url.startsWith("/api/hench/ready")).map((c) => c.url)).toEqual([
+      "/api/hench/ready?limit=50&offset=0", "/api/hench/ready?all=1",
+    ]);
+    expect(calls.filter((c) => c.url === "/api/rex/impact")).toHaveLength(1);
+    await click(byText("Show top 10"));
+    // A run removes a task from the queue; refresh must replace the cached rows.
+    tasks.splice(0, 1);
+    const before = calls.length;
+    await act(async () => { live.refresh!(); });
+    await flush();
+    expect(calls.slice(before).map((c) => c.url)).toEqual(["/api/hench/ready?all=1"]);
+    expect(rows()).toHaveLength(10);
+    expect(rows()[0].dataset.taskId).toBe("t1");
+    expect(document.querySelector(".ready-count")!.textContent).toBe("10 of 119");
+    await click(byText("Show all 119"));
+    expect(rows().map((r) => r.dataset.taskId)).toEqual(tasks.map((t) => t.id));
+    expect(rows()[118].querySelector(".impact-essential")).not.toBeNull();
+    expect(calls.slice(before).map((c) => c.url)).toEqual(["/api/hench/ready?all=1"]);
   });
 
   it("offers no controls when the whole list fits", async () => {

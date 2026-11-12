@@ -2,4 +2,6 @@
 "@n-dx/web": patch
 ---
 
-Ready to run lists every runnable task: the route pages through all of them with the v2 selector hench uses (Inbox changes never list, a task-less change is one unit, a change with tasks lists its tasks) and names each row's change; the view shows the top rows, then "Show all N", with a text search and priority, change and tag filters.
+`Ready to run` lists every runnable task with Show all, search, and priority, change and tag filters.
+
+The route pages through tasks with hench's v2 selector: Inbox changes never list, a task-less change is one unit, and a change with tasks lists its tasks. Each row names its change.

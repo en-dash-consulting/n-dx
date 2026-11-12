@@ -670,7 +670,7 @@ describe("hench prep routes", () => {
       return { id, title: `Task ${id}`, status: "pending", level: "task", priority: "medium", ...extra };
     }
 
-    async function ready(port: number, query = ""): Promise<{ tasks: Array<Record<string, unknown>>; limit: number; total: number; dir: string }> {
+    async function ready(port: number, query = ""): Promise<{ tasks: Array<Record<string, unknown>>; limit: number; offset: number; total: number; dir: string }> {
       const res = await fetch(`http://127.0.0.1:${port}/api/hench/ready${query}`);
       expect(res.status).toBe(200);
       return res.json();
@@ -828,6 +828,51 @@ describe("hench prep routes", () => {
       const byId = Object.fromEntries(tasks.map((t) => [t.id as string, t]));
       expect(byId["s1"]!.change).toEqual({ id: "split", title: "Change split" });
       expect(byId["bare"]!.change).toEqual({ id: "bare", title: "Change bare" });
+    });
+
+    it.each(["v1", "v2"])("keeps summaries and change identities across pages and all=1 on %s", async (layout) => {
+      const children = Array.from({ length: 120 }, (_, i) => task(`t${String(i).padStart(3, "0")}`, {
+        ...(layout === "v2" ? { type: "task" } : {}),
+        summary: `Readable work ${i}`,
+        priority: i % 2 ? "low" : "high",
+        acceptanceCriteria: ["Done"],
+        tags: ["web"],
+        ...(i === 119 ? { run: { tier: "heavy" } } : {}),
+      }));
+      const parents = [0, 1].map((i) => ({
+        id: `c${i}`, title: "Same change title", status: "pending", priority: "medium",
+        ...(layout === "v2" ? { type: "change" } : { level: "feature" }),
+        children: children.slice(i * 60, (i + 1) * 60),
+      }));
+      if (layout === "v2") {
+        await mkdir(join(ctx.rexDir, "product"), { recursive: true });
+        await writeFile(join(ctx.rexDir, ".cache", "prd.json"), JSON.stringify({
+          schema: "rex/v1", title: "v2", product: [], items: parents,
+        }));
+      } else {
+        await writeTasks(ctx, parents);
+      }
+      const port = await open(ctx);
+      const first = await ready(port, "?limit=50&offset=0");
+      const second = await ready(port, "?limit=50&offset=50");
+      const last = await ready(port, "?limit=50&offset=100");
+      // all=1 overrides both paging parameters and retains the same selector order and fields.
+      const all = await ready(port, "?all=1&limit=1&offset=119");
+      expect(all).toMatchObject({ total: 120, limit: 120, offset: 0, dir: ctx.projectDir });
+      expect(first).toMatchObject({ total: 120, limit: 50, offset: 0 });
+      expect(second).toMatchObject({ total: 120, limit: 50, offset: 50 });
+      expect(last).toMatchObject({ total: 120, limit: 50, offset: 100 });
+      expect(all.tasks).toEqual([...first.tasks, ...second.tasks, ...last.tasks]);
+      expect(new Set(all.tasks.map((t) => t.id)).size).toBe(120);
+      const byId = Object.fromEntries(all.tasks.map((t) => [t.id as string, t]));
+      expect(byId.t000).toMatchObject({
+        title: "Task t000", summary: "Readable work 0", itemType: "task",
+        change: { id: "c0", title: "Same change title" }, saved: false,
+      });
+      expect(byId.t119).toMatchObject({
+        title: "Task t119", summary: "Readable work 119", priority: "low", itemType: "task",
+        change: { id: "c1", title: "Same change title" }, criteriaCount: 1, tags: ["web"], saved: true,
+      });
     });
 
     it("honours ?limit=N, defaults to 10 and clamps to 1..50", async () => {

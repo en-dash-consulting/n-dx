@@ -2,4 +2,6 @@
 "@n-dx/web": patch
 ---
 
-The PRD tree Add item form takes a "Done when" list (add and remove one criterion at a time) and a comma-separated tags field, and sends both with the new item.
+The PRD tree `Add item` form accepts a Done when list and comma-separated tags, and sends both with the new item.
+
+Criteria can be added and removed one at a time.

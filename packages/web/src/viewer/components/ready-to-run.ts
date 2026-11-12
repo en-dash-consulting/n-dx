@@ -66,7 +66,7 @@ const isFiltering = (f: ReadyFilters) => f.query.trim() !== "" || f.priority !==
 /** The change id a row groups under: its change, else its own title. */
 const changeKey = (task: ReadyTask) => task.change?.id ?? "";
 
-/** Rows matching every filter; the text search reads the title, change, ancestors and tags. */
+/** Rows matching every filter; search reads the summary, title, change, ancestors and tags. */
 export function filterReady(tasks: ReadyTask[], f: ReadyFilters): ReadyTask[] {
   const q = f.query.trim().toLowerCase();
   return tasks.filter((t) => {
@@ -74,7 +74,7 @@ export function filterReady(tasks: ReadyTask[], f: ReadyFilters): ReadyTask[] {
     if (f.change && changeKey(t) !== f.change) return false;
     if (f.tag && !(t.tags ?? []).includes(f.tag)) return false;
     if (!q) return true;
-    return [t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
+    return [t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
   });
 }
 
@@ -112,8 +112,12 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [total, setTotal] = useState(0);
-  /** A control was used: the rest of the pages are needed for its options and its matches. */
+  /** Once a control is used, keep the whole queue for later filters and refreshes. */
   const [engaged, setEngaged] = useState(false);
+  const [allAttempt, setAllAttempt] = useState(0);
+  /** Whether the retained snapshot includes every row, even after a failed refresh. */
+  const complete = useRef(false);
+  const loading = useRef(0);
   const [filters, setFilters] = useState<ReadyFilters>(NO_FILTERS);
   const filtering = isFiltering(filters);
   const needAll = expanded || engaged || filtering;
@@ -126,9 +130,12 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
    * paging through it would repeat that per page).
    */
   const load = useCallback(async () => {
+    const all = needAllRef.current;
+    loading.current++;
     try {
-      const res = await fetch(needAllRef.current ? "/api/hench/ready?all=1" : `/api/hench/ready?limit=${READY_PAGE}&offset=0`);
+      const res = await fetch(all ? "/api/hench/ready?all=1" : `/api/hench/ready?limit=${READY_PAGE}&offset=0`);
       if (!res.ok) {
+        complete.current = false;
         setError(res.status === 404 ? null : `Could not load the ready list (${res.status})`);
         setTasks([]);
         setTotal(0);
@@ -136,18 +143,26 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
       }
       const data = (await res.json()) as ReadyReply;
       const rows = Array.isArray(data.tasks) ? data.tasks : [];
+      complete.current = rows.length >= (typeof data.total === "number" ? data.total : rows.length);
       setDir(typeof data.dir === "string" ? data.dir : "");
       setTasks(rows);
       setTotal(typeof data.total === "number" ? data.total : rows.length);
       setError(null);
+      // A control may have reused a complete snapshot while this page was in
+      // flight. If the queue has since grown, upgrade it once the page lands.
+      if (!all && needAllRef.current && !complete.current && loading.current === 1) {
+        setAllAttempt((prev) => prev + 1);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the ready list");
       setTasks((prev) => prev ?? []);
+    } finally {
+      loading.current--;
     }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { if (needAll) void load(); }, [needAll, load]);
+  useEffect(() => { if (needAll && !complete.current) void load(); }, [needAll, allAttempt, load]);
   useHenchRunsLiveRefresh(load);
   // After the ready list's own load, so the list is the first request out.
   const impacts = useItemImpacts();
@@ -208,7 +223,16 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const loaded = tasks ?? [];
   const matches = filtering ? filterReady(loaded, filters) : loaded;
   const shown = filtering || expanded ? matches : matches.slice(0, READY_TOP_ROWS);
-  const setFilter = (patch: Partial<ReadyFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
+  const engage = () => {
+    // Engagement stays latched for refreshes; an incomplete snapshot still needs
+    // another attempt when a control is used after a transient load failure.
+    if (needAllRef.current && !complete.current && loading.current === 0) setAllAttempt((prev) => prev + 1);
+    setEngaged(true);
+  };
+  const setFilter = (patch: Partial<ReadyFilters>) => {
+    engage();
+    setFilters((prev) => ({ ...prev, ...patch }));
+  };
 
   const changes = new Map<string, string>();
   const tags = new Set<string>();
@@ -221,7 +245,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
       class: "ready-filter",
       "aria-label": label,
       value,
-      onFocus: () => setEngaged(true),
+      onFocus: engage,
       onChange: (e: Event) => setFilter({ [key]: (e.target as HTMLSelectElement).value }),
     }, h("option", { value: "" }, label), options.map(([v, text]) => h("option", { value: v, key: v }, text)));
 
@@ -249,7 +273,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
     : null;
 
   const more = !filtering && total > READY_TOP_ROWS
-    ? h("button", { type: "button", class: "ready-more", onClick: () => setExpanded(!expanded) },
+    ? h("button", { type: "button", class: "ready-more", onClick: () => { if (!expanded) engage(); setExpanded(!expanded); } },
         expanded ? `Show top ${READY_TOP_ROWS}` : `Show all ${total}`)
     : null;
 
