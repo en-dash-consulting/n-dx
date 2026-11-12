@@ -28,7 +28,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync, truncateSync } from "node:fs";
 import { join } from "node:path";
-import { addTokenUsage, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
+import { addTokenUsage, isLLMVendor, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
 import type {
   RuntimeEvent,
   SessionTurnResult,
@@ -38,6 +38,7 @@ import type {
   VendorSessionOptions,
 } from "@n-dx/llm-client";
 import { writeRunFileAtomic } from "../run-end.js";
+import { errorMessage } from "../response-utils.js";
 import {
   CHECKPOINT_PROMPT,
   COLD_EXCHANGES,
@@ -94,10 +95,11 @@ export interface SidecarSessionRecord {
   lastActivityAt: string;
   endedAt?: string;
   /**
-   * Set when a turn ended above the context ceiling: the next turn starts a
-   * cold vendor session instead of resuming. Cleared once that turn completes.
+   * Set when a turn ended above the context ceiling, or checkpoint setup
+   * failed: the next turn starts cold. An unreadable ceiling is omitted.
+   * Cleared once that turn completes.
    */
-  refresh?: { contextTokens: number; ceiling: number };
+  refresh?: { contextTokens: number; ceiling?: number };
   /**
    * How the last finished turn ended, kept so a reload or a second tab still
    * shows a signed-out vendor CLI. Cleared when the next turn starts.
@@ -561,14 +563,39 @@ export class SidecarSessionRegistry {
       if (result.sessionId) record.resumeId = result.sessionId;
       if (cold && result.status === "completed") delete record.refresh;
       delivered = result.status === "completed";
+      const turnVendor = live.session.vendor;
+      const diagnostic = (message: string): void => {
+        console.error(`[sidecar] session ${record.id}: ${message}`);
+        const at = this.iso();
+        // Deliberately not a checkpoint frame: the drawer hides those.
+        if (isLLMVendor(turnVendor)) append({ seq: record.cursor + 1, at, type: "event", event: {
+          type: "failure", vendor: turnVendor, turn: result.turn, timestamp: at,
+          failure: { category: "unknown", message },
+        } });
+      };
       if (context && result.status === "completed") {
-        const ceiling = context.ceiling(record);
-        if (ended > ceiling) {
-          await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append, guard);
-          result = guard.settle(result);
+        try {
+          const ceiling = context.ceiling(record);
+          if (ended > ceiling) {
+            await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append, guard);
+          }
+        } catch (error) {
+          // The answer was delivered. A refused checkpoint must neither
+          // fail it nor skip its spend; never resume the oversized context.
+          record.refresh ??= { contextTokens: ended };
+          delete record.resumeId;
+          diagnostic(`Checkpoint failed; the answer is complete and the next turn will start cold: ${errorMessage(error)}`);
         }
+        result = guard.settle(result);
       }
-      this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
+      try {
+        // Keep this after checkpointing so its measured usage is included.
+        this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
+      } catch (error) {
+        // A callback may have appended before throwing. Retrying could bill
+        // the turn twice; report it without changing the delivered outcome.
+        diagnostic(`Turn spend recorder failed (not retried): ${errorMessage(error)}`);
+      }
       return result;
     } finally {
       // An opening turn that failed or was stopped may never have reached
@@ -602,6 +629,9 @@ export class SidecarSessionRegistry {
     };
     const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
+    if (result.status !== "completed") {
+      throw new Error(result.error ?? `Checkpoint ${result.status}`);
+    }
   }
 
   /**
