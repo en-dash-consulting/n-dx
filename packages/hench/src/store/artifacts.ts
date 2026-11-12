@@ -132,9 +132,12 @@ export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
     .filter((entry) => !RUNTIME_ENTRIES_AT_ROOT.includes(entry)),
 ];
 
-/** Normalize a path for comparison: forward slashes, no leading `./`. */
+/** Normalize native separators, preserving literal POSIX backslashes. */
 function normalize(path: string): string {
-  return path.replace(/\\/g, "/").replace(/^\.\//, "");
+  // Decoded Git paths can contain literal backslashes on POSIX. Treating
+  // those as separators would put a root-level `.rex\\changes\\notes.md`
+  // inside the PRD rollback scope and discard the operator's work.
+  return (process.platform === "win32" ? path.replace(/\\/g, "/") : path).replace(/^\.\//, "");
 }
 
 /**
@@ -273,9 +276,17 @@ export function splitPorcelainLines(output: string): string[] {
 
 function unquotePorcelainPath(path: string): string {
   const trimmed = path.trim();
-  return trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')
-    ? trimmed.slice(1, -1)
-    : trimmed;
+  if (trimmed.length < 2 || !trimmed.startsWith('"') || !trimmed.endsWith('"')) return trimmed;
+  // Porcelain quotes bytes, not just the enclosing string. Exact rollback
+  // pathspecs must receive the real name, including UTF-8 octal sequences.
+  const escapes: Record<string, string> = {
+    a: "\x07", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", '"': '"', "\\": "\\",
+  };
+  return trimmed.slice(1, -1).replace(/(?:\\[0-7]{3})+|\\([abfnrtv"\\])/g, (encoded, named: string | undefined) => {
+    if (named !== undefined) return escapes[named]!;
+    const bytes = encoded.match(/[0-7]{3}/g)!.map((octal: string) => Number.parseInt(octal, 8));
+    return Buffer.from(bytes).toString("utf8");
+  });
 }
 
 /**

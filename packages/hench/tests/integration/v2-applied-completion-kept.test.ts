@@ -363,7 +363,7 @@ describe("a failed run with rollback enabled after a v2 completion applied its c
     vi.doMock("node:readline", () => ({
       createInterface: () => ({
         question: (q: string, cb: (answer: string) => void) => {
-          if (/restore the pre-run/i.test(q)) {
+          if (/Roll back these PRD paths\?/i.test(q)) {
             asked.push(q);
             cb("y");
           } else {
@@ -418,6 +418,8 @@ describe("a failed run with rollback enabled after a v2 completion applied its c
     await failBypassedCompletion(true);
 
     expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain("Restore listed tracked paths to HEAD");
+    expect(asked[0]).toContain(".rex/changes/add-apple-pay/state.yaml");
   });
 });
 

@@ -92,8 +92,8 @@ describe("isHenchRuntimeArtifact", () => {
     expect(isHenchRuntimeArtifact(".hench-commit-msg.txt.bak")).toBe(false);
   });
 
-  it("normalizes backslash separators and a leading ./", () => {
-    expect(isHenchRuntimeArtifact(".hench\\locks\\12345.lock")).toBe(true);
+  it("normalizes native separators and a leading ./ without reinterpreting POSIX filenames", () => {
+    expect(isHenchRuntimeArtifact(".hench\\locks\\12345.lock")).toBe(process.platform === "win32");
     expect(isHenchRuntimeArtifact("./.hench/locks/")).toBe(true);
   });
 

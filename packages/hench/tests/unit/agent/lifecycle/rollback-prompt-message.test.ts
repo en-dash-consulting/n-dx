@@ -69,7 +69,7 @@ describe("promptRollbackConfirm", () => {
     vi.resetModules();
   });
 
-  it("names hench's own PRD writes and offers to restore the pre-run PRD state", async () => {
+  it("names the rollback scope and accurately describes HEAD and baseline protection", async () => {
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
@@ -86,10 +86,14 @@ describe("promptRollbackConfirm", () => {
       const question = fakes[0].question;
 
       expect(question).toContain("2 uncommitted PRD file(s)");
-      expect(question).toContain("hench's own status writes from this run");
+      expect(question).toContain("in the rollback scope");
       expect(question).toContain(".rex/prd_tree/epic/task/index.md");
       expect(question).toContain(".rex/tree-meta.json");
-      expect(question).toContain("Revert hench's writes and restore the pre-run PRD state");
+      expect(question).toContain("Restore listed tracked paths to HEAD");
+      expect(question).toContain("Pre-existing untracked files are preserved");
+      expect(question).toContain("without a baseline, all untracked files are preserved");
+      expect(question).toContain("cross-boundary renames are preserved");
+      expect(question).toContain("Roll back these PRD paths?");
       expect(question).toContain("[Y/n]");
       // Nothing else was dirty, so no line claims otherwise.
       expect(question).not.toContain("your work");

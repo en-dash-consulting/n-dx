@@ -1632,10 +1632,13 @@ export async function promptRollbackConfirm(
       ? `${otherCount} other uncommitted file(s) are your work — hench leaves those alone.\n`
       : "";
   return askYesNoWithSuspendedSigint(
-    `\n${paths.length} uncommitted PRD file(s) — hench's own status writes from this run:\n` +
+    `\n${paths.length} uncommitted PRD file(s) in the rollback scope:\n` +
       `${renderPaths(paths)}\n` +
       others +
-      `Revert hench's writes and restore the pre-run PRD state? [Y/n] `,
+      `Only the listed paths are in scope; cross-boundary renames are preserved.\n` +
+      `Restore listed tracked paths to HEAD; remove listed untracked files only if absent from the pre-run baseline.\n` +
+      `Pre-existing untracked files are preserved; without a baseline, all untracked files are preserved.\n` +
+      `Roll back these PRD paths? [Y/n] `,
     { interruptMode: "hold-then-exit", defaultYes: true },
   );
 }
@@ -1656,11 +1659,11 @@ export async function promptRollbackConfirm(
  *
  * The revert is prompt-only:
  * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
- *   names the dirty PRD paths and prompts `Revert hench's writes and restore
- *   the pre-run PRD state? [Y/n]`, defaulting to Yes — leaving hench's own
+ *   names the classified PRD paths and prompts `Roll back these PRD paths?
+ *   [Y/n]`, defaulting to Yes — leaving hench's own
  *   uncommitted writes in place is the damage, so a bare Enter reverts them.
  *   Only an explicit 'n'/'no' keeps them. Even then the scope narrows twice
- *   more: tracked changes are reverted only under the PRD paths, and
+ *   more: tracked changes are restored to HEAD only at the listed paths, and
  *   untracked removal is limited to files absent from the pre-run baseline
  *   (agent-created) *and* inside those paths, never pre-existing work.
  * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
@@ -1748,7 +1751,7 @@ async function performRollbackIfNeeded(
   try {
     const result = await revertChanges(projectDir, {
       baselineUntracked: options.baselineUntracked,
-      ...(scope === "prd" ? { scope: PRD_COMMIT_PATHS } : {}),
+      ...(scope === "prd" ? { paths: prd } : {}),
     });
     const removed = result.removedUntracked.length;
     const kept = result.keptUntracked.length;

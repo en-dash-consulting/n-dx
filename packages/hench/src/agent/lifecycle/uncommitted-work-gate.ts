@@ -395,14 +395,45 @@ export async function partitionDirtyPaths(
   if (lines.length === 0) return { prd: [], other: [] };
 
   const repoPrefix = await repoRelativePrefix(projectDir);
-  const prd: string[] = [];
+  let prdGroups: string[][] = [];
   const other: string[] = [];
+  const protectedPaths = new Set<string>();
   for (const line of lines) {
     const path = parsePorcelainPath(line);
-    if (matchesPorcelainLine(line, PRD_COMMIT_PATHS, repoPrefix)) prd.push(path);
-    else other.push(path);
+    const source = line.slice(0, 2).includes("R") ? porcelainSourcePath(line) : undefined;
+    const endpoints = source === undefined ? [path] : [path, source];
+    if (matchesPorcelainLine(line, PRD_COMMIT_PATHS, repoPrefix)) {
+      // A wholly PRD rename must restore its deleted source as well as remove
+      // its added target. Cross-boundary renames stay entirely in other.
+      prdGroups.push(endpoints);
+    } else {
+      other.push(path);
+      endpoints.forEach((p) => protectedPaths.add(p.toLowerCase()));
+    }
   }
-  return { prd, other };
+  // Even a literal Git pathspec recurses into directories. Restoring a deleted
+  // PRD file at a protected rename's new parent would unstage and overwrite
+  // that target. Keep overlapping groups together, including both endpoints
+  // of an internal rename; propagate protection through any connected groups.
+  // Compare conservatively without case: Git's literal pathspec can select
+  // node.md while checkout replaces NODE.md/ on a case-insensitive filesystem.
+  // Leaving a possible alias dirty is safer than deleting protected work;
+  // retain the original spelling in the prompt and in rollback pathspecs.
+  let changed: boolean;
+  do {
+    changed = false;
+    prdGroups = prdGroups.filter((group) => {
+      const overlaps = group.map((p) => p.toLowerCase()).some((p) => [...protectedPaths].some((protectedPath) =>
+        p === protectedPath || p.startsWith(`${protectedPath}/`) || protectedPath.startsWith(`${p}/`),
+      ));
+      if (!overlaps) return true;
+      other.push(group[0]!);
+      group.forEach((p) => protectedPaths.add(p.toLowerCase()));
+      changed = true;
+      return false;
+    });
+  } while (changed);
+  return { prd: [...new Set(prdGroups.flat())], other };
 }
 
 /**
