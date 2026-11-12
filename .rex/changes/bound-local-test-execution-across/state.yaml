@@ -190,6 +190,9 @@ items:
     resolutionDetail: "tests/test-max-workers.mjs reads NDX_TEST_MAX_WORKERS; root and every package vitest config (rex bench excepted) sets test.maxWorkers from it; unit + config policy tests added."
     lastModified: "2026-11-12T17:37:23.271Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d8a7343d-275f-4a4d-a782-c06c1a08f585":
+    lastModified: "2026-11-12T21:30:17.305Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "de29498f-6556-4355-b68b-d5c4b3c11129":
     status: "completed"
     startedAt: "2026-11-13T23:08:13.923Z"
