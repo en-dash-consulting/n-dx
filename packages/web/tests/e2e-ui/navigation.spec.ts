@@ -40,7 +40,6 @@ const VIEWS = Object.keys(VIEW_META);
 // Feature-gated views render nothing interesting with their toggle off, so
 // the deep-link loop below turns every gate on before it runs.
 const GATED_FEATURES = {
-  "sourcevision.prMarkdown": true,
   "sourcevision.ask": true,
 };
 

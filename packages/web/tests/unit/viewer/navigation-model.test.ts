@@ -483,11 +483,11 @@ describe("the Analysis stage is a tile dashboard", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
     expect(tiles.map((t) => t.panel ?? t.view)).toEqual([
       "map", "health", "next-steps", "delivery", "problems", "suggestions", "zones",
-      "architecture", "files", "languages", "pr-markdown", "ask",
+      "architecture", "files", "languages", "ask",
     ]);
     expect(placed).toEqual([
       "iso-map", "problems", "suggestions", "zones",
-      "architecture", "routes", "files", "pr-markdown", "ask",
+      "architecture", "routes", "files", "ask",
     ]);
   });
 
@@ -524,11 +524,6 @@ describe("the Analysis stage is a tile dashboard", () => {
       expect(placed, view).toContain(view);
       expect(ENRICHMENT_THRESHOLDS[view], view).toBeGreaterThan(0);
     }
-  });
-
-  it("gates PR Markdown behind a default-off feature flag", () => {
-    expect(tile("pr-markdown").featureGate).toBe("sourcevision.prMarkdown");
-    expect(tile("pr-markdown").requiresServer).toBeUndefined();
   });
 
   it("gates Ask behind a default-off flag and marks it server-rendered", () => {

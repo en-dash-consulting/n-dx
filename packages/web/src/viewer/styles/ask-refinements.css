@@ -3,7 +3,7 @@
  *
  * Split from ask.css to match the module split (views/ask-refinements.ts).
  * Same token caveat as ask.css: --panel2, --line and --mono do not exist in
- * tokens.css, so do not copy declarations using them from pr-markdown.css.
+ * tokens.css, so do not copy declarations using them from commands.css.
  *
  * Deliberately quieter than the answer it sits under: this is a list of
  * decisions, not a result.

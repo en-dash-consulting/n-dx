@@ -37,7 +37,7 @@ test.beforeAll(async () => {
   const res = await fetch(`${dashboard.baseUrl}/api/features`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ changes: { "sourcevision.prMarkdown": true, "sourcevision.ask": true } }),
+    body: JSON.stringify({ changes: { "sourcevision.ask": true } }),
   });
   if (!res.ok) throw new Error(`Failed to enable feature toggles for the sweep: ${res.status}`);
 });

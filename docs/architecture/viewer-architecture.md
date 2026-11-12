@@ -49,7 +49,7 @@ The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows`
 
 Current composition:
 
-- **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line and controls); tiles `map` (8 × 3, chromeless, `iso-map`, dropped in static exports), `health` (the stats), `next-steps` (4 × 2), then `problems`, `suggestions`, `zones`, `architecture` (tab `routes`), `files`, `languages`, `pr-markdown` (6 wide, gate `sourcevision.prMarkdown`), `ask` (6 wide, gate `sourcevision.ask`, requires server). Owns `graph` off-page.
+- **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line and controls); tiles `map` (8 × 3, chromeless, `iso-map`, dropped in static exports), `health` (the stats), `next-steps` (4 × 2), then `problems`, `suggestions`, `zones`, `architecture` (tab `routes`), `files`, `languages`, `ask` (6 wide, gate `sourcevision.ask`, requires server). Owns `graph` off-page.
 - **Plan:** `analysis` (plain); `inbox` (requires server); `prd`; `product` (requires server); `changes` (requires server); `validation`. Owns `requirements` off-page: it is a tab of Product, and its route still opens that tab.
 - **Work:** `rex-dashboard` (plain); `hench-audit`; `workspaces` (requires server).
 - **Tune (tiles):** lead `tune` (the stage's question, "how should this project's workflow change?": fit the workflow to the project and the tools it has); tiles `hench-runs` (Runs, 8 × 2, tab `activity` = Execution Log), `token-usage` (titled Spend), `hench-optimization` (titled Suggestions, tab `hench-adaptive`; never "Tuning", so the page does not read Tune › Tuning) and `merge-graph` (titled Shipped). Tile titles override view labels because labels are unique.

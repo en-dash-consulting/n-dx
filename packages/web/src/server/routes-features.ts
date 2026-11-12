@@ -52,15 +52,6 @@ interface FeatureDefinition {
 const FEATURE_REGISTRY: FeatureDefinition[] = [
   // ── SourceVision ──────────────────────────────────────────────────
   {
-    key: "sourcevision.prMarkdown",
-    label: "PR Markdown Page",
-    description: "Show the SourceVision PR Markdown page in navigation.",
-    impact: "When disabled, PR Markdown remains hidden from the SourceVision sidebar.",
-    package: "sourcevision",
-    stability: "experimental",
-    defaultValue: false,
-  },
-  {
     key: "sourcevision.ask",
     label: "Ask Panel",
     description: "Show the SourceVision Ask page: a prompt/response exchange that answers questions about this project from the existing analysis.",

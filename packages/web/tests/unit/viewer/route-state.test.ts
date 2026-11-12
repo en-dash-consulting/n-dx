@@ -11,7 +11,6 @@ const VIEWS = new Set<ViewId>([
   "architecture",
   "problems",
   "suggestions",
-  "pr-markdown",
   "rex-dashboard",
   "token-usage",
   "prd",
@@ -63,31 +62,31 @@ describe("route-state: Open changes area filter", () => {
 });
 
 describe("route-state", () => {
-  it("parses direct PR Markdown hash route", () => {
-    expect(parseLegacyHashRoute("#pr-markdown", VIEWS)).toEqual({ view: "pr-markdown", subId: null });
+  // The PR Markdown page was retired; its old addresses open the Analyze stage.
+  const WITH_ANALYZE = new Set<ViewId>([...VIEWS, "analyze"]);
+
+  it("opens Analyze for the retired PR Markdown path and hash routes", () => {
+    expect(parsePathnameRoute("/pr-markdown", WITH_ANALYZE)).toEqual({ view: "analyze", subId: null });
+    expect(parseLegacyHashRoute("#pr-markdown", WITH_ANALYZE)).toEqual({ view: "analyze", subId: null });
+    expect(parseLegacyHashRoute("#/sourcevision/pr-markdown", WITH_ANALYZE)).toEqual({ view: "analyze", subId: null });
+    expect(parseLegacyHashRoute("#sourcevision:pr_markdown", WITH_ANALYZE)).toEqual({ view: "analyze", subId: null });
+    expect(parseLegacyHashRoute("#sourcevision/pr-markdown?tab=raw", WITH_ANALYZE)).toEqual({ view: "analyze", subId: null });
   });
 
-  it("parses SourceVision-prefixed PR Markdown hash route variants", () => {
-    expect(parseLegacyHashRoute("#/sourcevision/pr-markdown", VIEWS)).toEqual({ view: "pr-markdown", subId: null });
-    expect(parseLegacyHashRoute("#sourcevision:pr_markdown", VIEWS)).toEqual({ view: "pr-markdown", subId: null });
-  });
-
-  it("returns null for malformed or unknown PR Markdown hash routes", () => {
-    expect(parseLegacyHashRoute("#sourcevision/pr-markdown?tab=raw", VIEWS)).toEqual({ view: "pr-markdown", subId: null });
+  it("returns null for malformed or unknown hash routes", () => {
     expect(parseLegacyHashRoute("#sourcevision/", VIEWS)).toBeNull();
-    expect(parseLegacyHashRoute("#sourcevision/pr-markdown/extra", VIEWS)).toBeNull();
     expect(parseLegacyHashRoute("#pr markdown", VIEWS)).toBeNull();
     expect(parseLegacyHashRoute("#missing-tab", VIEWS)).toBeNull();
   });
 
   it("prefers hash route when both hash and pathname exist", () => {
-    const parsed = resolveLocationRoute("/overview", "#pr-markdown", VIEWS);
-    expect(parsed).toEqual({ view: "pr-markdown", subId: null });
+    const parsed = resolveLocationRoute("/overview", "#files", VIEWS);
+    expect(parsed).toEqual({ view: "files", subId: null });
   });
 
   it("falls back to pathname route when hash is invalid", () => {
-    const parsed = resolveLocationRoute("/pr-markdown", "#not-a-tab", VIEWS);
-    expect(parsed).toEqual({ view: "pr-markdown", subId: null });
+    const parsed = resolveLocationRoute("/files", "#not-a-tab", VIEWS);
+    expect(parsed).toEqual({ view: "files", subId: null });
   });
 
   it("parses deep-link path routes for PRD and Hench runs", () => {

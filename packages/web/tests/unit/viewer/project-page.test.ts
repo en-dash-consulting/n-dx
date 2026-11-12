@@ -46,7 +46,7 @@ function stubApi(opts: { failures?: Record<string, string> } = {}) {
   const settings = { port: null as number | null, language: null as string | null, sourcevisionMergeThreshold: null as number | null, sourcevisionPins: {} as Record<string, string> };
   const toggles = [
     toggle("sourcevision.ask", "Ask", "sourcevision"),
-    toggle("sourcevision.prMarkdown", "PR Markdown", "sourcevision"),
+    toggle("rex.placementDraft", "Draft placement", "rex"),
   ];
   const respond = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 

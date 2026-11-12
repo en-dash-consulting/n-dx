@@ -88,11 +88,6 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
     lookFor: "Quick wins vs larger refactors. Suggestions that align with your current sprint goals. Patterns that could benefit from abstraction.",
     actions: "Prioritize suggestions by scope (global vs zone-specific). Start with suggestions that reduce coupling or improve cohesion.",
   },
-  "pr-markdown": {
-    description: "PR-ready markdown generated for copy/paste into pull request descriptions.",
-    lookFor: "Clear summary, accurate file/change grouping, and any missing sections before sharing.",
-    actions: "Copy sections into your PR description and refresh after major changes to keep the text current.",
-  },
   ask: {
     description: "Ask a question in plain language and get an answer grounded in this project's existing analysis. The model reads the analysis, not the source.",
     lookFor: "Answers that cite zone IDs, file paths, and findings. An answer that says the analysis does not cover the question is telling you to run a deeper pass, not failing.",

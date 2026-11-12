@@ -29,8 +29,6 @@ staleness. A full rebuild ensures tests reflect current source.
 | `boundary-check.test.ts` | Server/viewer/shared import boundary enforcement |
 | `request-dedup.test.ts` | Request deduplication pipeline |
 | `messaging-stack.test.ts` | WebSocket messaging pipeline |
-| `pr-markdown-refresh.test.ts` | PR markdown generation refresh |
-| `pr-markdown-tab-parity.test.ts` | PR markdown tab parity |
 | `smart-add-dispatch.test.ts` | Smart add UI dispatch |
 | `ws-health-integration.test.ts` | WebSocket health checks |
 | `background-suspension-recovery.test.ts` | Background tab polling suspension |

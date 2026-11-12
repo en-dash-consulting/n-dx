@@ -216,7 +216,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "architecture", tabs: [{ view: "routes" }] },
       { view: "files" },
       { view: "files", panel: "languages", title: "Languages" },
-      { view: "pr-markdown", cols: 6, featureGate: "sourcevision.prMarkdown" },
       { view: "ask", cols: 6, featureGate: "sourcevision.ask", requiresServer: true },
     ],
     alsoOwns: ["graph"],

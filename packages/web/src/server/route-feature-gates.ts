@@ -92,11 +92,6 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
       "The Ask panel's two write endpoints. Nothing but the panel posts to them, so they are off when the panel is.",
   },
   {
-    feature: "sourcevision.prMarkdown",
-    exact: ["/api/sv/pr-markdown", "/api/sv/pr-markdown/state"],
-    reason: "Reads for the PR Markdown page. Listed exactly so an unrelated subpath is still a 404, not a 403.",
-  },
-  {
     feature: "web.sidecar",
     exact: ["/api/commands/sidecar-command/status", "/api/commands/sidecar-command/stop"],
     prefix: "/api/sidecar",

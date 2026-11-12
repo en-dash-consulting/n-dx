@@ -786,7 +786,7 @@ describe("SettingsOverlay", () => {
   });
 
   it("lists the same pages whatever the feature toggles are — no toggle adds or removes a settings page", async () => {
-    stubApi(["sourcevision.ask", "sourcevision.prMarkdown"]);
+    stubApi(["sourcevision.ask", "rex.placementDraft"]);
     await mount(overlay("robot-wrangler"));
     expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
   });

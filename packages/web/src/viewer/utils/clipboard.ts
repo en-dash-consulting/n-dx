@@ -1,13 +1,11 @@
 /**
  * Clipboard copy with an `execCommand` fallback and a named failure reason.
  *
- * Lifted out of `views/pr-markdown.ts`, whose implementation this preserves
- * verbatim in behaviour, so the Ask panel's Copy action and the PR Markdown
- * view share one copy path and one set of user-facing strings. Two consumer
- * views satisfy the two-consumer rule; a third (`components/copy-link-button.ts`)
- * and a fourth (`views/overview.ts`) still carry their own inlined variants,
- * both of which swallow failure silently and would gain a message by moving
- * here.
+ * Lifted out of the PR Markdown view (retired 2026-11-12), whose behaviour it
+ * preserves. The Ask panel's Copy action is now its only consumer:
+ * `components/copy-link-button.ts` and `views/overview.ts` still carry their
+ * own inlined variants, both of which swallow failure silently and would gain
+ * a message, and restore the second consumer, by moving here.
  *
  * ## Why the fallback exists at all
  *

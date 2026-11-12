@@ -7,3 +7,7 @@ statement: "The PR markdown view shows one pane at a time, switching between a r
 criteria: [{"id":"c1","text":"The PR markdown view shall show the rendered preview and the raw markdown in a single pane instead of side by side."},{"id":"c2","text":"When the user switches the mode toggle, the PR markdown view shall switch the single pane between the rendered preview and the raw markdown."},{"id":"c3","text":"The PR markdown view shall provide a one-click action that copies the raw PR markdown to the clipboard."},{"id":"c4","text":"When the copy action succeeds, the PR markdown view shall show feedback that the copy succeeded."},{"id":"c5","text":"If the copy action fails, the PR markdown view shall show feedback that the copy failed."}]
 source: "smart-add"
 ---
+
+## History
+
+- 2026-11-12 e782039b-f010-45b8-bae3-868d36283243 removed: The PR Markdown view and its toggle and copy controls are removed with the page

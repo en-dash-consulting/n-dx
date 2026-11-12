@@ -2,12 +2,10 @@
 /**
  * The shared clipboard helper.
  *
- * The view-level suites (`ask-view.test.ts`, `pr-markdown.test.ts`) already
- * cover copying through the UI. What only this file can check is the
- * classification at the boundary — which failures count as a permission
- * denial, what happens when the modern API is absent versus present-and-
- * rejecting — and the wording parity that is the whole reason both views
- * share one module.
+ * `ask-view.test.ts` already covers copying through the UI. What only this
+ * file can check is the classification at the boundary — which failures count
+ * as a permission denial, what happens when the modern API is absent versus
+ * present-and-rejecting — and the wording the user sees.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {

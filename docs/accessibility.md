@@ -51,7 +51,6 @@ packages/web/tests/unit/viewer/axe-audit.test.ts
 | Overview | OverviewView with full LoadedData fixture |
 | Hench Monitor (`hench-runs`) | HenchRunsView loading state |
 | Workflow settings (`workflow`) | WorkflowView loading state (work settings, CLI timeouts and templates) |
-| PR Tab (`pr-markdown`) | PRMarkdownView loading state |
 | Ask (`ask`) | AskView idle state, plus the deployed-mode unavailable state |
 | Project settings (`project`) | ProjectView loading state (analyze and plan settings, feature flags) |
 

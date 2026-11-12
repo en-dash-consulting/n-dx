@@ -29,7 +29,6 @@ export type ViewId =
   | "iso-map"
   | "problems"
   | "suggestions"
-  | "pr-markdown"
   | "ask"
   | "rex-dashboard"
   | "prd"

@@ -621,46 +621,6 @@ describe.skipIf(!axeRun)("[a11y] WorkflowView — axe audit", () => {
   });
 });
 
-// ── [a11y] PRMarkdown (loading state) ────────────────────────────────────────
-
-describe.skipIf(!axeRun)("[a11y] PRMarkdownView — axe audit", () => {
-  let root: HTMLElement;
-  let cleanup: () => void;
-  let originalFetch: typeof globalThis.fetch;
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockReturnValue(new Promise(() => { /* never resolves */ }));
-  });
-
-  afterEach(() => {
-    act(() => {
-      render(null, root);
-    });
-    root.remove();
-    cleanup?.();
-    globalThis.fetch = originalFetch;
-  });
-
-  it("has zero critical/serious violations (light theme, loading state)", async () => {
-    cleanup = setTheme("light");
-    const { PRMarkdownView } = await import("../../../src/viewer/views/pr-markdown.js");
-    root = renderToDiv(h(PRMarkdownView, {}));
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    const violations = await runAxe(root);
-    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
-  });
-
-  it("has zero critical/serious violations (dark theme, loading state)", async () => {
-    cleanup = setTheme("dark");
-    const { PRMarkdownView } = await import("../../../src/viewer/views/pr-markdown.js");
-    root = renderToDiv(h(PRMarkdownView, {}));
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    const violations = await runAxe(root);
-    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
-  });
-});
-
 // ── [a11y] AskView ───────────────────────────────────────────────────────────
 
 describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
