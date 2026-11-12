@@ -128,6 +128,7 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   { path: "testGate.command", label: "Test Gate Command Template", description: "Gate command template; {base} becomes the run's start commit. Takes precedence over fullTestCommand", type: "string", category: "test-gate" },
   { path: "testGate.rerunCommand", label: "Test Gate Re-run Template", description: "Unattended runs re-run only the failed suites once; {suites} becomes their comma-joined labels", type: "string", category: "test-gate" },
   { path: "testGate.maxWorkers", label: "Test Worker Cap", description: "Sets NDX_TEST_MAX_WORKERS for the gate, post-task tests, the completion check and the agent's shell. Unset sets nothing", type: "number", integer: true, positive: true, category: "test-gate" },
+  { path: "testGate.hostSlot", label: "Host Validation Slot", description: "Run the gate, its re-run, post-task tests and the completion check one at a time per OS user, across worktrees. Queue wait does not count against the timeout", type: "boolean", category: "test-gate" },
   { path: "fullTestTimeoutMs", label: "Full Test Timeout (ms)", description: "How long the test gate may run before it is killed. 0 means no limit", type: "number", integer: true, category: "test-gate", defaultValue: 900000 },
 
   // ── Review ──

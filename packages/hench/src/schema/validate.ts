@@ -204,6 +204,7 @@ export const HenchConfigSchema = z.object({
       command: z.string().optional(),
       rerunCommand: z.string().optional(),
       maxWorkers: z.number().int().positive().optional(),
+      hostSlot: z.boolean().optional(),
     })
     .optional(),
   // No defaults, like testGate: the run-settings resolver applies them so
@@ -322,6 +323,8 @@ const PostRunTestRecordSchema = z.object({
   durationMs: z.number().optional(),
   targetedFiles: z.array(z.string()),
   error: z.string().optional(),
+  queueMs: z.number().nonnegative().optional(),
+  executionMs: z.number().nonnegative().optional(),
 });
 
 const RunSummaryDataSchema = z.object({

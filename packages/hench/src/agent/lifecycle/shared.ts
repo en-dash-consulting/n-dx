@@ -76,6 +76,11 @@ import { buildPreRunCommitSubject } from "./pre-run-commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
+import {
+  describeValidationSlotTiming,
+  validationSlotFromConfig,
+  type ValidationSlotRunOptions,
+} from "../../process/validation-run.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
 import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
@@ -1224,6 +1229,7 @@ export async function runPostTaskTestsIfNeeded(
   projectDir: string,
   testCommand?: string,
   testMaxWorkers?: number,
+  validationSlot?: ValidationSlotRunOptions,
 ): Promise<void> {
   if (run.status !== "completed" || !testCommand || !run.structuredSummary) {
     return;
@@ -1235,8 +1241,12 @@ export async function runPostTaskTestsIfNeeded(
     filesChanged: run.structuredSummary.filesChanged,
     testCommand,
     testMaxWorkers,
+    validationSlot,
   });
   run.structuredSummary.postRunTests = testResult;
+  if (testResult.queueMs !== undefined && testResult.executionMs !== undefined) {
+    detail(describeValidationSlotTiming({ queueMs: testResult.queueMs, executionMs: testResult.executionMs }));
+  }
 
   if (testResult.ran) {
     const scope = testResult.targetedFiles.length > 0
@@ -1474,6 +1484,11 @@ export interface FinalizeRunOptions {
    * failure to be optional about.
    */
   reviewOptional?: boolean;
+  /**
+   * The run's interrupt. With `hench.testGate.hostSlot` on, it stops a gate
+   * or post-task test run that is still waiting for the validation slot.
+   */
+  abortSignal?: AbortSignal;
 }
 
 // ---------------------------------------------------------------------------
@@ -4343,6 +4358,9 @@ export function enforceConfigBackstop(run: RunRecord, backstop: ConfigBackstop |
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
+  // Undefined unless hench.testGate.hostSlot is on; then each test command
+  // below takes the host-wide slot for itself alone.
+  const validationSlot = validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info });
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
   // Every spawn has closed; a leftover heartbeat-written pid would name a process that is gone.
@@ -4521,6 +4539,8 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         // failure would otherwise abort without asking anyone.
         rerunTemplate: isUnattendedGate(yes, autonomous) ? config?.testGate?.rerunCommand : undefined,
         testMaxWorkers: config?.testGate?.maxWorkers,
+        // Taken per command, inside this call: never across the prompt below.
+        validationSlot,
       });
 
       run.testGate = {
@@ -4530,6 +4550,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       };
       if (testGate.suites) {
         detail(`Test gate selected: ${testGate.suites.join(", ") || "(none)"}`);
+      }
+      if (testGate.queueMs !== undefined && testGate.executionMs !== undefined) {
+        detail(describeValidationSlotTiming({ queueMs: testGate.queueMs, executionMs: testGate.executionMs }));
       }
       if (testGate.rerunSkipped) {
         detail(`Test gate re-run skipped: ${testGate.rerunSkipped}`);
@@ -4669,6 +4692,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       } else if (testGate.skipReason) {
         detail(`Skipped: ${testGate.skipReason}`);
         gateComplete = true;
+      } else if (validationSlot?.signal?.aborted) {
+        // Interrupted while queued for the validation slot (or while running):
+        // the operator stopped the run, so this is not a launch problem to
+        // continue past. Nothing was tested, and nothing is committed.
+        gateComplete = true;
+        run.status = "failed";
+        run.error = testGate.error ?? "Test gate interrupted";
+        stream("Test Gate", `✗ ${run.error}`);
+        testGateFailed = true;
       } else {
         // INCONCLUSIVE — `ran: false` with no skipReason means the gate could not
         // be executed. The suite never started, so this is not a verdict on the
@@ -4899,7 +4931,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
-  await runPostTaskTestsIfNeeded(run, projectDir, testCommand, config?.testGate?.maxWorkers);
+  await runPostTaskTestsIfNeeded(run, projectDir, testCommand, config?.testGate?.maxWorkers, validationSlot);
 
   // Attempt to retrieve Codex token usage from the OpenAI API after run completion.
   // This is a best-effort operation: if the API is unavailable or returns zero data,

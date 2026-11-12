@@ -435,6 +435,17 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     impact: (v) => `Test commands hench runs get NDX_TEST_MAX_WORKERS=${v}`,
   },
   {
+    path: "testGate.hostSlot",
+    label: "Host Validation Slot",
+    description: "Run the gate, its re-run, post-task tests and the completion check one at a time per OS user, across worktrees. Queue wait does not count against fullTestTimeoutMs",
+    type: "boolean",
+    category: "test-gate",
+    impact: (v) =>
+      v
+        ? "Test commands hench runs wait for the host-wide validation slot"
+        : "Test commands hench runs start at once, whatever else is testing",
+  },
+  {
     path: "fullTestTimeoutMs",
     label: "Full Test Timeout (ms)",
     description: "How long the test gate may run before it is killed. 0 means no limit",
