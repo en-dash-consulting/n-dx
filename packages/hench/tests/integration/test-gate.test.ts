@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -384,6 +384,41 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/could not release the validation slot/);
   });
+
+  // Root ignores directory permissions, so the read-only slot cannot fail its release.
+  it.skipIf(process.getuid?.() === 0)(
+    "reclaims a record it could not release on its next validation instead of waiting on itself",
+    async () => {
+      // The command makes the slot directory read-only: release cannot unlink
+      // holder.json, which stays behind naming this process.
+      await writeFile(
+        join(projectDir, "lock-slot.cjs"),
+        `require("fs").chmodSync(${JSON.stringify(slotDir)}, 0o555);\n`,
+      );
+      const warnings: string[] = [];
+      const first = await runTestGate({
+        projectDir, filesChanged: ["src/a.ts"], testCommand: `node ${JSON.stringify(join(projectDir, "lock-slot.cjs"))}`,
+        validationSlot: slot({ onWarning: (w) => warnings.push(w) }),
+      });
+      await chmod(slotDir, 0o755);
+      expect(first.passed).toBe(true);
+      expect(warnings[0]).toMatch(/could not release the validation slot/);
+      expect(slotHeld()).toBe(true);
+
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(new Error("waited on its own record")), 5_000);
+      try {
+        const second = await runTestGate({
+          projectDir, filesChanged: ["src/a.ts"], testCommand: probe, validationSlot: slot({ signal: controller.signal }),
+        });
+        expect(second.error).toBeUndefined();
+        expect(second.passed).toBe(true);
+        expect(slotHeld()).toBe(false);
+      } finally {
+        clearTimeout(deadline);
+      }
+    },
+  );
 
   it("without a slot, takes none and records no timing", async () => {
     const result = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "process.exit(0)"` });

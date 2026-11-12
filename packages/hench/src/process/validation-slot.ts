@@ -55,6 +55,10 @@
  *    exists and its pid is dead, unlink it and retry later), re-read
  *    `holder.json`, unlink it only if its bytes equal the stale bytes
  *    observed, then unlink `reclaim.lock`.
+ *    5a. A holder whose release failed (the record may remain, naming its
+ *    live pid) remembers the token; its own next acquire treats that record
+ *    as stale and reclaims it, rather than waiting on itself. Other processes
+ *    wait until then or until the holder exits.
  * 6. **Re-entrancy.** The holder exports its token to its children as
  *    `NDX_VALIDATION_SLOT`. An acquire that finds that variable naming the
  *    token in this directory's `holder.json`, with a live `pid`, is nested:
@@ -439,6 +443,14 @@ function nestedLease(slotDir: string, token: string): ValidationSlotLease {
   };
 }
 
+/** Tokens of this process's leases whose release failed (rule 5a). */
+const orphanedTokens = new Set<string>();
+
+/** Whether `holder` is a record this process could not release (rule 5a). */
+function isOrphanedByThisProcess(holder: ValidationSlotHolder): boolean {
+  return holder.pid === process.pid && orphanedTokens.has(holder.token);
+}
+
 function heldLease(slotDir: string, record: ValidationSlotHolder, queueWaitMs: number): ValidationSlotLease {
   let released = false;
   return {
@@ -457,8 +469,14 @@ function heldLease(slotDir: string, record: ValidationSlotHolder, queueWaitMs: n
     async release() {
       if (released) return;
       released = true;
-      const current = await readValidationSlotHolder(slotDir);
-      if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
+      try {
+        const current = await readValidationSlotHolder(slotDir);
+        if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
+      } catch (err) {
+        // The record may still be on disk naming this live process (rule 5a).
+        orphanedTokens.add(record.token);
+        throw err;
+      }
     },
   };
 }
@@ -509,7 +527,11 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
 
     const observed = await readHolder(slotDir);
     if (observed === null) continue; // Released between the create and the read.
-    if (observed.holder === null || isValidationSlotHolderStale(observed.holder)) {
+    if (
+      observed.holder === null ||
+      isOrphanedByThisProcess(observed.holder) ||
+      isValidationSlotHolderStale(observed.holder)
+    ) {
       // Retry at once when this process cleared the record; another
       // reclaimer's record is waited out like a holder.
       if (await reclaimStale(slotDir, observed.raw)) continue;

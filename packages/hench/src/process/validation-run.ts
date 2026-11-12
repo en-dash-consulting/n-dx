@@ -112,7 +112,8 @@ export async function runInValidationSlot<T>(
 /**
  * Give the slot back. A failure is returned (and passed to `onWarning`) rather
  * than thrown: the command has already run, and its result must stand. A
- * holder record left behind is reclaimed as stale once this process exits.
+ * holder record left behind is reclaimed by this process's next acquire, or
+ * as stale once this process exits.
  */
 async function releaseReportingFailure(
   lease: ValidationSlotLease,
