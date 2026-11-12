@@ -180,6 +180,7 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       fullTestCommand: "pnpm test",
       "testGate.command": "node scripts/run-all-tests.mjs affected {base}",
       "testGate.rerunCommand": "node scripts/run-all-tests.mjs {suites}",
+      "testGate.maxWorkers": 2,
       fullTestTimeoutMs: 0,
       rollbackOnFailure: false,
       autoCommit: true,

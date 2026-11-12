@@ -1223,6 +1223,7 @@ export async function runPostTaskTestsIfNeeded(
   run: RunRecord,
   projectDir: string,
   testCommand?: string,
+  testMaxWorkers?: number,
 ): Promise<void> {
   if (run.status !== "completed" || !testCommand || !run.structuredSummary) {
     return;
@@ -1233,6 +1234,7 @@ export async function runPostTaskTestsIfNeeded(
     projectDir,
     filesChanged: run.structuredSummary.filesChanged,
     testCommand,
+    testMaxWorkers,
   });
   run.structuredSummary.postRunTests = testResult;
 
@@ -4518,6 +4520,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         // At most one re-run per gate, inside this attempt, and only where a
         // failure would otherwise abort without asking anyone.
         rerunTemplate: isUnattendedGate(yes, autonomous) ? config?.testGate?.rerunCommand : undefined,
+        testMaxWorkers: config?.testGate?.maxWorkers,
       });
 
       run.testGate = {
@@ -4896,7 +4899,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
-  await runPostTaskTestsIfNeeded(run, projectDir, testCommand);
+  await runPostTaskTestsIfNeeded(run, projectDir, testCommand, config?.testGate?.maxWorkers);
 
   // Attempt to retrieve Codex token usage from the OpenAI API after run completion.
   // This is a best-effort operation: if the API is unavailable or returns zero data,

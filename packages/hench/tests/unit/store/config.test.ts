@@ -108,6 +108,14 @@ describe("loadConfig", () => {
     expect(reloaded.maxTurns).toBe(75);
   });
 
+  it("saveConfig round-trips hench.testGate.maxWorkers", async () => {
+    const config = await loadConfig(henchDir);
+    config.testGate = { ...config.testGate, maxWorkers: 2 };
+    await saveConfig(henchDir, config);
+    const reloaded = await loadConfig(henchDir);
+    expect(reloaded.testGate?.maxWorkers).toBe(2);
+  });
+
   describe("project-level overrides (.n-dx.json / .n-dx.local.json)", () => {
     async function writeProjectConfig(data: unknown): Promise<void> {
       await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify(data), "utf-8");
@@ -127,6 +135,20 @@ describe("loadConfig", () => {
       await writeProjectConfig({ hench: { testGate: { command: "run affected {base}" } } });
       const config = await loadConfig(henchDir);
       expect(config.testGate).toEqual({ command: "run affected {base}" });
+    });
+
+    it("keeps hench.testGate.maxWorkers from .n-dx.json", async () => {
+      await writeProjectConfig({ hench: { testGate: { maxWorkers: 2 } } });
+      const config = await loadConfig(henchDir);
+      expect(config.testGate?.maxWorkers).toBe(2);
+    });
+
+    it.each([0, -1, 1.5, "2"])("reverts an invalid hench.testGate.maxWorkers (%s) and warns", async (value) => {
+      await writeProjectConfig({ hench: { testGate: { maxWorkers: value } } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, { onWarning: (message) => warnings.push(message) });
+      expect(config.testGate?.maxWorkers).toBeUndefined();
+      expect(warnings.join("\n")).toContain("maxWorkers");
     });
 
     it("reverts an invalid override to the base value and warns, naming the field and file", async () => {

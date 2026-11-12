@@ -41,6 +41,8 @@ export interface TestRunnerOptions {
   testCommand?: string;
   /** Timeout for the test command in ms. Default: 120_000. */
   timeout?: number;
+  /** `hench.testGate.maxWorkers`: sets `NDX_TEST_MAX_WORKERS` for the command. */
+  testMaxWorkers?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +340,7 @@ import { execShellCmd } from "../process/exec.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 // The environment every repository-owned command below runs with (#686).
 import { repoCommandEnv } from "../prd/llm-gateway.js";
+import { withTestMaxWorkers } from "../process/test-workers.js";
 import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
@@ -356,7 +359,7 @@ import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
 export async function runPostTaskTests(
   options: TestRunnerOptions,
 ): Promise<PostRunTestResult> {
-  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TIMEOUT } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TIMEOUT, testMaxWorkers } = options;
 
   if (!testCommand) {
     return { ran: false, passed: false, targetedFiles: [], error: "No test command configured" };
@@ -393,7 +396,12 @@ export async function runPostTaskTests(
   // Confined like the agent's own run_command: the suite is agent-written code.
   const { stdout, stderr, exitCode, launched, error } = await execRepoShellCmd(
     command,
-    { cwd: projectDir, timeout, maxBuffer: 2 * 1024 * 1024, env: repoCommandEnv(projectDir) },
+    {
+      cwd: projectDir,
+      timeout,
+      maxBuffer: 2 * 1024 * 1024,
+      env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
+    },
   );
   const durationMs = Date.now() - startMs;
 
@@ -612,6 +620,8 @@ export interface TestGateOptions {
    * timeout or a command that did not launch.
    */
   rerunTemplate?: string;
+  /** `hench.testGate.maxWorkers`: sets `NDX_TEST_MAX_WORKERS` for the gate and its re-run. */
+  testMaxWorkers?: number;
 }
 
 /**
@@ -833,7 +843,7 @@ function parseVitestOutput(
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS, rerunTemplate } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS, rerunTemplate, testMaxWorkers } = options;
 
   // Skip if no files were modified
   if (filesChanged.length === 0) {
@@ -847,7 +857,7 @@ export async function runTestGate(
 
   // Use provided command or default to pnpm test with JSON reporter
   const command = testCommand || "pnpm test --reporter=json";
-  const first = await runGateCommand(command, projectDir, timeout);
+  const first = await runGateCommand(command, projectDir, timeout, testMaxWorkers);
   if (!rerunTemplate || first.result.passed || !first.result.ran || first.timedOut) {
     return first.result;
   }
@@ -856,7 +866,7 @@ export async function runTestGate(
   if (!plan.ok) return { ...first.result, rerunSkipped: plan.reason };
 
   // One re-run, same timeout and process-tree kill as the gate itself.
-  const second = await runGateCommand(plan.command, projectDir, timeout);
+  const second = await runGateCommand(plan.command, projectDir, timeout, testMaxWorkers);
   const rerun = {
     command: plan.command,
     suites: plan.suites,
@@ -950,7 +960,12 @@ interface GateCommandOutcome {
 }
 
 /** Run one gate command and judge it. Never throws. */
-async function runGateCommand(command: string, projectDir: string, timeout: number): Promise<GateCommandOutcome> {
+async function runGateCommand(
+  command: string,
+  projectDir: string,
+  timeout: number,
+  testMaxWorkers: number | undefined,
+): Promise<GateCommandOutcome> {
   const startMs = Date.now();
 
   // The gate's own view of the deadline, beside the one `exec` enforces. Armed
@@ -976,7 +991,7 @@ async function runGateCommand(command: string, projectDir: string, timeout: numb
   const execResult = await execRepoShellCmd(command, {
     cwd: projectDir,
     timeout,
-    env: repoCommandEnv(projectDir),
+    env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
     // A full-monorepo run writes megabytes, mostly stderr from passing tests.
     // Past this ceiling exec stops the suite and keeps only what came first —
     // everything but the failure summary at the end — so it is a guard against

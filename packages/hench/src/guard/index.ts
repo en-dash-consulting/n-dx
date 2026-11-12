@@ -76,6 +76,7 @@ import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
 import { compileEnvPolicy, sanitizeChildEnv } from "./env.js";
+import { withTestMaxWorkers } from "../process/test-workers.js";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { ToolSandbox } from "./sandbox.js";
 import { NDX_CONFIG_BLOCKED_PATHS, agentCredentialDenials } from "../prd/llm-gateway.js";
@@ -131,6 +132,11 @@ export interface GuardRailsOptions {
    * the operator's full permissions; the agent loops always pass one.
    */
   sandbox?: ToolSandbox | null;
+  /**
+   * `hench.testGate.maxWorkers`: set as `NDX_TEST_MAX_WORKERS` on
+   * {@link GuardRails.childEnv}, so the agent's own test runs are capped too.
+   */
+  testMaxWorkers?: number;
 }
 
 /** What {@link GuardRails} keeps the agent from: `agentCredentialDenials()`'s shape. */
@@ -191,7 +197,10 @@ export class GuardRails {
     this.deniedCommands = denials.commandPrefixes;
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
-    this.childEnv = sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env));
+    this.childEnv = withTestMaxWorkers(
+      sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env)),
+      options.testMaxWorkers,
+    );
     this.sandbox = options.sandbox ?? null;
   }
 

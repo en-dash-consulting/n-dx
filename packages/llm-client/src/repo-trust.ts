@@ -1000,7 +1000,11 @@ const HENCH_FIELD_CHECKS = {
   language: optional(oneOf("typescript", "javascript", "go", "swift")),
   provider: optional(oneOf("cli", "api")),
   fullTestCommand: optional(isString),
-  testGate: optional(shape({ command: optional(isString), rerunCommand: optional(isString) })),
+  testGate: optional(shape({
+    command: optional(isString),
+    rerunCommand: optional(isString),
+    maxWorkers: optional((v) => positive(v) && Number.isSafeInteger(v)),
+  })),
 } satisfies Record<string, FieldCheck>;
 
 /**

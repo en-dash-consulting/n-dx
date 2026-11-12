@@ -33,6 +33,7 @@ import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { createVendorCliSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
 import { trackVendorProcess, terminateTrackedVendorProcess, describeAbortReason } from "../../process/run-interrupt.js";
+import { withTestMaxWorkers } from "../../process/test-workers.js";
 import { createSpendGate, priceRunUsd } from "./spend-cap.js";
 import type { SpendCapExceeded, SpendGate } from "./spend-cap.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
@@ -2215,6 +2216,8 @@ interface SuccessContext {
   projectDir: string;
   startingHead: string | undefined;
   testCommand?: string;
+  /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
+  testMaxWorkers?: number;
   tokenBudget?: number;
   /** Show the diff and prompt for approval before finalizing (`--approve-diff`). */
   approveDiff?: boolean;
@@ -2283,6 +2286,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     testCommand: ctx.testCommand,
     startingHead: ctx.startingHead,
     selfHeal: ctx.selfHeal,
+    testMaxWorkers: ctx.testMaxWorkers,
     baselineUntracked: ctx.baselineUntracked,
     finalizeReadyParent,
   });
@@ -2322,6 +2326,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
             testCommand: ctx.testCommand,
             startingHead: ctx.startingHead,
             selfHeal: ctx.selfHeal,
+            testMaxWorkers: ctx.testMaxWorkers,
             baselineUntracked: ctx.baselineUntracked,
             finalizeReadyParent,
           }),
@@ -2650,9 +2655,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
-  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
-    detail(cliEnvReportLine("CLI environment", names, kind), { captureWhenQuiet: true });
-  });
+  // The session's shell inherits this, so the agent's own test runs are
+  // capped like the gate's.
+  const cliEnv = withTestMaxWorkers(
+    resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
+      detail(cliEnvReportLine("CLI environment", names, kind), { captureWhenQuiet: true });
+    }),
+    config.testGate?.maxWorkers,
+  );
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
   // agent's PRD writes land in the worktree the run is executing in. Without
@@ -2726,9 +2736,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         vendor: reviewVendor,
         cliBinary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
         cliEnv: pairVendor
-          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names, kind) => {
-            detail(cliEnvReportLine(`${pairVendor} reviewer environment`, names, kind), { captureWhenQuiet: true });
-          })
+          ? withTestMaxWorkers(
+            resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names, kind) => {
+              detail(cliEnvReportLine(`${pairVendor} reviewer environment`, names, kind), { captureWhenQuiet: true });
+            }),
+            config.testGate?.maxWorkers,
+          )
           : cliEnv,
         ...(pairVendor
           ? {
@@ -2794,6 +2807,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
                   testCommand: brief.project.testCommand,
                   startingHead: base,
                   selfHeal: config.selfHeal,
+                  testMaxWorkers: config.testGate?.maxWorkers,
                   baselineUntracked,
                 }),
             });
@@ -3392,6 +3406,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           run, result, accumulated, attempt,
           store, taskId, projectDir, startingHead,
           testCommand: brief.project.testCommand,
+          testMaxWorkers: config.testGate?.maxWorkers,
           tokenBudget: config.tokenBudget,
           approveDiff: opts.approveDiff,
           reviewPass: reviewPassContext,

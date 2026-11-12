@@ -203,6 +203,7 @@ export const HenchConfigSchema = z.object({
     .object({
       command: z.string().optional(),
       rerunCommand: z.string().optional(),
+      maxWorkers: z.number().int().positive().optional(),
     })
     .optional(),
   // No defaults, like testGate: the run-settings resolver applies them so

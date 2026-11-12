@@ -1,6 +1,7 @@
 import { exec } from "../process/exec.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 import { repoCommandEnv } from "../prd/llm-gateway.js";
+import { withTestMaxWorkers } from "../process/test-workers.js";
 import { BOOKKEEPING_PATHS } from "../store/paths.js";
 import { discoverChangedFiles } from "./changed-files.js";
 
@@ -37,6 +38,8 @@ export interface CompletionValidationOptions {
    * diff completes it instead of being refused.
    */
   finalizeReadyParent?: boolean;
+  /** `hench.testGate.maxWorkers`: sets `NDX_TEST_MAX_WORKERS` for the test run. */
+  testMaxWorkers?: number;
 }
 
 const DEFAULT_TIMEOUT = 30_000;
@@ -142,7 +145,7 @@ export async function validateCompletion(
     // Agent-written tests: confined like the agent's own run_command.
     const { error: testError, stderr: testStderr, launched } = await execRepoShellCmd(
       options.testCommand,
-      { cwd: projectDir, timeout, env: repoCommandEnv(projectDir) },
+      { cwd: projectDir, timeout, env: withTestMaxWorkers(repoCommandEnv(projectDir), options.testMaxWorkers) },
     );
 
     // A command that never launched also arrives here with a non-null `error`,
