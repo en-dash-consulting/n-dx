@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { existsSync, readlinkSync } from "node:fs";
 import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -590,6 +591,22 @@ describe.skipIf(process.platform === "win32")("acquireValidationSlot — PID nam
       } finally {
         await chmod(join(proc, "9003"), 0o755);
       }
+    },
+  );
+
+  // The real /proc: root's daemons and kernel threads refuse a non-root
+  // reader their ns/pid. They cannot be this user's sandbox, so they must not
+  // keep a gone sandbox's record alive forever.
+  it.runIf(process.platform === "linux" && process.getuid?.() !== 0 && existsSync("/proc/self/ns/pid"))(
+    "on a real /proc, reclaims a gone sandbox's record despite other users' unreadable processes",
+    async () => {
+      const own = readlinkSync("/proc/self/ns/pid");
+      await writeHolder({ pid: 3, pidNamespace: "pid:[1]", outerPidNamespaces: [own] });
+      const lease = await acquireValidationSlot({
+        slotDir, projectDir: "/proj", env: {}, pollIntervalMs: 10, signal: AbortSignal.timeout(10_000),
+      });
+      expect(lease.nested).toBe(false);
+      await lease.release();
     },
   );
 

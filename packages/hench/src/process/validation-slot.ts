@@ -77,7 +77,9 @@
  *    - when R is one of the record's outer namespaces (W lies inside the
  *      reader's), as alive exactly when some process under `/proc` whose
  *      `ns/pid` is W has that pid as the last `NSpid` entry (`NSpgid` for a
- *      group), or when any such entry could not be read;
+ *      group), or when an entry owned by the reader's user could not be
+ *      read (another user's process is skipped: it cannot be in the
+ *      reader's sandbox, and root's refuse a non-root reader);
  *    - as alive otherwise (a sibling namespace, or an unrecorded chain).
  * 5. **Stale recovery.** A record is stale when its `pid` is dead AND its
  *    `child` is absent or dead; a record that does not parse is stale too. A
@@ -123,7 +125,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readdirSync, readFileSync, readlinkSync } from "node:fs";
+import { readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { uptime } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -345,6 +347,19 @@ function lastStatusEntry(status: string, field: string): number | null {
 }
 
 /**
+ * Whether `/proc/<entry>` belongs to this user, or cannot be told apart from
+ * one that does. A sandbox's processes run as the user who started it
+ * (bubblewrap sets no_new_privs), so another user's process is never one.
+ */
+function isOwnedByThisUser(procRoot: string, entry: string): boolean {
+  try {
+    return process.getuid === undefined || statSync(join(procRoot, entry)).uid === process.getuid();
+  } catch (err) {
+    return errCode(err) !== "ENOENT";
+  }
+}
+
+/**
  * Whether a process inside namespace `ns`, visible below the reader's, has
  * `pid` (a group id when `group`) in that namespace. An entry that cannot be
  * read for any reason but its process having exited counts as alive.
@@ -366,7 +381,9 @@ function isAliveInInnerNamespace(procRoot: string, ns: string, pid: number, grou
       if (entryNs !== ns) continue;
       status = readFileSync(join(procRoot, entry, "status"), "utf-8");
     } catch (err) {
-      if (errCode(err) !== "ENOENT") unreadable = true; // Exited mid-scan is the only safe miss.
+      // Exited mid-scan, or another user's process (root's daemons and kernel
+      // threads refuse a non-root reader): neither can be this user's sandbox.
+      if (errCode(err) !== "ENOENT" && isOwnedByThisUser(procRoot, entry)) unreadable = true;
       continue;
     }
     if (lastStatusEntry(status, field) === pid) return true;

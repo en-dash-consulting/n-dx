@@ -18,7 +18,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -201,6 +201,25 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
       expect(lease.nested).toBe(false);
       await lease.release();
     });
+
+    // The real /proc, where root's processes refuse a non-root reader their
+    // ns/pid: they are not this user's sandbox and must not keep its record.
+    it.runIf(process.platform === "linux" && process.getuid?.() !== 0 && existsSync("/proc/self/ns/pid"))(
+      "on a real /proc, reclaims a gone sandbox's record despite other users' unreadable processes",
+      async () => {
+        const own = readlinkSync("/proc/self/ns/pid");
+        const { child } = await startHolder(fakeProc(INNER), own);
+        const exited = new Promise((r) => child.once("exit", r));
+        child.kill("SIGKILL");
+        await exited;
+        holder = undefined;
+        const lease = await contender.acquireValidationSlot({
+          slotDir, projectDir: "/contender", env: {}, pollIntervalMs: 10, signal: AbortSignal.timeout(10_000),
+        });
+        expect(lease.nested).toBe(false);
+        await lease.release();
+      },
+    );
   });
 
   it("excludes the other implementation while it holds, and admits it once released", async () => {

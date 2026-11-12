@@ -13,7 +13,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readdirSync, readFileSync, readlinkSync } from "node:fs";
+import { readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { uptime } from "node:os";
 import { join } from "node:path";
@@ -144,7 +144,16 @@ function lastStatusEntry(status, field) {
   return last ? Number(last) : null;
 }
 
-/** Whether a process inside `ns`, visible below the reader's, has `pid` there; an unreadable entry counts as alive. */
+/** Whether `/proc/<entry>` belongs to this user (a sandbox's processes always do), or cannot be told apart. */
+function isOwnedByThisUser(procRoot, entry) {
+  try {
+    return process.getuid === undefined || statSync(join(procRoot, entry)).uid === process.getuid();
+  } catch (err) {
+    return err?.code !== "ENOENT";
+  }
+}
+
+/** Whether a process inside `ns`, visible below the reader's, has `pid` there; an unreadable entry of this user's counts as alive. */
 function isAliveInInnerNamespace(procRoot, ns, pid, group) {
   let entries;
   try {
@@ -161,7 +170,8 @@ function isAliveInInnerNamespace(procRoot, ns, pid, group) {
       if (readlinkSync(join(procRoot, entry, "ns", "pid")) !== ns) continue;
       status = readFileSync(join(procRoot, entry, "status"), "utf-8");
     } catch (err) {
-      if (err?.code !== "ENOENT") unreadable = true; // Exited mid-scan is the only safe miss.
+      // Exited mid-scan, or another user's process: neither can be this user's sandbox.
+      if (err?.code !== "ENOENT" && isOwnedByThisUser(procRoot, entry)) unreadable = true;
       continue;
     }
     if (lastStatusEntry(status, field) === pid) return true;
