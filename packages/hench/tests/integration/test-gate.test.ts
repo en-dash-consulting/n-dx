@@ -201,6 +201,7 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
   let projectDir: string;
   let slotDir: string;
   let probe: string;
+  let childProbe: string;
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-gate-slot-"));
@@ -221,6 +222,26 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
       ].join("\n"),
     );
     probe = `node ${JSON.stringify(join(projectDir, "probe.cjs"))}`;
+    // Exits 0 only when holder.json names the command this probe runs in: on
+    // POSIX its process group (the shell exec spawned leads it), on Windows a
+    // plain pid. The record is written just after the spawn, so it polls; a
+    // record that never comes is bounded by the command's own timeout.
+    await writeFile(
+      join(projectDir, "child-probe.cjs"),
+      [
+        `const fs = require("fs");`,
+        `const { execFileSync } = require("child_process");`,
+        `let child = null;`,
+        `while (!child) {`,
+        `  try { child = JSON.parse(fs.readFileSync(${holderFile}, "utf-8")).child; } catch (err) { child = null; }`,
+        `  if (!child) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);`,
+        `}`,
+        `if (process.platform === "win32") process.exit(child.group === false ? 0 : 8);`,
+        `const pgid = Number(execFileSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf-8" }).trim());`,
+        `process.exit(child.group === true && child.pid === pgid ? 0 : 9);`,
+      ].join("\n"),
+    );
+    childProbe = `node ${JSON.stringify(join(projectDir, "child-probe.cjs"))}`;
   });
 
   afterEach(async () => {
@@ -310,6 +331,36 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
     } finally {
       await lease.release();
     }
+  });
+
+  it("records the gate command's child in holder.json while it runs, for each attempt and the re-run", async () => {
+    const gate = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: childProbe, validationSlot: slot() });
+    expect(gate.passed).toBe(true);
+
+    const rerun = await runTestGate({
+      projectDir,
+      filesChanged: ["src/a.ts"],
+      testCommand: `node -e "console.log('test-gate: failed-suites=root'); process.exit(1)"`,
+      rerunTemplate: `${childProbe} {suites}`,
+      validationSlot: slot(),
+    });
+    expect(rerun.rerun?.passed).toBe(true);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("records the post-task and completion test commands' child in holder.json while they run", async () => {
+    const postTask = await runPostTaskTests({ projectDir, filesChanged: ["src/a.ts"], testCommand: childProbe, validationSlot: slot() });
+    expect(postTask.passed).toBe(true);
+
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
+    git("init", "-q");
+    git("add", "src");
+    git("commit", "-qm", "init");
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
+    const completion = await validateCompletion(projectDir, { testCommand: childProbe, validationSlot: slot() });
+    expect(completion.testsPassed).toBe(true);
+    expect(slotHeld()).toBe(false);
   });
 
   it("runs post-task tests inside the slot", async () => {

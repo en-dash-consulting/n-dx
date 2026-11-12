@@ -405,17 +405,17 @@ export async function runPostTaskTests(
   }
 
   // With a slot, the timeout starts after admission: `exec` arms it inside.
-  const slotRun = await runInValidationSlot(validationSlot, async (withSlotEnv) => {
+  const slotRun = await runInValidationSlot(validationSlot, async (withSlot) => {
     const startMs = Date.now();
     // Confined like the agent's own run_command: the suite is agent-written code.
     const result = await execRepoShellCmd(
       command,
-      {
+      withSlot({
         cwd: projectDir,
         timeout,
         maxBuffer: 2 * 1024 * 1024,
-        env: withSlotEnv(withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers)),
-      },
+        env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
+      }),
     );
     return { result, durationMs: Date.now() - startMs };
   });
@@ -1016,8 +1016,8 @@ async function runGateCommand(
   slot: ValidationSlotRunOptions | undefined,
 ): Promise<GateCommandOutcome> {
   const env = withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers);
-  const slotRun = await runInValidationSlot(slot, (withSlotEnv) =>
-    executeGateCommand(command, projectDir, timeout, withSlotEnv(env)));
+  const slotRun = await runInValidationSlot(slot, (withSlot) =>
+    executeGateCommand(command, withSlot({ cwd: projectDir, timeout, env })));
   if (!slotRun.ok) {
     return {
       output: "",
@@ -1040,10 +1040,9 @@ async function runGateCommand(
 /** Run one gate command and judge it. Never throws. */
 async function executeGateCommand(
   command: string,
-  projectDir: string,
-  timeout: number,
-  env: NodeJS.ProcessEnv,
+  execOptions: Pick<ExecOptions, "cwd" | "timeout" | "env" | "onSpawn">,
 ): Promise<GateCommandOutcome> {
+  const { timeout } = execOptions;
   const startMs = Date.now();
 
   // The gate's own view of the deadline, beside the one `exec` enforces. Armed
@@ -1067,9 +1066,7 @@ async function executeGateCommand(
   // The suite is agent-written code, so it runs inside the same OS sandbox
   // the agent's run_command does (see execRepoShellCmd).
   const execResult = await execRepoShellCmd(command, {
-    cwd: projectDir,
-    timeout,
-    env,
+    ...execOptions,
     // A full-monorepo run writes megabytes, mostly stderr from passing tests.
     // Past this ceiling exec stops the suite and keeps only what came first —
     // everything but the failure summary at the end — so it is a guard against
@@ -1284,7 +1281,7 @@ function formatMs(ms: number): string {
 // Dependency audit (pre-loop validation for self-heal mode)
 // ---------------------------------------------------------------------------
 
-import type { ExecResult } from "../process/exec.js";
+import type { ExecOptions, ExecResult } from "../process/exec.js";
 import type {
   DependencyAuditResult,
   DependencyAuditCommandRecord,

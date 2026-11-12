@@ -133,6 +133,13 @@ export interface ExecOptions {
    */
   freeze?: boolean;
   /**
+   * Called once, synchronously, as soon as the child has a pid. `group` is
+   * true when the child leads its own process group (detached under
+   * {@link treeKill} on POSIX), so `pid` is also the group id. Not called
+   * when nothing was spawned. Omitting it changes nothing.
+   */
+  onSpawn?: (child: { pid: number; group: boolean }) => void;
+  /**
    * @internal Override platform detection — for unit tests only.
    * Production callers must never pass this.
    */
@@ -219,6 +226,7 @@ export function exec(
     treeKill = true,
     windowsHide = true,
     signal: abortSignal,
+    onSpawn,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
     _windowsVerbatimArguments,
@@ -300,6 +308,9 @@ export function exec(
     // platform check, so this cannot disagree with how the child was spawned.
     if (forwardsInterrupts(spawnOptions) && child.pid !== undefined) {
       releaseInterrupts = processInterruptForwarder.register(child.pid);
+    }
+    if (onSpawn && child.pid !== undefined) {
+      onSpawn({ pid: child.pid, group: forwardsInterrupts(spawnOptions) });
     }
 
     /**
