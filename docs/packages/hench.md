@@ -159,6 +159,7 @@ Two config templates let a project gate less than its whole suite. Both are abse
 - **`hench.testGate.rerunCommand`** applies to unattended runs only (`--auto`, `--yes`, no TTY). When the gate fails and its output names the failed suites, hench runs this command once with `{suites}` replaced by those labels, comma-joined. A pass counts as a gate pass and is recorded as a flake; a failure fails the run. There is no re-run after a timeout, when the output names no failed suites, or on an interactive terminal (which offers rerun/abort/skip instead).
 
 - **`hench.testGate.maxWorkers`** is a positive integer, absent by default. Hench passes it as `NDX_TEST_MAX_WORKERS` to the gate and its re-run, post-task tests, the completion test run and the agent's shell, so the project's vitest configs start at most that many workers. Unset leaves the environment as it was. Several worktrees gating at once are otherwise each free to claim every core.
+- **`hench.testGate.hostSlot`** is a boolean, `false` by default. When `true`, the gate (each attempt and the re-run), the post-task tests and the completion test run each take the host-wide validation slot, so at most one runs per OS user across all hench processes and worktrees. The timeout starts after admission. An agent's own shell commands are not serialized; bound them with `maxWorkers`. Ctrl-C or the run's abort signal stops a wait and fails the run rather than continuing without a verdict.
 
 **Output-line protocol.** The project's runner tells hench what it did with lines in its output. `scripts/run-all-tests.mjs` emits both:
 
@@ -180,6 +181,10 @@ Labels are comma-separated. Hench reads the last line of each kind from the whol
 | `firstAttempt` | The original verdict (command, duration, failed suites, selected suites) when the gate was re-run. After a passing re-run the top-level fields describe the re-run |
 | `rerun` | The one re-run: command, suites, `passed`, duration, and `error` when it gave no verdict |
 | `rerunSkipped` | Why no re-run happened after a failure (no failed-suites line, unsafe label, no `{suites}` placeholder) |
+| `queueMs` | Milliseconds spent waiting for the validation slot, summed over the gate and its re-run. Present only with `hench.testGate.hostSlot` on |
+| `executionMs` | Milliseconds the gate and its re-run ran inside the slot. Present only with `hench.testGate.hostSlot` on |
+
+The post-task test record carries the same two fields for its run. `hench show <run-id> .` and the end-of-run output print them as `Validation slot: queued <n>s, ran <n>s`.
 
 ### Gate-only retry
 
