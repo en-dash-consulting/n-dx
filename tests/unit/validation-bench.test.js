@@ -30,6 +30,7 @@ import {
   runnerArgs,
 } from "../../scripts/bench/lib/plan.mjs";
 import { readWorkspaceManifests } from "../../scripts/lib/workspace-manifests.mjs";
+import { settleAll } from "../../scripts/bench/lib/settle.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
 const REPO = "/work/n-dx";
@@ -227,6 +228,29 @@ describe("summary arithmetic", () => {
     expect(md).toContain("- Commit: `abc123`");
     expect(md).toContain("| web | C | 2 | 9.2 min | 10.0 min | 8.38 GiB | 2.79 GiB | 0.09 GiB | 800 | 30.0 | 1 | 0/2 | – | – |");
     expect(md).toContain("| web | D | 3 | 13.3 min | 28.3 min | 3.73 GiB | 0.93 GiB | 2.79 GiB | 15 | 7.0 | 1 | 1/0 | 400 s | 300 s |");
+  });
+});
+
+describe("batch settling", () => {
+  it("holds a rejection until every run has settled, then rethrows the first", async () => {
+    let finishRunning;
+    const running = new Promise((resolvePromise) => { finishRunning = resolvePromise; });
+    const aborted = Promise.reject(new Error("aborted while waiting for the slot"));
+    let outcome = "pending";
+    const settled = settleAll([running, aborted]).then(
+      () => { outcome = "resolved"; },
+      (err) => { outcome = err.message; },
+    );
+    // Drain microtasks: Promise.all would have rejected by now.
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(outcome).toBe("pending");
+    finishRunning("done");
+    await settled;
+    expect(outcome).toBe("aborted while waiting for the slot");
+  });
+
+  it("returns every value in order when all resolve", async () => {
+    await expect(settleAll([Promise.resolve(1), Promise.resolve(2)])).resolves.toEqual([1, 2]);
   });
 });
 

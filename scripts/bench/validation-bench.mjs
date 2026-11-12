@@ -56,6 +56,7 @@ import {
 } from "./lib/samples.mjs";
 import { createLineCollector, parseGateOutput } from "./lib/gate-output.mjs";
 import { renderSummaryMarkdown, summarize } from "./lib/summary.mjs";
+import { settleAll } from "./lib/settle.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SAMPLE_INTERVAL_MS = 2_000;
@@ -498,7 +499,8 @@ async function main() {
           console.log(`Batch ${batchNo}/${plan.batches.length}: case ${batch.caseId}, ${batch.fixture}, ${batch.worktrees} run(s)…`);
           batch.startMs = Date.now();
           await sampler.begin(batch.batchId);
-          const records = await Promise.all(
+          // Every run must have exited before an error reaches cleanup, which removes their worktrees.
+          const records = await settleAll(
             worktrees.slice(0, batch.worktrees).map((worktree, i) =>
               measuredRun({ batch, worker: i + 1, worktree, base, slotApi, out, timeoutMs: options.timeoutMs })),
           );
