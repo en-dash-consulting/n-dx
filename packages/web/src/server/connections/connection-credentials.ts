@@ -6,13 +6,31 @@
  * from a route — callers show {@link connectionTokenFingerprint} at most.
  */
 
+import { statSync } from "node:fs";
 import {
   credentialFingerprint,
+  credentialStorePath,
   setCredential,
   storedCredential,
   unsetCredential,
   type CredentialStoreOptions,
 } from "@n-dx/llm-client";
+
+/**
+ * Metadata revision for auth verdict invalidation, without reading entries or
+ * invoking credential helpers. Store rewrites affect all store consumers;
+ * external helper/keychain changes still require bounded verdict freshness.
+ */
+export function credentialStoreRevision(): string {
+  const path = credentialStorePath();
+  try {
+    const stat = statSync(path, { throwIfNoEntry: false });
+    return JSON.stringify([path, stat ? [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, stat.mode] : null]);
+  } catch (err) {
+    // Preserve unreadability as an input; the preflight decides usability.
+    return JSON.stringify([path, (err as NodeJS.ErrnoException).code ?? "unreadable"]);
+  }
+}
 
 /** The store entry holding connection `id`'s token. */
 export function connectionCredentialName(id: string): string {

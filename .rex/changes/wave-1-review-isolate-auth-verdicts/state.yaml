@@ -9,9 +9,21 @@ items:
     lastModified: "2026-11-12T21:22:38.411Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "91257435-cb8e-4255-b4eb-f363aca7de9b":
-    lastModified: "2026-11-12T18:57:56.086Z"
+    status: "completed"
+    startedAt: "2026-11-12T21:24:47.263Z"
+    completedAt: "2026-11-12T22:34:27.484Z"
+    endedAt: "2026-11-12T22:34:27.484Z"
+    activeIntervals: [{"end":"2026-11-12T22:22:28.614Z","start":"2026-11-12T21:24:47.263Z"},{"end":"2026-11-12T22:34:27.484Z","start":"2026-11-12T22:24:29.574Z"}]
+    lastModified: "2026-11-12T22:34:30.110Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b2f8cfa9-a4c8-42bb-909f-e51db395362f":
+    status: "completed"
+    startedAt: "2026-11-12T22:34:27.484Z"
+    completedAt: "2026-11-12T22:34:27.484Z"
+    endedAt: "2026-11-12T22:34:27.484Z"
+    activeIntervals: [{"end":"2026-11-12T22:34:27.484Z","start":"2026-11-12T22:34:27.484Z"}]
+    appliedAt: "2026-11-12T22:34:27.484Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-12T18:57:53.156Z"
-    lastModified: "2026-11-12T18:57:56.086Z"
+    lastModified: "2026-11-12T22:34:27.484Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1934,7 +1934,7 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
 
   beforeEach(async () => {
     execMock.mockReset();
-    // The auth result is cached module-wide for the server's lifetime;
+    // Auth results are cached module-wide for a bounded interval;
     // tests must not see each other's cached verdicts.
     invalidateAuthCheckCache();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-tier3-"));

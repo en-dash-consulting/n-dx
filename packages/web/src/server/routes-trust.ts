@@ -23,6 +23,7 @@ import { clearRepoTrust, evaluateRepoTrust, recordRepoTrust } from "@n-dx/llm-cl
 import type { RepoTrustEvaluation } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
+import { invalidateAuthCheckCache } from "./routes-commands.js";
 
 const TRUST_PATH = "/api/trust";
 
@@ -71,11 +72,13 @@ export async function handleTrustRoute(
     }
     if (url === `${TRUST_PATH}/accept` && method === "POST") {
       recordRepoTrust(ctx.projectDir);
+      invalidateAuthCheckCache(ctx.projectDir);
       jsonResponse(res, 200, toTrustResponse(evaluateRepoTrust(ctx.projectDir)));
       return true;
     }
     if (url === `${TRUST_PATH}/revoke` && method === "POST") {
       clearRepoTrust(ctx.projectDir);
+      invalidateAuthCheckCache(ctx.projectDir);
       jsonResponse(res, 200, toTrustResponse(evaluateRepoTrust(ctx.projectDir)));
       return true;
     }

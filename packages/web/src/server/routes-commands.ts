@@ -42,10 +42,12 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
+import { CREDENTIAL_ENV_VARS, repoTrustRecordPath, resolveClaudeConfig } from "@n-dx/llm-client";
+import { credentialStoreRevision } from "./connections/connection-credentials.js";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
@@ -1745,45 +1747,92 @@ interface AuthCheckResult {
 }
 
 /**
- * Cached `n-dx auth` results and checks currently in flight, by context.
- *
- * The check spawns a subprocess with a 60s budget, and the settings page
- * mounts its chip on every navigation — without a cache, each visit costs a
- * spawn and rapid Re-checks stack processes. What the check reports only
- * changes when credentials or LLM config change, so the result is cached for
- * the server's lifetime, keyed by workspace and effective vendor config
- * ({@link authCheckKey}) and dropped on dashboard LLM config saves
- * ({@link invalidateAuthCheckCache}); `?refresh=true` forces a fresh run.
- * Concurrent requests for the same context share the in-flight check.
+ * Both successful and failed verdicts expire one minute after check start.
+ * CLI login/keychain state, helper output and server-side revocation are
+ * opaque here: a cache hit is recent evidence, not a live credential check.
+ * Re-check (`?refresh=true`) bypasses a completed verdict; concurrent requests
+ * for the same current context still share one subprocess (60s budget).
  */
-const authCheckCache = new Map<string, AuthCheckResult>();
-const authCheckInFlight = new Map<string, Promise<AuthCheckResult>>();
+const AUTH_CHECK_TTL_MS = 60_000;
+
+interface AuthCheckState {
+  key: string;
+  verdict?: { result: AuthCheckResult; startedAt: number };
+  inFlight?: Promise<AuthCheckResult>;
+}
+
+// Keep only the latest context per workspace. Replacing the object also retires
+// its pending check: a completion cannot revive an invalidated context.
+const authCheckStates = new Map<string, AuthCheckState>();
+
+/** File identity/metadata only: never read credential or trust-store contents. */
+function authFileRevision(path: string): unknown {
+  try {
+    const stat = statSync(path, { throwIfNoEntry: false });
+    return [path, stat ? [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, stat.mode] : null];
+  } catch (err) {
+    // An unreadable store is a distinct input, not a route failure. The
+    // preflight reports whether credentials are usable; expiry still applies.
+    return [path, (err as NodeJS.ErrnoException).code ?? "unreadable"];
+  }
+}
 
 /**
- * Context tracked by the cache: the workspace, effective vendor and that
- * vendor's `llm.<vendor>` block (CLI path, auth mode, key, endpoint, model).
- * Identical vendor config in two workspaces can still use different
- * workspace-local CLI configuration. Changes to the effective vendor block
- * made outside the dashboard (`n-dx config`, a hand edit, a branch switch)
- * produce a different key without a watcher or explicit invalidation.
- * Hashed so no API key is held as a key.
+ * Observe merged vendor settings (including legacy Claude fields), the
+ * server's inherited auth environment and this workspace's trust record.
+ * Store-dependent API checks also observe credential-store metadata; a store
+ * rewrite conservatively invalidates every store consumer, since this layer
+ * does not read its entries. No helper, keychain or CLI is run to form a key.
+ * External CLI config/login changes are bounded by the TTL, not detected.
+ * Only the digest is retained; no key/token is stored in map keys or logged.
  */
 function authCheckKey(projectDir: string): string {
-  const llm = (readEffectiveNdxConfig(projectDir)["llm"] ?? {}) as Record<string, unknown>;
+  const config = readEffectiveNdxConfig(projectDir);
+  const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const vendor = typeof llm["vendor"] === "string" && llm["vendor"] ? llm["vendor"] : "claude";
+  const vendorConfig = (vendor === "claude"
+    ? resolveClaudeConfig(llm["claude"], config["claude"]).config
+    : llm[vendor]) as Record<string, unknown> | undefined;
+  const keyEnv = vendor === "google" && typeof vendorConfig?.["apiKeyEnv"] === "string" && vendorConfig["apiKeyEnv"]
+    ? vendorConfig["apiKeyEnv"] : CREDENTIAL_ENV_VARS[vendor];
+  const authEnv = vendor === "claude"
+    ? ["ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR"]
+    : vendor === "codex" ? ["CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"] : [];
+  const envNames = ["PATH", "HOME", "USERPROFILE", ...authEnv, ...(keyEnv ? [keyEnv] : [])];
+  // Match the preflight loader: only a non-empty string is a configured key.
+  const configuredKey = typeof vendorConfig?.["api_key"] === "string" && vendorConfig["api_key"];
+  const usesStore = Boolean(CREDENTIAL_ENV_VARS[vendor])
+    && (vendor === "google" || vendorConfig?.["auth"] === "api")
+    && !configuredKey && !(keyEnv && process.env[keyEnv]?.trim());
   return createHash("sha256")
-    .update(JSON.stringify([resolve(projectDir), vendor, llm[vendor] ?? null]))
+    .update(JSON.stringify([
+      resolve(projectDir), vendor, vendorConfig ?? null,
+      envNames.map((name) => [name, process.env[name] ?? null]),
+      usesStore ? credentialStoreRevision() : null,
+      authFileRevision(repoTrustRecordPath(projectDir)),
+    ]))
     .digest("hex");
 }
 
-/** The cached verdict when it was made under the config now in effect. */
-function currentAuthVerdict(projectDir: string): AuthCheckResult | null {
-  return authCheckCache.get(authCheckKey(projectDir)) ?? null;
+function currentAuthState(projectDir: string): AuthCheckState {
+  const workspace = resolve(projectDir);
+  const key = authCheckKey(projectDir);
+  let state = authCheckStates.get(workspace);
+  if (!state || state.key !== key) {
+    state = { key };
+    authCheckStates.set(workspace, state);
+  }
+  if (state.verdict) {
+    const age = Date.now() - state.verdict.startedAt;
+    if (age < 0 || age >= AUTH_CHECK_TTL_MS) state.verdict = undefined;
+  }
+  return state;
 }
 
-/** Drop the cached credential-check result (call when LLM config changes). */
-export function invalidateAuthCheckCache(): void {
-  authCheckCache.clear();
+/** Retire this workspace's cached and pending checks; omit the path to reset all. */
+export function invalidateAuthCheckCache(projectDir?: string): void {
+  if (projectDir === undefined) authCheckStates.clear();
+  else authCheckStates.delete(resolve(projectDir));
 }
 
 async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
@@ -1810,10 +1859,10 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
 /**
  * POST /api/commands/auth — verify LLM provider credentials.
  *
- * Writes nothing, but it is a POST because it spawns: it runs `ndx auth`, whose exit code answers "are the
+ * Writes nothing, but it is a POST because it spawns: it runs `n-dx auth`, whose exit code answers "are the
  * configured provider's credentials usable". Surfaced as a chip in LLM
  * settings so a missing key is visible *before* an agent command fails.
- * Served from cache after the first check; `?refresh=true` re-runs it.
+ * Served from cache for at most one minute; `?refresh=true` re-runs it.
  */
 async function handleAuth(
   req: IncomingMessage,
@@ -1823,24 +1872,30 @@ async function handleAuth(
   const refresh = new URL(req.url || "/", "http://localhost")
     .searchParams.get("refresh") === "true";
 
-  const key = authCheckKey(ctx.projectDir);
-  const verdict = refresh ? null : authCheckCache.get(key);
-  if (verdict) {
-    jsonResponse(res, 200, { ...verdict, cached: true });
+  const state = currentAuthState(ctx.projectDir);
+  if (refresh) state.verdict = undefined;
+  if (state.verdict) {
+    jsonResponse(res, 200, { ...state.verdict.result, cached: true });
     return true;
   }
 
   // Only requests for this workspace/config share the answer, including a
   // forced refresh. Other contexts can check independently.
-  let check = authCheckInFlight.get(key);
+  let check = state.inFlight;
   if (!check) {
+    const startedAt = Date.now();
     check = runAuthCheck(ctx)
       .then((result) => {
-        authCheckCache.set(key, result);
+        // Check both object identity (explicit invalidation/context switches)
+        // and inputs (changes made while no request was observing the cache).
+        if (authCheckStates.get(resolve(ctx.projectDir)) === state
+          && authCheckKey(ctx.projectDir) === state.key) {
+          state.verdict = { result, startedAt };
+        }
         return result;
       })
-      .finally(() => { authCheckInFlight.delete(key); });
-    authCheckInFlight.set(key, check);
+      .finally(() => { state.inFlight = undefined; });
+    state.inFlight = check;
   }
   const result = await check;
   jsonResponse(res, 200, { ...result, cached: false });
@@ -1855,7 +1910,7 @@ async function handleAuth(
  * Wrangler's Re-check.
  */
 function handleAuthCached(res: ServerResponse, ctx: ServerContext): boolean {
-  const verdict = currentAuthVerdict(ctx.projectDir);
+  const verdict = currentAuthState(ctx.projectDir).verdict?.result;
   jsonResponse(res, 200, verdict ? { ...verdict, cached: true } : { cached: false });
   return true;
 }
@@ -2276,6 +2331,7 @@ export function handleCommandsRoute(
   // Routes that spawn a CLI working on this repository's own configuration
   // wait until that configuration has been accepted (see trust-gate.ts).
   if (method === "POST" && TRUST_GATED_POSTS.has(path) && refuseWhileRestricted(res, ctx.projectDir)) {
+    invalidateAuthCheckCache(ctx.projectDir);
     return true;
   }
 
