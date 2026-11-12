@@ -8,5 +8,8 @@ items:
     lastModified: "2026-11-12T04:34:43.873Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b2d58519-a069-4b03-9aef-3cc5753b1055":
-    lastModified: "2026-11-12T15:15:33.720Z"
+    startedAt: "2026-11-12T15:19:09.947Z"
+    activeIntervals: [{"end":"2026-11-12T15:23:09.880Z","start":"2026-11-12T15:19:09.947Z"},{"end":"2026-11-12T15:31:56.342Z","start":"2026-11-12T15:24:31.923Z"},{"end":"2026-11-12T16:10:08.775Z","start":"2026-11-12T15:34:51.825Z"}]
+    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED CODEX_HOME=/private/tmp/ndx-wave1-restack/.tool-cache/test-codex-home node scripts/run-all-tests.mjs affected 43ccdf3bd5893eae9f05564aa8df2de5f5f2ccab]: web; web failed again…\nFailing tests (41):\n- the top nav names each stage with the model's label\n- shows the problem and refuses to submit a path the server would reject\n- reports an authorization server's refusal, or a return this dashboard did not start, without posting anything\n- follows the map to another area, and re-picking the old area in the form brings the map back\n- at the area level, opens with no area and draws no ghost until one is chosen\n- Place sends the edited placement: a changed target, relation, statement and criteria delta\n- waits through old-only snapshots and opens the new run when it appears\n- keeps counting completed runs through a failed listing\n… and 33 more"
+    lastModified: "2026-11-12T16:17:44.097Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
