@@ -64,6 +64,8 @@ export interface SidecarSessionEntry {
 /** The parts of a vendor runtime event the transcript draws. */
 export interface SidecarRuntimeEvent {
   type: "assistant" | "tool_use" | "tool_result" | "completion" | "failure" | "token_usage";
+  /** Originating parser; optional for frames without recorded provenance. */
+  vendor?: string;
   text?: string;
   toolCall?: { tool: string; input: Record<string, unknown>; id?: string };
   /** `isError` is the vendor's verdict when it gave one; absent on older frames and when unknown. */

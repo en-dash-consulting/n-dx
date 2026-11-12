@@ -158,9 +158,10 @@ export function toolLineStatus(card: ToolLineCard | undefined, hasResult: boolea
  * Whether a tool result is a failure. The vendor parser sets `isError` when
  * the stream reports it (Claude's `is_error`, which includes a broker refusal;
  * a Codex command's failed status or non-zero exit), and it wins. Frames
- * recorded before the flag existed have none: for them, fall back to the
- * `[error] ` prefix the Claude parser writes on an `is_error` result.
+ * recorded before the flag existed have none: only known Claude results
+ * fall back to the `[error] ` prefix its parser writes on an `is_error`
+ * result. Codex and unknown origins have no such text convention.
  */
-export function toolResultFailed(result: { output: string; isError?: boolean }): boolean {
-  return result.isError ?? result.output.startsWith("[error] ");
+export function toolResultFailed(result: { output: string; isError?: boolean; vendor?: string }): boolean {
+  return result.isError ?? (result.vendor === "claude" && result.output.startsWith("[error] "));
 }

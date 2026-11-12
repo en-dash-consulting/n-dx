@@ -198,7 +198,7 @@ describe("claude tool results", () => {
   it("turns a user line into one tool_result per block, each naming its call", () => {
     const events = claudeSessionDriver.parseLineEvents(twoResults, 2);
     expect(events.map((e) => [e.type, e.turn, e.toolResult])).toEqual([
-      ["tool_result", 2, { tool: "", output: "     1\tconst a = 1;", durationMs: 0, id: "toolu_01A" }],
+      ["tool_result", 2, { tool: "", output: "     1\tconst a = 1;", durationMs: 0, id: "toolu_01A", isError: false }],
       ["tool_result", 2, { tool: "", output: "line one\nline two", durationMs: 0, id: "toolu_01B", isError: false }],
     ]);
     expect(claudeSessionDriver.parseLine(twoResults, 2)?.toolResult?.id).toBe("toolu_01A");
@@ -218,8 +218,13 @@ describe("claude tool results", () => {
     });
   });
 
-  it("leaves the flag unset when the block says nothing about errors", () => {
-    expect(claudeSessionDriver.parseLineEvents(twoResults, 2)[0].toolResult).not.toHaveProperty("isError");
+  it("treats omitted canonical is_error as success even for literal [error] output (synthetic)", () => {
+    const line = JSON.stringify({ type: "user", message: { role: "user", content: [
+      { type: "tool_result", tool_use_id: "toolu_A", content: "[error] printed" },
+    ] } });
+    expect(claudeSessionDriver.parseLineEvents(line, 2)[0]).toMatchObject({
+      vendor: "claude", toolResult: { id: "toolu_A", output: "[error] printed", isError: false },
+    });
   });
 
   it("flags a top-level tool_result from is_error when present", () => {
@@ -253,7 +258,8 @@ describe("claude tool results", () => {
 
 describe("codex tool results", () => {
   // Modelled on the real fixture packages/hench/tests/fixtures/codex-file-change-real.jsonl;
-  // the failed variants are not captured from a live CLI.
+  // recorded with codex-cli 0.148.0-alpha.15. All variants here are synthetic,
+  // including function_call_output; they do not establish current CLI output.
   const commandItem = (fields: Record<string, unknown>) => JSON.stringify({
     type: "item.completed",
     item: { id: "item_1", type: "command_execution", command: "bash -lc 'false'", aggregated_output: "out", ...fields },
@@ -277,5 +283,14 @@ describe("codex tool results", () => {
   it("leaves function_call_output unflagged: it carries no status", () => {
     const line = JSON.stringify({ type: "function_call_output", output: "x" });
     expect(codexSessionDriver.parseLine(line, 1)?.toolResult).not.toHaveProperty("isError");
+  });
+
+  it.each([
+    commandItem({ aggregated_output: "[error] printed" }),
+    JSON.stringify({ type: "function_call_output", output: "[error] printed" }),
+  ])("preserves Codex identity and unknown status for literal error text: %s", (line) => {
+    const event = codexSessionDriver.parseLine(line, 1);
+    expect(event).toMatchObject({ vendor: "codex", toolResult: { output: "[error] printed" } });
+    expect(event?.toolResult).not.toHaveProperty("isError");
   });
 });

@@ -308,7 +308,9 @@ function claudeToolResultEvents(
         output: (b.is_error === true ? "[error] " : "") + claudeToolResultText(b.content).slice(0, MAX_TOOL_OUTPUT_LENGTH),
         durationMs: 0,
         ...(typeof b.tool_use_id === "string" && b.tool_use_id ? { id: b.tool_use_id } : {}),
-        ...(typeof b.is_error === "boolean" ? { isError: b.is_error } : {}),
+        // Canonical content blocks omit is_error on success. Make that
+        // explicit so literal output cannot trigger the archived prefix fallback.
+        isError: b.is_error === true,
       },
     }];
   });

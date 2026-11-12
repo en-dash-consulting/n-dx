@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+import { claudeSessionDriver, codexSessionDriver } from "@n-dx/llm-client";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
 import { SidecarDock, SidecarFrameRow, clampSidecarWidth, effectiveSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
 import {
@@ -963,10 +964,11 @@ describe("tool calls", () => {
   const call = (seq: number, tool: string, input: Record<string, unknown>, id?: string): SidecarFrame => ({
     seq, at: "t", type: "event", event: { type: "tool_use", toolCall: { tool, input, ...(id ? { id } : {}) } },
   });
-  const result = (seq: number, tool: string, output: string, callId?: string, isError?: boolean): SidecarFrame => ({
+  const result = (seq: number, tool: string, output: string, callId?: string, isError?: boolean, vendor?: string): SidecarFrame => ({
     seq, at: "t", type: "event",
     event: {
       type: "tool_result",
+      ...(vendor ? { vendor } : {}),
       toolResult: { tool, output, durationMs: 5, ...(callId ? { id: callId } : {}), ...(isError !== undefined ? { isError } : {}) },
     },
   });
@@ -1059,12 +1061,12 @@ describe("tool calls", () => {
     expect(tools[0].querySelector(".sidecar-tool-wire")!.textContent).toBe("mcp__ndx-sidecar__fake__create_ticket");
   });
 
-  it("falls back to the [error] prefix for an unflagged (older) result: Failed, keeping its details", async () => {
+  it("falls back to the [error] prefix for an unflagged older Claude result: Failed, keeping its details", async () => {
     server.sessions = [{ session: session(), running: false }];
     server.frames = [
       call(1, "mcp__ndx-sidecar__run_command", { argv: ["rm"] }, "toolu_A"),
       call(2, "mcp__ndx-sidecar__run_command", { argv: ["ls"] }, "toolu_B"),
-      result(3, "unknown", "[error] command not allowed", "toolu_A"),
+      result(3, "unknown", "[error] command not allowed", "toolu_A", undefined, "claude"),
       result(4, "unknown", "ok", "toolu_B"),
     ];
     await mount();
@@ -1082,9 +1084,9 @@ describe("tool calls", () => {
     server.sessions = [{ session: session(), running: false }];
     server.frames = [
       call(1, "shell", { command: "false" }),
-      result(2, "shell", "exit 1", undefined, true),
+      result(2, "shell", "exit 1", undefined, true, "codex"),
       call(3, "shell", { command: "true" }),
-      result(4, "shell", "", undefined, false),
+      result(4, "shell", "", undefined, false, "codex"),
     ];
     await mount();
     await pressCmdJ();
@@ -1095,11 +1097,49 @@ describe("tool calls", () => {
     server.sessions = [{ session: session(), running: false }];
     server.frames = [
       call(1, "Bash", { command: "echo '[error] x'" }, "toolu_A"),
-      result(2, "", "[error] x", "toolu_A", false),
+      result(2, "", "[error] x", "toolu_A", false, "claude"),
     ];
     await mount();
     await pressCmdJ();
     expect(statuses()).toEqual(["Done"]);
+  });
+
+  // Synthetic wire cases parsed by the real drivers, fetched through the stub
+  // server and rendered in jsdom. No live CLI or browser session is exercised.
+  it("keeps result vendors through pairing and renders unknown Codex status without a text-based failure", async () => {
+    const parsedResult = (seq: number, vendor: "claude" | "codex", wire: object): SidecarFrame => {
+      const driver = vendor === "claude" ? claudeSessionDriver : codexSessionDriver;
+      const event = driver.parseLine(JSON.stringify(wire), 1);
+      expect(event?.type).toBe("tool_result");
+      return { seq, at: "t", type: "event", event: {
+        type: "tool_result", vendor: event!.vendor, toolResult: event!.toolResult,
+      } };
+    };
+    server.sessions = [{ session: session({ vendor: "claude" }), running: false }];
+    server.frames = [
+      call(1, "shell", { command: "print" }),
+      call(2, "function", {}),
+      call(3, "Read", {}, "old"),
+      call(4, "Read", {}, "new"),
+      call(5, "Read", {}, "no-vendor"),
+      result(6, "", "[error] archived", "old", undefined, "claude"),
+      parsedResult(7, "codex", { type: "item.completed", item: {
+        type: "command_execution", command: "print", aggregated_output: "[error] command output",
+      } }),
+      parsedResult(8, "codex", { type: "function_call_output", output: "[error] function output" }),
+      parsedResult(9, "claude", { type: "user", message: { role: "user", content: [
+        { type: "tool_result", tool_use_id: "new", content: "[error] canonical success" },
+      ] } }),
+      result(10, "", "[error] unknown origin", "no-vendor"),
+    ];
+    const paired = pairToolResults(JSON.parse(JSON.stringify(server.frames)));
+    expect([1, 2, 3, 4, 5].map((seq) => paired.get(seq)?.vendor))
+      .toEqual(["codex", "codex", "claude", "claude", undefined]);
+    expect(paired.get(1)).not.toHaveProperty("isError");
+    expect(paired.get(2)).not.toHaveProperty("isError");
+    await mount();
+    await pressCmdJ();
+    expect(statuses()).toEqual(["Done", "Done", "Failed", "Done", "Done"]);
   });
 
   it("uses the connection's label from its external-call card and shows the waiting state", async () => {

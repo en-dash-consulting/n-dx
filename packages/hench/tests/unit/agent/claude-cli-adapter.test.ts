@@ -1300,7 +1300,7 @@ describe("claudeCliAdapter session bounds", () => {
       {},
     );
     expect(event?.type).toBe("tool_result");
-    expect(event?.toolResult).toEqual({ tool: "", output: "file body", durationMs: 0, id: "toolu_1" });
+    expect(event?.toolResult).toEqual({ tool: "", output: "file body", durationMs: 0, id: "toolu_1", isError: false });
   });
 
   it("marks an errored tool result and truncates long output", () => {

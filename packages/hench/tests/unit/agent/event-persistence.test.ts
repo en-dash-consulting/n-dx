@@ -17,6 +17,7 @@ import { initConfig } from "../../../src/store/config.js";
 import { toPersistedEvent } from "../../../src/agent/lifecycle/cli-loop.js";
 import { formatEvent } from "../../../src/cli/commands/show.js";
 import type { RuntimeEvent } from "../../../src/prd/llm-gateway.js";
+import { claudeSessionDriver, codexSessionDriver } from "../../../src/prd/llm-gateway.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -191,6 +192,29 @@ describe("RunRecord schema — events field", () => {
 // ── AC2: toPersistedEvent conversion ──────────────────────────────────
 
 describe("toPersistedEvent — RuntimeEvent → PersistedRuntimeEvent", () => {
+  // Synthetic wire cases exercise the parser → persistence → JSON/schema path;
+  // no vendor CLI runs here, and unknown Codex status must remain absent.
+  it.each([
+    ["canonical Claude", claudeSessionDriver, { type: "user", message: { role: "user", content: [
+      { type: "tool_result", tool_use_id: "toolu_A", content: "[error] printed" },
+    ] } }, "claude", false],
+    ["legacy Claude", claudeSessionDriver, { type: "tool_result", output: "[error] archived" }, "claude", undefined],
+    ["Codex command", codexSessionDriver, { type: "item.completed", item: {
+      type: "command_execution", command: "print", aggregated_output: "[error] printed",
+    } }, "codex", undefined],
+    ["Codex function", codexSessionDriver, { type: "function_call_output", output: "[error] printed" }, "codex", undefined],
+  ] as const)("retains %s provenance and verdict in a persisted run", (_label, driver, wire, vendor, isError) => {
+    const event = driver.parseLine(JSON.stringify(wire), 1);
+    expect(event).not.toBeNull();
+    const persisted = toPersistedEvent(event!);
+    const run = RunRecordSchema.parse(JSON.parse(JSON.stringify(makeRun({ events: [persisted] }))));
+    expect(run.events?.[0].vendor).toBe(vendor);
+    expect(run.events?.[0].toolResult?.output).toMatch(/^\[error\] /);
+    if (isError === undefined) expect(run.events?.[0].toolResult).not.toHaveProperty("isError");
+    else expect(run.events?.[0].toolResult?.isError).toBe(isError);
+    if (vendor === "claude" && isError === false) expect(run.events?.[0].toolResult?.id).toBe("toolu_A");
+  });
+
   it("converts an assistant event", () => {
     const event = makeEvent({ type: "assistant", text: "Hello world" });
     const persisted = toPersistedEvent(event);

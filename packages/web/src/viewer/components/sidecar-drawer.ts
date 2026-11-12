@@ -116,7 +116,7 @@ function notesLabel(notes: number): string {
   return notes === 1 ? "1 note carried over" : `${notes} notes carried over`;
 }
 
-type ToolResult = NonNullable<SidecarRuntimeEvent["toolResult"]>;
+type ToolResult = NonNullable<SidecarRuntimeEvent["toolResult"]> & Pick<SidecarRuntimeEvent, "vendor">;
 
 const SUMMARY_KEYS = ["command", "file_path", "path", "pattern", "query", "url", "description", "prompt"];
 const SUMMARY_MAX = 80;
@@ -152,7 +152,7 @@ export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, To
         : named >= 0 ? named : open.length > 0 ? 0 : -1;
       if (index < 0) continue;
       const [call] = open.splice(index, 1);
-      paired.set(call.seq, event.toolResult);
+      paired.set(call.seq, { ...event.toolResult, vendor: event.vendor });
     }
   }
   return paired;
