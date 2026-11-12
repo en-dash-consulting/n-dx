@@ -351,7 +351,7 @@ async function launchRun({ batch, worktree, runKey, env, lease, base, out, timeo
     });
   });
   const gate = parseGateOutput(collector.lines);
-  const record = {
+  return {
     exitCode: result.exitCode,
     signal: result.signal,
     timedOut: result.timedOut,
@@ -362,12 +362,14 @@ async function launchRun({ batch, worktree, runKey, env, lease, base, out, timeo
     testTimeouts: gate.testTimeouts,
     log: logPath,
   };
-  if (result.exitCode !== 0 && existsSync(join(worktree, ".test-logs"))) {
-    const kept = join(out, "logs", `${runKey}-test-logs`);
-    cpSync(join(worktree, ".test-logs"), kept, { recursive: true });
-    record.testLogs = kept;
-  }
-  return record;
+}
+
+/** Copy a failed run's `.test-logs/` into `out`; done after the batch, outside the timed window and the slot. */
+function keepTestLogs(record, worktree, out) {
+  if (record.exitCode === 0 || !existsSync(join(worktree, ".test-logs"))) return;
+  const kept = join(out, "logs", `${record.caseId}-${record.fixture}-r${record.repeat}-w${record.worker}-test-logs`);
+  cpSync(join(worktree, ".test-logs"), kept, { recursive: true });
+  record.testLogs = kept;
 }
 
 function sleep(ms) {
@@ -484,6 +486,7 @@ async function main() {
           sampler.end();
           batch.endMs = Date.now();
           for (const record of records) {
+            keepTestLogs(record, worktrees[record.worker - 1], out);
             appendFileSync(paths.runs, `${JSON.stringify(record)}\n`);
             runs.push(record);
             const flag = record.timedOut ? " (timed out)" : record.exitCode !== 0 ? ` (exit ${record.exitCode ?? record.signal})` : "";
