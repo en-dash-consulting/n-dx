@@ -922,7 +922,7 @@ describe("gateway export auto-detection", () => {
         "parseApiTokenUsage", "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsage",
         "parseStreamTokenUsageWithDiagnostic", "mapCodexUsageToTokenUsage",
         "accumulateTokenUsage", "emptyAggregateTokenUsage",
-        "usageMessageId", "UsageMessageFilter",
+        "UsageMessageFilter",
         "resolveModel", "resolveVendorModel", "resolveReviewModel", "resolveTaskModel",
         // Claude API effort: hench's turn loop must apply the same rule the
         // llm-client API provider applies, so it shares the one resolver.
@@ -955,6 +955,8 @@ describe("gateway export auto-detection", () => {
         // (`.ndx/hench` → the project, not the container), which is the
         // resolver's knowledge of its own layout.
         "resolveLayout", "detectLayoutMode", "relativeToRoot", "projectRootOf",
+        // The per-user home, under which the host-wide validation slot lives.
+        "resolveNdxHome",
         // Available-memory reading. One reading for hench, the dashboard and
         // the hub admission floor, so they cannot disagree about the machine.
         "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader",

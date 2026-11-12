@@ -71,6 +71,8 @@ export {
   projectRootOf,
   relativeToRoot,
   resolveLayout,
+  // The per-user home: the host-wide validation slot lives under it.
+  resolveNdxHome,
 } from "@n-dx/llm-client";
 export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client";
 
@@ -204,7 +206,6 @@ export {
   mapCodexUsageToTokenUsage,
   accumulateTokenUsage,
   emptyAggregateTokenUsage,
-  usageMessageId,
   UsageMessageFilter,
 } from "@n-dx/llm-client";
 
