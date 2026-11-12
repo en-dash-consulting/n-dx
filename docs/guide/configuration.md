@@ -286,6 +286,12 @@ The test gate can be scoped and its flakes absorbed with `hench.testGate.command
 ndx config hench.testGate.maxWorkers 2 .
 ```
 
+`hench.testGate.hostSlot` (boolean, default `false`) makes hench admit one test run at a time per OS user on the host. The slot is shared by every hench process and every worktree, so several worktrees gating at once queue instead of each claiming the machine. It serializes the test gate (each attempt and the re-run), the post-task tests and the completion test run. It does not serialize an agent's own shell commands, such as a suite it starts itself; only `hench.testGate.maxWorkers` bounds those. While a run waits it prints who holds the slot, and the run record keeps the wait (`queueMs`) apart from the run time (`executionMs`). With it off, nothing is created and nothing changes.
+
+```sh
+ndx config hench.testGate.hostSlot true .
+```
+
 `hench.projectSkills` names project skills an agent should follow during `ndx work`, by directory name under `.claude/skills/` or `.agents/skills/`. A run cannot invoke a skill by name, so each run's system prompt lists the named skills by path and tells the agent to read the file before the work it covers. The setting is opt-in because those directories also hold operator workflows such as `ndx-work` that a running agent must not follow:
 
 ```sh

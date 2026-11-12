@@ -336,6 +336,33 @@ value wins: an exported cap below the configured one is kept, so repository
 config can never raise it. A new vitest
 config must read it with `testMaxWorkers()` at the top level of `test`.
 
+## Running Several Worktrees at Once
+
+Set `NDX_TEST_MAX_WORKERS` (above) and turn on the host-wide validation slot so
+the gates of several worktrees queue instead of competing:
+
+```sh
+ndx config hench.testGate.hostSlot true .
+```
+
+With `hench.testGate.hostSlot` on (default off), the test gate (each attempt and
+the re-run), the post-task tests and the completion test run each take one slot
+per OS user, shared by every hench process on the host. An agent's own shell
+commands are not serialized; only the worker cap bounds those.
+
+- **Is a run waiting?** It prints `Waiting for the validation slot held by pid
+  <n> in <project> since <time>`, repeated about every 30 s. A holder marked
+  `(exited; its tests still run)` has died but its test child is still alive.
+- **How long did it wait?** `hench show <run-id> .` prints
+  `Validation slot: queued <n>s, ran <n>s`; the run record stores `queueMs` and
+  `executionMs`.
+- **Where is it?** `<ndx home>/validation-slot/` (`~/.ndx/validation-slot/` by
+  default). `holder.json` exists exactly while the slot is held and names the
+  pid, project and start time.
+- **Stale holders.** A record whose process and test child are dead, that does
+  not parse, or that predates a reboot is reclaimed automatically by the next
+  waiter. Do not delete the directory by hand while a run is active.
+
 ## Timeout Guardrails
 
 Timeouts are allowed only as **guardrails against hangs**, not as a way to turn an
