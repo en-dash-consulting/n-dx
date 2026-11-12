@@ -105,7 +105,8 @@ import {
   PRD_TREE_DIRNAME,
   walkTree,
 } from "./rex-gateway.js";
-import { runsAsOneTask } from "./runnable-units.js";
+import type { V2Tree } from "./rex-gateway.js";
+import { runsAsOneTask, unitRefusal } from "./runnable-units.js";
 import { runnableRowText, withPlannedRowText } from "./runnable-row.js";
 import type {
   PRDItem,
@@ -2188,6 +2189,9 @@ async function judgeExecuteRequest(
 
   const task = findPRDItem(items, taskId);
   if (!task) return refused(404, { error: `Task "${taskId}" not found in PRD` });
+
+  const eligibilityRefusal = unitRefusal(items as unknown as PRDItem[], doc.product as V2Tree["product"] | undefined)(task as unknown as PRDItem);
+  if (eligibilityRefusal) return refused(400, { error: eligibilityRefusal, taskId });
 
   // Validate task is actionable
   const status = task.status as string;

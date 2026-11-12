@@ -193,6 +193,29 @@ describe("TaskDetail start control", () => {
     expect(stub.saves()).toHaveLength(0);
   });
 
+  it.each([
+    ["change", "Change needs placement"],
+    ["change", "Change is applied"],
+    ["change", "Change is closed"],
+    ["change", "Run nested changes or tasks"],
+    ["task", "Enclosing change needs placement"],
+    ["subtask", "Run the parent task"],
+  ] as const)("withholds both controls for ineligible %s: %s", async (type, reason) => {
+    const stub = stubServer();
+    const item: PRDItemData = {
+      id: "refused", title: "Refused", type, status: "pending",
+      executionEligible: false, executionRefusal: reason,
+    };
+    root = renderToDiv(h(TaskDetail, { item, allItems: [item] }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(root.querySelector(".start-task-primary")).toBeNull();
+    expect(root.querySelector(".start-task-caret")).toBeNull();
+    expect(root.querySelector(".task-execution-refusal")?.textContent).toBe(reason);
+    expect(stub.calls.filter((c) => c.url.startsWith("/api/hench/prep/"))).toHaveLength(0);
+    expect(stub.executes()).toHaveLength(0);
+    expect(stub.saves()).toHaveLength(0);
+  });
+
   it("offers no start for a change with tasks", async () => {
     stubServer();
     const item: PRDItemData = {

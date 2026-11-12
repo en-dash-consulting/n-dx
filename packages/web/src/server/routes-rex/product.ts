@@ -22,6 +22,7 @@
  * fails to compile if the two drift.
  */
 
+import { indexedUnitRefusal } from "../runnable-units.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
@@ -44,7 +45,6 @@ import {
   ProductEditError,
   withPrdModelTransaction,
   findNextWorkTask,
-  changeWorkShape,
   openClaimsStore,
   resolveClaimHolder,
   computeEdges,
@@ -643,6 +643,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
   const changes = changesOf(index);
   const areasOf = areasByChange(index, openChangesByArea(index, changes));
+  const refusalFor = indexedUnitRefusal(index);
   return changes
     .filter((change) => isOpenChange(change) || isAppliedChange(change))
     .map((change) => {
@@ -674,7 +675,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         touches: (change.touches ?? []).map((ref) => titleOf(index, ref)),
         taskCount: tasks.length,
         completedTaskCount: tasks.filter((t) => t.status === "completed").length,
-        ...(changeWorkShape(change) === "unit" ? { runsAsOneTask: true } : {}),
+        ...(refusalFor(change.id) === null ? { runsAsOneTask: true } : {}),
         ...gapOf(index, change, tasks),
         ...(areas ? { areas } : {}),
       };

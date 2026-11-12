@@ -122,7 +122,7 @@ export function handleDataRoute(
       if (prdExists(ctx.rexDir)) {
         const doc = loadPRDSync(ctx.rexDir);
         if (doc) {
-          markRunnableUnits(doc.items);
+          markRunnableUnits(doc.items, doc.product);
           const body = JSON.stringify(doc);
           res.writeHead(200, {
             "Content-Type": "application/json; charset=utf-8",

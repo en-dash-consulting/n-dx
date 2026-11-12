@@ -158,7 +158,7 @@ export function isRootType(type: string): boolean {
  * Task or subtask only, judged on the type alone. A task-less `change` is also
  * a unit `ndx work` runs, but that depends on its children, not its type: the
  * server marks it `runsAsOneTask` (`server/runnable-units.ts`), and Start and
- * run settings ask `isRunnableItem` / `isRunnableUnit` instead of this.
+ * run settings ask `isRunnableItem` / `unitRefusal` instead of this.
  */
 export function isWorkItemType(type: string): boolean {
   return type === "task" || type === "subtask";

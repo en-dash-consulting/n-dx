@@ -151,7 +151,7 @@ export function routePrdReads(
       errorResponse(res, 404, "No PRD data found");
       return true;
     }
-    markRunnableUnits(doc.items);
+    markRunnableUnits(doc.items, doc.product);
     jsonResponse(res, 200, doc);
     return true;
   }

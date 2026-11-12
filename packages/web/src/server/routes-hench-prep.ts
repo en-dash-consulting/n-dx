@@ -48,10 +48,12 @@ import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
 import { isV2Tree, loadPRDSync, summaryField } from "./prd-io.js";
 import { checkSavedRun, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
+import { indexedUnitRefusal, unitRefusal } from "./runnable-units.js";
 import { itemTypeOf } from "../shared/index.js";
 import {
   collectCompletedIds,
   findItem,
+  indexTree,
   findActionableTasks,
   findActionableWork,
   openClaimsStore,
@@ -255,6 +257,21 @@ function prdEntryOf(ctx: ServerContext, taskId: string): PrdEntry | null {
   return doc ? findItem(doc.items, taskId) : null;
 }
 
+/** Eligibility before any resolve/preview spawn or temporary context file. */
+function preparationRefusal(ctx: ServerContext, taskId: string): string | null {
+  const doc = loadPRDSync(ctx.rexDir);
+  if (!doc) return null;
+  const entry = findItem(doc.items, taskId);
+  if (entry) return unitRefusal(doc.items, doc.product)(entry.item);
+  // Known display ids and aliases need the same gate as their canonical id.
+  if (isV2Tree(ctx.rexDir)) {
+    const index = indexTree({ product: doc.product ?? [], changes: doc.items as unknown as V2Tree["changes"] });
+    if (index.resolve(taskId)) return indexedUnitRefusal(index)(taskId);
+  }
+  // Truly unknown refs retain the CLI's existing resolution diagnostics.
+  return null;
+}
+
 function detailOf(entry: PrdEntry | null): PrepDetail | null {
   if (!entry) return null;
   return {
@@ -318,6 +335,8 @@ async function handleSave(
 
 /** GET /api/hench/prep/:taskId */
 async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
+  const refusal = preparationRefusal(ctx, taskId);
+  if (refusal) { errorResponse(res, 400, refusal); return true; }
   const entry = prdEntryOf(ctx, taskId);
   // Requests for the same task share one spawn; the child is killed only once
   // every request waiting on it has disconnected.
@@ -386,6 +405,8 @@ export async function resolveTaskRun(
   options: unknown,
   signal?: AbortSignal,
 ): Promise<{ ok: true; resolution: Record<string, unknown> } | { ok: false; failure: string }> {
+  const refusal = preparationRefusal(ctx, taskId);
+  if (refusal) return { ok: false, failure: refusal };
   const checked = await validateRunOptions(ctx.projectDir, options);
   if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
   if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
@@ -416,6 +437,8 @@ export async function previewTaskRun(
   options: unknown,
   signal?: AbortSignal,
 ): Promise<{ ok: true; brief: string } | { ok: false; failure: string }> {
+  const refusal = preparationRefusal(ctx, taskId);
+  if (refusal) return { ok: false, failure: refusal };
   const checked = await validateRunOptions(ctx.projectDir, options);
   if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
   if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
@@ -463,6 +486,8 @@ export async function diagnoseTaskRun(
 
 /** POST /api/hench/prep/:taskId/preview */
 async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
+  const refusal = preparationRefusal(ctx, taskId);
+  if (refusal) { errorResponse(res, 400, refusal); return true; }
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(await readBody(req, res));

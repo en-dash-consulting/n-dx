@@ -1145,9 +1145,11 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
   const itemType = itemTypeOf(item);
   const itemLabel = itemTypeLabel(itemType);
-  // Tasks, subtasks and a change that runs as one task: what `ndx work` runs.
+  // The server judges explicit-run eligibility against the whole PRD index.
   const runnable = isRunnableItem(item);
-  const runs = useTaskRuns(runnable ? item.id : null);
+  // Eligibility gates controls, not the history of work already performed.
+  const tracksRuns = isWorkItemType(itemType) || itemType === "change";
+  const runs = useTaskRuns(tracksRuns ? item.id : null);
   const verdictEnabled = useFeatureToggle(RUN_VERDICT_FEATURE, false);
 
   // Determine if this item can have children added
@@ -1311,7 +1313,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
               navigateTo,
             }),
           )
-        : null,
+        : item.executionRefusal
+          ? h("p", { class: "task-execution-refusal" }, item.executionRefusal)
+          : null,
 
       // Inline failure reason input form
       (pendingFailStatus || editingFailureReason)
@@ -1378,7 +1382,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       : null,
 
     // Aggregated token usage across runs
-    runnable
+    tracksRuns
       ? h(
           "div",
           { class: "task-section task-usage-section" },
@@ -1404,8 +1408,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         )
       : null,
 
-    // Associated hench runs: whatever `ndx work` runs
-    runnable
+    // Associated hench runs, including closed work
+    tracksRuns
       ? h(HenchRunsList, { runs, navigateTo })
       : null,
 

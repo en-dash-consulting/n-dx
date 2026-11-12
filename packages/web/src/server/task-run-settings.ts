@@ -22,10 +22,9 @@ import { resolveActiveVendor, validateCatalogModel } from "./routes-llm.js";
 import { validateProviderForVendor } from "./hench-config-fields.js";
 import { refreshPRDCache } from "./prd-io.js";
 import { errorMessage } from "./response-utils.js";
-import { findItem, resolveStore, updateInTree, validateRunSettings } from "./rex-gateway.js";
+import { findItem, isChangeLayerStore, resolveStore, updateInTree, validateRunSettings } from "./rex-gateway.js";
 import type { RunSettings } from "./rex-gateway.js";
-import { itemTypeOf } from "../shared/index.js";
-import { isRunnableUnit } from "./runnable-units.js";
+import { unitRefusal } from "./runnable-units.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 /**
@@ -217,6 +216,8 @@ export function runConflictBody(saved: RunSettings | null, version: string): Rec
   };
 }
 
+class IneligibleRunSettings extends Error {}
+
 /** What {@link writeTaskRun} came to: the stored block and its version, or the answer to give. */
 export type TaskRunWrite =
   | { ok: true; saved: RunSettings | null; version: string }
@@ -244,7 +245,6 @@ export async function writeTaskRun(
 
   let conflict: { saved: RunSettings | null; version: string } | null = null;
   let missing = false;
-  let notRunnable: string | null = null;
   let updatedDoc;
   try {
     const store = await resolveStore(ctx.rexDir);
@@ -254,12 +254,10 @@ export async function writeTaskRun(
         missing = true;
         return doc;
       }
-      if (!isRunnableUnit(entry.item)) {
-        notRunnable = itemTypeOf(entry.item) === "change"
-          ? `Change "${taskId}" does not run as one task; n-dx work runs its tasks, so save run settings on those tasks`
-          : `Item "${taskId}" is not a task or subtask, so it cannot carry run settings`;
-        return doc;
-      }
+      // Read the product under the same PRD lock as the settings version and save.
+      const product = isChangeLayerStore(store) ? (await store.loadTree()).product : undefined;
+      const refusal = unitRefusal(doc.items, product)(entry.item);
+      if (refusal) throw new IneligibleRunSettings(refusal);
       const current = entry.item.run as RunSettings | undefined;
       const currentVersion = savedRunVersion(current);
       if (currentVersion !== version) {
@@ -271,6 +269,7 @@ export async function writeTaskRun(
       return doc;
     });
   } catch (err) {
+    if (err instanceof IneligibleRunSettings) return { ok: false, status: 400, body: { error: err.message } };
     const message = errorMessage(err);
     // The lock failure names the holder's PID, which is the most useful fact in
     // it — passed through rather than replaced with wording of our own.
@@ -278,13 +277,6 @@ export async function writeTaskRun(
   }
 
   if (missing) return { ok: false, status: 404, body: { error: `Task "${taskId}" not found` } };
-  if (notRunnable) {
-    return {
-      ok: false,
-      status: 400,
-      body: { error: notRunnable },
-    };
-  }
   if (conflict) {
     const current = conflict as { saved: RunSettings | null; version: string };
     return { ok: false, status: 409, body: runConflictBody(current.saved, current.version) };

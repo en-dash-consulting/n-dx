@@ -7,12 +7,12 @@ import type { PRDItemData, BranchStats, ItemStatus } from "./types.js";
 import { isWorkItemType, itemTypeOf } from "../../external.js";
 
 /**
- * Can `ndx work` run this item? A task or subtask, or a change the server
- * flagged `runsAsOneTask` (rex's selection rule: a change with no tasks is
- * itself the unit). Decides Start, run history and usage in the detail panel;
- * `isWorkItemType` stays task|subtask for callers that mean exactly that.
+ * Indexed explicit-run eligibility from the served PRD controls Start.
+ * Older payloads keep the task/subtask and server-marked unit fallback;
+ * isWorkItemType remains the type classification, independent of eligibility.
  */
 export function isRunnableItem(item: PRDItemData): boolean {
+  if (item.executionEligible !== undefined) return item.executionEligible;
   const type = itemTypeOf(item);
   return isWorkItemType(type) || (type === "change" && item.runsAsOneTask === true);
 }

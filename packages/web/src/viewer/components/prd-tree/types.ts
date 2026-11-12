@@ -121,6 +121,9 @@ export interface PRDItemData {
    * server from rex's selection rule (`runnable-units.ts`); never stored.
    */
   runsAsOneTask?: boolean;
+  /** Indexed explicit-run eligibility, supplied by the server. */
+  executionEligible?: boolean;
+  executionRefusal?: string;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.branch */
   branch?: string | null;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.sourceFile */
