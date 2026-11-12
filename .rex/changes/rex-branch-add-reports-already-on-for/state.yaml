@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "36dd680c-c708-4157-8c08-f1c468b4ad61":
+    status: "completed"
+    startedAt: "2026-11-09T18:59:44.307Z"
+    completedAt: "2026-11-09T19:07:21.680Z"
+    endedAt: "2026-11-09T19:07:21.680Z"
+    activeIntervals: [{"end":"2026-11-09T19:07:21.680Z","start":"2026-11-09T18:59:44.307Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "branch add / assign_to_branch adopt an open unit an earlier branch of the name left, writing delivery.since (fork point); earlierUseRows counts a row earlier only while its since matches the fork-point row."
+    appliedAt: "2026-11-09T19:07:21.680Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-09T18:45:31.824Z"
+    lastModified: "2026-11-09T19:07:21.680Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

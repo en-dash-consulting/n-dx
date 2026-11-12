@@ -1,0 +1,69 @@
+schema: "rex/v2"
+items:
+  "423da32e-7728-4fdc-93ef-039f7fef121a":
+    status: "completed"
+    startedAt: "2026-11-07T02:39:25.318Z"
+    completedAt: "2026-11-07T02:50:14.710Z"
+    endedAt: "2026-11-07T02:50:14.710Z"
+    activeIntervals: [{"end":"2026-11-07T02:50:14.710Z","start":"2026-11-07T02:39:25.318Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench selection (autoselect, menu, queue peek, --loop, --plan-queue) narrows to rex currentWorkSet; --any skips it; --task bypasses; WorkSetExhaustedError ends the loop with the work-set message; --resolve reports workSet; help in hench and core."
+    lastModified: "2026-11-07T02:50:14.710Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "438dd97f-37e2-4c72-8f94-bdebe90b8183":
+    status: "completed"
+    startedAt: "2026-11-07T02:50:23.384Z"
+    completedAt: "2026-11-07T02:51:44.209Z"
+    endedAt: "2026-11-07T02:51:44.209Z"
+    activeIntervals: [{"end":"2026-11-07T02:51:44.209Z","start":"2026-11-07T02:50:23.384Z"}]
+    lastModified: "2026-11-07T02:51:44.209Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4f7ddb95-7409-4752-9c77-ab697ee66924":
+    status: "completed"
+    startedAt: "2026-11-07T02:15:38.752Z"
+    completedAt: "2026-11-07T02:18:10.186Z"
+    endedAt: "2026-11-07T02:18:10.186Z"
+    activeIntervals: [{"end":"2026-11-07T02:18:10.186Z","start":"2026-11-07T02:15:38.752Z"}]
+    lastModified: "2026-11-07T02:18:10.186Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5f9a638c-8663-441e-9cb2-4a90be03e274":
+    status: "completed"
+    startedAt: "2026-11-07T02:32:40.058Z"
+    completedAt: "2026-11-07T02:39:16.589Z"
+    endedAt: "2026-11-07T02:39:16.589Z"
+    activeIntervals: [{"end":"2026-11-07T02:39:16.589Z","start":"2026-11-07T02:32:40.058Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "findActionableWork/findNextWorkTask take workSet; get_next_task and rex next narrow to the current branch's set via currentWorkSet, with any/--any to skip"
+    lastModified: "2026-11-07T02:39:16.589Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7567a708-d942-448f-9869-3cbc2aed9bab":
+    status: "completed"
+    startedAt: "2026-11-07T02:18:19.225Z"
+    completedAt: "2026-11-07T02:25:57.890Z"
+    endedAt: "2026-11-07T02:25:57.890Z"
+    activeIntervals: [{"end":"2026-11-07T02:25:57.890Z","start":"2026-11-07T02:18:19.225Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Optional delivery { branch } on the v2 state row (DeliverySchema, non-empty string); core/work-set.ts with planAssignToBranch / planUnassignFromBranch / readWorkSet and transactional assignToBranch / unassignFromBranch. Schema, state-writer, state-merge, core and integration tests."
+    lastModified: "2026-11-07T02:25:57.890Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8bc1f961-778d-4eac-8370-2cea280bfcb6":
+    status: "completed"
+    startedAt: "2026-11-07T02:26:06.789Z"
+    completedAt: "2026-11-07T02:32:31.205Z"
+    endedAt: "2026-11-07T02:32:31.205Z"
+    activeIntervals: [{"end":"2026-11-07T02:32:31.205Z","start":"2026-11-07T02:26:06.789Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex branch add/remove/show (cli/commands/branch.ts) and MCP assign_to_branch, with tests, docs and changeset"
+    lastModified: "2026-11-07T02:32:31.205Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d20fbfb8-af73-4dba-9fea-e514cc253512":
+    status: "completed"
+    startedAt: "2026-11-07T02:51:44.209Z"
+    completedAt: "2026-11-07T02:51:44.209Z"
+    endedAt: "2026-11-07T02:51:44.209Z"
+    activeIntervals: [{"end":"2026-11-07T02:51:44.209Z","start":"2026-11-07T02:51:44.209Z"}]
+    appliedAt: "2026-11-07T02:51:44.209Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-07T02:14:22.081Z"
+    lastModified: "2026-11-07T02:51:44.209Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

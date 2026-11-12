@@ -62,7 +62,8 @@
  *   operations hench also has to scope to it)
  * - v2 work selection (prdLayout, isChangeLayerStore, findNextWorkTask,
  *   findActionableWork, resolveWorkById — what `get_next_task` runs on a v2
- *   tree, so `ndx work` picks the same unit)
+ *   tree, so `ndx work` picks the same unit; given a workspace,
+ *   findNextWorkTask also returns the branch work set it narrowed to)
  * - v2 agent brief (buildChangeBrief — the selected unit's brief, built from
  *   its change and the product nodes it touches or amends)
  * - v2 completion (completeV2Work — what `update_task_status` runs on a v2
@@ -152,7 +153,9 @@ export {
 // `--task` resolver (resolveWorkById: id, display id or alias; a change with
 // open tasks resolves to one of them, and openChangeTasks names them when none
 // can run). `prdLayout` answers "is this tree v2" without reading it, for the
-// flags v2 refuses.
+// flags v2 refuses. Given a `workspace`, findNextWorkTask also narrows to that
+// checkout's branch work set and returns it: which branch has a set and which
+// units are in it is rex's rule, so hench never reads the set on its own.
 export {
   prdLayout,
   isChangeLayerStore,

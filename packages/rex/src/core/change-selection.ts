@@ -32,7 +32,9 @@
  *
  * `ready` is informational. `readyOnly` and `assignee` (`--ready-only`,
  * `--mine`) narrow the candidates only when asked; a task inherits either
- * value from its change unless it sets its own `ready`.
+ * value from its change unless it sets its own `ready`. `workSet` narrows them
+ * to a branch's work set, matched on the unit's own id; claims (`excludeIds`)
+ * still apply inside it.
  *
  * ## Order
  *
@@ -72,6 +74,12 @@ export interface WorkSelectionOptions {
   readyOnly?: boolean;
   /** Only units this identity is assigned, directly or through the change (`--mine`). */
   assignee?: string;
+  /**
+   * Only units whose own id is in the set: a branch's work set
+   * (`core/work-set.ts`). A task matches by its id, a task-less change by the
+   * change's. An empty set yields no candidates; omitted, nothing is filtered.
+   */
+  workSet?: ReadonlySet<string>;
 }
 
 /** A child as {@link changeWorkShape} reads it: a change-layer node or its projected item. */
@@ -91,6 +99,11 @@ export function changeWorkShape(change: { children?: readonly WorkShapeChild[] }
 }
 
 const ACTIONABLE: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["pending", "in_progress", "failing"]);
+
+/** Pending, in progress or failing (absent reads as pending): the statuses a unit is worked in. */
+export function isActionableStatus(status: ItemStatus | undefined): boolean {
+  return ACTIONABLE.has(status ?? "pending");
+}
 
 /** Every autonomous candidate, best first. */
 export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions = {}): WorkUnit[] {
@@ -128,6 +141,7 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
     (u) =>
       !exclude.has(u.node.id) &&
       !held(u.change) &&
+      (!options.workSet || options.workSet.has(u.node.id)) &&
       (!options.readyOnly || (u.node.ready ?? u.change.ready) === true) &&
       (!options.assignee || u.node.assignee === options.assignee || u.change.assignee === options.assignee),
   );
@@ -164,7 +178,95 @@ function openBlockers(index: TreeIndex, node: RuleNode): string[] {
 
 /** Pending, in progress or failing, with every blocker completed. */
 function runnableIn(index: TreeIndex, node: RuleNode): boolean {
-  return ACTIONABLE.has(node.status ?? "pending") && openBlockers(index, node).length === 0;
+  return isActionableStatus(node.status) && openBlockers(index, node).length === 0;
+}
+
+/** A unit selection cannot pick, with every reason it is passed over. */
+export interface UnpickableUnit {
+  id: string;
+  displayId?: string;
+  title: string;
+  status: ItemStatus;
+  /** Why it is passed over, in gate order; never empty. */
+  reasons: string[];
+}
+
+export interface PickabilityOptions extends WorkSelectionOptions {
+  /** Units another worktree holds, by id: passed over, and named as claimed with the holder. */
+  claims?: ReadonlyMap<string, { worktreeRoot: string }>;
+  /** Only units carrying at least one of these tags (their own). */
+  tags?: readonly string[];
+}
+
+/**
+ * The units in `ids` (a branch's work set) that selection with `options`
+ * cannot pick, each with why: claimed by another worktree, excluded by the
+ * caller, awaiting placement in the Inbox, its change not workable, its own
+ * status, an unfinished dependency (named, and marked when it is outside
+ * `ids`), not ready (`readyOnly`), not this assignee's, or none of `tags`.
+ * The one statement of why a work set's open unit is not picked: `rex next`,
+ * `get_next_task`, `rex branch show` and `ndx work` all report it. Units
+ * selection can pick, and ids the tree does not hold, are left out.
+ */
+export function unpickableUnits(tree: V2Tree, ids: readonly string[], options: PickabilityOptions = {}): UnpickableUnit[] {
+  const index = indexTree(tree);
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  const inSet = new Set(ids);
+  const claims = options.claims ?? new Map<string, { worktreeRoot: string }>();
+  const excludeIds = new Set([...(options.excludeIds ?? []), ...claims.keys()]);
+  const tags = options.tags ?? [];
+  const pickable = new Set(
+    findActionableWork(tree, { ...options, excludeIds, workSet: inSet })
+      .filter((u) => tags.length === 0 || (u.node.tags ?? []).some((t) => tags.includes(t)))
+      .map((u) => u.node.id),
+  );
+  const blocker = (ref: string): string => {
+    const target = index.resolve(ref);
+    if (!target) return `blocked by "${ref}", which names nothing in the PRD`;
+    return `blocked by ${nodeLabel(target)} (${target.status ?? "pending"}${inSet.has(target.id) ? "" : ", outside this branch's work set"})`;
+  };
+
+  return ids.flatMap((id) => {
+    const node = index.resolve(id);
+    if (!node || pickable.has(node.id)) return [];
+    // The changes gating the unit, innermost first; a task-less change is its own.
+    const changes = node.type === "change" ? [node, ...enclosingChanges(node, parentOf)] : enclosingChanges(node, parentOf);
+    const change = changes[0];
+    const reasons: string[] = [];
+    for (const held of node.type === "change" ? changes : [node, ...changes]) {
+      const claim = claims.get(held.id);
+      if (claim) reasons.push(`${ownerPrefix(node, held)}claimed by another worktree: ${claim.worktreeRoot}`);
+      else if (options.excludeIds?.has(held.id)) reasons.push(`${ownerPrefix(node, held)}excluded from this selection`);
+    }
+    const inbox = changes.find((c) => awaitsPlacement(index, c));
+    if (inbox) reasons.push(`${ownerPrefix(node, inbox)}awaiting placement in the Inbox; place it first`);
+    for (const c of changes) {
+      if (c === node) continue;
+      const status = c.status ?? "pending";
+      if (!isOpenChange(c)) reasons.push(`its change ${nodeLabel(c)} is ${status === "completed" ? "applied" : status}`);
+      else if (!isActionableStatus(c.status)) reasons.push(`its change ${nodeLabel(c)} is ${status}`);
+      else for (const ref of openBlockers(index, c)) reasons.push(`its change ${nodeLabel(c)} is ${blocker(ref)}`);
+    }
+    if (!isActionableStatus(node.status)) reasons.push(`it is ${node.status}`);
+    for (const ref of openBlockers(index, node)) reasons.push(blocker(ref));
+    if (options.readyOnly && (node.ready ?? change?.ready) !== true) reasons.push("not marked ready");
+    if (options.assignee && node.assignee !== options.assignee && change?.assignee !== options.assignee) {
+      reasons.push(`not assigned to ${options.assignee}`);
+    }
+    if (tags.length > 0 && !(node.tags ?? []).some((t) => tags.includes(t))) reasons.push(`has none of the tags ${tags.join(", ")}`);
+    if (reasons.length === 0) reasons.push("not selectable");
+    return [{ id: node.id, ...(node.displayId ? { displayId: node.displayId } : {}), title: node.title, status: node.status ?? "pending", reasons }];
+  });
+}
+
+/** `its change X is ` when `owner` encloses `node`; nothing when it is the node itself. */
+function ownerPrefix(node: RuleNode, owner: RuleNode): string {
+  return owner === node ? "" : `its change ${nodeLabel(owner)} is `;
+}
+
+/** A node as a reason names it: display id and title, or title and id. */
+function nodeLabel(node: RuleNode): string {
+  return node.displayId ? `${node.displayId} "${node.title}"` : `"${node.title}" (${node.id})`;
 }
 
 /** The unit autonomous selection runs next, or `null` when none is actionable. */

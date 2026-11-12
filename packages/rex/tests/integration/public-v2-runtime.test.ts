@@ -19,6 +19,7 @@ import {
   enclosingChangeIds,
   findNextWorkTask,
   completedWorkIds,
+  currentWorkSet,
   completeTask,
   completeChange,
   completeWork,
@@ -113,6 +114,10 @@ describe("v2 runtime exported from public.ts", () => {
     expect(enclosingChangeIds(t, TASK)).toEqual([CHANGE]);
     expect(enclosingChangeIds(t, CHANGE)).toEqual([]);
     expect(enclosingChangeIds(t, "no-such-ref")).toEqual([]);
+  });
+
+  it("currentWorkSet is null outside a git checkout: selection is not narrowed", async () => {
+    expect(currentWorkSet(await tree(), tmp)).toBeNull();
   });
 
   it("findNextWorkTask answers in v1 item shape; completedWorkIds starts empty", async () => {

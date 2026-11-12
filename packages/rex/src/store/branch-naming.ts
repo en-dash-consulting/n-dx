@@ -50,6 +50,7 @@ export function resolveGitBranch(cwd: string): string {
 export const DEFAULT_BRANCHES = ["main", "master"] as const;
 
 const ORIGIN_PREFIX = "refs/remotes/origin/";
+const HEADS_PREFIX = "refs/heads/";
 
 /**
  * The branch `origin/HEAD` points at, or null when the clone has no
@@ -108,6 +109,104 @@ function refExists(cwd: string, ref: string): boolean {
 export function isDefaultBranch(cwd: string, branch: string): boolean {
   const origin = resolveOriginDefaultBranch(cwd);
   return origin ? branch === origin : (DEFAULT_BRANCHES as readonly string[]).includes(branch);
+}
+
+/**
+ * The checked-out branch of the workspace at `projectDir`, or null when that
+ * workspace has no work-set branch: it is on the default branch, HEAD is
+ * detached, or `projectDir` is not in a git repository.
+ *
+ * Callers pass the workspace directory they resolved (the MCP server's
+ * `workspace.projectDir`, the CLI's dir argument), never `process.cwd()`.
+ * The default branch is read by {@link isDefaultBranch}, so there is one
+ * resolver for it.
+ */
+export function currentWorkSetBranch(projectDir: string): string | null {
+  let ref: string;
+  try {
+    // Unlike `rev-parse --abbrev-ref`, this fails on a detached HEAD. The full
+    // ref, not `--short`: a tag sharing the branch's name makes `--short`
+    // print `heads/<name>`.
+    ref = execFileSync(
+      "git",
+      ["symbolic-ref", "--quiet", "HEAD"],
+      { cwd: projectDir, encoding: "utf-8", ...QUIET_GIT },
+    ).trim();
+  } catch {
+    return null;
+  }
+  if (!ref.startsWith(HEADS_PREFIX)) return null;
+  const branch = ref.slice(HEADS_PREFIX.length);
+  if (!branch || isDefaultBranch(projectDir, branch)) return null;
+  return branch;
+}
+
+/**
+ * Where the checked-out branch of `projectDir` left the default branch: the
+ * merge-base of HEAD and the default branch {@link isDefaultBranch} names,
+ * local and `origin/` refs both, so the newer of the two counts. Null when
+ * no default branch ref exists or git cannot compute a merge-base (a shallow
+ * clone, unrelated histories).
+ */
+export function workSetForkPoint(projectDir: string): string | null {
+  const origin = resolveOriginDefaultBranch(projectDir);
+  const names = origin ? [origin] : DEFAULT_BRANCHES;
+  const refs = names
+    .flatMap((name) => [`${HEADS_PREFIX}${name}`, `${ORIGIN_PREFIX}${name}`])
+    .filter((ref) => refExists(projectDir, ref));
+  if (refs.length === 0) return null;
+  try {
+    // With several refs, git answers the merge-base of HEAD and their merge:
+    // the most recent point HEAD shares with any of them.
+    const base = execFileSync("git", ["merge-base", "HEAD", ...refs], { cwd: projectDir, encoding: "utf-8", ...QUIET_GIT }).trim();
+    return base || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The text of every `state.yaml` under `dir` at `ref` that contains `needle`,
+ * by repository path. `dir` is relative to `projectDir`. Empty when none
+ * matches; null when git cannot read the tree at `ref`.
+ */
+export function readStateFilesAt(projectDir: string, ref: string, dir: string, needle: string): Map<string, string> | null {
+  let listed: string;
+  try {
+    listed = execFileSync(
+      "git",
+      ["grep", "-z", "-l", "--full-name", "-F", "-e", needle, ref, "--", dir],
+      { cwd: projectDir, encoding: "utf-8", ...QUIET_GIT, maxBuffer: 64 * 1024 * 1024 },
+    );
+  } catch (err) {
+    // git grep exits 1 when nothing matches; anything else is an unreadable tree.
+    return (err as { status?: number }).status === 1 ? new Map() : null;
+  }
+  const objects = listed.split("\0").filter((name) => name.endsWith("/state.yaml"));
+  if (objects.length === 0) return new Map();
+  let batch: Buffer;
+  try {
+    batch = execFileSync("git", ["cat-file", "--batch"], {
+      cwd: projectDir,
+      input: objects.join("\n") + "\n",
+      stdio: ["pipe", "pipe", "ignore"],
+      windowsHide: true,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch {
+    return null;
+  }
+  const files = new Map<string, string>();
+  let at = 0;
+  for (const object of objects) {
+    const eol = batch.indexOf(0x0a, at);
+    const header = batch.subarray(at, eol).toString("utf-8").split(" ");
+    if (header[1] !== "blob") return null;
+    const size = Number(header[2]);
+    files.set(object.slice(object.indexOf(":") + 1), batch.subarray(eol + 1, eol + 1 + size).toString("utf-8"));
+    at = eol + 1 + size + 1;
+  }
+  return files;
 }
 
 /**

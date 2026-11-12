@@ -632,6 +632,45 @@ describe("on a v2 tree", () => {
     expect(r.task?.level).toBe("task");
   });
 
+  it("names the branch's work set: none without one, branch and ids with one, none under --any", async () => {
+    expect((await resolve({ task: WIRE_ID })).workSet).toBeNull();
+    git(projectDir, "checkout", "-q", "-b", "feat/ws");
+    const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+    await appendFile(stateFile, `  "${WIRE_ID}":\n    delivery: {"branch":"feat/ws"}\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "assign");
+    const r = await resolve({ task: WIRE_ID });
+    expect(r.workSet).toEqual({ branch: "feat/ws", ids: [WIRE_ID] });
+    expect(r.earlierUse).toBeNull();
+    expect(codes(r)).toEqual([]);
+    const any = await resolve({ task: WIRE_ID, any: "true" });
+    expect(any.workSet).toBeNull();
+    expect(any.command).toContain("--any");
+    // On a branch the task was not assigned to, there is no set.
+    git(projectDir, "checkout", "-q", "-b", "feat/other");
+    expect((await resolve({ task: WIRE_ID })).workSet).toBeNull();
+  });
+
+  it("names the tasks an earlier branch of the same name left, which are not in the set", async () => {
+    const base = git(projectDir, "rev-parse", "--abbrev-ref", "HEAD");
+    git(projectDir, "checkout", "-q", "-b", "feat/ws");
+    const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+    await appendFile(stateFile, `  "${WIRE_ID}":\n    delivery: {"branch":"feat/ws"}\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "assign");
+    git(projectDir, "checkout", "-q", base);
+    git(projectDir, "merge", "-q", "--no-ff", "-m", "merge feat/ws", "feat/ws");
+    git(projectDir, "branch", "-q", "-D", "feat/ws");
+    git(projectDir, "checkout", "-q", "-b", "feat/ws");
+    const r = await resolve({ task: WIRE_ID });
+    expect(r.workSet).toBeNull();
+    expect(r.earlierUse).toEqual({
+      branch: "feat/ws",
+      ids: [WIRE_ID],
+      message: "1 task on feat/ws comes from an earlier branch of this name; it is not in this branch's set",
+    });
+  });
+
   it("reports the next task, passing over one another worktree holds", async () => {
     const shipId = "c0000000-0000-4000-8000-000000000003";
     await writeFile(

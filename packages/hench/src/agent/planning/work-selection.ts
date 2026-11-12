@@ -51,13 +51,119 @@ export function readTreeAsReset(tree: V2Tree, ids: ReadonlySet<string>): V2Tree 
   return { product: tree.product, changes: reset(tree.changes) };
 }
 
+/** Said when every unit of the branch's work set is done; rex next and `rex branch show` say the same. */
+export const WORK_SET_FINISHED =
+  "This branch's work set is finished: all its tasks are done; selection stays narrowed to it, and --any picks outside it";
+
+/**
+ * Whether selection inside `workSet` picked nothing while it still has open
+ * units: blocked, not finished, and not a success.
+ */
+export function workSetBlocked(workSet: BranchWorkSet): boolean {
+  return workSet.ids.length > 0;
+}
+
+/**
+ * What to say when selection inside `workSet` picked nothing: finished, or
+ * each open unit with why it cannot be picked, as rex next prints it
+ * (rex's `workSetBlockedLines`).
+ */
+export function workSetEndMessage(workSet: BranchWorkSet): string {
+  if (!workSetBlocked(workSet)) return WORK_SET_FINISHED;
+  const n = workSet.ids.length;
+  return [
+    `Nothing in this branch's work set can be picked: ${n === 1 ? "its 1 open task is" : `its ${n} open tasks are`} blocked; --any picks outside it`,
+    ...workSet.blocked.map((u) => `  ${u.displayId ?? u.id} "${u.title}" [${u.status}]: ${u.reasons.join("; ")}`),
+  ].join("\n");
+}
+
+/**
+ * Autoselection found nothing inside the branch's work set. `blocked` false:
+ * the set is finished, and `--loop` reads it as "done". `blocked` true: open
+ * units remain that cannot be picked, and the run fails naming them.
+ */
+export class WorkSetExhaustedError extends Error {
+  readonly branch: string;
+  readonly blocked: boolean;
+  constructor(workSet: BranchWorkSet) {
+    super(workSetEndMessage(workSet));
+    this.name = "WorkSetExhaustedError";
+    this.branch = workSet.branch;
+    this.blocked = workSetBlocked(workSet);
+  }
+}
+
+/** An open unit of the set selection cannot pick, with rex's reasons (`unpickableUnits`). */
+export interface BlockedWorkUnit {
+  id: string;
+  displayId?: string;
+  title: string;
+  status: string;
+  reasons: readonly string[];
+}
+
+/**
+ * A branch work set as rex's selector returns it: the branch, its open units
+ * and, when nothing was picked from them, each with why.
+ */
+export interface BranchWorkSet {
+  branch: string;
+  ids: readonly string[];
+  blocked: readonly BlockedWorkUnit[];
+}
+
+/** Claims and filters rex's selector passes over, so a blocked set's reasons name them. */
+export interface WorkSetSelectContext {
+  /** Units other worktrees hold, by id (`TaskClaims.foreignClaims`). */
+  claims?: ReadonlyMap<string, { worktreeRoot: string }>;
+  /** `--mine`. */
+  assignee?: string;
+}
+
+/** Units an earlier branch of this name left, as rex's selector reports them: not in the set. */
+export interface EarlierBranchUse {
+  branch: string;
+  ids: readonly string[];
+  /** The line rex next and `rex branch show` print for them. */
+  message: string;
+}
+
+/**
+ * The work set selection in `projectDir` is narrowed to, as rex's selector
+ * works it out (get_next_task's rule): null on the default branch, a detached
+ * HEAD or a branch with no assignment, and null when `projectDir` is absent
+ * (`--any`). With `context`, a set nothing can be picked from lists why.
+ */
+export function branchWorkSet(tree: V2Tree, projectDir: string | undefined, context: WorkSetSelectContext = {}): BranchWorkSet | null {
+  return branchWork(tree, projectDir, context).workSet;
+}
+
+/**
+ * {@link branchWorkSet} with the units an earlier branch of this name left
+ * (`earlierUse`), which rex's selector reports and leaves out of the set.
+ * Both null when `projectDir` is absent (`--any`).
+ */
+export function branchWork(
+  tree: V2Tree,
+  projectDir: string | undefined,
+  context: WorkSetSelectContext = {},
+): { workSet: BranchWorkSet | null; earlierUse: EarlierBranchUse | null } {
+  if (!projectDir) return { workSet: null, earlierUse: null };
+  const { workSet, earlierUse } = findNextWorkTask(tree, { ...context, workspace: projectDir });
+  return { workSet, earlierUse };
+}
+
 export interface V2SelectOptions {
   /** Units to pass over: stuck, over their attempt limit, or claimed elsewhere. */
   excludeIds?: ReadonlySet<string>;
+  /** Units other worktrees hold, by id: passed over, and named as claimed when the work set is blocked. */
+  claims?: ReadonlyMap<string, { worktreeRoot: string }>;
   /** Only units carrying one of these tags (`--tags`, self-heal). */
   tags?: readonly string[];
   /** Only units assigned to this identity, directly or through their change (`--mine`). */
   assignee?: string;
+  /** Only units in this branch work set ({@link branchWorkSet}); an empty set selects nothing. */
+  workSet?: ReadonlySet<string>;
 }
 
 /**
@@ -70,15 +176,29 @@ export interface V2Entry extends TreeEntry {
 
 /** The unit autonomous selection runs next, or `null` when none is actionable. */
 export function nextV2Entry(tree: V2Tree, options: V2SelectOptions = {}): V2Entry | null {
-  const excludeIds = new Set(options.excludeIds ?? []);
-  if (options.assignee) {
-    // findNextWorkTask takes no assignee, so pass over every unit rex's own
-    // `--mine` rule (findActionableWork's) leaves out.
-    const mine = new Set(findActionableWork(tree, { assignee: options.assignee }).map((u) => u.node.id));
-    for (const unit of findActionableWork(tree)) if (!mine.has(unit.node.id)) excludeIds.add(unit.node.id);
-  }
-  const next = findNextWorkTask(tree, { excludeIds, ...(options.tags?.length ? { tags: options.tags } : {}) });
-  return next ? { item: next.item, parents: next.parents, explanation: next.explanation } : null;
+  return nextV2Selection(tree, options).entry;
+}
+
+/**
+ * {@link nextV2Entry} for a checkout: given `workspace` (absent under `--any`),
+ * rex's selector narrows to that checkout's branch work set and returns the
+ * set with the unit. `workSet` is null when selection was not narrowed.
+ */
+export function nextV2Selection(
+  tree: V2Tree,
+  options: V2SelectOptions & { workspace?: string } = {},
+): { entry: V2Entry | null; workSet: BranchWorkSet | null } {
+  const select = {
+    ...(options.excludeIds?.size ? { excludeIds: options.excludeIds } : {}),
+    ...(options.claims?.size ? { claims: options.claims } : {}),
+    ...(options.assignee ? { assignee: options.assignee } : {}),
+    ...(options.tags?.length ? { tags: options.tags } : {}),
+    ...(options.workSet ? { workSet: options.workSet } : {}),
+  };
+  const { task, workSet } = options.workspace
+    ? findNextWorkTask(tree, { ...select, workspace: options.workspace })
+    : { task: findNextWorkTask(tree, select), workSet: null };
+  return { entry: task ? { item: task.item, parents: task.parents, explanation: task.explanation } : null, workSet };
 }
 
 /** Every actionable unit, best first, as entries of `items` (the projected change layer). */
@@ -90,6 +210,7 @@ export function actionableV2Entries(
   const units = findActionableWork(tree, {
     ...(options.excludeIds?.size ? { excludeIds: options.excludeIds } : {}),
     ...(options.assignee ? { assignee: options.assignee } : {}),
+    ...(options.workSet ? { workSet: options.workSet } : {}),
   });
   return units.flatMap((u) => findItem(items, u.node.id) ?? []);
 }

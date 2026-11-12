@@ -364,6 +364,13 @@ describe("state", () => {
     expect(ItemStateSchema.safeParse({ checks: [{ requirementId: "r", result: "maybe", at: "t" }] }).success).toBe(false);
   });
 
+  it("accepts delivery with a branch name and rejects a missing, empty or non-string branch", () => {
+    expect(ItemStateSchema.safeParse({ delivery: { branch: "feat/pay" } }).success).toBe(true);
+    for (const delivery of [{}, { branch: "" }, { branch: 3 }, { branch: null }, "feat/pay", []]) {
+      expect(ItemStateSchema.safeParse({ delivery }).success, JSON.stringify(delivery)).toBe(false);
+    }
+  });
+
   it("keys a state file by item id under the v2 stamp", () => {
     expect(StateFileSchema.safeParse({ schema: "rex/v2", items: { [ID]: { status: "pending" } } }).success).toBe(true);
     expect(StateFileSchema.safeParse({ schema: "rex/v1", items: {} }).success).toBe(false);
@@ -425,7 +432,7 @@ describe("field coverage (design intent/state tables)", () => {
       "status", "startedAt", "completedAt", "endedAt", "activeIntervals",
       "failureReason", "resolutionType", "resolutionDetail",
       "metAt", "revisedAt", "reviewedHash", "checks",
-      "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "links",
+      "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "delivery", "links",
       "assignee", "ready", "needsPlacement", "createdAt",
       "lastModified", "lastModifiedBy",
     ];
@@ -567,6 +574,7 @@ describe("isolation", () => {
         "core/map-diff.ts",
         "core/release-stamp.ts",
         "cli/commands/release.ts",
+        "core/work-set.ts",
         "migrations/v1-to-v2/migration-plan.ts",
         "migrations/v1-to-v2/capability-spec.ts",
         "migrations/v1-to-v2/migration-plan-data.ts",
@@ -610,6 +618,8 @@ describe("isolation", () => {
         "cli/commands/import-bundle.ts",
         "cli/commands/next.ts",
         "cli/mcp-tools/get-next-task.ts",
+        "cli/commands/branch.ts",
+        "cli/mcp-tools/assign-to-branch.ts",
         "cli/commands/prune.ts",
         "cli/commands/reorganize.ts",
         "cli/commands/reshape.ts",

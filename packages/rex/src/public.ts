@@ -202,6 +202,7 @@ export {
   getFirstCommitDate,
   generatePRDFilename,
   resolvePRDFilename,
+  currentWorkSetBranch,
 } from "./store/branch-naming.js";
 
 // ---- Store: branch-scoped PRD discovery and resolution ---------------------
@@ -721,7 +722,9 @@ export { handleProductEdit, ProductEditError } from "./core/product-edit.js";
 export { findNextWork, findActionableWork, resolveWorkById, openChangeTasks, changeWorkShape, enclosingChangeIds } from "./core/change-selection.js";
 export type { WorkUnit, WorkKind, WorkSelectionOptions, ResolveWorkOptions, OpenChangeTask, ChangeWorkShape, WorkShapeChild } from "./core/change-selection.js";
 export { findNextWorkTask, completedWorkIds } from "./core/change-next-task.js";
-export type { NextWorkTask, NextWorkOptions } from "./core/change-next-task.js";
+export type { NextWorkTask, NextWorkOptions, WorkspaceNextWork, WorkspaceNextWorkOptions } from "./core/change-next-task.js";
+// The checked-out branch's work set, the narrowing `get_next_task`, `rex next` and `ndx work` apply
+export { currentWorkSet } from "./core/work-set.js";
 
 // Completion and apply-on-complete
 export { completeTask, completeChange, completeWork, ChangeCompletionError } from "./core/change-completion.js";

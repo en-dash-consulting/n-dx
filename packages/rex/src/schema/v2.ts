@@ -31,7 +31,8 @@
  * |   dependsOn                                      |   (product nodes)                            |
  * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
  * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
- * |                                                  | links*                                       |
+ * |                                                  | delivery { branch } (tasks, task-less        |
+ * |                                                  |   changes), links*                           |
  * | change: intent, acceptanceCriteria, amends,      | assignee, ready, needsPlacement, createdAt   |
  * |   touches, plannedRelease, spike, fix, priority, | lastModified, lastModifiedBy                 |
  * |   requirements, loe, loeRationale,               |                                              |
@@ -508,6 +509,21 @@ export const CheckResultSchema = z
   })
   .passthrough();
 
+/** Where a unit of work is delivered: the branch whose work set holds it. */
+export interface Delivery {
+  /** A branch name, never empty. */
+  branch: string;
+  /**
+   * The fork point (commit) of the branch that took this unit over from an
+   * earlier branch of the same name. It makes the row differ from the one
+   * on the default branch, so it reads as this branch's, not the earlier one's.
+   */
+  since?: string;
+  [key: string]: unknown;
+}
+
+export const DeliverySchema = z.object({ branch: z.string().min(1), since: z.string().min(1).optional() }).passthrough();
+
 /**
  * Tool-written state for one item, as stored under its id in `state.yaml`.
  * One flat shape for every type, because the file is keyed by id alone;
@@ -555,6 +571,11 @@ export interface ItemState {
   prs?: string[];
   /** Changes: issue references (full URLs or tracker keys). */
   issues?: string[];
+  /**
+   * Tasks, and changes without tasks: the branch whose work set holds this
+   * unit (`core/work-set.ts`). Absent: on no branch.
+   */
+  delivery?: Delivery;
   /** Reserved for the tracker bridge; no shape yet. */
   links?: unknown;
   /** Changes and tasks. "Name <email>" identity. */
@@ -599,6 +620,7 @@ export const ItemStateSchema = z
     shippedIn: z.string().optional(),
     prs: z.array(WorkRefSchema).optional(),
     issues: z.array(WorkRefSchema).optional(),
+    delivery: DeliverySchema.optional(),
     links: ReservedSchema,
     assignee: z.string().optional(),
     ready: z.boolean().optional(),
