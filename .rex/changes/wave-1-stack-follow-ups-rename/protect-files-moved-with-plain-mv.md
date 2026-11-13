@@ -10,4 +10,6 @@ acceptanceCriteria:
   - "The rollback prompt's rename wording is extended to cover moves made with plain mv."
 priority: "medium"
 source: "ndx-capture"
+blockedBy:
+  - "6d52c3c5-2257-4e58-8c14-f6eaf3f9c63a"
 ---
