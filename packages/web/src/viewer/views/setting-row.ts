@@ -11,7 +11,7 @@
 
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 
 /** A short tag shown beside the label. */
 export type SettingTag = "Experimental" | "Deprecated" | "Tokens" | "Restart";
@@ -41,6 +41,15 @@ const idPart = (key: string) => key.replace(/[^a-zA-Z0-9]/g, "-");
 export function SettingRow({ configKey, label, description, tags = [], info, unsaved = false, onReset, controlId, control, children }: SettingRowProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const infoId = `srow-info-${idPart(configKey)}`;
+  const controlRef = useRef<HTMLDivElement>(null);
+
+  // Reset disappears once the value is back at its default, so hand focus to
+  // the control first; a focused button that unmounts drops focus to <body>,
+  // outside the Settings dialog.
+  const reset = () => {
+    controlRef.current?.querySelector<HTMLElement>("input, select, textarea, button:not(.srow-reset)")?.focus();
+    onReset?.();
+  };
 
   return h("div", { class: `srow${unsaved ? " srow--unsaved" : ""}`, "data-key": configKey },
     h("div", { class: "srow-text" },
@@ -68,10 +77,10 @@ export function SettingRow({ configKey, label, description, tags = [], info, uns
       h("code", { class: "srow-key" }, configKey),
       info && infoOpen ? h("div", { class: "srow-details", id: infoId }, info) : null,
     ),
-    h("div", { class: "srow-control" },
+    h("div", { class: "srow-control", ref: controlRef },
       control,
       onReset
-        ? h("button", { type: "button", class: "srow-reset", onClick: onReset, "aria-label": `Reset ${label} to its default` }, "Reset")
+        ? h("button", { type: "button", class: "srow-reset", onClick: reset, "aria-label": `Reset ${label} to its default` }, "Reset")
         : null,
     ),
     children ? h("div", { class: "srow-body" }, children) : null,

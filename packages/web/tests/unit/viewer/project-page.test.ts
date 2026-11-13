@@ -43,7 +43,7 @@ function toggle(key: string, label: string, group: FeatureToggle["group"], extra
  * Serves every API the page reads. `failures` turns a write to that URL into a
  * 500 with that message.
  */
-function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; pins?: Record<string, string> } = {}) {
+function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; pins?: Record<string, string>; githubReadsHeld?: boolean } = {}) {
   sidecar.on = opts.sidecar ?? false;
   const requests: Request[] = [];
   const settings = {
@@ -86,7 +86,8 @@ function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; p
       case "GET /api/sidecar/settings":
         return respond({ githubReads });
       case "PUT /api/sidecar/settings":
-        githubReads = (body as { githubReads: boolean }).githubReads;
+        // Held: the server keeps reporting off, as for a tracked local config in an untrusted checkout.
+        if (!opts.githubReadsHeld) githubReads = (body as { githubReads: boolean }).githubReads;
         return respond({ githubReads });
       case "GET /api/connections":
         return respond({ connections: [] });
@@ -129,7 +130,9 @@ describe("ProjectView", () => {
 
   // ── Queries ───────────────────────────────────────────────────────
 
-  const titles = () => [...root.querySelectorAll(".project-section-title")].map((t) => t.textContent);
+  /** A search hides what it leaves out rather than unmounting it. */
+  const shown = (el: Element) => el.closest("[hidden]") === null;
+  const titles = () => [...root.querySelectorAll(".project-section-title")].filter(shown).map((t) => t.textContent);
   const indicator = () => root.querySelector(".settings-frame-indicator")!.textContent;
   const saveButton = () => root.querySelector<HTMLButtonElement>(".settings-frame-save")!;
   const frameError = () => root.querySelector(".settings-frame-error")?.textContent ?? null;
@@ -138,7 +141,7 @@ describe("ProjectView", () => {
   const row = (key: string) => root.querySelector<HTMLElement>(`.srow[data-key="${key}"]`);
   const keysIn = (title: string) => {
     const section = [...root.querySelectorAll("section.project-section")].find((s) => s.querySelector("h2")?.textContent === title);
-    return [...(section?.querySelectorAll<HTMLElement>(".srow") ?? [])].map((r) => r.dataset.key);
+    return [...(section?.querySelectorAll<HTMLElement>(".srow") ?? [])].filter(shown).map((r) => r.dataset.key);
   };
   const search = () => root.querySelector<HTMLInputElement>("#project-search")!;
 
@@ -316,11 +319,85 @@ describe("ProjectView", () => {
 
     await type(portInput(), "4000");
     await type(search(), "ask");
-    expect(row("web.port")).toBeNull();
+    expect(shown(row("web.port")!)).toBe(false);
     expect(indicator()).toBe("Unsaved changes");
 
     await clickSave();
     expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { port: 4000 } }]);
+  });
+
+  it("keeps an open editor open when a search hides it and is cleared", async () => {
+    stubApi({ pins: { "src/a.ts": "web" } });
+    await mount();
+
+    await click(row("sourcevision.zones.pins")!.querySelector<HTMLButtonElement>("button.srow-button")!);
+    expect(row("sourcevision.zones.pins")!.querySelector(".ps-pin-table")).not.toBeNull();
+
+    await type(search(), "port");
+    await type(search(), "");
+    expect(row("sourcevision.zones.pins")!.querySelector(".ps-pin-table")).not.toBeNull();
+  });
+
+  it("clears the search on Escape without letting it close Settings", async () => {
+    stubApi();
+    await mount();
+    const closed = vi.fn();
+    window.addEventListener("keydown", closed);
+    try {
+      await type(search(), "port");
+      await act(async () => {
+        search().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+      expect(search().value).toBe("");
+      expect(titles()).toHaveLength(6);
+      expect(closed).not.toHaveBeenCalled();
+
+      // With nothing to clear, Escape goes on to the overlay as before.
+      await act(async () => {
+        search().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+      expect(closed).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("keydown", closed);
+    }
+  });
+
+  it("hands focus to the control when Reset removes itself", async () => {
+    stubApi();
+    await mount();
+    await type(portInput(), "4000");
+    const reset = row("web.port")!.querySelector<HTMLButtonElement>("button.srow-reset")!;
+    reset.focus();
+
+    await click(reset);
+    expect(row("web.port")!.querySelector("button.srow-reset")).toBeNull();
+    expect(document.activeElement).toBe(portInput());
+  });
+
+  it("locks the page while Save runs, so an edit cannot slip in and be cleared unsaved", async () => {
+    stubApi();
+    await mount();
+    await click(flag("Ask"));
+
+    let release: (() => void) | undefined;
+    const original = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "PUT") await new Promise<void>((r) => { release = r; });
+      return original(url, init as never);
+    }));
+    act(() => { saveButton().click(); });
+    const container = root.querySelector<HTMLElement>(".project-container")!;
+    // jsdom has no inert property, so Preact writes the attribute; browsers get the property.
+    expect(container.inert === true || container.hasAttribute("inert")).toBe(true);
+    expect(container.getAttribute("aria-busy")).toBe("true");
+
+    // The PUT starts once the clean parts ahead of it have resolved.
+    await act(async () => {
+      await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+      release!();
+    });
+    await settle();
+    expect(container.inert === true || container.hasAttribute("inert")).toBe(false);
   });
 
   // ── Connections ───────────────────────────────────────────────────
@@ -348,6 +425,19 @@ describe("ProjectView", () => {
     await clickSave();
     expect(writes()).toEqual([{ method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } }]);
     expect(indicator()).toBe("All changes saved");
+  });
+
+  it("shows the GitHub reads value in force, and says so when it differs from the one saved", async () => {
+    const { writes } = stubApi({ sidecar: true, githubReadsHeld: true });
+    await mount();
+
+    await click(flag("GitHub reads"));
+    await clickSave();
+
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } }]);
+    expect(flag("GitHub reads").checked).toBe(false);
+    expect(indicator()).toBe("All changes saved");
+    expect(root.querySelector(".project-alert")!.textContent).toMatch(/^GitHub reads: Saved, but GitHub reads are still off/);
   });
 
   it("saves GitHub reads before a Save that turns the Sidecar off closes its route", async () => {
@@ -471,7 +561,7 @@ describe("ProjectView", () => {
       expect(indicator()).toBe("Unsaved changes");
       expect(frameError()).toContain("feature flags");
       expect(frameError()).not.toContain("project settings");
-      expect(root.querySelector('.project-alert[role="alert"]')!.textContent).toBe("Features are locked");
+      expect(root.querySelector('.project-alert[role="alert"]')!.textContent).toBe("Feature flags: Features are locked");
       // The saved form is clean: Save would now write only the flag.
       expect(portInput().value).toBe("4000");
       expect(flag("Ask").checked).toBe(true);
@@ -498,6 +588,10 @@ describe("ProjectView", () => {
     expect(frameError()).toContain("project settings");
     expect(frameError()).toContain("feature flags");
     expect(indicator()).toBe("Unsaved changes");
+    expect([...root.querySelectorAll(".project-alert")].map((a) => a.textContent)).toEqual([
+      "Project settings: Config is read-only",
+      "Feature flags: Features are locked",
+    ]);
   });
 
   it("does not send an invalid port and says so", async () => {
@@ -579,14 +673,45 @@ describe("Project sections in the Settings overlay nav", () => {
     stubApi();
     await mountInOverlay();
     const scrolled: string[] = [];
+    const original = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.id); };
+    try {
+      const git = navSections().find((b) => b.textContent === "Git and commits")!;
+      await act(async () => { git.click(); });
 
-    const git = navSections().find((b) => b.textContent === "Git and commits")!;
-    await act(async () => { git.click(); });
+      expect(scrolled).toEqual(["settings-section-git"]);
+      expect(document.activeElement?.id).toBe("project-git-title");
+      expect(git.getAttribute("aria-current")).toBe("location");
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
 
-    expect(scrolled).toEqual(["settings-section-git"]);
-    expect(document.activeElement?.id).toBe("project-git-title");
-    expect(git.getAttribute("aria-current")).toBe("location");
+  it("keeps the highlight on a section jumped to at the end of the page", async () => {
+    stubApi();
+    await mountInOverlay();
+    const content = root.querySelector<HTMLElement>(".settings-overlay-content")!;
+    // Scrolled to the very bottom: the last section's rule would claim the highlight.
+    Object.defineProperty(content, "scrollTop", { value: 500, configurable: true });
+    Object.defineProperty(content, "scrollHeight", { value: 1000, configurable: true });
+    Object.defineProperty(content, "clientHeight", { value: 500, configurable: true });
+    const originalRect = Element.prototype.getBoundingClientRect;
+    const originalScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = () => {};
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const top = this === content ? 0 : this.id === "settings-section-optional" ? 120 : -200;
+      return { top, bottom: this === content ? 500 : top + 10, left: 0, right: 0, width: 0, height: 10, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+    };
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    try {
+      const optional = navSections().find((b) => b.textContent === "Optional features")!;
+      await act(async () => { optional.click(); });
+      act(() => { content.dispatchEvent(new Event("scroll")); });
+      expect(navSections().find((b) => b.getAttribute("aria-current") === "location")!.textContent).toBe("Optional features");
+    } finally {
+      Element.prototype.getBoundingClientRect = originalRect;
+      Element.prototype.scrollIntoView = originalScroll;
+    }
   });
 
   it("moves the highlight as the content scrolls", async () => {
@@ -622,8 +747,11 @@ describe("Project sections in the Settings overlay nav", () => {
     expect(navSections().map((b) => b.textContent)).toEqual(["Git and commits"]);
   });
 
-  it("drops the list when another page is open", async () => {
+  it("drops Project's sections when the overlay moves to another page", async () => {
     stubApi();
+    await mountInOverlay();
+    expect(navSections()).toHaveLength(6);
+
     const views = new Set<ViewId>(["robot-wrangler", "project", "workflow", "commands"]);
     act(() => {
       render(h(SettingsOverlay, { view: "workflow", validViews: views, onNavigate: () => {}, onClose: () => {} },

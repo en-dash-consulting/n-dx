@@ -43,6 +43,8 @@ export function useGithubReadsForm(active: boolean): GithubReadsForm {
     // Off, the row is gone and its route refuses: an edit left behind could never save.
     if (!active) {
       setEdit(null);
+      setLoadError(null);
+      setSaveError(null);
       return;
     }
     let live = true;
@@ -77,12 +79,19 @@ export function useGithubReadsForm(active: boolean): GithubReadsForm {
         setSaveError(await errorOf(res, "Failed to save GitHub reads"));
         return false;
       }
+      // The answer is the value in force, which is not always the one saved:
+      // a local config that git tracks is honoured only in a trusted checkout.
+      const body = await res.json() as { githubReads?: boolean };
+      const effective = body.githubReads === true;
+      setSaved(effective);
+      setEdit((current) => (current === edit ? null : current));
+      if (effective !== edit) {
+        setSaveError("Saved, but GitHub reads are still off: this checkout's local config is tracked by git, so it applies only once the checkout is trusted.");
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save GitHub reads");
       return false;
     }
-    setSaved(edit);
-    setEdit(null);
     return true;
   }, [dirty, edit]);
 

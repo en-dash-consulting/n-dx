@@ -67,6 +67,15 @@ export function useSettingsSections(sections: readonly SettingsSection[]): void 
 /** A section is current once its top is this close to the top of the content. */
 const SPY_OFFSET_PX = 96;
 
+/** True while the section's heading is inside the content's visible area. */
+function headingInView(content: HTMLElement, id: string): boolean {
+  const el = document.getElementById(settingsSectionAnchor(id));
+  if (!el) return false;
+  const box = content.getBoundingClientRect();
+  const top = el.getBoundingClientRect().top;
+  return top >= box.top - 1 && top < box.bottom;
+}
+
 /** The section the reader is in: the last one whose top has reached the offset line. */
 function currentSection(content: HTMLElement, sections: readonly SettingsSection[]): string | null {
   if (sections.length === 0) return null;
@@ -91,6 +100,12 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
   const [sections, setSections] = useState<readonly SettingsSection[] | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  /**
+   * The section last jumped to from the nav. Near the end of the page its top
+   * may never reach the offset line, so it stays current while its heading is
+   * in view rather than yielding to the last section.
+   */
+  const jumpedRef = useRef<string | null>(null);
 
   const entries = useMemo(() => SETTINGS_ENTRIES
     .filter((e) => validViews.has(e.view))
@@ -119,6 +134,12 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     let frame = 0;
     const update = () => {
       frame = 0;
+      const jumped = jumpedRef.current;
+      if (jumped && sections.some((s) => s.id === jumped) && headingInView(content, jumped)) {
+        setActiveSection(jumped);
+        return;
+      }
+      jumpedRef.current = null;
       setActiveSection(currentSection(content, sections));
     };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
@@ -136,6 +157,7 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     el.scrollIntoView?.({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
     el.querySelector<HTMLElement>("h2, h3")?.focus({ preventScroll: true });
+    jumpedRef.current = id;
     setActiveSection(id);
   }, []);
 

@@ -109,22 +109,29 @@ export function ProjectView() {
     ...(sidecarOn ? [...githubReadsRows(githubReads), serversRow()] : []),
   ];
   // A row matches on its own text or its section title: "commit" finds Git and commits.
-  const sections = PROJECT_SECTIONS
-    .map((s) => ({ ...s, rows: rows.filter((r) => r.section === s.id && matchesQuery(`${s.title} ${r.searchText}`, query)) }))
-    .filter((s) => s.rows.length > 0);
-  const shownCount = sections.reduce((n, s) => n + s.rows.length, 0);
+  // Every row stays mounted; a search hides the ones it leaves out, so an open
+  // editor or a half-filled form keeps its state when the search is cleared.
+  const sections = PROJECT_SECTIONS.map((s) => {
+    const inSection = rows
+      .filter((r) => r.section === s.id)
+      .map((r) => ({ ...r, shown: matchesQuery(`${s.title} ${r.searchText}`, query) }));
+    return { ...s, rows: inSection, shown: inSection.some((r) => r.shown) };
+  }).filter((s) => s.rows.length > 0);
+  const shownSections = sections.filter((s) => s.shown);
+  const shownCount = shownSections.reduce((n, s) => n + s.rows.filter((r) => r.shown).length, 0);
 
-  useSettingsSections(sections.map(({ id, title }) => ({ id, title })));
+  useSettingsSections(shownSections.map(({ id, title }) => ({ id, title })));
 
   const loading = settings.loading || features.loading;
+  // Each names its form: two failures can share a message ("Failed to fetch").
   const problems = [
-    settings.loadError && !settings.data ? settings.loadError : null,
-    features.loadError && features.toggles.length === 0 ? features.loadError : null,
-    githubReads.loadError,
-    settings.saveError,
-    features.saveError,
-    githubReads.saveError,
-  ].filter((p): p is string => p !== null);
+    ["project-load", "Project settings", settings.loadError && !settings.data ? settings.loadError : null],
+    ["flags-load", "Feature flags", features.loadError && features.toggles.length === 0 ? features.loadError : null],
+    ["github-load", "GitHub reads", githubReads.loadError],
+    ["project-save", "Project settings", settings.saveError],
+    ["flags-save", "Feature flags", features.saveError],
+    ["github-save", "GitHub reads", githubReads.saveError],
+  ].filter((p): p is [string, string, string] => p[2] !== null);
 
   const searching = query.trim() !== "";
 
@@ -135,7 +142,9 @@ export function ProjectView() {
     onSave: handleSave,
     onDiscard: handleDiscard,
   },
-    h("div", { class: "project-container" },
+    // Inert while saving: an edit made mid-save would be cleared by the save's
+    // own "now clean" step without ever being written.
+    h("div", { class: "project-container", inert: saving, "aria-busy": saving ? "true" : undefined },
       h("div", { class: "project-header" },
         h("div", { class: "project-header-brand" },
           h(PixelIcon, { name: "project", variant: "tile", size: 40, class: "project-header-tile" }),
@@ -159,6 +168,13 @@ export function ProjectView() {
           "aria-label": "Search Project settings",
           "aria-controls": "project-sections",
           onInput: (e: Event) => setQuery((e.target as HTMLInputElement).value),
+          // Escape clears a search; only an empty box lets it close Settings.
+          onKeyDown: (e: KeyboardEvent) => {
+            if (e.key === "Escape" && query !== "") {
+              e.stopPropagation();
+              setQuery("");
+            }
+          },
         }),
         h("p", { class: "project-search-status", role: "status" },
           searching && !loading
@@ -166,7 +182,7 @@ export function ProjectView() {
             : ""),
       ),
 
-      ...problems.map((p) => h("div", { key: p, class: "project-alert", role: "alert" }, p)),
+      ...problems.map(([key, form, message]) => h("div", { key, class: "project-alert", role: "alert" }, `${form}: ${message}`)),
 
       loading ? h("div", { class: "loading" }, "Loading settings…") : null,
 
@@ -176,10 +192,12 @@ export function ProjectView() {
             key: s.id,
             id: settingsSectionAnchor(s.id),
             class: "project-section",
+            hidden: !s.shown,
             "aria-labelledby": `project-${s.id}-title`,
           },
             h("h2", { id: `project-${s.id}-title`, class: "project-section-title", tabIndex: -1 }, s.title),
-            h("div", { class: "srow-list" }, s.rows.map((r) => r.node)),
+            h("div", { class: "srow-list" },
+              s.rows.map((r) => h("div", { key: r.configKey, class: "srow-slot", hidden: !r.shown }, r.node))),
           )),
       ),
     ),

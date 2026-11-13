@@ -3,6 +3,9 @@
  * the left, the control on the right. A section's rows share one bordered list.
  */
 
+/* Rows a search leaves out are hidden, not unmounted, so open editors and
+   in-progress forms keep their state. Every shown row after the first gets the
+   divider. */
 .srow-list {
   display: flex;
   flex-direction: column;
@@ -11,17 +14,16 @@
   border-radius: var(--radius-lg);
 }
 
+.srow-slot:not([hidden]) ~ .srow-slot:not([hidden]) {
+  border-top: 1px solid var(--border);
+}
+
 .srow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2) var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border);
-}
-
-.srow:first-child {
-  border-top: none;
 }
 
 .srow-text {
@@ -181,7 +183,10 @@
 
 /* ── Switch ──────────────────────────────────────────────────────────── */
 
+/* Positioned, so the visually hidden input sits on its slider and scrolls with
+   the row: focus-scrolling then brings the slider into view. */
 .srow-switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
@@ -192,6 +197,8 @@
 /* The input stays focusable for the keyboard; the slider draws it. */
 .srow-switch input {
   position: absolute;
+  inset: 0;
+  margin: 0;
   opacity: 0;
   width: 1px;
   height: 1px;
