@@ -1641,7 +1641,8 @@ export async function promptRollbackConfirm(
     `\n${paths.length} uncommitted PRD file(s) in the rollback scope:\n` +
       `${renderPaths(paths)}\n` +
       others +
-      `Only the listed paths are in scope; cross-boundary renames are preserved.\n` +
+      `Only the listed paths are in scope; staged cross-boundary renames are preserved.\n` +
+      `Unstaged moves made with plain mv are not protected as renames.\n` +
       `Restore listed tracked paths to HEAD; remove listed untracked files only if absent from the pre-run baseline.\n` +
       `Pre-existing untracked files are preserved; without a baseline, all untracked files are preserved.\n` +
       `Roll back these PRD paths? [Y/n] `,

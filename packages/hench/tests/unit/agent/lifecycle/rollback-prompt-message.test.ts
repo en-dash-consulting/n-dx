@@ -69,7 +69,7 @@ describe("promptRollbackConfirm", () => {
     vi.resetModules();
   });
 
-  it("names the rollback scope and accurately describes HEAD and baseline protection", async () => {
+  it("names the rollback scope and limits rename protection to staged renames", async () => {
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
@@ -92,7 +92,8 @@ describe("promptRollbackConfirm", () => {
       expect(question).toContain("Restore listed tracked paths to HEAD");
       expect(question).toContain("Pre-existing untracked files are preserved");
       expect(question).toContain("without a baseline, all untracked files are preserved");
-      expect(question).toContain("cross-boundary renames are preserved");
+      expect(question).toContain("Only the listed paths are in scope; staged cross-boundary renames are preserved.");
+      expect(question).toContain("Unstaged moves made with plain mv are not protected as renames.");
       expect(question).toContain("Roll back these PRD paths?");
       expect(question).toContain("[Y/n]");
       // Nothing else was dirty, so no line claims otherwise.
