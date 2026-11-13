@@ -4,6 +4,6 @@
 "@n-dx/hench": patch
 ---
 
-Honor the trusted vendor CLI path for fresh and resumed Sidecar sessions, preserve local overrides and PATH discovery, and report actionable missing-binary errors.
+(experimental, off by default; enable with `web.sidecar`) Sidecar uses the trusted vendor CLI path for fresh and resumed sessions and explains missing binaries.
 
-Use the shared Sidecar error formatter and close replaced event writers in Hench tests.
+Local overrides and PATH discovery remain supported. Missing-binary errors identify the setting to repair.

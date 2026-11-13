@@ -2,6 +2,6 @@
 "@n-dx/web": patch
 ---
 
-Sidecar (experimental, off by default; enable with `web.sidecar`) keeps delivered answers completed when checkpointing fails, preserves measured spend, and shows a diagnostic before cold recovery.
+Sidecar (experimental, off by default; enable with `web.sidecar`) shows a checkpoint diagnostic and starts the next turn with fresh context when checkpointing fails.
 
-Successful checkpoint usage remains included once. Refused checkpoint spawns or unreadable configuration preserve the answer and mark the next turn to start with fresh context after configuration is repaired.
+Any measured checkpoint usage spent is recorded once, including usage from a checkpoint that started but failed. Checkpoint failures show a diagnostic and mark the next turn for fresh context, whatever the cause.
