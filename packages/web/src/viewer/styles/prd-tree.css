@@ -1161,6 +1161,13 @@
   margin-top: var(--space-2);
 }
 
+.task-execution-refusal {
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
 /* Editable title */
 .task-title-display {
   font-size: var(--font-lg, 1.1rem);

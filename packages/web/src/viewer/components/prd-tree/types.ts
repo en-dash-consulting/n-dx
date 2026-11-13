@@ -123,6 +123,7 @@ export interface PRDItemData {
   runsAsOneTask?: boolean;
   /** Indexed explicit-run eligibility, supplied by the server. */
   executionEligible?: boolean;
+  /** Actionable hold to show under Status; absent for ordinary non-runnable items. */
   executionRefusal?: string;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.branch */
   branch?: string | null;

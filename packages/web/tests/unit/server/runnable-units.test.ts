@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PRDItem, RuleNode } from "../../../src/server/rex-gateway.js";
-import { markRunnableUnits } from "../../../src/server/runnable-units.js";
+import { markRunnableUnits, unitRefusal } from "../../../src/server/runnable-units.js";
 
 const change = (extra: Record<string, unknown> = {}) => ({
   id: "change", type: "change", title: "Change", status: "pending", ...extra,
@@ -19,18 +19,30 @@ function mark(root: Record<string, unknown>, targets = product): Marked {
 
 describe("indexed runnable units", () => {
   it.each([
-    ["held Inbox", { needsPlacement: true }, /placement/i],
-    ["applied", { appliedAt: "2026-11-12T00:00:00Z" }, /applied/i],
-    ["completed", { status: "completed" }, /closed/i],
-    ["cancelled", { status: "cancelled" }, /closed/i],
-    ["deleted", { status: "deleted" }, /deleted/i],
-    ["container", { children: [change({ id: "inner" })] }, /nested changes/i],
-    ["with tasks", { children: [task()] }, /save.*tasks/i],
-  ])("does not advertise a %s change", (_name, fields, reason) => {
+    ["held Inbox", { needsPlacement: true }, /placement/i, true],
+    ["applied", { appliedAt: "2026-11-12T00:00:00Z" }, /applied/i, false],
+    ["completed", { status: "completed" }, /closed/i, true],
+    ["cancelled", { status: "cancelled" }, /closed/i, true],
+    ["deleted", { status: "deleted" }, /deleted/i, false],
+    ["container", { children: [change({ id: "inner" })] }, /nested changes/i, false],
+    ["with tasks", { children: [task()] }, /save.*tasks/i, false],
+  ] as const)("does not advertise a %s change", (_name, fields, reason, showInDetail) => {
     const item = mark(change(fields));
     expect(item.executionEligible).toBe(false);
-    expect(item.executionRefusal).toMatch(reason);
+    const refusal = unitRefusal([item], product)(item);
+    expect(refusal).toMatch(reason);
+    expect(item.executionRefusal).toBe(showInDetail ? refusal : undefined);
     expect(item.runsAsOneTask).not.toBe(true);
+  });
+
+  it("clears a stale detail hint when a held change is applied", () => {
+    const item = mark(change({ needsPlacement: true }));
+    expect(item.executionRefusal).toMatch(/placement/i);
+    Object.assign(item, { appliedAt: "2026-11-12T00:00:00Z" });
+    markRunnableUnits([item], product);
+    expect(item.executionEligible).toBe(false);
+    expect(item.executionRefusal).toBeUndefined();
+    expect(unitRefusal([item], product)(item)).toMatch(/applied/i);
   });
 
   it.each([

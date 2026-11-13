@@ -30,6 +30,7 @@ import { handleHenchPrepRoute, previewTaskRun, resolveTaskRun } from "../../src/
 import { refreshPRDCache } from "../../src/server/prd-io.js";
 import { savedRunVersion } from "../../src/server/task-run-settings.js";
 import type { ServerContext } from "../../src/server/types.js";
+import type { PRDItemData } from "../../src/viewer/components/prd-tree/types.js";
 import { startRouteTestServer, closeRouteTestServer } from "../helpers/server-route-test-support.js";
 
 const id = (n: number) => `c0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -109,22 +110,25 @@ describe.each(["HTTP", "in-process"])("indexed eligibility across dashboard path
   afterEach(async () => { if (server) await closeRouteTestServer(server); await rm(root, { recursive: true, force: true }); });
 
   it.each([
-    ["held Inbox unit", () => node(1, "change", { needsPlacement: true, run: pins }), 1, /placement/i],
-    ["held Inbox task", () => node(1, "change", { needsPlacement: true, children: [node(2, "task", { run: pins })] }), 2, /placement/i],
-    ["applied unit", () => node(1, "change", { appliedAt: "2026-11-12T00:00:00Z", run: pins }), 1, /applied/i],
-    ["applied task", () => node(1, "change", { appliedAt: "2026-11-12T00:00:00Z", children: [node(2, "task", { run: pins })] }), 2, /applied/i],
-    ["closed unit", () => node(1, "change", { status: "completed", run: pins }), 1, /closed/i],
-    ["closed task", () => node(1, "change", { status: "completed", children: [node(2, "task", { run: pins })] }), 2, /closed/i],
-    ["cancelled unit", () => node(1, "change", { status: "cancelled", run: pins }), 1, /closed/i],
-    ["container", () => node(1, "change", { children: [node(2)] }), 1, /nested changes/i],
-    ["change with tasks", () => node(1, "change", { children: [node(2, "task")] }), 1, /save.*tasks/i],
-    ["v2 subtask", () => node(1, "change", { children: [node(2, "task", { children: [node(3, "subtask", { run: pins })] })] }), 3, /parent task/i],
-    ["nested held task", () => node(1, "change", { needsPlacement: true, children: [node(2, "change", { children: [node(3, "task")] })] }), 3, /placement/i],
-  ] as const)("refuses %s without writing or spawning", async (_name, make, target, reason) => {
+    ["held Inbox unit", () => node(1, "change", { needsPlacement: true, run: pins }), 1, /placement/i, true],
+    ["held Inbox task", () => node(1, "change", { needsPlacement: true, children: [node(2, "task", { run: pins })] }), 2, /placement/i, true],
+    ["applied unit", () => node(1, "change", { appliedAt: "2026-11-12T00:00:00Z", run: pins }), 1, /applied/i, false],
+    ["applied task", () => node(1, "change", { appliedAt: "2026-11-12T00:00:00Z", children: [node(2, "task", { run: pins })] }), 2, /applied/i, false],
+    ["closed unit", () => node(1, "change", { status: "completed", run: pins }), 1, /closed/i, true],
+    ["closed task", () => node(1, "change", { status: "completed", children: [node(2, "task", { run: pins })] }), 2, /closed/i, true],
+    ["cancelled unit", () => node(1, "change", { status: "cancelled", run: pins }), 1, /closed/i, true],
+    ["container", () => node(1, "change", { children: [node(2)] }), 1, /nested changes/i, false],
+    ["change with tasks", () => node(1, "change", { children: [node(2, "task")] }), 1, /save.*tasks/i, false],
+    ["v2 subtask", () => node(1, "change", { children: [node(2, "task", { children: [node(3, "subtask", { run: pins })] })] }), 3, /parent task/i, true],
+    ["applied subtask", () => node(1, "change", { status: "completed", appliedAt: "2026-11-12T00:00:00Z", children: [node(2, "task", { status: "completed", children: [node(3, "subtask", { status: "completed", run: pins })] })] }), 3, /parent task/i, false],
+    ["nested held task", () => node(1, "change", { needsPlacement: true, children: [node(2, "change", { children: [node(3, "task")] })] }), 3, /placement/i, true],
+  ] as const)("refuses %s without writing or spawning", async (_name, make, target, reason, showInDetail) => {
     await seed([make()]);
     const before = await contents(ctx.rexDir);
     const prd = (await request("/api/rex/prd")).body;
-    expect(findItem(prd.items, id(target))?.item).toMatchObject({ executionEligible: false, executionRefusal: expect.stringMatching(reason) });
+    expect(findItem(prd.items, id(target))?.item).toMatchObject({ executionEligible: false });
+    const projected = findItem(prd.items, id(target))?.item as PRDItemData;
+    expect(projected.executionRefusal).toEqual(showInDetail ? expect.stringMatching(reason) : undefined);
     expect((await request("/data/prd.json")).body).toEqual(prd);
     const rows = (await request("/api/rex/changes")).body.changes;
     expect(rows.find((row: { id: string }) => row.id === id(1))?.runsAsOneTask).not.toBe(true);
