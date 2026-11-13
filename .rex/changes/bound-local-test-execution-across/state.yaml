@@ -186,6 +186,9 @@ items:
     resolutionDetail: "Option A: run.ts passes its abortSignal to agentLoop; loop.ts passes it to finalizeRun, the completion check's slot options and the tool context's slot options in the Claude API, Gemini and local loops. Test in local-tool-loop.test.ts: a gate queued behind another holder ends when the signal aborts."
     lastModified: "2026-11-12T18:38:24.093Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a683873b-dd71-4e72-a959-b09d287aa00d":
+    lastModified: "2026-11-13T23:13:56.876Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adb92a12-af68-4f9a-b28b-310fb0ea9980":
     status: "completed"
     startedAt: "2026-11-12T18:10:17.703Z"
