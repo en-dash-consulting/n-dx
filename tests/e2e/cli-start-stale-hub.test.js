@@ -48,12 +48,15 @@ const OLDER_HUB = `
 const { createServer } = require("node:http");
 const { appendFileSync, writeFileSync } = require("node:fs");
 const [portFile, token, busy, extra] = process.argv.slice(2);
+let replies = 0;
 const server = createServer((req, res) => {
   // Every request, in order, for the test to read once this process is gone.
   appendFileSync(portFile + ".seen", req.method + " " + req.url + "\\n");
   const reply = (status, body) => {
     res.writeHead(status, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(body));
+    // \`extra.exitAfterReplies\`: another ndx start stops this hub right after its nth answer, leaving hub.pid behind.
+    const last = ++replies === JSON.parse(extra || "{}").exitAfterReplies;
+    res.end(JSON.stringify(body), last ? () => process.exit(0) : undefined);
   };
   if (req.headers["x-ndx-token"] !== token) return reply(401, { error: "Unauthorized" });
   req.resume();
@@ -149,6 +152,22 @@ function alive(pid) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether a child this test spawned has exited within `timeoutMs`: its own
+ * exit, not its pid answering. Windows hands a freed pid to the next process
+ * within seconds, so polling the pid can watch an unrelated process.
+ */
+function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise((resolvePromise) => {
+    const timer = setTimeout(() => resolvePromise(false), timeoutMs);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolvePromise(true);
+    });
+  });
 }
 
 /** One authenticated JSON GET against the hub. */
@@ -252,7 +271,7 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.stderr).toContain(`Replacing the n-dx hub on port ${older.port}: the running n-dx hub predates this ndx`);
       expect(result.stderr).toContain("Its 2 projects come back on the same /p/<id>/ URLs.");
       expect(result.stdout).toMatch(/Serving again on port \d+: alpha-app, beta-app\./);
-      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expect(await waitForChildExit(older.child, 15_000)).toBe(true);
       // It asked the old hub to hand its signed-in sessions over before stopping it.
       expect(readFileSync(join(fx.home, "older-hub.port.seen"), "utf-8").split("\n")).toContain("POST /api/hub/handover");
 
@@ -319,7 +338,7 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.stderr).toMatch(says);
       expectNoManualRestart(result.stdout + result.stderr);
       if (replaced) {
-        expect(await waitForPidExit(other.child.pid, 15_000)).toBe(true);
+        expect(await waitForChildExit(other.child, 15_000)).toBe(true);
         await expectProjectsServedAgain(other.port);
       } else {
         expect(alive(other.child.pid)).toBe(true);
@@ -360,7 +379,7 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
       expect(result.code, result.stderr + result.stdout).toBe(0);
       expect(result.stderr).toContain(`Replacing the n-dx hub on port ${older.port}: it has no n-dx CLI to ask about extensions.`);
-      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expect(await waitForChildExit(older.child, 15_000)).toBe(true);
       expectNoManualRestart(result.stdout + result.stderr);
       const health = await hubGet(older.port, "/api/hub/health");
       expect(health.body.faults).toEqual([]);
@@ -423,7 +442,7 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
         expect(result.stdout).toContain("ndx_nonce=");
         expectNoManualRestart(result.stdout + result.stderr);
       }
-      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expect(await waitForChildExit(older.child, 15_000)).toBe(true);
       // Exactly one of them started the new hub; the other joined it (or, arriving
       // after the replacement, found a current hub to register with).
       const both = a.stdout + a.stderr + b.stdout + b.stderr;
@@ -556,11 +575,52 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.stderr).not.toContain("could not be checked");
       expect(result.stderr).not.toContain("Registering with the n-dx hub failed");
       expect(result.stdout).toContain("ndx_nonce=");
-      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expect(await waitForChildExit(older.child, 15_000)).toBe(true);
       expectNoManualRestart(result.stdout + result.stderr);
       const health = await hubGet(older.port, "/api/hub/health");
       expect(health.status).toBe(200);
       expect(health.body.build).toBeTruthy();
+    });
+  });
+
+  // Each check ndx start makes of the older hub, with the hub gone right after
+  // it: what the other side of a concurrent replacement sees when the first
+  // command stops the hub between two of its steps. hub.pid still names the
+  // stopped hub, which identifies as "the recorded hub is not running".
+  describe.each([
+    { replies: 1, after: "its anonymous health probe" },
+    { replies: 2, after: "its auth state was read" },
+    { replies: 3, after: "it was judged older" },
+  ])("when another ndx start stops the hub right after $after", ({ replies }) => {
+    let fx;
+    let older;
+
+    beforeAll(async () => {
+      if (!canBindPorts) return;
+      fx = await fixture();
+      older = await startOlderHub(fx.home, false, { exitAfterReplies: replies });
+    }, 120_000);
+
+    afterAll(async () => {
+      if (older?.child && alive(older.child.pid)) older.child.kill();
+      if (fx) {
+        await stopHomeHub(fx.home);
+        for (const dir of [fx.home, fx.root]) await removeTmpDir(dir);
+      }
+    }, 120_000);
+
+    it("takes the gone hub for gone, not for someone else's, and serves from a new hub", async () => {
+      if (!canBindPorts) return;
+      const result = await runStart([`--port=${older.port}`, fx.omega], fx.home);
+      expect(result.code, result.stderr + result.stdout).toBe(0);
+      expect(await waitForChildExit(older.child, 15_000)).toBe(true);
+      expect(readFileSync(join(fx.home, "older-hub.port.seen"), "utf-8").trim().split("\n")).toHaveLength(replies);
+      expect(result.stderr).not.toContain("could not be identified");
+      expect(result.stderr).not.toContain("Registering with the n-dx hub failed");
+      expect(result.stdout).toContain(`n-dx hub started on http://127.0.0.1:${older.port}`);
+      expect(result.stdout).toContain("ndx_nonce=");
+      expectNoManualRestart(result.stdout + result.stderr);
+      await expectProjectsServedAgain(older.port);
     });
   });
 
@@ -605,7 +665,7 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.code, result.stderr + result.stdout).toBe(0);
       expect(result.stderr).toContain(`Replacing the n-dx hub on port ${older.port}`);
       expect(result.stderr).toContain("This interrupts 2 open MCP sessions (alpha-app, beta-app), as --replace-hub asked.");
-      expect(await waitForPidExit(older.child.pid, 15_000)).toBe(true);
+      expect(await waitForChildExit(older.child, 15_000)).toBe(true);
       expect(result.stdout).toContain("ndx_nonce=");
       expectNoManualRestart(result.stdout + result.stderr);
       await expectProjectsServedAgain(older.port);

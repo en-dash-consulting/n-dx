@@ -1996,7 +1996,9 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile, deferred 
  *
  * Each replacement acts only while the hub judged is still the one on the
  * port; when another `ndx start` replaced it meanwhile, the hub now there is
- * judged again, once ({@link replaceOrDeferHub}).
+ * judged again, once ({@link replaceOrDeferHub}). The same holds when a check
+ * fails only because another `ndx start` stopped the hub between two steps of
+ * this one ({@link settledAfterHubWentAway}).
  *
  * @returns {Promise<{ spawned: boolean, pid: number | null, deferred?: string, note?: string, authNote?: string, servedWithToken?: boolean, restored?: { healthy: string[], unhealthy: Array<{ id: string, state: string, lastError?: string | null }> } }>}
  */
@@ -2006,9 +2008,11 @@ async function ensureHub(port, options, attempt = 0) {
   const wanted = tokenFile ? "token" : "open";
   const { state, pid: authPid } = await hubAuthProbe(port, hubRequest, (p) => identifyOwnHub(p, home));
   if (state === "absent") return spawnHub(port, { tools, __dir, home, tokenFile });
-  if (state === "foreign") throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
   // The hub judged was replaced by another ndx start before this one acted: judge the one there now.
   const rejudge = () => (attempt < 1 ? ensureHub(port, options, attempt + 1) : { spawned: false, pid: null, note: changedHubNote(port) });
+  // A 401 from the recorded hub, which another ndx start stopped before it could be identified.
+  if (state === "foreign" && attempt < 1 && (await settledAfterHubWentAway(port, null, home))) return rejudge();
+  if (state === "foreign") throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
 
   // A token hub, and this command asked for none, without --replace-hub: it
   // stays a token hub, and any replacement for another reason keeps the token.
@@ -2034,6 +2038,8 @@ async function ensureHub(port, options, attempt = 0) {
   // A hub that kept running across an upgrade or rebuild serves older code
   // than this CLI expects — first among it, no landing-nonce route.
   const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
+  // Unanswered because another ndx start stopped the hub just identified: nothing to keep.
+  if (health.status !== 200 && attempt < 1 && (await settledAfterHubWentAway(port, authPid, home))) return rejudge();
   const judgedPid = health.status === 200 && Number.isInteger(health.body?.pid) ? health.body.pid : null;
   const replace = async (reason) => {
     const result = await replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force, judgedPid });
@@ -2086,7 +2092,10 @@ async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
       return { spawned: true, pid: child.pid };
     }
     lastReason = healthy.reason ?? lastReason;
-    if (!isProcessRunning(child.pid)) break;
+    // Gone with the port held: it lost the bind to a hub another ndx start
+    // spawned at the same moment, which may not have recorded its pid yet.
+    // Keep asking until that hub identifies as this user's, and join it.
+    if (!isProcessRunning(child.pid) && !(await isPortInUse(port))) break;
     await new Promise((r) => setTimeout(r, 200));
   }
   // A hub that came up but could not be identified as ours answers nothing
@@ -2118,6 +2127,11 @@ async function spawnHub(port, { tools, __dir, home, tokenFile = null }) {
 async function replaceOrDeferHub(port, reason, { tools, __dir, home, tokenFile, force, judgedPid = null }) {
   const identified = await identifyOwnHub(port, home);
   if (identified.ok && judgedPid !== null && identified.pid !== judgedPid) return { spawned: false, pid: null, changed: true };
+  // Not identified now because another ndx start stopped the judged hub since it was judged:
+  // that hub is gone, not someone else's, and deferring on it would leave nothing to register with.
+  if (!identified.ok && judgedPid !== null && (await settledAfterHubWentAway(port, judgedPid, home))) {
+    return { spawned: false, pid: null, changed: true };
+  }
   // Never this process or the one that started it, whatever the pid file
   // says: stopping either would end this command with the hub half-replaced.
   const own = identified.ok && (identified.pid === process.pid || identified.pid === process.ppid)
@@ -2184,6 +2198,31 @@ async function hubGoingAway(port, pid) {
   if (health.status !== 200) return true;
   const answering = health.body?.pid;
   return Number.isInteger(answering) && answering !== pid;
+}
+
+/**
+ * Whether a check this `ndx start` just made failed only because another one
+ * stopped the hub in between, and the port has since settled: free, or held
+ * by the other command's hub. Callers then judge the hub there again.
+ *
+ * The stopped hub leaves `hub.pid` naming its dead pid until the new hub
+ * writes its own, so for that moment {@link identifyOwnHub} says "the recorded
+ * hub is not running", which used to read as a hub that is not this user's.
+ * It went away when `pid` (the hub this command judged; the recorded one when
+ * none was judged) is no longer running, or `hub.pid` no longer names it. No
+ * recorded hub at all is not that: something else holds the port. Nothing is
+ * sent to the port until a listener there is identified as this user's hub.
+ *
+ * @param {number} port
+ * @param {number | null} pid
+ * @param {string} home
+ * @returns {Promise<boolean>}
+ */
+async function settledAfterHubWentAway(port, pid, home) {
+  const recorded = await readHubPid(home);
+  const judged = pid ?? recorded;
+  if (judged === null || (isProcessRunning(judged) && recorded === judged)) return false;
+  return (await waitForPortFreeOrNewHub(port, judged, home, HUB_STOP_GRACE_MS + 5_000)) !== "held";
 }
 
 /** What a command that found its replacement already done reports: no spawn of its own, and a note. */
