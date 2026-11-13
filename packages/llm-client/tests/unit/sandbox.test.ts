@@ -653,7 +653,8 @@ posixOnly("the validation slot inside ndx home", () => {
     const probe = [
       "const fs = require('fs');",
       "const tryIt = (f) => { try { f(); return 'ok'; } catch (e) { return e.code; } };",
-      `const slot = ${JSON.stringify(join(home, "validation-slot"))};`,
+      // With -e, the first argument after the script is argv[1].
+      "const [slot, tokenPath, storePath] = process.argv.slice(1);",
       "console.log(JSON.stringify({",
       "  write: tryIt(() => fs.writeFileSync(slot + '/holder.json', 'x')),",
       "  read: tryIt(() => fs.readFileSync(slot + '/holder.json')),",
@@ -661,11 +662,12 @@ posixOnly("the validation slot inside ndx home", () => {
       // Empty now, so only the pin on the directory entry stops the removal
       // that would let a symlink take its place.
       "  rmdir: tryIt(() => fs.rmdirSync(slot)),",
-      `  token: tryIt(() => fs.readFileSync(${JSON.stringify(join(home, "auth.token"))})),`,
-      `  store: tryIt(() => fs.readFileSync(${JSON.stringify(join(home, "credentials.json"))})),`,
+      "  token: tryIt(() => fs.readFileSync(tokenPath)),",
+      "  store: tryIt(() => fs.readFileSync(storePath)),",
       "}));",
     ].join("\n");
-    const inv = wrapInSandbox(process.execPath, ["-e", probe], p, host);
+    const probeArgs = [join(home, "validation-slot"), join(home, "auth.token"), join(home, "credentials.json")];
+    const inv = wrapInSandbox(process.execPath, ["-e", probe, ...probeArgs], p, host);
     const out = spawnSync(inv.file, inv.args, { cwd: project, encoding: "utf-8", env: { ...process.env, ...inv.env } });
     const seen = JSON.parse(out.stdout.trim());
     expect(seen.write).toBe("ok");
