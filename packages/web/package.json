@@ -47,12 +47,12 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@n-dx/llm-client": "workspace:*",
     "@n-dx/rex": "workspace:*",
     "@n-dx/sourcevision": "workspace:*",
-    "d3-force": "^3.0.0",
-    "d3-selection": "^3.0.0",
+    "d3-force": "^3.0.1",
+    "d3-selection": "^3.0.1",
     "preact": "^10.29.8",
     "zod": "^4.6.7"
   },
