@@ -45,7 +45,9 @@
  *    releaser's. Never remove another holder's record.
  * 4. **Liveness.** A pid is alive when `kill(pid, 0)` succeeds or fails with
  *    `EPERM`; a group is alive when `kill(-pid, 0)` does (on Windows, which
- *    has no groups, the pid is checked instead).
+ *    has no groups, the pid is checked instead). On Windows a holder's
+ *    non-detached children end with it (libuv's kill-on-close job object),
+ *    so a recorded child there never outlives its holder.
  * 5. **Stale recovery.** A record is stale when its `pid` is dead AND its
  *    `child` is absent or dead; a record that does not parse is stale too. A
  *    dead holder whose child still runs is NOT stale: its tests still load
