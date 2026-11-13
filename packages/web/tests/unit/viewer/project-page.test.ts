@@ -45,7 +45,7 @@ function toggle(key: string, label: string, group: FeatureToggle["group"], extra
  * Serves every API the page reads. `failures` turns a write to that URL into a
  * 500 with that message.
  */
-function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; branchHealth?: boolean; pins?: Record<string, string>; githubReadsHeld?: boolean } = {}) {
+function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; branchHealth?: boolean; pins?: Record<string, string>; githubReadsHeld?: boolean; githubReadsError?: string } = {}) {
   sidecar.on = opts.sidecar ?? false;
   sidecar.branchHealth = opts.branchHealth ?? false;
   const requests: Request[] = [];
@@ -55,6 +55,7 @@ function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; b
     sourcevisionMergeThreshold: null as number | null,
     sourcevisionPins: opts.pins ?? {} as Record<string, string>,
     githubReads: false,
+    githubReadsError: opts.githubReadsError ?? null,
   };
   const toggles = [
     toggle("sourcevision.ask", "Ask", "optional", { costsTokens: true }),
@@ -448,6 +449,20 @@ describe("ProjectView", () => {
     await clickSave();
     expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { githubReads: true } }]);
     expect(flag("GitHub reads").checked).toBe(true);
+  });
+
+  it("keeps the other settings when GitHub reads cannot be read, and shows why on its row", async () => {
+    const reason = "GitHub reads could not be read from the project config: Unexpected token b in JSON at position 1";
+    const { writes } = stubApi({ branchHealth: true, githubReadsError: reason });
+    await mount();
+
+    expect(row("language")).not.toBeNull();
+    expect(row("web.port")).not.toBeNull();
+    expect(flag("GitHub reads").checked).toBe(false);
+    expect(flag("GitHub reads").disabled).toBe(true);
+    expect(row("web.sidecarGithubReads")!.querySelector("#ps-github-reads-error")!.textContent).toBe(reason);
+    await click(flag("GitHub reads"));
+    expect(writes()).toEqual([]);
   });
 
   it("hides GitHub reads while neither the Sidecar nor branch health reads it", async () => {

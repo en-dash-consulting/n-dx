@@ -88,14 +88,23 @@ export function SettingRow({ configKey, label, description, tags = [], info, uns
 }
 
 /** An on/off switch. `label` is its accessible name. */
-export function Switch({ checked, label, onChange }: { checked: boolean; label: string; onChange: (next: boolean) => void }) {
+export function Switch({ checked, label, onChange, disabled = false, describedBy }: {
+  checked: boolean;
+  label: string;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  /** Id of the text that explains the switch's state, such as why it is disabled. */
+  describedBy?: string;
+}) {
   return h("label", { class: "srow-switch" },
     h("input", {
       type: "checkbox",
       role: "switch",
       checked,
+      disabled,
       onChange: () => onChange(!checked),
       "aria-label": label,
+      "aria-describedby": describedBy,
     }),
     h("span", { class: "srow-switch-slider", "aria-hidden": "true" }),
   );

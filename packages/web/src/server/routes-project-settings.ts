@@ -39,8 +39,14 @@ export interface ProjectSettingsResponse {
    * `web.sidecarGithubReads` in force: whether branch health and the Sidecar
    * may run gh. Served here as well as by /api/sidecar/settings because branch
    * health reads it with the Sidecar off, when the Sidecar routes refuse.
+   * False when it could not be read.
    */
   githubReads: boolean;
+  /**
+   * Why `githubReads` could not be read (a config file that does not parse),
+   * else null. Only that setting fails: the rest of the response still loads.
+   */
+  githubReadsError: string | null;
 }
 
 /** Shape expected by PUT /api/project-settings. */
@@ -110,7 +116,21 @@ function extractProjectSettings(projectDir: string): ProjectSettingsResponse {
     if (typeof v === "string") sourcevisionPins[k] = v;
   }
 
-  return { port, language, sourcevisionMergeThreshold, sourcevisionPins, githubReads: readSidecarSettings(projectDir).githubReads };
+  return { port, language, sourcevisionMergeThreshold, sourcevisionPins, ...readGithubReads(projectDir) };
+}
+
+/**
+ * GitHub reads, read apart from the project's own keys: it parses the local
+ * config as well, and a half-edited one must not take Analysis and Dashboard
+ * settings down with it. Unreadable, it stays off, and the error says why.
+ */
+function readGithubReads(projectDir: string): Pick<ProjectSettingsResponse, "githubReads" | "githubReadsError"> {
+  try {
+    return { githubReads: readSidecarSettings(projectDir).githubReads, githubReadsError: null };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { githubReads: false, githubReadsError: `GitHub reads could not be read from the project config: ${reason}` };
+  }
 }
 
 // ---------------------------------------------------------------------------

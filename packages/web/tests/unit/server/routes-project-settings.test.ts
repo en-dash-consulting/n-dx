@@ -86,6 +86,24 @@ describe("GitHub reads through /api/project-settings", () => {
     expect(existsSync(localConfigFile)).toBe(false);
   });
 
+  it("loads the project's own settings when the local config does not parse, with GitHub reads off and why", async () => {
+    const { configFile, localConfigFile } = resolveLayout(projectDir);
+    await writeFile(configFile, JSON.stringify({ language: "go", web: { port: 4000 } }));
+    await writeFile(localConfigFile, "{broken");
+
+    const res = await fetch(`${server.baseUrl}/api/project-settings`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ language: "go", port: 4000, githubReads: false });
+    expect(body.githubReadsError).toMatch(/^GitHub reads could not be read from the project config: /);
+
+    // A save of the project's own keys still goes through, and reports the same.
+    const saved = await put({ port: 4001 });
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { settings: Record<string, unknown> }).settings).toMatchObject({ port: 4001, githubReads: false });
+    expect(await readFile(localConfigFile, "utf-8")).toBe("{broken");
+  });
+
   it("still writes the shared config for its own keys", async () => {
     const { configFile } = resolveLayout(projectDir);
     expect((await put({ port: 4000 })).status).toBe(200);

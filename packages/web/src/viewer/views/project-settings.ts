@@ -29,8 +29,10 @@ interface ProjectSettingsResponse {
   language: string | null;
   sourcevisionMergeThreshold: number | null;
   sourcevisionPins: Record<string, string>;
-  /** `web.sidecarGithubReads` in force. */
+  /** `web.sidecarGithubReads` in force; false when it could not be read. */
   githubReads: boolean;
+  /** Why GitHub reads could not be read, else null. The other settings load regardless. */
+  githubReadsError?: string | null;
 }
 
 /** One editable row of the zone-pins table. `id` is a stable render key. */
@@ -377,6 +379,7 @@ export function projectSettingRows(
 ): SettingRowSpec<ProjectSectionId>[] {
   if (!form.data) return [];
   const { portRaw, mergeThreshold, portError, mergeError } = form;
+  const githubReadsError = form.data.githubReadsError ?? null;
   const spec = (section: ProjectSectionId, configKey: string, label: string, description: string, node: ComponentChildren): SettingRowSpec<ProjectSectionId> =>
     ({ section, configKey, searchText: `${label} ${description} ${configKey}`, node });
 
@@ -459,9 +462,16 @@ export function projectSettingRows(
             "Saved to your local config; the shared config's true applies only in a trusted checkout. It never allows a post.",
           ),
           unsaved: form.githubReadsDirty,
-          onReset: form.githubReads ? () => form.setGithubReads(false) : undefined,
-          control: h(Switch, { checked: form.githubReads, label: "Toggle GitHub reads", onChange: form.setGithubReads }),
-        }))]
+          onReset: form.githubReads && !githubReadsError ? () => form.setGithubReads(false) : undefined,
+          // Unreadable, it is off and stays off: a save would rewrite the config that failed to parse.
+          control: h(Switch, {
+            checked: form.githubReads,
+            label: "Toggle GitHub reads",
+            onChange: form.setGithubReads,
+            disabled: githubReadsError != null,
+            describedBy: githubReadsError ? "ps-github-reads-error" : undefined,
+          }),
+        }, githubReadsError ? h("p", { id: "ps-github-reads-error", class: "ps-field-error" }, githubReadsError) : null))]
       : []),
   ];
 }
