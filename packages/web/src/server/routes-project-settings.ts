@@ -18,7 +18,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import { planSidecarSettings, readSidecarSettings, saveSidecarSettings } from "./sidecar/settings.js";
 
 // ---------------------------------------------------------------------------
@@ -128,8 +128,7 @@ function readGithubReads(projectDir: string): Pick<ProjectSettingsResponse, "git
   try {
     return { githubReads: readSidecarSettings(projectDir).githubReads, githubReadsError: null };
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { githubReads: false, githubReadsError: `GitHub reads could not be read from the project config: ${reason}` };
+    return { githubReads: false, githubReadsError: `GitHub reads could not be read from the project config: ${errorMessage(err)}` };
   }
 }
 
