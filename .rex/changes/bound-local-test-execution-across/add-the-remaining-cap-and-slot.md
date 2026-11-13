@@ -1,0 +1,19 @@
+---
+id: "6d28d3dc-e91b-4b6c-98f7-ea4a9ed8c63b"
+type: "task"
+title: "Add the remaining cap and slot pairings to the validation benchmark"
+slug: "add-the-remaining-cap-and-slot"
+summary: "The benchmark measures four of the eight combinations of running alone or in parallel, capping test workers or not, and taking the shared validation slot or not. Adding the other four shows which setting actually prevents the failures and what each one costs, so the pilot settings can be chosen on evidence."
+description: "PR 4 (validation benchmark) follow-up from the 2026-11-13 baseline run (rex task 53be00af).\n\nThe baseline compared A (solo, uncapped, no slot), B (solo, cap 2, no slot), C (parallel, uncapped, no slot) and D (parallel, cap 2, host slot). D removed all four of C's failures but took about twice C's batch time, and the cap alone made one run 43–94% slower. D changes two settings at once, so the run cannot tell whether the slot, the cap or both remove the failures, or what the slot costs on its own. Add the four missing pairings of {solo, parallel} × {cap unset, cap 2} × {no slot, host slot}:\n\n- E: parallel, NDX_TEST_MAX_WORKERS unset, host slot   (slot only)\n- F: parallel, NDX_TEST_MAX_WORKERS=2, no slot          (cap only)\n- G: solo, NDX_TEST_MAX_WORKERS unset, host slot        (slot overhead, uncapped)\n- H: solo, NDX_TEST_MAX_WORKERS=2, host slot            (slot overhead, capped)\n\nImplementation (scripts/bench/lib/plan.mjs, scripts/bench/validation-bench.mjs):\n- Add E–H to `CASES` in plan.mjs with the right `concurrent`, `maxWorkers` and `slot` values. Labels in the same style as A–D.\n- Keep the DEFAULT case list A, B, C, D so the documented re-run after wave 2 stays comparable to the baseline. `--cases` accepts any of A–H. Usage text lists all eight and says the default is A–D.\n- Everything keyed on case D specifically must key on the case's `slot` flag instead: the slot-module refusal message (currently \"Case D needs hench's built slot module\"), header comments that say only D takes the slot or that A–C pass `--no-slot`, the dry-run per-case slot line, and `estimateBatchSeconds` (already flag-driven; check E–H estimates are sensible: G/H ≈ A/B, E ≈ concurrency × A, F like C with the capped factor).\n- The summary already reports queue/exec only for runs with `slotTaken`; check G and H (solo, slot) show their queue time (expected ~0) and E shows queueing.\n\nTests (tests/unit/validation-bench.test.js):\n- Extend the fake-slot batch test: E, G and H acquire once per run; F never acquires and passes `--no-slot`; E's runs queue one after another while F's start together (start times within a small window, as for C).\n- caseEnv/runnerArgs for E–H; parseArgs default is still A–D and `--cases E,F,G,H` is accepted; the dry-run text names E–H with the right slot line.\n\nDocs: TESTING.md's benchmark section lists E–H and what each isolates (E vs D: what the cap adds once the slot serializes; F vs C: whether the cap alone stops the failures; G/H vs A/B: the slot's own overhead).\n\nOperator notes: no real benchmark runs in an agent session (commands time out); test with fakes and `--dry-run`. No `process.env.NDX_*` writes in tests. Run the static root policy tests before finishing. Repository tooling only: no changeset."
+acceptanceCriteria:
+  - "Cases E (parallel, uncapped, slot), F (parallel, cap 2, no slot), G (solo, uncapped, slot) and H (solo, cap 2, slot) can be selected with --cases; the default stays A–D"
+  - "Slot handling, refusal messages, comments and dry-run output key on each case's slot flag, not on case D"
+  - "A unit test with a fake slot API asserts E, G and H acquire once per run, F never acquires and passes --no-slot, E's runs serialize and F's start together"
+  - "TESTING.md lists the eight cases and which comparison each one isolates"
+priority: "high"
+tags:
+  - "validation-gate"
+  - "wave-1"
+  - "pr-4-benchmark"
+source: "ndx-capture"
+---
