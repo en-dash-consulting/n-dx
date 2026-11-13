@@ -183,6 +183,43 @@ describe("diffItems", () => {
     expect(result[0].tags).toEqual(["ui", "perf"]);
   });
 
+  it.each([
+    ["eligibility granted", { executionEligible: false }, { executionEligible: true }],
+    ["eligibility withdrawn", { executionEligible: true }, { executionEligible: false }],
+    ["eligibility supplied", {}, { executionEligible: false }],
+    ["eligibility cleared", { executionEligible: false }, {}],
+    ["refusal supplied", {}, { executionRefusal: "Needs placement" }],
+    ["refusal changed", { executionRefusal: "Needs placement" }, { executionRefusal: "Applied" }],
+    ["refusal cleared", { executionRefusal: "Needs placement" }, {}],
+    ["unit flag supplied", {}, { runsAsOneTask: true }],
+    ["unit flag changed", { runsAsOneTask: true }, { runsAsOneTask: false }],
+    ["unit flag cleared", { runsAsOneTask: true }, {}],
+  ] satisfies Array<[string, Partial<PRDItemData>, Partial<PRDItemData>]>)(
+    "refreshes only the changed path when %s",
+    (_name, before, after) => {
+      const child = makeItem({ id: "child", type: "subtask" });
+      const target = makeItem({ id: "target", type: "task", children: [child], ...before });
+      const sibling = makeItem({ id: "sibling", type: "task", executionEligible: true });
+      const parent = makeItem({ id: "parent", type: "change", children: [target, sibling] });
+      const untouched = makeItem({ id: "untouched", type: "change", runsAsOneTask: true });
+      const prev = [parent, untouched];
+      // Freshly parsed payload: only one derived field on target differs.
+      const next = JSON.parse(JSON.stringify(prev)) as PRDItemData[];
+      next[0].children![0] = makeItem({ id: "target", type: "task", children: [{ ...child }], ...after });
+
+      const result = diffItems(prev, next);
+      expect(result).not.toBe(prev);
+      expect(result[0]).not.toBe(parent);
+      expect(result[0].children![0]).not.toBe(target);
+      expect(result[0].children![0]).toEqual(next[0].children![0]);
+      expect(result[0].children![0].children).toBe(target.children);
+      expect(result[0].children![1]).toBe(sibling);
+      expect(result[1]).toBe(untouched);
+      // Repeating the same flags must still preserve the whole tree.
+      expect(diffItems(result, JSON.parse(JSON.stringify(next)))).toBe(result);
+    },
+  );
+
   it("detects acceptanceCriteria changes", () => {
     const a = makeItem({ id: "a", acceptanceCriteria: ["AC1"] });
     const items = [a];

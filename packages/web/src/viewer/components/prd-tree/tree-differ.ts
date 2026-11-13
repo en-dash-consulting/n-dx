@@ -37,6 +37,10 @@ const SCALAR_KEYS: ReadonlyArray<keyof PRDItemData> = [
   "startedAt",
   "completedAt",
   "failureReason",
+  // Derived from ancestor/product state, even when the item's own state is unchanged.
+  "executionEligible",
+  "executionRefusal",
+  "runsAsOneTask",
 ];
 
 // ── Item-level diffing ───────────────────────────────────────────────
