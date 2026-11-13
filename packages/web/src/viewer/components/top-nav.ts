@@ -20,7 +20,7 @@
 
 import { h } from "preact";
 import type { ViewId, NavigateTo } from "../api.js";
-import { useProjectStatus, openInboxCount, inboxCountLabel, stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLiveView } from "../api.js";
+import { useProjectStatus, openInboxCount, inboxCountLabel, stageForView, visibleStages, stageProduct, viewLabelFor, viewGlyph, isLiveView } from "../api.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { LiveTab } from "./live-tab.js";
@@ -43,7 +43,9 @@ export interface TopNavProps {
 }
 
 export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch, scope = null, sidecar = null }: TopNavProps) {
-  const inboxOpen = openInboxCount(useProjectStatus()?.rex);
+  const status = useProjectStatus();
+  const inboxOpen = openInboxCount(status?.rex);
+  const layout = status?.rex?.layout === "v2" ? "v2" : "v1";
   const active = stageForView(view, validViews);
   const stages = visibleStages(validViews);
   const scoped = !!scope && scope !== "all";
@@ -68,7 +70,7 @@ export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch,
     h("nav", { class: "topnav-tabs", "aria-label": "View navigation" },
       stages.map((id) => {
         const product = stageProduct(id);
-        const label = viewLabel(id);
+        const label = viewLabelFor(id, layout);
         const isActive = active === id;
         return h("button", {
           key: id,

@@ -1541,7 +1541,7 @@ export async function handleLlmRoute(
       );
       // The credential check's answer depends on this config — drop the
       // cached result so the auth chip re-verifies against the new settings.
-      invalidateAuthCheckCache();
+      invalidateAuthCheckCache(ctx.projectDir);
       // A new key, binary path or model changes what the live probe would see.
       clearLlmCatalogCache(ctx.projectDir);
       jsonResponse(res, 200, { applied, config: extractLlmConfig(ctx.projectDir) });

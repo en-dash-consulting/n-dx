@@ -19,6 +19,8 @@ export {
   viewMeta,
   viewLabel,
   viewBlurb,
+  viewLabelFor,
+  viewBlurbFor,
   viewGlyph,
   viewPixelIcon,
   viewProduct,

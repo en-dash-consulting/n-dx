@@ -19,6 +19,9 @@ export const BROKER_TOOL_LABELS: Readonly<Record<string, string>> = {
   place_change_card: "Place change",
   propose_edit: "Propose edit",
   propose_link: "Propose tracker link",
+  propose_item_edit: "Propose item edit",
+  propose_status: "Propose status",
+  ask_choice: "Ask a question",
   github_read: "Read GitHub",
   draft_github_post: "Draft GitHub post",
   migration_decision: "Migration decision",
@@ -152,11 +155,13 @@ export function toolLineStatus(card: ToolLineCard | undefined, hasResult: boolea
 }
 
 /**
- * Whether a tool result's output is an error. The wire has no flag: the vendor
- * parser (llm-client's Claude stream-json reader) prefixes `[error] ` to the
- * output of a result the CLI marked `is_error`, which includes a broker
- * refusal (an MCP `isError` result).
+ * Whether a tool result is a failure. The vendor parser sets `isError` when
+ * the stream reports it (Claude's `is_error`, which includes a broker refusal;
+ * a Codex command's failed status or non-zero exit), and it wins. Frames
+ * recorded before the flag existed have none: only known Claude results
+ * fall back to the `[error] ` prefix its parser writes on an `is_error`
+ * result. Codex and unknown origins have no such text convention.
  */
-export function toolResultIsError(output: string): boolean {
-  return output.startsWith("[error] ");
+export function toolResultFailed(result: { output: string; isError?: boolean; vendor?: string }): boolean {
+  return result.isError ?? (result.vendor === "claude" && result.output.startsWith("[error] "));
 }

@@ -10,17 +10,19 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { writeFakeCli } from "../helpers/fake-cli.js";
 import {
   resumeVendorSession,
   startVendorSession,
 } from "../../src/vendor-session.js";
+import type { VendorSessionOptions } from "../../src/vendor-session.js";
 import type { RuntimeEvent } from "../../src/runtime-contract.js";
+import { spawnCli } from "../../src/exec.js";
 import { codexShellEnvFlags } from "../../src/codex-cli-provider.js";
 
 function fakeScript(vendor: "claude" | "codex", log: string): string {
@@ -105,6 +107,52 @@ function startHanging(vendor: "claude" | "codex", prompt = "HANG") {
   });
   return { session, pending: session.sendTurn(prompt), working };
 }
+
+describe.each(["claude", "codex"] as const)("%s configured executable", (vendor) => {
+  it("uses llmConfig for fresh turns, continuation and a resumed session", async () => {
+    const binary = fake(vendor);
+    const competing = join(dir, "path-bin");
+    mkdirSync(competing);
+    writeFakeCli(competing, { name: vendor, exitCode: 81 });
+    const env = { ...process.env, PATH: `${competing}${delimiter}${process.env.PATH}` };
+    const binaries: string[] = [];
+    const spawn: NonNullable<VendorSessionOptions["spawn"]> = (actual, args, opts) => {
+      binaries.push(actual);
+      expect(actual).toBe(binary);
+      return spawnCli(actual, args, opts);
+    };
+    const options = { vendor, cwd: dir, llmConfig: { [vendor]: { cli_path: binary } }, env, spawn };
+    const session = startVendorSession(options);
+    expect((await session.sendTurn("one")).status).toBe("completed");
+    expect((await session.sendTurn("two")).status).toBe("completed");
+    const resumed = resumeVendorSession(session.sessionId!, options);
+    expect((await resumed.sendTurn("three")).status).toBe("completed");
+    expect(binaries).toEqual([binary, binary, binary]);
+  });
+
+  it("discovers the vendor on PATH when there is no explicit path", async () => {
+    fake(vendor);
+    const session = startVendorSession({ vendor, cwd: dir, env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}` } });
+    expect((await session.sendTurn("one")).status).toBe("completed");
+    expect(calls()).toHaveLength(1);
+  });
+
+  it("keeps an explicit binary override ahead of llmConfig", async () => {
+    const binary = fake(vendor);
+    const session = startVendorSession({ vendor, cwd: dir, binary, llmConfig: { [vendor]: { cli_path: join(dir, "ignored") } } });
+    expect((await session.sendTurn("one")).status).toBe("completed");
+    expect(calls()).toHaveLength(1);
+  });
+
+  it("reports a missing configured executable with its config key", async () => {
+    const binary = join(dir, "missing-cli");
+    const session = resumeVendorSession("stored", { vendor, cwd: dir, llmConfig: { [vendor]: { cli_path: binary } }, spawn: (actual, args, opts) => { expect(actual).toBe(binary); return spawnCli(actual, args, opts); } });
+    const result = await session.sendTurn("one");
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain(binary);
+    expect(result.error).toContain(`n-dx config llm.${vendor}.cli_path`);
+  });
+});
 
 describe("claude sessions", () => {
   it("starts, then resumes its own id on the next turn", async () => {
@@ -245,8 +293,8 @@ describe("codex sessions", () => {
       "--json", "--skip-git-repo-check", "-",
     ]);
     expect(a.stdin).toBe("SYSTEM:\nsys\n\nTASK:\nhello");
-    // A resumed turn drops the sandbox flag but keeps the overrides that
-    // blank the Codex key in the agent's commands: config is per process.
+    // A resumed turn with no resume policy drops the sandbox flag but keeps
+    // the overrides that blank the Codex key: config is per process.
     expect(b.argv).toEqual([
       "exec", "resume", "thread-1", "--json", "--skip-git-repo-check",
       ...codexShellEnvFlags(),
@@ -265,6 +313,25 @@ describe("codex sessions", () => {
     await working;
     await session.interrupt();
     expect((await pending).status).toBe("interrupted");
+  });
+
+  it("refuses a turn whose turn config flags throw, spawning nothing, and stays usable", async () => {
+    let refuse = true;
+    const session = startVendorSession({
+      vendor: "codex",
+      cwd: dir,
+      binary: fake("codex"),
+      codex: { turnConfigFlags: () => { if (refuse) throw new Error("bad project config"); return []; } },
+    });
+    await expect(session.sendTurn("hello")).rejects.toThrow("bad project config");
+    expect(session.turns).toBe(0);
+    expect(session.state).toBe("idle");
+    expect(existsSync(log)).toBe(false);
+
+    refuse = false;
+    const turn = await session.sendTurn("hello");
+    expect(turn).toMatchObject({ turn: 1, status: "completed" });
+    expect(calls()).toHaveLength(1);
   });
 
   it("carries the whole agent message", async () => {
@@ -355,6 +422,20 @@ describe("child environment", () => {
   it("passes an explicit env through unchanged", async () => {
     const explicit = { ONLY: "this" };
     expect(await spawnedEnv({ env: explicit })).toBe(explicit);
+  });
+
+  it("adds the named extra variables to the filtered env and widens nothing else", async () => {
+    const env = await spawnedEnv({ extraEnv: { NDX_EXTRA: "value" } });
+    expect(env.NDX_EXTRA).toBe("value");
+    expect(env[SECRET]).toBeUndefined();
+    expect(env.PATH).toBe(process.env.PATH);
+    expect(process.env.NDX_EXTRA).toBeUndefined();
+  });
+
+  it("adds the extra variables over an explicit env without changing it", async () => {
+    const explicit = { ONLY: "this" };
+    expect(await spawnedEnv({ env: explicit, extraEnv: { NDX_EXTRA: "value" } })).toEqual({ ONLY: "this", NDX_EXTRA: "value" });
+    expect(explicit).toEqual({ ONLY: "this" });
   });
 });
 

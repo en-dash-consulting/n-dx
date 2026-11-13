@@ -25,7 +25,6 @@ export { createRexMcpServer } from "@n-dx/rex";
 
 // ---- Rex legacy PRD migration -----------------------------------------------
 export { ensureLegacyPrdMigrated } from "@n-dx/rex";
-export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 
 // ---- Rex folder-tree storage path -------------------------------------------
 export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, cascadeParentCompletion } from "@n-dx/rex";
@@ -34,7 +33,10 @@ export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, 
 // On a v2 tree the dashboard's PRD cache is the change-layer projection
 // `resolveStore` returns, not a parse of `prd_tree/`.
 export { prdLayout } from "@n-dx/rex";
-export { findNextWorkTask } from "@n-dx/rex";
+export { findNextWorkTask, findActionableWork } from "@n-dx/rex";
+// Whether a change runs as one task (a task-less change is the unit `ndx work`
+// runs) is rex's selection rule; the server sends the viewer the computed flag.
+export { changeWorkShape } from "@n-dx/rex";
 // Item writes on a v2 tree: the guard narrows resolveStore's answer to the
 // change-layer store, and completion is rex's own v2 completion (apply-on-complete).
 export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
@@ -75,9 +77,9 @@ export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
 // `recordUnplacement` is "Place & add another"'s Remove: rex refuses a closed change and runs its rules.
 export { suggestPlacements, recordPlacement, recordProposal, recordUnplacement, ChangePlacementError, placementStrength } from "@n-dx/rex";
 export type { ChangePlacementErrorKind, SuggestedPlacementCandidate } from "@n-dx/rex";
-export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
+export type { RecordPlacementInput } from "@n-dx/rex";
 export type { RecordProposalInput, RecordProposalResult } from "@n-dx/rex";
-export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
+export type { PlacementCandidate, PlacementStrength } from "@n-dx/rex";
 // "Draft with the model" (behind rex.placementDraft): the `prd.place` text
 // model drafts a pick or a proposal and writes nothing.
 export { draftChangePlacement } from "@n-dx/rex";
@@ -193,7 +195,10 @@ export { applyReshape, reasonForReshape } from "@n-dx/rex";
 export type { ReshapeProposal } from "@n-dx/rex";
 
 // ---- Rex MCP tool handlers (direct invocation) -----------------------------
-export { handleEditItem } from "@n-dx/rex";
+// The Sidecar's item-edit and status cards write through the handlers MCP edit_item
+// and update_task_status run; validateTransition is the rule update_task_status
+// applies, which the status card quotes before approval.
+export { handleEditItem, handleUpdateTaskStatus, validateTransition } from "@n-dx/rex";
 
 // ---- Rex PRD tree backup snapshots (undo for reorganize/prune/reshape/fix) --
 export { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "@n-dx/rex";
@@ -222,7 +227,7 @@ export { PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS, parsePlacementSettin
 export type { PlacementAutoAccept, PlacementSettings } from "@n-dx/rex";
 
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
-export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
+export type { Proposal } from "@n-dx/rex";
 
 // ---- Rex Markdown serializer / parser (used by prd-io cache) ----------------
 export { serializeDocument, parseDocument } from "@n-dx/rex";

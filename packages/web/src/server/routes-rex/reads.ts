@@ -10,6 +10,7 @@ import { join, basename } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse } from "../response-utils.js";
 import { isV2Tree, loadPRDSync } from "../prd-io.js";
+import { markRunnableUnits } from "../runnable-units.js";
 import { findNextTask, collectCompletedIds } from "./rex-route-helpers.js";
 
 import {
@@ -150,6 +151,7 @@ export function routePrdReads(
       errorResponse(res, 404, "No PRD data found");
       return true;
     }
+    markRunnableUnits(doc.items, doc.product);
     jsonResponse(res, 200, doc);
     return true;
   }

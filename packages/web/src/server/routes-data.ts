@@ -9,6 +9,7 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import { ALL_DATA_FILES, SUPPLEMENTARY_FILES, applyStrictContentPolicy } from "../shared/index.js";
 import { prdExists, loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
+import { markRunnableUnits } from "./runnable-units.js";
 
 /**
  * The files `/data/*` serves: the sourcevision data set and its supplementary
@@ -121,6 +122,7 @@ export function handleDataRoute(
       if (prdExists(ctx.rexDir)) {
         const doc = loadPRDSync(ctx.rexDir);
         if (doc) {
+          markRunnableUnits(doc.items, doc.product);
           const body = JSON.stringify(doc);
           res.writeHead(200, {
             "Content-Type": "application/json; charset=utf-8",

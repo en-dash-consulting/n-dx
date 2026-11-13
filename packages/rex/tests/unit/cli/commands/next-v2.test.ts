@@ -51,6 +51,13 @@ describe("rex next on a v2 tree", () => {
     expect(output()).not.toContain("[epic]");
   });
 
+  it("hints at rex add with a title, never epic, on a tree with no changes", async () => {
+    await rm(join(tmp, ".rex", "changes"), { recursive: true, force: true });
+    await cmdNext(tmp, {});
+    expect(output()).toContain("No changes in PRD. Run: rex add --title=");
+    expect(output()).not.toContain("epic");
+  });
+
   it("--format=json keeps the v1 fields and adds changeId", async () => {
     await cmdNext(tmp, { format: "json" });
     const body = JSON.parse(output());

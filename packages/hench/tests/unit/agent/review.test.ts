@@ -203,16 +203,15 @@ describe("promptReview", () => {
 
 /**
  * Install an execFile mock that reports `untrackedNow` as the current set of
- * untracked paths for `git status --porcelain`, and succeeds silently for all
+ * NUL-separated paths for `git ls-files --others`, and succeeds silently for all
  * other git commands. Returns nothing — inspect `mockExecFile.mock.calls`.
  */
 function mockGitWithUntracked(untrackedNow: string[]): void {
   mockExecFile.mockImplementation(
     ((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
       const a = args as string[];
-      if (a[0] === "status") {
-        const body = untrackedNow.map((p) => `?? ${p}`).join("\n");
-        cb(null, body ? body + "\n" : "", "");
+      if (a[0] === "ls-files" && a.includes("--others")) {
+        cb(null, untrackedNow.join("\0") + (untrackedNow.length ? "\0" : ""), "");
       } else {
         cb(null, "", "");
       }
@@ -260,11 +259,23 @@ describe("revertChanges", () => {
     const cleanArgs = findCleanCall();
     expect(cleanArgs).toBeDefined();
     // Scoped clean: pathspec after "--" contains only the agent-created file.
-    expect(cleanArgs).toEqual(["clean", "-fd", "--", "agent-new.txt"]);
+    expect(cleanArgs).toEqual(["clean", "-fd", "--", ":(top,literal)agent-new.txt"]);
     expect(cleanArgs).not.toContain("keep.txt");
 
     expect(result.removedUntracked).toEqual(["agent-new.txt"]);
     expect(result.keptUntracked).toEqual(["keep.txt"]);
+  });
+
+  it("treats an empty exact path list as no permission to reset, checkout or clean", async () => {
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
+    mockGitWithUntracked(["new.txt"]);
+    const result = await revertChanges("/project", { paths: [], baselineUntracked: [] });
+    expect(mockExecFile.mock.calls.map((call) => (call[1] as string[])[0]))
+      .not.toEqual(expect.arrayContaining(["reset"]));
+    expect(mockExecFile.mock.calls.map((call) => (call[1] as string[])[0]))
+      .not.toEqual(expect.arrayContaining(["checkout"]));
+    expect(findCleanCall()).toBeUndefined();
+    expect(result).toEqual({ removedUntracked: [], keptUntracked: ["new.txt"] });
   });
 
   it("NEVER deletes untracked files when no baseline is provided", async () => {
@@ -306,7 +317,7 @@ describe("revertChanges", () => {
     });
 
     const cleanArgs = findCleanCall();
-    expect(cleanArgs).toEqual(["clean", "-fd", "--", "tmp-output.log"]);
+    expect(cleanArgs).toEqual(["clean", "-fd", "--", ":(top,literal)tmp-output.log"]);
     expect(cleanArgs).not.toContain(".env");
     expect(cleanArgs).not.toContain(".secret");
     expect(result.keptUntracked).toEqual([".env", ".secret"]);

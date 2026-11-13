@@ -20,7 +20,10 @@ import { EventAccumulator } from "../../src/agent/lifecycle/event-accumulator.js
 
 const SESSION = "5f0c2a64-0d55-4c1e-9b7e-1f3f1f9c2b11";
 
-/** A recorded Claude CLI stream-json turn: two parallel Reads, answered on one `user` line. */
+/**
+ * Recorded Claude stream-json turn; CLI version was not captured (the model
+ * label is not a CLI version). Replayed by Node, not a current live CLI probe.
+ */
 const TURN: object[] = [
   { type: "system", subtype: "init", session_id: SESSION, tools: ["Read"], model: "claude-sonnet-4-5" },
   {
@@ -128,6 +131,8 @@ describe("Claude tool results in spawnWithAdapter", () => {
 
     expect(acc.events.filter((e) => e.type === "tool_result").map((e) => e.toolResult?.id))
       .toEqual(["toolu_01A", "toolu_01B"]);
+    expect(acc.events.filter((e) => e.type === "tool_result").map((e) => [e.vendor, e.toolResult?.isError]))
+      .toEqual([["claude", false], ["claude", false]]);
     expect(acc.events.filter((e) => e.type === "tool_use").map((e) => e.toolCall?.id))
       .toEqual(["toolu_01A", "toolu_01B"]);
     expect(acc.toolCalls.calls.map((c) => c.output))

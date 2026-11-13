@@ -11,7 +11,7 @@ import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import type { NavigateTo } from "../../types.js";
-import { formatTimestamp } from "./compute.js";
+import { formatTimestamp, isRunnableItem } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
@@ -1013,7 +1013,7 @@ function getRunStatusConfig(status: string) {
 /**
  * A task's hench runs, fetched once for the detail panel: the verdict banner at
  * the top and the runs list further down both read them. A `null` taskId (an
- * item that is not a task or subtask) fetches nothing. Until the fetch lands,
+ * item `ndx work` does not run) fetches nothing. Until the fetch lands,
  * and when it fails, there are no runs, so neither renders.
  */
 function useTaskRuns(taskId: string | null): RunEntry[] {
@@ -1145,7 +1145,11 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
   const itemType = itemTypeOf(item);
   const itemLabel = itemTypeLabel(itemType);
-  const runs = useTaskRuns(isWorkItemType(itemType) ? item.id : null);
+  // The server judges explicit-run eligibility against the whole PRD index.
+  const runnable = isRunnableItem(item);
+  // Eligibility gates controls, not the history of work already performed.
+  const tracksRuns = isWorkItemType(itemType) || itemType === "change";
+  const runs = useTaskRuns(tracksRuns ? item.id : null);
   const verdictEnabled = useFeatureToggle(RUN_VERDICT_FEATURE, false);
 
   // Determine if this item can have children added
@@ -1299,8 +1303,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         onRequestReason: onUpdate ? handleRequestReason : undefined,
       }),
 
-      // Start control (only for tasks/subtasks)
-      isWorkItemType(itemType)
+      // Start control: whatever `ndx work` runs
+      runnable
         ? h("div", { class: "task-execute-section" },
             h(TaskStartControl, {
               task: item,
@@ -1309,7 +1313,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
               navigateTo,
             }),
           )
-        : null,
+        : item.executionRefusal
+          ? h("p", { class: "task-execution-refusal" }, item.executionRefusal)
+          : null,
 
       // Inline failure reason input form
       (pendingFailStatus || editingFailureReason)
@@ -1376,7 +1382,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       : null,
 
     // Aggregated token usage across runs
-    isWorkItemType(itemType)
+    tracksRuns
       ? h(
           "div",
           { class: "task-section task-usage-section" },
@@ -1402,8 +1408,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         )
       : null,
 
-    // Associated hench runs (tasks/subtasks only)
-    isWorkItemType(itemType)
+    // Associated hench runs, including closed work
+    tracksRuns
       ? h(HenchRunsList, { runs, navigateTo })
       : null,
 

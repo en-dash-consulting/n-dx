@@ -1,6 +1,10 @@
+import { readdir, lstat, rmdir } from "node:fs/promises";
+import { join, posix } from "node:path";
 import { createInterface } from "node:readline";
-import { execStdout } from "../../process/exec.js";
-import { matchesProjectPath } from "../../store/artifacts.js";
+import { exec, execStdout } from "../../process/exec.js";
+import { matchesProjectPath, repoRelativePrefix } from "../../store/artifacts.js";
+import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { stateDirNameUnder, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME } from "../../store/paths.js";
 import { section, subsection, info } from "../../types/output.js";
 
 /**
@@ -139,7 +143,7 @@ function defaultPrompt(question: string): Promise<string> {
 /** Options controlling how {@link revertChanges} treats untracked files. */
 export interface RevertOptions {
   /**
-   * Untracked paths (as reported by `git status --porcelain`) that existed
+   * Repository-relative untracked file paths captured by listUntrackedPaths
    * BEFORE the run started. Only untracked paths absent from this list are
    * treated as agent-created and removed.
    *
@@ -149,19 +153,27 @@ export interface RevertOptions {
    * scratch files from the user's own uncommitted work, so we delete nothing.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories, including empty ones. Unknown means no directory pruning. */
+  baselineDirectories?: DirectoryBaseline;
   /**
    * Path prefixes the revert is confined to. When set, tracked changes are
    * reverted only under these paths and only agent-created untracked files
    * under them are removed; everything outside is left exactly as it is.
    *
-   * The rollback caller passes the PRD paths, because those are the only
-   * files hench writes — an unscoped revert also discarded the agent's
-   * finished source edits, which it was never entitled to touch.
+   * Failure rollback uses exact paths below instead: a directory prefix can
+   * contain protected renames as well as ordinary PRD changes.
    *
-   * Omitted means the whole working tree, which is what a review repair
+   * Omitting both scope and paths means the whole working tree, which a review repair
    * wants: there the changes under review *are* the agent's.
    */
   scope?: readonly string[];
+  /**
+   * Repository-relative paths offered by the rollback prompt, passed literally.
+   * The caller excludes overlaps with protected paths: even literal Git
+   * pathspecs recurse into directories. When supplied, these take precedence
+   * over scope; an empty list authorizes no changes.
+   */
+  paths?: readonly string[];
   /** Timeout for each git invocation (ms). */
   timeout?: number;
 }
@@ -175,8 +187,8 @@ export interface RevertResult {
 }
 
 /**
- * List untracked paths as reported by `git status --porcelain` (the `??`
- * entries). Returns `[]` when the tree is clean or git is unavailable.
+ * List individual untracked files, relative to the repository root.
+ * Returns `[]` when the tree is clean or git is unavailable.
  *
  * Exported so the run lifecycle can capture a pre-run baseline with the exact
  * same parsing used during rollback, keeping the two sets directly comparable.
@@ -185,25 +197,132 @@ export async function listUntrackedPaths(
   projectDir: string,
   timeout = DEFAULT_TIMEOUT,
 ): Promise<string[]> {
-  const output = await execStdout("git", ["status", "--porcelain"], {
+  // NUL records preserve quotes, arrows and whitespace. Enumerate individual
+  // files so a baseline directory cannot hide files created later within it.
+  const output = await execStdout("git", ["ls-files", "--others", "--exclude-standard", "--full-name", "-z"], {
     cwd: projectDir,
     timeout,
   });
-  return output
-    .split("\n")
-    .filter((line) => line.startsWith("?? "))
-    .map((line) => {
-      // `git status --porcelain` wraps paths containing spaces or special
-      // characters in double quotes (e.g. `?? "my file.ts"`). Strip them so
-      // the same path matches between the baseline and the current set, and so
-      // the pathspec passed to `git clean -fd --` refers to the real file.
-      let path = line.slice(3).trim();
-      if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) {
-        path = path.slice(1, -1);
+  return output.split("\0").filter(Boolean);
+}
+
+/** Repository-relative directories, including boundaries we deliberately did not read. */
+export interface DirectoryBaseline {
+  directories: string[];
+  /** Preserve these directories AND every descendant, even if ignore rules change. */
+  unscanned: string[];
+}
+
+// Git can precompose names that readdir reports decomposed on macOS. Preserve
+// those aliases, as well as case-only aliases on insensitive filesystems.
+function directoryKey(path: string): string {
+  return path.normalize("NFC").toLowerCase();
+}
+
+/**
+ * Snapshot empty directories only where PRD rollback needs recursive cleanup.
+ * Both CLI/API loops call this before execution; review rejection can also
+ * revert source files. Keep that file behavior, but conservatively preserve
+ * subtrees outside the PRD instead of walking dependencies, worktrees or caches.
+ * Never follow symlinks or enter Git metadata. A failed scan disables pruning.
+ */
+export async function captureBaselineDirectories(projectDir: string): Promise<DirectoryBaseline | undefined> {
+  const root = (await execStdout("git", ["rev-parse", "--show-toplevel"], {
+    cwd: projectDir, timeout: DEFAULT_TIMEOUT,
+  })).trim();
+  if (!root) return undefined;
+  const prefix = await repoRelativePrefix(projectDir);
+  const scanRoots = (["legacy", "ndx"] as const).flatMap((layout) =>
+    [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME].map((tree) =>
+      directoryKey(`${prefix}${stateDirNameUnder("rex", layout)}/${tree}`)));
+  const baseline: DirectoryBaseline = { directories: [], unscanned: [] };
+  const pending = [""];
+  try {
+    while (pending.length > 0) {
+      const parents = pending.splice(0);
+      const ignored = new Set<string>();
+      if (parents[0] !== "") {
+        // One NUL-delimited batch per depth, not one process per directory.
+        // --no-index also preserves ignored folders containing tracked files.
+        const result = await exec("git", ["check-ignore", "--no-index", "-z", "--stdin"], {
+          cwd: root, timeout: DEFAULT_TIMEOUT,
+          input: parents.map((path) => `${path}/\0`).join(""),
+        });
+        if (!result.launched || (result.exitCode !== 0 && result.exitCode !== 1) ||
+          (result.exitCode === 0 && result.error)) {
+          throw new Error("Could not determine ignored directory boundaries");
+        }
+        for (const path of result.stdout.split("\0").filter(Boolean)) {
+          ignored.add(directoryKey(path.replace(/\/$/, "")));
+        }
       }
-      return path;
-    })
-    .filter(Boolean);
+      for (const parent of parents) {
+        if (ignored.has(directoryKey(parent))) {
+          baseline.unscanned.push(parent);
+          continue;
+        }
+        for (const entry of await readdir(join(root, parent), { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const path = parent ? `${parent}/${entry.name}` : entry.name;
+          baseline.directories.push(path);
+          const key = directoryKey(path);
+          if (entry.name !== ".git" && scanRoots.some((scope) =>
+            key === scope || key.startsWith(`${scope}/`) || scope.startsWith(`${key}/`))) {
+            pending.push(path);
+          } else {
+            baseline.unscanned.push(path);
+          }
+        }
+      }
+    }
+    return baseline;
+  } catch (err) {
+    info(`Directory baseline unavailable; rollback will preserve folders: ${(err as Error).message}`);
+    return undefined;
+  }
+}
+
+/** Remove only empty, new ancestors of files this rollback removed. */
+async function pruneEmptiedDirectories(
+  projectDir: string,
+  files: string[],
+  baselineDirectories: DirectoryBaseline,
+  timeout: number,
+): Promise<void> {
+  const root = (await execStdout("git", ["rev-parse", "--show-toplevel"], {
+    cwd: projectDir, timeout,
+  })).trim();
+  if (!root) return;
+  const baseline = new Set(baselineDirectories.directories.map(directoryKey));
+  const unscanned = baselineDirectories.unscanned.map(directoryKey);
+  const candidates = new Set<string>();
+  for (const file of files) {
+    const key = directoryKey(file);
+    if (unscanned.some((path) => key === path || key.startsWith(`${path}/`))) continue;
+    for (let parent = posix.dirname(file); parent !== "."; parent = posix.dirname(parent)) {
+      if (baseline.has(directoryKey(parent))) break;
+      candidates.add(parent);
+    }
+  }
+  // Children first. rmdir is deliberately non-recursive: ignored files, user
+  // work and unrelated empty subdirectories must all prevent removal.
+  for (const path of [...candidates].sort((a, b) => b.split("/").length - a.split("/").length)) {
+    try {
+      // Do not follow a directory replaced with a symlink during the run.
+      let parent = root;
+      let directory = true;
+      for (const part of path.split("/")) {
+        parent = join(parent, part);
+        if (!(await lstat(parent)).isDirectory()) { directory = false; break; }
+      }
+      if (directory) await rmdir(join(root, path));
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      // Already gone or still occupied are normal outcomes, not permission
+      // to recurse. Other failures must reach the rollback diagnostic.
+      if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw err;
+    }
+  }
 }
 
 /**
@@ -232,9 +351,9 @@ async function trackedPathspec(
 /**
  * Revert the agent's uncommitted work — safely.
  *
- * Tracked changes are reverted with `git reset` + `git checkout`; because those
- * files are known to git, their prior content is always recoverable from
- * history, so this can never destroy unrecoverable data.
+ * Tracked changes are restored to HEAD with `git reset` + `git checkout`,
+ * discarding staged and unstaged changes only
+ * within the authorized scope.
  *
  * Untracked files are the dangerous case: the previous implementation ran a
  * blanket `git clean -fd`, which deleted every untracked file in the tree —
@@ -253,26 +372,33 @@ export async function revertChanges(
 ): Promise<RevertResult> {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
   const scope = options.scope && options.scope.length > 0 ? [...options.scope] : undefined;
-  const inScope = (path: string): boolean =>
-    scope === undefined ||
-    scope.some((entry) => {
+  const paths = options.paths === undefined ? undefined : new Set(options.paths);
+  const literal = (path: string): string => `:(top,literal)${path}`;
+  const inScope = (path: string): boolean => {
+    if (paths !== undefined) return paths.has(path);
+    return scope === undefined || scope.some((entry) => {
       const prefix = entry.endsWith("/") ? entry : `${entry}/`;
       return path === entry || path === entry.replace(/\/$/, "") || path.startsWith(prefix);
     });
+  };
 
-  // 1. Unstage and revert modifications to TRACKED files only, within scope.
-  //    reset/checkout never touch untracked files, and tracked content is
-  //    recoverable from git history — so there is no unrecoverable data loss.
-  //
-  //    The pathspec is filtered to entries git actually tracks first. `git
-  //    checkout -- a b` where `b` matches nothing known to git fails the whole
-  //    command and reverts neither — so one scope entry for a file this
-  //    project has never committed (`.rex/tree-meta.json` in a fresh fixture,
-  //    say) would silently turn the entire revert into a no-op.
-  const pathspec = scope ? await trackedPathspec(projectDir, scope, timeout) : ["."];
+  // Exact paths come from the same classification as the prompt. Broad PRD
+  // prefixes would also unstage protected source-to-PRD renames, turning the
+  // target (including post-move edits) into an untracked file that clean deletes.
+  const pathspec = paths !== undefined
+    ? [...paths].map(literal)
+    : scope ? await trackedPathspec(projectDir, scope, timeout) : ["."];
   if (pathspec.length > 0) {
     await execStdout("git", ["reset", "HEAD", "--", ...pathspec], { cwd: projectDir, timeout });
-    await execStdout("git", ["checkout", "--", ...pathspec], { cwd: projectDir, timeout });
+    // Reset restores deleted sources to the index and removes added targets.
+    // Filter AFTER reset: one now-untracked target would make checkout reject
+    // the whole request, leaving ordinary PRD modifications unrestored too.
+    const checkoutPaths = paths !== undefined
+      ? await trackedPathspec(projectDir, pathspec, timeout)
+      : pathspec;
+    if (checkoutPaths.length > 0) {
+      await execStdout("git", ["checkout", "--", ...checkoutPaths], { cwd: projectDir, timeout });
+    }
   }
 
   // 2. Untracked files: remove ONLY the ones the agent created this run, and
@@ -292,10 +418,14 @@ export async function revertChanges(
   if (agentCreated.length > 0) {
     // Scoped clean: the pathspec after `--` limits removal to exactly the
     // agent-created paths. Pre-existing untracked files are never matched.
-    await execStdout("git", ["clean", "-fd", "--", ...agentCreated], {
+    await execStdout("git", ["clean", "-fd", "--", ...agentCreated.map(literal)], {
       cwd: projectDir,
       timeout,
     });
+  }
+
+  if (agentCreated.length > 0 && options.baselineDirectories !== undefined) {
+    await pruneEmptiedDirectories(projectDir, agentCreated, options.baselineDirectories, timeout);
   }
 
   return { removedUntracked: agentCreated, keptUntracked: preExisting };

@@ -40,8 +40,10 @@ import {
 } from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
+  matchesPorcelainLine,
   matchesProjectPath,
   parsePorcelainPath,
+  porcelainSourcePath,
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../../store/artifacts.js";
@@ -264,6 +266,20 @@ export interface UncommittedWorkResult {
   clean: boolean;
   /** Repository-relative paths that are still uncommitted, in git's order. */
   paths: string[];
+  /** Rename endpoints, independent of the single path chosen for display. */
+  renames?: RecoveryRename[];
+}
+
+export interface RecoveryRename {
+  source: string;
+  target: string;
+}
+
+function recoveryRenames(lines: string[]): RecoveryRename[] {
+  return lines.flatMap((line) => {
+    const source = line.slice(0, 2).includes("R") ? porcelainSourcePath(line) : undefined;
+    return source === undefined ? [] : [{ source, target: parsePorcelainPath(line) }];
+  });
 }
 
 /**
@@ -309,12 +325,24 @@ export async function findUncommittedWork(
 
   const repoPrefix = discountPaths.length > 0 ? await repoRelativePrefix(projectDir) : "";
 
-  const paths = operatorLines
+  const remaining = operatorLines
     .filter((line) => !(stagedCommitFollows && isFullyStaged(line)))
-    .map(parsePorcelainPath)
-    .filter((path) => !matchesProjectPath(path, discountPaths, repoPrefix));
+    .filter((line) => !matchesPorcelainLine(line, discountPaths, repoPrefix));
+  const paths = remaining.map((line) => reportedPath(line, discountPaths, repoPrefix));
+  const renames = recoveryRenames(remaining);
 
-  return { clean: paths.length === 0, paths };
+  return { clean: paths.length === 0, paths, ...(renames.length > 0 ? { renames } : {}) };
+}
+
+/**
+ * The path to name for a leftover line: its target, except a rename whose
+ * target the discount covers but whose source it does not, where the source is
+ * what left the tree and the target alone would read as innocent.
+ */
+function reportedPath(line: string, discountPaths: readonly string[], repoPrefix: string): string {
+  const target = parsePorcelainPath(line);
+  if (!matchesProjectPath(target, discountPaths, repoPrefix)) return target;
+  return porcelainSourcePath(line) ?? target;
 }
 
 /**
@@ -382,14 +410,45 @@ export async function partitionDirtyPaths(
   if (lines.length === 0) return { prd: [], other: [] };
 
   const repoPrefix = await repoRelativePrefix(projectDir);
-  const prd: string[] = [];
+  let prdGroups: string[][] = [];
   const other: string[] = [];
+  const protectedPaths = new Set<string>();
   for (const line of lines) {
     const path = parsePorcelainPath(line);
-    if (matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix)) prd.push(path);
-    else other.push(path);
+    const source = line.slice(0, 2).includes("R") ? porcelainSourcePath(line) : undefined;
+    const endpoints = source === undefined ? [path] : [path, source];
+    if (matchesPorcelainLine(line, PRD_COMMIT_PATHS, repoPrefix)) {
+      // A wholly PRD rename must restore its deleted source as well as remove
+      // its added target. Cross-boundary renames stay entirely in other.
+      prdGroups.push(endpoints);
+    } else {
+      other.push(path);
+      endpoints.forEach((p) => protectedPaths.add(p.toLowerCase()));
+    }
   }
-  return { prd, other };
+  // Even a literal Git pathspec recurses into directories. Restoring a deleted
+  // PRD file at a protected rename's new parent would unstage and overwrite
+  // that target. Keep overlapping groups together, including both endpoints
+  // of an internal rename; propagate protection through any connected groups.
+  // Compare conservatively without case: Git's literal pathspec can select
+  // node.md while checkout replaces NODE.md/ on a case-insensitive filesystem.
+  // Leaving a possible alias dirty is safer than deleting protected work;
+  // retain the original spelling in the prompt and in rollback pathspecs.
+  let changed: boolean;
+  do {
+    changed = false;
+    prdGroups = prdGroups.filter((group) => {
+      const overlaps = group.map((p) => p.toLowerCase()).some((p) => [...protectedPaths].some((protectedPath) =>
+        p === protectedPath || p.startsWith(`${protectedPath}/`) || protectedPath.startsWith(`${p}/`),
+      ));
+      if (!overlaps) return true;
+      other.push(group[0]!);
+      group.forEach((p) => protectedPaths.add(p.toLowerCase()));
+      changed = true;
+      return false;
+    });
+  } while (changed);
+  return { prd: [...new Set(prdGroups.flat())], other };
 }
 
 /**
@@ -466,7 +525,9 @@ export function formatRecordCommitPending(
   const mode = specMode(paths, files);
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
   let commands: string;
-  if (mode.kind === "file") {
+  if (files && "renames" in files) {
+    commands = renameRecoveryNotice(files.renames);
+  } else if (mode.kind === "file") {
     commands =
       `Land the record once the cause is fixed (paths listed in ${mode.files.all}):\n` +
       `  git add --pathspec-from-file=${mode.files.all}\n` +
@@ -516,13 +577,22 @@ const SHELL_INERT = /^[A-Za-z0-9._/-]+$/;
  * {@link prepareRecoveryPathspecs}. Paths are repo-root-relative and
  * shell-inert, so they can appear on a command line unquoted.
  */
-export interface RecoveryPathspecs {
+interface RecoveryPathspecFiles {
   /** Every listed path — read by `git commit` and `git stash push`. */
   all: string;
   /** Only the still-existing paths — read by `git add`. Absent when it would equal `all`. */
   add?: string;
   /** Only the deleted paths — read by `git rm --cached`. Absent when nothing is deleted. */
   rm?: string;
+}
+
+export type RecoveryPathspecs = RecoveryPathspecFiles | { renames: RecoveryRename[] };
+
+function renameRecoveryNotice(renames: RecoveryRename[]): string {
+  return "Automatic recovery commands are unavailable for this group because it contains a rename.\n" +
+    "A one-endpoint commit can land only a deletion; remove/stash commands can fail or split the rename.\n" +
+    "Review and recover both endpoints together, preserving unrelated staged and working-tree changes:\n" +
+    renames.map(({ source, target }) => `  source: ${JSON.stringify(source)}\n  target: ${JSON.stringify(target)}`).join("\n");
 }
 
 /**
@@ -542,8 +612,9 @@ function pathspecFileEntry(path: string): string {
 }
 
 /**
- * Write the pathspec files the recovery commands will reference, when they are
- * needed at all.
+ * Prepare recovery: retain any selected rename pair as an unavailable action,
+ * otherwise write the pathspec files the commands need. A display label alone
+ * is never enough to scope a rename's recovery.
  *
  * Returns `undefined` when every path is {@link SHELL_INERT} (the commands can
  * carry the paths inline, unquoted, safely in every shell), when the file
@@ -560,7 +631,21 @@ export async function prepareRecoveryPathspecs(
   projectDir: string,
   paths: string[],
   deleted: ReadonlySet<string> = new Set(),
+  knownRenames: readonly RecoveryRename[] = [],
 ): Promise<RecoveryPathspecs | undefined> {
+  // Some callers retain only a display path (record/reset or a baseline-
+  // filtered completion). Re-read the pairs before offering any mutations,
+  // including when all names are shell-inert. Keep caller metadata too so a
+  // later status snapshot cannot silently forget a previously observed pair.
+  const renames = [...knownRenames, ...recoveryRenames(await listDirtyPaths(projectDir))]
+    .filter(({ source, target }) => paths.some((path) => [source, target].some((endpoint) => {
+      const a = path.toLowerCase().replace(/\/$/, ""), b = endpoint.toLowerCase();
+      return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+    })))
+    .filter((pair, index, pairs) => pairs.findIndex((p) => p.source === pair.source && p.target === pair.target) === index);
+  // Do not infer that paired pathspecs make stash safe. Withhold the entire
+  // group instead of offering a partial recovery of its non-rename paths.
+  if (renames.length > 0) return { renames };
   if (paths.length === 0 || paths.every((p) => SHELL_INERT.test(p))) return undefined;
 
   const recoveryDir = resolveHenchPaths(projectDir).recoveryDir;
@@ -583,7 +668,7 @@ export async function prepareRecoveryPathspecs(
 
   try {
     mkdirSync(recoveryDir, { recursive: true });
-    const files: RecoveryPathspecs = { all: ref("pathspec.txt") };
+    const files: RecoveryPathspecFiles = { all: ref("pathspec.txt") };
     writeFileSync(join(recoveryDir, "pathspec.txt"), content(paths), "utf-8");
     if (gone.length > 0) {
       files.rm = ref("pathspec-rm.txt");
@@ -612,13 +697,13 @@ function posixQuote(path: string): string {
 
 type SpecMode =
   | { kind: "bare" }
-  | { kind: "file"; files: RecoveryPathspecs }
+  | { kind: "file"; files: RecoveryPathspecFiles }
   | { kind: "posix" };
 
 /** How this message's commands carry their pathspecs. */
 function specMode(paths: string[], files: RecoveryPathspecs | undefined): SpecMode {
   if (paths.every((p) => SHELL_INERT.test(p))) return { kind: "bare" };
-  if (files) return { kind: "file", files };
+  if (files && "all" in files) return { kind: "file", files };
   return { kind: "posix" };
 }
 
@@ -657,6 +742,7 @@ function renderRecoveryCommands(
   files?: RecoveryPathspecs,
   opts: { setAside?: boolean; message?: string[] } = {},
 ): string {
+  if (files && "renames" in files) return renameRecoveryNotice(files.renames);
   const { setAside = true } = opts;
   const existing = paths.filter((p) => !deleted.has(p));
   const gone = paths.filter((p) => deleted.has(p));

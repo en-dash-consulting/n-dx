@@ -268,6 +268,14 @@ export {
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
 
 export {
+  CodexProjectConfigError,
+  codexConfigMcpServerNames,
+  codexProjectMcpDisableFlags,
+} from "./codex-project-config.js";
+
+export { codexUserConfigPath, codexUserModelProvider } from "./codex-user-config.js";
+
+export {
   createOpenAiApiProvider,
   resolveOpenAiApiKey,
   parseOpenAiTokenUsage,

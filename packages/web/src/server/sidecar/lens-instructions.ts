@@ -11,6 +11,13 @@
 import { CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 
 /**
+ * Every worktree lens ends with this: a decision between options goes to the
+ * operator on a choice card, whose answer comes back as the tool result,
+ * instead of "A, B or C" in the transcript for the operator to type back.
+ */
+export const ASK_CHOICE_INSTRUCTION = "- When you need the operator to decide between options, call `ask_choice` with the question and each option's label (and a description when it helps) instead of listing them in your reply. The card offers an Other row, so do not add one; its answer is the tool result. Use it for a decision, not for a question with a free-form answer.";
+
+/**
  * Explain. The packet labels each capability criterion; the model is held to
  * those labels, and to keeping the two kinds of criteria apart, because
  * "criteria" alone reads as either.
@@ -21,6 +28,7 @@ export const EXPLAIN_INSTRUCTIONS = [
   "- Label every capability criterion you mention `met`, `not met` or `not verified`, exactly as the packet does, and cite its evidence. Never upgrade `not verified` to `met`; say what evidence is missing.",
   "- Say \"capability criteria\" for the standing requirements on the product layer (areas and capabilities). Say \"done when\" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.",
   "- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.",
+  ASK_CHOICE_INSTRUCTION,
 ].join("\n");
 
 /**
@@ -36,11 +44,12 @@ export const DIAGNOSE_RUN_INSTRUCTIONS = [
   "- Offer the classifier's ranked actions in the order the verdict section lists them, which is the classifier's ranking (design §5 Q5). Do not reorder, drop or add to them; say why each fits.",
   "- When the verdict section says attempt 2 of 2, open with \"attempt 2 of 2: next is a fix or a split\" and do not offer a re-run or `--fresh`, even where an action reads as one.",
   "- Act only through broker cards, one per action, never by telling the operator to run something:",
-  "  - verify-and-close (`close-verified`), a follow-up (`follow-up-run`), a split (`split-task`) or tightened done-when (`tighten-done-when`): `propose_prd_change`, which raises a change-set card.",
+  "  - verify-and-close (`close-verified`), a follow-up (`follow-up-run`), a split (`split-task`) or tightened done-when (`tighten-done-when`): `propose_prd_change`, which raises a PRD edits card.",
   "  - re-run (`re-run`): `start_work` for the task, which raises a work card.",
   "  - `--fresh` (`fresh`): `start_work` for the task with options `{ \"fresh\": true }`; the work card's resolve preview shows `--fresh`.",
   "  - a check such as `verify-on-main`, `release-claim` or `clean-tree`: `run_command`, which raises a command card.",
   "- Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.",
+  ASK_CHOICE_INSTRUCTION,
 ].join("\n");
 
 /**
@@ -51,12 +60,13 @@ export const DIAGNOSE_RUN_INSTRUCTIONS = [
 export const GUIDE_INSTRUCTIONS = [
   "## How to guide",
   "Say what to run next and why, from the queue planner's plan in the packet.",
-  "- Use the lanes exactly as the planner formed them: its commands, its task order, its reasons. Do not regroup, reorder or add to them, and never write a `ndx work` command of your own.",
+  "- Call each group of tasks a track, never a lane. Use the tracks exactly as the planner formed them: its commands, its task order, its reasons. Do not regroup, reorder or add to them, and never write a `ndx work` command of your own.",
   "- Say why each excluded task was left out, in the planner's words, and how many runs are active against the limit.",
-  "- Raise a run-plan card with `propose_run_plan` only when the plan has at least one lane. With an empty ready list, or no lane, say so and raise no card: there is nothing to plan.",
-  "- The card is the only way to propose a plan. The operator copies its commands or chooses Start lane; nothing starts without an approved work card.",
-  "- When Start lane is chosen, the result names the lane's first task: call `start_work` for that task only, never the lane's others. When its run has ended, in a later turn, raise `start_work` for the next task in the lane, and only if the plan still lists it. Pass the start_work options the result names for each task's step (`requireUnblocked: true` for a step with `--require-unblocked`), so a task whose blocker did not complete is refused rather than started. `start_work` refuses an unfinished blocker by default; pass `requireUnblocked: false` only when the operator asks to start over it.",
+  "- Raise a run-plan card with `propose_run_plan` only when the plan has at least one track. With an empty ready list, or no track, say so and raise no card: there is nothing to plan.",
+  "- The card is the only way to propose a plan. The operator copies its commands or chooses Start track; nothing starts without an approved work card.",
+  "- When Start track is chosen, the result names the track's first task: call `start_work` for that task only, never the track's others. When its run has ended, in a later turn, raise `start_work` for the next task in the track, and only if the plan still lists it. Pass the start_work options the result names for each task's step (`requireUnblocked: true` for a step with `--require-unblocked`), so a task whose blocker did not complete is refused rather than started. `start_work` refuses an unfinished blocker by default; pass `requireUnblocked: false` only when the operator asks to start over it.",
   "- Use only what the packet states. Where it says the plan is not available, say so and name `ndx work --plan-queue`.",
+  ASK_CHOICE_INSTRUCTION,
 ].join("\n");
 
 /**
@@ -77,6 +87,7 @@ export const DIAGNOSE_BRANCH_INSTRUCTIONS = [
   "- When the packet says the worktree is not this session's, raise no fix card at all: the fixes run in that worktree. Say to open its own Sidecar.",
   "- Read GitHub only with `github_read` and write to it only with `draft_github_post`, which the operator approves, copies or discards. Never tell the operator to run gh, and never post any other way.",
   "- Use only what the packet states. Where it says something is not available, say so and name the call or command that would supply it.",
+  ASK_CHOICE_INSTRUCTION,
 ].join("\n");
 
 /**
@@ -96,21 +107,23 @@ export const PLACE_INSTRUCTIONS = [
   "- Name any open change the packet lists as amending your target: an amends placement there is refused at apply once that change applies first.",
   "- Place only with `place_change_card`, passing `change`, the target or proposal, and `reasons`. The card shows rex's dry run; a refusal comes back with its kind: fix what it names and raise a new card. Never offer to apply the change, never call or suggest `apply_change`, and never tell the operator to run a placement command.",
   "- Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.",
+  ASK_CHOICE_INSTRUCTION,
 ].join("\n");
 
 /**
  * Describe. The agent cannot judge a model's answer, so the instructions name
- * the check it makes (vague done-when) and the one route for a fix: tightened
- * wording in the reply, which the operator applies. No tool edits an existing
- * task yet, and `propose_prd_change` only adds items.
+ * the check it makes (vague done-when) and the one route for a fix: an
+ * item-edit card carrying the tightened criteria, which the operator can
+ * adjust before approving. `propose_prd_change` only adds items.
  */
 export const DESCRIBE_INSTRUCTIONS = [
   "## How to describe",
   "Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.",
   "- Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as \"works\", \"properly\" or \"better\" doing the work. Quote it and say what cannot be checked.",
-  "- For every vague check, quote it and give the tightened wording in your reply, then say the operator applies it with `rex update` or the item editor. Do not call `propose_prd_change` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.",
+  "- For every vague check, quote it and give the tightened wording in your reply, then raise one `propose_item_edit` card for the task with `acceptanceCriteria`: the task's full done-when list with the vague checks replaced and the rest kept as they are. The operator sees each check before and after, can adjust the wording, and nothing is written before Approve. Do not call `propose_prd_change` for an existing task: it only adds items, so it would leave the task's criteria as they are and add a duplicate to the PRD.",
   "- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.",
   "- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.",
+  ASK_CHOICE_INSTRUCTION,
 ].join("\n");
 
 /**

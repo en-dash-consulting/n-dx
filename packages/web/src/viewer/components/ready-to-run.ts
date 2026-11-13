@@ -1,8 +1,9 @@
 /**
  * Ready to run — the tasks `ndx work --auto` would pick next, at the top of Work.
  *
- * Fed by `GET /api/hench/ready?limit=10`, shown in the order returned: the first
- * three by default, the rest behind a "Show N more" toggle. Each row
+ * Fed by `GET /api/hench/ready`, shown in the order returned: the top rows, then
+ * "Show all N", with a text search and priority, change and tag filters over
+ * every task once the whole list is loaded (one `all=1` request). Each row
  * opens the Prepare task modal (the primary button and the title); the split
  * button's menu starts the task at once with no options, or copies the terminal
  * command. A start shows a toast: started (with a link to Live), queued (with its
@@ -20,15 +21,11 @@ import { QueuedNotice } from "./queued-notice.js";
 import { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
 
-const READY_LIMIT = 10;
-/** Rows shown before "Show N more": the next few picks, not the whole queue. */
-export const READY_SHOWN = 3;
+/** Rows shown before "Show all N". */
+export const READY_TOP_ROWS = 10;
+/** The first request's page size (the server's maximum). */
+const READY_PAGE = 50;
 const TOAST_MS = 8000;
-
-/** The rows to render: the first READY_SHOWN, or all of them once expanded. Order is kept. */
-export function shownReadyTasks<T>(tasks: readonly T[], expanded: boolean): T[] {
-  return expanded ? [...tasks] : tasks.slice(0, READY_SHOWN);
-}
 
 /** One row of the `/api/hench/ready` reply (the server's `ReadyTask`). */
 export interface ReadyTask {
@@ -39,6 +36,9 @@ export interface ReadyTask {
   status: string;
   priority: string | null;
   parentChain: string[];
+  /** The change the task belongs to. Absent from a server that predates it. */
+  change?: { id: string; title: string } | null;
+  tags?: string[];
   criteriaCount: number;
   /** In progress with no live run. */
   resume: boolean;
@@ -51,7 +51,31 @@ export interface ReadyTask {
 
 interface ReadyReply {
   tasks: ReadyTask[];
+  /** Every actionable task, not just this page. Absent from a server that predates paging. */
+  total?: number;
   dir: string;
+}
+
+/** The narrowing the list's controls apply. An empty field matches every row. */
+export interface ReadyFilters { query: string; priority: string; change: string; tag: string }
+
+const NO_FILTERS: ReadyFilters = { query: "", priority: "", change: "", tag: "" };
+
+const isFiltering = (f: ReadyFilters) => f.query.trim() !== "" || f.priority !== "" || f.change !== "" || f.tag !== "";
+
+/** The change id a row groups under: its change, else its own title. */
+const changeKey = (task: ReadyTask) => task.change?.id ?? "";
+
+/** Rows matching every filter; search reads the summary, title, change, ancestors and tags. */
+export function filterReady(tasks: ReadyTask[], f: ReadyFilters): ReadyTask[] {
+  const q = f.query.trim().toLowerCase();
+  return tasks.filter((t) => {
+    if (f.priority && (t.priority ?? "none") !== f.priority) return false;
+    if (f.change && changeKey(t) !== f.change) return false;
+    if (f.tag && !(t.tags ?? []).includes(f.tag)) return false;
+    if (!q) return true;
+    return [t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
+  });
 }
 
 /** The terminal command Start now would run: `ndx work --task=<id> --auto <dir>`. */
@@ -82,31 +106,63 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
-  /** The rows past the first READY_SHOWN are shown. */
   const [expanded, setExpanded] = useState(false);
   /** Start now runs the hub queued, until dismissed. */
   const [queued, setQueued] = useState<Array<{ taskId: string; reply: QueuedReply }>>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const [total, setTotal] = useState(0);
+  /** Once a control is used, keep the whole queue for later filters and refreshes. */
+  const [engaged, setEngaged] = useState(false);
+  const [allAttempt, setAllAttempt] = useState(0);
+  /** Whether the retained snapshot includes every row, even after a failed refresh. */
+  const complete = useRef(false);
+  const loading = useRef(0);
+  const [filters, setFilters] = useState<ReadyFilters>(NO_FILTERS);
+  const filtering = isFiltering(filters);
+  const needAll = expanded || engaged || filtering;
+  const needAllRef = useRef(needAll);
+  needAllRef.current = needAll;
+
+  /**
+   * The first page; the whole list in one request once the list is expanded or
+   * a control is used (each request costs a full selection and runs scan, so
+   * paging through it would repeat that per page).
+   */
   const load = useCallback(async () => {
+    const all = needAllRef.current;
+    loading.current++;
     try {
-      const res = await fetch(`/api/hench/ready?limit=${READY_LIMIT}`);
+      const res = await fetch(all ? "/api/hench/ready?all=1" : `/api/hench/ready?limit=${READY_PAGE}&offset=0`);
       if (!res.ok) {
+        complete.current = false;
         setError(res.status === 404 ? null : `Could not load the ready list (${res.status})`);
         setTasks([]);
+        setTotal(0);
         return;
       }
       const data = (await res.json()) as ReadyReply;
-      setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      const rows = Array.isArray(data.tasks) ? data.tasks : [];
+      complete.current = rows.length >= (typeof data.total === "number" ? data.total : rows.length);
       setDir(typeof data.dir === "string" ? data.dir : "");
+      setTasks(rows);
+      setTotal(typeof data.total === "number" ? data.total : rows.length);
       setError(null);
+      // A control may have reused a complete snapshot while this page was in
+      // flight. If the queue has since grown, upgrade it once the page lands.
+      if (!all && needAllRef.current && !complete.current && loading.current === 1) {
+        setAllAttempt((prev) => prev + 1);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the ready list");
       setTasks((prev) => prev ?? []);
+    } finally {
+      loading.current--;
     }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (needAll && !complete.current) void load(); }, [needAll, allAttempt, load]);
   useHenchRunsLiveRefresh(load);
   // After the ready list's own load, so the list is the first request out.
   const impacts = useItemImpacts();
@@ -164,6 +220,69 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
     }
   };
 
+  const loaded = tasks ?? [];
+  const matches = filtering ? filterReady(loaded, filters) : loaded;
+  const shown = filtering || expanded ? matches : matches.slice(0, READY_TOP_ROWS);
+  const engage = () => {
+    // Engagement stays latched for refreshes; an incomplete snapshot still needs
+    // another attempt when a control is used after a transient load failure.
+    if (needAllRef.current && !complete.current && loading.current === 0) setAllAttempt((prev) => prev + 1);
+    setEngaged(true);
+  };
+  const setFilter = (patch: Partial<ReadyFilters>) => {
+    engage();
+    setFilters((prev) => ({ ...prev, ...patch }));
+  };
+
+  const changes = new Map<string, string>();
+  const tags = new Set<string>();
+  for (const t of loaded) {
+    if (t.change) changes.set(t.change.id, t.change.title);
+    for (const tag of t.tags ?? []) tags.add(tag);
+  }
+  const select = (label: string, value: string, key: keyof ReadyFilters, options: Array<[string, string]>) =>
+    h("select", {
+      class: "ready-filter",
+      "aria-label": label,
+      value,
+      onFocus: engage,
+      onChange: (e: Event) => setFilter({ [key]: (e.target as HTMLSelectElement).value }),
+    }, h("option", { value: "" }, label), options.map(([v, text]) => h("option", { value: v, key: v }, text)));
+
+  const controls = total > READY_TOP_ROWS || filtering
+    ? h("div", { class: "ready-controls" },
+        h("input", {
+          type: "search",
+          class: "ready-search",
+          placeholder: "Search ready tasks",
+          "aria-label": "Search ready tasks",
+          value: filters.query,
+          onInput: (e: Event) => setFilter({ query: (e.target as HTMLInputElement).value }),
+        }),
+        select("Any priority", filters.priority, "priority",
+          ["critical", "high", "medium", "low", "none"].map((p) => [p, p] as [string, string])),
+        select("Any change", filters.change, "change",
+          [...changes].sort((a, b) => a[1].localeCompare(b[1])).map(([id, title]) => [id, title] as [string, string])),
+        select("Any tag", filters.tag, "tag", [...tags].sort().map((t) => [t, t] as [string, string])),
+        filtering
+          ? h("button", { type: "button", class: "ready-clear", onClick: () => setFilters(NO_FILTERS) }, "Clear")
+          : null,
+        h("span", { class: "ready-count", role: "status" },
+          filtering ? `${matches.length} of ${total} match` : `${shown.length} of ${total}`),
+      )
+    : null;
+
+  const more = !filtering && total > READY_TOP_ROWS
+    ? h("button", {
+        type: "button",
+        class: "ready-more",
+        "aria-expanded": String(expanded),
+        "aria-controls": "ready-to-run-list",
+        onClick: () => { if (!expanded) engage(); setExpanded(!expanded); },
+      },
+        expanded ? `Show top ${READY_TOP_ROWS}` : `Show all ${total}`)
+    : null;
+
   const body = tasks === null
     ? h("p", { class: "ready-empty" }, "Loading…")
     : tasks.length === 0
@@ -174,7 +293,9 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
             onClick: (e: MouseEvent) => { e.preventDefault(); onOpenPrd(); },
           }, "Open the PRD"),
         )
-      : h("ul", { class: "ready-list", id: "ready-list" }, shownReadyTasks(tasks, expanded).map((task) => {
+      : shown.length === 0
+        ? h("p", { class: "ready-empty" }, "No ready task matches.")
+        : h("ul", { class: "ready-list", id: "ready-to-run-list" }, shown.map((task) => {
           const status = STATUS_ICON[task.status] ?? { icon: "○", label: task.status };
           const menuId = `ready-menu-${task.id}`;
           return h("li", { key: task.id, class: "ready-row", "data-task-id": task.id },
@@ -197,6 +318,10 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
               ),
               h("div", { class: "ready-meta" },
                 task.parentChain.length ? h("span", { class: "ready-chain" }, task.parentChain.join(" › ")) : null,
+                // The chain ends at the change on v2; a task-less change is its own row.
+                task.change && task.change.title !== task.title && task.parentChain[task.parentChain.length - 1] !== task.change.title
+                  ? h("span", { class: "ready-change" }, task.change.title)
+                  : null,
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
                 h("span", null, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
@@ -229,21 +354,11 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
           );
         }));
 
-  const hidden = tasks ? Math.max(0, tasks.length - READY_SHOWN) : 0;
-  const toggle = hidden > 0
-    ? h("button", {
-        type: "button",
-        class: "ready-more",
-        "aria-expanded": String(expanded),
-        "aria-controls": "ready-list",
-        onClick: () => setExpanded(!expanded),
-      }, expanded ? "Show fewer" : `Show ${hidden} more`)
-    : null;
-
   return h("section", { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" },
     h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
+    controls,
     body,
-    toggle,
+    more,
     queued.map((q) => h(QueuedNotice, {
       key: q.taskId,
       reply: q.reply,

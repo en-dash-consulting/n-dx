@@ -141,7 +141,19 @@ describe("cross-vendor execution policy parity", () => {
 
   // Every policy ends with the overrides that keep the Codex credentials out
   // of the agent's commands; llm-client's own tests pin their spelling.
-  const shellEnv = compileCodexPolicyFlags(STANDARD_POLICY, { resume: true });
+  const shellEnv = compileCodexPolicyFlags(FULL_ACCESS_POLICY).slice(1);
+
+  it("a resumed spawn re-applies each policy with -c overrides and no --sandbox", () => {
+    expect(compileCodexPolicyFlags(STANDARD_POLICY, { resume: true })).toEqual([
+      "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', ...shellEnv,
+    ]);
+    expect(compileCodexPolicyFlags(READONLY_POLICY, { resume: true })).toEqual([
+      "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="on-request"', ...shellEnv,
+    ]);
+    expect(compileCodexPolicyFlags(FULL_ACCESS_POLICY, { resume: true })).toEqual([
+      "-c", 'sandbox_mode="danger-full-access"', "-c", 'approval_policy="never"', ...shellEnv,
+    ]);
+  });
 
   it("standard policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);

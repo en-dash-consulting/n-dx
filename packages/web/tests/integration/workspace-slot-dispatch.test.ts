@@ -31,7 +31,7 @@ function git(cwd: string, ...args: string[]): string {
 }
 
 function prdMd(title: string): string {
-  return `---\nschema: rex/v1\ntitle: ${title}\nitems:\n  - id: e1\n    title: "${title} epic"\n    level: epic\n    status: pending\n---\n\n# ${title}\n`;
+  return `---\nschema: rex/v1\ntitle: ${title}\nitems:\n  - id: e1\n    title: "${title} epic"\n    level: epic\n    status: pending\n    children:\n      - id: t1\n        title: "${title} task"\n        level: task\n        status: pending\n---\n\n# ${title}\n`;
 }
 
 /** Boots on `repo`, waits for the worktree to be listed, probes, writes the result, exits. */
@@ -92,6 +92,7 @@ out.slotStillWinsOverNothing = JSON.parse((await probe("/w/" + key + "/api/statu
 // \`ready\` scans the workspace's own PRD. The prep GET spawns \`ndx work
 // --resolve <dir>\`; this fixture has no .hench, so hench refuses and names
 // that directory in its stderr, which the 502 carries back.
+// Prepare a runnable v1 task: its epic would be refused before the spawn.
 const readyJson = async (path, headers) => {
   const r = await probe(path, headers);
   return { status: r.status, dir: r.status === 200 ? JSON.parse(r.text).dir : null };
@@ -106,10 +107,10 @@ const prepJson = async (path, headers) => {
   const body = JSON.parse(r.text);
   return { status: r.status, dir: body.dir ?? null, stderr: body.stderr ?? "" };
 };
-out.prepAnchor = await prepJson("/api/hench/prep/e1");
-out.prepSlot = await prepJson("/w/" + key + "/api/hench/prep/e1");
-out.prepHeader = await prepJson("/api/hench/prep/e1", { "x-ndx-workspace": key });
-out.prepStaleHeader = (await probe("/api/hench/prep/e1", { "x-ndx-workspace": "no-such-worktree" })).status;
+out.prepAnchor = await prepJson("/api/hench/prep/t1");
+out.prepSlot = await prepJson("/w/" + key + "/api/hench/prep/t1");
+out.prepHeader = await prepJson("/api/hench/prep/t1", { "x-ndx-workspace": key });
+out.prepStaleHeader = (await probe("/api/hench/prep/t1", { "x-ndx-workspace": "no-such-worktree" })).status;
 
 // A header naming no known worktree is refused rather than quietly answered
 // about the anchor — including on a GET, where the fallback would put the

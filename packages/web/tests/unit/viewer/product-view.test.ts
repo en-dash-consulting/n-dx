@@ -115,6 +115,27 @@ describe("ProductView", () => {
     expect(broken?.textContent).toContain("Autonomous task runs");
   });
 
+  it("draws each open change on a constraint row as an overlay", () => {
+    const change = PRODUCT_MAP_FIXTURE.areas[0].capabilities
+      .flatMap((c) => c.openChanges)[0];
+    const [first, second] = PRODUCT_MAP_FIXTURE.constraints;
+    const map = {
+      ...PRODUCT_MAP_FIXTURE,
+      constraints: [
+        { ...first, openChanges: [{ ...change, title: "Gateway rule tightened" }] },
+        second,
+      ],
+    };
+    const el = mount(h(ProductView, { map }));
+
+    const withChange = el.querySelector(`[data-constraint-id="${first.id}"]`);
+    expect(withChange?.querySelectorAll(".pm-overlay")).toHaveLength(1);
+    expect(withChange?.querySelector(".pm-overlay-title")?.textContent).toBe("Gateway rule tightened");
+
+    const without = el.querySelector(`[data-constraint-id="${second.id}"]`);
+    expect(without?.querySelector(".pm-overlay-none")).not.toBeNull();
+  });
+
   // Counted from the fixture by hand, not from productTotals: asserting the
   // view against the same function the view calls would pass for any value
   // that function returned, including a wrong one.
@@ -268,14 +289,33 @@ describe("capability ordering", () => {
     const totals = productTotals({
       areas: [{ id: "a", slug: "a", title: "A", capabilities: [row({ health: "defective" })], openChangeIds: [] }],
       constraints: [
-        { id: "c1", title: "C1", health: "defective", appliesTo: "all" },
-        { id: "c2", title: "C2", health: "ok", appliesTo: "all" },
+        { id: "c1", title: "C1", health: "defective", appliesTo: "all", openChanges: [] },
+        { id: "c2", title: "C2", health: "ok", appliesTo: "all", openChanges: [] },
       ],
     });
 
     expect(totals.defective).toBe(2);
     // The capability count stays a capability count.
     expect(totals.capabilities).toBe(1);
+  });
+
+  it("counts an open change whose only reference is a top-level constraint", () => {
+    // A top-level constraint sits under no area: no area set or capability overlay holds the change.
+    const change = { id: "ch-con", title: "Tighten", stage: "ready" as const };
+    const shared = { id: "ch-shared", title: "Shared", stage: "ready" as const };
+    const totals = productTotals({
+      areas: [{
+        id: "a", slug: "a", title: "A",
+        capabilities: [row({ id: "one", title: "One", openChanges: [shared] })],
+        openChangeIds: ["ch-shared"],
+      }],
+      constraints: [
+        { id: "c1", title: "C1", health: "ok", appliesTo: "all", openChanges: [change, { ...change, delta: "modified" }] },
+        { id: "c2", title: "C2", health: "ok", appliesTo: "all", openChanges: [shared] },
+      ],
+    });
+
+    expect(totals.openChanges).toBe(2);
   });
 
   it("treats revised or defective as needing attention", () => {

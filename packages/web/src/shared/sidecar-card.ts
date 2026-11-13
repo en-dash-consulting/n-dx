@@ -18,6 +18,7 @@ export interface SidecarChangeSetItem {
   description?: string;
   /** Done-when: the item's acceptance criteria. */
   acceptanceCriteria?: string[];
+  tags?: string[];
   priority?: string;
   /** An existing item it goes under. */
   parentId?: string;
@@ -95,12 +96,76 @@ export interface SidecarLink {
   label: string | null;
 }
 
+/** An item's fields an item-edit card can change; a field left out is not edited. */
+export interface SidecarItemEditFields {
+  title?: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  tags?: string[];
+  priority?: "critical" | "high" | "medium" | "low";
+}
+
+/**
+ * An item-edit card: the item, and for each field the call changes its value
+ * when the card was raised (`before`) and the value approval writes (`after`).
+ * Both hold the same keys; the operator's edits replace `after`.
+ */
+export interface SidecarItemEdit {
+  itemId: string;
+  /** The item's title when the card was raised. */
+  itemTitle: string;
+  before: SidecarItemEditFields;
+  after: SidecarItemEditFields;
+}
+
+/**
+ * A status card: the item, its status when the card was raised (`from`), the
+ * proposed status (`to`) and rex's verdict on the move (`rule`, from rex's
+ * transition rule; `message` is rex's own wording when it refuses).
+ */
+export interface SidecarStatusChange {
+  itemId: string;
+  itemTitle: string;
+  from: SidecarItemStatus;
+  to: SidecarItemStatus;
+  /** Conditional policy disclosure, not a dry run or a promise that completion/apply will succeed. */
+  completionPolicy?: "v2";
+  reason?: string;
+  rule: { allowed: true } | { allowed: false; message: string };
+}
+
+/** One option of a choice card. */
+export interface SidecarChoiceOption {
+  label: string;
+  description?: string;
+}
+
+/** The operator's answer to a choice card: the labels picked, and free text from the Other row. */
+export interface SidecarChoiceAnswer {
+  selected: string[];
+  other?: string;
+}
+
+/**
+ * A choice card (`ask_choice`): the agent's question with options to pick
+ * from. `answer` is set once the operator sends one; the card writes nothing.
+ */
+export interface SidecarChoice {
+  question: string;
+  options: SidecarChoiceOption[];
+  multiSelect: boolean;
+  answer?: SidecarChoiceAnswer;
+}
+
+export type SidecarItemStatus ="pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "cancelled" | "deleted";
+
 /** The operator's edit of one item, sent with the approval. */
 export interface SidecarChangeSetEdit {
   index: number;
   title?: string;
   description?: string;
   acceptanceCriteria?: string[];
+  tags?: string[];
 }
 
 /** One choice of a picker an external-call card draws for a property. */

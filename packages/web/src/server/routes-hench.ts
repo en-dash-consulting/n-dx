@@ -103,8 +103,13 @@ import {
   checkTreeConformance,
   resolveStore,
   PRD_TREE_DIRNAME,
+  walkTree,
 } from "./rex-gateway.js";
+import type { V2Tree } from "./rex-gateway.js";
+import { runsAsOneTask, unitRefusal } from "./runnable-units.js";
+import { runnableRowText, withPlannedRowText } from "./runnable-row.js";
 import type {
+  PRDItem,
   PRDDocument,
   ItemTokenTotals,
   ItemDurationTotals,
@@ -138,7 +143,7 @@ import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { checkSaveRunRequest, runConflictBody, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
 import type { SaveRunRequest } from "./task-run-settings.js";
 import { readDiagnosis, type RunDiagnosisSummary } from "./run-diagnosis.js";
-import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type QueuePlan, type RunOptions, type RunMode } from "../shared/index.js";
+import { resetsDeferred, workCommandArgs, checkRunMode, itemTypeOf, MAX_DASHBOARD_ITERATIONS, type QueuePlan, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1104,7 +1109,7 @@ export async function readQueuePlan(
     return { ok: false, failure: `'${cli} work --plan-queue' did not complete: ${detail}` };
   }
   try {
-    return { ok: true, plan: JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))) as QueuePlan };
+    return { ok: true, plan: withPlannedRowText(JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))) as QueuePlan) };
   } catch {
     return { ok: false, failure: `'${cli} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}` };
   }
@@ -1950,6 +1955,25 @@ export function openTaskBlockers(ctx: ServerContext, taskId: string): BlockerSum
   return items && task ? describeBlockers(items, task).filter((b) => b.status !== "completed") : [];
 }
 
+/**
+ * What a work card names: the task's title and the change it sits in, or the
+ * change's own title when it has no tasks and runs as one task. Null when the
+ * PRD does not know the id. A v1 tree has no change, so only the title.
+ */
+export function describeRunnable(ctx: ServerContext, taskId: string): string | null {
+  const items = loadPRDForExecute(ctx)?.items as PRDItem[] | undefined;
+  if (!items) return null;
+  for (const { item, parents } of walkTree(items)) {
+    if (item.id !== taskId) continue;
+    return runnableRowText({
+      title: item.title,
+      chain: parents.map((p) => ({ title: p.title, itemType: itemTypeOf(p) })),
+      runsAsOneTask: runsAsOneTask(item),
+    });
+  }
+  return null;
+}
+
 /** The task's `blockedBy` items, with titles; an id no longer in the PRD keeps its id as title. */
 function describeBlockers(
   items: Array<Record<string, unknown>>,
@@ -2165,6 +2189,9 @@ async function judgeExecuteRequest(
 
   const task = findPRDItem(items, taskId);
   if (!task) return refused(404, { error: `Task "${taskId}" not found in PRD` });
+
+  const eligibilityRefusal = unitRefusal(items as unknown as PRDItem[], doc.product as V2Tree["product"] | undefined)(task as unknown as PRDItem);
+  if (eligibilityRefusal) return refused(400, { error: eligibilityRefusal, taskId });
 
   // Validate task is actionable
   const status = task.status as string;

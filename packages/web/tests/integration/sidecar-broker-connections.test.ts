@@ -77,7 +77,7 @@ async function startDashboard(connections?: Record<string, unknown>, options: { 
   const dir = join(root, ".hench", "sidecar");
   const ctx: ServerContext = { projectDir: root, svDir: join(root, ".sourcevision"), rexDir: join(root, ".rex"), dev: false };
   const connect = sidecarSessionConnect(dir, (id) => sidecarBrokerEndpoint(ctx, id));
-  const registry = new SidecarSessionRegistry({ dir, connect: (record) => ({ ...connect(record), spawn: holdingSpawn }) });
+  const registry = new SidecarSessionRegistry({ dir, connect: async (record) => ({ ...await connect(record), spawn: holdingSpawn }) });
   broker = createAnnouncingBroker(dir, () => {});
   server = await startRouteTestServer((req, res) => {
     if (handleRequestSecurity(req, res, { token: TOKEN, scopedCredential: isSidecarBrokerRequest })) return true;
@@ -118,12 +118,15 @@ async function sessionClient(): Promise<{ id: string; client: Client }> {
   });
   expect(created.status).toBe(201);
   const { id } = (await created.json()).session as { id: string };
+  const previousSpawns = configPaths.length;
   const turn = await fetch(`${server.baseUrl}/api/sidecar/sessions/${id}/turns`, {
     method: "POST",
     headers: { ...auth, "Content-Type": "application/json" },
     body: JSON.stringify({ prompt: "go" }),
   });
   expect(turn.status).toBe(202);
+  // Accepted is not spawned: config loading can still be in flight.
+  await expect.poll(() => configPaths.length).toBe(previousSpawns + 1);
   const config = JSON.parse(readFileSync(configPaths.at(-1)!, "utf-8")) as {
     mcpServers: Record<string, { url: string; headers: Record<string, string> }>;
   };

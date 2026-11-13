@@ -61,6 +61,9 @@ type Raw = Record<string, unknown>;
 
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === "string");
 
+/** Tags trimmed, blanks dropped, duplicates removed. */
+const cleanTags = (tags: string[]): string[] => [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
+
 /** One proposed item's own fields, or why they cannot be read. */
 function readItem(raw: unknown, n: number): (Omit<SidecarChangeSetItem, "type" | "duplicate"> & { type?: string }) | string {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return `item ${n} is not an object`;
@@ -70,6 +73,7 @@ function readItem(raw: unknown, n: number): (Omit<SidecarChangeSetItem, "type" |
     if (r[key] !== undefined && typeof r[key] !== "string") return `item ${n}: ${key} must be a string`;
   }
   if (r.acceptanceCriteria !== undefined && !isStrings(r.acceptanceCriteria)) return `item ${n}: acceptanceCriteria must be a list of strings`;
+  if (r.tags !== undefined && !isStrings(r.tags)) return `item ${n}: tags must be a list of strings`;
   if (r.parent !== undefined && !(Number.isInteger(r.parent) && (r.parent as number) >= 0 && (r.parent as number) < n - 1)) {
     return `item ${n}: parent must be the index of an earlier item`;
   }
@@ -77,11 +81,13 @@ function readItem(raw: unknown, n: number): (Omit<SidecarChangeSetItem, "type" |
   if (typeof r.priority === "string" && !isPriority(r.priority)) return `item ${n}: unknown priority "${String(r.priority)}"`;
   const description = typeof r.description === "string" && r.description.trim() ? r.description : undefined;
   const criteria = isStrings(r.acceptanceCriteria) ? r.acceptanceCriteria.filter((c) => c.trim()) : [];
+  const tags = isStrings(r.tags) ? cleanTags(r.tags) : [];
   return {
     title: r.title.trim(),
     ...(typeof r.type === "string" && { type: r.type }),
     ...(description && { description }),
     ...(criteria.length > 0 && { acceptanceCriteria: criteria }),
+    ...(tags.length > 0 && { tags }),
     ...(typeof r.priority === "string" && { priority: r.priority }),
     ...(typeof r.parentId === "string" && { parentId: r.parentId }),
     ...(r.parent !== undefined && { parent: r.parent as number }),
@@ -201,6 +207,12 @@ export function applyChangeSetEdits(changeSet: SidecarChangeSet, edits: unknown)
       if (criteria.length > 0) item.acceptanceCriteria = criteria;
       else delete item.acceptanceCriteria;
     }
+    if (edit.tags !== undefined) {
+      if (!isStrings(edit.tags)) return `item ${edit.index! + 1}: tags must be a list of strings`;
+      const tags = cleanTags(edit.tags);
+      if (tags.length > 0) item.tags = tags;
+      else delete item.tags;
+    }
   }
   return { ...changeSet, items };
 }
@@ -259,6 +271,7 @@ async function writeV1(ctx: ServerContext, changeSet: SidecarChangeSet): Promise
       if (item.description) node.description = item.description;
       if (item.priority && isPriority(item.priority)) node.priority = item.priority;
       if (item.acceptanceCriteria) node.acceptanceCriteria = item.acceptanceCriteria;
+      if (item.tags) node.tags = item.tags;
       if (!parentId) doc.items.push(node);
       else if (!insertChild(doc.items, parentId, node)) throw new Error(`a ${item.type} cannot go under "${parentId}"`);
     });
@@ -275,6 +288,7 @@ async function writeV2(ctx: ServerContext, changeSet: SidecarChangeSet): Promise
       title: item.title,
       description: item.description,
       acceptanceCriteria: item.acceptanceCriteria,
+      tags: item.tags,
       priority: item.priority && isPriority(item.priority) ? item.priority : undefined,
     });
     const added = addChangeNode(model.tree, { type: "change", ...fields(change) }, { now });

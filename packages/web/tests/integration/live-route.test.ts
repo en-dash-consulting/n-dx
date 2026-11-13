@@ -264,6 +264,8 @@ describe("GET /api/live", () => {
     const live = await fetchLive();
     expect(live.queue.next.map((t) => t.id)).toEqual(["next-1"]);
     expect(live.queue.next[0]?.epicChain.map((l) => l.id)).toEqual(["epic-1", "feature-1"]);
+    // A v1 tree has no change: the row keeps its bare title.
+    expect(live.queue.next[0]?.rowText).toBe("Next task");
     expect(live.machine.worktrees).toEqual({ total: 2, withLiveRun: 1 });
     expect(live.machine.memory.floorBytes).toBe(1);
     expect(live.machine.memory.belowFloor).toBe(false);
@@ -320,6 +322,12 @@ describe("v2 next work", () => {
       expect(ids).not.toContain("inbox");
       expect(ids).toContain("high");
       expect(ids.indexOf("high")).toBeLessThan(ids.indexOf("low"));
+      // A task-less change runs as one task; a task names the change it sits in.
+      expect(live.queue.next.find((item) => item.id === "high")?.rowText).toBe("High priority · runs as one task");
+      for (const item of live.queue.next.filter((n) => n.epicChain.some((l) => l.itemType === "change"))) {
+        const change = [...item.epicChain].reverse().find((l) => l.itemType === "change")!;
+        expect(item.rowText).toBe(`${item.title} · in ${change.title}`);
+      }
     } finally {
       clearLiveCaches();
       await removeTempDir(root);

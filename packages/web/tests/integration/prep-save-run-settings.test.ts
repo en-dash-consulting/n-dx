@@ -16,9 +16,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
+import { cpSync, readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 
@@ -30,6 +30,8 @@ import type { PRDDocument, PRDItem } from "../../src/server/rex-gateway.js";
 import type { ServerContext } from "../../src/server/types.js";
 import { handleHenchPrepRoute, savedRunVersion } from "../../src/server/routes-hench-prep.js";
 import { startRouteTestServer, closeRouteTestServer } from "../helpers/server-route-test-support.js";
+
+const V2_FIXTURE = resolve(__dirname, "../../../rex/tests/fixtures/v2-tree");
 
 interface Served {
   server: Server;
@@ -343,5 +345,56 @@ describe("PUT /api/hench/prep/:taskId", () => {
       expect(res.status, JSON.stringify(await res.clone().json())).toBe(200);
       expect(await storedRun(ctx, taskId)).toEqual(block);
     }
+  });
+
+  // On a v2 tree a change with no tasks is the unit `ndx work` runs, so it
+  // carries its own run settings; a change with tasks is worked through them.
+  describe("on a v2 tree", () => {
+    const WITH_TASKS = "c0000000-0000-4000-8000-000000000001";
+    const SOLO = "c0000000-0000-4000-8000-0000000000a1";
+    let v2: ServerContext;
+    let v2Dir: string;
+
+    beforeEach(async () => {
+      v2Dir = realpathSync.native(await mkdtemp(join(tmpdir(), "prep-save-v2-")));
+      const rexDir = join(v2Dir, ".rex");
+      cpSync(V2_FIXTURE, rexDir, { recursive: true });
+      await mkdir(join(rexDir, "changes", "solo-change"), { recursive: true });
+      await writeFile(join(rexDir, "changes", "solo-change", "index.md"), [
+        "---",
+        `id: "${SOLO}"`,
+        'type: "change"',
+        'title: "Solo change"',
+        'slug: "solo-change"',
+        'intent: "Small enough to run as one task."',
+        "---",
+        "",
+      ].join("\n"));
+      await writeFile(join(v2Dir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+      v2 = { projectDir: v2Dir, svDir: join(v2Dir, ".sourcevision"), rexDir, dev: false };
+    });
+
+    afterEach(async () => {
+      await rm(v2Dir, { recursive: true, force: true });
+    });
+
+    it("saves run settings on a change that runs as one task", async () => {
+      const port = await open(v2);
+      const res = await save(port, { run: { tier: "heavy" }, version: "none" }, SOLO);
+
+      expect(res.status).toBe(200);
+      const stored = await (await resolveStore(v2.rexDir)).getItem(SOLO);
+      expect(stored?.run).toEqual({ tier: "heavy" });
+    });
+
+    it("refuses a change with tasks, naming why", async () => {
+      const port = await open(v2);
+      const before = hashTree(v2.rexDir);
+      const res = await save(port, { run: { tier: "heavy" }, version: "none" }, WITH_TASKS);
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/does not run as one task/);
+      expect(hashTree(v2.rexDir)).toBe(before);
+    });
   });
 });

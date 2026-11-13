@@ -63,7 +63,7 @@ beforeEach(async () => {
   const dir = join(root, ".hench", "sidecar");
   const ctx: ServerContext = { projectDir: root, svDir: join(root, ".sourcevision"), rexDir: join(root, ".rex"), dev: false };
   const connect = sidecarSessionConnect(dir, (id) => sidecarBrokerEndpoint(ctx, id));
-  const registry = new SidecarSessionRegistry({ dir, connect: (record) => ({ ...connect(record), spawn: holdingSpawn }) });
+  const registry = new SidecarSessionRegistry({ dir, connect: async (record) => ({ ...await connect(record), spawn: holdingSpawn }) });
   const broker = createAnnouncingBroker(dir, () => {});
   server = await startRouteTestServer((req, res) => {
     if (handleRequestSecurity(req, res, { token: TOKEN, scopedCredential: isSidecarBrokerRequest })) return true;
@@ -92,12 +92,15 @@ async function runningSession(): Promise<{ id: string; headers: Record<string, s
   });
   expect(created.status).toBe(201);
   const { id } = (await created.json()).session as { id: string };
+  const previousSpawns = configPaths.length;
   const turn = await fetch(`${server.baseUrl}/api/sidecar/sessions/${id}/turns`, {
     method: "POST",
     headers: { ...auth, "Content-Type": "application/json" },
     body: JSON.stringify({ prompt: "go" }),
   });
   expect(turn.status).toBe(202);
+  // Wait for this session's spawn, rather than reading a prior session's config.
+  await expect.poll(() => configPaths.length).toBe(previousSpawns + 1);
   const text = readFileSync(configPaths.at(-1)!, "utf-8");
   const headers = JSON.parse(text).mcpServers["ndx-sidecar"].headers as Record<string, string>;
   return { id, headers, text };

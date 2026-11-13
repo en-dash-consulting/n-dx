@@ -22,6 +22,7 @@
  * fails to compile if the two drift.
  */
 
+import { indexedUnitRefusal } from "../runnable-units.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
@@ -85,6 +86,8 @@ export interface ConstraintRowWire {
   statement?: string;
   health: CapabilityHealthWire;
   appliesTo: "all" | string[];
+  /** Open changes that touch or amend the constraint; a top-level one sits in no area's openChangeIds. */
+  openChanges: OpenChangeOverlayWire[];
 }
 
 export interface AreaSectionWire {
@@ -134,6 +137,8 @@ export interface ChangeRowWire {
   touches: Array<{ id: string; title: string }>;
   taskCount: number;
   completedTaskCount: number;
+  /** No live tasks and no nested change: `ndx work` runs the change as one unit (rex's `changeWorkShape`). */
+  runsAsOneTask?: boolean;
   /** No acceptance criteria on the change, or on one of its open tasks. */
   criteriaGap: boolean;
   /** Distinct blockers, on the change or its open tasks, that are not completed. */
@@ -499,6 +504,7 @@ export function buildProductMap(tree: V2Tree, header: Record<string, unknown> | 
         ...(row.statement ? { statement: row.statement } : {}),
         health: row.health,
         appliesTo: appliesTo === undefined || appliesTo === "all" ? "all" : appliesTo.map((ref) => titleOf(index, ref).title),
+        openChanges: overlays.get(row.id) ?? [],
       });
     } else if (area) {
       area.capabilities.push({
@@ -640,6 +646,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
   const changes = changesOf(index);
   const areasOf = areasByChange(index, openChangesByArea(index, changes));
+  const refusalFor = indexedUnitRefusal(index);
   return changes
     .filter((change) => isOpenChange(change) || isAppliedChange(change))
     .map((change) => {
@@ -671,6 +678,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         touches: (change.touches ?? []).map((ref) => titleOf(index, ref)),
         taskCount: tasks.length,
         completedTaskCount: tasks.filter((t) => t.status === "completed").length,
+        ...(refusalFor(change.id) === null ? { runsAsOneTask: true } : {}),
         ...gapOf(index, change, tasks),
         ...(areas ? { areas } : {}),
       };

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   claudeSessionDriver,
@@ -65,23 +67,70 @@ describe("claude turn spawn", () => {
 });
 
 describe("codex turn spawn", () => {
-  // `exec resume` rejects the sandbox and approval flags, but config is read
-  // per process: the overrides that blank the Codex key in the agent's
-  // commands must ride on every resumed turn too.
-  it("ignores fork and drops policy flags on resume, keeping the key-blanking overrides", () => {
+  // `exec resume` rejects --sandbox, but config is read per process: the
+  // policy overrides and the ones that blank the Codex key in the agent's
+  // commands must ride on every resumed turn.
+  it("ignores fork and sends the resume policy, not the fresh flags, on resume", () => {
+    const resumePolicyFlags = compileCodexPolicyFlags(
+      { ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only" },
+      { resume: true },
+    );
     const { args } = codexSessionDriver.turnSpawn({
       systemPrompt: "",
       prompt: "hi",
       model: "m",
       resume: { sessionId: "t", fork: true },
-      codex: { policyFlags: ["-s", "read-only"] },
+      codex: { policyFlags: ["-s", "read-only"], resumePolicyFlags },
     });
     expect(args).toEqual([
       "exec", "resume", "t", "--json", "--skip-git-repo-check",
-      ...codexShellEnvFlags(),
+      ...resumePolicyFlags,
       "-m", "m", "-",
     ]);
-    expect(args).not.toContain("read-only");
+    expect(args).toContain('sandbox_mode="read-only"');
+    expect(args).not.toContain("-s");
+    expect(args).not.toContain("--sandbox");
+  });
+
+  it("keeps the key-blanking overrides on a resume with no resume policy", () => {
+    const { args } = codexSessionDriver.turnSpawn({
+      systemPrompt: "",
+      prompt: "hi",
+      resume: { sessionId: "t" },
+      codex: { policyFlags: ["-s", "read-only"] },
+    });
+    expect(args).toEqual(["exec", "resume", "t", "--json", "--skip-git-repo-check", ...codexShellEnvFlags(), "-"]);
+  });
+
+  it("puts config flags right after exec and exec resume, and blanks the hidden names, on every turn", () => {
+    const codex = {
+      policyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY),
+      resumePolicyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true }),
+      configFlags: ["--ignore-user-config", "-c", "features.apps=false"],
+      hiddenEnv: ["NDX_X"],
+    };
+    const blanked = codexShellEnvFlags(["NDX_X"]);
+    const fresh = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", codex }).args;
+    expect(fresh.slice(0, 4)).toEqual(["exec", "--ignore-user-config", "-c", "features.apps=false"]);
+    expect(fresh.slice(4, 4 + codex.policyFlags.length - codexShellEnvFlags().length + blanked.length)).toEqual([
+      ...codex.policyFlags.slice(0, -codexShellEnvFlags().length), ...blanked,
+    ]);
+    const resumed = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", resume: { sessionId: "t" }, codex }).args;
+    expect(resumed.slice(0, 6)).toEqual(["exec", "resume", "--ignore-user-config", "-c", "features.apps=false", "t"]);
+    expect(resumed.join(" ")).toContain(blanked.join(" "));
+    expect(resumed.join(" ")).toContain('sandbox_mode="workspace-write"');
+  });
+
+  it("reads turn config flags afresh for each turn and puts them after the config flags", () => {
+    let calls = 0;
+    const codex = {
+      configFlags: ["--ignore-user-config"],
+      turnConfigFlags: () => ["-c", `mcp_servers.rex${++calls}.enabled=false`],
+    };
+    const fresh = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", codex }).args;
+    expect(fresh.slice(0, 4)).toEqual(["exec", "--ignore-user-config", "-c", "mcp_servers.rex1.enabled=false"]);
+    const resumed = codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", resume: { sessionId: "t" }, codex }).args;
+    expect(resumed.slice(0, 6)).toEqual(["exec", "resume", "--ignore-user-config", "-c", "mcp_servers.rex2.enabled=false", "t"]);
   });
 
   // startVendorSession is public: a caller whose policy flags lack the
@@ -198,10 +247,41 @@ describe("claude tool results", () => {
   it("turns a user line into one tool_result per block, each naming its call", () => {
     const events = claudeSessionDriver.parseLineEvents(twoResults, 2);
     expect(events.map((e) => [e.type, e.turn, e.toolResult])).toEqual([
-      ["tool_result", 2, { tool: "", output: "     1\tconst a = 1;", durationMs: 0, id: "toolu_01A" }],
-      ["tool_result", 2, { tool: "", output: "line one\nline two", durationMs: 0, id: "toolu_01B" }],
+      ["tool_result", 2, { tool: "", output: "     1\tconst a = 1;", durationMs: 0, id: "toolu_01A", isError: false }],
+      ["tool_result", 2, { tool: "", output: "line one\nline two", durationMs: 0, id: "toolu_01B", isError: false }],
     ]);
     expect(claudeSessionDriver.parseLine(twoResults, 2)?.toolResult?.id).toBe("toolu_01A");
+  });
+
+  it("flags a result from is_error, and keeps the [error] prefix only when it is true", () => {
+    const line = (isError: boolean, text: string) => JSON.stringify({
+      type: "user",
+      message: { role: "user", content: [{ tool_use_id: "toolu_E", type: "tool_result", is_error: isError, content: text }] },
+    });
+    expect(claudeSessionDriver.parseLineEvents(line(true, "boom"), 1)[0].toolResult).toEqual({
+      tool: "", output: "[error] boom", durationMs: 0, id: "toolu_E", isError: true,
+    });
+    // A successful call whose output happens to start with "[error] " is still a success.
+    expect(claudeSessionDriver.parseLineEvents(line(false, "[error] printed"), 1)[0].toolResult).toEqual({
+      tool: "", output: "[error] printed", durationMs: 0, id: "toolu_E", isError: false,
+    });
+  });
+
+  it("treats omitted canonical is_error as success even for literal [error] output (synthetic)", () => {
+    const line = JSON.stringify({ type: "user", message: { role: "user", content: [
+      { type: "tool_result", tool_use_id: "toolu_A", content: "[error] printed" },
+    ] } });
+    expect(claudeSessionDriver.parseLineEvents(line, 2)[0]).toMatchObject({
+      vendor: "claude", toolResult: { id: "toolu_A", output: "[error] printed", isError: false },
+    });
+  });
+
+  it("flags a top-level tool_result from is_error when present", () => {
+    const top = (extra: Record<string, unknown>) =>
+      claudeSessionDriver.parseLine(JSON.stringify({ type: "tool_result", output: "out", ...extra }), 1)?.toolResult;
+    expect(top({ is_error: true })?.isError).toBe(true);
+    expect(top({ is_error: false })?.isError).toBe(false);
+    expect(top({})).not.toHaveProperty("isError");
   });
 
   it("caps a result's output like any tool output", () => {
@@ -222,5 +302,89 @@ describe("claude tool results", () => {
     expect(claudeSessionDriver.parseLineEvents(call, 1)).toHaveLength(1);
     expect(codexSessionDriver.parseLineEvents(JSON.stringify({ type: "summary", result: "ok" }), 1)).toHaveLength(1);
     expect(codexSessionDriver.parseLineEvents("", 1)).toEqual([]);
+  });
+});
+
+describe("codex tool results", () => {
+  // Modelled on the real fixture packages/hench/tests/fixtures/codex-file-change-real.jsonl;
+  // recorded with codex-cli 0.148.0-alpha.15. All variants here are synthetic,
+  // including function_call_output; they do not establish current CLI output.
+  const commandItem = (fields: Record<string, unknown>) => JSON.stringify({
+    type: "item.completed",
+    item: { id: "item_1", type: "command_execution", command: "bash -lc 'false'", aggregated_output: "out", ...fields },
+  });
+  const flag = (fields: Record<string, unknown>) => codexSessionDriver.parseLine(commandItem(fields), 1)?.toolResult;
+
+  it("flags a command that exited non-zero or failed", () => {
+    expect(flag({ exit_code: 1, status: "failed" })?.isError).toBe(true);
+    expect(flag({ exit_code: 2 })?.isError).toBe(true);
+    expect(flag({ status: "failed" })?.isError).toBe(true);
+  });
+
+  it("marks a command that completed with exit code 0 as not failed", () => {
+    expect(flag({ exit_code: 0, status: "completed" })).toEqual({ tool: "shell", output: "out", durationMs: 0, isError: false });
+  });
+
+  it("leaves the flag unset when the item carries neither status nor exit code", () => {
+    expect(flag({})).not.toHaveProperty("isError");
+  });
+
+  it("leaves function_call_output unflagged: it carries no status", () => {
+    const line = JSON.stringify({ type: "function_call_output", output: "x" });
+    expect(codexSessionDriver.parseLine(line, 1)?.toolResult).not.toHaveProperty("isError");
+  });
+
+  it.each([
+    commandItem({ aggregated_output: "[error] printed" }),
+    JSON.stringify({ type: "function_call_output", output: "[error] printed" }),
+  ])("preserves Codex identity and unknown status for literal error text: %s", (line) => {
+    const event = codexSessionDriver.parseLine(line, 1);
+    expect(event).toMatchObject({ vendor: "codex", toolResult: { output: "[error] printed" } });
+    expect(event?.toolResult).not.toHaveProperty("isError");
+  });
+});
+
+describe("codex mcp tool calls", () => {
+  // Verbatim `codex exec --json` lines from codex-cli 0.164.0-alpha.11.1
+  // (2026-11-06), in this order: success started, success completed, tool
+  // error result, transport failure, timeout.
+  const [started, success, toolError, transport, timeout] = readFileSync(
+    fileURLToPath(new URL("../fixtures/codex-mcp-tool-call-0.164.0-alpha.11.1.jsonl", import.meta.url)),
+    "utf-8",
+  ).split("\n").filter(Boolean);
+  const result = (line: string) => codexSessionDriver.parseLine(line, 1)?.toolResult;
+  const tool = "mcp__ndx-sidecar__propose_status";
+  const callError = "tool call error: tool call failed for `ndx-sidecar/propose_status`\n\nCaused by:\n    ";
+
+  it("maps item.started to a tool use named from the event's server and tool", () => {
+    const event = codexSessionDriver.parseLine(started, 1);
+    expect(event?.type).toBe("tool_use");
+    expect(event?.toolCall).toEqual({ tool, input: { mode: "success" }, id: "item_1" });
+  });
+
+  it("maps a completed call to a successful result with its text content", () => {
+    expect(result(success)).toEqual({ tool, output: "probe accepted", durationMs: 0, id: "item_1", isError: false });
+  });
+
+  it("flags a tool error result from status alone: error is null", () => {
+    expect(result(toolError)).toEqual({ tool, output: "probe rejected", durationMs: 0, id: "item_2", isError: true });
+  });
+
+  it("flags a transport failure and reports error.message", () => {
+    const r = result(transport);
+    expect(r?.tool).toBe(tool);
+    expect(r?.isError).toBe(true);
+    expect(r?.output.startsWith(`${callError}Transport send error: `)).toBe(true);
+    expect(r?.output.endsWith("error sending request for url (http://127.0.0.1:58821/mcp)")).toBe(true);
+  });
+
+  it("flags a timeout and reports error.message", () => {
+    expect(result(timeout)).toEqual({
+      tool,
+      output: `${callError}timed out awaiting tools/call after 1000ms`,
+      durationMs: 0,
+      id: "item_1",
+      isError: true,
+    });
   });
 });

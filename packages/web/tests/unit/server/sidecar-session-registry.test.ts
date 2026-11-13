@@ -303,7 +303,7 @@ describe("vendor environment", () => {
   }
 
   async function envOfTurn(): Promise<NodeJS.ProcessEnv> {
-    const reg = registry((record) => ({ ...resolveSidecarSessionEnv(record.worktree), spawn: fakeSpawn }));
+    const reg = registry(async (record) => ({ ...await resolveSidecarSessionEnv(record.worktree), spawn: fakeSpawn }));
     const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
     await reg.sendTurn(id, "one");
     const env = spawned[0].env;
@@ -319,7 +319,7 @@ describe("vendor environment", () => {
 
   it("drops a repository guard.env.allow while the checkout is untrusted", async () => {
     writeHenchConfig({ allow: [SECRET] });
-    expect(resolveSidecarSessionEnv(root).envPolicy?.allow).toBeUndefined();
+    expect((await resolveSidecarSessionEnv(root)).envPolicy?.allow).toBeUndefined();
     expect((await envOfTurn())[SECRET]).toBeUndefined();
   });
 
@@ -329,9 +329,141 @@ describe("vendor environment", () => {
     expect((await envOfTurn())[SECRET]).toBe("secret");
   });
 
-  it("merges the .n-dx.json hench override over .hench/config.json", () => {
+  it("merges the .n-dx.json hench override over .hench/config.json", async () => {
     writeHenchConfig({ deny: ["FROM_HENCH_*"] });
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ hench: { guard: { env: { deny: ["FROM_NDX_*"] } } } }));
-    expect(resolveSidecarSessionEnv(root).envPolicy?.deny).toEqual(["FROM_NDX_*"]);
+    expect((await resolveSidecarSessionEnv(root)).envPolicy?.deny).toEqual(["FROM_NDX_*"]);
+  });
+});
+
+describe("MCP backstop", () => {
+  /**
+   * A Codex stand-in that starts an MCP call on `server`, then waits until it
+   * is stopped (recording the signal), or exits by itself when `server` is the broker.
+   */
+  function codexCalling(server: string, killed: string[]): NonNullable<VendorSessionOptions["spawn"]> {
+    return (_binary, args, opts) => {
+      spawned.push({ args, env: opts.env });
+      const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+      const stdout = new PassThrough();
+      const exit = (signal: NodeJS.Signals | null) => {
+        Object.assign(child, signal ? { signalCode: signal } : { exitCode: 0 });
+        stdout.end();
+        setImmediate(() => {
+          child.emit("exit", signal ? null : 0, signal);
+          child.emit("close", signal ? null : 0, signal);
+        });
+      };
+      Object.assign(child, {
+        stdin: new PassThrough(), stdout, stderr: new PassThrough(), pid: undefined, exitCode: null, signalCode: null,
+        kill: (signal: NodeJS.Signals = "SIGTERM") => {
+          killed.push(signal);
+          exit(signal);
+          return true;
+        },
+      });
+      setImmediate(() => {
+        stdout.write(JSON.stringify({ type: "thread.started", thread_id: "t-1" }) + "\n");
+        stdout.write(JSON.stringify({
+          type: "item.started",
+          item: { id: "i-1", type: "mcp_tool_call", server, tool: "update_task_status", arguments: { id: "x" }, status: "in_progress" },
+        }) + "\n");
+        if (server === "ndx-sidecar") setImmediate(() => exit(null));
+      });
+      return child as unknown as ChildProcess;
+    };
+  }
+
+  it("stops a turn that uses an MCP server other than ndx-sidecar and records why in the transcript and the result", async () => {
+    const killed: string[] = [];
+    const reg = registry(() => ({ spawn: codexCalling("rex", killed) }));
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "codex" });
+
+    const result = await reg.sendTurn(id, "go");
+
+    expect(killed).toEqual(["SIGTERM"]);
+    expect(result.status).toBe("failed");
+    expect(result.error).toMatch(/MCP server "rex".*only ndx-sidecar/);
+    expect(reg.isRunning(id)).toBe(false);
+    const failure = reg.readFrames(id).find((f) => f.type === "event" && f.event.type === "failure");
+    expect(failure?.type === "event" && failure.event.failure?.message).toBe(result.error);
+  });
+
+  it("lets a turn that uses only ndx-sidecar run to its end", async () => {
+    const killed: string[] = [];
+    const reg = registry(() => ({ spawn: codexCalling("ndx-sidecar", killed) }));
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "codex" });
+
+    const result = await reg.sendTurn(id, "go");
+
+    expect(killed).toEqual([]);
+    expect(result.status).not.toBe("failed");
+    expect(reg.readFrames(id).some((f) => f.type === "event" && f.event.type === "failure")).toBe(false);
+  });
+});
+
+
+describe("asynchronous connection setup", () => {
+  function heldConnection() {
+    let release!: () => void;
+    const ready = new Promise<void>((resolve) => { release = resolve; });
+    return { release: () => release(), connect: async () => { await ready; return { spawn: fakeSpawn }; } };
+  }
+
+  it("honors Stop before connection setup finishes, then allows another turn", async () => {
+    const held = heldConnection();
+    const reg = registry(held.connect);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    const pending = reg.sendTurn(id, "stop during config load");
+    expect(reg.isRunning(id)).toBe(true);
+    expect(await reg.interrupt(id)).toBe(true);
+    held.release();
+    expect((await pending).status).toBe("interrupted");
+    expect(spawned).toHaveLength(0);
+    expect((await reg.sendTurn(id, "try again")).status).toBe("completed");
+  });
+
+  it("does not reopen a session ended during setup", async () => {
+    const held = heldConnection();
+    const reg = registry(held.connect);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    const pending = reg.sendTurn(id, "end during config load");
+    await reg.end(id);
+    held.release();
+    expect((await pending).status).toBe("interrupted");
+    expect(spawned).toHaveLength(0);
+    await expect(reg.sendTurn(id, "again")).rejects.toThrow("has ended");
+  });
+
+  it("keeps the original lens spend and carries a re-lens made during setup next turn", async () => {
+    const held = heldConnection();
+    const spends: Array<string | undefined> = [];
+    const packets: Array<string | undefined> = [];
+    const reg = new SidecarSessionRegistry({
+      dir, connect: held.connect,
+      onTurnSpend: ({ record }) => spends.push(record.lens),
+      context: { ceiling: () => Infinity, ledger: () => [], packet: async (record) => { packets.push(record.lens); return record.lens; } },
+    });
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "plan" });
+    const pending = reg.sendTurn(id, "one");
+    await new Promise((resolve) => setImmediate(resolve));
+    reg.update(id, { lens: "describe" });
+    held.release();
+    await pending;
+    await reg.sendTurn(id, "two");
+    expect(spends).toEqual(["plan", "describe"]);
+    expect(packets).toEqual(["plan", "describe"]);
+  });
+
+  it("clears a failed connection setup so the next turn can retry", async () => {
+    let calls = 0;
+    const reg = registry(async () => {
+      if (++calls === 1) throw new Error("config unavailable");
+      return { spawn: fakeSpawn };
+    });
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await expect(reg.sendTurn(id, "one")).rejects.toThrow("config unavailable");
+    expect(reg.isRunning(id)).toBe(false);
+    expect((await reg.sendTurn(id, "two")).status).toBe("completed");
   });
 });

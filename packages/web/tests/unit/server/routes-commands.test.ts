@@ -1934,7 +1934,7 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
 
   beforeEach(async () => {
     execMock.mockReset();
-    // The auth result is cached module-wide for the server's lifetime;
+    // Auth results are cached module-wide for a bounded interval;
     // tests must not see each other's cached verdicts.
     invalidateAuthCheckCache();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-tier3-"));
@@ -2066,6 +2066,41 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     const after = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`, { method: "POST" })).json();
     expect(execMock).toHaveBeenCalledTimes(2);
     expect(after.ok).toBe(true);
+  });
+
+  it("a vendor change made on disk, not through the dashboard, drops the cached verdict", async () => {
+    const configFile = join(tmpDir, ".n-dx.json");
+    await writeFile(configFile, JSON.stringify({ llm: { vendor: "claude" } }));
+    execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
+    execMock.mockResolvedValueOnce({ stdout: "", stderr: "codex: not logged in", error: new Error("exit 1") });
+    const authUrl = `http://127.0.0.1:${port}/api/commands/auth`;
+
+    const first = await (await fetch(authUrl, { method: "POST" })).json();
+    expect(first.ok).toBe(true);
+
+    // What `ndx config llm.vendor codex .` does: no PUT /api/llm/config.
+    await writeFile(configFile, JSON.stringify({ llm: { vendor: "codex" } }));
+
+    expect(await (await fetch(`${authUrl}/cached`)).json()).toEqual({ cached: false });
+    const second = await (await fetch(authUrl, { method: "POST" })).json();
+    expect(execMock).toHaveBeenCalledTimes(2);
+    expect(second).toMatchObject({ ok: false, cached: false });
+  });
+
+  it("an auth-mode change in .n-dx.local.json for the same vendor drops the cached verdict", async () => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+    execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
+    execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
+    const authUrl = `http://127.0.0.1:${port}/api/commands/auth`;
+
+    expect((await (await fetch(authUrl, { method: "POST" })).json()).ok).toBe(true);
+
+    // What `ndx config llm.claude.auth api .` writes: the vendor is unchanged.
+    await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { auth: "api" } } }));
+
+    expect(await (await fetch(`${authUrl}/cached`)).json()).toEqual({ cached: false });
+    expect((await (await fetch(authUrl, { method: "POST" })).json()).ok).toBe(false);
+    expect(execMock).toHaveBeenCalledTimes(2);
   });
 
   it("validate-tokens runs the hench check and returns its output", async () => {

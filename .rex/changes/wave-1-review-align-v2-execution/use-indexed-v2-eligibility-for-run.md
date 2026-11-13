@@ -1,0 +1,15 @@
+---
+id: "f779a309-d05c-44ff-8b8f-749419cf2f83"
+type: "task"
+title: "Use indexed v2 eligibility for run controls and task settings"
+slug: "use-indexed-v2-eligibility-for-run"
+description: "PR #1002 review comments 4554546902, 4554546912, 4508160465: https://github.com/en-dash-consulting/n-dx/pull/1002#discussion_r4554546902 https://github.com/en-dash-consulting/n-dx/pull/1002#discussion_r4554546912 https://github.com/en-dash-consulting/n-dx/pull/1002#discussion_r4508160465. Cross-reference 99df935b-e894-41c2-983b-7df37ccbdfb3. Approved by the user on 2026-11-12 for the existing seven-PR Wave 1 stack, rebased on main 6f72df28b0319174cb600eb67d94327d0377ed7f. Execute this repair through actual checkout-local ndx work, not direct coordinator edits. Use the configured absolute bundled Codex CLI, mandatory Codex self-review and test gate, scoped patch changesets where applicable, and an atomic code/PRD completion commit with a bare N-DX-Item trailer. Preserve user pins, other work, experimental defaults and unrelated behavior. Do not merge PRs, repair parked Wave 2, duplicate completed findings 8/2/3, or implement unrelated parity work. Identify scripted/mocked fixtures separately from live CLI/browser evidence."
+acceptanceCriteria:
+  - "Held Inbox changes, applied or closed changes, containers and v2 subtasks neither advertise independent execution nor accept doomed launches/settings writes. Explain placement, closure or parent-task requirements in diagnostics."
+  - "Preserve Rex's empty-product Inbox exception through awaitsPlacement, placed task-less changes, ordinary and deferred task semantics, explicit-versus-autonomous selection differences and v1 task/subtask behavior."
+  - "Preserve saved model pins and defaults, transactional saves and version checks. Cover served PRD eligibility flags, change rows, detail controls, preparation, execution and check paths using negative cases and positive controls; refusals do not write or spawn."
+  - "Extend the completed shared task-less-change implementation rather than duplicating it. Report HTTP/unit/browser evidence at its actual scope."
+priority: "medium"
+run: {"tier":"heavy","models":{"codex":"gpt-6-astra"},"provider":"cli","review":true,"reviewMode":"self","reviewTier":"heavy","reviewModels":{"codex":"gpt-6-astra"},"reviewOptional":false,"skipTestGate":false,"contextNotes":"Approved by the user on 2026-11-12 for the existing seven-PR Wave 1 stack, rebased on main 6f72df28b0319174cb600eb67d94327d0377ed7f. Execute this repair through actual checkout-local ndx work, not direct coordinator edits. Use the configured absolute bundled Codex CLI, mandatory Codex self-review and test gate, scoped patch changesets where applicable, and an atomic code/PRD completion commit with a bare N-DX-Item trailer. Preserve user pins, other work, experimental defaults and unrelated behavior. Do not merge PRs, repair parked Wave 2, duplicate completed findings 8/2/3, or implement unrelated parity work. Identify scripted/mocked fixtures separately from live CLI/browser evidence."}
+source: "ndx-capture"
+---

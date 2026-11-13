@@ -20,7 +20,9 @@
 
 import { resolveVendorCliEnv } from "./child-env.js";
 import type { EnvPolicyConfig } from "./child-env.js";
-import { spawnCli } from "./exec.js";
+import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
+import { resolveCliPath } from "./config.js";
+import { resolveCodexCliPath } from "./codex-cli-provider.js";
 import type { LLMConfig } from "./llm-types.js";
 import type { SpawnCliOptions } from "./exec.js";
 import { terminateProcessTree } from "./process-tree.js";
@@ -32,6 +34,7 @@ import type {
   ClaudeTurnFlags,
   CodexTurnFlags,
   SessionResume,
+  SessionTurnSpawn,
   VendorSessionDriver,
 } from "./vendor-session-driver.js";
 import { vendorSessionDriver } from "./vendor-session-driver.js";
@@ -63,7 +66,7 @@ export interface VendorSessionOptions {
   readonly systemPrompt?: string;
   /** Model override for every turn. */
   readonly model?: string;
-  /** CLI binary path; defaults to the driver's (`claude`, `codex`). */
+  /** CLI binary override; otherwise uses llmConfig's vendor cli_path, then PATH. */
   readonly binary?: string;
   /**
    * Child environment. When omitted, the parent's is filtered through
@@ -73,8 +76,16 @@ export interface VendorSessionOptions {
   readonly env?: NodeJS.ProcessEnv;
   /** The project's `guard.env` policy, applied when {@link env} is omitted. */
   readonly envPolicy?: EnvPolicyConfig;
-  /** LLM config supplying a configured API key when {@link env} is omitted. */
+  /** Trusted LLM config supplying the vendor CLI path and, without {@link env}, authentication. */
   readonly llmConfig?: LLMConfig;
+  /**
+   * Named variables added to the child environment after it is resolved —
+   * values the caller supplies itself (the Sidecar's broker headers), never
+   * ones read from the parent. Widens nothing else: the env policy still
+   * decides every inherited variable. A Codex caller that sets one should
+   * also name it in `codex.hiddenEnv`, so the agent's commands read it empty.
+   */
+  readonly extraEnv?: Readonly<Record<string, string>>;
   readonly claude?: ClaudeTurnFlags;
   readonly codex?: CodexTurnFlags;
   /** Called with each event as it is parsed. */
@@ -159,8 +170,13 @@ function createSession(
   initial: SessionResume | undefined,
 ): VendorSession {
   const spawnImpl = opts.spawn ?? spawnCli;
-  const env = opts.env
+  const binary = opts.binary ?? (driver.vendor === "codex"
+    ? resolveCodexCliPath(opts.llmConfig?.codex)
+    : resolveCliPath(opts.llmConfig?.claude ?? {}));
+  const cliPathKey = `llm.${driver.vendor}.cli_path`;
+  const baseEnv = opts.env
     ?? resolveVendorCliEnv({ ...opts.llmConfig, vendor: driver.vendor }, opts.envPolicy);
+  const env = opts.extraEnv ? { ...baseEnv, ...opts.extraEnv } : baseEnv;
   // One filter for the whole session: message ids are unique per
   // conversation, and a resumed turn may replay none of them.
   const usageFilter = new UsageMessageFilter();
@@ -180,9 +196,10 @@ function createSession(
     });
   }
 
-  function runTurn(prompt: string, turn: number): Promise<SessionTurnResult> {
+  /** The next turn's spawn. A throw (from `codex.turnConfigFlags`) refuses the turn before anything runs. */
+  function turnSpawn(prompt: string): SessionTurnSpawn {
     const resume: SessionResume | undefined = pending ?? (sessionId ? { sessionId } : undefined);
-    const spawnSpec = driver.turnSpawn({
+    return driver.turnSpawn({
       systemPrompt: opts.systemPrompt ?? "",
       prompt,
       model: opts.model,
@@ -190,7 +207,9 @@ function createSession(
       claude: opts.claude,
       codex: opts.codex,
     });
+  }
 
+  function runTurn(spawnSpec: SessionTurnSpawn, turn: number): Promise<SessionTurnResult> {
     return new Promise((resolve) => {
       const events: RuntimeEvent[] = [];
       let tokenUsage: TokenUsage = { input: 0, output: 0 };
@@ -236,7 +255,7 @@ function createSession(
         if (usage) emit(usage);
       };
 
-      const proc = spawnImpl(opts.binary ?? spawnSpec.binary, spawnSpec.args, {
+      const proc = spawnImpl(binary, spawnSpec.args, {
         cwd: opts.cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
@@ -283,7 +302,8 @@ function createSession(
             : "completed";
         const error = status === "failed"
           ? spawnError ?? failure ??
-            (stderr.trim() || `${driver.vendor} exited with code ${exitCode}`)
+            (diagnoseCliNotFound(stderr.trim(), binary, cliPathKey)
+              ?? (stderr.trim() || `${driver.vendor} exited with code ${exitCode}`))
           : undefined;
 
         resolve({
@@ -300,7 +320,7 @@ function createSession(
 
       proc.on("error", (err) => {
         spawnError = (err as NodeJS.ErrnoException).code === "ENOENT"
-          ? `${driver.vendor} CLI not found (${opts.binary ?? spawnSpec.binary})`
+          ? `${driver.vendor} CLI not found: ${diagnoseCliInvocation(binary, cliPathKey).message}`
           : err.message;
         finish(null);
       });
@@ -325,9 +345,10 @@ function createSession(
       if (state === "running") throw new Error("A turn is already running in this session");
       state = "running";
       interrupted = false;
-      turns += 1;
       try {
-        return await runTurn(prompt, turns);
+        const spawnSpec = turnSpawn(prompt);
+        turns += 1;
+        return await runTurn(spawnSpec, turns);
       } finally {
         if (state === "running") state = "idle";
       }

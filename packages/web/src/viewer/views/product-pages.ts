@@ -187,7 +187,8 @@ function ProductMapPage({ onCapabilityChange, initialTab = "map", navigateTo }: 
   }
   if (load.state !== "ready") {
     // A failed map read must not hide the requirements view, which reads its own data.
-    return tab === "requirements" ? h(RequirementsView, null) : h(Pending, { load });
+    return h(ProductTabs, { tab, onTab: setTab },
+      tab === "requirements" ? h(RequirementsView, null) : h(Pending, { load }));
   }
   if (capabilityId && tab === "map") {
     return h(CapabilityFromRoute, {

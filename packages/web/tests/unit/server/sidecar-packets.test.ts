@@ -437,12 +437,13 @@ describe("Describe", () => {
     expect(text).toContain("## Task");
   });
 
-  it("tells the agent to flag vague done-when and give tightened wording as text, not a change set", async () => {
+  it("tells the agent to flag vague done-when and propose the tightened wording on an item-edit card, not a change set", async () => {
     const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
     expect(text).toContain(DESCRIBE_INSTRUCTIONS);
     expect(DESCRIBE_INSTRUCTIONS).toMatch(/flag any that is vague/);
     expect(DESCRIBE_INSTRUCTIONS).toContain("quote it and give the tightened wording in your reply");
-    expect(DESCRIBE_INSTRUCTIONS).toContain("`rex update` or the item editor");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("raise one `propose_item_edit` card for the task with `acceptanceCriteria`");
+    expect(DESCRIBE_INSTRUCTIONS).not.toContain("`rex update` or the item editor");
     expect(DESCRIBE_INSTRUCTIONS).toContain("Do not call `propose_prd_change` for an existing task");
     expect(DESCRIBE_INSTRUCTIONS).not.toContain("change-set card");
   });
@@ -929,7 +930,7 @@ describe("lens registry", () => {
       expect(packet.chars).toBeLessThanOrEqual(6_000);
       expect(packet.text).toContain("Active runs: 1 of 3");
       expect(packet.text).toContain("1 lane from 3 ready tasks.");
-      expect(packet.text).toContain(`Lane 1 (change ch1): ${PLAN.lanes[0].command}`);
+      expect(packet.text).toContain(`Track 1 (change ch1): ${PLAN.lanes[0].command}`);
       expect(packet.text).toContain("t2 Style the button: follows t1 in the same change");
       expect(packet.text).toContain("t9 Migrate the schema: tagged migration: runs cold, on its own");
       expect(packet.text).toContain(GUIDE_INSTRUCTIONS);
@@ -940,9 +941,9 @@ describe("lens registry", () => {
       const plan: QueuePlan = { ...PLAN, lanes: [PLAN.lanes[0], { command: "ndx work --task=t5 --auto .", changeId: "ch2", ownWorktree: true, tasks: [{ id: "t5", title: "Other", reason: "ready" }] }] };
       const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => plan }), NOW);
       if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
-      const note = "Run this lane in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
+      const note = "Run this track in its own worktree: its command targets the current checkout, and two runs in one checkout collide.";
       const lines = result.packet.text.split("\n");
-      const lane2 = lines.findIndex((l) => l.startsWith("Lane 2 (change ch2)"));
+      const lane2 = lines.findIndex((l) => l.startsWith("Track 2 (change ch2)"));
       expect(lines[lane2 + 1]).toBe(`  ${note}`);
       expect(result.packet.text.split(note)).toHaveLength(2);
     });
@@ -951,15 +952,15 @@ describe("lens registry", () => {
       const empty: QueuePlan = { lanes: [], excluded: [], activeRuns: 0, runLimit: 3, summary: "Nothing is ready." };
       const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => empty }), NOW);
       if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
-      expect(result.packet.text).toContain("The ready list is empty: no task is ready to run, so there is no lane to plan and no run-plan card to raise.");
-      expect(GUIDE_INSTRUCTIONS).toMatch(/Raise a run-plan card with `propose_run_plan` only when the plan has at least one lane\. With an empty ready list/);
+      expect(result.packet.text).toContain("The ready list is empty: no task is ready to run, so there is no track to plan and no run-plan card to raise.");
+      expect(GUIDE_INSTRUCTIONS).toMatch(/Raise a run-plan card with `propose_run_plan` only when the plan has at least one track\. With an empty ready list/);
     });
 
     it("with ready tasks but no lane, says there is nothing to start and lists why each was left out", async () => {
       const none: QueuePlan = { ...PLAN, lanes: [], summary: "Every ready task was left out." };
       const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => none }), NOW);
       if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
-      expect(result.packet.text).toContain("No lane: every ready task was left out. There is nothing to start, so raise no run-plan card.");
+      expect(result.packet.text).toContain("No track: every ready task was left out. There is nothing to start, so raise no run-plan card.");
       expect(result.packet.text).toContain("t9 Migrate the schema");
     });
 

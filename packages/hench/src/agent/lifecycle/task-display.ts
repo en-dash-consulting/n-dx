@@ -31,7 +31,14 @@ export function displayTaskInfo(
 ): void {
   subsection("Task");
 
-  stream("Task", `${brief.task.title}`);
+  const unit = brief.workUnit;
+  if (unit?.kind === "change") {
+    stream("Change", `${brief.task.title} (runs as one task)`);
+  } else if (unit && unit.changeTitle !== brief.task.title) {
+    stream("Task", `${brief.task.title} (in change ${unit.changeTitle})`);
+  } else {
+    stream("Task", `${brief.task.title}`);
+  }
   detail(`ID: ${brief.task.id}`);
 
   if (brief.task.priority) {

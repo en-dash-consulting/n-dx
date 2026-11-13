@@ -108,7 +108,7 @@ import type { RunMode } from "../external.js";
 export interface StartTaskButtonProps {
   taskId: string;
   onStarted: () => void;
-  /** Button label while idle. Defaults to "Start Task". */
+  /** Button label while idle. Defaults to "Start". */
   label?: string;
   /**
    * Run in this workspace instead of the one the viewer is mounted under.
@@ -163,7 +163,7 @@ const CONFLICT_MESSAGE =
   "Run settings were saved on this task by someone else just now, so nothing was started. " +
   "Start again to run with them, or open them with the arrow.";
 
-export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo, liveHref, runModes = false }: StartTaskButtonProps) {
+export function StartTaskButton({ taskId, onStarted, label = "Start", workspace, ariaLabel, navigateTo, liveHref, runModes = false }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Set when the server reported a refusal `rex migrate-slugs` would fix. */

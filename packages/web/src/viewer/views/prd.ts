@@ -41,7 +41,9 @@ import {
   useFacetState,
   useClaims,
   useProductRead,
+  usePrdLayout,
 } from "../hooks/index.js";
+import { viewLabelFor } from "./view-meta.js";
 import { ghostRowsByParent } from "../components/prd-tree/ghost-rows.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
@@ -80,6 +82,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     taskUsageById, rollupById, weeklyBudget,
     fetchPRDData, fetchTaskUsage,
   } = usePRDData(prdData);
+
+  // ── Layout: a v2 tree says change, not epic or feature ─────────
+  const layout = usePrdLayout();
 
   // ── Feature toggles ────────────────────────────────────────────
   const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
@@ -274,7 +279,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     // Branded header
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
-      h("h2", { class: "section-header" }, "Tasks"),
+      h("h2", { class: "section-header" }, viewLabelFor("prd", layout)),
     ),
 
     // Which tree an edit here lands in — shown only off the anchor.
@@ -348,7 +353,15 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       onBranchChange: setActiveBranch,
       inboxIds,
       ghostRows,
-      titleInfo: h(InfoTip, { term: "epic / feature / task" }),
+      titleInfo: layout === "v2"
+        ? h("span", { class: "prd-title-tips" },
+            h(InfoTip, { term: "Change" }),
+            h(InfoTip, { term: "Task" }),
+            h(InfoTip, { term: "Subtask" }),
+            h(InfoTip, { term: "Inbox" }),
+            h(InfoTip, { term: "Runs as one task" }),
+          )
+        : h(InfoTip, { term: "epic / feature / task" }),
       // Search, facets and item actions — one wrapping row beneath the summary.
       controls: h("div", { class: "prd-filter-bar" },
         h("div", { class: "prd-search-row" },
@@ -356,7 +369,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
             ref: searchInputRef,
             class: "prd-search-input",
             type: "search",
-            placeholder: "Search tasks\u2026 (Ctrl+F)",
+            placeholder: layout === "v2" ? "Search changes\u2026 (Ctrl+F)" : "Search tasks\u2026 (Ctrl+F)",
             value: searchQuery,
             "aria-label": "Search PRD tree",
             onInput: (e: Event) => setSearchQuery((e.target as HTMLInputElement).value),

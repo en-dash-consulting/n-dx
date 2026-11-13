@@ -28,7 +28,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync, truncateSync } from "node:fs";
 import { join } from "node:path";
-import { addTokenUsage, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
+import { addTokenUsage, isLLMVendor, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
 import type {
   RuntimeEvent,
   SessionTurnResult,
@@ -38,6 +38,7 @@ import type {
   VendorSessionOptions,
 } from "@n-dx/llm-client";
 import { writeRunFileAtomic } from "../run-end.js";
+import { errorMessage } from "../response-utils.js";
 import {
   CHECKPOINT_PROMPT,
   COLD_EXCHANGES,
@@ -51,7 +52,15 @@ import { renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
-import { hubVendorRefusal, sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
+import {
+  hubVendorRefusal,
+  sidecarCodexSpawn,
+  sidecarSpawnFlags,
+  strayMcpServer,
+  strayMcpStopReason,
+  writeBrokerMcpConfig,
+  type SidecarBrokerEndpoint,
+} from "./spawn-policy.js";
 
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
@@ -86,10 +95,11 @@ export interface SidecarSessionRecord {
   lastActivityAt: string;
   endedAt?: string;
   /**
-   * Set when a turn ended above the context ceiling: the next turn starts a
-   * cold vendor session instead of resuming. Cleared once that turn completes.
+   * Set when a turn ended above the context ceiling, or checkpoint setup
+   * failed: the next turn starts cold. An unreadable ceiling is omitted.
+   * Cleared once that turn completes.
    */
-  refresh?: { contextTokens: number; ceiling: number };
+  refresh?: { contextTokens: number; ceiling?: number };
   /**
    * How the last finished turn ended, kept so a reload or a second tab still
    * shows a signed-out vendor CLI. Cleared when the next turn starts.
@@ -131,9 +141,10 @@ export interface UpdateSidecarSessionInput {
 }
 
 /** Session options the registry does not own: env policy, LLM config, binary. */
+type SidecarConnectionOptions = Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
 export type SidecarSessionConnect = (
   record: SidecarSessionRecord,
-) => Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
+) => SidecarConnectionOptions | Promise<SidecarConnectionOptions>;
 
 /** What a session needs to checkpoint at its context ceiling and start cold. */
 export interface SidecarContextOptions {
@@ -208,30 +219,43 @@ export function createWorktreeSidecarRegistry(
 ): SidecarSessionRegistry {
   const { broker, ...rest } = opts;
   const dir = worktreeSidecarDir(projectDir);
-  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker) });
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, undefined, rest.ttlMs) });
 }
 
 /**
  * What every Sidecar session's vendor CLI is opened with: the filtered
- * environment, the read-only spawn flags for the session's scope and a fresh
- * MCP config naming only the broker.
+ * environment, the read-only spawn flags for the session's scope and the
+ * broker as its only MCP server.
+ *
+ * Claude reads the broker from a fresh MCP config file. Codex gets it through
+ * `-c` flags, its headers through variables set in its child environment
+ * only; its MCP config file names no server, so the broker credential is
+ * written nowhere a Codex session reads.
  *
  * @param envDir The project whose env policy and LLM config the session
  *   takes; defaults to the session's own checkout. A hub session runs in no
  *   checkout, so it takes its host project's.
+ * @param idleMs The session idle window, which bounds how long a Codex broker
+ *   call may wait on its card. Read on every connect, so a saved change
+ *   applies to the next session opened.
  */
 export function sidecarSessionConnect(
   dir: string,
   broker?: WorktreeSidecarRegistryOptions["broker"],
   envDir?: string,
+  idleMs: SidecarRegistryOptions["ttlMs"] = DEFAULT_SIDECAR_TTL_MS,
 ): SidecarSessionConnect {
-  return (record) => {
+  return async (record) => {
     // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
     const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
     if (refusal) throw new Error(refusal);
+    const endpoint = broker?.(record.id);
+    const isCodex = record.vendor === "codex";
+    const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
     return {
-      ...resolveSidecarSessionEnv(envDir ?? record.worktree),
-      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id)), record.scope),
+      ...await resolveSidecarSessionEnv(envDir ?? record.worktree),
+      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),
+      ...(isCodex && Object.keys(codex.env).length > 0 && { extraEnv: codex.env }),
     };
   };
 }
@@ -250,7 +274,14 @@ export interface HubSidecarRegistryOptions extends WorktreeSidecarRegistryOption
  */
 export function createHubSidecarRegistry(opts: HubSidecarRegistryOptions): SidecarSessionRegistry {
   const { broker, dir, hostProjectDir, ...rest } = opts;
-  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir) });
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir, rest.ttlMs) });
+}
+
+/** Stops a turn that reaches an MCP server other than the broker; see `SidecarSessionRegistry.mcpGuard`. */
+interface McpGuard {
+  observe(event: RuntimeEvent): void;
+  /** The result as the operator should see it: failed with the reason once the guard has fired. */
+  settle(result: SessionTurnResult): SessionTurnResult;
 }
 
 /** An open vendor session, and where its running turn's events go. */
@@ -458,7 +489,13 @@ export class SidecarSessionRegistry {
     // A turn that opens a vendor session (the first, or after a restart without
     // a resume id or the TTL) knows nothing yet, so it carries the packet.
     const fresh = !this.live.has(record.id) && !record.resumeId;
-    const live = this.liveSession(record);
+    let live: LiveSession | undefined;
+    // Capture before asynchronous connection setup: a re-lens applies to the next turn.
+    const ranAs = { ...record };
+    const interrupted = (): SessionTurnResult => ({
+      turn: this.live.get(record.id)?.session.turns ?? 0,
+      status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null,
+    });
 
     this.reconcileCursor(record);
     // The packet and the ledger open a fresh vendor session and the turn after
@@ -495,7 +532,7 @@ export class SidecarSessionRegistry {
         // Stopped while the packet was built: settle without spawning. The
         // session stays marked, so its next turn starts cold again.
         if (this.stopRequested.has(record.id)) {
-          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+          return interrupted();
         }
       }
 
@@ -504,36 +541,67 @@ export class SidecarSessionRegistry {
         const ledger = renderLedger(context.ledger(record)).text;
         if (packet || ledger) vendorPrompt = composeOpeningPrompt({ packet, ledger, notes, prompt });
         if (this.stopRequested.has(record.id)) {
-          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+          return interrupted();
         }
       }
 
+      live = await this.liveSession(ranAs, signal);
+      if (!live || signal.aborted) return interrupted();
+
       // The context the turn ended with: what its last call sent in.
       let ended = 0;
+      const guard = this.mcpGuard(record, append);
       live.sink = (event) => {
         if (event.type === "token_usage" && event.tokenUsage) ended = contextTokens(event.tokenUsage);
         append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
+        guard.observe(event);
       };
       const before = record.tokens;
-      // The session as the turn ran: a lens changed mid-turn applies to the next one.
-      const ranAs = { ...record };
-      const result = await live.session.sendTurn(vendorPrompt);
+      let result = guard.settle(await live.session.sendTurn(vendorPrompt));
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
       if (result.sessionId) record.resumeId = result.sessionId;
       if (cold && result.status === "completed") delete record.refresh;
       delivered = result.status === "completed";
+      const turnVendor = live.session.vendor;
+      const diagnostic = (message: string): void => {
+        console.error(`[sidecar] session ${record.id}: ${message}`);
+        const at = this.iso();
+        // Deliberately not a checkpoint frame: the drawer hides those.
+        if (isLLMVendor(turnVendor)) append({ seq: record.cursor + 1, at, type: "event", event: {
+          type: "failure", vendor: turnVendor, turn: result.turn, timestamp: at,
+          failure: { category: "unknown", message },
+        } });
+      };
       if (context && result.status === "completed") {
-        const ceiling = context.ceiling(record);
-        if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
+        try {
+          const ceiling = context.ceiling(record);
+          if (ended > ceiling) {
+            await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append, guard);
+          }
+        } catch (error) {
+          // The answer was delivered. A refused checkpoint must neither
+          // fail it nor skip its spend; never resume the oversized context.
+          record.refresh ??= { contextTokens: ended };
+          delete record.resumeId;
+          diagnostic(`Checkpoint failed; the answer is complete and the next turn will start cold: ${errorMessage(error)}`);
+        }
+        result = guard.settle(result);
       }
-      this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
+      try {
+        // Keep this after checkpointing so its measured usage is included.
+        this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
+      } catch (error) {
+        // A callback may have appended before throwing. Retrying could bill
+        // the turn twice; report it without changing the delivered outcome.
+        diagnostic(`Turn spend recorder failed (not retried): ${errorMessage(error)}`);
+      }
       return result;
     } finally {
       // An opening turn that failed or was stopped may never have reached
       // the model: the next turn carries the packet again.
       if (opening && !delivered) record.packetDue = true;
-      live.sink = undefined;
+      if (live) live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
       // After the persist, so the turn is saved whatever the hook does.
@@ -551,12 +619,54 @@ export class SidecarSessionRegistry {
     live: LiveSession,
     measured: { contextTokens: number; ceiling: number },
     append: (frame: SidecarFrame) => void,
+    guard: McpGuard,
   ): Promise<void> {
     record.refresh = measured;
     this.persist();
-    live.sink = (event) => append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
+    live.sink = (event) => {
+      append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
+      guard.observe(event);
+    };
     const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
+    if (result.status !== "completed") {
+      throw new Error(result.error ?? `Checkpoint ${result.status}`);
+    }
+  }
+
+  /**
+   * The backstop behind the spawn flags: at the first tool use or result on
+   * an MCP server other than the broker, stop the running turn as the Stop
+   * control does. Once it has fired, {@link McpGuard.settle} appends a
+   * failure event with the reason to the transcript (once) and fails the
+   * result with it, so the drawer shows why the turn ended.
+   */
+  private mcpGuard(record: SidecarSessionRecord, append: (frame: SidecarFrame) => void): McpGuard {
+    let stray: { reason: string; vendor: RuntimeEvent["vendor"] } | undefined;
+    let recorded = false;
+    return {
+      observe: (event) => {
+        if (stray) return;
+        const server = strayMcpServer(event);
+        if (!server) return;
+        stray = { reason: strayMcpStopReason(server), vendor: event.vendor };
+        this.interrupt(record.id).catch((error: unknown) => {
+          console.error(`[sidecar] could not stop session ${record.id} after it reached MCP server ${server}: ${(error as Error).message}`);
+        });
+      },
+      settle: (result) => {
+        if (!stray) return result;
+        if (!recorded) {
+          recorded = true;
+          const at = this.iso();
+          append({
+            seq: record.cursor + 1, at, type: "event",
+            event: { type: "failure", vendor: stray.vendor, turn: result.turn, timestamp: at, failure: { category: "unknown", message: stray.reason } },
+          });
+        }
+        return { ...result, status: "failed", error: stray.reason };
+      },
+    };
   }
 
   /**
@@ -672,11 +782,13 @@ export class SidecarSessionRegistry {
   }
 
   /** The open vendor session, resuming the stored id when there is none — after a restart or the TTL. */
-  private liveSession(record: SidecarSessionRecord): LiveSession {
+  private async liveSession(record: SidecarSessionRecord, signal: AbortSignal): Promise<LiveSession | undefined> {
     const existing = this.live.get(record.id);
     if (existing) return existing;
+    const connection = await this.connect(record);
+    if (signal.aborted) return undefined;
     const options: VendorSessionOptions = {
-      ...this.connect(record),
+      ...connection,
       vendor: record.vendor,
       cwd: record.worktree,
       ...(record.model && { model: record.model }),

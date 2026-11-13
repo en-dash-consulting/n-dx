@@ -1056,6 +1056,8 @@ export interface PersistedRuntimeEvent {
     durationMs: number;
     /** `toolCall.id` of the call this answers, when known. */
     id?: string;
+    /** Whether the call failed, when the vendor reported it. Absent in older frames and when unknown. */
+    isError?: boolean;
   };
 
   /** Token usage for this turn or cumulative (type: "token_usage"). */
@@ -2388,7 +2390,16 @@ export interface TaskBriefChangeSection {
   text: string;
 }
 
+/** On a v2 tree, what the run is for: a task, or a task-less change that runs as one task. */
+export interface TaskBriefWorkUnit {
+  kind: "change" | "task";
+  /** The change the unit belongs to (the unit itself for kind "change"). */
+  changeTitle: string;
+}
+
 export interface TaskBrief {
+  /** Present on a v2 tree only; a v1 brief keeps the v1 words. */
+  workUnit?: TaskBriefWorkUnit;
   /**
    * On a v2 tree, rex's change brief for this unit, in render order: the work
    * item, its change, the capabilities and constraints it touches or amends,

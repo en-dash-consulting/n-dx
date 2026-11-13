@@ -7,6 +7,17 @@ import type { PRDItemData, BranchStats, ItemStatus } from "./types.js";
 import { isWorkItemType, itemTypeOf } from "../../external.js";
 
 /**
+ * Indexed explicit-run eligibility from the served PRD controls Start.
+ * Older payloads keep the task/subtask and server-marked unit fallback;
+ * isWorkItemType remains the type classification, independent of eligibility.
+ */
+export function isRunnableItem(item: PRDItemData): boolean {
+  if (item.executionEligible !== undefined) return item.executionEligible;
+  const type = itemTypeOf(item);
+  return isWorkItemType(type) || (type === "change" && item.runsAsOneTask === true);
+}
+
+/**
  * Compute stats for a list of items, counting only tasks and subtasks
  * (matching Rex's computeStats behavior).
  */

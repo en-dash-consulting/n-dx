@@ -132,9 +132,12 @@ export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
     .filter((entry) => !RUNTIME_ENTRIES_AT_ROOT.includes(entry)),
 ];
 
-/** Normalize a path for comparison: forward slashes, no leading `./`. */
+/** Normalize native separators, preserving literal POSIX backslashes. */
 function normalize(path: string): string {
-  return path.replace(/\\/g, "/").replace(/^\.\//, "");
+  // Decoded Git paths can contain literal backslashes on POSIX. Treating
+  // those as separators would put a root-level `.rex\\changes\\notes.md`
+  // inside the PRD rollback scope and discard the operator's work.
+  return (process.platform === "win32" ? path.replace(/\\/g, "/") : path).replace(/^\.\//, "");
 }
 
 /**
@@ -273,18 +276,40 @@ export function splitPorcelainLines(output: string): string[] {
 
 function unquotePorcelainPath(path: string): string {
   const trimmed = path.trim();
-  return trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')
-    ? trimmed.slice(1, -1)
-    : trimmed;
+  if (trimmed.length < 2 || !trimmed.startsWith('"') || !trimmed.endsWith('"')) return trimmed;
+  // Porcelain quotes bytes, not just the enclosing string. Exact rollback
+  // pathspecs must receive the real name, including UTF-8 octal sequences.
+  const escapes: Record<string, string> = {
+    a: "\x07", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", '"': '"', "\\": "\\",
+  };
+  return trimmed.slice(1, -1).replace(/(?:\\[0-7]{3})+|\\([abfnrtv"\\])/g, (encoded, named: string | undefined) => {
+    if (named !== undefined) return escapes[named]!;
+    const bytes = encoded.match(/[0-7]{3}/g)!.map((octal: string) => Number.parseInt(octal, 8));
+    return Buffer.from(bytes).toString("utf8");
+  });
 }
 
-/** Split a porcelain line into its path(s); `from` is set only for R/C lines. */
+/**
+ * Index of the " -> " separating an R/C line's source from its target. Git
+ * quotes any path containing a space, so a separator inside a path is always
+ * inside quotes: skip a quoted source to its closing quote (a backslash
+ * escapes the next character), otherwise the source is unquoted and has no
+ * space, so the first " -> " is the separator. -1 when there is none.
+ */
+function renameArrowIndex(path: string): number {
+  if (!path.startsWith('"')) return path.indexOf(" -> ");
+  let i = 1;
+  while (i < path.length && path[i] !== '"') i += path[i] === "\\" ? 2 : 1;
+  return path.startsWith(" -> ", i + 1) ? i + 1 : -1;
+}
+
+/** Split a porcelain line into its path(s);`from` is set only for R/C lines. */
 function splitPorcelainPaths(line: string): { from?: string; to: string } {
   const status = line.slice(0, 2);
   const path = line.length > 3 ? line.slice(3) : line.trim();
 
   if (status.includes("R") || status.includes("C")) {
-    const arrow = path.lastIndexOf(" -> ");
+    const arrow = renameArrowIndex(path);
     if (arrow !== -1) {
       return {
         from: unquotePorcelainPath(path.slice(0, arrow)),
@@ -298,6 +323,30 @@ function splitPorcelainPaths(line: string): { from?: string; to: string } {
 /** The path a porcelain line leaves behind: the new path of an R/C line. */
 export function parsePorcelainPath(line: string): string {
   return splitPorcelainPaths(line).to;
+}
+
+/** The source path of an R/C porcelain line, or undefined for any other line. */
+export function porcelainSourcePath(line: string): string | undefined {
+  return splitPorcelainPaths(line).from;
+}
+
+/**
+ * True when every path a porcelain line leaves changed matches `patterns`. A
+ * rename (R) removes its source, so the source must match as well as the
+ * target: a move out of a non-matching path into one is not matched by its
+ * target alone. A copy (C) leaves its source in place, so only the target counts.
+ */
+export function matchesPorcelainLine(
+  line: string,
+  patterns: readonly string[],
+  repoPrefix = "",
+): boolean {
+  const { from, to } = splitPorcelainPaths(line);
+  const isRename = line.slice(0, 2).includes("R");
+  return (
+    matchesProjectPath(to, patterns, repoPrefix) &&
+    (!isRename || from === undefined || matchesProjectPath(from, patterns, repoPrefix))
+  );
 }
 
 /**

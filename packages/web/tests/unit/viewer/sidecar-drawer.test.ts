@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+import { claudeSessionDriver, codexSessionDriver } from "@n-dx/llm-client";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
 import { SidecarDock, SidecarFrameRow, clampSidecarWidth, effectiveSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
 import {
@@ -32,6 +33,7 @@ import {
   type SidecarLensInfo,
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
+import { StatusBody } from "../../../src/viewer/components/sidecar-status.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
 import { openExtensionTab } from "../../../src/viewer/components/sidecar-extension-tabs.js";
 import { installBasePathFetch, setBasePathForTests } from "../../../src/viewer/base-path.js";
@@ -962,10 +964,16 @@ describe("tool calls", () => {
   const call = (seq: number, tool: string, input: Record<string, unknown>, id?: string): SidecarFrame => ({
     seq, at: "t", type: "event", event: { type: "tool_use", toolCall: { tool, input, ...(id ? { id } : {}) } },
   });
-  const result = (seq: number, tool: string, output: string, callId?: string): SidecarFrame => ({
+  const result = (seq: number, tool: string, output: string, callId?: string, isError?: boolean, vendor?: string): SidecarFrame => ({
     seq, at: "t", type: "event",
-    event: { type: "tool_result", toolResult: { tool, output, durationMs: 5, ...(callId ? { id: callId } : {}) } },
+    event: {
+      type: "tool_result",
+      ...(vendor ? { vendor } : {}),
+      toolResult: { tool, output, durationMs: 5, ...(callId ? { id: callId } : {}), ...(isError !== undefined ? { isError } : {}) },
+    },
   });
+  const statuses = () => [...root.querySelectorAll<HTMLElement>(".sidecar-tool")]
+    .map((t) => t.querySelector(".sidecar-tool-status")!.textContent);
 
   it("pairs a result naming its call by id with that call, whatever the order", () => {
     const paired = pairToolResults([
@@ -1053,12 +1061,12 @@ describe("tool calls", () => {
     expect(tools[0].querySelector(".sidecar-tool-wire")!.textContent).toBe("mcp__ndx-sidecar__fake__create_ticket");
   });
 
-  it("reads a card-less call whose result is an error as Failed, keeping its details", async () => {
+  it("falls back to the [error] prefix for an unflagged older Claude result: Failed, keeping its details", async () => {
     server.sessions = [{ session: session(), running: false }];
     server.frames = [
       call(1, "mcp__ndx-sidecar__run_command", { argv: ["rm"] }, "toolu_A"),
       call(2, "mcp__ndx-sidecar__run_command", { argv: ["ls"] }, "toolu_B"),
-      result(3, "unknown", "[error] command not allowed", "toolu_A"),
+      result(3, "unknown", "[error] command not allowed", "toolu_A", undefined, "claude"),
       result(4, "unknown", "ok", "toolu_B"),
     ];
     await mount();
@@ -1070,6 +1078,68 @@ describe("tool calls", () => {
 
     await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
     expect(tools[0].querySelector(".sidecar-tool-output")!.textContent).toBe("[error] command not allowed");
+  });
+
+  it("reads a flagged Codex result as Failed though its output has no [error] prefix", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "shell", { command: "false" }),
+      result(2, "shell", "exit 1", undefined, true, "codex"),
+      call(3, "shell", { command: "true" }),
+      result(4, "shell", "", undefined, false, "codex"),
+    ];
+    await mount();
+    await pressCmdJ();
+    expect(statuses()).toEqual(["Failed", "Done"]);
+  });
+
+  it("reads a result flagged as no error as Done though its output starts with [error] ", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "Bash", { command: "echo '[error] x'" }, "toolu_A"),
+      result(2, "", "[error] x", "toolu_A", false, "claude"),
+    ];
+    await mount();
+    await pressCmdJ();
+    expect(statuses()).toEqual(["Done"]);
+  });
+
+  // Synthetic wire cases parsed by the real drivers, fetched through the stub
+  // server and rendered in jsdom. No live CLI or browser session is exercised.
+  it("keeps result vendors through pairing and renders unknown Codex status without a text-based failure", async () => {
+    const parsedResult = (seq: number, vendor: "claude" | "codex", wire: object): SidecarFrame => {
+      const driver = vendor === "claude" ? claudeSessionDriver : codexSessionDriver;
+      const event = driver.parseLine(JSON.stringify(wire), 1);
+      expect(event?.type).toBe("tool_result");
+      return { seq, at: "t", type: "event", event: {
+        type: "tool_result", vendor: event!.vendor, toolResult: event!.toolResult,
+      } };
+    };
+    server.sessions = [{ session: session({ vendor: "claude" }), running: false }];
+    server.frames = [
+      call(1, "shell", { command: "print" }),
+      call(2, "function", {}),
+      call(3, "Read", {}, "old"),
+      call(4, "Read", {}, "new"),
+      call(5, "Read", {}, "no-vendor"),
+      result(6, "", "[error] archived", "old", undefined, "claude"),
+      parsedResult(7, "codex", { type: "item.completed", item: {
+        type: "command_execution", command: "print", aggregated_output: "[error] command output",
+      } }),
+      parsedResult(8, "codex", { type: "function_call_output", output: "[error] function output" }),
+      parsedResult(9, "claude", { type: "user", message: { role: "user", content: [
+        { type: "tool_result", tool_use_id: "new", content: "[error] canonical success" },
+      ] } }),
+      result(10, "", "[error] unknown origin", "no-vendor"),
+    ];
+    const paired = pairToolResults(JSON.parse(JSON.stringify(server.frames)));
+    expect([1, 2, 3, 4, 5].map((seq) => paired.get(seq)?.vendor))
+      .toEqual(["codex", "codex", "claude", "claude", undefined]);
+    expect(paired.get(1)).not.toHaveProperty("isError");
+    expect(paired.get(2)).not.toHaveProperty("isError");
+    await mount();
+    await pressCmdJ();
+    expect(statuses()).toEqual(["Done", "Done", "Failed", "Done", "Done"]);
   });
 
   it("uses the connection's label from its external-call card and shows the waiting state", async () => {
@@ -1360,6 +1430,116 @@ describe("permission cards", () => {
     });
   });
 
+  describe("status card", () => {
+    const status = (rule: NonNullable<SidecarCard["statusChange"]>["rule"], to = "deferred"): SidecarCard => card("s1", 1, {
+      kind: "status", tool: "propose_status", allowListKey: null,
+      input: { id: "t1", status: to },
+      statusChange: { itemId: "t1", itemTitle: "Write the cache", from: "in_progress", to, reason: "waiting on design", rule },
+    });
+
+    it("shows the move and rex's rule, offers no always-allow, and Approve sends a plain approval", async () => {
+      await openWith([status({ allowed: true })]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("t1: in progress → deferred");
+      expect(root.querySelector(".sidecar-status-item")?.textContent).toBe("t1 Write the cache");
+      expect(root.querySelector(".sidecar-status-move")?.textContent).toBe("in progress → deferred");
+      expect(root.querySelector(".sidecar-status-reason")?.textContent).toBe("Why: waiting on design");
+      expect(root.querySelector(".sidecar-status-rule")?.textContent).toBe("Rex allows this move without force.");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("quotes rex's refusal on a move rex will not make", async () => {
+      await openWith([status({ allowed: false, message: 'Cannot move from "completed" to "pending".' }, "pending")]);
+      expect(root.querySelector(".sidecar-status-refused")?.textContent).toBe('Rex refuses this move: Cannot move from "completed" to "pending".');
+    });
+
+    it("discloses enclosing-change completion and conditional product apply before approval", async () => {
+      const pending = status({ allowed: true }, "completed");
+      pending.statusChange!.completionPolicy = "v2";
+      await openWith([pending]);
+      const effects = root.querySelector(".sidecar-status-effects")?.textContent;
+      expect(effects).toContain("enclosing pending changes");
+      expect(effects).toContain("all their live work is complete");
+      expect(effects).toContain('rex.applyOn is "complete" (the default)');
+      expect(effects).toContain("apply their product amendments");
+      expect(effects).toContain('"review" or "release"');
+      expect(effects).toContain("unapplied");
+      expect(effects).toContain("test gate");
+      expect(decisions()).toEqual([]);
+      expect(root.querySelector(".sidecar-card-approve")).not.toBeNull();
+    });
+
+    it("does not describe v2 apply effects for an ordinary status move", async () => {
+      await openWith([status({ allowed: true })]);
+      expect(root.querySelector(".sidecar-status-effects")).toBeNull();
+    });
+
+    const noteOf = (carriedOut: NonNullable<SidecarCard["carriedOut"]>): string | null | undefined => {
+      const decided = { ...status({ allowed: true }, "completed"), status: "approved" as const, carriedOut };
+      act(() => { render(h(StatusBody, { card: decided }), root); });
+      return root.querySelector(".sidecar-status-note")?.textContent;
+    };
+
+    it("says a completion held for a hench run is recorded, not written", () => {
+      expect(noteOf({ ok: true, held: true, ids: ["t1"] })).toBe("Recorded; the hench run applies it after its test gate.");
+    });
+
+    it("says a written status is written", () => {
+      expect(noteOf({ ok: true, ids: ["t1"] })).toBe("Status written.");
+    });
+  });
+
+  describe("item-edit card", () => {
+    const edit = (): SidecarCard => card("e1", 1, {
+      kind: "item-edit", tool: "propose_item_edit", allowListKey: null,
+      input: { id: "t1", acceptanceCriteria: ["Loads fast", "Loads in under 1 s"], tags: ["ui"] },
+      itemEdit: {
+        itemId: "t1", itemTitle: "Write the cache",
+        before: { acceptanceCriteria: ["Loads fast", "Works"], tags: [] },
+        after: { acceptanceCriteria: ["Loads fast", "Loads in under 1 s"], tags: ["ui"] },
+      },
+    });
+    const field = (name: string) => root.querySelector(`.sidecar-item-edit-field[data-field="${name}"]`)!;
+
+    it("shows each field before and after, offers no always-allow, and Approve sends no edits when none were made", async () => {
+      await openWith([edit()]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("t1: acceptanceCriteria, tags");
+      expect(root.querySelector(".sidecar-item-edit-item")?.textContent).toBe("t1 Write the cache");
+      const marks = [...field("acceptanceCriteria").querySelectorAll("li")].map((li) => [li.className, li.textContent?.trim()]);
+      expect(marks).toEqual([
+        ["sidecar-item-edit-removed", "− Works"],
+        ["sidecar-item-edit-kept", "Loads fast"],
+        ["sidecar-item-edit-added", "+ Loads in under 1 s"],
+      ]);
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      expect(root.querySelector(".sidecar-card-approve")?.textContent).toBe("Approve and write");
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("sends the operator's edited values with the approval, and the diff follows them", async () => {
+      await openWith([edit()]);
+      const tags = field("tags").querySelector<HTMLTextAreaElement>("textarea")!;
+      await act(async () => { tags.value = "ui\ncache"; tags.dispatchEvent(new Event("input", { bubbles: true })); });
+      expect([...field("tags").querySelectorAll("li.sidecar-item-edit-added")].map((li) => li.textContent?.trim())).toEqual(["+ ui", "+ cache"]);
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", edits: { tags: ["ui", "cache"] } }]);
+    });
+
+    it("sends no edits with a denial", async () => {
+      await openWith([edit()]);
+      const tags = field("tags").querySelector<HTMLTextAreaElement>("textarea")!;
+      await act(async () => { tags.value = "other"; tags.dispatchEvent(new Event("input", { bubbles: true })); });
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-deny")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
+  });
+
   describe("draft-file card", () => {
     const file = (): SidecarCard => card("f1", 1, { kind: "draft-file", tool: "save_draft", input: { kind: "restack-plan", path: "/h/hub/drafts/restack.md", content: "1. rebase #12" } });
     const pathInput = () => root.querySelector<HTMLInputElement>(".sidecar-draft-path-input")!;
@@ -1418,6 +1598,12 @@ describe("permission cards", () => {
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
     // Without its link (a card from before the link was read) the title is the call's own.
     link: { tool: "propose_link", input: { itemId: "t1", ref: "WM-2054" }, title: "t1 → WM-2054" },
+    // Without its fields (a card from before the item was read) the title is the item's id.
+    "item-edit": { tool: "propose_item_edit", input: { id: "t1", tags: ["ui"] }, title: "t1" },
+    // Without its change (a card from before the status was read) the title is the item's id.
+    status: { tool: "propose_status", input: { id: "t1", status: "deferred" }, title: "t1" },
+    // Without its choice (a card from before the question was read) the title is the call's question.
+    choice: { tool: "ask_choice", input: { question: "Which store?", options: [] }, title: "Which store?" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },

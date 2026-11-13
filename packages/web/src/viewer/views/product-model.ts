@@ -152,6 +152,7 @@ export interface ConstraintRow {
   health: CapabilityHealth;
   /** `"all"` binds every product node; otherwise the titles it binds. */
   appliesTo: "all" | string[];
+  openChanges: OpenChangeOverlay[];
 }
 
 /** An area and the capabilities under it. */
@@ -222,6 +223,8 @@ export interface ChangeRow {
   touches: TouchedNode[];
   taskCount: number;
   completedTaskCount: number;
+  /** No live tasks and no nested change: `ndx work` runs the change as one unit. */
+  runsAsOneTask?: boolean;
   /** No acceptance criteria on the change, or on one of its open tasks. */
   criteriaGap: boolean;
   /** Distinct blockers, on the change or its open tasks, that are not completed. */
@@ -855,6 +858,11 @@ export function productTotals(map: ProductMap): ProductTotals {
   const openChangeIds = new Set<string>(map.areas.flatMap((area) => area.openChangeIds));
   for (const capability of capabilities) {
     for (const change of capability.openChanges) openChangeIds.add(change.id);
+  }
+  // A top-level constraint sits under no area, so a change that only touches
+  // or amends one is in no area set and no capability overlay.
+  for (const constraint of map.constraints) {
+    for (const change of constraint.openChanges) openChangeIds.add(change.id);
   }
   return {
     capabilities: capabilities.length,

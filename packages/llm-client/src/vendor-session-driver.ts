@@ -98,16 +98,42 @@ export interface ClaudeTurnFlags {
 export interface CodexTurnFlags {
   /**
    * Sandbox and approval flags for a fresh `codex exec`
-   * (see `compileCodexPolicyFlags`). Dropped on resume, where `exec resume`
-   * rejects them. The driver adds `codexShellEnvFlags` to every turn, fresh
-   * or resumed, so the agent's commands never see the Codex key whatever
-   * flags the caller passes. A resumed turn does not
-   * keep the thread's starting policy:
-   * `exec resume` reads sandbox and approval from the invocation's config, so
-   * the user's `~/.codex/config.toml` decides. Re-applying the policy on
-   * resume is PRD item 31307b89.
+   * (`compileCodexPolicyFlags(policy)`). Not sent on resume, where
+   * `exec resume` rejects `--sandbox`: see {@link resumePolicyFlags}. The
+   * driver ends every turn's flags, fresh or resumed, with
+   * `codexShellEnvFlags`, so the agent's commands never see the Codex key
+   * whatever flags the caller passes.
    */
   readonly policyFlags?: readonly string[];
+  /**
+   * The same policy for `codex exec resume`
+   * (`compileCodexPolicyFlags(policy, { resume: true })`: `-c sandbox_mode=`
+   * and `-c approval_policy=` overrides). A resumed thread does not keep its
+   * starting policy, since resume reads sandbox and approval from the
+   * invocation's config: a caller that omits this leaves a resumed turn to the
+   * user's `~/.codex/config.toml`.
+   */
+  readonly resumePolicyFlags?: readonly string[];
+  /**
+   * Flags every turn, fresh or resumed, carries directly after `exec` /
+   * `exec resume` (`--ignore-user-config`, `-c` config overrides). Argv is
+   * logged: never put a credential here — pass it through the child's
+   * environment and name the variable in {@link hiddenEnv}.
+   */
+  readonly configFlags?: readonly string[];
+  /**
+   * More of the same, computed afresh for each turn and placed after
+   * {@link configFlags}: for flags that depend on files that can change
+   * between turns (a project `.codex/config.toml`). A throw refuses the turn
+   * before anything is spawned; the session stays usable.
+   */
+  readonly turnConfigFlags?: () => readonly string[];
+  /**
+   * Environment variable names, beyond the Codex credentials, that the
+   * agent's commands must read empty: variables set in the Codex child's
+   * environment for Codex itself (`codexShellEnvFlags(hiddenEnv)`).
+   */
+  readonly hiddenEnv?: readonly string[];
 }
 
 export interface SessionTurnInput {
@@ -308,6 +334,9 @@ function claudeToolResultEvents(
         output: (b.is_error === true ? "[error] " : "") + claudeToolResultText(b.content).slice(0, MAX_TOOL_OUTPUT_LENGTH),
         durationMs: 0,
         ...(typeof b.tool_use_id === "string" && b.tool_use_id ? { id: b.tool_use_id } : {}),
+        // Canonical content blocks omit is_error on success. Make that
+        // explicit so literal output cannot trigger the archived prefix fallback.
+        isError: b.is_error === true,
       },
     }];
   });
@@ -437,6 +466,7 @@ function parseClaudeEventObject(
           output: output.slice(0, MAX_TOOL_OUTPUT_LENGTH),
           durationMs: 0,
           ...(typeof event.tool_use_id === "string" && event.tool_use_id ? { id: event.tool_use_id } : {}),
+          ...(typeof event.is_error === "boolean" ? { isError: event.is_error } : {}),
         },
       };
     }
@@ -542,24 +572,26 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
     : input.prompt;
   const modelArgs = input.model ? ["-m", input.model] : [];
 
+  const configFlags = [...(input.codex?.configFlags ?? []), ...(input.codex?.turnConfigFlags?.() ?? [])];
+  const hiddenEnv = input.codex?.hiddenEnv ?? [];
+
   // Codex cannot fork, so a resume always appends to the thread. Two
   // differences from a fresh exec, both dictated by `codex exec resume`:
-  //   1. No policy flags — resume rejects `-s/--sandbox` and
-  //      `--approve-for-me`. The thread does not keep its starting policy:
-  //      resume takes sandbox and approval from this invocation's config, so
-  //      the user's ~/.codex/config.toml decides (PRD item 31307b89). The
-  //      shell-environment overrides still go (`-c` is a global flag): config
-  //      is read per process, so without them a resumed agent's commands
-  //      would see the Codex key.
+  //   1. The policy travels as `-c sandbox_mode=` / `-c approval_policy=`
+  //      overrides (resumePolicyFlags): resume rejects `-s/--sandbox`, and the
+  //      thread does not keep its starting policy — resume takes sandbox and
+  //      approval from this invocation's config. The shell-environment
+  //      overrides go too: config is read per process, so without them a
+  //      resumed agent's commands would see the Codex key.
   //   2. The id is always explicit, never `--last`, which picks the newest
   //      session on the machine and would let any other codex run capture it.
   if (input.resume) {
     return {
       binary: "codex",
       args: [
-        "exec", "resume", input.resume.sessionId,
+        "exec", "resume", ...configFlags, input.resume.sessionId,
         "--json", "--skip-git-repo-check",
-        ...codexShellEnvFlags(),
+        ...withCodexShellEnvFlags(input.codex?.resumePolicyFlags ?? [], hiddenEnv),
         ...modelArgs,
         "-", // resume reads the follow-up prompt from stdin
       ],
@@ -571,7 +603,8 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
     binary: "codex",
     args: [
       "exec",
-      ...withCodexShellEnvFlags(input.codex?.policyFlags ?? []),
+      ...configFlags,
+      ...withCodexShellEnvFlags(input.codex?.policyFlags ?? [], hiddenEnv),
       "--json", "--skip-git-repo-check",
       ...modelArgs,
       "-", // codex exec reads the prompt from stdin
@@ -581,16 +614,22 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
 }
 
 /**
- * A fresh turn's policy flags, ending with {@link codexShellEnvFlags} whatever
+ * A turn's policy flags, ending with `codexShellEnvFlags(hiddenEnv)` whatever
  * the caller passed: `startVendorSession` is public, and flags without them
  * would let the agent's commands read the Codex key. `compileCodexPolicyFlags`
- * output already ends with them, so it passes through unchanged.
+ * output ends with the default overrides; those are swapped for the full set
+ * when `hiddenEnv` adds names, and pass through unchanged when it does not.
  */
-function withCodexShellEnvFlags(policyFlags: readonly string[]): string[] {
-  const envFlags = codexShellEnvFlags();
-  const tail = policyFlags.slice(-envFlags.length);
-  const present = tail.length === envFlags.length && tail.every((flag, i) => flag === envFlags[i]);
-  return present ? [...policyFlags] : [...policyFlags, ...envFlags];
+function withCodexShellEnvFlags(policyFlags: readonly string[], hiddenEnv: readonly string[]): string[] {
+  const required = codexShellEnvFlags(hiddenEnv);
+  if (endsWith(policyFlags, required)) return [...policyFlags];
+  const defaults = codexShellEnvFlags();
+  const head = endsWith(policyFlags, defaults) ? policyFlags.slice(0, -defaults.length) : policyFlags;
+  return [...head, ...required];
+}
+
+function endsWith(flags: readonly string[], tail: readonly string[]): boolean {
+  return flags.length >= tail.length && tail.every((flag, i) => flag === flags[flags.length - tail.length + i]);
 }
 
 /**
@@ -790,11 +829,53 @@ export function normalizeCodexResponse(raw: unknown): NormalizedCodexResponse {
 }
 
 /**
+ * Whether a completed Codex `command_execution` item failed: `true` for a
+ * `failed` status or a non-zero exit code, `false` for a `completed` status or
+ * exit code 0, `undefined` when the item carries neither.
+ */
+function codexCommandFailed(item: Record<string, unknown>): boolean | undefined {
+  const exitCode = typeof item.exit_code === "number" ? item.exit_code : undefined;
+  if (item.status === "failed" || (exitCode !== undefined && exitCode !== 0)) return true;
+  if (item.status === "completed" || exitCode === 0) return false;
+  return undefined;
+}
+
+/**
+ * The tool name of a Codex `mcp_tool_call` item: `mcp__<server>__<tool>` from
+ * the item's own `server` and `tool` fields. Never from the model's spelling,
+ * which normalises a hyphen in the server name to an underscore.
+ */
+function codexMcpToolName(item: Record<string, unknown>): string | undefined {
+  if (typeof item.server !== "string" || !item.server) return undefined;
+  if (typeof item.tool !== "string" || !item.tool) return undefined;
+  return `mcp__${item.server}__${item.tool}`;
+}
+
+/**
+ * The output of a completed Codex `mcp_tool_call` item: the text parts of
+ * `result.content` joined by newlines, or `error.message` when there is no
+ * result (a transport failure or a timeout).
+ */
+function codexMcpToolOutput(item: Record<string, unknown>): string {
+  const result = item.result as { content?: unknown } | null | undefined;
+  if (result && Array.isArray(result.content)) {
+    return result.content
+      .filter((part): part is { type: "text"; text: string } =>
+        !!part && typeof part === "object" && part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text)
+      .join("\n");
+  }
+  const error = item.error as { message?: unknown } | null | undefined;
+  return typeof error?.message === "string" ? error.message : "";
+}
+
+/**
  * Parse one JSONL line of `codex exec --json` into a RuntimeEvent.
  *
- * Supported types: `item.started` (`command_execution` → `shell` tool_use),
- * `item.completed` (`agent_message` → assistant; `command_execution` →
- * `shell` tool_result; `file_change` → `apply_patch` tool_use), `message`,
+ * Supported types: `item.started` (`command_execution` → `shell` tool_use;
+ * `mcp_tool_call` → `mcp__<server>__<tool>` tool_use), `item.completed`
+ * (`agent_message` → assistant; `command_execution` → `shell` tool_result;
+ * `mcp_tool_call` → tool_result; `file_change` → `apply_patch` tool_use), `message`,
  * `function_call`, `function_call_output`, `error`, `turn.failed`, and the
  * completion family (`summary`, `response.completed`, `done`, `complete`).
  * Anything else, and non-JSON, returns `null`.
@@ -838,6 +919,22 @@ export function parseCodexJsonLine(
           toolCall: { tool: "shell", input: { command: item.command } },
         };
       }
+      if (item?.type === "mcp_tool_call") {
+        const tool = codexMcpToolName(item);
+        if (!tool) return null;
+        const args = item.arguments;
+        return {
+          type: "tool_use" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolCall: {
+            tool,
+            input: args && typeof args === "object" && !Array.isArray(args) ? args as Record<string, unknown> : {},
+            ...(typeof item.id === "string" && item.id ? { id: item.id } : {}),
+          },
+        };
+      }
       return null;
     }
 
@@ -864,6 +961,7 @@ export function parseCodexJsonLine(
           (typeof item.result === "string" && item.result) ||
           (typeof item.text === "string" && item.text) ||
           "";
+        const isError = codexCommandFailed(item);
         return {
           type: "tool_result" as RuntimeEventType,
           vendor,
@@ -873,6 +971,28 @@ export function parseCodexJsonLine(
             tool: "shell",
             output: outputCandidate.slice(0, MAX_TOOL_OUTPUT_LENGTH),
             durationMs: 0,
+            ...(isError !== undefined ? { isError } : {}),
+          },
+        };
+      }
+
+      // An MCP tool call. Failure is read from `status` alone: a tool that
+      // returns isError arrives with `error: null` and no flag in its result.
+      if (itemType === "mcp_tool_call") {
+        const tool = codexMcpToolName(item);
+        if (!tool) return null;
+        const isError = item.status === "failed" ? true : item.status === "completed" ? false : undefined;
+        return {
+          type: "tool_result" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolResult: {
+            tool,
+            output: codexMcpToolOutput(item).slice(0, MAX_TOOL_OUTPUT_LENGTH),
+            durationMs: 0,
+            ...(typeof item.id === "string" && item.id ? { id: item.id } : {}),
+            ...(isError !== undefined ? { isError } : {}),
           },
         };
       }

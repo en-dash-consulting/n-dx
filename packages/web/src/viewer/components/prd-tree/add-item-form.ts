@@ -66,6 +66,11 @@ function flattenItems(items: PRDItemData[], depth = 0): Array<{ item: PRDItemDat
   return result;
 }
 
+/** Split comma-separated tags, trimmed, without blanks or repeats. */
+function parseTags(text: string): string[] {
+  return [...new Set(text.split(",").map((t) => t.trim()).filter(Boolean))];
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: AddItemFormProps) {
@@ -74,6 +79,9 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
   const [type, setType] = useState<ItemType | "">(defaultParentId ? "" : "epic");
   const [parentId, setParentId] = useState<string>(defaultParentId ?? "");
   const [priority, setPriority] = useState<string>("");
+  const [tagsText, setTagsText] = useState("");
+  const [criteria, setCriteria] = useState<string[]>([]);
+  const [criterionDraft, setCriterionDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [titleTouched, setTitleTouched] = useState(false);
@@ -111,6 +119,13 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
   // Title validation state
   const titleError = titleTouched && !title.trim() ? "Title is required" : null;
 
+  const addCriterion = useCallback(() => {
+    const text = criterionDraft.trim();
+    if (!text) return;
+    setCriteria((prev) => [...prev, text]);
+    setCriterionDraft("");
+  }, [criterionDraft]);
+
   const handleSubmit = useCallback(
     async (e: Event) => {
       e.preventDefault();
@@ -125,6 +140,11 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
       setSubmitting(true);
       setError(null);
 
+      // A criterion typed but not yet added still counts.
+      const pending = criterionDraft.trim();
+      const acceptanceCriteria = pending ? [...criteria, pending] : criteria;
+      const tags = parseTags(tagsText);
+
       try {
         await onSubmit({
           title: title.trim(),
@@ -132,6 +152,8 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
           parentId: parentId || undefined,
           description: description.trim() || undefined,
           priority: priority || undefined,
+          tags: tags.length > 0 ? tags : undefined,
+          acceptanceCriteria: acceptanceCriteria.length > 0 ? acceptanceCriteria : undefined,
         });
         // Reset form on success
         setTitle("");
@@ -139,6 +161,9 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         setType("");
         setParentId("");
         setPriority("");
+        setTagsText("");
+        setCriteria([]);
+        setCriterionDraft("");
         setTitleTouched(false);
       } catch (err) {
         setError(String(err));
@@ -146,7 +171,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         setSubmitting(false);
       }
     },
-    [title, effectiveType, parentId, description, priority, onSubmit],
+    [title, effectiveType, parentId, description, priority, tagsText, criteria, criterionDraft, onSubmit],
   );
 
   const typeLabel = effectiveType ? itemTypeLabel(effectiveType) : "item";
@@ -284,6 +309,68 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
           h("option", { key: opt.value, value: opt.value }, opt.label),
         ),
       ),
+    ),
+
+    // Done when
+    h("div", { class: "rex-add-form-field" },
+      h("label", { class: "rex-add-form-label", for: "add-form-criterion" },
+        "Done when ",
+        h("span", { class: "rex-add-form-optional" }, "(optional)"),
+      ),
+      criteria.length > 0
+        ? h("ul", { class: "rex-add-form-criteria", "aria-label": "Done when" },
+            criteria.map((text, i) =>
+              h("li", { key: `${i}-${text}`, class: "rex-add-form-criterion" },
+                h("span", { class: "rex-add-form-criterion-text" }, text),
+                h("button", {
+                  type: "button",
+                  class: "rex-add-form-criterion-remove",
+                  "aria-label": `Remove criterion: ${text}`,
+                  onClick: () => setCriteria((prev) => prev.filter((_, j) => j !== i)),
+                }, h(ActionIcon, { name: "close" })),
+              ),
+            ),
+          )
+        : null,
+      h("div", { class: "rex-add-form-criterion-entry" },
+        h("input", {
+          id: "add-form-criterion",
+          class: "rex-add-form-input",
+          type: "text",
+          value: criterionDraft,
+          placeholder: "One criterion, then Add...",
+          onInput: (e: Event) => setCriterionDraft((e.target as HTMLInputElement).value),
+          onKeyDown: (e: KeyboardEvent) => {
+            // IME confirmation can report isComposing=false with keyCode 229.
+            if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
+              e.preventDefault();
+              addCriterion();
+            }
+          },
+        }),
+        h("button", {
+          type: "button",
+          class: "rex-add-form-criterion-add",
+          disabled: !criterionDraft.trim(),
+          onClick: addCriterion,
+        }, "Add"),
+      ),
+    ),
+
+    // Tags
+    h("div", { class: "rex-add-form-field" },
+      h("label", { class: "rex-add-form-label", for: "add-form-tags" },
+        "Tags ",
+        h("span", { class: "rex-add-form-optional" }, "(optional, comma-separated)"),
+      ),
+      h("input", {
+        id: "add-form-tags",
+        class: "rex-add-form-input",
+        type: "text",
+        value: tagsText,
+        placeholder: "ui, sidecar...",
+        onInput: (e: Event) => setTagsText((e.target as HTMLInputElement).value),
+      }),
     ),
 
     // Actions

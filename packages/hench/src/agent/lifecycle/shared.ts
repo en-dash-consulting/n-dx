@@ -60,7 +60,8 @@ import {
 import { buildRunSummary } from "../analysis/summary.js";
 import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
-import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
+export { captureBaselineDirectories, type DirectoryBaseline } from "../analysis/review.js";
+import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths, type DirectoryBaseline } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import {
   formatMissingReviewRefusal,
@@ -1041,6 +1042,8 @@ export interface ReviewGateOptions {
    * agent-created files. See {@link captureBaselineUntracked}.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories; preserve all folders when the snapshot is unavailable. */
+  baselineDirectories?: DirectoryBaseline;
 }
 
 /**
@@ -1082,6 +1085,7 @@ export async function runReviewGate(
         yes: options.yes,
         autonomous: options.autonomous,
         baselineUntracked: options.baselineUntracked,
+        baselineDirectories: options.baselineDirectories,
         scope: "all",
       });
     }
@@ -1422,6 +1426,8 @@ export interface FinalizeRunOptions {
    * an untracked file that was already there is the user's, not the run's.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories; preserve all folders when the snapshot is unavailable. */
+  baselineDirectories?: DirectoryBaseline;
   /**
    * Every path dirty before the run started (via
    * {@link captureBaselineDirty}).
@@ -1632,10 +1638,14 @@ export async function promptRollbackConfirm(
       ? `${otherCount} other uncommitted file(s) are your work — hench leaves those alone.\n`
       : "";
   return askYesNoWithSuspendedSigint(
-    `\n${paths.length} uncommitted PRD file(s) — hench's own status writes from this run:\n` +
+    `\n${paths.length} uncommitted PRD file(s) in the rollback scope:\n` +
       `${renderPaths(paths)}\n` +
       others +
-      `Revert hench's writes and restore the pre-run PRD state? [Y/n] `,
+      `Only the listed paths are in scope; staged cross-boundary renames are preserved.\n` +
+      `Unstaged moves made with plain mv are not protected as renames.\n` +
+      `Restore listed tracked paths to HEAD; remove listed untracked files only if absent from the pre-run baseline.\n` +
+      `Pre-existing untracked files are preserved; without a baseline, all untracked files are preserved.\n` +
+      `Roll back these PRD paths? [Y/n] `,
     { interruptMode: "hold-then-exit", defaultYes: true },
   );
 }
@@ -1656,11 +1666,11 @@ export async function promptRollbackConfirm(
  *
  * The revert is prompt-only:
  * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
- *   names the dirty PRD paths and prompts `Revert hench's writes and restore
- *   the pre-run PRD state? [Y/n]`, defaulting to Yes — leaving hench's own
+ *   names the classified PRD paths and prompts `Roll back these PRD paths?
+ *   [Y/n]`, defaulting to Yes — leaving hench's own
  *   uncommitted writes in place is the damage, so a bare Enter reverts them.
  *   Only an explicit 'n'/'no' keeps them. Even then the scope narrows twice
- *   more: tracked changes are reverted only under the PRD paths, and
+ *   more: tracked changes are restored to HEAD only at the listed paths, and
  *   untracked removal is limited to files absent from the pre-run baseline
  *   (agent-created) *and* inside those paths, never pre-existing work.
  * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
@@ -1691,6 +1701,8 @@ interface PerformRollbackOptions {
    * this set are removed. When omitted, no untracked files are deleted.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories; preserve all folders when the snapshot is unavailable. */
+  baselineDirectories?: DirectoryBaseline;
 }
 
 async function performRollbackIfNeeded(
@@ -1748,7 +1760,8 @@ async function performRollbackIfNeeded(
   try {
     const result = await revertChanges(projectDir, {
       baselineUntracked: options.baselineUntracked,
-      ...(scope === "prd" ? { scope: PRD_COMMIT_PATHS } : {}),
+      baselineDirectories: options.baselineDirectories,
+      ...(scope === "prd" ? { paths: prd } : {}),
     });
     const removed = result.removedUntracked.length;
     const kept = result.keptUntracked.length;
@@ -3800,9 +3813,9 @@ async function keepAppliedCompletion(
   // Dirty before the run is the operator's, not the task's: listed apart, so
   // the commit commands cannot sweep it under the task's trailer (WM2048).
   const preexisting = new Set(baselineDirty);
-  const found = (await findUncommittedWork({ projectDir })).paths;
-  const paths = found.filter((p) => !preexisting.has(p));
-  const preRun = found.filter((p) => preexisting.has(p));
+  const found = await findUncommittedWork({ projectDir });
+  const paths = found.paths.filter((p) => !preexisting.has(p));
+  const preRun = found.paths.filter((p) => preexisting.has(p));
   const deleted = deletedAmong(projectDir, paths);
   run.error = formatAppliedCompletionKept({
     cause: reason,
@@ -3810,7 +3823,7 @@ async function keepAppliedCompletion(
     taskId,
     paths,
     deleted,
-    files: await prepareRecoveryPathspecs(projectDir, paths, deleted),
+    files: await prepareRecoveryPathspecs(projectDir, paths, deleted, found.renames),
     preRun,
   });
   info(`\n${run.error}`);
@@ -4820,7 +4833,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       uncommittedWorkRefused = true;
       run.status = "failed";
       const leakedDeleted = deletedAmong(projectDir, leaked.paths);
-      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted);
+      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted, leaked.renames);
       run.error = repairCommitError
         ? formatReviewRepairsUncommittedRefusal(
             leaked.paths,
@@ -5045,6 +5058,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       yes: opts.yes,
       autonomous: opts.autonomous,
       baselineUntracked: opts.baselineUntracked,
+      baselineDirectories: opts.baselineDirectories,
     });
   }
 

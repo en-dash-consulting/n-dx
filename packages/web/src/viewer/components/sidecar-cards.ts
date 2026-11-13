@@ -43,6 +43,9 @@ import { CopyTextButton } from "./copy-text-button.js";
 import { linkHref, linkText } from "./tracker-links.js";
 import { checkPlacementRequest, PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
 import { ExternalCallBody, ProblemList, type ExternalCallEdit } from "./sidecar-external-call.js";
+import { ItemEditBody, itemEditDraftOf, itemEditEdits, type ItemEditDraft } from "./sidecar-item-edit.js";
+import { StatusBody, statusLabel } from "./sidecar-status.js";
+import { ChoiceBody, choiceAnswerLine, choiceAnswerOf, EMPTY_CHOICE_DRAFT, type ChoiceDraft } from "./sidecar-choice.js";
 
 /** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
 export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
@@ -50,11 +53,14 @@ export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing 
 export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>> = {
   command: "Command",
   work: "Work",
-  "change-set": "Change set",
+  "change-set": "PRD edits",
   "run-plan": "Run plan",
   placement: "Placement",
   edit: "Edit",
   link: "Link",
+  "item-edit": "Item edit",
+  status: "Status",
+  choice: "Question",
   "network-read": "Network read",
   "draft-post": "Draft post",
   "draft-file": "Draft file",
@@ -100,7 +106,7 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
         return str(input.taskId) ? [cliName, ...workCommandArgs({ taskId: str(input.taskId), options, dir: "." })].join(" ") : "";
       }
       case "change-set": return count(input.items, "item", "items");
-      case "run-plan": return card.runPlan ? count(card.runPlan.lanes, "lane", "lanes") : "";
+      case "run-plan": return card.runPlan ? count(card.runPlan.lanes, "track", "tracks") : "";
       // The card's own placement, as approval will write it; the call's input only when the card carries none.
       case "placement":
         return card.placement ? placementTitle(card.placement) : str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
@@ -108,6 +114,13 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       // The card's own link, as approval will write it; the call's input only when the card carries none.
       case "link":
         return card.link ? `${card.link.itemId} → ${linkText(card.link.ref, card.link.label)}` : [str(input.itemId), str(input.ref)].filter(Boolean).join(" → ");
+      // The item and the fields approval writes.
+      case "item-edit":
+        return card.itemEdit ? `${card.itemEdit.itemId}: ${Object.keys(card.itemEdit.after).join(", ")}` : str(input.id);
+      // The item and its move, as the card read it.
+      case "status":
+        return card.statusChange ? `${card.statusChange.itemId}: ${statusLabel(card.statusChange.from)} → ${statusLabel(card.statusChange.to)}` : str(input.id);
+      case "choice": return card.choice?.question ?? str(input.question);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
       case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
       case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
@@ -142,19 +155,25 @@ export function sidecarCommandEffectsLine(card: SidecarCard, manifest: SidecarSt
 
 // ── Change-set card (story 11) ───────────────────────────────────────
 
-/** One item's fields as the operator is editing them; criteria one per line. */
+/**
+ * One item's fields as the operator is editing them; criteria and tags one
+ * per line, as the item-edit card takes them, so a tag holding a comma
+ * survives an edit to another field.
+ */
 export interface ChangeSetDraft {
   title: string;
   description: string;
   criteria: string;
+  tags: string;
 }
 
 type ChangeSetItem = NonNullable<SidecarCard["changeSet"]>["items"][number];
 
 const criteriaLines = (text: string): string[] => text.split("\n").map((l) => l.trim()).filter(Boolean);
+const tagList = (text: string): string[] => [...new Set(criteriaLines(text))];
 
 function draftOf(item: ChangeSetItem): ChangeSetDraft {
-  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n") };
+  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n"), tags: (item.tags ?? []).join("\n") };
 }
 
 /** The edits an approval sends: only the items, and fields, the operator changed. */
@@ -170,6 +189,8 @@ export function changeSetEdits(card: SidecarCard, drafts: Readonly<Record<number
     if (draft.description.trim() !== (item.description ?? "").trim()) edit.description = draft.description;
     const criteria = criteriaLines(draft.criteria);
     if (criteria.join("\n") !== (item.acceptanceCriteria ?? []).join("\n")) edit.acceptanceCriteria = criteria;
+    const tags = tagList(draft.tags);
+    if (tags.join("\n") !== (item.tags ?? []).join("\n")) edit.tags = tags;
     if (Object.keys(edit).length > 1) edits.push(edit);
   }
   return edits;
@@ -226,6 +247,7 @@ function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) 
                 h("input", { type: "text", class: "sidecar-change-set-title", "aria-label": `Title of ${label}`, value: draft.title, onInput: set("title") }),
                 h("textarea", { class: "sidecar-change-set-description", "aria-label": `Description of ${label}`, rows: 2, value: draft.description, onInput: set("description") }),
                 h("textarea", { class: "sidecar-change-set-criteria", "aria-label": `Done when (one per line) for ${label}`, rows: 2, placeholder: "Done when… (one per line)", value: draft.criteria, onInput: set("criteria") }),
+                h("textarea", { class: "sidecar-change-set-tags", "aria-label": `Tags (one per line) for ${label}`, rows: 1, placeholder: "Tags… (one per line)", value: draft.tags, onInput: set("tags") }),
               )
             : h("div", { class: "sidecar-change-set-fields" },
                 h("p", { class: "sidecar-change-set-title" }, item.title, written?.ids?.[index] ? h("code", null, ` ${written.ids[index]}`) : null),
@@ -233,6 +255,7 @@ function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) 
                 item.acceptanceCriteria?.length
                   ? h("ul", { class: "sidecar-change-set-criteria", "aria-label": "Done when" }, item.acceptanceCriteria.map((c) => h("li", null, c)))
                   : null,
+                item.tags?.length ? h("p", { class: "sidecar-change-set-tags", "aria-label": "Tags" }, item.tags.join(", ")) : null,
               ),
         );
       }),
@@ -282,7 +305,7 @@ export function runPlanRestartPrompt(plan: SidecarCard, lane: number): string {
   const first = planned?.tasks[0];
   const { options } = stepRunOptions(planned ? laneSteps(planned)[0] ?? "" : "");
   const withOptions = Object.keys(options).length > 0 ? ` with options ${JSON.stringify(options)}` : "";
-  return `Start lane ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""}${withOptions} only. Do not propose a new run plan.`;
+  return `Start track ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""}${withOptions} only. Do not propose a new run plan.`;
 }
 
 /**
@@ -336,27 +359,27 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
         const steps = laneSteps(lane);
         return h("li", { class: "sidecar-run-plan-lane", "data-lane": index, key: lane.changeId },
           h("div", { class: "sidecar-run-plan-lane-head" },
-            h("span", { class: "sidecar-run-plan-lane-title" }, `Lane ${index + 1} · change ${lane.changeId}`),
+            h("span", { class: "sidecar-run-plan-lane-title" }, `Track ${index + 1} · change ${lane.changeId}`),
             decidable
               ? h("button", {
                   type: "button",
                   class: "sidecar-run-plan-start",
                   disabled: deciding,
                   onClick: () => onStartLane(index),
-                }, "Start lane")
+                }, "Start track")
               : startAgain(card, index, cards, onRestartLane)
                 ? h("button", {
                     type: "button",
                     class: "sidecar-run-plan-start sidecar-run-plan-restart",
                     disabled: deciding,
                     onClick: () => onRestartLane!(index),
-                  }, "Start lane")
+                  }, "Start track")
                 : laneBadge(runPlanLaneState(card, index, cards)),
           ),
           lane.ownWorktree ? h("p", { class: "sidecar-run-plan-worktree" }, OWN_WORKTREE_NOTE) : null,
           h("ol", { class: "sidecar-run-plan-tasks" },
             lane.tasks.map((task, i) => h("li", { class: "sidecar-run-plan-task", key: task.id },
-              h("span", { class: "sidecar-run-plan-task-title" }, `${task.title}${i === 0 ? " (starts first)" : ""}`),
+              h("span", { class: "sidecar-run-plan-task-title" }, `${task.rowText ?? task.title}${i === 0 ? " (starts first)" : ""}`),
               h("span", { class: "sidecar-run-plan-task-reason" }, task.reason),
               h("code", { class: "sidecar-run-plan-command" }, steps[i] ?? lane.command),
             ))),
@@ -364,7 +387,7 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
       })),
     h("div", { class: "sidecar-run-plan-actions" },
       h(CopyTextButton, { text: runPlanCommands(plan), class: "sidecar-run-plan-copy", label: "Copy commands", caption: "Copy commands" }),
-      h("span", { class: "sidecar-run-plan-hint" }, "Start lane asks for one work card, for the lane's first task. Nothing runs without it."),
+      h("span", { class: "sidecar-run-plan-hint" }, "Start track asks for one work card, for the track's first task. Nothing runs without it."),
     ),
   );
 }
@@ -464,10 +487,11 @@ async function allowGithubReads(): Promise<void> {
 
 function settledNote(card: SidecarCard, state: SidecarCardState): string {
   switch (state) {
-    case "approved": return "Approved";
+    case "approved": return card.choice?.answer ? `Answered · ${choiceAnswerLine(card.choice.answer)}` : "Approved";
     case "allow-listed": return "Approved · allow-listed, runs without asking from now on";
     case "denied":
       if (card.status === "withdrawn") return `Denied · ${SIDECAR_SESSION_ENDED_REASON}`;
+      if (card.choice) return card.reason ? `Skipped · note sent to the agent: "${card.reason}"` : "Skipped · no answer given";
       return card.reason ? `Denied · note sent to the agent: "${card.reason}"` : "Denied";
     case "withdrawn": return `Withdrawn · ${card.reason ?? "the turn stopped"}`;
     case "pending": return "";
@@ -523,10 +547,16 @@ interface CardProps {
   /** The first waiting external-call card's arguments as edited; null while a field's text is not a value, undefined before any edit. */
   externalEdit: ExternalCallEdit | undefined;
   onExternalEdit: (edit: ExternalCallEdit) => void;
+  /** The first waiting item-edit card's fields as the operator is editing them. */
+  itemEditDraft: ItemEditDraft;
+  onItemEditDraft: (draft: ItemEditDraft) => void;
+  /** The first waiting choice card's picks. */
+  choiceDraft: ChoiceDraft;
+  onChoiceDraft: (draft: ChoiceDraft) => void;
   onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, itemEditDraft, onItemEditDraft, choiceDraft, onChoiceDraft, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   // A decided card is one line (head + note) until the operator opens its body.
   const [open, setOpen] = useState(false);
@@ -551,6 +581,21 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
     : card.placement
       ? [
           h(PlacementBody, { card, editable, onEdit: onPlacementEdit, edit: placementEdit }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
+    : card.itemEdit
+      ? [
+          h(ItemEditBody, { card, editable, draft: editable ? itemEditDraft : {}, onDraft: onItemEditDraft }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
+    : card.choice
+      ? h(ChoiceBody, {
+          card, editable, draft: editable ? choiceDraft : EMPTY_CHOICE_DRAFT, onDraft: onChoiceDraft,
+          onSend: () => { const answer = choiceAnswerOf(choiceDraft); if (answer) onDecide({ approve: true, answer }); },
+        })
+    : card.statusChange
+      ? [
+          h(StatusBody, { card }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
     : card.link
@@ -589,6 +634,9 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
         )
       : null,
     !folded && card.kind === "command" ? h("div", { class: "sidecar-card-effects" }, sidecarCommandEffectsLine(card, manifest)) : null,
+    !folded && card.kind === "work" && card.rowText
+      ? h("p", { class: "sidecar-card-note sidecar-card-runnable" }, card.rowText)
+      : null,
     !folded && card.preview !== undefined
       ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
       : null,
@@ -612,12 +660,19 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                 : h("button", {
                     type: "button", class: "sidecar-card-approve",
                     // Place waits for the dry-run line of the placement as edited; a call waits for every field to hold a value.
-                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)) || externalEdit === null,
-                    onClick: () => onDecide({ approve: true }),
+                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)) || externalEdit === null
+                      || (!!card.choice && !choiceAnswerOf(choiceDraft)),
+                    // A question is answered by sending the picks: its approval is the answer.
+                    onClick: () => {
+                      const choiceAnswer = card.choice ? choiceAnswerOf(choiceDraft) : null;
+                      onDecide(choiceAnswer ? { approve: true, answer: choiceAnswer } : { approve: true });
+                    },
                   },
-                    card.changeSet
+                    card.choice ? "Send"
+                    : card.changeSet
                       ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
                       : card.placement ? "Place"
+                      : card.itemEdit ? "Approve and write"
                       : draft ? "Post under your gh login" : card.kind === "draft-file" ? "Save file" : "Approve"),
               // Leaving the change in the Inbox settles the card as denied and writes nothing.
               card.placement
@@ -626,7 +681,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
               // Copy hands the draft to the operator and posts nothing: it settles the card as denied.
               draft ? h(DraftCopyButton, { text: str(card.input.body), deciding, onCopied: () => onDecide({ approve: false, reason: DRAFT_COPIED_REASON }) }) : null,
               h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) },
-                card.runPlan ? "Not now" : draft ? "Discard" : "Deny"),
+                card.runPlan ? "Not now" : draft ? "Discard" : card.choice ? "Skip" : "Deny"),
               card.kind === "network-read"
                 ? h("button", {
                     type: "button",
@@ -643,7 +698,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                     onClick: () => onDecide({ approve: true, remember: true }),
                   }, "Always allow")
                 : null,
-              h("span", { class: "sidecar-card-keys", "aria-hidden": "true" }, card.runPlan ? "⌘⌫ not now" : "⌘↵ approve · ⌘⌫ deny"),
+              h("span", { class: "sidecar-card-keys", "aria-hidden": "true" }, card.runPlan ? "⌘⌫ not now" : card.choice ? "⌘↵ send · ⌘⌫ skip" : "⌘↵ approve · ⌘⌫ deny"),
             ),
           )
         : h("p", { class: "sidecar-card-queued" }, "Decided after the card above"),
@@ -675,12 +730,19 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [deciding, setDeciding] = useState(false);
   const [path, setPath] = useState("");
   const [externalEdit, setExternalEdit] = useState<ExternalCallEdit | undefined>(undefined);
+  const [itemEditDraft, setItemEditDraft] = useState<ItemEditDraft>({});
+  const [choiceDraft, setChoiceDraft] = useState<ChoiceDraft>(EMPTY_CHOICE_DRAFT);
   const [decidedOpen, setDecidedOpen] = useState(false);
   const firstId = first?.id ?? null;
   const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
+  const firstItemEdit = first?.itemEdit;
 
-  // A note, a change set's or placement's edits, and a draft's path belong to the card they were typed on.
-  useEffect(() => { setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined); }, [firstId]);
+  // A note, a change set's, item edit's or placement's edits, and a draft's path belong to the card they were typed on.
+  useEffect(() => {
+    setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined);
+    setItemEditDraft(firstItemEdit ? itemEditDraftOf(firstItemEdit) : {});
+    setChoiceDraft(EMPTY_CHOICE_DRAFT);
+  }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
@@ -690,6 +752,14 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     if (first.placement && decision.approve && !placementDecidable(first, placementEdit)) return;
     // Nor of a call while a field's text is not a value of its type.
     if (first.kind === "external-call" && decision.approve && externalEdit === null) return;
+    // Nor of a question until a row is picked (or Other holds text): ⌘↵ sends what the card shows.
+    if (first.choice && decision.approve) {
+      const picked = decision.answer ?? choiceAnswerOf(choiceDraft);
+      if (!picked) return;
+      setDeciding(true);
+      try { await decide(first.id, { ...decision, answer: picked }); } finally { setDeciding(false); }
+      return;
+    }
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
@@ -702,6 +772,12 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
           const check = await checkPlacementRequest(first.placement.change, mine.body);
           setPlacementEdit((current) => (current === mine ? { ...mine, check } : current));
         }
+        return;
+      }
+      // The values the operator left on an item-edit card are what an approval writes.
+      if (decision.approve && first.itemEdit) {
+        const fields = itemEditEdits(first.itemEdit, itemEditDraft);
+        await decide(first.id, Object.keys(fields).length > 0 ? { ...decision, edits: fields } : decision);
         return;
       }
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];
@@ -757,6 +833,10 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       onPlacementEdit: setPlacementEdit,
       externalEdit: card.id === firstId ? externalEdit : undefined,
       onExternalEdit: setExternalEdit,
+      itemEditDraft: card.id === firstId ? itemEditDraft : {},
+      onItemEditDraft: setItemEditDraft,
+      choiceDraft: card.id === firstId ? choiceDraft : EMPTY_CHOICE_DRAFT,
+      onChoiceDraft: setChoiceDraft,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
       path,
       onPath: setPath,

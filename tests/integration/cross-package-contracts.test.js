@@ -540,6 +540,8 @@ describe("web → rex gateway contract", () => {
     "isRequirementCategory",
     "isValidationType",
     "handleEditItem",
+    "handleUpdateTaskStatus",
+    "validateTransition",
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
     "estimateCostFromTotals",
@@ -999,7 +1001,7 @@ describe("gateway export auto-detection", () => {
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
-        "collectAllIds", "findNextTask", "findNextWorkTask", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
+        "collectAllIds", "findNextTask", "findNextWorkTask", "findActionableWork", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "validateChangesMerge", "mergeChanges",
@@ -1012,7 +1014,7 @@ describe("gateway export auto-detection", () => {
         "detectReorganizations", "applyProposals", "applyReshape",
         "reasonForReshape", "isPriority",
         "isRequirementCategory", "isValidationType",
-        "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
+        "handleEditItem", "handleUpdateTaskStatus", "validateTransition", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "addChangeNode", "changeInputsFromProposals", "addProposedChanges", "cascadeParentReset", "cascadeParentCompletion",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
@@ -1025,7 +1027,9 @@ describe("gateway export auto-detection", () => {
         "parseApplyOn", "parsePlacementSettings",
         "suggestPlacements", "recordPlacement", "recordProposal", "recordUnplacement", "ChangePlacementError", "placementStrength", "draftChangePlacement",
         // The Sidecar change-set card flags proposed items with smart add's own matcher.
-        "findDuplicateItem"],
+        "findDuplicateItem",
+        // Ready to run shows a change with no tasks as one task.
+        "changeWorkShape"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);

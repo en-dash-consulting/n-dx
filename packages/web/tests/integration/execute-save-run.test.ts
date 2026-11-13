@@ -15,10 +15,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 
@@ -49,6 +49,8 @@ import type { ServerContext } from "../../src/server/types.js";
 import { loadPRDSync, refreshPRDCache } from "../../src/server/prd-io.js";
 import { handleHenchRoute, resetHenchRouteStateForTests } from "../../src/server/routes-hench.js";
 import { savedRunVersion } from "../../src/server/task-run-settings.js";
+import { defaultsRunBlockOf } from "../../src/viewer/components/prepare-task-model.js";
+import { prepFixture } from "../helpers/prep-fixture.js";
 import { startRouteTestServer, closeRouteTestServer } from "../helpers/server-route-test-support.js";
 
 const BLOCK = {
@@ -301,5 +303,93 @@ describe("POST /api/hench/execute with saveRun", () => {
 
     expect(res.status).toBe(202);
     expect(await storedRun()).toEqual({ tier: "heavy" });
+  });
+
+  describe("on a v2 tree", () => {
+    const SOLO = "c0000000-0000-4000-8000-0000000000a1";
+    const WITH_TASKS = "c0000000-0000-4000-8000-000000000001";
+    let intentAtSpawn: string;
+
+    beforeEach(async () => {
+      await rm(ctx.rexDir, { recursive: true });
+      await cp(resolve(__dirname, "../../../rex/tests/fixtures/v2-tree"), ctx.rexDir, { recursive: true });
+      const soloDir = join(ctx.rexDir, "changes", "solo-change");
+      await mkdir(soloDir);
+      await writeFile(join(soloDir, "index.md"), [
+        "---", `id: "${SOLO}"`, 'type: "change"', 'title: "Solo change"',
+        'slug: "solo-change"', 'intent: "Run as one task."', "---", "",
+      ].join("\n"));
+      refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
+      intentAtSpawn = "";
+      mocks.spawnManaged.mockImplementation(() => {
+        runAtSpawn = loadPRDSync(ctx.rexDir)?.items.find((item) => item.id === SOLO)?.run ?? null;
+        intentAtSpawn = readFileSync(join(soloDir, "index.md"), "utf8");
+        return { done: new Promise(() => {}), kill: vi.fn(() => true), pid: 4242 };
+      });
+    });
+
+    it("saves a task-less change's project defaults before starting, including unlisted model pins", async () => {
+      const model = "claude-unlisted-9-9";
+      const reviewModel = "claude-unlisted-reviewer-9";
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({
+        llm: { vendor: "claude", claude: { model, reviewModel } },
+        hench: { review: { mode: "self" } },
+      }));
+      const prep = prepFixture({ resolved: {
+        ...prepFixture().resolved,
+        model: { value: model, source: "llm.claude.model" },
+        review: { value: true, source: "hench.review.mode" },
+        reviewMode: { value: "self", source: "hench.review.mode" },
+        reviewModel: { value: reviewModel, source: "llm.claude.reviewModel", vendorDefault: reviewModel },
+      } });
+      const run = defaultsRunBlockOf(prep);
+      expect(run).toMatchObject({ models: { claude: model }, reviewModels: { claude: reviewModel } });
+
+      const res = await execute({ taskId: SOLO, saveRun: { run, version: prep.savedVersion } });
+
+      expect(res.status, JSON.stringify(await res.clone().json())).toBe(202);
+      expect(mocks.spawnManaged).toHaveBeenCalledTimes(1);
+      expect(mocks.spawnManaged.mock.calls[0][1]).toContain(`--task=${SOLO}`);
+      expect(runAtSpawn).toEqual(run);
+      expect(intentAtSpawn).toContain(model);
+      expect(intentAtSpawn).toContain(reviewModel);
+      expect((await (await resolveStore(ctx.rexDir)).getItem(SOLO))?.run).toEqual(run);
+    });
+
+    it("refuses a change with tasks without saving or spawning", async () => {
+      const before = hashTree(ctx.rexDir);
+      const res = await execute({ taskId: WITH_TASKS, saveRun: { run: BLOCK, version: "none" } });
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/does not run as one task.*n-dx work.*save.*tasks/i);
+      expect(mocks.spawnManaged).not.toHaveBeenCalled();
+      expect(hashTree(ctx.rexDir)).toBe(before);
+    });
+
+    it("preserves a task-less change's saved settings when the request has a stale version", async () => {
+      const store = await resolveStore(ctx.rexDir);
+      await store.updateItem(SOLO, { run: { tier: "heavy" } });
+      refreshPRDCache(ctx.rexDir, await store.loadDocument());
+      const before = hashTree(ctx.rexDir);
+
+      const res = await execute({ taskId: SOLO, saveRun: { run: BLOCK, version: "none" } });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ conflict: true, saved: { tier: "heavy" } });
+      expect(mocks.spawnManaged).not.toHaveBeenCalled();
+      expect(hashTree(ctx.rexDir)).toBe(before);
+    });
+
+    it("starts a task-less change with saved settings without replacing them with defaults", async () => {
+      const store = await resolveStore(ctx.rexDir);
+      await store.updateItem(SOLO, { run: { tier: "heavy" } });
+      refreshPRDCache(ctx.rexDir, await store.loadDocument());
+
+      const res = await execute({ taskId: SOLO });
+
+      expect(res.status).toBe(202);
+      expect(runAtSpawn).toEqual({ tier: "heavy" });
+      expect((await store.getItem(SOLO))?.run).toEqual({ tier: "heavy" });
+    });
   });
 });

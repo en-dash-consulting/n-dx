@@ -25,7 +25,7 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments? }`; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments?, answer? }`; `answer` (`{ selected: string[], other? }`), only on a choice-card approval and required there; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval (a list of item edits), an item-edit approval (an object of the card's fields) or a placement approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | GET  | `/api/sidecar/ledger/latest` | each open session's latest `unfinished` and `decision` notes, which the hub snapshot shows per worktree |
  * | POST | `/api/sidecar/handoff` | the hub's drill-down (`{ question, vendor }`): resume the latest open session or create one, leave a `handoff` entry naming the question, carry the ledger on its next turn |
@@ -90,9 +90,11 @@ import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardS
 import { awaitSidecarCommand, renderWorkPreview, runFailedResult, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { readLinkCall, writeLinkCard } from "./tracker/link-card.js";
+import { readItemEditCall, writeItemEditCard } from "./sidecar/item-edit-card.js";
+import { readStatusCall, writeStatusCard } from "./sidecar/status-card.js";
 import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
-import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
+import { describeRunnable, judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -130,7 +132,7 @@ import {
   type SidecarTurnOutcome,
   type WorktreeSidecarRegistryOptions,
 } from "./sidecar/session-registry.js";
-import { hubVendorRefusal, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
+import { codexUserProviderRefusal, hubVendorRefusal, sidecarCodexProjectFlags, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
 import {
@@ -445,6 +447,7 @@ export function sidecarActions(
         : { ok: false, text: `No GitHub facts for ${read.ref}: ${githubReason ?? "gh did not answer"}` };
     },
     postGithub: (draft) => postGithubDraft(exec, ctx.projectDir, draft),
+    describeWork: (taskId) => describeRunnable(ctx, taskId),
     async previewWork(taskId, options) {
       const read = await resolveTaskRun(ctx, taskId, options);
       const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);
@@ -486,6 +489,22 @@ export function sidecarActions(
     },
     async writeLink(link) {
       const written = await writeLinkCard(ctx, link);
+      if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      return written;
+    },
+    checkItemEdit(input) {
+      return readItemEditCall(ctx.rexDir, input);
+    },
+    async writeItemEdit(itemEdit) {
+      const written = await writeItemEditCard(ctx, itemEdit);
+      if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      return written;
+    },
+    checkStatus(input) {
+      return readStatusCall(ctx.rexDir, input);
+    },
+    async writeStatus(change) {
+      const written = await writeStatusCard(ctx, change);
       if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
       return written;
     },
@@ -619,17 +638,6 @@ function defaultBrokerFor(projectDir: string, broadcast: WebSocketBroadcaster): 
   }
   return broker;
 }
-
-/**
- * Why a Codex Sidecar session is refused. `codex exec resume` takes its
- * sandbox and approval policy from the invocation's config, not the thread,
- * so from the second turn the user's `~/.codex/config.toml` would decide and
- * the session could write the worktree with no card. Re-applying the policy
- * on resume is PRD item 31307b89; until it lands, Codex is refused at create
- * and at every turn.
- */
-export const CODEX_SIDECAR_UNAVAILABLE =
-  "Codex Sidecar sessions are unavailable until a resumed turn keeps the read-only sandbox";
 
 /** Answer an error; true, so a handler can `return refuse(…)`. */
 function refuse(res: ServerResponse, status: number, message: string): true {
@@ -1386,13 +1394,14 @@ function readNameAndModel(body: Record<string, unknown>): { name?: string; model
 function createWorktreeSession(registry: SidecarSessionRegistry, worktree: string, body: Record<string, unknown>): CreateAnswer {
   const vendor = optionalString(body, "vendor");
   if (!vendor || vendor instanceof Error || !vendorSessionDriver(vendor)) {
-    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude)` };
+    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude, codex)` };
   }
-  if (vendor === "codex") return { status: 400, error: CODEX_SIDECAR_UNAVAILABLE };
   const fields = readNameAndModel(body);
   if (fields instanceof Error) return { status: 400, error: fields.message };
   const lens = optionalString(body, "lens");
   if (lens instanceof Error) return { status: 400, error: lens.message };
+  const refusal = vendor === "codex" ? codexUserProviderRefusal() : null;
+  if (refusal) return { status: 400, error: refusal };
   const target = readTarget(body);
   if (target instanceof Error) return { status: 400, error: target.message };
   const session = registry.create({
@@ -1490,8 +1499,16 @@ async function handleSessionRoutes(
       const prompt = body.prompt;
       if (typeof prompt !== "string" || !prompt.trim()) return refuse(res, 400, `"prompt" must be a non-empty string`);
       if (session.endedAt) return refuse(res, 409, `Sidecar session ${id} has ended`);
-      // A Codex session indexed before the create refusal must not resume without its sandbox.
-      if (session.vendor === "codex") return refuse(res, 409, CODEX_SIDECAR_UNAVAILABLE);
+      // Refused here, so no turn is recorded; the spawn reads the files again.
+      if (session.vendor === "codex") {
+        const refusal = codexUserProviderRefusal();
+        if (refusal) return refuse(res, 409, refusal);
+        try {
+          sidecarCodexProjectFlags(session.worktree);
+        } catch (err) {
+          return refuse(res, 409, errorMessage(err));
+        }
+      }
       if (registry.isRunning(id)) return refuse(res, 409, `A turn is already running in Sidecar session ${id}`);
       startTurn(registry, broker, id, prompt, broadcast);
       const started = registry.get(id) ?? session;
@@ -1532,6 +1549,9 @@ async function handleSessionRoutes(
       if (body.arguments !== undefined && (typeof body.arguments !== "object" || body.arguments === null || Array.isArray(body.arguments))) {
         return refuse(res, 400, `"arguments" must be an object`);
       }
+      if (body.answer !== undefined && (typeof body.answer !== "object" || body.answer === null || Array.isArray(body.answer))) {
+        return refuse(res, 400, `"answer" must be an object`);
+      }
       // A placement card's edit is a placement: dry-run it, against the dry run the operator reviewed, before the card is touched.
       const waiting = broker.cards(id).find((c) => c.id === cardId);
       let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, PlacementEditRefusal> | undefined;
@@ -1549,6 +1569,7 @@ async function handleSessionRoutes(
           ...(body.lane !== undefined && { lane: body.lane }),
           ...(body.path !== undefined && { path: body.path }),
           ...(body.arguments !== undefined && { arguments: body.arguments }),
+          ...(body.answer !== undefined && { answer: body.answer }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {

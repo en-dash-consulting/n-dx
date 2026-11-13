@@ -61,6 +61,15 @@ describe("v2 brief", () => {
     expect(brief.changeBrief).toEqual(expected.sections.map((sec) => ({ name: sec.name, text: sec.text })));
   });
 
+  it("names the unit's change: a task in its change, a task-less change as a change", async () => {
+    const { brief } = await assembleTaskBrief(await store(), WIRE_ID);
+    expect(brief.workUnit).toEqual({ kind: "task", changeTitle: "Add Apple Pay" });
+
+    await rm(join(rexDir, "changes", "add-apple-pay", "wire-the-button.md"));
+    const { brief: changeBrief } = await assembleTaskBrief(await store(), "c0000000-0000-4000-8000-000000000001");
+    expect(changeBrief.workUnit).toEqual({ kind: "change", changeTitle: "Add Apple Pay" });
+  });
+
   it("carries the change and the capability it amends, not the v1 parent chain", async () => {
     const { brief } = await assembleTaskBrief(await store(), WIRE_ID);
     const text = formatTaskBrief(brief);

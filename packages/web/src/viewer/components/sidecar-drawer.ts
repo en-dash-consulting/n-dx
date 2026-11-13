@@ -27,7 +27,7 @@ import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions, NewSessionButton } from "./sidecar-sessions.js";
 import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
 import {
-  TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultIsError,
+  TOOL_STATUS_TEXT, cardIsForCall, connectionLabelsFromCards, parseToolName, toolLineStatus, toolResultFailed,
 } from "./sidecar-tool-names.js";
 import type { ToolLineCard } from "./sidecar-tool-names.js";
 import { useHubProjects } from "./project-switcher.js";
@@ -116,7 +116,7 @@ function notesLabel(notes: number): string {
   return notes === 1 ? "1 note carried over" : `${notes} notes carried over`;
 }
 
-type ToolResult = NonNullable<SidecarRuntimeEvent["toolResult"]>;
+type ToolResult = NonNullable<SidecarRuntimeEvent["toolResult"]> & Pick<SidecarRuntimeEvent, "vendor">;
 
 const SUMMARY_KEYS = ["command", "file_path", "path", "pattern", "query", "url", "description", "prompt"];
 const SUMMARY_MAX = 80;
@@ -152,7 +152,7 @@ export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, To
         : named >= 0 ? named : open.length > 0 ? 0 : -1;
       if (index < 0) continue;
       const [call] = open.splice(index, 1);
-      paired.set(call.seq, event.toolResult);
+      paired.set(call.seq, { ...event.toolResult, vendor: event.vendor });
     }
   }
   return paired;
@@ -186,7 +186,7 @@ function SidecarToolRow({ seq, call, result, card, connectionLabels }: {
 }) {
   const [expanded, setExpanded] = useState(false);
   const bodyId = `sidecar-tool-${seq}`;
-  const status = toolLineStatus(card, result !== undefined, result !== undefined && toolResultIsError(result.output));
+  const status = toolLineStatus(card, result !== undefined, result !== undefined && toolResultFailed(result));
   return h("li", { class: "sidecar-tool", "data-seq": seq },
     h("button", {
       type: "button",

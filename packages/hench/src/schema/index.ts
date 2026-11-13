@@ -75,6 +75,7 @@ export type {
   RunSessionRecord,
   TaskBrief,
   TaskBriefChangeSection,
+  TaskBriefWorkUnit,
   TaskBriefTask,
   TaskBriefParent,
   TaskBriefSibling,

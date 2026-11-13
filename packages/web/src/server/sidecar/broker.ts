@@ -30,8 +30,10 @@ import {
   type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarExternalCall, SidecarLink, SidecarPlacement } from "../../shared/index.js";
+import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarChoice, SidecarExternalCall, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
+import { applyItemEditEdits } from "./item-edit-card.js";
+import { readChoiceAnswer } from "./choice-card.js";
 import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
 import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { resolveDraftPath } from "./draft-file.js";
@@ -51,6 +53,8 @@ export interface SidecarCard {
   preview?: string;
   /** A work card's run options as start uses them (`workOptions`), defaults applied; the viewer titles the card from these. */
   runOptions?: Record<string, unknown>;
+  /** A work card's row: the task and the change it sits in, as the PRD read when the card was raised. */
+  rowText?: string;
   /** A change-set card's items as approval writes them, read against the PRD before the card was raised. */
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan as the planner printed it when the card was raised; its commands are never the model's. */
@@ -59,6 +63,12 @@ export interface SidecarCard {
   placement?: SidecarPlacement;
   /** A link card's item, work ref and tracker label as approval writes them, read when the card was raised. */
   link?: SidecarLink;
+  /** An item-edit card's fields as read when it was raised and as approval writes them. */
+  itemEdit?: SidecarItemEdit;
+  /** A status card's item, current and proposed status and rex's verdict on the move. */
+  statusChange?: SidecarStatusChange;
+  /** A choice card's question and options, and the answer once the operator sends one. */
+  choice?: SidecarChoice;
   /** An external-call card's connection, workspace, input schema and picker choices. */
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator chose to start on a run-plan card. */
@@ -70,24 +80,28 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow": its rule went onto the allow-list. */
   remembered?: true;
-  /** The operator edited the change set, the placement, a draft file's path or an external call's arguments before approving it. */
+  /** The operator edited the change set, the item edit, the placement, a draft file's path or an external call's arguments before approving it. */
   edited?: true;
   /**
    * How the approved call's effect ended; `ids` are the PRD items a change-set
    * card wrote, `problems` the list an external server's validation error
    * returned (the session got the result unchanged).
    */
-  carriedOut?: { ok: boolean; ids?: string[]; problems?: SidecarCallProblem[] };
+  carriedOut?: { ok: boolean; ids?: string[]; held?: boolean; problems?: SidecarCallProblem[] };
 }
 
 /** What the broker reads before raising a card, for the operator to see on it. */
 export interface CardAnnex {
   preview?: string;
   runOptions?: Record<string, unknown>;
+  rowText?: string;
   changeSet?: SidecarChangeSet;
   runPlan?: QueuePlan;
   placement?: SidecarPlacement;
   link?: SidecarLink;
+  itemEdit?: SidecarItemEdit;
+  statusChange?: SidecarStatusChange;
+  choice?: SidecarChoice;
   externalCall?: SidecarExternalCall;
 }
 
@@ -101,7 +115,10 @@ export interface CardDecision {
   reason?: string;
   /** Also add the call's rule to the allow-list. Refused for a call that can never be allow-listed. */
   remember?: boolean;
-  /** A change-set card's item edits, written by the approval. Refused on any other card or decision. */
+  /**
+   * A change-set card's item edits (a list), or an item-edit card's field
+   * values (an object), written by the approval. Refused on any other card or decision.
+   */
   edits?: unknown;
   /**
    * A placement card's edited placement, already read and dry-run against the
@@ -120,6 +137,8 @@ export interface CardDecision {
    * did not send cannot be added.
    */
   arguments?: unknown;
+  /** A choice card's answer: the labels picked and any Other text. Required on a choice approval, refused elsewhere. */
+  answer?: unknown;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -222,10 +241,14 @@ export class SidecarBroker {
       allowListKey: key,
       ...(annex.preview !== undefined && { preview: annex.preview }),
       ...(annex.runOptions !== undefined && { runOptions: annex.runOptions }),
+      ...(annex.rowText !== undefined && { rowText: annex.rowText }),
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
       ...(annex.placement !== undefined && { placement: annex.placement }),
       ...(annex.link !== undefined && { link: annex.link }),
+      ...(annex.itemEdit !== undefined && { itemEdit: annex.itemEdit }),
+      ...(annex.statusChange !== undefined && { statusChange: annex.statusChange }),
+      ...(annex.choice !== undefined && { choice: annex.choice }),
       ...(annex.externalCall !== undefined && { externalCall: annex.externalCall }),
       status: "pending",
       raisedAt: this.iso(),
@@ -325,12 +348,20 @@ export class SidecarBroker {
     const { card } = entry;
     // Every refusal comes before anything is changed.
     let edited: SidecarChangeSet | undefined;
+    let editedItem: SidecarItemEdit | undefined;
     if (decision.edits !== undefined) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries edits");
-      if (!card.changeSet) throw new BrokerDecisionError(409, `A ${card.kind} card takes no edits`);
-      const applied = applyChangeSetEdits(card.changeSet, decision.edits);
-      if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
-      edited = applied;
+      if (card.changeSet) {
+        const applied = applyChangeSetEdits(card.changeSet, decision.edits);
+        if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
+        edited = applied;
+      } else if (card.itemEdit) {
+        const applied = applyItemEditEdits(card.itemEdit, decision.edits);
+        if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
+        if (!isDeepStrictEqual(applied, card.itemEdit)) editedItem = applied;
+      } else {
+        throw new BrokerDecisionError(409, `A ${card.kind} card takes no edits`);
+      }
     }
     if (decision.placement !== undefined) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries an edited placement");
@@ -368,6 +399,14 @@ export class SidecarBroker {
       }
       if (!isDeepStrictEqual(next, agent)) editedArguments = next;
     }
+    let answered: SidecarChoice | undefined;
+    if (card.choice && decision.approve) {
+      const answer = readChoiceAnswer(card.choice, decision.answer);
+      if (typeof answer === "string") throw new BrokerDecisionError(400, answer);
+      answered = { ...card.choice, answer };
+    } else if (decision.answer !== undefined) {
+      throw new BrokerDecisionError(409, card.choice ? "Only an approval carries an answer" : `A ${card.kind} card takes no answer`);
+    }
     if (decision.remember) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval can be remembered");
       if (card.allowListKey === null) {
@@ -378,6 +417,10 @@ export class SidecarBroker {
     }
     if (edited) {
       card.changeSet = edited;
+      card.edited = true;
+    }
+    if (editedItem) {
+      card.itemEdit = editedItem;
       card.edited = true;
     }
     if (editedPath !== undefined && editedPath !== card.input.path) {
@@ -392,6 +435,7 @@ export class SidecarBroker {
       card.input = { ...card.input, arguments: editedArguments };
       card.edited = true;
     }
+    if (answered) card.choice = answered;
     if (decision.lane !== undefined) card.lane = decision.lane;
     this.settle(cardId, decision.approve ? "approved" : "denied", decision.reason);
     return { ...card };

@@ -215,6 +215,12 @@ export interface RuntimeEvent {
     readonly durationMs: number;
     /** The id of the {@link RuntimeEvent.toolCall} this answers, when known. */
     readonly id?: string;
+    /**
+     * Whether the call failed, when the vendor's stream says so (Claude's
+     * `is_error`, a Codex item's failed status or non-zero exit code).
+     * Absent means unknown, not success.
+     */
+    readonly isError?: boolean;
   };
 
   /** Token usage for this turn or cumulative (type: "token_usage"). */
