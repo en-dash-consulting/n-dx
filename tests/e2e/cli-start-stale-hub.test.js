@@ -21,7 +21,7 @@
  * @see packages/core/hub-replacement.js — the decision and its wording
  * @see tests/unit/hub-replacement.test.js — the same rules as pure functions
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -232,12 +232,21 @@ function expectNoManualRestart(text) {
   expect(advice).not.toMatch(/pnpm/);
 }
 
-/** Every project from hub.json, and the one just started, is healthy on the new hub. */
-async function expectProjectsServedAgain(port) {
-  const projects = await hubGet(port, "/api/hub/projects");
-  expect(projects.status).toBe(200);
-  const states = Object.fromEntries(projects.body.projects.map((p) => [p.id, p.status.state]));
-  expect(states).toMatchObject({ "alpha-app": "healthy", "beta-app": "healthy", "omega-app": "healthy" });
+/**
+ * Every project from hub.json, and the one just started, is healthy on the new hub.
+ * A replacement waits for them before ndx start returns, so by default they are
+ * checked at once. `settleMs`: the hub was started on a port already free, and
+ * brings hub.json's projects back on its own, after ndx start has returned.
+ */
+async function expectProjectsServedAgain(port, { settleMs = 0 } = {}) {
+  const allHealthy = async () => {
+    const projects = await hubGet(port, "/api/hub/projects");
+    expect(projects.status).toBe(200);
+    const states = Object.fromEntries(projects.body.projects.map((p) => [p.id, p.status.state]));
+    expect(states).toMatchObject({ "alpha-app": "healthy", "beta-app": "healthy", "omega-app": "healthy" });
+  };
+  if (settleMs > 0) await vi.waitFor(allHealthy, { timeout: settleMs, interval: 250 });
+  else await allHealthy();
   // The same /p/<id>/ URL reaches each one's own server.
   for (const id of ["alpha-app", "beta-app"]) {
     const status = await hubGet(port, `/p/${id}/api/status`);
@@ -633,7 +642,7 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
       expect(result.stdout).toContain(`n-dx hub started on http://127.0.0.1:${older.port}`);
       expect(result.stdout).toContain("ndx_nonce=");
       expectNoManualRestart(result.stdout + result.stderr);
-      await expectProjectsServedAgain(older.port);
+      await expectProjectsServedAgain(older.port, { settleMs: 30_000 });
     });
   });
 
