@@ -360,7 +360,7 @@ ndx config hench.testGate.hostSlot true .
 ```
 
 The slot alone had no failed runs in the [benchmark](#validation-benchmark)
-and finished 19–48% faster than the slot with a worker cap, so this repository
+and took 19–48% less batch time than the slot with a worker cap, so this repository
 sets no cap. Use the cap ([above](#capping-test-workers)) only for runs the
 slot does not cover.
 
