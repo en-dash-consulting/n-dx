@@ -1,6 +1,10 @@
+import { readdir, lstat, rmdir } from "node:fs/promises";
+import { join, posix } from "node:path";
 import { createInterface } from "node:readline";
-import { execStdout } from "../../process/exec.js";
-import { matchesProjectPath } from "../../store/artifacts.js";
+import { exec, execStdout } from "../../process/exec.js";
+import { matchesProjectPath, repoRelativePrefix } from "../../store/artifacts.js";
+import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { stateDirNameUnder, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME } from "../../store/paths.js";
 import { section, subsection, info } from "../../types/output.js";
 
 /**
@@ -149,6 +153,8 @@ export interface RevertOptions {
    * scratch files from the user's own uncommitted work, so we delete nothing.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories, including empty ones. Unknown means no directory pruning. */
+  baselineDirectories?: DirectoryBaseline;
   /**
    * Path prefixes the revert is confined to. When set, tracked changes are
    * reverted only under these paths and only agent-created untracked files
@@ -198,6 +204,125 @@ export async function listUntrackedPaths(
     timeout,
   });
   return output.split("\0").filter(Boolean);
+}
+
+/** Repository-relative directories, including boundaries we deliberately did not read. */
+export interface DirectoryBaseline {
+  directories: string[];
+  /** Preserve these directories AND every descendant, even if ignore rules change. */
+  unscanned: string[];
+}
+
+// Git can precompose names that readdir reports decomposed on macOS. Preserve
+// those aliases, as well as case-only aliases on insensitive filesystems.
+function directoryKey(path: string): string {
+  return path.normalize("NFC").toLowerCase();
+}
+
+/**
+ * Snapshot empty directories only where PRD rollback needs recursive cleanup.
+ * Both CLI/API loops call this before execution; review rejection can also
+ * revert source files. Keep that file behavior, but conservatively preserve
+ * subtrees outside the PRD instead of walking dependencies, worktrees or caches.
+ * Never follow symlinks or enter Git metadata. A failed scan disables pruning.
+ */
+export async function captureBaselineDirectories(projectDir: string): Promise<DirectoryBaseline | undefined> {
+  const root = (await execStdout("git", ["rev-parse", "--show-toplevel"], {
+    cwd: projectDir, timeout: DEFAULT_TIMEOUT,
+  })).trim();
+  if (!root) return undefined;
+  const prefix = await repoRelativePrefix(projectDir);
+  const scanRoots = (["legacy", "ndx"] as const).flatMap((layout) =>
+    [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME].map((tree) =>
+      directoryKey(`${prefix}${stateDirNameUnder("rex", layout)}/${tree}`)));
+  const baseline: DirectoryBaseline = { directories: [], unscanned: [] };
+  const pending = [""];
+  try {
+    while (pending.length > 0) {
+      const parents = pending.splice(0);
+      const ignored = new Set<string>();
+      if (parents[0] !== "") {
+        // One NUL-delimited batch per depth, not one process per directory.
+        // --no-index also preserves ignored folders containing tracked files.
+        const result = await exec("git", ["check-ignore", "--no-index", "-z", "--stdin"], {
+          cwd: root, timeout: DEFAULT_TIMEOUT,
+          input: parents.map((path) => `${path}/\0`).join(""),
+        });
+        if (!result.launched || (result.exitCode !== 0 && result.exitCode !== 1) ||
+          (result.exitCode === 0 && result.error)) {
+          throw new Error("Could not determine ignored directory boundaries");
+        }
+        for (const path of result.stdout.split("\0").filter(Boolean)) {
+          ignored.add(directoryKey(path.replace(/\/$/, "")));
+        }
+      }
+      for (const parent of parents) {
+        if (ignored.has(directoryKey(parent))) {
+          baseline.unscanned.push(parent);
+          continue;
+        }
+        for (const entry of await readdir(join(root, parent), { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const path = parent ? `${parent}/${entry.name}` : entry.name;
+          baseline.directories.push(path);
+          const key = directoryKey(path);
+          if (entry.name !== ".git" && scanRoots.some((scope) =>
+            key === scope || key.startsWith(`${scope}/`) || scope.startsWith(`${key}/`))) {
+            pending.push(path);
+          } else {
+            baseline.unscanned.push(path);
+          }
+        }
+      }
+    }
+    return baseline;
+  } catch (err) {
+    info(`Directory baseline unavailable; rollback will preserve folders: ${(err as Error).message}`);
+    return undefined;
+  }
+}
+
+/** Remove only empty, new ancestors of files this rollback removed. */
+async function pruneEmptiedDirectories(
+  projectDir: string,
+  files: string[],
+  baselineDirectories: DirectoryBaseline,
+  timeout: number,
+): Promise<void> {
+  const root = (await execStdout("git", ["rev-parse", "--show-toplevel"], {
+    cwd: projectDir, timeout,
+  })).trim();
+  if (!root) return;
+  const baseline = new Set(baselineDirectories.directories.map(directoryKey));
+  const unscanned = baselineDirectories.unscanned.map(directoryKey);
+  const candidates = new Set<string>();
+  for (const file of files) {
+    const key = directoryKey(file);
+    if (unscanned.some((path) => key === path || key.startsWith(`${path}/`))) continue;
+    for (let parent = posix.dirname(file); parent !== "."; parent = posix.dirname(parent)) {
+      if (baseline.has(directoryKey(parent))) break;
+      candidates.add(parent);
+    }
+  }
+  // Children first. rmdir is deliberately non-recursive: ignored files, user
+  // work and unrelated empty subdirectories must all prevent removal.
+  for (const path of [...candidates].sort((a, b) => b.split("/").length - a.split("/").length)) {
+    try {
+      // Do not follow a directory replaced with a symlink during the run.
+      let parent = root;
+      let directory = true;
+      for (const part of path.split("/")) {
+        parent = join(parent, part);
+        if (!(await lstat(parent)).isDirectory()) { directory = false; break; }
+      }
+      if (directory) await rmdir(join(root, path));
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      // Already gone or still occupied are normal outcomes, not permission
+      // to recurse. Other failures must reach the rollback diagnostic.
+      if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw err;
+    }
+  }
 }
 
 /**
@@ -297,6 +422,10 @@ export async function revertChanges(
       cwd: projectDir,
       timeout,
     });
+  }
+
+  if (agentCreated.length > 0 && options.baselineDirectories !== undefined) {
+    await pruneEmptiedDirectories(projectDir, agentCreated, options.baselineDirectories, timeout);
   }
 
   return { removedUntracked: agentCreated, keptUntracked: preExisting };

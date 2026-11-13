@@ -60,7 +60,8 @@ import {
 import { buildRunSummary } from "../analysis/summary.js";
 import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
-import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
+export { captureBaselineDirectories, type DirectoryBaseline } from "../analysis/review.js";
+import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths, type DirectoryBaseline } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import {
   formatMissingReviewRefusal,
@@ -1041,6 +1042,8 @@ export interface ReviewGateOptions {
    * agent-created files. See {@link captureBaselineUntracked}.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories; preserve all folders when the snapshot is unavailable. */
+  baselineDirectories?: DirectoryBaseline;
 }
 
 /**
@@ -1082,6 +1085,7 @@ export async function runReviewGate(
         yes: options.yes,
         autonomous: options.autonomous,
         baselineUntracked: options.baselineUntracked,
+        baselineDirectories: options.baselineDirectories,
         scope: "all",
       });
     }
@@ -1422,6 +1426,8 @@ export interface FinalizeRunOptions {
    * an untracked file that was already there is the user's, not the run's.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories; preserve all folders when the snapshot is unavailable. */
+  baselineDirectories?: DirectoryBaseline;
   /**
    * Every path dirty before the run started (via
    * {@link captureBaselineDirty}).
@@ -1694,6 +1700,8 @@ interface PerformRollbackOptions {
    * this set are removed. When omitted, no untracked files are deleted.
    */
   baselineUntracked?: string[];
+  /** Pre-run directories; preserve all folders when the snapshot is unavailable. */
+  baselineDirectories?: DirectoryBaseline;
 }
 
 async function performRollbackIfNeeded(
@@ -1751,6 +1759,7 @@ async function performRollbackIfNeeded(
   try {
     const result = await revertChanges(projectDir, {
       baselineUntracked: options.baselineUntracked,
+      baselineDirectories: options.baselineDirectories,
       ...(scope === "prd" ? { paths: prd } : {}),
     });
     const removed = result.removedUntracked.length;
@@ -5048,6 +5057,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       yes: opts.yes,
       autonomous: opts.autonomous,
       baselineUntracked: opts.baselineUntracked,
+      baselineDirectories: opts.baselineDirectories,
     });
   }
 

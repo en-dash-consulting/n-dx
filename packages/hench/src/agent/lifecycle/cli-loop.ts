@@ -136,6 +136,8 @@ import {
   initRunRecord,
   captureStartingHead,
   captureBaselineUntracked,
+  captureBaselineDirectories,
+  type DirectoryBaseline,
   captureBaselineDirty,
   runReviewGate,
   finalizeRun,
@@ -2230,6 +2232,7 @@ interface SuccessContext {
   autonomous?: boolean;
   /** Untracked files present before the run, for scoped rollback (#303). */
   baselineUntracked?: string[];
+  baselineDirectories?: DirectoryBaseline;
   /** Per-attempt EventAccumulator (event pipeline path). */
   attemptAccumulator?: EventAccumulator;
   /** Cross-retry EventAccumulator (event pipeline path). */
@@ -2331,6 +2334,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
         yes: ctx.yes,
         autonomous: ctx.autonomous,
         baselineUntracked: ctx.baselineUntracked,
+        baselineDirectories: ctx.baselineDirectories,
       });
       if (reviewGate.rejected) {
         run.summary = result.summary;
@@ -2766,6 +2770,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Snapshot untracked files before the agent runs, so a rollback removes only
   // the files the agent creates — never the user's pre-existing work (#303).
   const baselineUntracked = await captureBaselineUntracked(projectDir);
+  const baselineDirectories = await captureBaselineDirectories(projectDir);
   // Snapshot everything already dirty, so the run's own work can be told
   // apart from the operator's at commit time (see stageRunWork).
   const baselineDirty = await captureBaselineDirty(projectDir);
@@ -2807,6 +2812,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         autoCommit: config.autoCommit === true,
         skipFullTestGate: config.skipFullTestGate,
         baselineUntracked,
+        baselineDirectories,
         baselineDirty,
         reviewOptional: opts.reviewOptional,
       },
@@ -3393,6 +3399,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           yes: opts.yes,
           autonomous,
           baselineUntracked,
+          baselineDirectories,
           attemptAccumulator,
           runAccumulator,
           readOnlyRetryAvailable: lastSpawnForked && !readOnlyRetryUsed,
@@ -3499,6 +3506,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
     baselineUntracked,
+    baselineDirectories,
     baselineDirty,
     startingHead,
     reviewOptional: opts.reviewOptional,
