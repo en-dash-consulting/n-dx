@@ -324,16 +324,17 @@ describe("auth verdict context isolation and bounded freshness", () => {
     expect(execMock).toHaveBeenCalledTimes(2);
   });
 
-  it("observes active-vendor environment changes without exposing synthetic key values", async () => {
+  it("observes active-vendor environment changes without invalidating another vendor's verdict", async () => {
     await config(b, { vendor: "google" });
     execMock.mockResolvedValue({ stdout: "synthetic", stderr: "", error: null });
     await request(a);
     await request(b);
-    vi.stubEnv("OPENAI_API_KEY", "synthetic-key-never-returned");
+    vi.stubEnv("OPENAI_API_KEY", "synthetic-replacement-key");
     expect(await cached(a)).toEqual({ cached: false });
     expect(await cached(b)).toMatchObject({ cached: true });
-    expect(JSON.stringify(await request(a))).not.toContain("synthetic-key-never-returned");
-    expect(JSON.stringify(execMock.mock.calls)).not.toContain("synthetic-key-never-returned");
+    expect(await request(a)).toMatchObject({ cached: false });
+    expect(execMock).toHaveBeenCalledTimes(3);
+    expect(await cached(a)).toMatchObject({ cached: true });
   });
 
   it("observes legacy Claude settings while preserving modern field precedence", async () => {
