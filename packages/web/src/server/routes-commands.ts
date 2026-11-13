@@ -1747,13 +1747,14 @@ interface AuthCheckResult {
 }
 
 /**
- * Both successful and failed verdicts expire one minute after check start.
+ * Both successful and failed verdicts expire five minutes after check start,
+ * so ordinary revisits reuse recent evidence instead of another billed check.
  * CLI login/keychain state, helper output and server-side revocation are
  * opaque here: a cache hit is recent evidence, not a live credential check.
  * Re-check (`?refresh=true`) bypasses a completed verdict; concurrent requests
  * for the same current context still share one subprocess (60s budget).
  */
-const AUTH_CHECK_TTL_MS = 60_000;
+const AUTH_CHECK_TTL_MS = 5 * 60_000;
 
 interface AuthCheckState {
   key: string;
@@ -1862,7 +1863,7 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
  * Writes nothing, but it is a POST because it spawns: it runs `n-dx auth`, whose exit code answers "are the
  * configured provider's credentials usable". Surfaced as a chip in LLM
  * settings so a missing key is visible *before* an agent command fails.
- * Served from cache for at most one minute; `?refresh=true` re-runs it.
+ * Served from cache for at most five minutes; `?refresh=true` re-runs it.
  */
 async function handleAuth(
   req: IncomingMessage,

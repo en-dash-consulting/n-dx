@@ -196,12 +196,21 @@ describe("auth verdict context isolation and bounded freshness", () => {
     expect(execMock).toHaveBeenCalledTimes(2);
   });
 
-  it.each([true, false])("expires a %s verdict at one minute without a GET spawning", async (ok) => {
+  it.each([true, false])("reuses a %s verdict on repeated visits until five minutes, without a GET spawning", async (ok) => {
     execMock.mockResolvedValue({ stdout: "synthetic verdict", stderr: "denied", error: ok ? null : new Error("exit 1") });
-    await request(a);
-    vi.setSystemTime(Date.now() + 59_999);
-    expect(await cached(a)).toMatchObject({ cached: true, ok });
-    vi.setSystemTime(Date.now() + 1);
+    const startedAt = Date.now();
+    const first = await request(a);
+    expect(first).toMatchObject({ cached: false, ok });
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(execMock.mock.calls[0][2]).toMatchObject({ timeout: 60_000 });
+    // Model Robot Wrangler's ordinary POST on each mount, beyond the old TTL.
+    for (const age of [60_001, 120_000, 299_999]) {
+      vi.setSystemTime(startedAt + age);
+      expect(await request(a)).toEqual({ ...first, cached: true });
+      expect(await cached(a)).toEqual({ ...first, cached: true });
+      expect(execMock).toHaveBeenCalledTimes(1);
+    }
+    vi.setSystemTime(startedAt + 300_000);
     expect(await cached(a)).toEqual({ cached: false });
     expect(execMock).toHaveBeenCalledTimes(1);
     expect(await request(a)).toMatchObject({ cached: false, ok });
@@ -211,6 +220,9 @@ describe("auth verdict context isolation and bounded freshness", () => {
   it("rechecks on demand and hides the old verdict while same-context requests coalesce", async () => {
     execMock.mockResolvedValueOnce({ stdout: "old", stderr: "", error: null });
     await request(a);
+    vi.setSystemTime(Date.now() + 120_000);
+    expect(await request(a)).toMatchObject({ output: "old", cached: true });
+    expect(execMock).toHaveBeenCalledTimes(1);
     const check = deferCheck();
     execMock.mockReturnValueOnce(check.promise);
     const refreshed = request(a, "auth?refresh=true");
@@ -354,11 +366,15 @@ describe("auth verdict context isolation and bounded freshness", () => {
   it("does not extend freshness by the duration of a slow check", async () => {
     const check = deferCheck();
     execMock.mockReturnValueOnce(check.promise);
+    const startedAt = Date.now();
     const pending = request(a);
-    vi.setSystemTime(Date.now() + 60_000);
-    check.resolve({ stdout: "too old", stderr: "", error: null });
+    vi.setSystemTime(startedAt + 30_000);
+    check.resolve({ stdout: "slow verdict", stderr: "", error: null });
     await pending;
+    expect(await cached(a)).toMatchObject({ cached: true, output: "slow verdict" });
+    vi.setSystemTime(startedAt + 300_000);
     expect(await cached(a)).toEqual({ cached: false });
+    expect(execMock).toHaveBeenCalledTimes(1);
   });
 
   it.each(["accept", "revoke", "config"])("a dashboard %s retires pending checks for only its workspace", async (action) => {
