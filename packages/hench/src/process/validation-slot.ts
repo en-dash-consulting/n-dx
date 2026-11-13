@@ -79,7 +79,11 @@
  *      `ns/pid` is W has that pid as the last `NSpid` entry (`NSpgid` for a
  *      group), or when an entry owned by the reader's user could not be
  *      read (another user's process is skipped: it cannot be in the
- *      reader's sandbox, and root's refuse a non-root reader);
+ *      reader's sandbox, and root's refuse a non-root reader). `status` is
+ *      read before `ns/pid`, and an entry whose `NSpid` has a single entry
+ *      is skipped: it is in the reader's own namespace, and its `ns/pid`
+ *      needs ptrace access that the user's own non-dumpable processes
+ *      refuse;
  *    - as alive otherwise (a sibling namespace, or an unrecorded chain).
  * 5. **Stale recovery.** A record is stale when its `pid` is dead AND its
  *    `child` is absent or dead; a record that does not parse is stale too. A
@@ -339,10 +343,15 @@ export function pidNamespaceView(
   };
 }
 
+/** The entries of a `/proc/<n>/status` field such as `NSpid`, outermost first. */
+function statusEntries(status: string, field: string): string[] {
+  const line = status.split("\n").find((l) => l.startsWith(`${field}:`));
+  return line?.slice(field.length + 1).trim().split(/\s+/).filter(Boolean) ?? [];
+}
+
 /** The last entry of a `/proc/<n>/status` field such as `NSpid`, or null. */
 function lastStatusEntry(status: string, field: string): number | null {
-  const line = status.split("\n").find((l) => l.startsWith(`${field}:`));
-  const last = line?.slice(field.length + 1).trim().split(/\s+/).pop();
+  const last = statusEntries(status, field).pop();
   return last ? Number(last) : null;
 }
 
@@ -361,8 +370,11 @@ function isOwnedByThisUser(procRoot: string, entry: string): boolean {
 
 /**
  * Whether a process inside namespace `ns`, visible below the reader's, has
- * `pid` (a group id when `group`) in that namespace. An entry that cannot be
- * read for any reason but its process having exited counts as alive.
+ * `pid` (a group id when `group`) in that namespace. `status` is read first:
+ * it needs no ptrace access, and an entry whose `NSpid` has a single entry is
+ * in the reader's own namespace, so cannot be in `ns`, and is skipped. A
+ * nested entry, or one whose `status` cannot be read, that this user owns and
+ * that fails for any reason but its process having exited counts as alive.
  */
 function isAliveInInnerNamespace(procRoot: string, ns: string, pid: number, group: boolean): boolean {
   let entries: string[];
@@ -375,18 +387,18 @@ function isAliveInInnerNamespace(procRoot: string, ns: string, pid: number, grou
   let unreadable = false;
   for (const entry of entries) {
     if (!/^\d+$/.test(entry)) continue;
-    let status: string;
     try {
-      const entryNs = readlinkSync(join(procRoot, entry, "ns", "pid"));
-      if (entryNs !== ns) continue;
-      status = readFileSync(join(procRoot, entry, "status"), "utf-8");
+      const status = readFileSync(join(procRoot, entry, "status"), "utf-8");
+      // One NSpid entry: in the reader's namespace. Its ns/pid needs ptrace
+      // access, which this user's own non-dumpable processes refuse.
+      if (statusEntries(status, "NSpid").length < 2) continue;
+      if (readlinkSync(join(procRoot, entry, "ns", "pid")) !== ns) continue;
+      if (lastStatusEntry(status, field) === pid) return true;
     } catch (err) {
       // Exited mid-scan, or another user's process (root's daemons and kernel
       // threads refuse a non-root reader): neither can be this user's sandbox.
       if (errCode(err) !== "ENOENT" && isOwnedByThisUser(procRoot, entry)) unreadable = true;
-      continue;
     }
-    if (lastStatusEntry(status, field) === pid) return true;
   }
   return unreadable;
 }
