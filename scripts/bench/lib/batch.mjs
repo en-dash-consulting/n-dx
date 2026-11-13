@@ -1,6 +1,6 @@
 /**
  * One benchmark batch: start every run of a case at once, taking the host
- * slot around each run only when the case says so (case D). Spawning is the
+ * slot around each run only when the case's `slot` flag is set. Spawning is the
  * caller's `launch`, so the slot logic can be driven with fakes.
  */
 

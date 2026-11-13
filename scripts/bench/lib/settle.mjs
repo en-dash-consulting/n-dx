@@ -1,7 +1,7 @@
 /**
  * Wait for every promise in a batch, then fail with the first rejection.
  *
- * `Promise.all` rejects as soon as one run does. In case D a Ctrl-C makes
+ * `Promise.all` rejects as soon as one run does. In a parallel slot case a Ctrl-C makes
  * the runs still waiting for the slot reject at once while the run holding
  * it is still stopping, and cleanup would then remove its worktree under it.
  *

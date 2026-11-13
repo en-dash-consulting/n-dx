@@ -1,8 +1,9 @@
 /**
- * Validation benchmark: replay the affected test gate under four settings on
- * ONE commit, so only the worker cap, the host slot and the concurrency differ.
+ * Validation benchmark: replay the affected test gate under up to eight
+ * settings on ONE commit, so only the worker cap, the host slot and the
+ * concurrency differ.
  *
- *   node scripts/bench/validation-bench.mjs --out <dir> [--cases A,B,C,D]
+ *   node scripts/bench/validation-bench.mjs --out <dir> [--cases A,B,C,D (any of A–H)]
  *     [--fixtures hench,llm-client,web] [--repeat N] [--concurrency N]
  *     [--timeout-min N] [--dry-run] [--keep]
  *
@@ -16,11 +17,11 @@
  * measured run pays a stale-dist rebuild. Each measured run is
  * `node scripts/run-all-tests.mjs affected <HEAD>` in a bench worktree.
  *
- * Case D takes the host slot around each run through hench's built slot
- * module, the way a hench gate does, and passes its token on; the runner
- * finds the token and runs inside that slot (nesting rule) instead of
- * acquiring again. Cases A–C never touch the slot and pass `--no-slot`, the
- * pre-wave-1 behaviour (./lib/batch.mjs).
+ * A case whose `slot` flag is set (D, E, G, H) takes the host slot around
+ * each run through hench's built slot module, the way a hench gate does, and
+ * passes its token on; the runner finds the token and runs inside that slot
+ * (nesting rule) instead of acquiring again. The other cases never touch the
+ * slot and pass `--no-slot`, the pre-wave-1 behaviour (./lib/batch.mjs).
  *
  * The idle check runs once, at start: a run started later is not detected.
  *
@@ -46,6 +47,7 @@ import {
   formatPlan,
   parseBenchArgs,
   runnerArgs,
+  slotModuleMissingMessage,
 } from "./lib/plan.mjs";
 import { runBatch } from "./lib/batch.mjs";
 import {
@@ -382,9 +384,9 @@ function sleep(ms) {
   });
 }
 
-async function loadSlotApi() {
+async function loadSlotApi(slotCases) {
   if (!existsSync(HENCH_SLOT_MODULE) || !existsSync(HENCH_SLOT_DIR_MODULE)) {
-    throw new BenchUsageError(`Case D needs hench's built slot module (${HENCH_SLOT_MODULE}). Run: pnpm --filter @n-dx/hench build`);
+    throw new BenchUsageError(slotModuleMissingMessage(slotCases, HENCH_SLOT_MODULE));
   }
   const slot = await import(pathToFileURL(HENCH_SLOT_MODULE).href);
   const { resolveValidationSlotDir } = await import(pathToFileURL(HENCH_SLOT_DIR_MODULE).href);
@@ -424,7 +426,8 @@ async function main() {
   }
   const out = options.out;
   if (existsSync(join(out, "runs.jsonl"))) throw new BenchUsageError(`${out} already holds a benchmark (runs.jsonl); choose another --out.`);
-  const slotApi = options.cases.some((c) => CASES[c].slot) ? await loadSlotApi() : null;
+  const slotCases = options.cases.filter((c) => CASES[c].slot);
+  const slotApi = slotCases.length > 0 ? await loadSlotApi(slotCases) : null;
 
   keepWorktrees = options.keep;
   mkdirSync(join(out, "logs"), { recursive: true });

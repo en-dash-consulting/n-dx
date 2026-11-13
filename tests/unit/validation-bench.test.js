@@ -29,9 +29,11 @@ import {
   FIXTURES,
   buildPlan,
   caseEnv,
+  estimateBatchSeconds,
   formatPlan,
   parseBenchArgs,
   runnerArgs,
+  slotModuleMissingMessage,
 } from "../../scripts/bench/lib/plan.mjs";
 import { readWorkspaceManifests } from "../../scripts/lib/workspace-manifests.mjs";
 import { settleAll } from "../../scripts/bench/lib/settle.mjs";
@@ -310,8 +312,8 @@ describe("batch slot use", () => {
     return { records, launched, calls: slotApi?.calls };
   }
 
-  it("never acquires in A, B or C, which still pass --no-slot", async () => {
-    for (const caseId of ["A", "B", "C"]) {
+  it("never acquires in A, B, C or F, which still pass --no-slot", async () => {
+    for (const caseId of ["A", "B", "C", "F"]) {
       const { records, launched, calls } = await run(caseId);
       expect(calls).toEqual({ acquire: 0, release: 0 });
       expect(launched.every((l) => l.lease === null && l.args.includes("--no-slot") && !("NDX_VALIDATION_SLOT" in l.env))).toBe(true);
@@ -319,38 +321,88 @@ describe("batch slot use", () => {
     }
   });
 
-  it("starts C's runs together", async () => {
-    const { records } = await run("C");
-    expect(records.map((r) => r.startedAt)).toEqual([0, 0, 0]);
+  it("starts the runs of C and F, the parallel cases without the slot, together", async () => {
+    for (const caseId of ["C", "F"]) {
+      const { records } = await run(caseId);
+      expect(records.map((r) => r.startedAt)).toEqual([0, 0, 0]);
+    }
   });
 
-  it("acquires and releases once per run in D, nesting the runner in the lease", async () => {
-    const { records, launched, calls } = await run("D");
-    expect(calls).toEqual({ acquire: 3, release: 3 });
-    expect(launched.every((l) => l.lease !== null && !l.args.includes("--no-slot") && l.env.NDX_VALIDATION_SLOT === "fake-token")).toBe(true);
-    expect(records.every((r) => r.slot === true && r.slotTaken === true && r.slotNested === false)).toBe(true);
-    // The slot serialises D: each run queues behind the ones before it.
-    expect(records.map((r) => [r.startedAt, r.queueMs, r.execMs])).toEqual([[0, 0, RUN_MS], [RUN_MS, RUN_MS, RUN_MS], [2 * RUN_MS, 2 * RUN_MS, RUN_MS]]);
+  it("acquires and releases once per run in D and E, nesting the runner and running one at a time", async () => {
+    for (const caseId of ["D", "E"]) {
+      const { records, launched, calls } = await run(caseId);
+      expect(calls).toEqual({ acquire: 3, release: 3 });
+      expect(launched.every((l) => l.lease !== null && !l.args.includes("--no-slot") && l.env.NDX_VALIDATION_SLOT === "fake-token")).toBe(true);
+      expect(records.every((r) => r.slot === true && r.slotTaken === true && r.slotNested === false)).toBe(true);
+      // The slot serialises the batch: each run queues behind the ones before it.
+      expect(records.map((r) => [r.startedAt, r.queueMs, r.execMs])).toEqual([[0, 0, RUN_MS], [RUN_MS, RUN_MS, RUN_MS], [2 * RUN_MS, 2 * RUN_MS, RUN_MS]]);
+    }
   });
 
-  it("refuses to run D without a slot module", async () => {
-    await expect(run("D", { withSlot: false })).rejects.toThrow(/takes the host slot/);
+  it("acquires once in the solo slot cases G and H and records a zero queue", async () => {
+    for (const caseId of ["G", "H"]) {
+      const { records, launched, calls } = await run(caseId);
+      expect(calls).toEqual({ acquire: 1, release: 1 });
+      expect(launched).toHaveLength(1);
+      expect(launched[0].args).not.toContain("--no-slot");
+      expect(launched[0].env.NDX_VALIDATION_SLOT).toBe("fake-token");
+      expect(records.map((r) => [r.slotTaken, r.queueMs, r.execMs])).toEqual([[true, 0, RUN_MS]]);
+    }
+  });
+
+  it("refuses to run any slot case without a slot module", async () => {
+    for (const caseId of ["D", "E", "G", "H"]) {
+      await expect(run(caseId, { withSlot: false })).rejects.toThrow(`Case ${caseId} takes the host slot`);
+    }
+  });
+
+  it("names the selected slot cases, not case D, when hench's slot module is missing", () => {
+    expect(slotModuleMissingMessage(["G"], "/m.js")).toBe("Case G takes the host slot, which needs hench's built slot module (/m.js). Run: pnpm --filter @n-dx/hench build");
+    expect(slotModuleMissingMessage(["D", "E", "H"], "/m.js")).toMatch(/^Cases D, E, H take the host slot/);
   });
 });
 
 describe("plan and flags", () => {
   const parse = (argv) => parseBenchArgs(argv, { repoRoots: [REPO], cwd: "/home/u" });
 
-  it("defaults to every case, the first three fixtures, one repeat and three worktrees", () => {
+  it("defaults to the baseline cases A–D, the first three fixtures, one repeat and three worktrees", () => {
     expect(parse(["--out", "/tmp/b"])).toMatchObject({
       out: "/tmp/b", cases: ["A", "B", "C", "D"], fixtures: DEFAULT_FIXTURES, repeat: 1, concurrency: 3, dryRun: false, keep: false,
     });
   });
 
+  it("accepts the pairings E–H with --cases and lists all eight in the usage text", () => {
+    expect(parse(["--out", "/tmp/b", "--cases", "e,F,G,H"]).cases).toEqual(["E", "F", "G", "H"]);
+    expect(Object.keys(CASES)).toEqual(["A", "B", "C", "D", "E", "F", "G", "H"]);
+    expect(USAGE).toContain("any of A–H (default A,B,C,D)");
+    for (const id of Object.keys(CASES)) expect(USAGE).toMatch(new RegExp(`^ +${id} (1 worktree|N worktrees at once)`, "m"));
+  });
+
+  it("gives E–H the cap and slot their labels name", () => {
+    expect(Object.values(CASES).map(({ id, concurrent, maxWorkers, slot }) => [id, concurrent, maxWorkers, slot])).toEqual([
+      ["A", false, null, false],
+      ["B", false, "2", false],
+      ["C", true, null, false],
+      ["D", true, "2", true],
+      ["E", true, null, true],
+      ["F", true, "2", false],
+      ["G", false, null, true],
+      ["H", false, "2", true],
+    ]);
+  });
+
+  it("estimates G/H as A/B, E as the runs back to back, and F as C slowed by the cap", () => {
+    const est = (id) => estimateBatchSeconds(id, 100, 3);
+    expect(est("G")).toBe(est("A"));
+    expect(est("H")).toBe(est("B"));
+    expect(est("E")).toBe(3 * est("A"));
+    expect(est("F") / est("C")).toBeCloseTo(est("B") / est("A"));
+  });
+
   it("requires --out outside the repository and rejects unknown cases, fixtures and counts", () => {
     expect(() => parse([])).toThrow(/--out <dir> is required/);
     expect(() => parse(["--out", `${REPO}/bench`])).toThrow(/outside the repository/);
-    expect(() => parse(["--out", "/tmp/b", "--cases", "A,E"])).toThrow(/unknown "E"/);
+    expect(() => parse(["--out", "/tmp/b", "--cases", "A,Z"])).toThrow(/unknown "Z"/);
     expect(() => parse(["--out", "/tmp/b", "--fixtures", "nope"])).toThrow(BenchUsageError);
     expect(() => parse(["--out", "/tmp/b", "--repeat", "0"])).toThrow(/positive integer/);
   });
@@ -362,6 +414,21 @@ describe("plan and flags", () => {
     expect(runnerArgs("C", "abc")).toEqual(["scripts/run-all-tests.mjs", "affected", "abc", "--no-slot"]);
     // D's runner finds the bench's token and runs nested rather than acquiring again.
     expect(runnerArgs("D", "abc")).toEqual(["scripts/run-all-tests.mjs", "affected", "abc"]);
+    expect(caseEnv("E", base)).toEqual({ PATH: "/bin" });
+    expect(caseEnv("F", base)).toEqual({ PATH: "/bin", NDX_TEST_MAX_WORKERS: "2" });
+    expect(caseEnv("G", base)).toEqual({ PATH: "/bin" });
+    expect(caseEnv("H", base)).toEqual({ PATH: "/bin", NDX_TEST_MAX_WORKERS: "2" });
+    for (const id of ["E", "G", "H"]) expect(runnerArgs(id, "abc")).toEqual(["scripts/run-all-tests.mjs", "affected", "abc"]);
+    expect(runnerArgs("F", "abc")).toEqual(["scripts/run-all-tests.mjs", "affected", "abc", "--no-slot"]);
+  });
+
+  it("prints E–H in the dry run with each case's slot line", () => {
+    const options = parse(["--out", "/tmp/b", "--dry-run", "--cases", "E,F,G,H", "--fixtures", "docs"]);
+    const text = formatPlan(buildPlan(options, { manifests: readWorkspaceManifests(ROOT), fileExists: () => true }), options);
+    expect(text).toMatch(/E {2}3 worktrees {2}NDX_TEST_MAX_WORKERS unset +takes the host slot around each run +\(parallel, uncapped, host slot\)/);
+    expect(text).toMatch(/F {2}3 worktrees {2}NDX_TEST_MAX_WORKERS=2 +never takes the host slot \(--no-slot\) +\(parallel, capped, no slot\)/);
+    expect(text).toMatch(/G {2}1 worktree {3}NDX_TEST_MAX_WORKERS unset +takes the host slot around each run +\(solo, uncapped, host slot\)/);
+    expect(text).toMatch(/H {2}1 worktree {3}NDX_TEST_MAX_WORKERS=2 +takes the host slot around each run +\(solo, capped, host slot\)/);
   });
 
   it("plans the matrix with each fixture's files, selected suites and an estimate", () => {
