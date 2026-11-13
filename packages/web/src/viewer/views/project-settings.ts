@@ -366,7 +366,9 @@ const GITHUB_READS_DESC = "Let the Sidecar and branch health read pull requests,
 /**
  * The project settings as rows: language, merge threshold and zone pins under
  * Analysis, the port under Dashboard, and GitHub reads under Connections while
- * something that uses it (the Sidecar, branch health) is on.
+ * something that uses it (the Sidecar, branch health) is on — or while it
+ * holds an unsaved edit, so a save that failed as its readers were turned off
+ * leaves the edit on screen to retry or discard.
  */
 export function projectSettingRows(
   form: ProjectSettingsForm,
@@ -446,7 +448,7 @@ export function projectSettingRows(
         onInput: (e: Event) => form.setPortRaw((e.target as HTMLInputElement).value),
       }),
     }, portError ? h("p", { id: "ps-port-error", class: "ps-field-error" }, portError) : null)),
-    ...(githubReadsUsed
+    ...(githubReadsUsed || form.githubReadsDirty
       ? [spec("connections", GITHUB_READS_KEY, "GitHub reads", GITHUB_READS_DESC, h(SettingRow, {
           key: "github-reads",
           configKey: GITHUB_READS_KEY,
