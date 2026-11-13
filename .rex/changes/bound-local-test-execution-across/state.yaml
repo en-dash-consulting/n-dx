@@ -115,7 +115,14 @@ items:
     lastModified: "2026-11-12T18:09:39.348Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "53be00af-2a22-4259-a5ce-ef69d8171b17":
-    lastModified: "2026-11-12T22:31:48.880Z"
+    status: "completed"
+    startedAt: "2026-11-13T18:36:26.387Z"
+    completedAt: "2026-11-13T18:36:26.387Z"
+    endedAt: "2026-11-13T18:36:26.387Z"
+    activeIntervals: [{"end":"2026-11-13T18:36:26.387Z","start":"2026-11-13T18:36:26.387Z"}]
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Default matrix run 2026-11-13 on a quiet M2/16 GiB at 7a0f45ef0. Note: ~/ndx-core/local-design-workshop/docs/analysis/task-prep/04-validation-bench-2026-11-13.md (raw data in validation-bench-2026-11-13/). D vs C: 0/9 vs 4/9 failures, test RSS -75-78%, swap -0.3-0.7 GiB, ~2x batch time. B vs A: +43-94% per run. Keep the slot; measure slot-only (case E) before keeping the cap of 2."
+    lastModified: "2026-11-13T18:36:26.387Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "58c29a6c-14b2-474e-acfb-237613391f80":
     status: "completed"
