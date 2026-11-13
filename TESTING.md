@@ -407,19 +407,26 @@ commands are not serialized; only the worker cap bounds those.
 ### Validation benchmark
 
 `scripts/bench/validation-bench.mjs` measures what the worker cap and the slot
-change on your machine. It replays the affected gate on one commit under four
-cases, so only these settings differ:
+change on your machine. It replays the affected gate on one commit under up to
+eight cases, every pairing of solo or parallel, cap unset or 2, and slot or
+none, so only these settings differ:
 
-| Case | Worktrees | `NDX_TEST_MAX_WORKERS` | Slot |
-|------|-----------|------------------------|------|
-| A | 1 | unset | none (`--no-slot`) |
-| B | 1 | 2 | none |
-| C | 3, started together | unset | none |
-| D | 3, started together | 2 | host slot, held by the bench around each run (the runner nests in it) |
+| Case | Worktrees | `NDX_TEST_MAX_WORKERS` | Slot | Isolates |
+|------|-----------|------------------------|------|----------|
+| A | 1 | unset | none (`--no-slot`) | the behaviour before wave 1 |
+| B | 1 | 2 | none | B vs A: what the cap costs one run |
+| C | 3, started together | unset | none | parallel work before wave 1 |
+| D | 3, started together | 2 | host slot, held by the bench around each run (the runner nests in it) | D vs C: the cap and the slot together |
+| E | 3, started together | unset | host slot | E vs C: the slot alone; E vs D: what the cap adds once the slot serializes |
+| F | 3, started together | 2 | none | F vs C: whether the cap alone stops the failures |
+| G | 1 | unset | host slot | G vs A: the slot's own overhead, uncapped |
+| H | 1 | 2 | host slot | H vs B: the slot's own overhead, capped |
 
-A and C are the behaviour before the cap and the slot; with both unset nothing changes.
-Only D's runs take the slot. A, B and C never touch it, so C's runs share the
-machine, and `--dry-run` says per case whether the slot is taken.
+The default is A–D, the baseline's cases, so a re-run stays comparable to it;
+select others with `--cases` (any of A–H). The cases with a slot (D, E, G, H)
+take it around each run; the others never touch it and pass `--no-slot`, so
+C's and F's runs share the machine. `--dry-run` says per case whether the slot
+is taken.
 
 ```sh
 node scripts/bench/validation-bench.mjs --dry-run --out /tmp/bench   # the plan, the fixture files, an estimate; creates nothing
@@ -430,8 +437,8 @@ node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the defa
   and `docs`) append a comment to one file and commit it in each bench
   worktree. Selection depends only on changed paths, so this produces the
   workload a real edit would. They are listed in `scripts/bench/lib/plan.mjs`.
-- **Other flags.** `--cases A,B,C,D`, `--repeat N`, `--concurrency N` (the
-  worktrees in C and D), `--timeout-min N` per run (default 60), and `--keep`,
+- **Other flags.** `--cases A,B,C,D` (any of A–H), `--repeat N`, `--concurrency N` (the
+  worktrees in C, D, E and F), `--timeout-min N` per run (default 60), and `--keep`,
   which leaves the worktrees in place for inspection.
 - **Before the clock.** The bench adds detached worktrees of `HEAD` under
   `~/.cache/ndx-bench/<run id>/`, then installs and builds each one. Each
@@ -449,7 +456,7 @@ node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the defa
   - `runs.jsonl`: one line per run, with wall-clock, exit code, timeout,
     per-suite pass/fail and duration, the case's `slot` setting, and
     `slotTaken`, whether this run actually held the slot. Queue and execution
-    time are recorded only when it did (case D).
+    time are recorded only when it did (cases D, E, G and H).
   - `samples.jsonl`: every 2 s, the load, free memory, swap in use, the
     page-out counter, and the summed RSS of every process under the runs. It
     reads `vm_stat` and `sysctl vm.swapusage` on macOS, `/proc` on Linux, and
@@ -457,12 +464,13 @@ node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the defa
   - `batches.jsonl` and `meta.json`, which records the commit and machine.
   - `logs/`: each run's output, plus `.test-logs/` copies for failed runs.
   - `summary.md`.
-- **Reading `summary.md`.** There is one row per fixture and case. Compare B
-  with A for what the cap costs one run, and D with C for what the cap and
-  the slot buy parallel work: peak RSS, peak swap, minimum free memory,
-  page-outs and failures should fall, while total batch time shows what the
-  queueing costs. Median wall time for D includes its queue wait. The median
-  queue and exec columns count only runs with `slotTaken`, so A–C show `–`.
+- **Reading `summary.md`.** There is one row per fixture and case; pair the
+  rows as the table's last column says. Against C, a parallel case should
+  lower peak RSS, peak swap, page-outs and failures and raise minimum free
+  memory, while total batch time shows what the queueing costs. Median wall
+  time for a slot case includes its queue wait. The median queue and exec
+  columns count only runs with `slotTaken`, so A, B, C and F show `–`; G and H
+  show a queue near zero, and E and D show the queueing.
 
 ## Timeout Guardrails
 

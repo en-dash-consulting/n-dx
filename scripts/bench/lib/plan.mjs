@@ -19,16 +19,26 @@ export class BenchUsageError extends Error {
 export const PILOT_MAX_WORKERS = "2";
 
 /**
- * Cases. `concurrent` cases run `--concurrency` worktrees at once; the others one.
+ * Cases: every pairing of {solo, parallel} × {cap unset, cap} × {no slot, host slot}.
+ * `concurrent` cases run `--concurrency` worktrees at once; the others one.
  * `maxWorkers: null` leaves NDX_TEST_MAX_WORKERS unset, so A and C are the
- * pre-wave-1 behaviour on the current commit.
+ * pre-wave-1 behaviour on the current commit. `slot` cases take the host slot
+ * around each run; the others pass `--no-slot`. E–H separate D's two settings:
+ * E is the slot alone, F the cap alone, G and H the slot's own cost on a solo run.
  */
 export const CASES = {
   A: { id: "A", label: "solo, uncapped, no slot", concurrent: false, maxWorkers: null, slot: false },
   B: { id: "B", label: "solo, capped, no slot", concurrent: false, maxWorkers: PILOT_MAX_WORKERS, slot: false },
   C: { id: "C", label: "parallel, uncapped, no slot", concurrent: true, maxWorkers: null, slot: false },
   D: { id: "D", label: "parallel, capped, host slot", concurrent: true, maxWorkers: PILOT_MAX_WORKERS, slot: true },
+  E: { id: "E", label: "parallel, uncapped, host slot", concurrent: true, maxWorkers: null, slot: true },
+  F: { id: "F", label: "parallel, capped, no slot", concurrent: true, maxWorkers: PILOT_MAX_WORKERS, slot: false },
+  G: { id: "G", label: "solo, uncapped, host slot", concurrent: false, maxWorkers: null, slot: true },
+  H: { id: "H", label: "solo, capped, host slot", concurrent: false, maxWorkers: PILOT_MAX_WORKERS, slot: true },
 };
+
+/** The baseline's cases; the default, so a re-run stays comparable to the baseline. */
+export const DEFAULT_CASES = ["A", "B", "C", "D"];
 
 /**
  * Fixtures: files a comment is appended to. Selection depends only on changed
@@ -81,19 +91,23 @@ export const IDLE_WARNING =
 
 export const USAGE = `Usage: node scripts/bench/validation-bench.mjs --out <dir> [options]
 
-Replays the affected test gate under four settings on one commit.
+Replays the affected test gate under up to eight settings on one commit.
 
 ${IDLE_WARNING}
 
   --out <dir>          where results go (required; outside the repository)
-  --cases A,B,C,D      cases to run (default all)
+  --cases A,B,...      cases to run, any of A–H (default ${DEFAULT_CASES.join(",")})
                          A 1 worktree, NDX_TEST_MAX_WORKERS unset, no slot
                          B 1 worktree, NDX_TEST_MAX_WORKERS=${PILOT_MAX_WORKERS}, no slot
                          C N worktrees at once, unset, no slot
                          D N worktrees at once, NDX_TEST_MAX_WORKERS=${PILOT_MAX_WORKERS}, host slot
+                         E N worktrees at once, unset, host slot
+                         F N worktrees at once, NDX_TEST_MAX_WORKERS=${PILOT_MAX_WORKERS}, no slot
+                         G 1 worktree, NDX_TEST_MAX_WORKERS unset, host slot
+                         H 1 worktree, NDX_TEST_MAX_WORKERS=${PILOT_MAX_WORKERS}, host slot
   --fixtures a,b       fixtures (default ${DEFAULT_FIXTURES.join(",")}; also ${Object.keys(FIXTURES).filter((f) => !DEFAULT_FIXTURES.includes(f)).join(", ")})
   --repeat N           repeats of the whole matrix (default 1)
-  --concurrency N      worktrees for C and D (default 3)
+  --concurrency N      worktrees for C, D, E and F (default 3)
   --timeout-min N      kill a run after N minutes (default 60)
   --dry-run            print the plan and an estimate; create nothing
   --keep               leave the bench worktrees for inspection
@@ -153,7 +167,7 @@ export function parseBenchArgs(argv, { repoRoots, cwd = process.cwd() }) {
   return {
     help: false,
     out,
-    cases: values.cases ? listOf(values.cases.toUpperCase(), Object.keys(CASES), "--cases") : Object.keys(CASES),
+    cases: values.cases ? listOf(values.cases.toUpperCase(), Object.keys(CASES), "--cases") : [...DEFAULT_CASES],
     fixtures: values.fixtures ? listOf(values.fixtures, Object.keys(FIXTURES), "--fixtures") : [...DEFAULT_FIXTURES],
     repeat: values.repeat ? positiveInt(values.repeat, "--repeat") : 1,
     concurrency: values.concurrency ? positiveInt(values.concurrency, "--concurrency") : 3,
@@ -180,6 +194,12 @@ export function caseEnv(caseId, base) {
 /** The runner's arguments: cases without the slot opt out of the one the runner takes itself. */
 export function runnerArgs(caseId, baseRef) {
   return ["scripts/run-all-tests.mjs", "affected", baseRef, ...(CASES[caseId].slot ? [] : ["--no-slot"])];
+}
+
+/** The refusal when the selected slot cases cannot load hench's built slot module. */
+export function slotModuleMissingMessage(slotCases, modulePath) {
+  const subject = slotCases.length === 1 ? `Case ${slotCases[0]} takes` : `Cases ${slotCases.join(", ")} take`;
+  return `${subject} the host slot, which needs hench's built slot module (${modulePath}). Run: pnpm --filter @n-dx/hench build`;
 }
 
 /** Estimated seconds for one batch of a case on a fixture. */

@@ -2,7 +2,7 @@
  * Summary arithmetic for the benchmark: one row per case and fixture, built
  * from the run records, the batch records and the 2-second samples. Pure.
  *
- * - median wall-clock: per run, from the moment it was started (case D: from
+ * - median wall-clock: per run, from the moment it was started (slot cases: from
  *   asking for the slot) to its exit.
  * - total batch time: summed over repeats, each batch from its first start to
  *   its last exit.
@@ -104,7 +104,7 @@ export function renderSummaryMarkdown(rows, meta) {
   }
   lines.push(
     "",
-    "Peak RSS sums every process under the batch's runs. Page-outs are pages written out during the batch. Queue and exec count only runs that took the host slot (`slotTaken` in `runs.jsonl`, case D); other rows show –. Raw data: `runs.jsonl`, `batches.jsonl`, `samples.jsonl`.",
+    "Peak RSS sums every process under the batch's runs. Page-outs are pages written out during the batch. Queue and exec count only runs that took the host slot (`slotTaken` in `runs.jsonl`: cases D, E, G and H); other rows show –. Raw data: `runs.jsonl`, `batches.jsonl`, `samples.jsonl`.",
     "",
   );
   return lines.join("\n");
