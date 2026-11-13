@@ -1,7 +1,8 @@
 /**
  * A holder that dies while its validation command still runs must not free
  * the host slot: the record names the command's child (its process group on
- * POSIX), and the slot stays held until that child exits too.
+ * POSIX), and the slot stays held until that child exits too. On Windows the
+ * child is not detached, so it ends with its holder and the slot frees then.
  *
  * The holder is a separate Node process running the built hench modules, so
  * it can be SIGKILLed alone, the way an OOM kill takes it. Uses a temp slot
@@ -60,6 +61,15 @@ function stopChild(child: ValidationSlotChild): void {
   }
 }
 
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 /** The child the holder records, or a rejection when the holder exits first. */
 async function recordedChild(proc: ChildProcess, stderr: () => string): Promise<ValidationSlotChild> {
   for (;;) {
@@ -71,7 +81,7 @@ async function recordedChild(proc: ChildProcess, stderr: () => string): Promise<
 }
 
 describe("validation slot after its holder is killed", () => {
-  it("stays held while the validation child runs, and frees once it exits", async () => {
+  it("stays held while the validation child runs, and frees once it exits (on Windows, it dies with the holder)", async () => {
     let stderr = "";
     holder = spawn(process.execPath, ["--input-type=module", "-e", HOLDER], {
       env: {
@@ -93,6 +103,17 @@ describe("validation slot after its holder is killed", () => {
     const holderExited = new Promise((resolve) => holder!.once("exit", resolve));
     holder.kill("SIGKILL");
     await holderExited;
+
+    if (process.platform === "win32") {
+      // libuv puts a non-detached child in a kill-on-close job object its
+      // parent owns, so killing the holder ends the child too: the record is
+      // stale and the next acquire reclaims it.
+      const lease = await acquireValidationSlot({ slotDir, projectDir: "/second", env: {}, pollIntervalMs: 20 });
+      expect(isAlive(recorded.pid)).toBe(false);
+      expect(await readValidationSlotHolder(slotDir)).toMatchObject({ projectDir: "/second", child: null });
+      await lease.release();
+      return;
+    }
 
     // Counted polls, not elapsed time: five consecutive looks at the record
     // that each found it still occupying the slot.

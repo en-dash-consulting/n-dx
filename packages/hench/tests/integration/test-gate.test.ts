@@ -418,12 +418,15 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
   });
 
   it("keeps the command's result when the slot cannot be released, and warns", async () => {
-    // The command replaces the slot directory with a file, so release fails with ENOTDIR.
+    // The command replaces holder.json with a directory, so release cannot read
+    // it (EISDIR on every platform). A file in place of the slot directory
+    // fails only on POSIX: Windows reports ENOENT, which reads as already free.
+    const holderFile = JSON.stringify(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
     await writeFile(
       join(projectDir, "break-slot.cjs"),
       `const fs = require("fs");\n` +
-        `fs.rmSync(${JSON.stringify(slotDir)}, { recursive: true, force: true });\n` +
-        `fs.writeFileSync(${JSON.stringify(slotDir)}, "");\n`,
+        `fs.rmSync(${holderFile});\n` +
+        `fs.mkdirSync(${holderFile});\n`,
     );
     const warnings: string[] = [];
     const result = await runTestGate({
@@ -436,8 +439,11 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
     expect(warnings[0]).toMatch(/could not release the validation slot/);
   });
 
-  // Root ignores directory permissions, so the read-only slot cannot fail its release.
-  it.skipIf(process.getuid?.() === 0)(
+  // Root ignores directory permissions, so the read-only slot cannot fail its
+  // release. Windows has no equivalent that keeps holder.json readable: a
+  // read-only directory does not stop deletion there, and Node's unlink clears
+  // a file's read-only attribute before deleting it.
+  it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
     "reclaims a record it could not release on its next validation instead of waiting on itself",
     async () => {
       // The command makes the slot directory read-only: release cannot unlink

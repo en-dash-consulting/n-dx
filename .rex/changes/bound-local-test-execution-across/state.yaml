@@ -146,7 +146,14 @@ items:
     lastModified: "2026-11-12T17:37:23.271Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "de29498f-6556-4355-b68b-d5c4b3c11129":
-    lastModified: "2026-11-13T23:07:52.316Z"
+    status: "completed"
+    startedAt: "2026-11-13T23:08:13.923Z"
+    completedAt: "2026-11-13T23:12:34.432Z"
+    endedAt: "2026-11-13T23:12:34.432Z"
+    activeIntervals: [{"end":"2026-11-13T23:12:34.432Z","start":"2026-11-13T23:08:13.923Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Crash test asserts win32 reclaim (child dies with holder); ENOTDIR test now uses holder.json-as-directory (fails release on all OSes); read-only-dir test skipped on win32 with reason; slot header rule 4 notes Windows children end with holder."
+    lastModified: "2026-11-13T23:12:34.432Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed2f3d51-97a5-4f5b-8b98-2ff2e2667a10":
     status: "completed"
