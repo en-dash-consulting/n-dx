@@ -339,9 +339,11 @@ it through one helper, `tests/test-max-workers.mjs` (`testMaxWorkers()`).
 - **Anything else** (`0`, negative, `50%`, text): ignored with a one-line
   warning; the run uses vitest's default.
 
-A developer running several worktrees at once can export it in the shell
-profile (`export NDX_TEST_MAX_WORKERS=2`) so their suites together do not claim
-several times the machine. Hench sets it for the commands it runs from
+For several worktrees, the host slot ([below](#running-several-worktrees-at-once))
+is the better bound. The cap is for runs outside it: an agent's own shell
+commands, `run-all-tests.mjs --no-slot`, machines that leave the slot off, and
+CI. Export it in the shell profile (`export NDX_TEST_MAX_WORKERS=2`) to cap
+those. Hench sets it for the commands it runs from
 `hench.testGate.maxWorkers` (see
 [Configuration](docs/guide/configuration.md#hench-configuration)). The lower
 value wins: an exported cap below the configured one is kept, so repository
@@ -350,12 +352,17 @@ config must read it with `testMaxWorkers()` at the top level of `test`.
 
 ## Running Several Worktrees at Once
 
-Set `NDX_TEST_MAX_WORKERS` (above) and turn on the host-wide validation slot so
-the gates of several worktrees queue instead of competing:
+Turn on the host-wide validation slot so the gates of several worktrees queue
+instead of competing:
 
 ```sh
 ndx config hench.testGate.hostSlot true .
 ```
+
+The slot alone had no failed runs in the [benchmark](#validation-benchmark)
+and finished 19–48% faster than the slot with a worker cap, so this repository
+sets no cap. Use the cap ([above](#capping-test-workers)) only for runs the
+slot does not cover.
 
 With `hench.testGate.hostSlot` on (default off), the test gate (each attempt and
 the re-run), the post-task tests and the completion test run each take one slot
