@@ -10,6 +10,7 @@ items:
     resolutionDetail: "Historical audit duplicate of completed canonical change 21973e6f-ab9b-44b9-aa49-cb6daa659948 and its PR #1017 fix. Canonical intent and completion history remain at listworktrees-returns-no-entry-for-a; this preserved historical record requires no additional product amendments."
     appliedAt: "2026-11-12T17:17:06.988Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.4"
     createdAt: "2026-11-07T02:02:19.049Z"
     lastModified: "2026-11-12T17:17:06.988Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

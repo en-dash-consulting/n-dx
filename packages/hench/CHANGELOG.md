@@ -1,5 +1,68 @@
 # @n-dx/hench
 
+## 0.10.4
+
+### Patch Changes
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`ca40bbe`](https://github.com/en-dash-consulting/n-dx/commit/ca40bbef422a85a327a4fdefbeadfdeffe2f1fd0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` preserves staged renames across PRD boundaries, including subsequent edits, when you accept an interactive failure rollback.
+  
+  Rollback touches only the classified PRD paths offered by the prompt. The prompt describes restoration to HEAD and preservation of pre-existing untracked files. Noninteractive and autonomous runs continue to leave changes in place.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`756264a`](https://github.com/en-dash-consulting/n-dx/commit/756264a4072bc66cf817f6e158d2789e2aa90d1c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` removes newly emptied PRD folders after a confirmed rollback, preserving folders that existed before the run, including empty ones.
+  
+  The pre-run directory scan is limited to PRD trees and their ancestors. Ignored and unrelated subtrees remain unread and their directories are conservatively preserved during rollback.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`eb59a53`](https://github.com/en-dash-consulting/n-dx/commit/eb59a5322c32639fdc5b9c11f964d004592d5461) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 tree, `n-dx work` names runnable changes as changes and tasks as tasks.
+  
+  Hench prints "Change: <title> (runs as one task)" for a task-less change and "Task: <title> (in change <title>)" for a task. The adversarial reviewer says a capture lands as an Inbox change. `n-dx work` help says `--task` takes a task or a change that runs as one task and lists `--mine` and `--tags`; `rex next` help says task or change, and its empty-tree hint on v2 is `rex add --title=...`. A v1 tree keeps its words.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`627f8f4`](https://github.com/en-dash-consulting/n-dx/commit/627f8f4b3158facdd176cae7d562eab8bcd9f776) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A resumed Codex run (the batch session chain) re-applies the run's sandbox and approval policy with `-c sandbox_mode=` and `-c approval_policy=` overrides, instead of falling back to the user's `~/.codex/config.toml`.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`3871254`](https://github.com/en-dash-consulting/n-dx/commit/38712542caf94c4099e9370f01f2569b9679b546) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The leftover-work checks discount a copy into `.rex/` by its target again, since a copy leaves its source in place; only a rename must match on both sides. A refused rename whose source contains ` -> ` is now named in full.
+
+- [#1020](https://github.com/en-dash-consulting/n-dx/pull/1020) [`9222084`](https://github.com/en-dash-consulting/n-dx/commit/9222084daa1d528329c786071b5e15afef6bb7ea) Thanks [@endash-shal](https://github.com/endash-shal)! - New `hench.projectSkills` setting names project skills that `ndx work` agents read before the work each one covers (opt-in, default none).
+  
+  Each name is a directory under `.claude/skills/` or `.agents/skills/`. Every run's system prompt lists the named skills by path and description and tells the agent to read the file first, because a run cannot invoke a skill by name: hench does not grant Claude's `Skill` tool, whose `allowed-tools` frontmatter could widen the run's command policy. A name with no `SKILL.md` is skipped with a warning. The setting is opt-in because the same directories hold operator workflows such as `ndx-work` that a running agent must not follow. Set it with `ndx config hench.projectSkills '["<name>"]' .`; the dashboard lists it under execution settings.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`32e7a80`](https://github.com/en-dash-consulting/n-dx/commit/32e7a80b1d99b7a265b39f1a65d1850aa5275773) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench run --epic-by-epic --epic=<id>` now reports the flag conflict even when the project has no PRD folder. Flag-only refusals run before the config and PRD-folder checks.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`f81f106`](https://github.com/en-dash-consulting/n-dx/commit/f81f106bec5e70bcbfe8fc4386f4883863769065) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Leftover-work checks preserve quoted rename and copy paths.
+  
+  The checks split each line using git's quoting, so a source or target containing ` -> ` is read whole instead of being cut at the wrong arrow.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`85945fa`](https://github.com/en-dash-consulting/n-dx/commit/85945fa14d4b2d0ff0a835cb8c48998a7d5e328d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The `Sidecar` transcript (experimental, off by default; enable with `web.sidecar`) preserves tool-result vendor semantics when output begins with `[error]`.
+  
+  Canonical Claude successes without an error flag remain successful. Unflagged Codex output retains unknown status and is not marked failed from its text alone. Archived Claude results keep their prefix fallback, and explicit error flags retain precedence.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`f0c285a`](https://github.com/en-dash-consulting/n-dx/commit/f0c285a84daa26e100cf6e1886d29e40acac8101) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The leftover-work checks no longer discount a rename into `.rex/` from a non-planning path by its target alone; the source must match too, and the refusal names it.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`17ab435`](https://github.com/en-dash-consulting/n-dx/commit/17ab435c842b4832a8a1fea46fe8ba79c73a23c8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Run controls say "Start" and the Live view "Live run". On a v2 tree, Live's running and Up next rows, the Sidecar work card and the run-plan card's track rows read "<task> · in <change>", or "<change> · runs as one task" for a change with no tasks. The queue plan JSON gains an additive `changeTitle` per lane.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`913d868`](https://github.com/en-dash-consulting/n-dx/commit/913d86826ac5929e9dbcb40173f93fc42510b37b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - (experimental, off by default; enable with `web.sidecar`) Sidecar uses the trusted vendor CLI path for fresh and resumed sessions and explains missing binaries.
+  
+  Local overrides and PATH discovery remain supported. Missing-binary errors identify the setting to repair.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`4f85124`](https://github.com/en-dash-consulting/n-dx/commit/4f851249de2b55320a54b0f1b90952d5ba1f4c0c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar's change set card reads `PRD edits`, and the plan queue's lanes read `track`.
+  
+  The track label appears in the run-plan card, Live's Ready next, `n-dx work --plan-queue` output and help, the Ready next setting and the Sidecar lens instructions. JSON keys and the plan-queue schema are unchanged.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`ac36982`](https://github.com/en-dash-consulting/n-dx/commit/ac36982d0dfcaa6c9ef1a4c92845464ac47e4fa8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` limits its PRD rollback prompt's rename protection promise to staged cross-boundary renames and explicitly excludes unstaged moves made with plain `mv`.
+  
+  Message text only; rollback behavior is unchanged.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`4ef69b4`](https://github.com/en-dash-consulting/n-dx/commit/4ef69b473d9c11a3fcf2fe5a934cf02a0eeb6681) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` recovery messages retain both rename endpoints and explain when automatic recovery commands are unavailable.
+  
+  Action needed: Inspect both endpoints with `git status --short` and recover each rename together before rerunning `n-dx work`.
+  
+  Rename groups require manual recovery of both endpoints together, preserving unrelated staged and working-tree changes. Completion and loop refusals no longer suggest source-only deletion commits or partial removal and stash commands. Ordinary file recovery keeps its existing scoped commands and pathspec files.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`c32fbda`](https://github.com/en-dash-consulting/n-dx/commit/c32fbdaa97af98358f522adff484d6b73fd525e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Run records keep a tool result's `isError` flag. Frames written before the flag existed still validate.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`fa4b56e`](https://github.com/en-dash-consulting/n-dx/commit/fa4b56e2c7eb7df0e8d12e3a735f690d68c7746e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Test-only: Rename recovery fixtures resolve equivalent Windows short and canonical directory paths consistently while retaining worktree and Git-directory isolation checks.
+- Updated dependencies [[`eb59a53`](https://github.com/en-dash-consulting/n-dx/commit/eb59a5322c32639fdc5b9c11f964d004592d5461), [`ab81666`](https://github.com/en-dash-consulting/n-dx/commit/ab81666a7198577f0d7ad48ac08986d7ef49a850), [`ae73cd2`](https://github.com/en-dash-consulting/n-dx/commit/ae73cd212bcb64ab4667f2702fbf3446348a9ba9), [`6bd923f`](https://github.com/en-dash-consulting/n-dx/commit/6bd923f35c889904e6a5caac4258857490d2f3db), [`d6b1896`](https://github.com/en-dash-consulting/n-dx/commit/d6b1896792ae0aa5af95c1d940debbf084b5fbc3), [`627f8f4`](https://github.com/en-dash-consulting/n-dx/commit/627f8f4b3158facdd176cae7d562eab8bcd9f776), [`5e1246b`](https://github.com/en-dash-consulting/n-dx/commit/5e1246b96ba207d5b1626b001524f393d7a64411), [`499490c`](https://github.com/en-dash-consulting/n-dx/commit/499490c85cb9ac06f319eb688049f7c4a97ee487), [`a6de03b`](https://github.com/en-dash-consulting/n-dx/commit/a6de03b2be31b0f40f1f15e78ce9d6f72107258d), [`994117a`](https://github.com/en-dash-consulting/n-dx/commit/994117acc6ae59d1aabb6d6349770fce25f6a39f), [`85945fa`](https://github.com/en-dash-consulting/n-dx/commit/85945fa14d4b2d0ff0a835cb8c48998a7d5e328d), [`d007823`](https://github.com/en-dash-consulting/n-dx/commit/d0078230c7ada1b710f97e4cf8b7620ce5888a11), [`913d868`](https://github.com/en-dash-consulting/n-dx/commit/913d86826ac5929e9dbcb40173f93fc42510b37b), [`1b209fd`](https://github.com/en-dash-consulting/n-dx/commit/1b209fde13acc9eea834973fecff9e53f00d84bb), [`f3ac44f`](https://github.com/en-dash-consulting/n-dx/commit/f3ac44f519f4c8f490dfad94a99a0b03e8f72392), [`62ec0da`](https://github.com/en-dash-consulting/n-dx/commit/62ec0dab7a8cb18fa8306412dbb4a7b07c49e890), [`c32fbda`](https://github.com/en-dash-consulting/n-dx/commit/c32fbdaa97af98358f522adff484d6b73fd525e4), [`9bde7d5`](https://github.com/en-dash-consulting/n-dx/commit/9bde7d58dfe64816d4407fb8f809b7be23b59114)]:
+  - @n-dx/rex@0.10.4
+  - @n-dx/llm-client@0.10.4
+
 ## 0.10.3
 
 ### Patch Changes

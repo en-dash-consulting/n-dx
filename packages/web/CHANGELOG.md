@@ -1,5 +1,229 @@
 # @n-dx/web
 
+## 0.10.4
+
+### Patch Changes
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`ff4a6ff`](https://github.com/en-dash-consulting/n-dx/commit/ff4a6ffc0d060b82a32d4bfea3536cf64c44f4c0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The PRD tree `Add item` form accepts a Done when list and comma-separated tags, and sends both with the new item.
+  
+  Criteria can be added and removed one at a time.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`9e19619`](https://github.com/en-dash-consulting/n-dx/commit/9e19619d6d054b63620aeacfbe72a17f6c609c8b) Thanks [@endash-shal](https://github.com/endash-shal)! - Open changes offers `Apply all…` for every change that is done and waiting to apply: it previews each one, then applies those that can in one step.
+  
+  Each change applies against its own preview, so one edited since is skipped and named while the rest apply. If an apply fails partway through, for example because another command holds the PRD, the changes already applied are still reported and the rest are listed as not applied. A change still held in the Inbox is placed first, so Apply all leaves it out. The bar links to Settings → Workflow, whose `Apply amendments` choices now read in plain words: automatically when a change is done, after someone applies it, or when a release is stamped.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`2b427e0`](https://github.com/en-dash-consulting/n-dx/commit/2b427e0ee976dab56f40ae5846d9463918b04808) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The credential-check cache is keyed by the effective vendor and its `llm.<vendor>` settings, so a config change made outside the dashboard no longer serves the previous vendor's verdict.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`e075c46`](https://github.com/en-dash-consulting/n-dx/commit/e075c46829f56f696424e1f6f03a95d535e0fab6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard's `Robot Wrangler` reuses credential verdicts for up to five minutes across visits, avoiding repeated vendor checks while tracked authentication inputs remain unchanged.
+  
+  Checks observe effective vendor settings, the server's authentication environment, workspace trust records, and credential-store metadata when the API check depends on that store. Dashboard settings and trust changes invalidate only their workspace, including pending checks.
+  
+  External CLI login, keychain state, helper output and provider-side revocation are not detected directly. Successful and failed verdicts expire five minutes after a check starts; use `Re-check` to check those external changes immediately. It bypasses completed verdicts while concurrent checks of the same context share work. Read-only tiles stop returning expired verdicts without launching a check. The auth subprocess timeout remains 60 seconds, separate from the cache lifetime.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`4f0d484`](https://github.com/en-dash-consulting/n-dx/commit/4f0d4843b1d525756160c1b1ac6483b20fd844fc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard's `Robot Wrangler` credential checks keep each workspace's result separate, including when checks run concurrently.
+  
+  Checks share work only when their workspace and effective vendor configuration match. Project-local configuration still takes precedence, and changing contexts no longer replaces another context's cached verdict.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`0e40be1`](https://github.com/en-dash-consulting/n-dx/commit/0e40be1173141f9dda359bfef36ea59e89a12e31) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A v2 change with no tasks offers `Start`, run history, usage and saved run settings on the dashboard.
+  
+  The Changes view reads "runs as one task". The server marks such a change `runsAsOneTask` from rex's selection rule; a change with tasks, or one holding a change, still refuses run settings.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`ab81666`](https://github.com/en-dash-consulting/n-dx/commit/ab81666a7198577f0d7ad48ac08986d7ef49a850) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Codex Sidecar (experimental, off by default; enable with `web.sidecar`) uses complete disabled entries for project MCP servers so turns can load their configuration.
+  
+  Each project MCP server except `ndx-sidecar` is turned off with `enabled=false` plus a placeholder matching its declared transport: `command="ndx-sidecar-disabled"` for stdio or `url="http://127.0.0.1:9/ndx-sidecar-disabled"` for HTTP. The entry is valid whether or not Codex loads the project `.codex/config.toml`; a server declaring neither or both transports refuses the turn. A turn that still reaches an MCP server other than `ndx-sidecar` is stopped, and the reason is shown.
+  
+  Action needed: If a turn refuses an ambiguous transport, edit the named `.codex/config.toml` so each server declares exactly one `command` or `url`.
+  
+  The original codex-cli `0.166.0` report showed that `--ignore-user-config` skips the project config and an `enabled=false` override alone fails transport validation. Final broker behavior on `0.166.0` and `0.164.0-alpha.11.1` remains unverified here; parser and scripted argv tests do not establish live CLI compatibility.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`627f8f4`](https://github.com/en-dash-consulting/n-dx/commit/627f8f4b3158facdd176cae7d562eab8bcd9f776) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Codex Sidecar (experimental, off by default; enable with `web.sidecar`) connects turns to the broker under a read-only policy.
+  
+  Codex Sidecar turns, fresh and resumed, spawn with `--ignore-user-config`, `features.apps=false`, `features.shell_snapshot=false`, the read-only policy (re-applied on resume) and the `ndx-sidecar` broker as `-c mcp_servers.ndx-sidecar.*` flags: url, `required`, a 30 s startup timeout and a tool timeout of the session idle window. The broker headers travel as `env_http_headers` variables set only in the Codex child's environment and blanked in the agent's commands, so the credential is never in argv or an MCP config file. Other project MCP servers receive complete disabled entries (`enabled=false` plus a placeholder `command` or `url`).
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`d6b1896`](https://github.com/en-dash-consulting/n-dx/commit/d6b1896792ae0aa5af95c1d940debbf084b5fbc3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Sidecar (experimental, off by default; enable with `web.sidecar`) supports Codex worktree sessions and turns; hub sessions stay Claude-only.
+  
+  Every Codex turn, fresh and resumed, re-reads each project `.codex/config.toml` from the checkout up to the repository root and turns off every MCP server it declares except `ndx-sidecar`. Each receives a complete disabled entry: `-c mcp_servers.<name>.enabled=false` plus a placeholder `command` for stdio or `url` for HTTP. The entries are valid whether or not Codex loads the project file. An unreadable or unsupported project config, a server name that is not a bare TOML key, or a server declaring neither or both transports refuses the turn before anything is spawned, with a reason naming the file. User configurations selecting a non-default model provider remain unsupported.
+  
+  Action needed: If a turn refuses a project config, repair the named `.codex/config.toml`; use bare server names and exactly one `command` or `url` per server. For a non-default Codex provider, select Claude for the Sidecar.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`5e1246b`](https://github.com/en-dash-consulting/n-dx/commit/5e1246b96ba207d5b1626b001524f393d7a64411) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Codex Sidecar (experimental, off by default; enable with `web.sidecar`) explains incompatible user-configured model providers before starting.
+  
+  A Codex Sidecar session is refused when the user's Codex config (`$CODEX_HOME/config.toml`) selects a model provider other than `openai`, at the top level or through the selected profile: Sidecar turns skip that config, so the provider would not apply and every turn would fail auth. Create answers 400 and records nothing; a turn answers 409 and spawns nothing. A config that cannot be read refuses too. The reason names the provider and the file. Claude sessions are unaffected. llm-client exports `codexUserModelProvider` and `codexUserConfigPath`.
+  
+  Action needed: Select Claude for the Sidecar if your Codex setup requires a non-default provider, or use the default `openai` provider. If the user config cannot be read, repair the named `$CODEX_HOME/config.toml`.
+  
+  Provider forwarding is not implemented. Provider selections inside inline tables are not detected by this check and can still fail authentication; no live Azure-specific verification is claimed.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`235c988`](https://github.com/en-dash-consulting/n-dx/commit/235c988e6b309deaa41237a07be1fb30861e7f5d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard's `Add New Item` form preserves acceptance criteria drafts when Enter confirms IME input, including compatibility events.
+
+- [#1020](https://github.com/en-dash-consulting/n-dx/pull/1020) [`9222084`](https://github.com/en-dash-consulting/n-dx/commit/9222084daa1d528329c786071b5e15afef6bb7ea) Thanks [@endash-shal](https://github.com/endash-shal)! - New `hench.projectSkills` setting names project skills that `ndx work` agents read before the work each one covers (opt-in, default none).
+  
+  Each name is a directory under `.claude/skills/` or `.agents/skills/`. Every run's system prompt lists the named skills by path and description and tells the agent to read the file first, because a run cannot invoke a skill by name: hench does not grant Claude's `Skill` tool, whose `allowed-tools` frontmatter could widen the run's command policy. A name with no `SKILL.md` is skipped with a warning. The setting is opt-in because the same directories hold operator workflows such as `ndx-work` that a running agent must not follow. Set it with `ndx config hench.projectSkills '["<name>"]' .`; the dashboard lists it under execution settings.
+
+- [#1009](https://github.com/en-dash-consulting/n-dx/pull/1009) [`f663dc0`](https://github.com/en-dash-consulting/n-dx/commit/f663dc0950b5f243ddc87fbb59172b18fbfae81e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Live's container is centred in the free width, so no gutter shows on its right on wide windows or after the Sidecar drawer closes.
+
+- [#1009](https://github.com/en-dash-consulting/n-dx/pull/1009) [`9885ccf`](https://github.com/en-dash-consulting/n-dx/commit/9885ccf751000a7b113d8f0921f48a4b730501f3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Analysis next steps: a long file path in a step title wraps inside the row, so the copy button stays in the row instead of being clipped by the tile.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`568023b`](https://github.com/en-dash-consulting/n-dx/commit/568023b74d8b42754f8426e820167f0494981e8b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Browser-pasted Notion URLs now read back as CAOS ids.
+  
+  Workspace paths, title slugs and query strings are accepted, so tracker moves for a change linked that way are no longer refused.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`d37f6e7`](https://github.com/en-dash-consulting/n-dx/commit/d37f6e72999ab64f1430a8cf0a6e0ffe45227866) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Board-view Notion peek URLs now resolve to the page id.
+  
+  The `p=` parameter takes precedence over the database id in the path, so the tracker move is no longer refused.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`6b79868`](https://github.com/en-dash-consulting/n-dx/commit/6b79868c128eb4063050ce93f73a457246c65152) Thanks [@endash-shal](https://github.com/endash-shal)! - Plan: Open changes is a table of change, size, progress and status. Size reads Small, Medium or Large (the file count is in its tooltip and the detail panel), progress is a percentage, and status is one word (Planned, Ready, Working, Waiting when blocked, Done when awaiting apply) with the full stage on hover. Security and Essential flags follow the name; tracker and Describe actions show on hover.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`748d4f2`](https://github.com/en-dash-consulting/n-dx/commit/748d4f26e3aa2f5a865373215c009fb2e2821a3e) Thanks [@endash-shal](https://github.com/endash-shal)! - Dashboard rows on Plan and Work lead with an item's plain-language summary and show impact tags for size, security-sensitive files, essential files and file kinds.
+  
+  The technical title stays as the row's tooltip and the detail panel's heading, and the detail panel gains an editable "In plain terms" field. Tags come from the files runs changed or, before any run, the files the item names. `GET /api/rex/impact` serves them, and the detail panel lists the files behind each tag. Tags on an open page update when a run lands or the PRD changes, and the Tasks search finds an item by its summary.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`5312457`](https://github.com/en-dash-consulting/n-dx/commit/5312457fb08315b340cd6cf8ce377fe630e8e01d) Thanks [@endash-shal](https://github.com/endash-shal)! - Plan: the product area map tile is gone, because readers could not tell what its blocks meant. The Product page is now a tab of Open changes, and its routes, area pages and placement links work as before. Each area's heading on the Product page opens that area's page.
+
+- [#1009](https://github.com/en-dash-consulting/n-dx/pull/1009) [`c01f270`](https://github.com/en-dash-consulting/n-dx/commit/c01f2709d4b5ea41a5d6112d1dd7ea89babdef84) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Plan: the area map's "N open" badge no longer covers the area name, and names wrap between words instead of breaking mid-word; stage tile heads keep the count badge beside the title.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`7fc63a4`](https://github.com/en-dash-consulting/n-dx/commit/7fc63a4d31e043a2deaaa949c50db0c4a70c0fee) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard's `Status` block shows run holds only when placement, reopening a change, or running the parent task offers a next step.
+  
+  Ordinary containers and tasks of applied changes stay quiet. Visible holds use the status block's supporting-text styling. Execution and saved-settings guards remain unchanged.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`0d68772`](https://github.com/en-dash-consulting/n-dx/commit/0d68772a917d5865fa20bbea0f56985ee593ed55) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard's `PRD` tree updates task `Start` controls after placing or applying a change, without a reload.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`e8d8926`](https://github.com/en-dash-consulting/n-dx/commit/e8d89269bbd37fbce284159b052cf8011043bd75) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Product page's Constraints table now shows each open change a constraint carries.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`433f693`](https://github.com/en-dash-consulting/n-dx/commit/433f6937f745b3d54f20909a9b802c3e41e374fb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Product page's Open changes total counts a change that only touches or amends a top-level constraint. `GET /api/rex/product` carries `openChanges` on each constraint row.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`49a9582`](https://github.com/en-dash-consulting/n-dx/commit/49a9582896965202ac695b31eb013e20b719e3e9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - When the Product page's map read fails, the Map/Requirements tabs stay on screen with the error in the Map panel, so the Requirements view is still reachable without typing `/requirements`.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`85945fa`](https://github.com/en-dash-consulting/n-dx/commit/85945fa14d4b2d0ff0a835cb8c48998a7d5e328d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The `Sidecar` transcript (experimental, off by default; enable with `web.sidecar`) preserves tool-result vendor semantics when output begins with `[error]`.
+  
+  Canonical Claude successes without an error flag remain successful. Unflagged Codex output retains unknown status and is not marked failed from its text alone. Archived Claude results keep their prefix fallback, and explicit error flags retain precedence.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`4577e10`](https://github.com/en-dash-consulting/n-dx/commit/4577e1002d92d5003fa931fd0d0e490a6559d18e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The `Work` page's Show all toggle exposes its expanded state and identifies the Ready to run list for assistive technology.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`b864445`](https://github.com/en-dash-consulting/n-dx/commit/b864445c5073f7c7003e3c756be0a73c2a11e803) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `Ready to run` searches readable summaries as well as technical titles and reuses the complete queue when you clear filters or toggle Show all.
+  
+  After a failed full-queue request, reopening Show all or using a filter retries loading the remaining tasks. Successful full queues stay reusable, and run updates refresh the current rows.
+  
+  The list keeps its first ten rows, technical title tooltips, impact tags, and Prepare/Resume menu controls.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`3e253b3`](https://github.com/en-dash-consulting/n-dx/commit/3e253b3246f945f126ace2dbd68c7cb8f57aeb8b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `Ready to run` lists every runnable task with Show all, search, and priority, change and tag filters.
+  
+  The route pages through tasks with hench's v2 selector: Inbox changes never list, a task-less change is one unit, and a change with tasks lists its tasks. Each row names its change.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`71684a6`](https://github.com/en-dash-consulting/n-dx/commit/71684a6d817f0ebc0c40fdf448a6ab0943c53180) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `Ready to run` loads its complete queue in one request, including on live refresh.
+  
+  `GET /api/hench/ready?all=1` replaces requests for successive 50-row pages, so selection and the hench runs scan each run once per load.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`23d9ae0`](https://github.com/en-dash-consulting/n-dx/commit/23d9ae07510be0c62f8dab8410ad7896393f4f6b) Thanks [@endash-shal](https://github.com/endash-shal)! - Work: Ready to run shows the next three tasks, with a "Show N more" toggle for the rest of the list.
+
+- [#1014](https://github.com/en-dash-consulting/n-dx/pull/1014) [`9e3a08f`](https://github.com/en-dash-consulting/n-dx/commit/9e3a08fb2fd5ab7b792d6ac79a130307f2e59776) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's run control finds the app's localhost link when the dev server colours it (Vite bolds the port), and offers it as an Open app button opposite Stop. Command output renders its terminal colours instead of showing `[0m` codes, and starts collapsed to its last three lines with a toggle for the full log.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`17ab435`](https://github.com/en-dash-consulting/n-dx/commit/17ab435c842b4832a8a1fea46fe8ba79c73a23c8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Run controls say "Start" and the Live view "Live run". On a v2 tree, Live's running and Up next rows, the Sidecar work card and the run-plan card's track rows read "<task> · in <change>", or "<change> · runs as one task" for a change with no tasks. The queue plan JSON gains an additive `changeTitle` per lane.
+
+- [#1011](https://github.com/en-dash-consulting/n-dx/pull/1011) [`d007823`](https://github.com/en-dash-consulting/n-dx/commit/d0078230c7ada1b710f97e4cf8b7620ce5888a11) Thanks [@endash-shal](https://github.com/endash-shal)! - n-dx recovers from a stale build itself instead of telling you to rebuild. On a source-linked checkout, `ndx start` (hub, `--here` and `--preview`) rebuilds `@n-dx/web` and the workspace packages it depends on when its `dist/` is older than its source, says so, and then spawns; a command whose package `dist/` is missing builds it and runs; `ndx export` builds a missing viewer. A failed automatic build exits non-zero with the build's own output. A published install missing a built file says it is incomplete and to reinstall.
+  
+  `ndx start` replaces a running hub that is older than the one it would start (see below for what counts as older): it stops that hub, starts the current build on the same port and home, and brings every project from `hub.json` back on its own `/p/<id>/` URL, then prints the sign-in link as usual. When an agent run or an MCP session is live on the old hub, the replacement is deferred to the first `ndx start` after that work ends, and `--replace-hub` forces it now. Project servers answer `GET /api/live-work` with what a restart would cut off: open MCP sessions and Sidecar turns in progress, the hub-scope Sidecar's included, all of which defer a replacement. A project whose live work cannot be read (a timeout, a server error) defers it too, and the note names that project; a server too old to have the route, or a project with no running server, has none. A start that fails once the old hub is stopped is tried again, and a second failure says that `hub.json` is intact and the next `ndx start` brings every project back.
+  
+  A hub running in the other authentication mode than `ndx start` asked for is replaced in the requested mode the same way, instead of `ndx start` asking you to stop it: an open hub becomes a token hub, and a token hub becomes an open one only when the command asked for no token (`--no-auth`, `web.auth=false`) and passed `--replace-hub`, which the notice says. Without `--replace-hub`, such a command joins the token hub and is served with the token, so one project's setting never turns the token off for every project on the hub. With live work on it the replacement defers, and an open hub still never serves a project that wants the token.
+  
+  Hub-side faults no longer end in restart advice. A hub started without `--ndx-cli` finds `@n-dx/core` beside its own package; a hub with no n-dx binary looks for its own entry again before each start and health check; `/api/hub/health` reports what is still missing as `faults`, and `ndx start` replaces such a hub. A sidecar stop the hub does not confirm is a note and no longer fails `ndx extensions disable`/`enable`/`remove`/`add`.
+  
+  `ndx start` replaces only a hub older than itself: one with no build identity, an older `@n-dx/web` version, or an earlier build of the same checkout (`/api/hub/health` now reports the hub's package root). A newer hub, or one started from another checkout, keeps serving, with a one-line note.
+  
+  When the automatic rebuild of a `dist/` that is there but lags its source fails, or another process still holds the rebuild after the wait, `ndx start` warns with the build's output and goes on with the existing build, leaving an older hub serving; only a missing build is fatal.
+  
+  When `ndx start` replaces the hub, signed-in dashboard tabs stay signed in: the old hub hands its live sessions (as digests, in an owner-only file the new hub deletes on reading) to the new one. `ndx hub stop` still signs every tab out. `@n-dx/llm-client` exports `writeOwnerOnlyFile`.
+  
+  Two `ndx start` that replace the same older hub at once both succeed: the second joins the hub the first started instead of failing on the port, and never stops it — a replacement stops only the hub it judged.
+  
+  The automatic rebuild's lock is claimed atomically when its owner is gone, and is stale once older than any rebuild may take, so two waiters never build into one `dist/` at once.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`d2e7482`](https://github.com/en-dash-consulting/n-dx/commit/d2e7482e0cefc53306c93dd684644006d10241eb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar (experimental, off by default; enable with `web.sidecar`) can ask the operator to pick between options.
+  
+  A new `ask_choice` broker tool raises a choice card with a radio (or checkbox) row per option, arrow-key movement, an Other free-text row and a Send button; the answer returns to the agent as the tool result. It writes nothing, and every worktree lens now tells the agent to use it for a decision instead of listing options in its reply.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`c96ea94`](https://github.com/en-dash-consulting/n-dx/commit/c96ea941a3be038ba6ee7ac743b87b2474010a8c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar change-set card (experimental, off by default; enable with `web.sidecar`) carries editable tags into newly approved items.
+  
+  `propose_prd_change` takes optional `tags` per item, the card shows them in an editable field, and approval writes them to the new items.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`43bd99c`](https://github.com/en-dash-consulting/n-dx/commit/43bd99cc7e69fcfb8e589fea9d083f95686c0fd9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Sidecar (experimental, off by default; enable with `web.sidecar`) shows a checkpoint diagnostic and starts the next turn with fresh context when checkpointing fails.
+  
+  Any measured checkpoint usage spent is recorded once, including usage from a checkpoint that started but failed. Checkpoint failures show a diagnostic and mark the next turn for fresh context, whatever the cause.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`913d868`](https://github.com/en-dash-consulting/n-dx/commit/913d86826ac5929e9dbcb40173f93fc42510b37b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - (experimental, off by default; enable with `web.sidecar`) Sidecar uses the trusted vendor CLI path for fresh and resumed sessions and explains missing binaries.
+  
+  Local overrides and PATH discovery remain supported. Missing-binary errors identify the setting to repair.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`4f85124`](https://github.com/en-dash-consulting/n-dx/commit/4f851249de2b55320a54b0f1b90952d5ba1f4c0c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar's change set card reads `PRD edits`, and the plan queue's lanes read `track`.
+  
+  The track label appears in the run-plan card, Live's Ready next, `n-dx work --plan-queue` output and help, the Ready next setting and the Sidecar lens instructions. JSON keys and the plan-queue schema are unchanged.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`777dc18`](https://github.com/en-dash-consulting/n-dx/commit/777dc18d271a2754a70f6a1e06b759651297101d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar (experimental, off by default; enable with `web.sidecar`) can propose edits to an existing item.
+  
+  A new `propose_item_edit` card shows each changed field before and after, covering the title, description, done-when, tags and priority. The operator can change the proposed values, and only Approve writes them, through rex's `edit_item`. The Describe lens now uses this card for tightened done-when wording.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`1b209fd`](https://github.com/en-dash-consulting/n-dx/commit/1b209fde13acc9eea834973fecff9e53f00d84bb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar (experimental, off by default; enable with `web.sidecar`) can change an item's status.
+  
+  A new `propose_status` card shows the current and proposed status and rex's own transition rule. Only Approve writes, through rex's `update_task_status` path and never forced, so completion still runs rex's checks, and a move rex refuses comes back as a failed card with rex's message. rex now exports `handleUpdateTaskStatus` and `validateTransition` for it.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`3fdea69`](https://github.com/en-dash-consulting/n-dx/commit/3fdea694b1df9413ee02c756e4f2c1c8764cee22) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Sidecar status cards (experimental, off by default; enable with `web.sidecar`) reject deletion and disclose completion effects before approval.
+  
+  Deletion is also rejected when approving older deletion cards. V2 completion cards now disclose enclosing-change completion, product amendment apply policy and test-gate holds before approval. Completion continues through Rex's existing policy.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`60656be`](https://github.com/en-dash-consulting/n-dx/commit/60656be55ccf6b148d4cf79579d15e13217c8aa3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A `Sidecar` status card (experimental, off by default; enable with `web.sidecar`) explains when a completion is recorded but held by a running hench session.
+  
+  After completion is approved, the card says the run applies it after its test gate, instead of "Status written."
+
+- [#1009](https://github.com/en-dash-consulting/n-dx/pull/1009) [`ea349ab`](https://github.com/en-dash-consulting/n-dx/commit/ea349ab695d08d253c7d22b0039e768a45b14381) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The side stage links hide, and their gutters go, when the page body is narrower than 640 px, so the right link no longer covers content when the Sidecar drawer narrows the body.
+
+- [#1012](https://github.com/en-dash-consulting/n-dx/pull/1012) [`2b40afe`](https://github.com/en-dash-consulting/n-dx/commit/2b40afeafb0aba0f944863f7ccca1e15f3dc31c3) Thanks [@endash-shal](https://github.com/endash-shal)! - Start Working runs in one click. The button starts the run with the task's saved run settings; a task with none first has the project defaults the Prepare task modal would show saved on it as its `run` block, so the settings the run used are visible and editable afterwards. The ▾ arrow now opens the Prepare task modal directly instead of a menu. The run-mode picker governs the click and is named on it ("Start working · until done"). If the defaults cannot be saved, or someone else saved settings on the task in between, nothing starts and the reason stays on the button.
+
+- [#1012](https://github.com/en-dash-consulting/n-dx/pull/1012) [`d4079b9`](https://github.com/en-dash-consulting/n-dx/commit/d4079b9587443eea2045b763992205f5be6ab816) Thanks [@endash-shal](https://github.com/endash-shal)! - Start Working's one click no longer saves the project defaults on a task before the run is accepted. The defaults now travel with the execute as `saveRun: {run, version}`, and the server saves them (through the same path and version check as the Prepare task modal's Save) only after every execute gate has passed, right before it spawns — so a start refused because executions are paused, the task is already running, claimed by another worktree or blocked leaves the task's settings and the working tree unchanged, and a start that passes the gates but then fails to spawn has the saved block taken off again (best effort). A queued run carries `saveRun` through the hub's queue and saves it when it actually starts; a version conflict refuses the start with 409.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`f3ac44f`](https://github.com/en-dash-consulting/n-dx/commit/f3ac44f519f4c8f490dfad94a99a0b03e8f72392) Thanks [@endash-shal](https://github.com/endash-shal)! - Plain-language summaries are kept when the dashboard accepts analysis proposals, and the Plan capture bar drafts one in its Preview and saves it on Accept.
+  
+  `rex add` on a v2 tree takes `--summary` for a single description (it refuses several, and keeps the text as typed), and its JSON preview drafts one per change with `--summarize`, using the light-tier model. A draft that fails is left out. Review & Edit Proposals, used by analysis, batch import and Smart Add, passes each feature's and task's summary through to the accepted items.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`c77f9d1`](https://github.com/en-dash-consulting/n-dx/commit/c77f9d1def487e5f2b8749df3f43721ef95f525d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard's `Start` and `Prepare task` controls save run settings for changes without child tasks.
+  
+  One-click Start saves project defaults before launching, while existing saved settings and version-conflict checks remain intact. Changes containing tasks direct you to save settings on those tasks.
+
+- [#1009](https://github.com/en-dash-consulting/n-dx/pull/1009) [`6785ee7`](https://github.com/en-dash-consulting/n-dx/commit/6785ee73553fd4f0d5df0ade2fc0e459adb458ca) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tasks rows and the Tune panels shrink with a main column the Sidecar drawer narrows. A row's tag list shrinks and wraps beside a title that shrinks from its own width, so the row's actions stay inside it; the Tune panel grids use `minmax(0, 1fr)` tracks.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`a736bfc`](https://github.com/en-dash-consulting/n-dx/commit/a736bfca2f5e8494b08a68c1a5828e62891073fb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - (experimental, off by default; enable with `web.sidecar`) Codex Sidecar broker calls reach operator cards on fresh and resumed turns.
+  
+  Only the Sidecar broker is authorized at the CLI layer. Read-only shell policy and credential isolation remain in effect.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`0343201`](https://github.com/en-dash-consulting/n-dx/commit/034320158ff96a8718f9580d827e860b6825ba23) Thanks [@endash-shal](https://github.com/endash-shal)! - Dashboard tiles shrink to fit their content, and tiles with more to show keep their size, fade and "Open to see all".
+  
+  The Files tile draws roles as full-width bars. On Plan, Plan health and Specs to tighten sit side by side under Open changes, and Plan health shows its Check, Fix and Reshape buttons.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`19d4637`](https://github.com/en-dash-consulting/n-dx/commit/19d4637176c678b2bd015268304a68c554b2b335) Thanks [@endash-shal](https://github.com/endash-shal)! - Plan's Open changes tile shows three changes and links to the full list, Tune's Spend tile shows a spend summary, and crowded tiles offer "Open to see all".
+  
+  The Spend summary gives the estimated total, the latest day, budget use and the top three places tokens went, and opens the full Token usage view. Row actions on Open changes appear on hover.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`c32fbda`](https://github.com/en-dash-consulting/n-dx/commit/c32fbdaa97af98358f522adff484d6b73fd525e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar transcript reads a tool call's Failed or Done state from the result's error flag. A failed Codex command now reads Failed, and a successful call whose output starts with `[error] ` reads Done. Older transcripts without the flag still fall back to the `[error] ` prefix.
+
+- [#1013](https://github.com/en-dash-consulting/n-dx/pull/1013) [`7ac5b95`](https://github.com/en-dash-consulting/n-dx/commit/7ac5b951c882ad66ba4aa3791c4fd928b3cea822) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The trust strip's visible line always shows how many PRD items carry saved run settings, even when three config files come first. `GET /api/trust` gains a `prdRunBlocks` count and a `prdRunBlocksPath`, the directory that holds them. The strip leaves that path out of the named sources and shows it with its count under Details. The strip is capped at a third of the viewport less the top nav and bottom bar, and the restrictions sentence moved under Details so the collapsed line fits two lines.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`5fa7dfa`](https://github.com/en-dash-consulting/n-dx/commit/5fa7dfa8e911adba826d8b0c6e91db1562357815) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 tree, the `Change tree` view, Up Next and the search type filter use change, task and subtask labels.
+  
+  These replace epic and feature labels. The dashboard glossary defines Change, Task, Subtask, Inbox and "Runs as one task". A v1 tree reads as before.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`85a2dc5`](https://github.com/en-dash-consulting/n-dx/commit/85a2dc5338206c650ebbfdd2535f4b66310178cf) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 tree the top nav, page title, browser tab title, guide, settings overlay and stage sections say "Change tree" for the PRD view instead of "Tasks".
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`937b581`](https://github.com/en-dash-consulting/n-dx/commit/937b58110d8bec12972b55837e35d7529e2e5bbd) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The `dashboard` withholds run controls and refuses settings or launches for held Inbox work, closed changes, containers and v2 subtasks.
+  
+  Action needed: Place held work from the Inbox, reopen closed changes when appropriate, and start or configure a subtask through its parent task.
+  
+  Empty-product Inbox work, placed task-less changes, explicit deferred tasks and v1 tasks/subtasks retain their execution behavior. Saved model pins and transactional version checks remain intact.
+
+- [#1009](https://github.com/en-dash-consulting/n-dx/pull/1009) [`4d6354c`](https://github.com/en-dash-consulting/n-dx/commit/4d6354ce9f6826db00d7f4c3ba0b75f0edab151c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tune's workflow suggestion actions wrap, so the Dismiss button stays inside its card instead of being clipped.
+- Updated dependencies [[`eb59a53`](https://github.com/en-dash-consulting/n-dx/commit/eb59a5322c32639fdc5b9c11f964d004592d5461), [`ab81666`](https://github.com/en-dash-consulting/n-dx/commit/ab81666a7198577f0d7ad48ac08986d7ef49a850), [`ae73cd2`](https://github.com/en-dash-consulting/n-dx/commit/ae73cd212bcb64ab4667f2702fbf3446348a9ba9), [`6bd923f`](https://github.com/en-dash-consulting/n-dx/commit/6bd923f35c889904e6a5caac4258857490d2f3db), [`d6b1896`](https://github.com/en-dash-consulting/n-dx/commit/d6b1896792ae0aa5af95c1d940debbf084b5fbc3), [`627f8f4`](https://github.com/en-dash-consulting/n-dx/commit/627f8f4b3158facdd176cae7d562eab8bcd9f776), [`5e1246b`](https://github.com/en-dash-consulting/n-dx/commit/5e1246b96ba207d5b1626b001524f393d7a64411), [`499490c`](https://github.com/en-dash-consulting/n-dx/commit/499490c85cb9ac06f319eb688049f7c4a97ee487), [`a6de03b`](https://github.com/en-dash-consulting/n-dx/commit/a6de03b2be31b0f40f1f15e78ce9d6f72107258d), [`994117a`](https://github.com/en-dash-consulting/n-dx/commit/994117acc6ae59d1aabb6d6349770fce25f6a39f), [`85945fa`](https://github.com/en-dash-consulting/n-dx/commit/85945fa14d4b2d0ff0a835cb8c48998a7d5e328d), [`d007823`](https://github.com/en-dash-consulting/n-dx/commit/d0078230c7ada1b710f97e4cf8b7620ce5888a11), [`913d868`](https://github.com/en-dash-consulting/n-dx/commit/913d86826ac5929e9dbcb40173f93fc42510b37b), [`1b209fd`](https://github.com/en-dash-consulting/n-dx/commit/1b209fde13acc9eea834973fecff9e53f00d84bb), [`f3ac44f`](https://github.com/en-dash-consulting/n-dx/commit/f3ac44f519f4c8f490dfad94a99a0b03e8f72392), [`62ec0da`](https://github.com/en-dash-consulting/n-dx/commit/62ec0dab7a8cb18fa8306412dbb4a7b07c49e890), [`c32fbda`](https://github.com/en-dash-consulting/n-dx/commit/c32fbdaa97af98358f522adff484d6b73fd525e4), [`9bde7d5`](https://github.com/en-dash-consulting/n-dx/commit/9bde7d58dfe64816d4407fb8f809b7be23b59114)]:
+  - @n-dx/rex@0.10.4
+  - @n-dx/llm-client@0.10.4
+  - @n-dx/sourcevision@0.10.4
+
 ## 0.10.3
 
 ### Patch Changes

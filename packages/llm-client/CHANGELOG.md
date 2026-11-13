@@ -1,5 +1,73 @@
 # @n-dx/llm-client
 
+## 0.10.4
+
+### Patch Changes
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`ab81666`](https://github.com/en-dash-consulting/n-dx/commit/ab81666a7198577f0d7ad48ac08986d7ef49a850) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Codex Sidecar (experimental, off by default; enable with `web.sidecar`) uses complete disabled entries for project MCP servers so turns can load their configuration.
+  
+  Each project MCP server except `ndx-sidecar` is turned off with `enabled=false` plus a placeholder matching its declared transport: `command="ndx-sidecar-disabled"` for stdio or `url="http://127.0.0.1:9/ndx-sidecar-disabled"` for HTTP. The entry is valid whether or not Codex loads the project `.codex/config.toml`; a server declaring neither or both transports refuses the turn. A turn that still reaches an MCP server other than `ndx-sidecar` is stopped, and the reason is shown.
+  
+  Action needed: If a turn refuses an ambiguous transport, edit the named `.codex/config.toml` so each server declares exactly one `command` or `url`.
+  
+  The original codex-cli `0.166.0` report showed that `--ignore-user-config` skips the project config and an `enabled=false` override alone fails transport validation. Final broker behavior on `0.166.0` and `0.164.0-alpha.11.1` remains unverified here; parser and scripted argv tests do not establish live CLI compatibility.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`ae73cd2`](https://github.com/en-dash-consulting/n-dx/commit/ae73cd212bcb64ab4667f2702fbf3446348a9ba9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - (experimental, off by default; enable with `web.sidecar`) Codex broker calls appear in the Sidecar transcript.
+  
+  Codex `mcp_tool_call` items parse into a tool use named `mcp__<server>__<tool>` and a tool result whose error flag comes from the item's status.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`6bd923f`](https://github.com/en-dash-consulting/n-dx/commit/6bd923f35c889904e6a5caac4258857490d2f3db) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Codex turns refuse project MCP server names that cannot be disabled safely.
+  
+  `codexProjectMcpDisableFlags` names the file and server when a name is not a bare TOML key (`a.b`, `my server`), instead of emitting a quoted `-c` path the Codex CLI may not honour.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`d6b1896`](https://github.com/en-dash-consulting/n-dx/commit/d6b1896792ae0aa5af95c1d940debbf084b5fbc3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `codexProjectMcpDisableFlags`, `codexConfigMcpServerNames` and `CodexProjectConfigError`: a strict reader of the MCP servers a repository's `.codex/config.toml` files declare, which throws rather than skipping anything it cannot parse. `CodexTurnFlags.turnConfigFlags` adds flags computed afresh for each turn; a throw refuses the turn before anything is spawned and leaves the session usable.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`627f8f4`](https://github.com/en-dash-consulting/n-dx/commit/627f8f4b3158facdd176cae7d562eab8bcd9f776) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A resumed `codex exec` re-applies the sandbox and approval policy. `compileCodexPolicyFlags(policy, { resume: true })` now emits `-c sandbox_mode="<mode>"` and `-c approval_policy="<value>"` before the shell-environment overrides (never `--sandbox`, which `exec resume` rejects), and the Codex session driver sends them on resume through the new optional `CodexTurnFlags.resumePolicyFlags`. Also additive: `CodexTurnFlags.configFlags` (flags placed right after `exec` / `exec resume` on every turn), `CodexTurnFlags.hiddenEnv` and `codexShellEnvFlags(extraHidden)` (more names blanked in the agent's commands), and `VendorSessionOptions.extraEnv` (named variables added to the resolved child environment).
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`5e1246b`](https://github.com/en-dash-consulting/n-dx/commit/5e1246b96ba207d5b1626b001524f393d7a64411) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Codex Sidecar (experimental, off by default; enable with `web.sidecar`) explains incompatible user-configured model providers before starting.
+  
+  A Codex Sidecar session is refused when the user's Codex config (`$CODEX_HOME/config.toml`) selects a model provider other than `openai`, at the top level or through the selected profile: Sidecar turns skip that config, so the provider would not apply and every turn would fail auth. Create answers 400 and records nothing; a turn answers 409 and spawns nothing. A config that cannot be read refuses too. The reason names the provider and the file. Claude sessions are unaffected. llm-client exports `codexUserModelProvider` and `codexUserConfigPath`.
+  
+  Action needed: Select Claude for the Sidecar if your Codex setup requires a non-default provider, or use the default `openai` provider. If the user config cannot be read, repair the named `$CODEX_HOME/config.toml`.
+  
+  Provider forwarding is not implemented. Provider selections inside inline tables are not detected by this check and can still fail authentication; no live Azure-specific verification is claimed.
+
+- [#1005](https://github.com/en-dash-consulting/n-dx/pull/1005) [`499490c`](https://github.com/en-dash-consulting/n-dx/commit/499490c85cb9ac06f319eb688049f7c4a97ee487) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A credential write no longer fails, and no longer leaves the store locked under its own PID, when Windows refuses to delete the lock's temporary file (an antivirus scanner or the indexer holding it open). The temp file is removed later instead.
+
+- [#1005](https://github.com/en-dash-consulting/n-dx/pull/1005) [`a6de03b`](https://github.com/en-dash-consulting/n-dx/commit/a6de03b2be31b0f40f1f15e78ce9d6f72107258d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Windows credential store writers no longer fail when another process is removing the lock: a lock file being deleted now counts as a held lock, and the writer retries within its wait budget.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`85945fa`](https://github.com/en-dash-consulting/n-dx/commit/85945fa14d4b2d0ff0a835cb8c48998a7d5e328d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The `Sidecar` transcript (experimental, off by default; enable with `web.sidecar`) preserves tool-result vendor semantics when output begins with `[error]`.
+  
+  Canonical Claude successes without an error flag remain successful. Unflagged Codex output retains unknown status and is not marked failed from its text alone. Archived Claude results keep their prefix fallback, and explicit error flags retain precedence.
+
+- [#1011](https://github.com/en-dash-consulting/n-dx/pull/1011) [`d007823`](https://github.com/en-dash-consulting/n-dx/commit/d0078230c7ada1b710f97e4cf8b7620ce5888a11) Thanks [@endash-shal](https://github.com/endash-shal)! - n-dx recovers from a stale build itself instead of telling you to rebuild. On a source-linked checkout, `ndx start` (hub, `--here` and `--preview`) rebuilds `@n-dx/web` and the workspace packages it depends on when its `dist/` is older than its source, says so, and then spawns; a command whose package `dist/` is missing builds it and runs; `ndx export` builds a missing viewer. A failed automatic build exits non-zero with the build's own output. A published install missing a built file says it is incomplete and to reinstall.
+  
+  `ndx start` replaces a running hub that is older than the one it would start (see below for what counts as older): it stops that hub, starts the current build on the same port and home, and brings every project from `hub.json` back on its own `/p/<id>/` URL, then prints the sign-in link as usual. When an agent run or an MCP session is live on the old hub, the replacement is deferred to the first `ndx start` after that work ends, and `--replace-hub` forces it now. Project servers answer `GET /api/live-work` with what a restart would cut off: open MCP sessions and Sidecar turns in progress, the hub-scope Sidecar's included, all of which defer a replacement. A project whose live work cannot be read (a timeout, a server error) defers it too, and the note names that project; a server too old to have the route, or a project with no running server, has none. A start that fails once the old hub is stopped is tried again, and a second failure says that `hub.json` is intact and the next `ndx start` brings every project back.
+  
+  A hub running in the other authentication mode than `ndx start` asked for is replaced in the requested mode the same way, instead of `ndx start` asking you to stop it: an open hub becomes a token hub, and a token hub becomes an open one only when the command asked for no token (`--no-auth`, `web.auth=false`) and passed `--replace-hub`, which the notice says. Without `--replace-hub`, such a command joins the token hub and is served with the token, so one project's setting never turns the token off for every project on the hub. With live work on it the replacement defers, and an open hub still never serves a project that wants the token.
+  
+  Hub-side faults no longer end in restart advice. A hub started without `--ndx-cli` finds `@n-dx/core` beside its own package; a hub with no n-dx binary looks for its own entry again before each start and health check; `/api/hub/health` reports what is still missing as `faults`, and `ndx start` replaces such a hub. A sidecar stop the hub does not confirm is a note and no longer fails `ndx extensions disable`/`enable`/`remove`/`add`.
+  
+  `ndx start` replaces only a hub older than itself: one with no build identity, an older `@n-dx/web` version, or an earlier build of the same checkout (`/api/hub/health` now reports the hub's package root). A newer hub, or one started from another checkout, keeps serving, with a one-line note.
+  
+  When the automatic rebuild of a `dist/` that is there but lags its source fails, or another process still holds the rebuild after the wait, `ndx start` warns with the build's output and goes on with the existing build, leaving an older hub serving; only a missing build is fatal.
+  
+  When `ndx start` replaces the hub, signed-in dashboard tabs stay signed in: the old hub hands its live sessions (as digests, in an owner-only file the new hub deletes on reading) to the new one. `ndx hub stop` still signs every tab out. `@n-dx/llm-client` exports `writeOwnerOnlyFile`.
+  
+  Two `ndx start` that replace the same older hub at once both succeed: the second joins the hub the first started instead of failing on the port, and never stops it — a replacement stops only the hub it judged.
+  
+  The automatic rebuild's lock is claimed atomically when its owner is gone, and is stale once older than any rebuild may take, so two waiters never build into one `dist/` at once.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`913d868`](https://github.com/en-dash-consulting/n-dx/commit/913d86826ac5929e9dbcb40173f93fc42510b37b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - (experimental, off by default; enable with `web.sidecar`) Sidecar uses the trusted vendor CLI path for fresh and resumed sessions and explains missing binaries.
+  
+  Local overrides and PATH discovery remain supported. Missing-binary errors identify the setting to repair.
+
+- [#1017](https://github.com/en-dash-consulting/n-dx/pull/1017) [`62ec0da`](https://github.com/en-dash-consulting/n-dx/commit/62ec0dab7a8cb18fa8306412dbb4a7b07c49e890) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Test workers drop git's command-line config and repository-location variables inherited from the host, so the bare-repository `listWorktrees` test passes when the suite runs from a shell that exports `GIT_CONFIG_PARAMETERS='safe.bareRepository=explicit'`.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`c32fbda`](https://github.com/en-dash-consulting/n-dx/commit/c32fbdaa97af98358f522adff484d6b73fd525e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A tool result now carries an optional `isError` flag. The Claude parsers set it from `is_error`, and the Codex parser sets it from a command's failed status or non-zero exit code. It is left unset when the stream says nothing.
+
+- [#1013](https://github.com/en-dash-consulting/n-dx/pull/1013) [`9bde7d5`](https://github.com/en-dash-consulting/n-dx/commit/9bde7d58dfe64816d4407fb8f809b7be23b59114) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The repository trust assessment lists the PRD's saved run blocks as one directory source (`.rex/changes/`, or the rex directory when blocks sit in more than one PRD root) instead of one path per file. Every `sources` entry stays a real path, and the new `prdRunBlocksPath` field names the PRD entry. The trust report prints the count beside it (`.rex/changes/ (214 PRD items with saved run settings)`). The `run-settings` finding names at most five blocks before "and N more". The trust report, the dashboard's source list and the readiness evidence no longer grow with the number of PRD files. The trust digest is unchanged, so no accepted checkout re-prompts.
+
 ## 0.10.3
 
 ### Patch Changes
