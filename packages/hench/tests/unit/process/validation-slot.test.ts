@@ -504,11 +504,11 @@ describe.skipIf(process.platform === "win32")("acquireValidationSlot — PID nam
   });
 
   it("reads a record without namespace fields as written in no known namespace", async () => {
-    const raw = JSON.stringify({
+    const record = {
       version: 1, token: "t", pid: 4242, child: null, startedAt: "x", bootedAt: currentBootTimeMs(), projectDir: "/p",
-    });
-    expect(parseValidationSlotHolder(raw)).toMatchObject({ pidNamespace: null, outerPidNamespaces: [] });
-    expect(parseValidationSlotHolder(raw.replace("}", ',"pidNamespace":7}'))).toBeNull();
+    };
+    expect(parseValidationSlotHolder(JSON.stringify(record))).toMatchObject({ pidNamespace: null, outerPidNamespaces: [] });
+    expect(parseValidationSlotHolder(JSON.stringify({ ...record, pidNamespace: 7 }))).toBeNull();
   });
 
   it("inside a sandbox, nests on the token of a holder outside it, whose pid it cannot see", async () => {

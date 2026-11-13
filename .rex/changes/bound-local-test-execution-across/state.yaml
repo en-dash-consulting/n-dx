@@ -128,7 +128,14 @@ items:
     lastModified: "2026-11-14T05:03:31.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "74838585-5fc7-436e-ba6c-f378be47807f":
-    lastModified: "2026-11-13T22:12:19.256Z"
+    status: "completed"
+    startedAt: "2026-11-13T22:12:41.225Z"
+    completedAt: "2026-11-13T22:14:20.312Z"
+    endedAt: "2026-11-13T22:14:20.312Z"
+    activeIntervals: [{"end":"2026-11-13T22:14:20.312Z","start":"2026-11-13T22:12:41.225Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot test builds the namespace variant from an object; sandbox live probe takes paths via argv. Commit 141608352."
+    lastModified: "2026-11-13T22:14:20.312Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "823880dc-c2ca-4221-8fae-5a413a0eed80":
     status: "completed"
