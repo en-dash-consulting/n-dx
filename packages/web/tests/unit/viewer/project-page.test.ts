@@ -255,6 +255,21 @@ describe("ProjectView", () => {
     expect(flag("Ask").getAttribute("role")).toBe("switch");
   });
 
+  it("offers every project language n-dx supports, and saves the one picked", async () => {
+    const { writes } = stubApi();
+    await mount();
+
+    const select = root.querySelector<HTMLSelectElement>("#ps-language")!;
+    expect([...select.options].map((o) => o.textContent)).toEqual(
+      ["Auto-detect", "TypeScript", "JavaScript", "Go", "Swift", "Python", "C#", "Java"]);
+    await act(async () => {
+      select.value = "python";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await clickSave();
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { language: "python" } }]);
+  });
+
   it("collapses zone pins to a count and opens the table in place", async () => {
     stubApi({ pins: { "src/a.ts": "web", "src/b.ts": "core" } });
     await mount();

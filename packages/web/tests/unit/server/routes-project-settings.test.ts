@@ -47,6 +47,20 @@ function put(body: Record<string, unknown>): Promise<Response> {
 
 const readJson = async (file: string) => JSON.parse(await readFile(file, "utf-8")) as Record<string, Record<string, unknown>>;
 
+describe("project language", () => {
+  it.each(["swift", "python", "csharp", "java", "go", "auto"])("accepts %s", async (language) => {
+    const res = await put({ language });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { settings: { language: string } }).settings.language).toBe(language);
+  });
+
+  it("refuses an unknown language, naming every valid one", async () => {
+    const res = await put({ language: "klingon" });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("typescript, javascript, go, swift, python, csharp, java");
+  });
+});
+
 describe("GitHub reads through /api/project-settings", () => {
   it("reports GitHub reads off by default", async () => {
     expect(await get()).toMatchObject({ githubReads: false });

@@ -20,6 +20,7 @@ import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import { planSidecarSettings, readSidecarSettings, saveSidecarSettings } from "./sidecar/settings.js";
+import { PROJECT_LANGUAGES, isProjectLanguage } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,7 +65,6 @@ interface ProjectSettingsPutBody {
 // Constants
 // ---------------------------------------------------------------------------
 
-const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
@@ -175,11 +175,11 @@ export async function handleProjectSettingsRoute(
       // Validate language
       if ("language" in parsed) {
         const v = parsed.language;
-        if (v !== null && v !== undefined && !VALID_LANGUAGES.has(v)) {
+        if (v !== null && v !== undefined && (typeof v !== "string" || !isProjectLanguage(v))) {
           errorResponse(
             res,
             400,
-            `language must be one of: ${[...VALID_LANGUAGES].join(", ")}`,
+            `language must be one of: ${PROJECT_LANGUAGES.map((l) => l.id).join(", ")}`,
           );
           return true;
         }

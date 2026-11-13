@@ -21,6 +21,7 @@ import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { SettingRow, Switch, type SettingRowSpec } from "./setting-row.js";
 import type { ProjectSectionId } from "./project-sections.js";
+import { PROJECT_LANGUAGES } from "../external.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -44,12 +45,6 @@ interface PinRow {
 
 // ── Constants ─────────────────────────────────────────────────────────
 
-const LANGUAGE_OPTIONS = [
-  { value: "auto", label: "Auto-detect" },
-  { value: "typescript", label: "TypeScript" },
-  { value: "javascript", label: "JavaScript" },
-  { value: "go", label: "Go" },
-];
 
 const DEFAULT_PORT = 3117;
 
@@ -401,7 +396,7 @@ export function projectSettingRows(
         class: "ps-select",
         value: form.language,
         onChange: (e: Event) => form.setLanguage((e.target as HTMLSelectElement).value),
-      }, LANGUAGE_OPTIONS.map((opt) => h("option", { key: opt.value, value: opt.value }, opt.label))),
+      }, PROJECT_LANGUAGES.map((opt) => h("option", { key: opt.id, value: opt.id }, opt.label))),
     })),
     spec("analysis", "sourcevision.zones.mergeThreshold", "Merge threshold", mergeDesc, h(SettingRow, {
       key: "merge",
