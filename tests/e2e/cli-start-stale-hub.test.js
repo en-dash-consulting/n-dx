@@ -55,8 +55,16 @@ const server = createServer((req, res) => {
   const reply = (status, body) => {
     res.writeHead(status, { "Content-Type": "application/json" });
     // \`extra.exitAfterReplies\`: another ndx start stops this hub right after its nth answer, leaving hub.pid behind.
-    const last = ++replies === JSON.parse(extra || "{}").exitAfterReplies;
-    res.end(JSON.stringify(body), last ? () => process.exit(0) : undefined);
+    // \`extra.drainMs\`: as a real hub stops, it closes its listener first and exits that much later.
+    const { exitAfterReplies, drainMs } = JSON.parse(extra || "{}");
+    const last = ++replies === exitAfterReplies;
+    res.end(JSON.stringify(body), last ? stop : undefined);
+    function stop() {
+      if (!drainMs) return process.exit(0);
+      server.close();
+      server.closeAllConnections();
+      setTimeout(() => process.exit(0), drainMs);
+    }
   };
   if (req.headers["x-ndx-token"] !== token) return reply(401, { error: "Unauthorized" });
   req.resume();
@@ -586,19 +594,24 @@ describe("ndx start — a hub older than this ndx (e2e)", { timeout: 300_000 }, 
   // Each check ndx start makes of the older hub, with the hub gone right after
   // it: what the other side of a concurrent replacement sees when the first
   // command stops the hub between two of its steps. hub.pid still names the
-  // stopped hub, which identifies as "the recorded hub is not running".
+  // stopped hub, which identifies as "the recorded hub is not running". With
+  // `drainMs`, the hub drains first: its listener is closed while its process
+  // and hub.pid are still there, as a real hub's are while it stops projects.
   describe.each([
-    { replies: 1, after: "its anonymous health probe" },
-    { replies: 2, after: "its auth state was read" },
-    { replies: 3, after: "it was judged older" },
-  ])("when another ndx start stops the hub right after $after", ({ replies }) => {
+    { replies: 1, drainMs: 0, after: "its anonymous health probe" },
+    { replies: 2, drainMs: 0, after: "its auth state was read" },
+    { replies: 3, drainMs: 0, after: "it was judged older" },
+    { replies: 1, drainMs: 3_000, after: "its anonymous health probe, draining before it exits" },
+    { replies: 2, drainMs: 3_000, after: "its auth state was read, draining before it exits" },
+    { replies: 3, drainMs: 3_000, after: "it was judged older, draining before it exits" },
+  ])("when another ndx start stops the hub right after $after", ({ replies, drainMs }) => {
     let fx;
     let older;
 
     beforeAll(async () => {
       if (!canBindPorts) return;
       fx = await fixture();
-      older = await startOlderHub(fx.home, false, { exitAfterReplies: replies });
+      older = await startOlderHub(fx.home, false, { exitAfterReplies: replies, drainMs });
     }, 120_000);
 
     afterAll(async () => {

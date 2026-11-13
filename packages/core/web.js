@@ -2209,9 +2209,12 @@ async function hubGoingAway(port, pid) {
  * writes its own, so for that moment {@link identifyOwnHub} says "the recorded
  * hub is not running", which used to read as a hub that is not this user's.
  * It went away when `pid` (the hub this command judged; the recorded one when
- * none was judged) is no longer running, or `hub.pid` no longer names it. No
- * recorded hub at all is not that: something else holds the port. Nothing is
- * sent to the port until a listener there is identified as this user's hub.
+ * none was judged) is no longer running, or `hub.pid` no longer names it, or
+ * it is draining: still running and recorded with nothing listening on the
+ * port, since a stopped hub closes its listener before it stops its projects
+ * and Sidecars and removes `hub.pid`. No recorded hub at all is not that:
+ * something else holds the port. Nothing is sent to the port until a listener
+ * there is identified as this user's hub.
  *
  * @param {number} port
  * @param {number | null} pid
@@ -2221,8 +2224,32 @@ async function hubGoingAway(port, pid) {
 async function settledAfterHubWentAway(port, pid, home) {
   const recorded = await readHubPid(home);
   const judged = pid ?? recorded;
-  if (judged === null || (isProcessRunning(judged) && recorded === judged)) return false;
+  if (judged === null) return false;
+  if (isProcessRunning(judged) && recorded === judged) {
+    // A listener there is left to the checks that found it; none means draining.
+    if (await isPortInUse(port)) return false;
+    await waitForDrainedHub(port, judged, home, HUB_STOP_GRACE_MS + 5_000);
+  }
   return (await waitForPortFreeOrNewHub(port, judged, home, HUB_STOP_GRACE_MS + 5_000)) !== "held";
+}
+
+/**
+ * Wait out a hub that closed its listener and is still stopping: until its
+ * process exits, `hub.pid` stops naming it, or something listens on the port
+ * again. A hub started before then would lose its `hub.pid` to the old hub's
+ * last step and be unidentifiable afterwards.
+ *
+ * @param {number} port
+ * @param {number} pid
+ * @param {string} home
+ * @param {number} timeoutMs
+ * @returns {Promise<void>}
+ */
+async function waitForDrainedHub(port, pid, home, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline && isProcessRunning(pid) && (await readHubPid(home)) === pid && !(await isPortInUse(port))) {
+    await new Promise((r) => setTimeout(r, 200));
+  }
 }
 
 /** What a command that found its replacement already done reports: no spawn of its own, and a note. */
