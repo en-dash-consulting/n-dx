@@ -101,11 +101,15 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   /**
-   * The section last jumped to from the nav. Near the end of the page its top
-   * may never reach the offset line, so it stays current while its heading is
-   * in view rather than yielding to the last section.
+   * The section last jumped to from the nav. A smooth scroll fires scroll
+   * events all the way there, while the heading is still off-screen, so the
+   * target stays current until it has `arrived` (its heading came into view).
+   * After that it stays current while its heading is in view — near the end of
+   * the page its top may never reach the offset line, and the last section
+   * would take over. Scrolling by hand (wheel, touch, a pointer or a key on
+   * the content) releases it at once.
    */
-  const jumpedRef = useRef<string | null>(null);
+  const jumpedRef = useRef<{ id: string; arrived: boolean } | null>(null);
 
   const entries = useMemo(() => SETTINGS_ENTRIES
     .filter((e) => validViews.has(e.view))
@@ -135,18 +139,27 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     const update = () => {
       frame = 0;
       const jumped = jumpedRef.current;
-      if (jumped && sections.some((s) => s.id === jumped) && headingInView(content, jumped)) {
-        setActiveSection(jumped);
-        return;
+      if (jumped && sections.some((s) => s.id === jumped.id)) {
+        if (headingInView(content, jumped.id)) jumped.arrived = true;
+        // Still travelling, or arrived and still in view: the jump holds.
+        if (!jumped.arrived || headingInView(content, jumped.id)) {
+          setActiveSection(jumped.id);
+          return;
+        }
       }
       jumpedRef.current = null;
       setActiveSection(currentSection(content, sections));
     };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    // The reader took over the scrolling: follow it, not the last jump.
+    const release = () => { jumpedRef.current = null; };
+    const MANUAL = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
     update();
     content.addEventListener("scroll", onScroll, { passive: true });
+    for (const type of MANUAL) content.addEventListener(type, release, { passive: true });
     return () => {
       content.removeEventListener("scroll", onScroll);
+      for (const type of MANUAL) content.removeEventListener(type, release);
       if (frame) cancelAnimationFrame(frame);
     };
   }, [sections]);
@@ -157,7 +170,7 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     el.scrollIntoView?.({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
     el.querySelector<HTMLElement>("h2, h3")?.focus({ preventScroll: true });
-    jumpedRef.current = id;
+    jumpedRef.current = { id, arrived: false };
     setActiveSection(id);
   }, []);
 

@@ -702,7 +702,7 @@ describe("Project sections in the Settings overlay nav", () => {
       const top = this === content ? 0 : this.id === "settings-section-optional" ? 120 : -200;
       return { top, bottom: this === content ? 500 : top + 10, left: 0, right: 0, width: 0, height: 10, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
     };
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
     try {
       const optional = navSections().find((b) => b.textContent === "Optional features")!;
       await act(async () => { optional.click(); });
@@ -727,7 +727,7 @@ describe("Project sections in the Settings overlay nav", () => {
       return { top, bottom: top + 10, left: 0, right: 0, width: 0, height: 10, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
     };
     // The overlay reads positions once a frame; run the frame at once.
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
     try {
       act(() => { content.dispatchEvent(new Event("scroll")); });
       expect(navSections().find((b) => b.getAttribute("aria-current") === "location")!.textContent).toBe("Display");
@@ -745,6 +745,75 @@ describe("Project sections in the Settings overlay nav", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(navSections().map((b) => b.textContent)).toEqual(["Git and commits"]);
+  });
+
+  /**
+   * A smooth jump from the top: scroll events arrive while the target heading
+   * is still below the fold, then the scroll ends at the bottom of the page.
+   * `place` moves the target heading; the content box is 0..500.
+   */
+  function stubLayout(content: HTMLElement) {
+    const target = { top: 900 };
+    Object.defineProperty(content, "scrollHeight", { value: 1000, configurable: true });
+    Object.defineProperty(content, "clientHeight", { value: 500, configurable: true });
+    const originalRect = Element.prototype.getBoundingClientRect;
+    const originalScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = () => {};
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const top = this === content ? 0 : this.id === "settings-section-optional" ? target.top : -200;
+      return { top, bottom: this === content ? 500 : top + 10, left: 0, right: 0, width: 0, height: 10, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+    };
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
+    const scrollTo = (scrollTop: number, headingTop: number) => {
+      Object.defineProperty(content, "scrollTop", { value: scrollTop, configurable: true });
+      target.top = headingTop;
+      act(() => { content.dispatchEvent(new Event("scroll")); });
+    };
+    return {
+      scrollTo,
+      restore: () => {
+        Element.prototype.getBoundingClientRect = originalRect;
+        Element.prototype.scrollIntoView = originalScroll;
+      },
+    };
+  }
+
+  const current = () => navSections().find((b) => b.getAttribute("aria-current") === "location")!.textContent;
+
+  it("keeps a smooth jump's target highlighted through the animation to the end of the page", async () => {
+    stubApi();
+    await mountInOverlay();
+    const content = root.querySelector<HTMLElement>(".settings-overlay-content")!;
+    const layout = stubLayout(content);
+    try {
+      await act(async () => { navSections().find((b) => b.textContent === "Optional features")!.click(); });
+      // Mid-animation: the heading is still below the fold.
+      layout.scrollTo(150, 750);
+      expect(current()).toBe("Optional features");
+      layout.scrollTo(300, 600);
+      expect(current()).toBe("Optional features");
+      // Arrived at the bottom, where the last section's rule would otherwise win.
+      layout.scrollTo(500, 120);
+      expect(current()).toBe("Optional features");
+    } finally {
+      layout.restore();
+    }
+  });
+
+  it("lets the reader take over a jump by scrolling by hand", async () => {
+    stubApi();
+    await mountInOverlay();
+    const content = root.querySelector<HTMLElement>(".settings-overlay-content")!;
+    const layout = stubLayout(content);
+    try {
+      await act(async () => { navSections().find((b) => b.textContent === "Optional features")!.click(); });
+      layout.scrollTo(150, 750);
+      act(() => { content.dispatchEvent(new Event("wheel")); });
+      layout.scrollTo(500, 120);
+      expect(current()).toBe("Connections");
+    } finally {
+      layout.restore();
+    }
   });
 
   it("drops Project's sections when the overlay moves to another page", async () => {
