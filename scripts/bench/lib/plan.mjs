@@ -15,7 +15,7 @@ export class BenchUsageError extends Error {
   }
 }
 
-/** The test worker cap the pilot uses (`hench.testGate.maxWorkers` in this repository). */
+/** The test worker cap value the benchmark measures (the original wave 1 pilot's). */
 export const PILOT_MAX_WORKERS = "2";
 
 /**
