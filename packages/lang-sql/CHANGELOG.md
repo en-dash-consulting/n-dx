@@ -1,5 +1,13 @@
 # @n-dx/lang-sql
 
+## 0.10.4
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @n-dx/lang-kit@0.10.4
+  - @n-dx/lang-runtime@0.10.4
+
 ## 0.10.3
 
 ### Patch Changes

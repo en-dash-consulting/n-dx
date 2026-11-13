@@ -10,5 +10,6 @@ items:
     resolutionDetail: "Added matchesPorcelainLine (artifacts.ts); findUncommittedWork and partitionDirtyPaths discount an R/C line only when source and target both match. Leftover report names the source."
     appliedAt: "2026-11-06T21:24:17.198Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.4"
     lastModified: "2026-11-06T21:24:17.198Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

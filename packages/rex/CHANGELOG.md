@@ -1,5 +1,28 @@
 # @n-dx/rex
 
+## 0.10.4
+
+### Patch Changes
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`eb59a53`](https://github.com/en-dash-consulting/n-dx/commit/eb59a5322c32639fdc5b9c11f964d004592d5461) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 tree, `n-dx work` names runnable changes as changes and tasks as tasks.
+  
+  Hench prints "Change: <title> (runs as one task)" for a task-less change and "Task: <title> (in change <title>)" for a task. The adversarial reviewer says a capture lands as an Inbox change. `n-dx work` help says `--task` takes a task or a change that runs as one task and lists `--mine` and `--tags`; `rex next` help says task or change, and its empty-tree hint on v2 is `rex add --title=...`. A v1 tree keeps its words.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`994117a`](https://github.com/en-dash-consulting/n-dx/commit/994117acc6ae59d1aabb6d6349770fce25f6a39f) Thanks [@endash-shal](https://github.com/endash-shal)! - Changes, tasks and subtasks take an optional plain-language `summary` that says, for a non-coder, what the work does and why it is worth doing.
+  
+  `add_item`, `edit_item` (an empty string removes it), `rex add --summary` and `rex update --summary` set it. Analyze proposals ask the model for one, and `/ndx-capture` and `/ndx-plan` draft one with each item.
+
+- [#998](https://github.com/en-dash-consulting/n-dx/pull/998) [`1b209fd`](https://github.com/en-dash-consulting/n-dx/commit/1b209fde13acc9eea834973fecff9e53f00d84bb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Sidecar (experimental, off by default; enable with `web.sidecar`) can change an item's status.
+  
+  A new `propose_status` card shows the current and proposed status and rex's own transition rule. Only Approve writes, through rex's `update_task_status` path and never forced, so completion still runs rex's checks, and a move rex refuses comes back as a failed card with rex's message. rex now exports `handleUpdateTaskStatus` and `validateTransition` for it.
+
+- [#1021](https://github.com/en-dash-consulting/n-dx/pull/1021) [`f3ac44f`](https://github.com/en-dash-consulting/n-dx/commit/f3ac44f519f4c8f490dfad94a99a0b03e8f72392) Thanks [@endash-shal](https://github.com/endash-shal)! - Plain-language summaries are kept when the dashboard accepts analysis proposals, and the Plan capture bar drafts one in its Preview and saves it on Accept.
+  
+  `rex add` on a v2 tree takes `--summary` for a single description (it refuses several, and keeps the text as typed), and its JSON preview drafts one per change with `--summarize`, using the light-tier model. A draft that fails is left out. Review & Edit Proposals, used by analysis, batch import and Smart Add, passes each feature's and task's summary through to the accepted items.
+- Updated dependencies [[`ab81666`](https://github.com/en-dash-consulting/n-dx/commit/ab81666a7198577f0d7ad48ac08986d7ef49a850), [`ae73cd2`](https://github.com/en-dash-consulting/n-dx/commit/ae73cd212bcb64ab4667f2702fbf3446348a9ba9), [`6bd923f`](https://github.com/en-dash-consulting/n-dx/commit/6bd923f35c889904e6a5caac4258857490d2f3db), [`d6b1896`](https://github.com/en-dash-consulting/n-dx/commit/d6b1896792ae0aa5af95c1d940debbf084b5fbc3), [`627f8f4`](https://github.com/en-dash-consulting/n-dx/commit/627f8f4b3158facdd176cae7d562eab8bcd9f776), [`5e1246b`](https://github.com/en-dash-consulting/n-dx/commit/5e1246b96ba207d5b1626b001524f393d7a64411), [`499490c`](https://github.com/en-dash-consulting/n-dx/commit/499490c85cb9ac06f319eb688049f7c4a97ee487), [`a6de03b`](https://github.com/en-dash-consulting/n-dx/commit/a6de03b2be31b0f40f1f15e78ce9d6f72107258d), [`85945fa`](https://github.com/en-dash-consulting/n-dx/commit/85945fa14d4b2d0ff0a835cb8c48998a7d5e328d), [`d007823`](https://github.com/en-dash-consulting/n-dx/commit/d0078230c7ada1b710f97e4cf8b7620ce5888a11), [`913d868`](https://github.com/en-dash-consulting/n-dx/commit/913d86826ac5929e9dbcb40173f93fc42510b37b), [`62ec0da`](https://github.com/en-dash-consulting/n-dx/commit/62ec0dab7a8cb18fa8306412dbb4a7b07c49e890), [`c32fbda`](https://github.com/en-dash-consulting/n-dx/commit/c32fbdaa97af98358f522adff484d6b73fd525e4), [`9bde7d5`](https://github.com/en-dash-consulting/n-dx/commit/9bde7d58dfe64816d4407fb8f809b7be23b59114)]:
+  - @n-dx/llm-client@0.10.4
+  - @n-dx/lang-kit@0.10.4
+
 ## 0.10.3
 
 ### Patch Changes
