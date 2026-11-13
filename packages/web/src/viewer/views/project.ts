@@ -11,9 +11,8 @@
  *
  * The page is dirty when any form differs from its saved values. Save writes
  * each dirty form to its own endpoint (PUT /api/project-settings,
- * /api/features, /api/sidecar/settings). A form that saves becomes clean; one
- * whose write fails stays dirty, and the frame names it. Discard restores
- * every form.
+ * /api/features). A form that saves becomes clean; one whose write fails
+ * stays dirty, and the frame names it. Discard restores every form.
  *
  * The export and refresh panels live on the Commands page.
  */
@@ -24,7 +23,6 @@ import { PixelIcon, SettingsFrame, settingsSectionAnchor, useSettingsSections } 
 import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { projectSettingRows, useProjectSettingsForm } from "./project-settings.js";
 import { featureToggleRows, useFeatureTogglesForm } from "./feature-toggles.js";
-import { githubReadsRows, useGithubReadsForm } from "./github-reads.js";
 import { ConnectionsSection } from "./connections.js";
 import { PROJECT_SECTIONS, type ProjectSectionId } from "./project-sections.js";
 import { SettingRow, matchesQuery, type SettingRowSpec } from "./setting-row.js";
@@ -57,20 +55,17 @@ function serversRow(): SettingRowSpec<ProjectSectionId> {
 export function ProjectView() {
   const cliName = useCliName();
   const sidecarOn = useFeatureToggle("web.sidecar", false);
+  const branchHealthOn = useFeatureToggle("git.branchHealth", false);
 
   const settings = useProjectSettingsForm();
   const features = useFeatureTogglesForm();
-  const githubReads = useGithubReadsForm(sidecarOn);
 
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // GitHub reads saves before the flags: its route answers only while the
-  // Sidecar is on, and the same Save may be turning the Sidecar off.
   const parts: SettingsPart[] = [
     { label: "project settings", dirty: settings.dirty, save: settings.save, discard: settings.discard },
-    { label: "GitHub reads", dirty: githubReads.dirty, save: githubReads.save, discard: githubReads.discard },
     { label: "feature flags", dirty: features.dirty, save: features.save, discard: features.discard },
   ];
 
@@ -101,12 +96,16 @@ export function ProjectView() {
     setError(null);
   };
 
-  // Read-only rows (the server editor) save on their own and never make the page dirty.
-  // Only the Sidecar uses connections and GitHub reads.
+  // GitHub reads shows while something reads it: the Sidecar or branch health.
+  // The server editor saves on its own and never makes the page dirty; only
+  // the Sidecar uses connections.
+  const settingRows = projectSettingRows(settings, cliName, { githubReadsUsed: sidecarOn || branchHealthOn });
   const rows: SettingRowSpec<ProjectSectionId>[] = [
-    ...projectSettingRows(settings, cliName),
+    ...settingRows.filter((r) => r.section !== "connections"),
     ...featureToggleRows(features),
-    ...(sidecarOn ? [...githubReadsRows(githubReads), serversRow()] : []),
+    // After the switches that turn its readers on.
+    ...settingRows.filter((r) => r.section === "connections"),
+    ...(sidecarOn ? [serversRow()] : []),
   ];
   // A row matches on its own text or its section title: "commit" finds Git and commits.
   // Every row stays mounted; a search hides the ones it leaves out, so an open
@@ -127,10 +126,9 @@ export function ProjectView() {
   const problems = [
     ["project-load", "Project settings", settings.loadError && !settings.data ? settings.loadError : null],
     ["flags-load", "Feature flags", features.loadError && features.toggles.length === 0 ? features.loadError : null],
-    ["github-load", "GitHub reads", githubReads.loadError],
     ["project-save", "Project settings", settings.saveError],
+    ["project-notice", "Project settings", settings.notice],
     ["flags-save", "Feature flags", features.saveError],
-    ["github-save", "GitHub reads", githubReads.saveError],
   ].filter((p): p is [string, string, string] => p[2] !== null);
 
   const searching = query.trim() !== "";

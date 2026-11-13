@@ -215,7 +215,8 @@ worktree is the session's own, because a card runs in the session's worktree
 (no cross-workspace write action). A source conflict never gets a card.
 
 GitHub reads have one allowance, `web.sidecarGithubReads` (Settings › Project ›
-Connections), saved to the user's local config; the shared config's `true` applies only in a trusted
+Connections, through `/api/project-settings` or `/api/sidecar/settings`), saved
+to the user's local config; the shared config's `true` applies only in a trusted
 checkout (`network-reads` trust finding). The packet runs gh
 only under it; `github_read` runs without a card under it and raises a
 network-read card otherwise. `github_read` is `per-project` in the broker

@@ -4,7 +4,7 @@
  *
  * Fields: the allow-list editor (the broker's allow-list file), mode, the
  * context ceilings and the idle window. GitHub reads, saved by the same
- * route, is on Settings › Project › Connections (github-reads.ts). Nothing is
+ * route, is on Settings › Project › Connections (project-settings.ts). Nothing is
  * written until the page's Save: `useSidecarSettingsForm` holds the edits,
  * `save` sends them and refuses an invalid value with a message first.
  *

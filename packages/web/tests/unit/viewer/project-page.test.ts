@@ -12,11 +12,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-// The Sidecar toggle is read through a hook that resolves after a fetch; it is
-// served synchronously here so the Connections rows render deterministically.
-const sidecar = vi.hoisted(() => ({ on: false }));
+// The Sidecar and branch health toggles are read through a hook that resolves
+// after a fetch; they are served synchronously here so the Connections rows
+// render deterministically.
+const sidecar = vi.hoisted(() => ({ on: false, branchHealth: false }));
 vi.mock("../../../src/viewer/hooks/use-feature-toggle.js", () => ({
-  useFeatureToggle: (key: string, fallback: boolean) => (key === "web.sidecar" ? sidecar.on : fallback),
+  useFeatureToggle: (key: string, fallback: boolean) =>
+    key === "web.sidecar" ? sidecar.on : key === "git.branchHealth" ? sidecar.branchHealth : fallback,
 }));
 
 import { ProjectView } from "../../../src/viewer/views/project.js";
@@ -43,14 +45,16 @@ function toggle(key: string, label: string, group: FeatureToggle["group"], extra
  * Serves every API the page reads. `failures` turns a write to that URL into a
  * 500 with that message.
  */
-function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; pins?: Record<string, string>; githubReadsHeld?: boolean } = {}) {
+function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; branchHealth?: boolean; pins?: Record<string, string>; githubReadsHeld?: boolean } = {}) {
   sidecar.on = opts.sidecar ?? false;
+  sidecar.branchHealth = opts.branchHealth ?? false;
   const requests: Request[] = [];
   const settings = {
     port: null as number | null,
     language: null as string | null,
     sourcevisionMergeThreshold: null as number | null,
     sourcevisionPins: opts.pins ?? {} as Record<string, string>,
+    githubReads: false,
   };
   const toggles = [
     toggle("sourcevision.ask", "Ask", "optional", { costsTokens: true }),
@@ -59,7 +63,6 @@ function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; p
     toggle("rex.showTokenBudget", "Show Token Budget", "display", { stability: "stable", enabled: true }),
     toggle("web.sidecar", "Sidecar", "connections", { enabled: opts.sidecar ?? false }),
   ];
-  let githubReads = false;
   const respond = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
@@ -74,6 +77,8 @@ function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; p
         return respond(settings);
       case "PUT /api/project-settings":
         if (body && "port" in body) settings.port = body["port"] as number | null;
+        // Held: the server keeps reporting off, as for a tracked local config in an untrusted checkout.
+        if (body && "githubReads" in body && !opts.githubReadsHeld) settings.githubReads = body["githubReads"] === true;
         return respond({ applied: [], settings });
       case "GET /api/features":
         return respond({ toggles });
@@ -83,12 +88,6 @@ function stubApi(opts: { failures?: Record<string, string>; sidecar?: boolean; p
           if (t) t.enabled = enabled;
         }
         return respond({ applied: [] });
-      case "GET /api/sidecar/settings":
-        return respond({ githubReads });
-      case "PUT /api/sidecar/settings":
-        // Held: the server keeps reporting off, as for a tracked local config in an untrusted checkout.
-        if (!opts.githubReadsHeld) githubReads = (body as { githubReads: boolean }).githubReads;
-        return respond({ githubReads });
       case "GET /api/connections":
         return respond({ connections: [] });
       default:
@@ -414,7 +413,7 @@ describe("ProjectView", () => {
     expect(requests.some((r) => r.url.startsWith("/api/sidecar") || r.url.startsWith("/api/connections"))).toBe(false);
   });
 
-  it("saves GitHub reads to the Sidecar settings route on Save", async () => {
+  it("saves GitHub reads through the project settings route on Save", async () => {
     const { writes } = stubApi({ sidecar: true });
     await mount();
 
@@ -423,7 +422,7 @@ describe("ProjectView", () => {
     expect(writes()).toEqual([]);
 
     await clickSave();
-    expect(writes()).toEqual([{ method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } }]);
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { githubReads: true } }]);
     expect(indicator()).toBe("All changes saved");
   });
 
@@ -434,13 +433,30 @@ describe("ProjectView", () => {
     await click(flag("GitHub reads"));
     await clickSave();
 
-    expect(writes()).toEqual([{ method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } }]);
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { githubReads: true } }]);
     expect(flag("GitHub reads").checked).toBe(false);
     expect(indicator()).toBe("All changes saved");
-    expect(root.querySelector(".project-alert")!.textContent).toMatch(/^GitHub reads: Saved, but GitHub reads are still off/);
+    expect(root.querySelector(".project-alert")!.textContent).toMatch(/^Project settings: Saved, but GitHub reads are still off/);
   });
 
-  it("saves GitHub reads before a Save that turns the Sidecar off closes its route", async () => {
+  it("offers GitHub reads while only branch health uses it, and saves it without the Sidecar", async () => {
+    const { writes } = stubApi({ branchHealth: true });
+    await mount();
+
+    expect(keysIn("Connections")).toEqual(["features.web.sidecar", "web.sidecarGithubReads"]);
+    await click(flag("GitHub reads"));
+    await clickSave();
+    expect(writes()).toEqual([{ method: "PUT", url: "/api/project-settings", body: { githubReads: true } }]);
+    expect(flag("GitHub reads").checked).toBe(true);
+  });
+
+  it("hides GitHub reads while neither the Sidecar nor branch health reads it", async () => {
+    stubApi();
+    await mount();
+    expect(row("web.sidecarGithubReads")).toBeNull();
+  });
+
+  it("saves GitHub reads alongside a Save that turns the Sidecar off", async () => {
     const { writes } = stubApi({ sidecar: true });
     await mount();
 
@@ -448,7 +464,7 @@ describe("ProjectView", () => {
     await click(flag("Sidecar"));
     await clickSave();
 
-    expect(writes().map((w) => w.url)).toEqual(["/api/sidecar/settings", "/api/features"]);
+    expect(writes().map((w) => w.url)).toEqual(["/api/project-settings", "/api/features"]);
     expect(frameError()).toBeNull();
   });
 

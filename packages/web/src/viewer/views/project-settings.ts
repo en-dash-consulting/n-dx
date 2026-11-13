@@ -7,6 +7,7 @@
  * - language           — project language override (select)
  * - sourcevision.zones.mergeThreshold — small-zone merge threshold (min zone size in files)
  * - sourcevision.zones.pins           — file → zone override map (key-value)
+ * - web.sidecarGithubReads           — the server saves it to the local config
  *
  * Data comes from GET /api/project-settings (read) and
  * PUT /api/project-settings (update). The page owns the frame and the Save
@@ -18,7 +19,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { SettingRow, type SettingRowSpec } from "./setting-row.js";
+import { SettingRow, Switch, type SettingRowSpec } from "./setting-row.js";
 import type { ProjectSectionId } from "./project-sections.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -28,6 +29,8 @@ interface ProjectSettingsResponse {
   language: string | null;
   sourcevisionMergeThreshold: number | null;
   sourcevisionPins: Record<string, string>;
+  /** `web.sidecarGithubReads` in force. */
+  githubReads: boolean;
 }
 
 /** One editable row of the zone-pins table. `id` is a stable render key. */
@@ -100,21 +103,26 @@ export interface ProjectSettingsForm {
   loadError: string | null;
   /** Why the last save failed. Cleared by the next save or a discard. */
   saveError: string | null;
+  /** Something the last save could not do although it succeeded. Cleared like saveError. */
+  notice: string | null;
   portRaw: string;
   language: string;
   mergeThreshold: string;
   pinRows: PinRow[];
+  githubReads: boolean;
   portError: string | null;
   mergeError: string | null;
   portDirty: boolean;
   langDirty: boolean;
   mergeDirty: boolean;
   pinsDirty: boolean;
+  githubReadsDirty: boolean;
   /** True while any field differs from its saved value. */
   dirty: boolean;
   setPortRaw: (raw: string) => void;
   setLanguage: (value: string) => void;
   setMergeThreshold: (raw: string) => void;
+  setGithubReads: (on: boolean) => void;
   addPin: () => void;
   updatePin: (id: number, field: "filePath" | "zoneId", value: string) => void;
   removePin: (id: number) => void;
@@ -133,8 +141,10 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [portRaw, setPortRaw] = useState("");
+  const [githubReads, setGithubReads] = useState(false);
   const [language, setLanguage] = useState("auto");
   const [mergeThreshold, setMergeThreshold] = useState("");
   const [pinRows, setPinRows] = useState<PinRow[]>([]);
@@ -146,6 +156,7 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
     setPortRaw(asText(s.port));
     setLanguage(s.language ?? "auto");
     setMergeThreshold(asText(s.sourcevisionMergeThreshold));
+    setGithubReads(s.githubReads === true);
     const rows = rowsFrom(s.sourcevisionPins);
     setPinRows(rows);
     setNextPinId(rows.length);
@@ -183,7 +194,8 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
   const langDirty = data != null && language !== (data.language ?? "auto");
   const mergeDirty = data != null && mergeThreshold !== asText(data.sourcevisionMergeThreshold);
   const pinsDirty = Object.keys(pinUpdates).length > 0;
-  const dirty = portDirty || langDirty || mergeDirty || pinsDirty;
+  const githubReadsDirty = data != null && githubReads !== (data.githubReads === true);
+  const dirty = portDirty || langDirty || mergeDirty || pinsDirty || githubReadsDirty;
   const hasErrors = portError != null || mergeError != null;
 
   const addPin = useCallback(() => {
@@ -202,6 +214,7 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
   const save = useCallback(async (): Promise<boolean> => {
     if (!dirty) return true;
     setSaveError(null);
+    setNotice(null);
     if (hasErrors) {
       setSaveError("Fix the invalid project settings before saving");
       return false;
@@ -214,6 +227,7 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
         mergeThreshold === "" ? null : parseInt(mergeThreshold, 10);
     }
     if (pinsDirty) body["sourcevisionPins"] = pinUpdates;
+    if (githubReadsDirty) body["githubReads"] = githubReads;
 
     try {
       const res = await fetch("/api/project-settings", {
@@ -226,7 +240,13 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
         setSaveError((errBody as { error?: string }).error ?? "Failed to save");
         return false;
       }
-      adopt((await res.json() as { settings: ProjectSettingsResponse }).settings);
+      const saved = (await res.json() as { settings: ProjectSettingsResponse }).settings;
+      adopt(saved);
+      // The answer is the value in force, which is not always the one saved:
+      // a local config that git tracks is honoured only in a trusted checkout.
+      if (githubReadsDirty && saved.githubReads !== githubReads) {
+        setNotice("Saved, but GitHub reads are still off: this checkout's local config is tracked by git, so it applies only once the checkout is trusted.");
+      }
       return true;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save");
@@ -234,20 +254,21 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
     }
   }, [
     dirty, hasErrors, portDirty, portRaw, langDirty, language,
-    mergeDirty, mergeThreshold, pinsDirty, pinUpdates, adopt,
+    mergeDirty, mergeThreshold, pinsDirty, pinUpdates, githubReadsDirty, githubReads, adopt,
   ]);
 
   const discard = useCallback(() => {
     if (data) adopt(data);
     setSaveError(null);
+    setNotice(null);
   }, [data, adopt]);
 
   return {
-    data, loading, loadError, saveError,
-    portRaw, language, mergeThreshold, pinRows,
+    data, loading, loadError, saveError, notice,
+    portRaw, language, mergeThreshold, pinRows, githubReads,
     portError, mergeError,
-    portDirty, langDirty, mergeDirty, pinsDirty, dirty,
-    setPortRaw, setLanguage, setMergeThreshold,
+    portDirty, langDirty, mergeDirty, pinsDirty, githubReadsDirty, dirty,
+    setPortRaw, setLanguage, setMergeThreshold, setGithubReads,
     addPin, updatePin, removePin,
     save, discard,
   };
@@ -339,11 +360,19 @@ function PinsRow({ form }: { form: ProjectSettingsForm }) {
   }, open ? h(PinEditor, { form }) : null);
 }
 
+const GITHUB_READS_KEY = "web.sidecarGithubReads";
+const GITHUB_READS_DESC = "Let the Sidecar and branch health read pull requests, issues and checks with gh, without asking each time.";
+
 /**
  * The project settings as rows: language, merge threshold and zone pins under
- * Analysis, the port under Dashboard.
+ * Analysis, the port under Dashboard, and GitHub reads under Connections while
+ * something that uses it (the Sidecar, branch health) is on.
  */
-export function projectSettingRows(form: ProjectSettingsForm, cliName: string): SettingRowSpec<ProjectSectionId>[] {
+export function projectSettingRows(
+  form: ProjectSettingsForm,
+  cliName: string,
+  { githubReadsUsed }: { githubReadsUsed: boolean },
+): SettingRowSpec<ProjectSectionId>[] {
   if (!form.data) return [];
   const { portRaw, mergeThreshold, portError, mergeError } = form;
   const spec = (section: ProjectSectionId, configKey: string, label: string, description: string, node: ComponentChildren): SettingRowSpec<ProjectSectionId> =>
@@ -417,5 +446,20 @@ export function projectSettingRows(form: ProjectSettingsForm, cliName: string): 
         onInput: (e: Event) => form.setPortRaw((e.target as HTMLInputElement).value),
       }),
     }, portError ? h("p", { id: "ps-port-error", class: "ps-field-error" }, portError) : null)),
+    ...(githubReadsUsed
+      ? [spec("connections", GITHUB_READS_KEY, "GitHub reads", GITHUB_READS_DESC, h(SettingRow, {
+          key: "github-reads",
+          configKey: GITHUB_READS_KEY,
+          label: "GitHub reads",
+          description: GITHUB_READS_DESC,
+          info: h("p", null,
+            "Reads run with your own gh login. Off, each Sidecar read raises a card to approve, and branch health shows no GitHub facts. ",
+            "Saved to your local config; the shared config's true applies only in a trusted checkout. It never allows a post.",
+          ),
+          unsaved: form.githubReadsDirty,
+          onReset: form.githubReads ? () => form.setGithubReads(false) : undefined,
+          control: h(Switch, { checked: form.githubReads, label: "Toggle GitHub reads", onChange: form.setGithubReads }),
+        }))]
+      : []),
   ];
 }
