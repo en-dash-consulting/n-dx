@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import {
@@ -26,9 +26,13 @@ function rawGit(args: string[]): string {
   return execFileSync("git", args, { cwd: fixture.root, encoding: "utf8" });
 }
 function assertFixture(cwd: string): void {
-  expect(realpathSync(cwd)).toBe(fixture.root);
-  expect(realpathSync(rawGit(["rev-parse", "--show-toplevel"]).trim())).toBe(fixture.root);
-  expect(realpathSync(rawGit(["rev-parse", "--absolute-git-dir"]).trim())).toBe(join(fixture.root, ".git"));
+  // Resolve both sides natively: Windows temp paths may use 8.3 aliases while
+  // Git reports their long spelling. Lexical normalization cannot equate them.
+  const root = realpathSync.native(fixture.root);
+  expect(realpathSync.native(cwd)).toBe(root);
+  expect(realpathSync.native(rawGit(["rev-parse", "--show-toplevel"]).trim())).toBe(root);
+  expect(realpathSync.native(rawGit(["rev-parse", "--absolute-git-dir"]).trim()))
+    .toBe(realpathSync.native(join(fixture.root, ".git")));
 }
 function git(...args: string[]): string { assertFixture(fixture.root); return rawGit(args); }
 function put(path: string, bytes: string): void {
@@ -46,7 +50,7 @@ function snapshot(): string[] {
 }
 beforeEach(() => {
   for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) vi.stubEnv(key, undefined);
-  fixture.root = realpathSync(mkdtempSync(join(tmpdir(), "hench-recovery-renames-")));
+  fixture.root = realpathSync.native(mkdtempSync(join(tmpdir(), "hench-recovery-renames-")));
   const config = join(fixture.root, "isolated-gitconfig"); writeFileSync(config, "");
   vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1"); vi.stubEnv("GIT_CONFIG_GLOBAL", config);
   rawGit(["init", "--quiet", "--template="]);
@@ -60,6 +64,62 @@ afterEach(() => {
   vi.restoreAllMocks(); process.exitCode = undefined;
   vi.unstubAllEnvs();
 });
+// Portable directory-alias regressions using real Git. Junctions avoid Windows
+// symlink privileges; these do not substitute for native Windows 8.3-path CI.
+it("fixture guard accepts equivalent cwd and root directory aliases", () => {
+  const root = fixture.root;
+  const alias = join(root, "root-alias");
+  symlinkSync(root, alias, "junction");
+  expect(() => assertFixture(alias)).not.toThrow();
+  fixture.root = alias;
+  try {
+    expect(() => assertFixture(root)).not.toThrow();
+  } finally {
+    fixture.root = root;
+  }
+});
+
+it("fixture guard accepts an equivalent Git directory alias", () => {
+  const gitDir = join(fixture.root, ".git");
+  const actualGitDir = join(fixture.root, "actual-git");
+  renameSync(gitDir, actualGitDir);
+  symlinkSync(actualGitDir, gitDir, "junction");
+  expect(() => assertFixture(fixture.root)).not.toThrow();
+});
+
+it("fixture guard rejects a different cwd", () => {
+  const other = join(fixture.root, "other-worktree");
+  rawGit(["init", "--quiet", "--template=", other]);
+  expect(() => assertFixture(other)).toThrow();
+});
+
+it("fixture guard rejects a different Git worktree root", () => {
+  const other = join(fixture.root, "other-worktree");
+  rawGit(["init", "--quiet", "--template=", other]);
+  vi.stubEnv("GIT_WORK_TREE", other);
+  try {
+    expect(realpathSync.native(rawGit(["rev-parse", "--show-toplevel"]).trim())).toBe(realpathSync.native(other));
+    expect(() => assertFixture(fixture.root)).toThrow();
+  } finally {
+    vi.stubEnv("GIT_WORK_TREE", undefined);
+  }
+});
+
+it("fixture guard rejects a different Git directory with the same worktree root", () => {
+  const other = join(fixture.root, "other-worktree");
+  rawGit(["init", "--quiet", "--template=", other]);
+  vi.stubEnv("GIT_DIR", join(other, ".git"));
+  vi.stubEnv("GIT_WORK_TREE", fixture.root);
+  try {
+    expect(realpathSync.native(rawGit(["rev-parse", "--show-toplevel"]).trim())).toBe(realpathSync.native(fixture.root));
+    expect(realpathSync.native(rawGit(["rev-parse", "--absolute-git-dir"]).trim())).toBe(realpathSync.native(join(other, ".git")));
+    expect(() => assertFixture(fixture.root)).toThrow();
+  } finally {
+    vi.stubEnv("GIT_DIR", undefined);
+    vi.stubEnv("GIT_WORK_TREE", undefined);
+  }
+});
+
 const names = process.platform === "win32" ? ["app.ts", "two spaces.ts"]
   : ["app.ts", 'literal "quote".ts', "source -> arrow.ts"];
 for (const layout of [".rex", ".ndx/rex"]) for (const state of ["R", "RM"]) for (const name of names) {
