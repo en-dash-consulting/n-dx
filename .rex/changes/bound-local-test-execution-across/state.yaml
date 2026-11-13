@@ -187,7 +187,14 @@ items:
     lastModified: "2026-11-12T18:38:24.093Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a683873b-dd71-4e72-a959-b09d287aa00d":
-    lastModified: "2026-11-13T23:13:56.876Z"
+    status: "completed"
+    startedAt: "2026-11-13T23:14:17.661Z"
+    completedAt: "2026-11-13T23:17:30.248Z"
+    endedAt: "2026-11-13T23:17:30.248Z"
+    activeIntervals: [{"end":"2026-11-13T23:17:30.248Z","start":"2026-11-13T23:14:17.661Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Both slot implementations read /proc/<n>/status first and skip single-NSpid entries before readlinking ns/pid; nested unreadable own-user entries still count as alive. Rule 4a header updated, tests and hench patch changeset added."
+    lastModified: "2026-11-13T23:17:30.248Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adb92a12-af68-4f9a-b28b-310fb0ea9980":
     status: "completed"

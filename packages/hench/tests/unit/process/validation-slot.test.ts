@@ -467,11 +467,18 @@ describe.skipIf(process.platform === "win32")("acquireValidationSlot — PID nam
     await symlink(ns, join(proc, "self", "ns", "pid"));
   }
 
-  /** A process `entry` visible in the fake /proc, in `ns`, with `pid`/`pgid` there. */
+  /** A process `entry` visible in the fake /proc, nested in `ns`, with `pid`/`pgid` there. */
   async function addProcess(entry: number, ns: string, pid: number, pgid = pid): Promise<void> {
     await mkdir(join(proc, String(entry), "ns"), { recursive: true });
     await symlink(ns, join(proc, String(entry), "ns", "pid"));
     await writeFile(join(proc, String(entry), "status"), `Name:\tnode\nNSpid:\t${entry}\t${pid}\nNSpgid:\t${entry}\t${pgid}\n`);
+  }
+
+  /** A process `entry` in the reader's own namespace `ns`: a single `NSpid` entry. */
+  async function addOwnNamespaceProcess(entry: number, ns: string): Promise<void> {
+    await mkdir(join(proc, String(entry), "ns"), { recursive: true });
+    await symlink(ns, join(proc, String(entry), "ns", "pid"));
+    await writeFile(join(proc, String(entry), "status"), `Name:\tnode\nNSpid:\t${entry}\nNSpgid:\t${entry}\n`);
   }
 
   function waitThenAbortIn(env: NodeJS.ProcessEnv): Promise<{ waits: ValidationSlotWait[]; error: unknown }> {
@@ -578,18 +585,38 @@ describe.skipIf(process.platform === "win32")("acquireValidationSlot — PID nam
   });
 
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
-    "outside a sandbox, counts a process it cannot inspect as the holder",
+    "outside a sandbox, counts a nested process it cannot inspect as the holder",
     async () => {
       await setOwnNamespace(OUTER);
       await addProcess(9003, INNER, 2);
-      await chmod(join(proc, "9003"), 0o000);
+      // status stays readable (two NSpid entries); ns/pid refuses, as ptrace access does.
+      await chmod(join(proc, "9003", "ns"), 0o000);
       try {
         const raw = await writeHolder({ pid: 3, pidNamespace: INNER, outerPidNamespaces: [OUTER] });
         const { error } = await waitThenAbortIn({});
         expect(error).toBeInstanceOf(ValidationSlotAbortedError);
         expect(await holderRaw()).toBe(raw);
       } finally {
-        await chmod(join(proc, "9003"), 0o755);
+        await chmod(join(proc, "9003", "ns"), 0o755);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "outside a sandbox, reclaims a gone holder's record despite an uninspectable process in its own namespace",
+    async () => {
+      await setOwnNamespace(OUTER);
+      await addOwnNamespaceProcess(9005, OUTER);
+      await chmod(join(proc, "9005", "ns"), 0o000);
+      try {
+        await writeHolder({ pid: 3, pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+        const lease = await acquireValidationSlot({
+          slotDir, projectDir: "/proj", env: {}, procRoot: proc, signal: AbortSignal.timeout(10_000),
+        });
+        expect(lease.nested).toBe(false);
+        await lease.release();
+      } finally {
+        await chmod(join(proc, "9005", "ns"), 0o755);
       }
     },
   );

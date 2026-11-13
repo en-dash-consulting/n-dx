@@ -18,7 +18,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -201,6 +201,29 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
       expect(lease.nested).toBe(false);
       await lease.release();
     });
+
+    // A process in the reader's own namespace (one NSpid entry) whose ns/pid
+    // refuses, as a non-dumpable process of the same user does on Linux.
+    it.skipIf(process.getuid?.() === 0)(
+      "outside a sandbox, reclaims a gone holder's record despite an uninspectable process in its own namespace",
+      async () => {
+        await deadHolderIn(fakeProc(INNER), OUTER);
+        const procRoot = fakeProc(OUTER);
+        mkdirSync(join(procRoot, "9005", "ns"), { recursive: true });
+        symlinkSync(OUTER, join(procRoot, "9005", "ns", "pid"));
+        writeFileSync(join(procRoot, "9005", "status"), "NSpid:\t9005\nNSpgid:\t9005\n");
+        chmodSync(join(procRoot, "9005", "ns"), 0o000);
+        try {
+          const lease = await contender.acquireValidationSlot({
+            slotDir, projectDir: "/contender", env: {}, procRoot, signal: AbortSignal.timeout(10_000),
+          });
+          expect(lease.nested).toBe(false);
+          await lease.release();
+        } finally {
+          chmodSync(join(procRoot, "9005", "ns"), 0o755);
+        }
+      },
+    );
 
     // The real /proc, where root's processes refuse a non-root reader their
     // ns/pid: they are not this user's sandbox and must not keep its record.

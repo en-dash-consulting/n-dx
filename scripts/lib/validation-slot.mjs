@@ -138,9 +138,13 @@ export function pidNamespaceView(env = process.env, procRoot = process.platform 
   };
 }
 
-function lastStatusEntry(status, field) {
+function statusEntries(status, field) {
   const line = status.split("\n").find((l) => l.startsWith(`${field}:`));
-  const last = line?.slice(field.length + 1).trim().split(/\s+/).pop();
+  return line?.slice(field.length + 1).trim().split(/\s+/).filter(Boolean) ?? [];
+}
+
+function lastStatusEntry(status, field) {
+  const last = statusEntries(status, field).pop();
   return last ? Number(last) : null;
 }
 
@@ -153,7 +157,11 @@ function isOwnedByThisUser(procRoot, entry) {
   }
 }
 
-/** Whether a process inside `ns`, visible below the reader's, has `pid` there; an unreadable entry of this user's counts as alive. */
+/**
+ * Whether a process inside `ns`, visible below the reader's, has `pid` there. An entry
+ * with a single `NSpid` entry is in the reader's namespace and skipped before `ns/pid`;
+ * an unreadable nested (or status-less) entry of this user's counts as alive.
+ */
 function isAliveInInnerNamespace(procRoot, ns, pid, group) {
   let entries;
   try {
@@ -165,16 +173,16 @@ function isAliveInInnerNamespace(procRoot, ns, pid, group) {
   let unreadable = false;
   for (const entry of entries) {
     if (!/^\d+$/.test(entry)) continue;
-    let status;
     try {
+      const status = readFileSync(join(procRoot, entry, "status"), "utf-8");
+      // One NSpid entry: in the reader's namespace; its ns/pid may refuse this user anyway.
+      if (statusEntries(status, "NSpid").length < 2) continue;
       if (readlinkSync(join(procRoot, entry, "ns", "pid")) !== ns) continue;
-      status = readFileSync(join(procRoot, entry, "status"), "utf-8");
+      if (lastStatusEntry(status, field) === pid) return true;
     } catch (err) {
       // Exited mid-scan, or another user's process: neither can be this user's sandbox.
       if (err?.code !== "ENOENT" && isOwnedByThisUser(procRoot, entry)) unreadable = true;
-      continue;
     }
-    if (lastStatusEntry(status, field) === pid) return true;
   }
   return unreadable;
 }
