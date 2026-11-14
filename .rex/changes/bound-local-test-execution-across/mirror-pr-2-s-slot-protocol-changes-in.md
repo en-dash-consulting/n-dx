@@ -1,0 +1,19 @@
+---
+id: "c1e742ad-552e-47c7-8587-b0d5212cde09"
+type: "task"
+title: "Mirror PR 2's slot protocol changes in the runner's slot copy"
+slug: "mirror-pr-2-s-slot-protocol-changes-in"
+summary: "The test runner keeps its own copy of the shared-slot rules, and PR 2 just changed those rules in hench. This brings the runner's copy up to date so both enforce the same protocol."
+description: "PR 3 (#1035) carries `scripts/lib/validation-slot.mjs`, a plain-JS copy of the protocol specified in the header of `packages/hench/src/process/validation-slot.ts` (scripts cannot import hench). PR 2 (#1034) has just changed that protocol in hench in several tasks: 1bb5db41, 24e3c609, 96357e8a, dec010f7 and f2aa9f8c. Read the current hench header and `validation-slot.ts` / `validation-slot-dir.ts` / `validation-run.ts` on this branch first; they are the spec.\n\nMirror in `scripts/lib/validation-slot.mjs`, keeping it line-for-line equivalent in behaviour:\n1. **Rule 5a, own pid** (1bb5db41, plus the review fix that respects a live child):\n   - per-process sets of live lease tokens and live reclaim-lock tokens;\n   - a `holder.json` or `reclaim.lock` naming this process's pid, written in this process's PID namespace (or with either namespace unknown), with a token it does not hold, is stale;\n   - for a record, only if its child is dead.\n\n   This replaces the copy's older `isOrphanedByThisProcess`.\n2. **Reclaim lock ownership** (24e3c609): the `finally` removes `reclaim.lock` only if its bytes still equal this process's lock. Lock staleness is judged namespace-aware, using the lock's `pidNamespace`/`outerPidNamespaces` and rule 4a, as hench now does.\n3. **Per-host directory** (96357e8a, dec010f7): resolve `<ndx home>/validation-slot/<m-|h-><16 hex of sha256>/` from the same machine-id sources, same order, same hashing, same 10 s lookup timeout, same caching rule. A transient lookup failure is not cached and surfaces as a slot error; a no-source outcome caches the hostname identity. Two processes on one machine, one using each copy, must resolve the same directory.\n4. **Nested directory** (96357e8a): honour `NDX_VALIDATION_SLOT_DIR` for a nested acquire, exactly as hench does. When the runner holds the slot itself, export both `NDX_VALIDATION_SLOT` and `NDX_VALIDATION_SLOT_DIR` to the suites it spawns.\n5. **Wait report** (1bb5db41): include the `holder.json` path in the wait description (`describeValidationSlotWait`).\n\nExtend `tests/e2e/validation-slot-parity.test.js` (it runs one implementation as holder and the other as contender, in both directions):\n- both copies resolve the same per-host directory from an injected identity;\n- a nested acquire with `NDX_VALIDATION_SLOT_DIR` nests across copies;\n- own-pid leftover records are reclaimed by both copies;\n- a replaced reclaim lock is not removed by either copy.\n\nKeep the existing parity cases passing.\n\nOperator notes: build hench first (`pnpm --filter @n-dx/hench build`); the parity test imports hench's dist. Run the parity test, `tests/integration/run-all-tests-selection.test.js` and the static root policy tests. No changeset: scripts and tests are repository tooling. No `process.env.NDX_*` writes in tests."
+acceptanceCriteria:
+  - "scripts/lib/validation-slot.mjs implements rule 5a (own pid, namespace-aware), reclaim-lock ownership, the machine-id per-host directory with the same hashing and caching rules, NDX_VALIDATION_SLOT_DIR nesting and the holder path in wait reports, matching hench"
+  - "The parity test covers the shared directory, nested-dir nesting, own-pid reclaim and reclaim-lock ownership in both directions and passes"
+  - "The runner exports NDX_VALIDATION_SLOT_DIR beside the token to the suites it runs"
+priority: "high"
+tags:
+  - "validation-gate"
+  - "wave-1"
+  - "pr-3-runner-slot"
+  - "review-fix"
+source: "ndx-capture"
+---
