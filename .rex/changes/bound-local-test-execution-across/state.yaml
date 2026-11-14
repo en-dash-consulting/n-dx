@@ -33,10 +33,14 @@ items:
     lastModified: "2026-11-14T04:58:43.847Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "61977eb2-9bdc-4f1d-9bf0-5be0fc593e0b":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T04:59:12.140Z"
-    activeIntervals: [{"start":"2026-11-14T04:59:12.140Z"}]
-    lastModified: "2026-11-14T04:59:12.871Z"
+    completedAt: "2026-11-14T05:03:31.649Z"
+    endedAt: "2026-11-14T05:03:31.649Z"
+    activeIntervals: [{"end":"2026-11-14T05:03:31.649Z","start":"2026-11-14T04:59:12.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "HENCH_VALIDATORS gains testGate.maxWorkers (requirePositiveInteger, now isSafeInteger); withTestMaxWorkers keeps the lower of config and a valid inherited cap; docs, TESTING.md, changesets updated."
+    lastModified: "2026-11-14T05:03:31.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "85839d4a-3b74-4e79-bb93-838726de17cf":
     lastModified: "2026-11-12T17:28:05.138Z"

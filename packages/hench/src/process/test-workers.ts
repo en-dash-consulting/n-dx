@@ -13,7 +13,10 @@
  * not clamp the value to the core count, so overwriting it could widen a run.
  *
  * Applied after the environment is sanitized, so a `guard.env` deny glob
- * cannot drop it.
+ * cannot drop it. The inherited cap is read from the parent environment
+ * before sanitizing (`source`), because a repository's `guard.env.deny`
+ * always applies: reading the sanitized copy would let a repository strip the
+ * user's cap and then raise it.
  *
  * @module hench/process/test-workers
  */
@@ -34,12 +37,17 @@ function parseInheritedCap(raw: string | undefined): number | undefined {
 
 /**
  * `env` with `NDX_TEST_MAX_WORKERS` set to the lower of `maxWorkers` and a
- * valid inherited value, or `env` itself when no cap is configured, so an
- * unset cap changes nothing.
+ * valid value in `source`, or `env` itself when no cap is configured, so an
+ * unset cap changes nothing. `source` is the unsanitized parent environment
+ * `env` was built from.
  */
-export function withTestMaxWorkers(env: NodeJS.ProcessEnv, maxWorkers: number | undefined): NodeJS.ProcessEnv {
+export function withTestMaxWorkers(
+  env: NodeJS.ProcessEnv,
+  maxWorkers: number | undefined,
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   if (maxWorkers === undefined) return env;
-  const inherited = parseInheritedCap(env[TEST_MAX_WORKERS_ENV]);
+  const inherited = parseInheritedCap(source[TEST_MAX_WORKERS_ENV]);
   const cap = inherited === undefined ? maxWorkers : Math.min(inherited, maxWorkers);
   return { ...env, [TEST_MAX_WORKERS_ENV]: String(cap) };
 }

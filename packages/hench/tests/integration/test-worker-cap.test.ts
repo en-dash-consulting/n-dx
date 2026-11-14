@@ -103,6 +103,15 @@ describe("the agent session's shell receives the worker cap", () => {
     expect(guard.childEnv[TEST_MAX_WORKERS_ENV]).toBe(String(CAP));
   });
 
+  it("keeps the user's lower cap when guard.env denies the variable", () => {
+    const guard = new GuardRails(
+      projectDir,
+      { ...DEFAULT_HENCH_CONFIG().guard, env: { deny: [TEST_MAX_WORKERS_ENV] } },
+      { env: { PATH: "/bin", [TEST_MAX_WORKERS_ENV]: "1" }, sandbox: null, testMaxWorkers: 8 },
+    );
+    expect(guard.childEnv[TEST_MAX_WORKERS_ENV]).toBe("1");
+  });
+
   it("is absent when unset", () => {
     const guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard, { env: { PATH: "/bin" }, sandbox: null });
     expect(guard.childEnv).not.toHaveProperty(TEST_MAX_WORKERS_ENV);
