@@ -32,8 +32,9 @@ import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { createVendorCliSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
+import type { CreateToolSandboxOptions } from "../../guard/index.js";
 import { trackVendorProcess, terminateTrackedVendorProcess, describeAbortReason } from "../../process/run-interrupt.js";
-import { validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
+import { startHostIdentityLookup, validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
 import { createSpendGate, priceRunUsd } from "./spend-cap.js";
 import type { SpendCapExceeded, SpendGate } from "./spend-cap.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
@@ -816,6 +817,11 @@ export interface SpawnWithAdapterOptions {
    * completion check or test gate. Writes found are reported at finalization.
    */
   configBackstop?: ConfigBackstop;
+  /**
+   * Injected for tests: the vendor sandbox's setting, backend and slot seams.
+   * Production resolves the operator's setting and probes this host.
+   */
+  vendorSandbox?: Pick<CreateToolSandboxOptions, "setting" | "backend" | "reclaimSlot" | "hostIdentity">;
 }
 
 /** Mid-spawn counters. Mutated in place; read by the heartbeat. */
@@ -920,8 +926,10 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
   // OS confinement for the vendor CLI and everything it starts; null for
   // Codex (it confines itself) and when the operator turned the sandbox off
   // or no backend is usable. The argv passes through verbatim.
-  const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { cliBinary });
-  await sandbox?.prepareSpawn();
+  const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { ...opts.vendorSandbox, cliBinary });
+  // The CLI and everything it starts (an agent's own `pnpm test`) get the
+  // host-resolved slot directory, so none of them runs the host lookup.
+  const spawnEnv = sandbox ? await sandbox.prepareSpawn(cliEnv) : cliEnv;
   // An abort that fired during the await above has no listener to reach yet.
   if (abortSignal?.aborted) {
     sandbox?.dispose();
@@ -939,7 +947,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     const proc = spawnCli(inv.file, inv.args, {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: { ...cliEnv, ...inv.env },
+      env: { ...spawnEnv, ...inv.env },
     });
     if (sandbox) proc.once("close", () => sandbox.dispose());
 
@@ -2589,6 +2597,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     const sandboxPosture = resolveSandboxPosture(projectDir).posture;
     assertSandboxReady(sandboxPosture, autonomous);
     stream("Guard", formatSandboxPosture(sandboxPosture));
+    // Read on the host now, so the confined CLI is handed the slot directory.
+    if (sandboxPosture.state === "confined") startHostIdentityLookup();
   } else {
     stream("Guard", `sandbox: managed by the ${vendor} CLI`);
   }

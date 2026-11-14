@@ -11,7 +11,7 @@ import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
-import { validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
+import { startHostIdentityLookup, validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
@@ -1941,6 +1941,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const sandboxPosture = resolveSandboxPosture(projectDir).posture;
   assertSandboxReady(sandboxPosture, opts.autonomous === true || config.autonomous === true);
   stream("Guard", formatSandboxPosture(sandboxPosture));
+  // Read on the host now, so confined commands are handed the slot directory.
+  if (sandboxPosture.state === "confined") startHostIdentityLookup();
 
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);

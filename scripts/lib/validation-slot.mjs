@@ -11,7 +11,14 @@
  *
  * The slot directory (`<ndx home>/validation-slot/<host>/`) mirrors hench's
  * packages/hench/src/process/validation-slot-dir.ts: same machine-id sources
- * in the same order, same hash, same lookup timeout, same caching rule.
+ * in the same order, same hash, same lookup timeout, same caching rule (a
+ * transient failure is remembered for 60 s).
+ *
+ * Rule 6, as this copy applies it: an absolute `NDX_VALIDATION_SLOT_DIR` names
+ * the slot directory, with or without a token beside it. Hench hands it to
+ * every command it confines, and a holder to its validation command, so a
+ * runner started there takes or nests on that directory and runs no
+ * machine-id lookup (`resolveValidationSlotDir`).
  *
  * Change the protocol in hench's header first, then here.
  */
@@ -117,7 +124,7 @@ export class HostIdentityLookupError extends Error {
    * @param {string} reason
    */
   constructor(lookup, reason) {
-    super(`could not read this host's machine id (${lookup}: ${reason}); the next validation retries it`);
+    super(`could not read this host's machine id (${lookup}: ${reason}); it is read again after 60 s`);
     this.name = "HostIdentityLookupError";
   }
 }
@@ -246,28 +253,39 @@ export async function readHostIdentity(sources = DEFAULT_SOURCES) {
   }
 }
 
+/** How long a transient lookup failure is remembered before the lookup runs again. */
+export const LOOKUP_RETRY_AFTER_MS = 60_000;
+
 /**
  * `readHostIdentity(sources)`, kept once it resolves. A rejected lookup is
- * forgotten, so the next call retries it.
+ * remembered for `retryAfterMs` (default 60 s): a call within that window
+ * rejects with it at once, without running the lookup; the first call after
+ * it retries. The runner reads it once, so it has no `peek`.
  * @param {HostIdentitySources} sources
+ * @param {{ now?: () => number, retryAfterMs?: number }} [options]
  * @returns {() => Promise<HostIdentity>}
  */
-export function createHostIdentityCache(sources) {
+export function createHostIdentityCache(sources, options = {}) {
+  const now = options.now ?? Date.now;
+  const retryAfterMs = options.retryAfterMs ?? LOOKUP_RETRY_AFTER_MS;
   let cached;
+  let failure;
   return () => {
-    if (!cached) {
-      const attempt = readHostIdentity(sources);
-      cached = attempt;
-      // The caller sees the rejection through `attempt`; this only forgets it.
-      attempt.then(undefined, () => {
-        if (cached === attempt) cached = undefined;
-      });
-    }
-    return cached;
+    if (cached) return cached;
+    if (failure && now() < failure.until) return Promise.reject(failure.error);
+    failure = undefined;
+    const attempt = readHostIdentity(sources);
+    cached = attempt;
+    // The caller sees a rejection through `attempt`; this records it.
+    attempt.then(undefined, (error) => {
+      cached = undefined;
+      failure = { error, until: now() + retryAfterMs };
+    });
+    return attempt;
   };
 }
 
-/** This host's identity, read once per process; a transient failure is retried on the next call. */
+/** This host's identity, read once per process; a transient failure is retried after 60 s. */
 export const hostIdentity = createHostIdentityCache(DEFAULT_SOURCES);
 
 /**
@@ -286,14 +304,30 @@ export function validationSlotRootDir(env = process.env) {
 }
 
 /**
- * This host's slot directory under the ndx home `env` resolves to: hench's `resolveValidationSlotDir`.
+ * The slot directory `env` names in `NDX_VALIDATION_SLOT_DIR`, when that is an
+ * absolute path (rule 6): hench's `validationSlotDirFromEnv`.
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string | undefined}
+ */
+export function validationSlotDirFromEnv(env) {
+  const named = env[VALIDATION_SLOT_DIR_ENV];
+  return named && isAbsolute(named) ? named : undefined;
+}
+
+/**
+ * The slot directory: the one `NDX_VALIDATION_SLOT_DIR` names, without a
+ * lookup, else this host's directory under the ndx home `env` resolves to.
+ * Hench's `resolveValidationSlotDir`.
  * @param {NodeJS.ProcessEnv} [env]
- * @param {HostIdentity} [identity]
+ * @param {HostIdentity | (() => Promise<HostIdentity>)} [identity] the host's identity, or the cache to read it from
  * @returns {Promise<string>}
  * @throws {HostIdentityLookupError} when the machine id could not be read this time.
  */
-export async function resolveValidationSlotDir(env = process.env, identity) {
-  return join(validationSlotRootDir(env), validationSlotHostDirname(identity ?? (await hostIdentity())));
+export async function resolveValidationSlotDir(env = process.env, identity = hostIdentity) {
+  const named = validationSlotDirFromEnv(env);
+  if (named) return named;
+  const known = typeof identity === "function" ? await identity() : identity;
+  return join(validationSlotRootDir(env), validationSlotHostDirname(known));
 }
 
 // Liveness (rule 4)

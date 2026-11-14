@@ -48,8 +48,10 @@
  * once the running suite has exited. A runner a slot holder spawned (its
  * `NDX_VALIDATION_SLOT` names the live holder of the slot directory in
  * `NDX_VALIDATION_SLOT_DIR`) runs inside that holder's slot. The suites it
- * runs get both variables, so a nested gate or runner nests on this one.
- * `--list` never takes it, nor does an affected run with nothing to run or
+ * runs get both variables, so a nested gate or runner nests on this one. An
+ * absolute `NDX_VALIDATION_SLOT_DIR` without a token (hench hands it to every
+ * command it confines) is the directory the slot is taken in; with it set,
+ * the runner runs no machine-id lookup. `--list` never takes it, nor does an affected run with nothing to run or
  * rebuild. A slot that cannot be taken is skipped with a warning and the
  * suites run without it. Always on here: the runner is repository tooling,
  * not hench config.

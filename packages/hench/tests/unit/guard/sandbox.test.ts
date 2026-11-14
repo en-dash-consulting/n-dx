@@ -112,8 +112,8 @@ posixOnly("createToolSandbox", () => {
       setting: on, backend: seatbelt, env, reclaimSlot: async (e) => { seen.push(e); },
     })!;
     try {
-      await sandbox.prepareSpawn();
-      await sandbox.prepareSpawn();
+      await sandbox.prepareSpawn({});
+      await sandbox.prepareSpawn({});
       expect(seen).toEqual([env, env]);
     } finally {
       sandbox.dispose();
@@ -130,7 +130,7 @@ describe("tool children route through the sandbox", () => {
       // Stand-in for sandbox-exec: echo a marker so the test sees the wrapper ran.
       wrap: (file, args) => { calls.push({ file, args }); return { file: "node", args: ["-e", "console.log('via-sandbox')"], env: { TMPDIR: project } }; },
       wrapShell: (command) => { calls.push({ file: "sh", args: ["-c", command] }); return { file: "node", args: ["-e", "console.log('via-sandbox')"], env: { TMPDIR: project } }; },
-      prepareSpawn: async () => { calls.push({ file: "prepare", args: [] }); },
+      prepareSpawn: async (base) => { calls.push({ file: "prepare", args: [] }); return base; },
       dispose: () => {},
     };
     const guard = new GuardRails(project, guardDefaultsForLanguage("typescript"), { sandbox: fake });
@@ -262,7 +262,7 @@ posixOnly("createVendorCliSandbox", () => {
       cliBinary: process.execPath, setting: on, backend: seatbelt, env, reclaimSlot: async (e) => { seen.push(e); },
     })!;
     try {
-      await sandbox.prepareSpawn();
+      await sandbox.prepareSpawn({});
       expect(seen).toEqual([env]);
     } finally {
       sandbox.dispose();

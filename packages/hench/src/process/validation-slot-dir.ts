@@ -12,6 +12,12 @@
  * started after a network change would find a different, free directory and
  * run beside the holder. The id is hashed, so no raw machine id lands on disk.
  *
+ * A process handed an absolute `NDX_VALIDATION_SLOT_DIR` uses that directory
+ * and runs no lookup (rule 6 in `validation-slot.ts`): hench resolves the
+ * directory on the host and passes it to every command it confines, where
+ * the lookup may be refused or slow, and a slot holder passes it to its
+ * validation command.
+ *
  * A lookup ends one of three ways, and only the first two are cached for the
  * life of the process:
  * - **found**: the machine id was read; the directory is `m-<hash>`.
@@ -22,7 +28,10 @@
  *   with no id. This rejects with `HostIdentityLookupError` and never falls
  *   back to the hostname, because every other process on the host read the id
  *   and uses `m-<hash>`. The caller runs that one validation without the slot
- *   and warns; the next call retries the lookup.
+ *   and warns. The failure is remembered for 60 s: a call within that window
+ *   rejects at once without running the lookup, and the first call after it
+ *   retries. A lookup that keeps failing costs one timeout a minute, not one
+ *   per validation or per sandboxed command.
  *
  * The lookup command may run for 10 s: on a loaded host (swapping, exactly
  * when the slot matters) `ioreg` or `reg` can take seconds to start, and a
@@ -38,10 +47,10 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { resolveNdxHome } from "../prd/llm-gateway.js";
 import { exec } from "./exec.js";
-import { VALIDATION_SLOT_DIRNAME } from "./validation-slot.js";
+import { VALIDATION_SLOT_DIR_ENV, VALIDATION_SLOT_DIRNAME } from "./validation-slot.js";
 
 /** What names this host: a stable machine id, or the hostname when the host has none. */
 export interface HostIdentity {
@@ -68,10 +77,10 @@ export interface HostIdentitySources {
   hostname(): string;
 }
 
-/** A machine-id lookup that failed in a way that may not recur. Not cached; never the hostname. */
+/** A machine-id lookup that failed in a way that may not recur. Remembered for 60 s; never the hostname. */
 export class HostIdentityLookupError extends Error {
   constructor(lookup: string, reason: string) {
-    super(`could not read this host's machine id (${lookup}: ${reason}); the next validation retries it`);
+    super(`could not read this host's machine id (${lookup}: ${reason}); it is read again after 60 s`);
     this.name = "HostIdentityLookupError";
   }
 }
@@ -81,6 +90,9 @@ export const LINUX_MACHINE_ID_FILES = ["/etc/machine-id", "/var/lib/dbus/machine
 
 /** How long a platform lookup command may run; see the module header. */
 export const LOOKUP_TIMEOUT_MS = 10_000;
+
+/** How long a transient lookup failure is remembered before the lookup runs again. */
+export const LOOKUP_RETRY_AFTER_MS = 60_000;
 
 /** Run a lookup command through `exec` and say how it ended; the default `HostIdentitySources.run`. */
 export async function runLookup(file: string, args: string[], timeoutMs = LOOKUP_TIMEOUT_MS): Promise<LookupRun> {
@@ -188,27 +200,66 @@ export async function readHostIdentity(sources: HostIdentitySources = DEFAULT_SO
   }
 }
 
-/**
- * `readHostIdentity(sources)`, kept once it resolves. A rejected lookup is
- * forgotten, so the next call retries it.
- */
-export function createHostIdentityCache(sources: HostIdentitySources): () => Promise<HostIdentity> {
-  let cached: Promise<HostIdentity> | undefined;
-  return () => {
-    if (!cached) {
-      const attempt = readHostIdentity(sources);
-      cached = attempt;
-      // The caller sees the rejection through `attempt`; this only forgets it.
-      attempt.then(undefined, () => {
-        if (cached === attempt) cached = undefined;
-      });
-    }
-    return cached;
-  };
+/** This host's identity, read once and kept; see `createHostIdentityCache`. */
+export interface HostIdentityCache {
+  /**
+   * The identity. Within 60 s of a transient failure, rejects with that
+   * failure at once, without running the lookup again.
+   */
+  (): Promise<HostIdentity>;
+  /**
+   * The identity if a lookup has already resolved, without waiting.
+   * Otherwise starts one (unless one is running or a failure is remembered)
+   * and returns undefined.
+   */
+  peek(): HostIdentity | undefined;
 }
 
-/** This host's identity, read once per process; a transient failure is retried on the next call. */
-export const hostIdentity: () => Promise<HostIdentity> = createHostIdentityCache(DEFAULT_SOURCES);
+/**
+ * `readHostIdentity(sources)`, kept once it resolves. A rejected lookup is
+ * remembered for `retryAfterMs` (default 60 s), then retried.
+ */
+export function createHostIdentityCache(
+  sources: HostIdentitySources,
+  options: { now?: () => number; retryAfterMs?: number } = {},
+): HostIdentityCache {
+  const now = options.now ?? Date.now;
+  const retryAfterMs = options.retryAfterMs ?? LOOKUP_RETRY_AFTER_MS;
+  let cached: Promise<HostIdentity> | undefined;
+  let resolved: HostIdentity | undefined;
+  let failure: { error: unknown; until: number } | undefined;
+  const failureRemembered = (): boolean => failure !== undefined && now() < failure.until;
+
+  const lookup = (): Promise<HostIdentity> => {
+    if (cached) return cached;
+    if (failure && failureRemembered()) return Promise.reject(failure.error);
+    failure = undefined;
+    const attempt = readHostIdentity(sources);
+    cached = attempt;
+    // The caller sees a rejection through `attempt`; this records the outcome.
+    attempt.then(
+      (identity) => {
+        resolved = identity;
+      },
+      (error: unknown) => {
+        cached = undefined;
+        failure = { error, until: now() + retryAfterMs };
+      },
+    );
+    return attempt;
+  };
+
+  const peek = (): HostIdentity | undefined => {
+    // `lookup()` has attached its own handler, so a failure is recorded, not unhandled.
+    if (!resolved && !cached && !failureRemembered()) void lookup();
+    return resolved;
+  };
+
+  return Object.assign(lookup, { peek });
+}
+
+/** This host's identity, read once per process; a transient failure is retried after 60 s. */
+export const hostIdentity: HostIdentityCache = createHostIdentityCache(DEFAULT_SOURCES);
 
 /**
  * The host directory's name: `m-` (machine id) or `h-` (hostname) and the
@@ -219,11 +270,47 @@ export function validationSlotHostDirname(identity: HostIdentity): string {
   return `${identity.kind === "machine" ? "m" : "h"}-${digest.slice(0, 16)}`;
 }
 
-/** This host's slot directory under the ndx home `env` resolves to. */
+/**
+ * The slot directory `env` names in `NDX_VALIDATION_SLOT_DIR`, when that is an
+ * absolute path. Handed down by hench or by a slot holder, it is used as is.
+ */
+export function validationSlotDirFromEnv(env: NodeJS.ProcessEnv): string | undefined {
+  const named = env[VALIDATION_SLOT_DIR_ENV];
+  return named && isAbsolute(named) ? named : undefined;
+}
+
+/**
+ * The slot directory: the one `NDX_VALIDATION_SLOT_DIR` names, without a
+ * lookup, else this host's directory under the ndx home `env` resolves to.
+ * `identity` is the host's identity, or the cache to read it from.
+ *
+ * @throws {HostIdentityLookupError} when the machine id could not be read.
+ */
 export async function resolveValidationSlotDir(
   env: NodeJS.ProcessEnv = process.env,
-  identity?: HostIdentity,
+  identity: HostIdentity | (() => Promise<HostIdentity>) = hostIdentity,
 ): Promise<string> {
-  const host = validationSlotHostDirname(identity ?? (await hostIdentity()));
-  return join(resolveNdxHome({ env }), VALIDATION_SLOT_DIRNAME, host);
+  const named = validationSlotDirFromEnv(env);
+  if (named) return named;
+  return hostSlotDir(env, typeof identity === "function" ? await identity() : identity);
+}
+
+/**
+ * `resolveValidationSlotDir` without waiting: undefined while the host's
+ * identity is still being read, or while its failure is remembered
+ * (`cache.peek()` starts a lookup when none runs). For paths that must never
+ * wait on a lookup, such as the one before each confined spawn.
+ */
+export function peekValidationSlotDir(
+  env: NodeJS.ProcessEnv = process.env,
+  cache: Pick<HostIdentityCache, "peek"> = hostIdentity,
+): string | undefined {
+  const named = validationSlotDirFromEnv(env);
+  if (named) return named;
+  const known = cache.peek();
+  return known ? hostSlotDir(env, known) : undefined;
+}
+
+function hostSlotDir(env: NodeJS.ProcessEnv, identity: HostIdentity): string {
+  return join(resolveNdxHome({ env }), VALIDATION_SLOT_DIRNAME, validationSlotHostDirname(identity));
 }
