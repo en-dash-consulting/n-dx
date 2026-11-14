@@ -118,10 +118,14 @@ items:
     lastModified: "2026-11-12T18:42:07.287Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "58c29a6c-14b2-474e-acfb-237613391f80":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T06:38:34.411Z"
-    activeIntervals: [{"start":"2026-11-14T06:38:34.411Z"}]
-    lastModified: "2026-11-14T06:38:35.086Z"
+    completedAt: "2026-11-14T06:50:55.347Z"
+    endedAt: "2026-11-14T06:50:55.347Z"
+    activeIntervals: [{"end":"2026-11-14T06:50:55.347Z","start":"2026-11-14T06:38:34.411Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "9d828a7fd: the vendor CLI session spawn waits for the host lookup (withSessionValidationSlotDir, bounded by LOOKUP_TIMEOUT_MS, abortable) and passes NDX_VALIDATION_SLOT_DIR; Codex sessions get it unless the sandbox setting is off; failure spawns without it with one warning; per-command spawns still peek."
+    lastModified: "2026-11-14T06:50:55.347Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5bd00ff5-6790-498b-be8c-123681df0b4b":
     status: "completed"
