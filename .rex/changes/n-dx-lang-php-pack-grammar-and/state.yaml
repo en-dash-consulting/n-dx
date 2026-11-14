@@ -4,10 +4,14 @@ items:
     lastModified: "2026-11-14T05:22:20.070Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5cd796e9-6177-4d40-8439-b1678e700322":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T06:48:33.246Z"
-    activeIntervals: [{"start":"2026-11-14T06:48:33.246Z"}]
-    lastModified: "2026-11-14T06:48:33.986Z"
+    completedAt: "2026-11-14T07:04:23.721Z"
+    endedAt: "2026-11-14T07:04:23.721Z"
+    activeIntervals: [{"end":"2026-11-14T07:04:23.721Z","start":"2026-11-14T06:48:33.246Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "queries/php (imports, guards, definitions, calls), php-imports.ts (written imports + no-edge resolver), php-symbols.ts (rules + constructor/global refine), goldens for php52/php53/php8 fixtures; lang-kit WrittenImport.form/alias and CallFact.construct; lang-runtime groupCalls reads new expressions and picks the nearest chained receiver."
+    lastModified: "2026-11-14T07:04:23.721Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aac5fad8-89d8-4cd4-8e2e-d1edf328c2ad":
     status: "completed"

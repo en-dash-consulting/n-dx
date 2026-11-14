@@ -67,6 +67,18 @@ describe("groupCalls", () => {
     ]);
   });
 
+  it("names a creation by its class when space before the list leaves its name unpaired", () => {
+    // new Foo ($y) — the name ends before the list opens, so the name rule cannot pair it.
+    const calls = groupCalls([
+      capture("call.construct", "new Foo ($y)", 1, 0, 12),
+      capture("call.invocation", "new Foo ($y)", 1, 0, 12),
+      capture("call.class", "Foo", 1, 4, 7),
+      capture("call.name", "Foo", 1, 4, 7),
+      capture("call.arguments", "($y)", 1, 8, 12),
+    ]);
+    expect(calls).toEqual([{ callee: "Foo", construct: true, strings: [] }]);
+  });
+
   it("gives each call in a chain the receiver that ends right before its name", () => {
     // a.b().c() — both receivers start where both invocations start.
     const calls = groupCalls([

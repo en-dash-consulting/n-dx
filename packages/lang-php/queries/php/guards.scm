@@ -5,8 +5,9 @@
 ;   alternative `if (…): … endif;` syntax), a `switch` body and loop bodies.
 ;   An `if (!function_exists('f'))` or `if (!defined('X'))` check is one.
 ; - A function, method, closure or arrow function body: it runs when called.
-; - The right operand of `&&`, `||`, `and`, `or` and `??`, which short-circuit
-;   (`function_exists('f') || require 'f.php';`), the branches of `?:` and the
+; - The right operand of `&&`, `||`, `and`, `or`, `??` and `??=`, which
+;   short-circuit (`function_exists('f') || require 'f.php';`,
+;   `$config ??= include 'config.php';`), the branches of `?:` and the
 ;   arms of `match`. The left operand always runs: `require 'a.php' or die();`
 ;   is not guarded.
 (if_statement body: (_) @guard.conditional)
@@ -25,6 +26,9 @@
 
 (binary_expression
   operator: ["&&" "||" "and" "or" "??"]
+  right: (_) @guard.conditional)
+(augmented_assignment_expression
+  operator: "??="
   right: (_) @guard.conditional)
 (conditional_expression body: (_) @guard.conditional)
 (conditional_expression alternative: (_) @guard.conditional)

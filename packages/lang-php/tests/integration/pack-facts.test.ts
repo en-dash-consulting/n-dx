@@ -5,6 +5,9 @@
  * grammar is not built.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FileFacts } from "@n-dx/lang-kit";
 import { fixtureDirFor, listFixtureFiles, skipUnlessGrammar } from "@n-dx/lang-runtime";
@@ -70,5 +73,19 @@ describe("php pack facts", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const index = (await facts()).get("php52/index.php")!;
     expect(index.calls).toContainEqual({ callee: "Shop_Cart", construct: true, strings: [] });
+  });
+
+  it("guards an include assigned with ??=, and names a `new` written with a space before its arguments", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const projectDir = mkdtempSync(join(tmpdir(), "lang-php-facts-"));
+    try {
+      writeFileSync(join(projectDir, "a.php"), "<?php\n$cfg ??= include 'cfg.php';\n$x = new Foo ($y);\n");
+      const result = await pack.analyzeProject({ projectDir, files: ["a.php"] });
+      const [file] = result.facts;
+      expect(file?.imports?.written?.map((w) => [w.specifier, w.guard])).toEqual([["'cfg.php'", "conditional"]]);
+      expect(file?.calls).toEqual([{ callee: "Foo", construct: true, strings: [] }]);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 });
