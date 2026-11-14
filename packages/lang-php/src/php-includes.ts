@@ -373,6 +373,11 @@ function concatenationOperands(text: string): string[] | undefined {
     } else if ((c === "/" && text[i + 1] === "/") || (c === "#" && text[i + 1] !== "[")) {
       const end = text.indexOf("\n", i);
       i = end < 0 ? text.length : end;
+    } else if (depth === 0 && (text.startsWith("->", i) || text.startsWith("::", i))) i += 1;
+    else if (depth === 0 && text.startsWith("?->", i)) i += 2;
+    else if (depth === 0 && (/[?:|&^<>=!]/.test(c) || (!/[\w$\x80-￿]/.test(text[i - 1] ?? "") && /^(and|or|xor|instanceof)\b/i.test(text.slice(i))))) {
+      // An operator binding more loosely than `.` (`?:`, `??`, `||`, a comparison, `and`): the operands of `.` are not the path's ends.
+      return undefined;
     } else if (c === "(" || c === "[" || c === "{") depth += 1;
     else if (c === ")" || c === "]" || c === "}") {
       depth -= 1;

@@ -28,8 +28,12 @@ items:
     lastModified: "2026-11-14T08:35:17.129Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd220c20-0191-4388-b858-0a1454884daa":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T08:35:55.875Z"
-    activeIntervals: [{"start":"2026-11-14T08:35:55.875Z"}]
-    lastModified: "2026-11-14T08:35:56.584Z"
+    completedAt: "2026-11-14T08:46:31.045Z"
+    endedAt: "2026-11-14T08:46:31.045Z"
+    activeIntervals: [{"end":"2026-11-14T08:46:31.045Z","start":"2026-11-14T08:35:55.875Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Dynamic-include notices (php-dynamic-include, php-host-include), capped literal-prefix/suffix candidates never edges (sourcevision test), include section in php-resolve-report.mjs; corpus numbers left to the operator."
+    lastModified: "2026-11-14T08:46:31.045Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

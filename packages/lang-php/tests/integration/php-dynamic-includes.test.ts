@@ -67,4 +67,15 @@ describe("php dynamic includes", () => {
     expect(includes.candidates("index.php", "'a/b.php'")).toBeUndefined();
     expect(includes.candidates("index.php", "'a/' . $x")).toEqual({ files: ["a/b.php"], total: 1 });
   });
+
+  it("takes no ends from a path whose top level has an operator binding more loosely than `.`", () => {
+    const includes = new PhpIncludes([], new Set(["a/b.php", "c.php"]), []);
+    // `('a/' . $x) ? 'c.php' : 'd.php'`: the path is 'c.php' or 'd.php', not under a/.
+    expect(includes.candidates("index.php", "'a/' . $x ? 'c.php' : 'd.php'")).toBeUndefined();
+    expect(includes.candidates("index.php", "'a/' . $x or die()")).toBeUndefined();
+    // Inside parentheses, and in `->`, `?->` and `::`, they are part of one operand.
+    expect(includes.candidates("index.php", "'a/' . ($x ?: 'b') . '.php'")).toEqual({ files: ["a/b.php"], total: 1 });
+    expect(includes.candidates("index.php", "'a/' . $this?->name . '.php'")).toEqual({ files: ["a/b.php"], total: 1 });
+    expect(includes.candidates("index.php", "'a/' . Config::$name . '.php'")).toEqual({ files: ["a/b.php"], total: 1 });
+  });
 });
