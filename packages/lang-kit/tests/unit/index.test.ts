@@ -30,6 +30,8 @@ describe("@n-dx/lang-kit barrel", () => {
       "normalizePythonName",
       "parseRequirement",
       "readSetupCall",
+      "readComposerProjects",
+      "composerProjectsFrom",
       "parseToml",
       "parseTomlLocated",
       "parseIni",

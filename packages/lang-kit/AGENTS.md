@@ -60,6 +60,14 @@ against the `files` inventory, not the disk. Dependencies reuse
 `BuildDependency` (`group` empty, `artifact` PEP 503-normalised, specifier as
 written) with file and line. `parseTomlLocated` gives each value's line.
 
+The Composer reader (`src/php-composer.ts`, `readComposerProjects(projectDir,
+files)`) gives one model per `composer.json` in the inventory, skipping one
+inside another project's vendor directory: requirements as written (a name
+with no `vendor/` part is `platform`), autoload blocks with repository-relative
+paths, repositories, `vendorDir`, and the beside-it `composer.lock`'s packages
+(`version` in memory only; autoload paths relative to the package root).
+Malformed JSON is a notice and an empty model.
+
 A config's `skipUnlessContains` names directories skipped unless they directly
 hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`).
 `skipBesideMarker` names directories skipped only as build output: under the
