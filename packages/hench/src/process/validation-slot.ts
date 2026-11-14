@@ -14,7 +14,11 @@
  * ## On-disk protocol (version 1)
  *
  * Everything lives in one directory, `<slot dir>` (normally
- * `<ndx home>/validation-slot/`, created on first use):
+ * `<ndx home>/validation-slot/<host>/`, created on first use). `<host>` is
+ * `os.hostname()` lower-cased with each character outside `[a-z0-9._-]`
+ * replaced by `-`, or `unknown-host` when that is empty or only dots. Liveness
+ * (rules 4 and 5) only holds on one host, so hosts sharing an ndx home must
+ * never share a slot directory:
  *
  * - `holder.json` — present exactly while the slot is held. JSON object:
  *   ```json
@@ -57,7 +61,8 @@
  *    create `reclaim.lock` as in rule 1 (if it exists and is stale — its pid
  *    dead, or rule 5a — unlink it and retry later), re-read `holder.json`,
  *    unlink it only if its bytes equal the stale bytes observed, then unlink
- *    `reclaim.lock`.
+ *    `reclaim.lock` only if its bytes are still the reclaimer's own (another
+ *    waiter may have judged it stale and replaced it meanwhile).
  *    5a. **Own pid.** A process knows the tokens it holds: its unreleased
  *    leases and the `reclaim.lock` it is writing. A `holder.json` or
  *    `reclaim.lock` naming this process's own pid with a token it does not
@@ -96,7 +101,7 @@ import { join } from "node:path";
 /** The environment variable a holder exports its token to children under. */
 export const VALIDATION_SLOT_ENV = "NDX_VALIDATION_SLOT";
 
-/** The slot directory's name inside the ndx home. */
+/** The slot root's name inside the ndx home; each host's slot is a subdirectory. */
 export const VALIDATION_SLOT_DIRNAME = "validation-slot";
 
 /** The file present exactly while the slot is held. */
@@ -430,7 +435,9 @@ async function reclaimStale(slotDir: string, staleRaw: string): Promise<boolean>
       const current = await readIfExists(holderPath(slotDir));
       if (current === staleRaw) await unlinkIfExists(holderPath(slotDir));
     } finally {
-      await unlinkIfExists(lockPath);
+      // A waiter that judged this lock stale may have replaced it; that lock
+      // is its owner's to remove, not this process's.
+      if ((await readIfExists(lockPath)) === lock) await unlinkIfExists(lockPath);
     }
     return true;
   } finally {

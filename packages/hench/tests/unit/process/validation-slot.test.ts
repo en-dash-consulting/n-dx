@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile, access } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -16,7 +16,11 @@ import {
   type ValidationSlotHolder,
   type ValidationSlotWait,
 } from "../../../src/process/validation-slot.js";
-import { resolveValidationSlotDir } from "../../../src/process/validation-slot-dir.js";
+import {
+  resolveValidationSlotDir,
+  validationSlotHostDirname,
+  VALIDATION_SLOT_FALLBACK_HOST,
+} from "../../../src/process/validation-slot-dir.js";
 
 const MODULE_URL = pathToFileURL(
   fileURLToPath(new URL("../../../src/process/validation-slot.ts", import.meta.url)),
@@ -521,7 +525,28 @@ describe("acquireValidationSlot — two processes", () => {
 });
 
 describe("resolveValidationSlotDir", () => {
-  it("is validation-slot under the ndx home the environment names", () => {
-    expect(resolveValidationSlotDir({ NDX_HOME: root })).toBe(join(root, VALIDATION_SLOT_DIRNAME));
+  it("is this host's directory under validation-slot in the ndx home the environment names", () => {
+    expect(resolveValidationSlotDir({ NDX_HOME: root }, "build-01")).toBe(join(root, VALIDATION_SLOT_DIRNAME, "build-01"));
+    expect(resolveValidationSlotDir({ NDX_HOME: root })).toBe(
+      join(root, VALIDATION_SLOT_DIRNAME, validationSlotHostDirname(hostname())),
+    );
+  });
+
+  it("gives hosts sharing one ndx home separate directories", () => {
+    expect(resolveValidationSlotDir({ NDX_HOME: root }, "host-a")).not.toBe(resolveValidationSlotDir({ NDX_HOME: root }, "host-b"));
+  });
+});
+
+describe("validationSlotHostDirname", () => {
+  it("lower-cases the hostname and replaces characters outside [a-z0-9._-]", () => {
+    expect(validationSlotHostDirname("Ryans-MacBook-Pro.local")).toBe("ryans-macbook-pro.local");
+    expect(validationSlotHostDirname("build_box 7/../x\\y:z")).toBe("build_box-7-..-x-y-z");
+    expect(validationSlotHostDirname("hôte")).toBe("h-te");
+  });
+
+  it("falls back when the hostname is empty or would name the slot root or its parent", () => {
+    for (const name of ["", ".", ".."]) {
+      expect(validationSlotHostDirname(name)).toBe(VALIDATION_SLOT_FALLBACK_HOST);
+    }
   });
 });
