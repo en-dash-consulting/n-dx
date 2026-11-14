@@ -17,8 +17,10 @@
  */
 
 import type { HenchConfig } from "../schema/index.js";
+import { verbose } from "../types/output.js";
 import {
   acquireValidationSlot,
+  reclaimIfStale,
   ValidationSlotAbortedError,
   type ValidationSlotLease,
   type ValidationSlotWait,
@@ -198,6 +200,29 @@ async function releaseReportingFailure(
     const warning = `could not release the validation slot in ${lease.slotDir}: ${describeReason(err)}`;
     slot.onWarning?.(warning);
     return warning;
+  }
+}
+
+/**
+ * Clear a stale holder from this host's slot, judged from hench's own (host)
+ * view, before a confined command starts (rule 4a in `validation-slot.ts`): a
+ * confined runner cannot judge a record left by a dead sibling sandbox, and
+ * would wait on it until its own timeout. Runs whatever
+ * `hench.testGate.hostSlot` says, because the test runner takes the slot
+ * unconditionally. Never waits and never throws; a failure is logged in
+ * verbose mode only, since the spawn goes ahead either way.
+ */
+export async function reclaimHostValidationSlot(env: NodeJS.ProcessEnv = process.env): Promise<void> {
+  const onError = (err: unknown): void => verbose(`validation slot: could not check for a stale holder: ${describeReason(err)}`);
+  let slotDir: string;
+  try {
+    slotDir = await resolveValidationSlotDir(env);
+  } catch (err) {
+    onError(err);
+    return;
+  }
+  if (await reclaimIfStale(slotDir, { env, onError })) {
+    verbose(`validation slot: cleared a stale holder in ${slotDir}`);
   }
 }
 

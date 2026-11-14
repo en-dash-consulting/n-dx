@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, readlinkSync } from "node:fs";
-import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile, access } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, symlink, unlink, writeFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -11,6 +11,7 @@ import {
   OUTER_PID_NAMESPACES_ENV,
   parseValidationSlotHolder,
   readValidationSlotHolder,
+  reclaimIfStale,
   ValidationSlotAbortedError,
   VALIDATION_SLOT_DIR_ENV,
   VALIDATION_SLOT_ENV,
@@ -650,6 +651,58 @@ describe.skipIf(process.platform === "win32")("acquireValidationSlot — PID nam
     // The live reclaimer is waited out, never cleared.
     expect(error).toBeInstanceOf(ValidationSlotAbortedError);
     expect(await readFile(join(slotDir, "reclaim.lock"), "utf-8")).toBe(lock);
+  });
+
+  describe("reclaimIfStale from the host", () => {
+    it("clears a dead sibling sandbox's record that a contender in another sandbox would wait on", async () => {
+      // The holder's sandbox (SIBLING) was killed; nothing runs in it now.
+      const raw = await writeHolder({ pid: 3, pidNamespace: SIBLING, outerPidNamespaces: [OUTER] });
+      await setOwnNamespace(INNER);
+      const { error } = await waitThenAbortIn(inside);
+      expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+      expect(await holderRaw()).toBe(raw);
+
+      await unlink(join(proc, "self", "ns", "pid"));
+      await setOwnNamespace(OUTER);
+      const errors: unknown[] = [];
+      expect(await reclaimIfStale(slotDir, { env: {}, procRoot: proc, onError: (e) => errors.push(e) })).toBe(true);
+      expect(existsSync(join(slotDir, VALIDATION_SLOT_HOLDER_FILE))).toBe(false);
+      expect(existsSync(join(slotDir, VALIDATION_SLOT_RECLAIM_FILE))).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    it("leaves a live sandboxed holder's record alone", async () => {
+      await setOwnNamespace(OUTER);
+      await addProcess(9001, SIBLING, 3);
+      const raw = await writeHolder({ pid: 3, pidNamespace: SIBLING, outerPidNamespaces: [OUTER] });
+      expect(await reclaimIfStale(slotDir, { env: {}, procRoot: proc })).toBe(false);
+      expect(await holderRaw()).toBe(raw);
+    });
+
+    it("does not wait for another live reclaimer, and leaves its lock and the record", async () => {
+      await setOwnNamespace(OUTER);
+      await addProcess(9004, INNER, 4);
+      const raw = await writeHolder({});
+      const lock = JSON.stringify({ pid: 4, token: "l", startedAt: "x", pidNamespace: INNER, outerPidNamespaces: [OUTER] });
+      await writeFile(join(slotDir, VALIDATION_SLOT_RECLAIM_FILE), lock);
+      expect(await reclaimIfStale(slotDir, { env: {}, procRoot: proc })).toBe(false);
+      expect(await holderRaw()).toBe(raw);
+      expect(await readFile(join(slotDir, VALIDATION_SLOT_RECLAIM_FILE), "utf-8")).toBe(lock);
+    });
+
+    it("does nothing, and creates nothing, when the slot directory does not exist", async () => {
+      await setOwnNamespace(OUTER);
+      expect(await reclaimIfStale(slotDir, { env: {}, procRoot: proc })).toBe(false);
+      expect(existsSync(slotDir)).toBe(false);
+    });
+
+    it("reports a failure to onError instead of throwing", async () => {
+      await setOwnNamespace(OUTER);
+      await mkdir(join(slotDir, VALIDATION_SLOT_HOLDER_FILE), { recursive: true });
+      const errors: unknown[] = [];
+      expect(await reclaimIfStale(slotDir, { env: {}, procRoot: proc, onError: (e) => errors.push(e) })).toBe(false);
+      expect(errors).toHaveLength(1);
+    });
   });
 });
 

@@ -409,7 +409,8 @@ function isRecordedPidAlive(place, pid, group, view) {
   if (!isPositiveInt(pid)) return false;
   // The record's namespace lies inside the reader's, so its processes are visible.
   if (place.outerPidNamespaces.includes(own)) return isAliveInInnerNamespace(view.procRoot, recorded, pid, group);
-  // Outside the reader's namespace, or beside it: invisible, so never judged dead.
+  // Outside the reader's namespace, or beside it: invisible, so never judged
+  // dead here. Hench clears such a record from the host (rule 4a).
   return true;
 }
 

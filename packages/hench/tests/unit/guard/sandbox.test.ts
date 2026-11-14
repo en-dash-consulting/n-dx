@@ -15,6 +15,7 @@ import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { detectSandboxBackend } from "../../../src/prd/llm-gateway.js";
 import { execRepoShellCmd } from "../../../src/guard/sandbox.js";
+import { execArgv } from "../../../src/tools/exec-shell.js";
 
 const seatbelt = { name: "seatbelt" as const, available: true };
 const missing = { name: "bwrap" as const, available: false, reason: "bwrap is not on PATH" };
@@ -103,6 +104,21 @@ posixOnly("createToolSandbox", () => {
     expect(existsSync(sandbox.tmpDir)).toBe(false);
     expect(() => sandbox.dispose()).not.toThrow();
   });
+
+  it("clears a stale validation-slot holder from the host before each confined spawn", async () => {
+    const env = { MARK: "tool" };
+    const seen: NodeJS.ProcessEnv[] = [];
+    const sandbox = createToolSandbox(tempProject(), {
+      setting: on, backend: seatbelt, env, reclaimSlot: async (e) => { seen.push(e); },
+    })!;
+    try {
+      await sandbox.prepareSpawn();
+      await sandbox.prepareSpawn();
+      expect(seen).toEqual([env, env]);
+    } finally {
+      sandbox.dispose();
+    }
+  });
 });
 
 describe("tool children route through the sandbox", () => {
@@ -114,12 +130,17 @@ describe("tool children route through the sandbox", () => {
       // Stand-in for sandbox-exec: echo a marker so the test sees the wrapper ran.
       wrap: (file, args) => { calls.push({ file, args }); return { file: "node", args: ["-e", "console.log('via-sandbox')"], env: { TMPDIR: project } }; },
       wrapShell: (command) => { calls.push({ file: "sh", args: ["-c", command] }); return { file: "node", args: ["-e", "console.log('via-sandbox')"], env: { TMPDIR: project } }; },
+      prepareSpawn: async () => { calls.push({ file: "prepare", args: [] }); },
       dispose: () => {},
     };
     const guard = new GuardRails(project, guardDefaultsForLanguage("typescript"), { sandbox: fake });
     const out = await toolRunCommand(guard, project, { command: "node --version" });
     expect(out).toContain("via-sandbox");
-    expect(calls).toEqual([{ file: "sh", args: ["-c", "node --version"] }]);
+    expect(calls).toEqual([{ file: "prepare", args: [] }, { file: "sh", args: ["-c", "node --version"] }]);
+
+    calls.length = 0;
+    await execArgv({ file: "git", args: ["status"], cwd: project, timeout: 30_000, sandbox: fake });
+    expect(calls).toEqual([{ file: "prepare", args: [] }, { file: "git", args: ["status"] }]);
   });
 
   it("GuardRails without a sandbox runs unconfined, as before", () => {
@@ -200,6 +221,17 @@ describe("execRepoShellCmd", () => {
     expect(readFileSync(join(project, "gate.txt"), "utf-8")).toBe("ran");
   });
 
+  it("clears a stale validation-slot holder from the host before the command, even unconfined", async () => {
+    // These are hench's own validation steps: during a vendor-CLI session they
+    // are where a dead host holder is cleared for the session's confined runners.
+    const project = tempProject();
+    const ranFirst: boolean[] = [];
+    const reclaimSlot = async (): Promise<void> => { ranFirst.push(!existsSync(join(project, "gate.txt"))); };
+    const command = `node -e "require('fs').writeFileSync('gate.txt', 'ran')"`;
+    await execRepoShellCmd(command, { cwd: project, timeout: 30_000 }, { setting: off, backend: seatbelt, reclaimSlot });
+    expect(ranFirst).toEqual([true]);
+  });
+
   it("reports a wrapped command that never launched instead of throwing", async () => {
     // A backend binary that cannot be found: the wrapped spawn fails, and the
     // result says so the way execShellCmd would.
@@ -221,6 +253,20 @@ posixOnly("createVendorCliSandbox", () => {
     expect(createVendorCliSandbox("/p", "codex", { cliBinary: "/bin/codex", setting: on, backend: seatbelt })).toBeNull();
     expect(createVendorCliSandbox("/p", "claude", { cliBinary: "/bin/claude", setting: off, backend: seatbelt })).toBeNull();
     expect(createVendorCliSandbox("/p", "claude", { cliBinary: "/bin/claude", setting: on, backend: missing })).toBeNull();
+  });
+
+  it("clears a stale validation-slot holder from the host before the CLI starts", async () => {
+    const env = { ...process.env, MARK: "cli" };
+    const seen: NodeJS.ProcessEnv[] = [];
+    const sandbox = createVendorCliSandbox(tempProject(), "claude", {
+      cliBinary: process.execPath, setting: on, backend: seatbelt, env, reclaimSlot: async (e) => { seen.push(e); },
+    })!;
+    try {
+      await sandbox.prepareSpawn();
+      expect(seen).toEqual([env]);
+    } finally {
+      sandbox.dispose();
+    }
   });
 
   it("gives the Claude CLI its config, TLS network and the project, but not hench's config or other credentials", () => {

@@ -38,6 +38,7 @@ import type {
 // Through hench's exec module, so a test that stubs it stubs these spawns too.
 import { exec, execShellCmd } from "../process/exec.js";
 import type { ExecOptions, ExecResult } from "../process/exec.js";
+import { reclaimHostValidationSlot } from "../process/validation-run.js";
 import { GuardError } from "./paths.js";
 
 /** What a tool spawn site needs: wrap one argv, and say what it is running under. */
@@ -45,6 +46,12 @@ export interface ToolSandbox {
   wrap(file: string, args: readonly string[]): SandboxedInvocation;
   /** Wrap a shell command string in the shell `execShellCmd` would use. */
   wrapShell(command: string): SandboxedInvocation;
+  /**
+   * Await before each confined spawn: clears a stale validation-slot holder
+   * that the confined command could not judge (`reclaimHostValidationSlot`).
+   * Never throws.
+   */
+  prepareSpawn(): Promise<void>;
   readonly backend: SandboxBackend;
   readonly setting: SandboxSetting;
   readonly tmpDir: string;
@@ -68,6 +75,15 @@ export interface CreateToolSandboxOptions {
   backend?: SandboxBackend;
   /** Injected for tests; defaults to `resolveSandboxSetting`. */
   setting?: SandboxSetting;
+  /** Injected for tests; defaults to `reclaimHostValidationSlot`. Must never throw. */
+  reclaimSlot?: (env: NodeJS.ProcessEnv) => Promise<void>;
+}
+
+/** The `prepareSpawn` of a sandbox built with `options`. */
+function slotReclaimer(options: CreateToolSandboxOptions): () => Promise<void> {
+  const reclaim = options.reclaimSlot ?? reclaimHostValidationSlot;
+  const env = options.env ?? process.env;
+  return () => reclaim(env);
 }
 
 function realOr(path: string): string {
@@ -132,6 +148,7 @@ export function createToolSandbox(
     tmpDir,
     wrap: (file, args) => wrapInSandbox(file, args, policy, backend),
     wrapShell: (command) => wrapShellInSandbox(command, policy, backend),
+    prepareSpawn: slotReclaimer(options),
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -161,6 +178,11 @@ export function createToolSandbox(
  * The sandbox is built per call and removed afterwards. npm's cache moves
  * into its scratch directory, because the home directory is not writable.
  * Never throws for a command failure; the result is `execShellCmd`'s.
+ *
+ * Every call first clears a stale validation-slot holder from the host view,
+ * confined or not: these are hench's own validation steps, so during a
+ * vendor-CLI session (one sandbox for the whole session) they are where a
+ * holder that died on the host is cleared for the session's confined runners.
  */
 export async function execRepoShellCmd(
   command: string,
@@ -168,8 +190,12 @@ export async function execRepoShellCmd(
   sandboxOptions: CreateToolSandboxOptions = {},
 ): Promise<ExecResult> {
   const sandbox = createToolSandbox(opts.cwd, sandboxOptions);
-  if (!sandbox) return execShellCmd(command, opts);
+  if (!sandbox) {
+    await slotReclaimer(sandboxOptions)();
+    return execShellCmd(command, opts);
+  }
   try {
+    await sandbox.prepareSpawn();
     const inv = sandbox.wrapShell(command);
     const env = {
       ...(opts.env ?? process.env),
@@ -301,6 +327,7 @@ export function createVendorCliSandbox(
     tmpDir,
     wrap: (file, args) => withClaudeTmp(wrapInSandbox(file, args, policy, backend)),
     wrapShell: (command) => withClaudeTmp(wrapShellInSandbox(command, policy, backend)),
+    prepareSpawn: slotReclaimer(options),
     dispose: () => {
       if (disposed) return;
       disposed = true;
