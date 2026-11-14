@@ -194,6 +194,21 @@ describe("skipsDirectory — PHP", () => {
     expect(skipsDirectory(phpConfig, name, (marker) => markerMatches("page.html", marker))).toBe(true);
   });
 
+  it("merged with TypeScript, cache and tmp are kept by TypeScript source too", () => {
+    const merged = mergeLanguageConfigs([typescriptConfig, phpConfig]);
+    const holdsTs = (marker: string) => markerMatches("index.ts", marker);
+    for (const name of ["cache", "tmp", ".phpunit.cache"]) {
+      expect(skipsDirectory(merged, name, holdsTs)).toBe(false);
+      expect(skipsDirectory(merged, name, (marker) => markerMatches("Cache.php", marker))).toBe(false);
+      expect(skipsDirectory(merged, name, (marker) => markerMatches("data.json", marker))).toBe(true);
+    }
+  });
+
+  it("merged with Python, literal markers gain no extension patterns", () => {
+    const merged = mergeLanguageConfigs([pythonConfig, phpConfig]);
+    expect(merged.skipUnlessContains?.get("env")).toEqual(["__init__.py", "__init__.pyi"]);
+  });
+
   it("merged with Go, vendor is always skipped", () => {
     const merged = mergeLanguageConfigs([phpConfig, goConfig]);
     expect(skipsDirectory(merged, "vendor", holdsNothing, at("vendor"))).toBe(true);

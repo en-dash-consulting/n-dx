@@ -10,6 +10,7 @@ import {
   analyzeInventory,
 } from "../../../src/analyzers/inventory.js";
 import { IgnoreFilter, loadIgnoreFilter } from "../../../src/util/project-walk.js";
+import { detectLanguages, mergeLanguageConfigs } from "../../../src/language/detect.js";
 import type { InventoryResult } from "../../../src/analyzers/inventory.js";
 
 // ── detectLanguage ────────────────────────────────────────────────────────────
@@ -592,6 +593,20 @@ describe("analyzeInventory", () => {
     });
     const inv = await analyzeInventory(tmpDir, { codeOnly: false });
     expect(inv.files.map((f) => f.path).sort()).toEqual(["cache/Cache.php", "index.php"]);
+  });
+
+  it("keeps a TypeScript cache directory in a repository with composer.json beside package.json", async () => {
+    tmpDir = await project("sv-inv-ts-composer-cache-", {
+      "package.json": '{ "name": "test" }\n',
+      "composer.json": "{}\n",
+      "src/index.ts": "export {};\n",
+      "src/cache/store.ts": "export {};\n",
+      "src/tmp/scratch.ts": "export {};\n",
+    });
+    const configs = await detectLanguages(tmpDir);
+    expect(configs.map((c) => c.id)).toEqual(["typescript", "php"]);
+    const inv = await analyzeInventory(tmpDir, { languageConfig: mergeLanguageConfigs(configs) });
+    expect(inv.files.map((f) => f.path).sort()).toEqual(["src/cache/store.ts", "src/index.ts", "src/tmp/scratch.ts"]);
   });
 
   it("produces deterministic output across runs", async () => {

@@ -500,7 +500,9 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
  * - `configFilePatterns`: concatenation of all patterns (omitted when none)
  * - `skipDirectories`: union of all skip directories
  * - `skipUnlessContains`: union of the marker files per name (omitted when
- *   none); a name another config lists in `skipDirectories` stays skipped
+ *   none); a name another config lists in `skipDirectories` stays skipped.
+ *   A name whose markers are all `*.ext` patterns also gets one for every
+ *   merged extension: it is kept by source of any merged language.
  * - `skipBesideMarker`: likewise (omitted when none)
  * - `skipOnlyBeside`: likewise (omitted when none)
  * - `generatedFilePatterns`: concatenation of all patterns
@@ -550,6 +552,15 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
     for (const r of config.generatedHeaders ?? []) generatedHeaders.push(r);
     for (const p of config.entryPointPatterns) entryPointPatterns.push(p);
+  }
+
+  // A name kept only by source files (all its markers are `*.ext`, as PHP's
+  // `cache/` is kept by a `.php` file) is kept by any merged language's
+  // source, so a TypeScript `src/cache/` beside PHP stays inventoried.
+  for (const [d, markers] of skipUnlessContains) {
+    if (markers.every((m) => m.startsWith("*."))) {
+      skipUnlessContains.set(d, [...new Set([...markers, ...[...extensions].map((ext) => `*${ext}`)])]);
+    }
   }
 
   return {
