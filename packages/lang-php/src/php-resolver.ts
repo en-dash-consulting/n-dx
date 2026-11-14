@@ -49,7 +49,9 @@
  * (`php:Zend` for `Zend_Db_Table`). Edge and external symbols are the
  * qualified names.
  *
- * Includes are reported as written (`php-imports.ts`) and not resolved.
+ * Includes (`include`, `require` and their `_once` forms) whose path is
+ * computable resolve to files through `php-includes.ts`, with symbol `*`;
+ * the written include keeps its guard.
  *
  * @module lang-php/php-resolver
  */
@@ -69,6 +71,7 @@ import {
 import { contains, type Capture, type PackResolver, type PackSourceFile, type PreparedResolver } from "@n-dx/lang-runtime";
 import { isPhpBuiltinClass } from "./php-builtins.js";
 import { readWrittenImports } from "./php-imports.js";
+import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
 
 // ── Names and paths ─────────────────────────────────────────────────────────
 
@@ -518,6 +521,26 @@ function resolveReference(index: Index, ref: PhpReference, out: Collector): PhpO
  * finds the manifests in that list. Nothing else of the project is walked.
  */
 export async function readPhpResolveProjects(projectDir: string, files: readonly string[]): Promise<ComposerProject[]> {
+  return readComposerProjects(projectDir, await listBeside(projectDir, files));
+}
+
+/** Composer projects and include-path settings around `files`; see {@link readPhpResolveProjects} and `php-includes.ts`. */
+export interface PhpProjectFacts {
+  readonly projects: readonly ComposerProject[];
+  readonly includeConfigs: readonly PhpIncludeConfig[];
+  /** Configuration files that could not be read. */
+  readonly notices: readonly string[];
+}
+
+/** What resolution reads from outside the PHP files: Composer manifests, php.ini, `.user.ini` and `.htaccess`. */
+export async function readPhpProjectFacts(projectDir: string, files: readonly string[]): Promise<PhpProjectFacts> {
+  const listed = await listBeside(projectDir, files);
+  const { configs, notices } = await readPhpIncludeConfigs(projectDir, listed);
+  return { projects: await readComposerProjects(projectDir, listed), includeConfigs: configs, notices };
+}
+
+/** `files` and every file in a directory holding one of them or above one, sorted. */
+async function listBeside(projectDir: string, files: readonly string[]): Promise<string[]> {
   const dirs = new Set<string>([""]);
   for (const file of files) {
     for (let dir = dirOf(file); dir !== "" && !dirs.has(dir); dir = dirOf(dir)) dirs.add(dir);
@@ -532,7 +555,7 @@ export async function readPhpResolveProjects(projectDir: string, files: readonly
     }
     for (const entry of entries) if (entry.isFile()) listed.add(joinPath(dir, entry.name));
   }
-  return readComposerProjects(projectDir, [...listed].sort());
+  return [...listed].sort();
 }
 
 // ── Resolver ────────────────────────────────────────────────────────────────
@@ -541,41 +564,66 @@ export async function readPhpResolveProjects(projectDir: string, files: readonly
 export interface PreparedPhpResolver extends PreparedResolver {
   /** Each reference of a prepared file with its outcome, in document order. */
   outcomes(fromFile: string): readonly ResolvedPhpReference[];
+  /** Each include of a prepared file with its outcome, in document order. */
+  includes(fromFile: string): readonly ResolvedPhpInclude[];
 }
+
+/** One include and what it resolved to. */
+export interface ResolvedPhpInclude {
+  readonly include: WrittenImport;
+  readonly outcome: PhpIncludeOutcome;
+}
+
+/** Include-path settings read from configuration files, and the files that could not be read. */
+export type PhpIncludeSettings = Pick<PhpProjectFacts, "includeConfigs" | "notices">;
+
+const NO_INCLUDE_SETTINGS: PhpIncludeSettings = { includeConfigs: [], notices: [] };
 
 /** Resolve every file of a project at once. */
 export function preparePhpImports(
   projects: readonly ComposerProject[],
   files: readonly PackSourceFile[],
   unparsed: readonly string[] = [],
+  includeSettings: PhpIncludeSettings = NO_INCLUDE_SETTINGS,
 ): PreparedPhpResolver {
-  const index = new Index(projects, files.map(declarationsOf), [...files.map((f) => f.path), ...unparsed]);
+  const paths = [...files.map((f) => f.path), ...unparsed];
+  const index = new Index(projects, files.map(declarationsOf), paths);
+  const includes = new PhpIncludes(files, index.files, includeSettings.includeConfigs);
   const refs = new Map<string, FileReferences>();
   const outcomes = new Map<string, ResolvedPhpReference[]>();
+  const includeOutcomes = new Map<string, ResolvedPhpInclude[]>();
   for (const file of files) {
     const written = readWrittenImports(file);
     const out = new Collector(file.path);
     const resolved = readPhpReferences(file, written).map((reference) => ({ reference, outcome: resolveReference(index, reference, out) }));
+    const resolvedIncludes = written.filter(isInclude).map((include) => {
+      const outcome = includes.resolve(file.path, include);
+      if (outcome.kind === "internal") out.file(outcome.target, "*");
+      return { include, outcome };
+    });
     refs.set(file.path, out.result(written));
     outcomes.set(file.path, resolved);
+    includeOutcomes.set(file.path, resolvedIncludes);
   }
-  const notices = projects.flatMap((p) => p.notices.map((n) => `PHP: ${n}`));
+  const notices = [...projects.flatMap((p) => p.notices), ...includeSettings.notices, ...includes.notices()].map((n) => `PHP: ${n}`);
   return {
     resolve: (fromFile) => refs.get(fromFile) ?? { files: [], external: [] },
     outcomes: (fromFile) => outcomes.get(fromFile) ?? [],
+    includes: (fromFile) => includeOutcomes.get(fromFile) ?? [],
     notices: () => notices,
   };
 }
 
-function createPhpResolver(projects: readonly ComposerProject[]): PackResolver {
+function createPhpResolver(facts: PhpProjectFacts): PackResolver {
   return {
-    forProject: async (projectDir, files) => createPhpResolver(await readPhpResolveProjects(projectDir, files)),
-    prepare: (files, unparsed) => preparePhpImports(projects, files, unparsed),
+    forProject: async (projectDir, files) => createPhpResolver(await readPhpProjectFacts(projectDir, files)),
+    prepare: (files, unparsed) => preparePhpImports(facts.projects, files, unparsed, facts),
   };
 }
 
 /**
  * The PHP resolver. Without {@link PackResolver.forProject} it knows no
- * Composer project, so only classes declared in the repository resolve.
+ * Composer project and no configuration file, so only classes declared in
+ * the repository and includes set up in PHP code resolve.
  */
-export const phpResolver: PackResolver = createPhpResolver([]);
+export const phpResolver: PackResolver = createPhpResolver({ projects: [], ...NO_INCLUDE_SETTINGS });

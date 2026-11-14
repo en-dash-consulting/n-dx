@@ -20,6 +20,42 @@
 (require_expression (parenthesized_expression (_) @import.inner_path))
 (require_once_expression (parenthesized_expression (_) @import.inner_path))
 
+; What an include's path may be built from (php-includes.ts), function
+; names in any letter case as PHP reads them:
+;
+;   define('ROOT', dirname(__FILE__));       @include.define, @include.define_name, @include.define_value
+;   const ROOT = __DIR__;                    @include.const, @include.const_name, @include.const_value
+;   set_include_path('lib' . PATH_SEPARATOR . get_include_path());
+;                                            @include.set, @include.set_path
+;   ini_set('include_path', 'lib');          @include.ini, @include.ini_key, @include.ini_value
+((function_call_expression
+  function: (name) @_define
+  arguments: (arguments
+    .
+    (argument . [(string) (encapsed_string)] @include.define_name)
+    .
+    (argument (_) @include.define_value .))) @include.define
+  (#match? @_define "^[dD][eE][fF][iI][nN][eE]$"))
+
+; File-level `const` only: a class constant is never a global one.
+(program
+  (const_declaration
+    (const_element . (name) @include.const_name (_) @include.const_value .) @include.const))
+
+((function_call_expression
+  function: (name) @_set
+  arguments: (arguments . (argument (_) @include.set_path .))) @include.set
+  (#match? @_set "^[sS][eE][tT]_[iI][nN][cC][lL][uU][dD][eE]_[pP][aA][tT][hH]$"))
+
+((function_call_expression
+  function: (name) @_ini
+  arguments: (arguments
+    .
+    (argument . [(string) (encapsed_string)] @include.ini_key)
+    .
+    (argument (_) @include.ini_value .))) @include.ini
+  (#match? @_ini "^[iI][nN][iI]_[sS][eE][tT]$"))
+
 ; `use` imports. @use.declaration spans the statement; each @use.clause is
 ; one imported name, with @use.name its name as written and @use.alias the
 ; `as` name. A group use (`use A\{B, C as D}`) has @use.prefix, its shared

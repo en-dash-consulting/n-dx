@@ -8,7 +8,8 @@
  * other PHP parser.
  *
  * `use` imports and class references resolve to files through Composer's
- * autoload rules (`php-resolver.ts`); includes are reported as written.
+ * autoload rules (`php-resolver.ts`); includes with a computable path
+ * resolve through PHP's include search order (`php-includes.ts`).
  *
  * @module lang-php/php-pack
  */
@@ -67,6 +68,24 @@ export const phpPack: LanguagePack = {
       verifiedAgainst: [`tree-sitter-php@${GRAMMAR_VERSION}`],
       verifiedOn: "2026-11-14",
       source: "https://www.php.net/manual/en/function.include.php",
+    },
+    // An include's search order: absolute and `./`/`../` paths as written, other relative paths in include_path, then the calling script's directory.
+    "include-search": {
+      verifiedAgainst: ["PHP manual"],
+      verifiedOn: "2026-11-14",
+      source: "https://www.php.net/manual/en/function.include.php",
+    },
+    // `include_path` from set_include_path(), ini_set(), php.ini, `.user.ini` and `.htaccess` `php_value`.
+    "include-path": {
+      verifiedAgainst: ["PHP manual"],
+      verifiedOn: "2026-11-14",
+      source: "https://www.php.net/manual/en/ini.core.php#ini.include-path",
+    },
+    // `__DIR__` and `__FILE__`; `dirname()` with its `levels` argument.
+    "magic-constants": {
+      verifiedAgainst: ["PHP manual"],
+      verifiedOn: "2026-11-14",
+      source: "https://www.php.net/manual/en/language.constants.magic.php",
     },
     // `use` imports: classes and namespaces, `use function`, `use const`, group use and `as` aliases.
     "use-imports": {

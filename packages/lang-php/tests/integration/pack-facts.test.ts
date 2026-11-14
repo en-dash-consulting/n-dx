@@ -45,15 +45,15 @@ describe("php pack facts", () => {
     ]);
   });
 
-  it("resolves class references to declared classes without Composer, never includes", async (ctx) => {
+  it("resolves class references to declared classes without Composer, and includes to files that exist", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const references = [...(await facts()).values()].flatMap((f) => [
       ...(f.imports?.files ?? []).map((r) => `${f.path} -> ${r.to} ${r.symbols.join(",")}`),
       ...(f.imports?.external ?? []).map((e) => `${f.path} => ${e.package} ${e.symbols.join(",")}`),
     ]);
     expect(references).toEqual([
-      // `new Shop_Cart()`; the require_once of lib/Shop/Cart.php is not an edge.
-      "php52/index.php -> php52/lib/Shop/Cart.php Shop_Cart",
+      // `new Shop_Cart()` and `require_once(dirname(__FILE__) . '/lib/Shop/Cart.php')`; the other includes name no fixture file.
+      "php52/index.php -> php52/lib/Shop/Cart.php *,Shop_Cart",
       // The fixture declares Acme\Shop only, so the missing Acme\Billing, Acme\Shipping and Acme\Support names share its
       // root namespace but not its namespace: a library's, external.
       "php53/src/Shop/Order.php => php:Acme Acme\\Billing\\Gateway,Acme\\Billing\\Invoice,Acme\\Shipping\\Carrier,Acme\\Shipping\\MAX_WEIGHT,Acme\\Shipping\\Parcel,Acme\\Shipping\\weigh,Acme\\Support\\CURRENCY,Acme\\Support\\Clock,Acme\\Support\\money_format",

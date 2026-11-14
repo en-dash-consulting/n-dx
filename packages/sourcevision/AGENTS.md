@@ -67,8 +67,9 @@ is Python-specific.
 ### PHP
 
 `@n-dx/lang-php` is an opt-in `KNOWN_PACKS` entry with no fallback parser.
-Installed and running, its `use` imports and class references reach
-imports.json through `buildPackImportGraph` as edges (Composer autoload) and
+Installed and running, its `use` imports, class references and computable
+includes reach imports.json through `buildPackImportGraph` as edges
+(Composer autoload, PHP's include search order) and
 `php:<namespace>` externals, other languages' entries unchanged, and it joins
 `analysedLanguages`; missing and unlisted, it is only suggested and every
 artifact is unchanged (`tests/integration/php-pack-imports.test.ts`). Over

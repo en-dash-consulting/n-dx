@@ -3,8 +3,8 @@
  * (`queries/php/`): each include with its path expression as written, and
  * each `use` import with its qualified name, form and alias.
  *
- * `php-resolver.ts` resolves the `use` imports; includes are reported as
- * written and not resolved.
+ * `php-resolver.ts` resolves the `use` imports, and `php-includes.ts` the
+ * includes whose path is computable.
  *
  * @module lang-php/php-imports
  */

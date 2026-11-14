@@ -143,6 +143,123 @@
             }
           },
           {
+            "name": "include.define",
+            "nodeType": "function_call_expression",
+            "text": "define('SHOP_ROOT', dirname(__FILE__))",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 38
+            }
+          },
+          {
+            "name": "include.define_name",
+            "nodeType": "string",
+            "text": "'SHOP_ROOT'",
+            "start": {
+              "line": 8,
+              "column": 7
+            },
+            "end": {
+              "line": 8,
+              "column": 18
+            }
+          },
+          {
+            "name": "include.define_value",
+            "nodeType": "function_call_expression",
+            "text": "dirname(__FILE__)",
+            "start": {
+              "line": 8,
+              "column": 20
+            },
+            "end": {
+              "line": 8,
+              "column": 37
+            }
+          },
+          {
+            "name": "include.define",
+            "nodeType": "function_call_expression",
+            "text": "define(\"SHOP_VERSION\", '1.0')",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 29
+            }
+          },
+          {
+            "name": "include.define_name",
+            "nodeType": "encapsed_string",
+            "text": "\"SHOP_VERSION\"",
+            "start": {
+              "line": 9,
+              "column": 7
+            },
+            "end": {
+              "line": 9,
+              "column": 21
+            }
+          },
+          {
+            "name": "include.define_value",
+            "nodeType": "string",
+            "text": "'1.0'",
+            "start": {
+              "line": 9,
+              "column": 23
+            },
+            "end": {
+              "line": 9,
+              "column": 28
+            }
+          },
+          {
+            "name": "include.define",
+            "nodeType": "function_call_expression",
+            "text": "define('SHOP_DEBUG', false)",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 31
+            }
+          },
+          {
+            "name": "include.define_name",
+            "nodeType": "string",
+            "text": "'SHOP_DEBUG'",
+            "start": {
+              "line": 13,
+              "column": 11
+            },
+            "end": {
+              "line": 13,
+              "column": 23
+            }
+          },
+          {
+            "name": "include.define_value",
+            "nodeType": "boolean",
+            "text": "false",
+            "start": {
+              "line": 13,
+              "column": 25
+            },
+            "end": {
+              "line": 13,
+              "column": 30
+            }
+          },
+          {
             "name": "import.include",
             "nodeType": "include_expression",
             "text": "include SHOP_ROOT . '/local.php'",
@@ -3091,6 +3208,84 @@
             }
           },
           {
+            "name": "include.const",
+            "nodeType": "const_element",
+            "text": "STATUS_OPEN = 'open'",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 26
+            }
+          },
+          {
+            "name": "include.const_name",
+            "nodeType": "name",
+            "text": "STATUS_OPEN",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 17
+            }
+          },
+          {
+            "name": "include.const_value",
+            "nodeType": "string",
+            "text": "'open'",
+            "start": {
+              "line": 14,
+              "column": 20
+            },
+            "end": {
+              "line": 14,
+              "column": 26
+            }
+          },
+          {
+            "name": "include.const",
+            "nodeType": "const_element",
+            "text": "STATUS_PAID = 'paid'",
+            "start": {
+              "line": 14,
+              "column": 28
+            },
+            "end": {
+              "line": 14,
+              "column": 48
+            }
+          },
+          {
+            "name": "include.const_name",
+            "nodeType": "name",
+            "text": "STATUS_PAID",
+            "start": {
+              "line": 14,
+              "column": 28
+            },
+            "end": {
+              "line": 14,
+              "column": 39
+            }
+          },
+          {
+            "name": "include.const_value",
+            "nodeType": "string",
+            "text": "'paid'",
+            "start": {
+              "line": 14,
+              "column": 42
+            },
+            "end": {
+              "line": 14,
+              "column": 48
+            }
+          },
+          {
             "name": "import.require",
             "nodeType": "require_expression",
             "text": "require $file",
@@ -4601,6 +4796,45 @@
             "end": {
               "line": 3,
               "column": 23
+            }
+          },
+          {
+            "name": "include.define",
+            "nodeType": "function_call_expression",
+            "text": "define('GLOBAL_CART', true)",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 27,
+              "column": 31
+            }
+          },
+          {
+            "name": "include.define_name",
+            "nodeType": "string",
+            "text": "'GLOBAL_CART'",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 24
+            }
+          },
+          {
+            "name": "include.define_value",
+            "nodeType": "boolean",
+            "text": "true",
+            "start": {
+              "line": 27,
+              "column": 26
+            },
+            "end": {
+              "line": 27,
+              "column": 30
             }
           }
         ],
@@ -6550,6 +6784,7 @@
         {
           "to": "php52/lib/Shop/Cart.php",
           "symbols": [
+            "*",
             "Shop_Cart"
           ]
         }

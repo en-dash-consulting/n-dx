@@ -2,7 +2,8 @@
  * PHP through inventory and imports. Without the PHP pack, inventory.json and
  * imports.json are what they were before PHP was a pack, and the pack is only
  * suggested. With it, PHP class references resolve through the Composer
- * autoload into edges and `php:` externals beside the TypeScript ones, which
+ * autoload, and literal includes to files, into edges and `php:` externals
+ * beside the TypeScript ones, which
  * are unchanged, and the imports phase records PHP as analysed.
  */
 
@@ -99,8 +100,9 @@ describe("PHP files with the PHP pack registered", () => {
     const before = await imports(WITHOUT_PHP);
     const loaded = await imports(KNOWN_PACKS.slice());
     const isPhp = (path: string): boolean => path.endsWith(".php");
-    // The include is reported as written, not as an edge; the constructor's type is.
+    // The literal include between HTML is an edge, as is the constructor's type.
     expect(loaded.imports.edges.filter((e) => isPhp(e.from)).map((e) => `${e.from} -> ${e.to} ${e.type}`)).toEqual([
+      "index.php -> lib/Db.php static",
       "lib/Repo.php -> lib/Db.php static",
     ]);
     expect(loaded.imports.external.filter((e) => e.package.startsWith("php:"))).toEqual([
