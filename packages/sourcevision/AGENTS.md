@@ -67,14 +67,18 @@ is Python-specific.
 ### PHP
 
 `@n-dx/lang-php` is an opt-in `KNOWN_PACKS` entry with no fallback parser.
-It reports imports as written and resolves none, so with or without it
-imports.json is unchanged; installed and running, it joins
-`analysedLanguages` with no edges, and missing and unlisted, it is only
-suggested (`tests/integration/php-pack-imports.test.ts`). Over the pinned
-corpus (`php-corpus.json`, `php5` marking the PHP 5 era repositories),
-`scripts/php-corpus-report.mjs` measures the clean-parse rate of the files
-analyze would parse, per repository and for the PHP 5 repositories against
-decision D4's 99.5% bar.
+Installed and running, its `use` imports and class references reach
+imports.json through `buildPackImportGraph` as edges (Composer autoload) and
+`php:<namespace>` externals, other languages' entries unchanged, and it joins
+`analysedLanguages`; missing and unlisted, it is only suggested and every
+artifact is unchanged (`tests/integration/php-pack-imports.test.ts`). Over
+the pinned corpus (`php-corpus.json`, `php5` marking the PHP 5 era
+repositories), `scripts/php-corpus-report.mjs` measures the clean-parse rate
+of the files analyze would parse, per repository and for the PHP 5
+repositories against decision D4's 99.5% bar, and
+`scripts/php-resolve-report.mjs` the resolver: internal resolution rate per
+repository (`no composer` without a manifest), unresolved names and a seeded
+hand-check sample.
 
 ### The Terraform model in infrastructure.json
 
