@@ -196,10 +196,14 @@ items:
     lastModified: "2026-11-13T23:12:34.432Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dec010f7-03e8-41d5-85c8-d40526f58c0e":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T05:44:44.491Z"
-    activeIntervals: [{"start":"2026-11-14T05:44:44.491Z"}]
-    lastModified: "2026-11-14T05:44:45.563Z"
+    completedAt: "2026-11-14T05:50:27.953Z"
+    endedAt: "2026-11-14T05:50:27.953Z"
+    activeIntervals: [{"end":"2026-11-14T05:50:27.953Z","start":"2026-11-14T05:44:44.491Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "d1e4224a0: lookups classified found / no source / transient; only the first two cached (createHostIdentityCache); transient throws HostIdentityLookupError, which runInValidationSlot's fail-open path turns into an unslotted run with slotWarning; timeout 10 s; module header, TESTING.md, docs/packages/hench.md updated. Change 10a4e198 closed."
+    lastModified: "2026-11-14T05:50:27.953Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed2f3d51-97a5-4f5b-8b98-2ff2e2667a10":
     status: "completed"
