@@ -152,7 +152,8 @@ export async function validateCompletion(
         testCommand,
         withSlot({ cwd: projectDir, timeout, env: withTestMaxWorkers(repoCommandEnv(projectDir), options.testMaxWorkers) }),
       ));
-    // Fails closed, like a command that never launched: nothing was tested.
+    // Only an interrupted slot wait lands here (a slot that cannot be taken
+    // runs the command without it). Fails closed: nothing was tested.
     if (!slotRun.ok) {
       return {
         valid: false,

@@ -12,7 +12,7 @@ import {
   VALIDATION_SLOT_ENV,
   VALIDATION_SLOT_HOLDER_FILE,
 } from "../../src/process/validation-slot.js";
-import { describeValidationSlotWait, type ValidationSlotRunOptions } from "../../src/process/validation-run.js";
+import { describeValidationSlotWait, runInValidationSlot, type ValidationSlotRunOptions } from "../../src/process/validation-run.js";
 import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
 
 describe("Test Suite Gate Integration", () => {
@@ -385,37 +385,68 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
   });
 
   /** A slot directory that cannot be created: its parent is a regular file. */
-  const unwritableSlot = () => slot({ slotDir: join(projectDir, "src", "a.ts", "slot") });
-  const writesRan = `node -e "require('fs').writeFileSync('ran', '')"`;
+  const unwritableSlotDir = () => join(projectDir, "src", "a.ts", "slot");
+  const unwritableSlot = (warnings: string[]) =>
+    slot({ slotDir: unwritableSlotDir(), onWarning: (w) => warnings.push(w) });
+  /** Writes `ran`, then exits with `code`. */
+  const writesRan = (code: number) => `node -e "require('fs').writeFileSync('ran', ''); process.exit(${code})"`;
+  const expectSkippedSlotWarning = (warnings: string[]) => {
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/skipped the validation slot and ran without it/);
+    expect(warnings[0]).toContain(unwritableSlotDir());
+  };
 
-  it("reports a slot that cannot be taken as a gate that did not run, without throwing", async () => {
-    const result = await runTestGate({
-      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan, validationSlot: unwritableSlot(),
-    });
-    expect(result.ran).toBe(false);
-    expect(result.passed).toBe(false);
-    expect(result.error).toMatch(/could not take the validation slot/);
-    expect(existsSync(join(projectDir, "ran"))).toBe(false);
+  it("returns the skipped slot as a slotWarning beside the command's result", async () => {
+    const run = await runInValidationSlot(unwritableSlot([]), async (withSlot) => withSlot({ env: {} }).env);
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(run.value[VALIDATION_SLOT_ENV]).toBeUndefined();
+    expect(run.timing).toBeUndefined();
+    expect(run.slotWarning).toMatch(/skipped the validation slot and ran without it/);
+    expect(run.slotWarning).toContain(unwritableSlotDir());
   });
 
-  it("reports a slot that cannot be taken from post-task tests and the completion check", async () => {
-    const post = await runPostTaskTests({
-      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan, validationSlot: unwritableSlot(),
+  it.each([
+    { code: 0, passed: true },
+    { code: 1, passed: false },
+  ])("runs the gate without a slot that cannot be taken and reports its real result (exit $code)", async ({ code, passed }) => {
+    const warnings: string[] = [];
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan(code), validationSlot: unwritableSlot(warnings),
     });
-    expect(post.ran).toBe(false);
-    expect(post.error).toMatch(/could not take the validation slot/);
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(passed);
+    expect(existsSync(join(projectDir, "ran"))).toBe(true);
+    expectSkippedSlotWarning(warnings);
+  });
 
+  it("runs post-task tests without a slot that cannot be taken", async () => {
+    const warnings: string[] = [];
+    const post = await runPostTaskTests({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan(1), validationSlot: unwritableSlot(warnings),
+    });
+    expect(post.ran).toBe(true);
+    expect(post.passed).toBe(false);
+    expectSkippedSlotWarning(warnings);
+  });
+
+  it.each([
+    { code: 0, valid: true },
+    { code: 1, valid: false },
+  ])("runs the completion check without a slot that cannot be taken and reports its real result (exit $code)", async ({ code, valid }) => {
     const git = (...args: string[]) =>
       execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
     git("init", "-q");
     git("add", "src");
     git("commit", "-qm", "init");
     await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
-    const completion = await validateCompletion(projectDir, { testCommand: writesRan, validationSlot: unwritableSlot() });
-    expect(completion.valid).toBe(false);
-    expect(completion.testsRan).toBe(false);
-    expect(completion.reason).toMatch(/could not take the validation slot/);
-    expect(existsSync(join(projectDir, "ran"))).toBe(false);
+    const warnings: string[] = [];
+    const completion = await validateCompletion(projectDir, { testCommand: writesRan(code), validationSlot: unwritableSlot(warnings) });
+    expect(completion.valid).toBe(valid);
+    expect(completion.testsRan).toBe(true);
+    expect(completion.testsPassed).toBe(valid);
+    expect(existsSync(join(projectDir, "ran"))).toBe(true);
+    expectSkippedSlotWarning(warnings);
   });
 
   it("keeps the command's result when the slot cannot be released, and warns", async () => {
