@@ -35,7 +35,7 @@ function git(cwd: string, ...args: string[]): string {
 interface GateCall {
   filesChanged: string[];
   testCommand?: string;
-  validationSlot?: { slotDir: string; signal?: AbortSignal };
+  validationSlot?: { slotDir?: string; projectDir: string; signal?: AbortSignal };
 }
 
 describe("gate-only retry", () => {
@@ -215,7 +215,9 @@ describe("gate-only retry", () => {
 
     expect(cli.invocations).toHaveLength(0);
     expect(gateCalls).toHaveLength(1);
-    expect(gateCalls[0]!.validationSlot?.slotDir).toMatch(/validation-slot$/);
+    // No directory yet: the slot resolves this host's when it is taken.
+    expect(gateCalls[0]!.validationSlot?.projectDir).toBe(projectDir);
+    expect(gateCalls[0]!.validationSlot?.slotDir).toBeUndefined();
     expect(gateCalls[0]!.validationSlot?.signal).toBe(controller.signal);
   });
 

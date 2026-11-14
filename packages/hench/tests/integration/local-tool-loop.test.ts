@@ -244,7 +244,7 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     stubChatEndpoint(writeAndComplete);
     const { acquireValidationSlot } = await import("../../src/process/validation-slot.js");
     const { resolveValidationSlotDir } = await import("../../src/process/validation-slot-dir.js");
-    const lease = await acquireValidationSlot({ slotDir: resolveValidationSlotDir(), projectDir: "/elsewhere", env: {} });
+    const lease = await acquireValidationSlot({ slotDir: await resolveValidationSlotDir(), projectDir: "/elsewhere", env: {} });
     // The first Ctrl-C: run.ts aborts the run's signal. It fires here as soon
     // as the gate reports that it is waiting, and nothing else stops the wait.
     const controller = new AbortController();

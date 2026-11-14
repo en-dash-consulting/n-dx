@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile, access } from "node:fs/promises";
-import { hostname, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -9,6 +9,7 @@ import {
   currentBootTimeMs,
   readValidationSlotHolder,
   ValidationSlotAbortedError,
+  VALIDATION_SLOT_DIR_ENV,
   VALIDATION_SLOT_ENV,
   VALIDATION_SLOT_HOLDER_FILE,
   VALIDATION_SLOT_DIRNAME,
@@ -16,11 +17,6 @@ import {
   type ValidationSlotHolder,
   type ValidationSlotWait,
 } from "../../../src/process/validation-slot.js";
-import {
-  resolveValidationSlotDir,
-  validationSlotHostDirname,
-  VALIDATION_SLOT_FALLBACK_HOST,
-} from "../../../src/process/validation-slot-dir.js";
 
 const MODULE_URL = pathToFileURL(
   fileURLToPath(new URL("../../../src/process/validation-slot.ts", import.meta.url)),
@@ -144,9 +140,13 @@ describe("acquireValidationSlot — holding and releasing", () => {
     expect(await holderRaw()).toBe(other);
   });
 
-  it("childEnv exports the token as NDX_VALIDATION_SLOT", async () => {
+  it("childEnv exports the token as NDX_VALIDATION_SLOT and the slot directory as NDX_VALIDATION_SLOT_DIR", async () => {
     const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {} });
-    expect(lease.childEnv({ PATH: "/bin" })).toEqual({ PATH: "/bin", [VALIDATION_SLOT_ENV]: lease.token });
+    expect(lease.childEnv({ PATH: "/bin" })).toEqual({
+      PATH: "/bin",
+      [VALIDATION_SLOT_ENV]: lease.token,
+      [VALIDATION_SLOT_DIR_ENV]: slotDir,
+    });
     await lease.release();
   });
 });
@@ -376,13 +376,67 @@ describe("acquireValidationSlot — nesting", () => {
     await lease.release();
   });
 
-  it("ignores a token for a different slot directory", async () => {
+  it("ignores a token for a different slot directory when no directory is inherited", async () => {
     const otherDir = join(root, "other-slot");
     const outer = await acquireValidationSlot({ slotDir: otherDir, projectDir: "/proj", env: {} });
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: outer.childEnv({}) });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: { [VALIDATION_SLOT_ENV]: outer.token }, signal: bounded() });
     expect(lease.nested).toBe(false);
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
     await lease.release();
+    await outer.release();
+  });
+
+  it("nests in the inherited NDX_VALIDATION_SLOT_DIR even when its own directory resolves differently", async () => {
+    // The parent resolved one host directory; this child resolves another
+    // (its hostname changed, say). It must nest, not wait on its parent.
+    const parentDir = join(root, "parent-host");
+    const outer = await acquireValidationSlot({ slotDir: parentDir, projectDir: "/proj", env: {} });
+    const before = await readFile(join(parentDir, VALIDATION_SLOT_HOLDER_FILE), "utf-8");
+    const inner = await acquireValidationSlot({
+      slotDir,
+      projectDir: "/proj",
+      env: outer.childEnv({}),
+      signal: bounded(),
+      onWait: () => {
+        throw new Error("a nested acquire must not wait");
+      },
+    });
+    expect(inner).toMatchObject({ nested: true, token: outer.token, slotDir: parentDir, queueWaitMs: 0 });
+    expect(inner.childEnv({})).toEqual(outer.childEnv({}));
+    expect(await holderRaw()).toBeNull();
+    await inner.release();
+    expect(await readFile(join(parentDir, VALIDATION_SLOT_HOLDER_FILE), "utf-8")).toBe(before);
+    await outer.release();
+  });
+
+  it("takes its own directory's slot when the inherited directory's holder is dead", async () => {
+    const parentDir = join(root, "parent-host");
+    await mkdir(parentDir, { recursive: true });
+    await writeFile(
+      join(parentDir, VALIDATION_SLOT_HOLDER_FILE),
+      JSON.stringify({ version: 1, token: "dead-parent", pid: deadPid(), child: null, startedAt: "2026-11-12T00:00:00.000Z", bootedAt: currentBootTimeMs(), projectDir: "/proj" }),
+      "utf-8",
+    );
+    const lease = await acquireValidationSlot({
+      slotDir,
+      projectDir: "/proj",
+      env: { [VALIDATION_SLOT_ENV]: "dead-parent", [VALIDATION_SLOT_DIR_ENV]: parentDir },
+      signal: bounded(),
+    });
+    expect(lease).toMatchObject({ nested: false, slotDir });
+    expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
+    await lease.release();
+  });
+
+  it("ignores an inherited directory that is not absolute", async () => {
+    const outer = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {} });
+    const inner = await acquireValidationSlot({
+      slotDir,
+      projectDir: "/proj",
+      env: { [VALIDATION_SLOT_ENV]: outer.token, [VALIDATION_SLOT_DIR_ENV]: "relative/slot" },
+      signal: bounded(),
+    });
+    expect(inner).toMatchObject({ nested: true, slotDir });
     await outer.release();
   });
 });
@@ -528,32 +582,5 @@ describe("acquireValidationSlot — two processes", () => {
     second.child.stdin!.write("release\n");
     await second.next("released");
     await expect(access(join(slotDir, VALIDATION_SLOT_HOLDER_FILE))).rejects.toThrow();
-  });
-});
-
-describe("resolveValidationSlotDir", () => {
-  it("is this host's directory under validation-slot in the ndx home the environment names", () => {
-    expect(resolveValidationSlotDir({ NDX_HOME: root }, "build-01")).toBe(join(root, VALIDATION_SLOT_DIRNAME, "build-01"));
-    expect(resolveValidationSlotDir({ NDX_HOME: root })).toBe(
-      join(root, VALIDATION_SLOT_DIRNAME, validationSlotHostDirname(hostname())),
-    );
-  });
-
-  it("gives hosts sharing one ndx home separate directories", () => {
-    expect(resolveValidationSlotDir({ NDX_HOME: root }, "host-a")).not.toBe(resolveValidationSlotDir({ NDX_HOME: root }, "host-b"));
-  });
-});
-
-describe("validationSlotHostDirname", () => {
-  it("lower-cases the hostname and replaces characters outside [a-z0-9._-]", () => {
-    expect(validationSlotHostDirname("Ryans-MacBook-Pro.local")).toBe("ryans-macbook-pro.local");
-    expect(validationSlotHostDirname("build_box 7/../x\\y:z")).toBe("build_box-7-..-x-y-z");
-    expect(validationSlotHostDirname("hôte")).toBe("h-te");
-  });
-
-  it("falls back when the hostname is empty or would name the slot root or its parent", () => {
-    for (const name of ["", ".", ".."]) {
-      expect(validationSlotHostDirname(name)).toBe(VALIDATION_SLOT_FALLBACK_HOST);
-    }
   });
 });

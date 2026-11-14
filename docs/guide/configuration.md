@@ -286,7 +286,7 @@ The test gate can be scoped and its flakes absorbed with `hench.testGate.command
 ndx config hench.testGate.maxWorkers 2 .
 ```
 
-`hench.testGate.hostSlot` (boolean, default `false`) makes hench admit one test run at a time per OS user on the host. The slot is shared by every hench process and every worktree, so several worktrees gating at once queue instead of each claiming the machine. It serializes the test gate (each attempt and the re-run), the post-task tests and the completion test run. It does not serialize an agent's own shell commands, such as a suite it starts itself; only `hench.testGate.maxWorkers` bounds those. While a run waits it prints who holds the slot, and the run record keeps the wait (`queueMs`) apart from the run time (`executionMs`). With it off, nothing is created and nothing changes.
+`hench.testGate.hostSlot` (boolean, default `false`) makes hench admit one test run at a time per OS user on the host. The slot is shared by every hench process and every worktree, so several worktrees gating at once queue instead of each claiming the machine. It serializes the test gate (each attempt and the re-run), the post-task tests and the completion test run. It does not serialize an agent's own shell commands, such as a suite it starts itself; only `hench.testGate.maxWorkers` bounds those. While a run waits it prints who holds the slot, and the run record keeps the wait (`queueMs`) apart from the run time (`executionMs`). The slot is a directory under `<ndx home>/validation-slot/`, named after a hash of the machine id (the hostname when none can be read), so a network change that renames the host does not split it. With it off, nothing is created and nothing changes.
 
 ```sh
 ndx config hench.testGate.hostSlot true .
