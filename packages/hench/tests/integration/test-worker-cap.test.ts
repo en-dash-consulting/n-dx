@@ -12,8 +12,14 @@ import { TEST_MAX_WORKERS_ENV } from "../../src/process/test-workers.js";
 import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
 
 /**
- * `hench.testGate.maxWorkers` reaches every test command hench runs as
+ * The leaf functions hench runs test commands through apply a given cap as
  * `NDX_TEST_MAX_WORKERS`, and an unset cap leaves the environment alone.
+ *
+ * These cases pass the cap in directly. That callers pass
+ * `hench.testGate.maxWorkers` is pinned elsewhere: finalizeRun's gate and
+ * post-task tests in test-gate-flaky-rerun.test.ts ("hench.testGate.maxWorkers
+ * through finalizeRun"), and the vendor CLI session's environment in
+ * tests/unit/agent/vendor-cli-env.test.ts (`resolveSessionCliEnv`).
  *
  * Each command is a probe that exits 0 only when it sees the expected value.
  * The lower of the cap and a valid inherited value wins, so the cap used is 1:
