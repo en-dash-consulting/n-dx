@@ -26,6 +26,15 @@ items:
     resolutionDetail: "createCommandExecutor(projectDir, testMaxWorkers) wraps env in withTestMaxWorkers; rex_update_status passes options.testMaxWorkers. Probe cases added. Commit 9f67254e0."
     lastModified: "2026-11-12T17:57:54.099Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4cabcef6-50cd-46b6-b78a-334e047774cb":
+    lastModified: "2026-11-14T04:58:42.308Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
+    lastModified: "2026-11-14T04:58:43.847Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "61977eb2-9bdc-4f1d-9bf0-5be0fc593e0b":
+    lastModified: "2026-11-14T04:58:40.741Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "85839d4a-3b74-4e79-bb93-838726de17cf":
     lastModified: "2026-11-12T17:28:05.138Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -42,7 +51,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     createdAt: "2026-11-12T17:26:37.734Z"
-    lastModified: "2026-11-12T17:57:26.059Z"
+    lastModified: "2026-11-14T04:58:43.847Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d34d2902-408a-4b05-9de9-7b2932aae778":
     status: "completed"
