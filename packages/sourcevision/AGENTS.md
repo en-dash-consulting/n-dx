@@ -67,10 +67,10 @@ is Python-specific.
 ### PHP
 
 `@n-dx/lang-php` is an opt-in `KNOWN_PACKS` entry with no fallback parser.
-It produces no facts yet, so with or without it PHP files get inventory only
-and every artifact is unchanged; installed, it is reported as not producing
-imports, and missing and unlisted, it is only suggested
-(`tests/integration/php-pack-imports.test.ts`).
+It reports imports as written and resolves none, so with or without it
+imports.json is unchanged; installed and running, it joins
+`analysedLanguages` with no edges, and missing and unlisted, it is only
+suggested (`tests/integration/php-pack-imports.test.ts`).
 
 ### The Terraform model in infrastructure.json
 

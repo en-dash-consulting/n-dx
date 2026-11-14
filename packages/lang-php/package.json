@@ -32,6 +32,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:update-goldens": "node ../lang-runtime/scripts/update-pack-goldens.mjs",
     "validate": "tsc --noEmit && vitest run",
     "prepare": "pnpm run build"
   },

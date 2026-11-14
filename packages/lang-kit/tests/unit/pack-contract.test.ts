@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DECLARED_FACT_KINDS,
   FACT_KINDS,
+  IMPORT_FORMS,
   IMPORT_GUARDS,
   PRODUCED_FACT_KINDS,
   SYMBOL_KINDS,
@@ -57,6 +58,10 @@ describe("pack contract", () => {
 
   it("guards an import that runs only under a condition", () => {
     expect([...IMPORT_GUARDS]).toEqual(["type-checking", "optional", "conditional"]);
+  });
+
+  it("names PHP's include forms and use imports as import forms", () => {
+    expect([...IMPORT_FORMS]).toEqual(["include", "include_once", "require", "require_once", "use", "use function", "use const"]);
   });
 
   it("mentions no parser machinery", () => {

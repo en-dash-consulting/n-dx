@@ -87,11 +87,10 @@ describe("tree-sitter-php grammar (WASM)", () => {
       if (result.status !== "parsed") return;
       expect(result.hasErrorNodes).toBe(false);
       expect(result.hasMissingNodes).toBe(false);
-      expect(result.captures).toEqual({});
     });
   }
 
-  it("runs through the pack entry and returns one fact record per file, with no facts in it", async (ctx) => {
+  it("runs through the pack entry and reports imports as written, with no import edges", async (ctx) => {
     skipUnlessGrammar(ctx, PHP_WASM);
     const projectDir = mkdtempSync(join(tmpdir(), "lang-php-entry-"));
     try {
@@ -102,7 +101,14 @@ describe("tree-sitter-php grammar (WASM)", () => {
 
       expect(result.degraded).toBeUndefined();
       expect(result.unparsed).toEqual([]);
-      expect(result.facts).toEqual([{ path: "users.php" }, { path: "OrderService.php" }]);
+      expect(result.facts.map((f) => f.path)).toEqual(["users.php", "OrderService.php"]);
+      const written = result.facts.map((f) => f.imports?.written?.map((w) => `${w.form} ${w.specifier}`));
+      expect(written).toEqual([
+        ["include 'config.inc'", 'require_once "lib/db.php"'],
+        ["use App\\Billing\\Invoice", "use function App\\Support\\money"],
+      ]);
+      for (const f of result.facts) expect([f.imports?.files, f.imports?.external]).toEqual([[], []]);
+      expect(result.facts[0]?.symbols?.map((s) => `${s.kind} ${s.name}`)).toEqual(["function list_users"]);
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }
