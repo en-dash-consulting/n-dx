@@ -27,10 +27,14 @@ items:
     lastModified: "2026-11-12T17:57:54.099Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4cabcef6-50cd-46b6-b78a-334e047774cb":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T05:03:40.404Z"
-    activeIntervals: [{"start":"2026-11-14T05:03:40.404Z"}]
-    lastModified: "2026-11-14T05:03:41.090Z"
+    completedAt: "2026-11-14T05:08:30.435Z"
+    endedAt: "2026-11-14T05:08:30.435Z"
+    activeIntervals: [{"end":"2026-11-14T05:08:30.435Z","start":"2026-11-14T05:03:40.404Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "finalizeRun-level maxWorkers cases in test-gate-flaky-rerun.test.ts (mutation-checked against both shared.ts sites); resolveSessionCliEnv extracted to store/project-config.ts with unit tests; test-worker-cap.test.ts header now points at them."
+    lastModified: "2026-11-14T05:08:30.435Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
     lastModified: "2026-11-14T04:58:43.847Z"
