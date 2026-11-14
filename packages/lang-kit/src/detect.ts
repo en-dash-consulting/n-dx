@@ -13,7 +13,8 @@
  *     `composer.json` → PHP)
  * 3. Multiple markers present → file-count tiebreak (whichever has more source files)
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No other marker, a `.php` file at the root → PHP
+ * 5. No other marker, a `.php` file at the root or a docroot `index.php`
+ *    (`public/`, `web/`, `htdocs/`, `www/`, `public_html/`) → PHP
  * 6. Fallback → TypeScript/JS (backward-compatible default)
  *
  * Multi-language detection (`detectLanguages`) returns ALL detected language
@@ -36,7 +37,7 @@ import { pythonConfig } from "./python.js";
 import { javaConfig, javaSecondaryConfig } from "./java.js";
 import { terraformConfig } from "./terraform.js";
 import { csharpConfig } from "./csharp.js";
-import { phpConfig, PHP_REPOSITORY_ONLY_EXTENSIONS } from "./php.js";
+import { phpConfig, PHP_DOCROOT_DIRECTORIES, PHP_REPOSITORY_ONLY_EXTENSIONS } from "./php.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -164,17 +165,22 @@ async function hasPhpMarker(rootDir: string): Promise<boolean> {
 }
 
 /**
- * A `.php` file at the root (`index.php`, or any other)? The weak PHP marker:
- * consulted only when no other language's marker matched, so a TypeScript
- * repository with a few PHP files keeps its detection.
+ * The weak PHP marker: a `.php` file at the root (`index.php`, or any other),
+ * or an `index.php` directly inside one of {@link PHP_DOCROOT_DIRECTORIES}.
+ * Consulted only when no other language's marker matched, so a TypeScript
+ * repository with a few PHP files keeps its detection. Never walks deeper.
  */
-async function hasRootPhpFile(rootDir: string): Promise<boolean> {
+async function hasWeakPhpMarker(rootDir: string): Promise<boolean> {
   try {
     const entries = await readdir(rootDir, { withFileTypes: true });
-    return entries.some((e) => e.isFile() && e.name.endsWith(".php"));
+    if (entries.some((e) => e.isFile() && e.name.endsWith(".php"))) return true;
   } catch {
     return false; // Unreadable — no marker.
   }
+  for (const docroot of PHP_DOCROOT_DIRECTORIES) {
+    if (await fileExists(join(rootDir, docroot, "index.php"))) return true;
+  }
+  return false;
 }
 
 /**
@@ -305,15 +311,24 @@ const FALLBACK_LANGUAGE_EXTENSIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * PHP source with no weak PHP marker (`src/app.php` alone): it keeps a
+ * markerless repository from being Terraform alone, as it did before PHP had
+ * a config. Extensions other ecosystems share are left out.
+ */
+const MARKERLESS_PHP_EXTENSIONS: ReadonlySet<string> = new Set(
+  [...phpConfig.extensions].filter((ext) => !PHP_REPOSITORY_ONLY_EXTENSIONS.has(ext)),
+);
+
+/**
  * Is `fileName` source the TypeScript fallback is for: authored JS/TS (not
- * minified), or a language with no config here? A markerless repository
- * with any of these keeps the fallback primary, however many Terraform
- * files it has.
+ * minified), a language with no config here, or PHP below the root? A
+ * markerless repository with any of these keeps the fallback primary,
+ * however many Terraform files it has.
  */
 export function isFallbackSourceFile(fileName: string): boolean {
   if (fileName.endsWith(".min.js")) return false;
   const ext = extname(fileName);
-  return typescriptConfig.extensions.has(ext) || FALLBACK_LANGUAGE_EXTENSIONS.has(ext);
+  return typescriptConfig.extensions.has(ext) || FALLBACK_LANGUAGE_EXTENSIONS.has(ext) || MARKERLESS_PHP_EXTENSIONS.has(ext);
 }
 
 /**
@@ -352,7 +367,7 @@ async function markerlessTerraform(search: ProjectFileSearch): Promise<"none" | 
  * 2. Exactly one language marker present → that language
  * 3. Several markers present → file-count tiebreak
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No other marker, a `.php` file at the root → PHP
+ * 5. No other marker, a `.php` file at the root or a docroot `index.php` → PHP
  * 6. No markers → TypeScript/JS fallback (Terraform when the repository
  *    has Terraform files and no source the fallback is for)
  */
@@ -407,8 +422,8 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   // mixed repositories keep their existing primary language.
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
-  // Step 6: Then a `.php` file at the root, which outranks Terraform too.
-  if (await hasRootPhpFile(rootDir)) return phpConfig;
+  // Step 6: Then the weak PHP marker, which outranks Terraform too.
+  if (await hasWeakPhpMarker(rootDir)) return phpConfig;
 
   // Java and PHP outrank Terraform, and so does any of the fallback's source.
   if ((await markerlessTerraform(options.searchProjectFiles)) === "alone") return terraformConfig;
@@ -457,13 +472,13 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
     if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
   }
 
-  // No markers → Java, then PHP (a `.php` file at the root), then the
+  // No markers → Java, then PHP (the weak PHP marker), then the
   // TypeScript/JS fallback for backward compatibility, with Terraform beside
   // it; Terraform alone only when there is no fallback source at all (never
   // beside Java or PHP). Searched with the skip set of the result (see
   // markerlessTerraform).
   if (present.length === 0) {
-    const markerless = hasJava ? javaConfig : (await hasRootPhpFile(rootDir)) ? phpConfig : undefined;
+    const markerless = hasJava ? javaConfig : (await hasWeakPhpMarker(rootDir)) ? phpConfig : undefined;
     if (markerless) {
       const { terraform } = await options.searchProjectFiles([markerless], { count: false });
       return terraform > 0 ? [markerless, terraformConfig] : [markerless];
