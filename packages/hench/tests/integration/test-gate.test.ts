@@ -297,12 +297,13 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
   });
 
   it("starts the gate's timeout after admission: queue wait does not count", async () => {
-    await holdSlotFor(1_000);
+    await holdSlotFor(3_000);
     const result = await runTestGate({
-      projectDir, filesChanged: ["src/a.ts"], testCommand: probe, timeout: 800, validationSlot: slot(),
+      projectDir, filesChanged: ["src/a.ts"], testCommand: probe, timeout: 2_500, validationSlot: slot(),
     });
     expect(result.passed).toBe(true);
-    expect(result.queueMs).toBeGreaterThanOrEqual(900);
+    // Longer than the timeout, so a timeout that counted the wait would have fired.
+    expect(result.queueMs).toBeGreaterThanOrEqual(2_900);
   });
 
   it("reports the holder while waiting", async () => {
