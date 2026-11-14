@@ -21,16 +21,29 @@ import { verbose } from "../types/output.js";
 import {
   acquireValidationSlot,
   reclaimIfStale,
+  VALIDATION_SLOT_DIR_ENV,
   ValidationSlotAbortedError,
   type ValidationSlotLease,
   type ValidationSlotWait,
 } from "./validation-slot.js";
-import { resolveValidationSlotDir } from "./validation-slot-dir.js";
+import {
+  hostIdentity,
+  peekValidationSlotDir,
+  resolveValidationSlotDir,
+  validationSlotDirFromEnv,
+  type HostIdentityCache,
+} from "./validation-slot-dir.js";
 
 /** Where and how a validation run takes the slot. */
 export interface ValidationSlotRunOptions {
-  /** The slot directory. Omitted in production: `resolveValidationSlotDir()` when the slot is taken. */
+  /**
+   * The slot directory. Omitted in production: `resolveValidationSlotDir()`
+   * when the slot is taken, which is the absolute `NDX_VALIDATION_SLOT_DIR`
+   * this process was handed, without a host lookup, when there is one.
+   */
   slotDir?: string;
+  /** Where `NDX_VALIDATION_SLOT` and `NDX_VALIDATION_SLOT_DIR` are read from. Defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv;
   /** The project the validation runs for, recorded for whoever waits. */
   projectDir: string;
   /** The only thing that stops a wait: the run's interrupt (Ctrl-C, SIGTERM). There is no maximum wait. */
@@ -88,9 +101,10 @@ export async function runInValidationSlot<T>(
   let slotDir = slot.slotDir;
   const queueStarted = Date.now();
   try {
-    slotDir ??= await resolveValidationSlotDir();
+    slotDir ??= await resolveValidationSlotDir(slot.env);
     lease = await acquireValidationSlot({
       slotDir,
+      env: slot.env,
       projectDir: slot.projectDir,
       signal: slot.signal,
       onWait: slot.onWait,
@@ -211,19 +225,51 @@ async function releaseReportingFailure(
  * `hench.testGate.hostSlot` says, because the test runner takes the slot
  * unconditionally. Never waits and never throws; a failure is logged in
  * verbose mode only, since the spawn goes ahead either way.
+ *
+ * Never waits on the host lookup either: until this process has read the
+ * host's identity, the call starts the lookup and skips this reclaim, and a
+ * later spawn does it. `cache` is injectable for tests.
  */
-export async function reclaimHostValidationSlot(env: NodeJS.ProcessEnv = process.env): Promise<void> {
+export async function reclaimHostValidationSlot(
+  env: NodeJS.ProcessEnv = process.env,
+  cache: Pick<HostIdentityCache, "peek"> = hostIdentity,
+): Promise<void> {
   const onError = (err: unknown): void => verbose(`validation slot: could not check for a stale holder: ${describeReason(err)}`);
-  let slotDir: string;
-  try {
-    slotDir = await resolveValidationSlotDir(env);
-  } catch (err) {
-    onError(err);
+  const slotDir = peekValidationSlotDir(env, cache);
+  if (!slotDir) {
+    verbose("validation slot: this host's slot directory is not known yet; skipped the stale-holder check");
     return;
   }
   if (await reclaimIfStale(slotDir, { env, onError })) {
     verbose(`validation slot: cleared a stale holder in ${slotDir}`);
   }
+}
+
+/**
+ * Start reading this host's identity without waiting, so it is known by the
+ * time a run's first confined command spawns. Called when a confined run starts.
+ */
+export function startHostIdentityLookup(): void {
+  hostIdentity.peek();
+}
+
+/**
+ * `base` with `NDX_VALIDATION_SLOT_DIR` naming this host's slot directory, as
+ * hench resolved it from `hostEnv` on the host, for a command it confines:
+ * inside the sandbox the machine-id lookup may be refused or slow, and with
+ * the variable set a runner there uses the directory without one (rule 6).
+ * The directory only: a token is exported by an actual holder alone. `base`
+ * is returned unchanged when it already names an absolute directory (a
+ * holder's, through `withSlot`) or the host's identity is not read yet.
+ */
+export function withHostValidationSlotDir(
+  base: NodeJS.ProcessEnv,
+  hostEnv: NodeJS.ProcessEnv = process.env,
+  cache: Pick<HostIdentityCache, "peek"> = hostIdentity,
+): NodeJS.ProcessEnv {
+  if (validationSlotDirFromEnv(base)) return base;
+  const slotDir = peekValidationSlotDir(hostEnv, cache);
+  return slotDir ? { ...base, [VALIDATION_SLOT_DIR_ENV]: slotDir } : base;
 }
 
 /** The slot options `config` asks for, or undefined when `hench.testGate.hostSlot` is off. */

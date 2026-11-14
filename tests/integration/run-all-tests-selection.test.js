@@ -167,10 +167,11 @@ if (process.env.FAKE_PNPM === "build") {
   };
   /**
    * The runner's environment. A suite run by a hench gate inherits the gate's
-   * slot token; the runner under test must see only the token a test gives it.
+   * slot token and directory; the runner under test must see only those a
+   * test gives it (tests/setup-ndx-home.js clears them too).
    */
   const gateEnv = (mode, extraEnv = {}) => {
-    const { NDX_VALIDATION_SLOT: _inherited, ...base } = process.env;
+    const { NDX_VALIDATION_SLOT: _token, NDX_VALIDATION_SLOT_DIR: _dir, ...base } = process.env;
     return {
       ...base,
       FAKE_PNPM: mode,
@@ -321,6 +322,49 @@ if (process.env.FAKE_PNPM === "build") {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("Validation slot: ran inside the slot of the process that started this runner");
       expect(readHolderRecord().token).toBe(lease.token);
+    });
+
+    it("takes the slot in a token-less NDX_VALIDATION_SLOT_DIR, as hench hands it to a confined command", async () => {
+      selectTinySuites();
+      const handed = join(home, "handed-slot");
+      held = await acquireValidationSlot({ slotDir: handed, projectDir: "/elsewhere", env: {} });
+      const run = startGate("noop", { NDX_VALIDATION_SLOT_DIR: handed });
+      await vi.waitFor(
+        () => expect(run.output()).toContain(`(${join(handed, "holder.json")})`),
+        { timeout: 30_000, interval: 50 },
+      );
+      await held.release();
+      const result = await run.done;
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/Validation slot: queued \d+\.\ds/);
+      expect(existsSync(holderFile())).toBe(false);
+    });
+
+    // macOS reads the machine id with `ioreg`; a stand-in that fails puts a
+    // failing lookup on PATH, as a sandbox that refuses IOKit would.
+    describe.runIf(process.platform === "darwin")("under a failing machine-id lookup", () => {
+      // fakebin/ comes first on the runner's PATH (gateEnv).
+      beforeEach(() => {
+        write("fakebin/ioreg", "#!/bin/sh\nexit 1\n", 0);
+        chmodSync(join(root, "fakebin/ioreg"), 0o755);
+      });
+
+      it("runs unslotted with a warning when it has to look the directory up", () => {
+        selectTinySuites();
+        const result = gate("noop", [], homeEnv());
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain("Validation slot: skipped (could not take it in ");
+        expect(result.stdout).toContain("could not read this host's machine id");
+      });
+
+      it("nests on the holder its environment names without the lookup", async () => {
+        selectTinySuites();
+        const lease = await hold();
+        const result = gate("noop", [], homeEnv(lease.childEnv({})));
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain("Validation slot: ran inside the slot of the process that started this runner");
+        expect(result.stderr).not.toContain("machine id");
+      });
     });
 
     // A home it may not write stands in for a sandbox that does not grant the

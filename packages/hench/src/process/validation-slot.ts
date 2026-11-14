@@ -130,6 +130,11 @@
  *    ignored: the acquire takes its own directory's slot.
  *    The check reads `holder.json` before anything creates or writes in the
  *    directory, so a nested acquire needs read access only.
+ *    `NDX_VALIDATION_SLOT_DIR` may also arrive without a token: hench resolves
+ *    the slot directory on the host and hands it to every command it confines,
+ *    where the machine-id lookup may be refused or slow. An absolute value
+ *    names the slot directory to use, for taking the slot as well as for
+ *    nesting, and a process that has one runs no lookup.
  * 7. **Waiting.** Poll at a bounded interval; report the holder (pid,
  *    project directory, since when, and the `holder.json` path) on the first
  *    wait and then periodically. Only the caller's abort signal stops a

@@ -38,7 +38,8 @@ import type {
 // Through hench's exec module, so a test that stubs it stubs these spawns too.
 import { exec, execShellCmd } from "../process/exec.js";
 import type { ExecOptions, ExecResult } from "../process/exec.js";
-import { reclaimHostValidationSlot } from "../process/validation-run.js";
+import { reclaimHostValidationSlot, withHostValidationSlotDir } from "../process/validation-run.js";
+import { hostIdentity, type HostIdentityCache } from "../process/validation-slot-dir.js";
 import { GuardError } from "./paths.js";
 
 /** What a tool spawn site needs: wrap one argv, and say what it is running under. */
@@ -47,11 +48,14 @@ export interface ToolSandbox {
   /** Wrap a shell command string in the shell `execShellCmd` would use. */
   wrapShell(command: string): SandboxedInvocation;
   /**
-   * Await before each confined spawn: clears a stale validation-slot holder
-   * that the confined command could not judge (`reclaimHostValidationSlot`).
-   * Never throws.
+   * Await before each confined spawn, and spawn with the environment it
+   * returns: clears a stale validation-slot holder that the confined command
+   * could not judge (`reclaimHostValidationSlot`), and returns `base` with
+   * the host-resolved slot directory in `NDX_VALIDATION_SLOT_DIR`
+   * (`withHostValidationSlotDir`). Never throws, and never waits on the host
+   * lookup.
    */
-  prepareSpawn(): Promise<void>;
+  prepareSpawn(base: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv>;
   readonly backend: SandboxBackend;
   readonly setting: SandboxSetting;
   readonly tmpDir: string;
@@ -77,13 +81,25 @@ export interface CreateToolSandboxOptions {
   setting?: SandboxSetting;
   /** Injected for tests; defaults to `reclaimHostValidationSlot`. Must never throw. */
   reclaimSlot?: (env: NodeJS.ProcessEnv) => Promise<void>;
+  /** Injected for tests; defaults to this process's host identity cache. */
+  hostIdentity?: Pick<HostIdentityCache, "peek">;
+}
+
+/** Clear a stale holder from the host view, as `prepareSpawn` does. */
+function reclaimSlot(options: CreateToolSandboxOptions): Promise<void> {
+  const env = options.env ?? process.env;
+  return options.reclaimSlot ? options.reclaimSlot(env) : reclaimHostValidationSlot(env, options.hostIdentity);
 }
 
 /** The `prepareSpawn` of a sandbox built with `options`. */
-function slotReclaimer(options: CreateToolSandboxOptions): () => Promise<void> {
-  const reclaim = options.reclaimSlot ?? reclaimHostValidationSlot;
-  const env = options.env ?? process.env;
-  return () => reclaim(env);
+function spawnPreparer(options: CreateToolSandboxOptions): (base: NodeJS.ProcessEnv) => Promise<NodeJS.ProcessEnv> {
+  const hostEnv = options.env ?? process.env;
+  // Started now, so the identity is usually known by the first spawn.
+  (options.hostIdentity ?? hostIdentity).peek();
+  return async (base) => {
+    await reclaimSlot(options);
+    return withHostValidationSlotDir(base, hostEnv, options.hostIdentity);
+  };
 }
 
 function realOr(path: string): string {
@@ -148,7 +164,7 @@ export function createToolSandbox(
     tmpDir,
     wrap: (file, args) => wrapInSandbox(file, args, policy, backend),
     wrapShell: (command) => wrapShellInSandbox(command, policy, backend),
-    prepareSpawn: slotReclaimer(options),
+    prepareSpawn: spawnPreparer(options),
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -191,14 +207,14 @@ export async function execRepoShellCmd(
 ): Promise<ExecResult> {
   const sandbox = createToolSandbox(opts.cwd, sandboxOptions);
   if (!sandbox) {
-    await slotReclaimer(sandboxOptions)();
+    await reclaimSlot(sandboxOptions);
     return execShellCmd(command, opts);
   }
   try {
-    await sandbox.prepareSpawn();
+    const base = await sandbox.prepareSpawn(opts.env ?? process.env);
     const inv = sandbox.wrapShell(command);
     const env = {
-      ...(opts.env ?? process.env),
+      ...base,
       ...inv.env,
       npm_config_cache: join(sandbox.tmpDir, "npm-cache"),
     };
@@ -327,7 +343,7 @@ export function createVendorCliSandbox(
     tmpDir,
     wrap: (file, args) => withClaudeTmp(wrapInSandbox(file, args, policy, backend)),
     wrapShell: (command) => withClaudeTmp(wrapShellInSandbox(command, policy, backend)),
-    prepareSpawn: slotReclaimer(options),
+    prepareSpawn: spawnPreparer(options),
     dispose: () => {
       if (disposed) return;
       disposed = true;

@@ -185,18 +185,25 @@ describe("validation slot parity: the per-host slot directory", () => {
     }
   });
 
-  it("caches a found or absent identity, and retries a transient failure", async () => {
+  it("caches a found or absent identity, remembers a transient failure for 60 s, then retries it", async () => {
+    expect(scripts.LOOKUP_RETRY_AFTER_MS).toBe(henchDir.LOOKUP_RETRY_AFTER_MS);
     for (const copy of [scripts, henchDir]) {
       let calls = 0;
+      let clock = 0;
       const results = [{ kind: "failed", reason: "timed out" }, { kind: "missing" }];
       const flaky = { ...sources("darwin"), run: async () => results[Math.min(calls++, results.length - 1)] };
-      const identity = copy.createHostIdentityCache(flaky);
+      const identity = copy.createHostIdentityCache(flaky, { now: () => clock });
+      await expect(identity()).rejects.toThrow(/could not read this host's machine id .*read again after 60 s/);
+      clock = copy.LOOKUP_RETRY_AFTER_MS - 1;
       await expect(identity()).rejects.toThrow(/could not read this host's machine id/);
+      expect(calls).toBe(1);
+      clock = copy.LOOKUP_RETRY_AFTER_MS;
       expect(await identity()).toEqual({ kind: "hostname", id: "Some-Host.local" });
       await identity();
       expect(calls).toBe(2);
     }
   });
+
 
   // The real lookup, one copy in each of two processes, as a gate and a runner on one host.
   it("resolves the same directory on this host from two processes, one per copy", async () => {
@@ -407,6 +414,45 @@ describe.each(DIRECTIONS)("validation slot parity: $name", ({ holderModule, cont
     expect(lease.nested).toBe(false);
     await lease.release();
     expect(existsSync(join(slotDir, "holder.json"))).toBe(false);
+  });
+
+  // A lookup that always fails, as `ioreg` refused by a sandbox would. The
+  // contender's own resolver must not call it when it was handed a directory.
+  const contenderDir = contender === scripts ? scripts : henchDir;
+  let lookups = 0;
+  const failingLookup = async () => {
+    lookups++;
+    throw new henchDir.HostIdentityLookupError("running ioreg -rd1 -c IOPlatformExpertDevice", "exited with code 1");
+  };
+
+  it("takes the slot in a token-less NDX_VALIDATION_SLOT_DIR without a lookup, so it meets the other's holder there", async () => {
+    const { child, next } = await startHolder();
+    lookups = 0;
+    const env = { N_DX_HOME: join(home, "elsewhere"), [hench.VALIDATION_SLOT_DIR_ENV]: slotDir };
+    const resolved = await contenderDir.resolveValidationSlotDir(env, failingLookup);
+    expect(resolved).toBe(slotDir);
+    const wait = await contendUntilWait(env);
+    expect(wait.holder.pid).toBe(child.pid);
+
+    child.stdin.end();
+    expect(await next()).toBe("released");
+    const lease = await contender.acquireValidationSlot({ slotDir: resolved, projectDir: "/contender", env });
+    expect(lease.nested).toBe(false);
+    expect(lease.slotDir).toBe(slotDir);
+    await lease.release();
+    expect(lookups).toBe(0);
+  });
+
+  it("nests on the other's token and directory under a failing lookup", async () => {
+    const { childEnv, token } = await startHolder();
+    lookups = 0;
+    const env = { ...childEnv, N_DX_HOME: join(home, "elsewhere") };
+    const lease = await contender.acquireValidationSlot({
+      slotDir: await contenderDir.resolveValidationSlotDir(env, failingLookup), projectDir: "/nested", env,
+    });
+    expect(lease.nested).toBe(true);
+    expect(lease.token).toBe(token);
+    expect(lookups).toBe(0);
   });
 
   it("runs nested on the other implementation's token, and never releases its slot", async () => {
