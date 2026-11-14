@@ -85,6 +85,16 @@
  *      needs ptrace access that the user's own non-dumpable processes
  *      refuse;
  *    - as alive otherwise (a sibling namespace, or an unrecorded chain).
+ *    So a confined reader never clears a record left by a dead sibling
+ *    sandbox, and cannot tell a dead namespace from a live one that reused
+ *    its number (the kernel reuses namespace inode numbers, and a reused
+ *    number's small pids may match the reader's own processes). Only a
+ *    reader in an enclosing namespace can judge those records. Hench runs on
+ *    the host, so it calls `reclaimIfStale` before each confined spawn and
+ *    before each of its own validation commands: a record whose namespace
+ *    has died is cleared before a new namespace can reuse its number. A
+ *    holder that dies while a confined contender already waits beside it is
+ *    cleared at hench's next spawn, or by any unconfined acquirer.
  * 5. **Stale recovery.** A record is stale when its `pid` is dead AND its
  *    `child` is absent or dead; a record that does not parse is stale too. A
  *    dead holder whose child still runs is NOT stale: its tests still load
@@ -413,7 +423,8 @@ function isRecordedPidAlive(place: PidNamespacePlace, pid: number, group: boolea
   if (!Number.isInteger(pid) || pid <= 0) return false;
   // The record's namespace lies inside the reader's, so its processes are visible.
   if (place.outerPidNamespaces.includes(own)) return isAliveInInnerNamespace(view.procRoot, recorded, pid, group);
-  // Outside the reader's namespace, or beside it: invisible, so never judged dead.
+  // Outside the reader's namespace, or beside it: invisible, so never judged
+  // dead here. Hench clears such a record from the host (`reclaimIfStale`).
   return true;
 }
 
@@ -644,6 +655,41 @@ async function reclaimStale(slotDir: string, staleRaw: string, view: PidNamespac
     return true;
   } finally {
     liveReclaimTokens.delete(token);
+  }
+}
+
+export interface ReclaimIfStaleOptions {
+  /** Environment to read `NDX_OUTER_PID_NAMESPACES` from. Defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv;
+  /** The `/proc` to read PID namespaces from, for tests. Default `/proc` on Linux, none elsewhere. */
+  procRoot?: string;
+  /** Called with a failure to read, judge or reclaim; nothing else reports it. */
+  onError?: (err: unknown) => void;
+}
+
+/**
+ * Remove `holder.json` when it is stale as judged from this process's view,
+ * with the reclaim lock of rule 5. One read: no record, or a live one, is left
+ * alone, and another reclaimer holding the lock is not waited for. Never
+ * throws; a failure goes to `onError`. True when a stale record was found
+ * and is gone afterwards (removed by this call or by another reclaimer).
+ *
+ * Meant for a process in an enclosing PID namespace (hench on the host),
+ * which can judge records that a confined reader cannot (rule 4a).
+ */
+export async function reclaimIfStale(slotDir: string, options: ReclaimIfStaleOptions = {}): Promise<boolean> {
+  try {
+    const observed = await readHolder(slotDir);
+    if (observed === null) return false; // Free, or no slot directory yet.
+    const view = pidNamespaceView(options.env, options.procRoot);
+    if (observed.holder !== null && !isValidationSlotHolderStale(observed.holder, currentBootTimeMs(), view)) {
+      return false;
+    }
+    await reclaimStale(slotDir, observed.raw, view);
+    return (await readIfExists(holderPath(slotDir))) !== observed.raw;
+  } catch (err) {
+    options.onError?.(err);
+    return false;
   }
 }
 

@@ -906,7 +906,7 @@ function emptySpawnResult(): SpawnResult {
   return { turns: 0, toolCalls: [], tokenUsage: { input: 0, output: 0 }, turnTokenUsage: [] };
 }
 
-function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
   const {
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress, abortSignal,
@@ -917,14 +917,16 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
   // Vendors without a turn flag are capped here, from the event stream.
   const countSteps = maxTurns > 0 && adapter.enforcesTurnCap !== true;
 
+  // OS confinement for the vendor CLI and everything it starts; null for
+  // Codex (it confines itself) and when the operator turned the sandbox off
+  // or no backend is usable. The argv passes through verbatim.
+  const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { cliBinary });
+  await sandbox?.prepareSpawn();
+
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
     // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
     // with a self-quoted verbatim command line instead of shell:true+args.
-    // OS confinement for the vendor CLI and everything it starts; null for
-    // Codex (it confines itself) and when the operator turned the sandbox off
-    // or no backend is usable. The argv passes through verbatim.
-    const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { cliBinary });
     const inv = sandbox
       ? sandbox.wrap(cliBinary, [...spawnConfig.args])
       : { file: cliBinary, args: [...spawnConfig.args], env: {} };

@@ -85,6 +85,7 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
 
   const liveTail = createLiveTail();
   if (sandbox) {
+    await sandbox.prepareSpawn();
     // The same shell execShellCmd would pick, wrapped by the backend.
     const inv = sandbox.wrapShell(command);
     const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...env, ...inv.env }, onData: liveTail.onData });
@@ -122,6 +123,7 @@ export async function execArgv(opts: ExecArgvOptions): Promise<string> {
   } = opts;
 
   const liveTail = createLiveTail();
+  await sandbox?.prepareSpawn();
   const inv = sandbox ? sandbox.wrap(file, args) : { file, args, env: {} };
   const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...env, ...inv.env }, onData: liveTail.onData });
   liveTail.flush();
