@@ -46,7 +46,9 @@
  * queue instead of loading the machine together. It is taken before the
  * stale-package rebuild and given back after the summary, or on SIGINT/SIGTERM
  * once the running suite has exited. A runner a slot holder spawned (its
- * `NDX_VALIDATION_SLOT` names the live holder) runs inside that holder's slot.
+ * `NDX_VALIDATION_SLOT` names the live holder of the slot directory in
+ * `NDX_VALIDATION_SLOT_DIR`) runs inside that holder's slot. The suites it
+ * runs get both variables, so a nested gate or runner nests on this one.
  * `--list` never takes it. Always on here: the runner is repository tooling,
  * not hench config.
  */
@@ -65,6 +67,7 @@ import {
   describeValidationSlotFailure,
   describeValidationSlotWait,
   resolveValidationSlotDir,
+  validationSlotRootDir,
 } from "./lib/validation-slot.mjs";
 
 /** Human-readable name for each root-subset suite, shown in the per-suite summary. */
@@ -295,8 +298,10 @@ async function takeSlot() {
   };
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
-  const slotDir = resolveValidationSlotDir();
+  // The slot root names the failure until the host directory resolves.
+  let slotDir = validationSlotRootDir();
   try {
+    slotDir = await resolveValidationSlotDir();
     return await acquireValidationSlot({
       slotDir,
       projectDir: ROOT,

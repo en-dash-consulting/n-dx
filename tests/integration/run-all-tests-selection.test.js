@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, ut
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { acquireValidationSlot } from "../../scripts/lib/validation-slot.mjs";
+import { acquireValidationSlot, resolveValidationSlotDir } from "../../scripts/lib/validation-slot.mjs";
 
 const SCRIPT = join(import.meta.dirname, "../../scripts/run-all-tests.mjs");
 
@@ -134,9 +134,9 @@ import { writeBuildStamp } from ${JSON.stringify(pathToFileURL(join(root, "scrip
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(join(root, "pnpm-calls.log"))}, JSON.stringify(args) + "\\n");
 if (!args.includes("build")) {
-  // A suite that runs until it is stopped, after saying so and naming the slot token it got.
+  // A suite that runs until it is stopped, after saying so and naming the slot token and directory it got.
   if (!process.env.FAKE_SUITE_MARKER) process.exit(0);
-  appendFileSync(process.env.FAKE_SUITE_MARKER, process.env.NDX_VALIDATION_SLOT ?? "");
+  appendFileSync(process.env.FAKE_SUITE_MARKER, JSON.stringify({ token: process.env.NDX_VALIDATION_SLOT, dir: process.env.NDX_VALIDATION_SLOT_DIR }));
   setInterval(() => {}, 1000);
 } else {
 if (process.env.FAKE_PNPM === "fail") { console.error("tsc: boom"); process.exit(1); }
@@ -235,9 +235,10 @@ if (process.env.FAKE_PNPM === "build") {
     let home;
     let slotDir;
     let held;
-    beforeEach(() => {
+    beforeEach(async () => {
       home = mkdtempSync(join(tmpdir(), "runner-slot-home-"));
-      slotDir = join(home, "validation-slot");
+      // This host's directory under that home; the runner resolves the same one.
+      slotDir = await resolveValidationSlotDir({ N_DX_HOME: home });
       // The fake pnpm and the logs a run writes are untracked files that would
       // select root; ignored, an unedited tree selects no suite and the run exits 0.
       write(".gitignore", "fakebin/\npnpm-calls.log\nsuite-started\nclaude_commands.log\n.test-logs/\n", 0);
@@ -354,7 +355,7 @@ if (process.env.FAKE_PNPM === "build") {
         });
         const record = readHolderRecord();
         expect(record.pid).toBe(run.child.pid);
-        expect(readFileSync(marker, "utf-8")).toBe(record.token);
+        expect(JSON.parse(readFileSync(marker, "utf-8"))).toEqual({ token: record.token, dir: slotDir });
         expect(pnpmCalls().filter((a) => a.includes("build"))).toEqual([["--filter", "@n-dx/llm-client", "run", "build"]]);
 
         run.child.kill("SIGTERM");

@@ -9,23 +9,32 @@
  * implementation against a contender through the other, both ways round,
  * and is in ROOT_DRIFT_TEST_FILES so a change to either selects it.
  *
+ * The slot directory (`<ndx home>/validation-slot/<host>/`) mirrors hench's
+ * packages/hench/src/process/validation-slot-dir.ts: same machine-id sources
+ * in the same order, same hash, same lookup timeout, same caching rule.
+ *
  * Change the protocol in hench's header first, then here.
  */
 
-import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { uptime } from "node:os";
-import { join } from "node:path";
+import { hostname, tmpdir, uptime } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { resolveNdxHome } from "../../packages/core/layout.js";
 
 /** The environment variable a holder exports its token to children under. */
 export const VALIDATION_SLOT_ENV = "NDX_VALIDATION_SLOT";
 
+/** The environment variable a holder exports its absolute slot directory under (rule 6). */
+export const VALIDATION_SLOT_DIR_ENV = "NDX_VALIDATION_SLOT_DIR";
+
 /** The PID namespaces enclosing this process, outermost first (rule 4a). */
 export const OUTER_PID_NAMESPACES_ENV = "NDX_OUTER_PID_NAMESPACES";
 
-const VALIDATION_SLOT_DIRNAME = "validation-slot";
+/** The slot root's name inside the ndx home; each host's slot is a subdirectory. */
+export const VALIDATION_SLOT_DIRNAME = "validation-slot";
 const HOLDER_FILE = "holder.json";
 const RECLAIM_FILE = "reclaim.lock";
 const PROTOCOL_VERSION = 1;
@@ -48,7 +57,7 @@ const RENAME_ATTEMPTS = 5;
  * }} ValidationSlotHolder
  * @typedef {{ pidNamespace: string | null, outerPidNamespaces: string[] }} PidNamespacePlace
  * @typedef {PidNamespacePlace & { procRoot: string }} PidNamespaceView
- * @typedef {{ holder: ValidationSlotHolder, holderAlive: boolean, waitedMs: number }} ValidationSlotWait
+ * @typedef {{ holder: ValidationSlotHolder, holderAlive: boolean, waitedMs: number, holderPath: string }} ValidationSlotWait
  * @typedef {{
  *   slotDir: string, token: string, nested: boolean, queueWaitMs: number,
  *   childEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv,
@@ -79,9 +88,212 @@ export class ValidationSlotLostError extends Error {
   }
 }
 
-/** The slot directory under the ndx home `env` resolves to: hench's `resolveValidationSlotDir`. */
-export function resolveValidationSlotDir(env = process.env) {
+// Slot directory (hench's validation-slot-dir.ts)
+
+/**
+ * @typedef {{ kind: "machine" | "hostname", id: string }} HostIdentity
+ * @typedef {
+ *   | { kind: "exited", exitCode: number, stdout: string }
+ *   | { kind: "missing" }
+ *   | { kind: "failed", reason: string }
+ * } LookupRun
+ * @typedef {{
+ *   platform: NodeJS.Platform,
+ *   readFile(path: string): Promise<string>,
+ *   run(file: string, args: string[]): Promise<LookupRun>,
+ *   hostname(): string,
+ * }} HostIdentitySources
+ * @typedef {
+ *   | { kind: "found", id: string }
+ *   | { kind: "none" }
+ *   | { kind: "transient", lookup: string, reason: string }
+ * } MachineIdOutcome
+ */
+
+/** A machine-id lookup that failed in a way that may not recur. Not cached; never the hostname. */
+export class HostIdentityLookupError extends Error {
+  /**
+   * @param {string} lookup
+   * @param {string} reason
+   */
+  constructor(lookup, reason) {
+    super(`could not read this host's machine id (${lookup}: ${reason}); the next validation retries it`);
+    this.name = "HostIdentityLookupError";
+  }
+}
+
+/** Linux machine-id files, in lookup order. */
+export const LINUX_MACHINE_ID_FILES = ["/etc/machine-id", "/var/lib/dbus/machine-id"];
+
+/** How long a platform lookup command may run (see hench's module header). */
+export const LOOKUP_TIMEOUT_MS = 10_000;
+
+/**
+ * Run a lookup command without a shell and say how it ended: hench's
+ * `runLookup` over llm-client's `exec`. A timeout kills it and is a failure.
+ * @returns {Promise<LookupRun>}
+ */
+export function runLookup(file, args, timeoutMs = LOOKUP_TIMEOUT_MS) {
+  return new Promise((resolvePromise) => {
+    let child;
+    try {
+      child = spawn(file, args, { cwd: tmpdir(), stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+    } catch (err) {
+      resolvePromise(err?.code === "ENOENT" ? { kind: "missing" } : { kind: "failed", reason: err?.message ?? String(err) });
+      return;
+    }
+    const chunks = [];
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    child.stdout.on("data", (chunk) => chunks.push(chunk));
+    child.once("error", (err) => {
+      clearTimeout(timer);
+      resolvePromise(err?.code === "ENOENT" ? { kind: "missing" } : { kind: "failed", reason: err?.message ?? String(err) });
+    });
+    child.once("close", (exitCode, signal) => {
+      clearTimeout(timer);
+      if (timedOut) resolvePromise({ kind: "failed", reason: `Command timed out after ${timeoutMs}ms: ${[file, ...args].join(" ")}` });
+      else if (exitCode !== null) resolvePromise({ kind: "exited", exitCode, stdout: Buffer.concat(chunks).toString("utf-8") });
+      else resolvePromise({ kind: "failed", reason: `Command was killed with ${signal}: ${[file, ...args].join(" ")}` });
+    });
+  });
+}
+
+/** @type {HostIdentitySources} */
+const DEFAULT_SOURCES = {
+  platform: process.platform,
+  readFile: (path) => readFile(path, "utf-8"),
+  run: (file, args) => runLookup(file, args),
+  hostname,
+};
+
+/** @type {MachineIdOutcome} */
+const NONE = { kind: "none" };
+
+/** @returns {Promise<MachineIdOutcome>} */
+async function readMachineIdFile(sources, path) {
+  let id;
+  try {
+    id = (await sources.readFile(path)).trim();
+  } catch (err) {
+    const code = err?.code;
+    if (code === "ENOENT" || code === "ENOTDIR") return NONE;
+    return { kind: "transient", lookup: `reading ${path}`, reason: err instanceof Error ? err.message : String(err) };
+  }
+  // An unset id ("" or "uninitialized" during first boot) is not one.
+  return /^[0-9a-f]{32}$/i.test(id) ? { kind: "found", id } : NONE;
+}
+
+/** @returns {Promise<MachineIdOutcome>} */
+async function linuxMachineId(sources) {
+  let transient;
+  for (const path of LINUX_MACHINE_ID_FILES) {
+    const outcome = await readMachineIdFile(sources, path);
+    if (outcome.kind === "found") return outcome;
+    if (outcome.kind === "transient") transient ??= outcome;
+  }
+  return transient ?? NONE;
+}
+
+/** @returns {Promise<MachineIdOutcome>} */
+async function commandMatch(sources, file, args, pattern) {
+  const lookup = `running ${[file, ...args].join(" ")}`;
+  const run = await sources.run(file, args);
+  if (run.kind === "missing") return NONE;
+  if (run.kind === "failed") return { kind: "transient", lookup, reason: run.reason };
+  const id = pattern.exec(run.stdout)?.[1]?.trim();
+  if (id) return { kind: "found", id };
+  return run.exitCode === 0 ? NONE : { kind: "transient", lookup, reason: `exited with code ${run.exitCode}` };
+}
+
+/** @returns {Promise<MachineIdOutcome>} */
+function machineId(sources) {
+  switch (sources.platform) {
+    case "linux":
+      return linuxMachineId(sources);
+    case "darwin":
+      return commandMatch(sources, "ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"], /"IOPlatformUUID"\s*=\s*"([^"]+)"/);
+    case "win32":
+      return commandMatch(
+        sources,
+        "reg",
+        ["query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"],
+        /MachineGuid\s+REG_SZ\s+(\S+)/i,
+      );
+    default:
+      return Promise.resolve(NONE);
+  }
+}
+
+/**
+ * This host's identity, read now: its machine id, else its hostname when the
+ * host has none. Rejects with `HostIdentityLookupError` on a transient failure.
+ * @param {HostIdentitySources} [sources]
+ * @returns {Promise<HostIdentity>}
+ */
+export async function readHostIdentity(sources = DEFAULT_SOURCES) {
+  const outcome = await machineId(sources);
+  switch (outcome.kind) {
+    case "found":
+      return { kind: "machine", id: outcome.id };
+    case "none":
+      return { kind: "hostname", id: sources.hostname() };
+    case "transient":
+      throw new HostIdentityLookupError(outcome.lookup, outcome.reason);
+  }
+}
+
+/**
+ * `readHostIdentity(sources)`, kept once it resolves. A rejected lookup is
+ * forgotten, so the next call retries it.
+ * @param {HostIdentitySources} sources
+ * @returns {() => Promise<HostIdentity>}
+ */
+export function createHostIdentityCache(sources) {
+  let cached;
+  return () => {
+    if (!cached) {
+      const attempt = readHostIdentity(sources);
+      cached = attempt;
+      // The caller sees the rejection through `attempt`; this only forgets it.
+      attempt.then(undefined, () => {
+        if (cached === attempt) cached = undefined;
+      });
+    }
+    return cached;
+  };
+}
+
+/** This host's identity, read once per process; a transient failure is retried on the next call. */
+export const hostIdentity = createHostIdentityCache(DEFAULT_SOURCES);
+
+/**
+ * The host directory's name: `m-` (machine id) or `h-` (hostname) and the
+ * first 16 hex characters of the SHA-256 of the trimmed, lower-cased id.
+ * @param {HostIdentity} identity
+ */
+export function validationSlotHostDirname(identity) {
+  const digest = createHash("sha256").update(identity.id.trim().toLowerCase()).digest("hex");
+  return `${identity.kind === "machine" ? "m" : "h"}-${digest.slice(0, 16)}`;
+}
+
+/** The slot root under the ndx home `env` resolves to; each host's slot is a subdirectory. */
+export function validationSlotRootDir(env = process.env) {
   return join(resolveNdxHome({ env }), VALIDATION_SLOT_DIRNAME);
+}
+
+/**
+ * This host's slot directory under the ndx home `env` resolves to: hench's `resolveValidationSlotDir`.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {HostIdentity} [identity]
+ * @returns {Promise<string>}
+ * @throws {HostIdentityLookupError} when the machine id could not be read this time.
+ */
+export async function resolveValidationSlotDir(env = process.env, identity) {
+  return join(validationSlotRootDir(env), validationSlotHostDirname(identity ?? (await hostIdentity())));
 }
 
 // Liveness (rule 4)
@@ -201,7 +413,32 @@ function isRecordedPidAlive(place, pid, group, view) {
   return true;
 }
 
-const isHolderAlive = (holder, view) => isRecordedPidAlive(holder, holder.pid, false, view);
+// Tokens this process holds (rule 5a)
+
+/** Tokens of this process's unreleased leases. @type {Set<string>} */
+const liveLeaseTokens = new Set();
+
+/** Tokens of the `reclaim.lock` files this process is writing or holds. @type {Set<string>} */
+const liveReclaimTokens = new Set();
+
+/**
+ * Whether a file names this process's pid with a token this process does not
+ * hold: a leftover whose pid the OS reused, or this process's own failed
+ * release (rule 5a). Only a file written in this process's own PID namespace
+ * (or with either namespace unknown) can name this process (rule 4a).
+ */
+function isUnheldByThisProcess(place, pid, token, live, view) {
+  if (pid !== process.pid) return false;
+  const sameNamespace =
+    place.pidNamespace === null || view.pidNamespace === null || place.pidNamespace === view.pidNamespace;
+  return sameNamespace && !(typeof token === "string" && live.has(token));
+}
+
+/** Whether the holding process itself is alive, as seen from `view` (rules 4, 4a and 5a). */
+function isHolderAlive(holder, view) {
+  if (isUnheldByThisProcess(holder, holder.pid, holder.token, liveLeaseTokens, view)) return false;
+  return isRecordedPidAlive(holder, holder.pid, false, view);
+}
 
 // Records
 
@@ -254,7 +491,7 @@ function parsePidNamespacePlace(r) {
   return { pidNamespace: ns, outerPidNamespaces: outer };
 }
 
-/** Whether a record no longer occupies the slot (rule 5). */
+/** Whether a record no longer occupies the slot (rules 5 and 5a). */
 function isStale(holder, view) {
   if (Math.abs(holder.bootedAt - currentBootTimeMs()) > BOOT_TIME_TOLERANCE_MS) return true;
   if (isHolderAlive(holder, view)) return false;
@@ -339,38 +576,57 @@ export async function readValidationSlotHolder(slotDir) {
  */
 async function reclaimStale(slotDir, staleRaw, view) {
   const lockPath = join(slotDir, RECLAIM_FILE);
+  const token = randomUUID();
   const lock = JSON.stringify({
     pid: process.pid,
-    token: randomUUID(),
+    token,
     startedAt: new Date().toISOString(),
     pidNamespace: view.pidNamespace,
     outerPidNamespaces: view.outerPidNamespaces,
   });
-  if (!(await createExclusive(slotDir, lockPath, lock))) {
-    // Another process is reclaiming. If it died doing so, clear its lock.
-    const raw = await readIfExists(lockPath);
-    if (raw === null) return true;
-    let owner = {};
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed === "object" && parsed !== null) owner = parsed;
-    } catch {
-      // An unreadable lock has no live owner.
-    }
-    const place = parsePidNamespacePlace(owner);
-    if (place === null || !isPositiveInt(owner.pid) || !isRecordedPidAlive(place, owner.pid, false, view)) {
-      await unlinkIfExists(lockPath);
-      return true;
-    }
-    return false;
-  }
+  // Live before the lock exists, so a concurrent reclaim in this process
+  // never takes it for a leftover (rule 5a).
+  liveReclaimTokens.add(token);
   try {
-    const current = await readIfExists(holderPath(slotDir));
-    if (current === staleRaw) await unlinkIfExists(holderPath(slotDir));
+    if (!(await createExclusive(slotDir, lockPath, lock))) {
+      // Another reclaimer holds the lock. If it died doing so, or left it
+      // under a pid this process now has, clear it; the next poll retries.
+      const raw = await readIfExists(lockPath);
+      if (raw === null) return true;
+      if (isReclaimLockStale(raw, view)) {
+        await unlinkIfExists(lockPath);
+        return true;
+      }
+      return false;
+    }
+    try {
+      const current = await readIfExists(holderPath(slotDir));
+      if (current === staleRaw) await unlinkIfExists(holderPath(slotDir));
+    } finally {
+      // A waiter that judged this lock stale may have replaced it; that lock
+      // is its owner's to remove, not this process's.
+      if ((await readIfExists(lockPath)) === lock) await unlinkIfExists(lockPath);
+    }
+    return true;
   } finally {
-    await unlinkIfExists(lockPath);
+    liveReclaimTokens.delete(token);
   }
-  return true;
+}
+
+/** Whether a `reclaim.lock` has no live owner (rules 4a, 5 and 5a). */
+function isReclaimLockStale(raw, view) {
+  let owner;
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return true;
+    owner = parsed;
+  } catch {
+    return true; // An unreadable lock has no live owner.
+  }
+  const place = parsePidNamespacePlace(owner);
+  if (place === null || !isPositiveInt(owner.pid)) return true;
+  if (!isRecordedPidAlive(place, owner.pid, false, view)) return true;
+  return isUnheldByThisProcess(place, owner.pid, owner.token, liveReclaimTokens, view);
 }
 
 // Waiting
@@ -397,7 +653,7 @@ function sleep(ms, signal) {
 
 // Leases
 
-const withToken = (base, token) => ({ ...base, [VALIDATION_SLOT_ENV]: token });
+const withToken = (base, slotDir, token) => ({ ...base, [VALIDATION_SLOT_ENV]: token, [VALIDATION_SLOT_DIR_ENV]: slotDir });
 
 /** @returns {ValidationSlotLease} */
 function nestedLease(slotDir, token) {
@@ -406,15 +662,12 @@ function nestedLease(slotDir, token) {
     token,
     nested: true,
     queueWaitMs: 0,
-    childEnv: (base) => withToken(base, token),
+    childEnv: (base) => withToken(base, slotDir, token),
     // The enclosing holder owns the record and its child.
     recordChild: async () => {},
     release: async () => {},
   };
 }
-
-/** Tokens of this process's leases whose release failed (rule 5a). */
-const orphanedTokens = new Set();
 
 /** @returns {ValidationSlotLease} */
 function heldLease(slotDir, record, queueWaitMs) {
@@ -424,7 +677,7 @@ function heldLease(slotDir, record, queueWaitMs) {
     token: record.token,
     nested: false,
     queueWaitMs,
-    childEnv: (base) => withToken(base, record.token),
+    childEnv: (base) => withToken(base, slotDir, record.token),
     async recordChild(pid, options = {}) {
       if (released) throw new ValidationSlotLostError(slotDir);
       const current = await readValidationSlotHolder(slotDir);
@@ -435,14 +688,11 @@ function heldLease(slotDir, record, queueWaitMs) {
     async release() {
       if (released) return;
       released = true;
-      try {
-        const current = await readValidationSlotHolder(slotDir);
-        if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
-      } catch (err) {
-        // The record may still be on disk naming this live process (rule 5a).
-        orphanedTokens.add(record.token);
-        throw err;
-      }
+      // No longer live even if the unlink below fails: a record left on disk
+      // is then this process's own to reclaim (rule 5a).
+      liveLeaseTokens.delete(record.token);
+      const current = await readValidationSlotHolder(slotDir);
+      if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
     },
   };
 }
@@ -450,8 +700,9 @@ function heldLease(slotDir, record, queueWaitMs) {
 /**
  * Take the host's validation slot, waiting while another process holds it.
  *
- * Returns at once as a nested lease when `env` carries the token of this
- * slot's live holder (rule 6). Otherwise waits until the slot is free or
+ * Returns at once as a nested lease when `env` carries the token of the live
+ * holder of the slot `NDX_VALIDATION_SLOT_DIR` names, or of `slotDir` when it
+ * names none (rule 6); that lease's `slotDir` is the holder's. Otherwise waits until the slot is free or
  * stale, takes it, and reports the time spent waiting as `queueWaitMs`.
  *
  * @param {{
@@ -475,8 +726,10 @@ export async function acquireValidationSlot(options) {
   // the slot directory (rule 6).
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
-    const current = await readValidationSlotHolder(slotDir);
-    if (current?.token === inherited && isHolderAlive(current, view)) return nestedLease(slotDir, inherited);
+    const inheritedDir = env[VALIDATION_SLOT_DIR_ENV];
+    const parentDir = inheritedDir && isAbsolute(inheritedDir) ? inheritedDir : slotDir;
+    const current = await readValidationSlotHolder(parentDir);
+    if (current?.token === inherited && isHolderAlive(current, view)) return nestedLease(parentDir, inherited);
   }
 
   await mkdir(slotDir, { recursive: true });
@@ -498,15 +751,23 @@ export async function acquireValidationSlot(options) {
     if (signal?.aborted) throw new ValidationSlotAbortedError(now() - started, signal.reason);
 
     record.startedAt = new Date(now()).toISOString();
-    if (await createExclusive(slotDir, holderPath(slotDir), JSON.stringify(record))) {
-      return heldLease(slotDir, { ...record }, now() - started);
+    // Live before the record exists, so a concurrent acquire in this process
+    // waits on it rather than reclaiming it (rule 5a).
+    liveLeaseTokens.add(record.token);
+    let created = false;
+    try {
+      created = await createExclusive(slotDir, holderPath(slotDir), JSON.stringify(record));
+    } finally {
+      if (!created) liveLeaseTokens.delete(record.token);
     }
+    if (created) return heldLease(slotDir, { ...record }, now() - started);
 
     const observed = await readHolder(slotDir);
     if (observed === null) continue; // Released between the create and the read.
     const { holder } = observed;
-    const orphaned = holder !== null && holder.pid === process.pid && orphanedTokens.has(holder.token);
-    if (holder === null || orphaned || isStale(holder, view)) {
+    if (holder === null || isStale(holder, view)) {
+      // Retry at once when this process cleared the record; another
+      // reclaimer's record is waited out like a holder.
       if (await reclaimStale(slotDir, observed.raw, view)) continue;
       await sleep(pollIntervalMs, signal);
       continue;
@@ -515,7 +776,7 @@ export async function acquireValidationSlot(options) {
     const waitedMs = now() - started;
     if (onWait && (lastReport === undefined || waitedMs - lastReport >= reportIntervalMs)) {
       lastReport = waitedMs;
-      onWait({ holder, holderAlive: isHolderAlive(holder, view), waitedMs });
+      onWait({ holder, holderAlive: isHolderAlive(holder, view), waitedMs, holderPath: holderPath(slotDir) });
     }
     await sleep(pollIntervalMs, signal);
   }
@@ -548,5 +809,5 @@ export function describeValidationSlotFailure(err, slotDir) {
 export function describeValidationSlotWait(wait) {
   const { holder } = wait;
   const who = wait.holderAlive ? `pid ${holder.pid}` : `pid ${holder.pid} (exited; its tests still run)`;
-  return `Waiting for the validation slot held by ${who} in ${holder.projectDir} since ${holder.startedAt}`;
+  return `Waiting for the validation slot held by ${who} in ${holder.projectDir} since ${holder.startedAt} (${wait.holderPath})`;
 }
