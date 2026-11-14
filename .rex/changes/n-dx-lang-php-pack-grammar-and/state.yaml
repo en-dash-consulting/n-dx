@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "2104cdb9-fd29-4472-9c32-8e2b74f973e5":
-    lastModified: "2026-11-14T07:05:13.939Z"
+    status: "completed"
+    startedAt: "2026-11-14T07:06:34.713Z"
+    completedAt: "2026-11-14T07:09:52.459Z"
+    endedAt: "2026-11-14T07:09:52.459Z"
+    activeIntervals: [{"end":"2026-11-14T07:09:52.459Z","start":"2026-11-14T07:06:34.713Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "callSites falls back to the invocation's own name ending last before the list; commit 4f6895488"
+    lastModified: "2026-11-14T07:09:52.459Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "220d4f19-4cf3-488b-baae-bd894498844b":
     lastModified: "2026-11-14T05:22:20.070Z"

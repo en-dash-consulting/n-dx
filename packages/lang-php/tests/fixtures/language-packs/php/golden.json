@@ -355,11 +355,11 @@
             "nodeType": "include_expression",
             "text": "include 'partials/user.php'",
             "start": {
-              "line": 46,
+              "line": 49,
               "column": 8
             },
             "end": {
-              "line": 46,
+              "line": 49,
               "column": 35
             }
           },
@@ -368,11 +368,11 @@
             "nodeType": "string",
             "text": "'partials/user.php'",
             "start": {
-              "line": 46,
+              "line": 49,
               "column": 16
             },
             "end": {
-              "line": 46,
+              "line": 49,
               "column": 35
             }
           },
@@ -381,11 +381,11 @@
             "nodeType": "include_expression",
             "text": "include 'partials/login.php'",
             "start": {
-              "line": 49,
+              "line": 52,
               "column": 8
             },
             "end": {
-              "line": 49,
+              "line": 52,
               "column": 36
             }
           },
@@ -394,11 +394,11 @@
             "nodeType": "string",
             "text": "'partials/login.php'",
             "start": {
-              "line": 49,
+              "line": 52,
               "column": 16
             },
             "end": {
-              "line": 49,
+              "line": 52,
               "column": 36
             }
           }
@@ -513,11 +513,11 @@
             "nodeType": "colon_block",
             "text": ": ?>\n  <?php include 'partials/user.php'; ?>\n  <p>Hello, <?= $user->getName()",
             "start": {
-              "line": 45,
+              "line": 48,
               "column": 16
             },
             "end": {
-              "line": 47,
+              "line": 50,
               "column": 32
             }
           },
@@ -526,11 +526,11 @@
             "nodeType": "colon_block",
             "text": ": ?>\n  <?php include 'partials/login.php';",
             "start": {
-              "line": 48,
+              "line": 51,
               "column": 10
             },
             "end": {
-              "line": 49,
+              "line": 52,
               "column": 37
             }
           },
@@ -539,11 +539,11 @@
             "nodeType": "compound_statement",
             "text": "{ ?>\n  <li><?php echo format_price($item[\"price\"], \"USD\"); ?></li>\n<?php }",
             "start": {
-              "line": 52,
+              "line": 55,
               "column": 40
             },
             "end": {
-              "line": 54,
+              "line": 57,
               "column": 7
             }
           }
@@ -1347,13 +1347,104 @@
           {
             "name": "call.invocation",
             "nodeType": "function_call_expression",
-            "text": "htmlspecialchars($title)",
+            "text": "mysql_query ($sql)",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "mysql_query",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($sql)",
+            "start": {
+              "line": 42,
+              "column": 22
+            },
+            "end": {
+              "line": 42,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$db->query ($sql)",
             "start": {
               "line": 43,
-              "column": 24
+              "column": 8
             },
             "end": {
               "line": 43,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$db",
+            "start": {
+              "line": 43,
+              "column": 8
+            },
+            "end": {
+              "line": 43,
+              "column": 11
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "query",
+            "start": {
+              "line": 43,
+              "column": 13
+            },
+            "end": {
+              "line": 43,
+              "column": 18
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($sql)",
+            "start": {
+              "line": 43,
+              "column": 19
+            },
+            "end": {
+              "line": 43,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "htmlspecialchars($title)",
+            "start": {
+              "line": 46,
+              "column": 24
+            },
+            "end": {
+              "line": 46,
               "column": 48
             }
           },
@@ -1362,11 +1453,11 @@
             "nodeType": "name",
             "text": "htmlspecialchars",
             "start": {
-              "line": 43,
+              "line": 46,
               "column": 24
             },
             "end": {
-              "line": 43,
+              "line": 46,
               "column": 40
             }
           },
@@ -1375,11 +1466,11 @@
             "nodeType": "arguments",
             "text": "($title)",
             "start": {
-              "line": 43,
+              "line": 46,
               "column": 40
             },
             "end": {
-              "line": 43,
+              "line": 46,
               "column": 48
             }
           },
@@ -1388,11 +1479,11 @@
             "nodeType": "member_call_expression",
             "text": "$user->getName()",
             "start": {
-              "line": 47,
+              "line": 50,
               "column": 16
             },
             "end": {
-              "line": 47,
+              "line": 50,
               "column": 32
             }
           },
@@ -1401,11 +1492,11 @@
             "nodeType": "variable_name",
             "text": "$user",
             "start": {
-              "line": 47,
+              "line": 50,
               "column": 16
             },
             "end": {
-              "line": 47,
+              "line": 50,
               "column": 21
             }
           },
@@ -1414,11 +1505,11 @@
             "nodeType": "name",
             "text": "getName",
             "start": {
-              "line": 47,
+              "line": 50,
               "column": 23
             },
             "end": {
-              "line": 47,
+              "line": 50,
               "column": 30
             }
           },
@@ -1427,11 +1518,11 @@
             "nodeType": "arguments",
             "text": "()",
             "start": {
-              "line": 47,
+              "line": 50,
               "column": 30
             },
             "end": {
-              "line": 47,
+              "line": 50,
               "column": 32
             }
           },
@@ -1440,11 +1531,11 @@
             "nodeType": "member_call_expression",
             "text": "$cart->items()",
             "start": {
-              "line": 52,
+              "line": 55,
               "column": 15
             },
             "end": {
-              "line": 52,
+              "line": 55,
               "column": 29
             }
           },
@@ -1453,11 +1544,11 @@
             "nodeType": "variable_name",
             "text": "$cart",
             "start": {
-              "line": 52,
+              "line": 55,
               "column": 15
             },
             "end": {
-              "line": 52,
+              "line": 55,
               "column": 20
             }
           },
@@ -1466,11 +1557,11 @@
             "nodeType": "name",
             "text": "items",
             "start": {
-              "line": 52,
+              "line": 55,
               "column": 22
             },
             "end": {
-              "line": 52,
+              "line": 55,
               "column": 27
             }
           },
@@ -1479,11 +1570,11 @@
             "nodeType": "arguments",
             "text": "()",
             "start": {
-              "line": 52,
+              "line": 55,
               "column": 27
             },
             "end": {
-              "line": 52,
+              "line": 55,
               "column": 29
             }
           },
@@ -1492,11 +1583,11 @@
             "nodeType": "function_call_expression",
             "text": "format_price($item[\"price\"], \"USD\")",
             "start": {
-              "line": 53,
+              "line": 56,
               "column": 17
             },
             "end": {
-              "line": 53,
+              "line": 56,
               "column": 52
             }
           },
@@ -1505,11 +1596,11 @@
             "nodeType": "name",
             "text": "format_price",
             "start": {
-              "line": 53,
+              "line": 56,
               "column": 17
             },
             "end": {
-              "line": 53,
+              "line": 56,
               "column": 29
             }
           },
@@ -1518,11 +1609,11 @@
             "nodeType": "arguments",
             "text": "($item[\"price\"], \"USD\")",
             "start": {
-              "line": 53,
+              "line": 56,
               "column": 29
             },
             "end": {
-              "line": 53,
+              "line": 56,
               "column": 52
             }
           },
@@ -1531,11 +1622,11 @@
             "nodeType": "encapsed_string",
             "text": "\"USD\"",
             "start": {
-              "line": 53,
+              "line": 56,
               "column": 46
             },
             "end": {
-              "line": 53,
+              "line": 56,
               "column": 51
             }
           }
@@ -6176,7 +6267,7 @@
           "specifier": "'partials/user.php'",
           "names": [],
           "position": {
-            "line": 46,
+            "line": 49,
             "column": 16
           },
           "form": "include",
@@ -6186,7 +6277,7 @@
           "specifier": "'partials/login.php'",
           "names": [],
           "position": {
-            "line": 49,
+            "line": 52,
             "column": 16
           },
           "form": "include",

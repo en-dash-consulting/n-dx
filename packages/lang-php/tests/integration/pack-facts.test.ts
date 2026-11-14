@@ -75,6 +75,13 @@ describe("php pack facts", () => {
     expect(index.calls).toContainEqual({ callee: "Shop_Cart", construct: true, strings: [] });
   });
 
+  it("names a call written with a space before its argument list", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const index = (await facts()).get("php52/index.php")!;
+    expect(index.calls).toContainEqual({ callee: "mysql_query", strings: [] });
+    expect(index.calls).toContainEqual({ callee: "query", receiver: "$db", strings: [] });
+  });
+
   it("guards an include assigned with ??=, and names a `new` written with a space before its arguments", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const projectDir = mkdtempSync(join(tmpdir(), "lang-php-facts-"));

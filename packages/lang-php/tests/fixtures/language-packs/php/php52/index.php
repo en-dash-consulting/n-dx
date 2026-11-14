@@ -38,6 +38,9 @@ foreach ($plugins as $plugin) {
 $cart = new Shop_Cart;
 $cart->addItem('sku-1', 2);
 $total = Shop_Cart::format($cart->total());
+// A space before the argument list still names the call.
+$result = mysql_query ($sql);
+$rows = $db->query ($sql);
 ?>
 <html>
 <head><title><?php echo htmlspecialchars($title); ?></title></head>
