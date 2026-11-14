@@ -62,10 +62,14 @@ items:
     lastModified: "2026-11-12T17:53:30.628Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3ab4bb09-5f4b-4127-bb01-8aca612cd9b4":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T06:07:20.192Z"
-    activeIntervals: [{"start":"2026-11-14T06:07:20.192Z"}]
-    lastModified: "2026-11-14T06:07:20.890Z"
+    completedAt: "2026-11-14T06:18:22.855Z"
+    endedAt: "2026-11-14T06:18:22.855Z"
+    activeIntervals: [{"end":"2026-11-14T06:18:22.855Z","start":"2026-11-14T06:07:20.192Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "reclaimIfStale + prepareSpawn hook at every confined spawn and hench validation step; rule 4a documents namespace reuse"
+    lastModified: "2026-11-14T06:18:22.855Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3f564624-cbee-4520-b9f6-247ccfc8e92a":
     status: "completed"

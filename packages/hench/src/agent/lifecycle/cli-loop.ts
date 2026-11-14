@@ -922,6 +922,12 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
   // or no backend is usable. The argv passes through verbatim.
   const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { cliBinary });
   await sandbox?.prepareSpawn();
+  // An abort that fired during the await above has no listener to reach yet.
+  if (abortSignal?.aborted) {
+    sandbox?.dispose();
+    const reason = describeAbortReason(abortSignal.reason);
+    return { ...emptySpawnResult(), error: reason, aborted: { reason } };
+  }
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
