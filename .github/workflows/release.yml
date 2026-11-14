@@ -66,8 +66,10 @@ jobs:
             suites: root,llm-client,lang-kit,lang-runtime,lang-java,lang-go,lang-sql,lang-terraform,lang-python
           - group: rex+sourcevision
             suites: rex,sourcevision,graview,graview-face
-          - group: hench+web
-            suites: hench,web
+          - group: hench
+            suites: hench
+          - group: web
+            suites: web
 
     steps:
       - name: Checkout
