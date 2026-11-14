@@ -197,9 +197,11 @@ export class GuardRails {
     this.deniedCommands = denials.commandPrefixes;
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
+    const parentEnv = options.env ?? process.env;
     this.childEnv = withTestMaxWorkers(
-      sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env)),
+      sanitizeChildEnv(parentEnv, compileEnvPolicy(config.env)),
       options.testMaxWorkers,
+      parentEnv,
     );
     this.sandbox = options.sandbox ?? null;
   }
