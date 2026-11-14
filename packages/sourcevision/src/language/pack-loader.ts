@@ -22,7 +22,7 @@
 import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { goConfig, isLanguagePackEntry, javaConfig, pythonConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
+import { goConfig, isLanguagePackEntry, javaConfig, phpConfig, pythonConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
 import { sourcevisionVersion } from "./package-paths.js";
 
@@ -73,6 +73,8 @@ export const KNOWN_PACKS: readonly KnownPack[] = [
   { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", config: terraformConfig, importByResolution: () => import("@n-dx/lang-terraform") },
   // No fallback parser: without it, Python files get inventory only.
   { id: pythonConfig.id, packageName: "@n-dx/lang-python", config: pythonConfig, importByResolution: () => import("@n-dx/lang-python") },
+  // No fallback parser: without it, PHP files get inventory only.
+  { id: phpConfig.id, packageName: "@n-dx/lang-php", config: phpConfig, importByResolution: () => import("@n-dx/lang-php") },
 ];
 
 /**

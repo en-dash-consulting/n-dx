@@ -1,0 +1,1801 @@
+{
+  "facts": [
+    {
+      "path": "php52/index.php",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "dirname(__FILE__) . '/lib/Shop/Cart.php'",
+            "names": [],
+            "position": {
+              "line": 3,
+              "column": 13
+            },
+            "form": "require_once"
+          },
+          {
+            "specifier": "dirname(__FILE__) . \"/config.inc.php\"",
+            "names": [],
+            "position": {
+              "line": 4,
+              "column": 13
+            },
+            "form": "require_once"
+          },
+          {
+            "specifier": "'header.php'",
+            "names": [],
+            "position": {
+              "line": 5,
+              "column": 8
+            },
+            "form": "include"
+          },
+          {
+            "specifier": "'optional.php'",
+            "names": [],
+            "position": {
+              "line": 6,
+              "column": 14
+            },
+            "form": "include_once"
+          },
+          {
+            "specifier": "SHOP_ROOT . '/local.php'",
+            "names": [],
+            "position": {
+              "line": 17,
+              "column": 12
+            },
+            "form": "include",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "'fallback.php'",
+            "names": [],
+            "position": {
+              "line": 19,
+              "column": 12
+            },
+            "form": "include",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "'defaults.php'",
+            "names": [],
+            "position": {
+              "line": 21,
+              "column": 12
+            },
+            "form": "require",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "'compat/json.php'",
+            "names": [],
+            "position": {
+              "line": 24,
+              "column": 47
+            },
+            "form": "require_once",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "'settings.php'",
+            "names": [],
+            "position": {
+              "line": 25,
+              "column": 18
+            },
+            "form": "require"
+          },
+          {
+            "specifier": "'boot.php' or die('boot failed')",
+            "names": [],
+            "position": {
+              "line": 26,
+              "column": 8
+            },
+            "form": "require"
+          },
+          {
+            "specifier": "'pages/' . $page . '.php'",
+            "names": [],
+            "position": {
+              "line": 30,
+              "column": 16
+            },
+            "form": "include",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "$plugin",
+            "names": [],
+            "position": {
+              "line": 35,
+              "column": 17
+            },
+            "form": "include_once",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "'partials/user.php'",
+            "names": [],
+            "position": {
+              "line": 49,
+              "column": 16
+            },
+            "form": "include",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "'partials/login.php'",
+            "names": [],
+            "position": {
+              "line": 52,
+              "column": 16
+            },
+            "form": "include",
+            "guard": "conditional"
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "SHOP_ROOT",
+          "kind": "constant",
+          "position": {
+            "line": 8,
+            "column": 7
+          },
+          "span": {
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 38
+            }
+          }
+        },
+        {
+          "name": "SHOP_VERSION",
+          "kind": "constant",
+          "position": {
+            "line": 9,
+            "column": 7
+          },
+          "span": {
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 29
+            }
+          }
+        },
+        {
+          "name": "SHOP_DEBUG",
+          "kind": "constant",
+          "position": {
+            "line": 13,
+            "column": 11
+          },
+          "span": {
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 31
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "dirname",
+          "strings": []
+        },
+        {
+          "callee": "dirname",
+          "strings": []
+        },
+        {
+          "callee": "define",
+          "strings": [
+            {
+              "text": "'SHOP_ROOT'",
+              "start": {
+                "line": 8,
+                "column": 7
+              },
+              "end": {
+                "line": 8,
+                "column": 18
+              }
+            }
+          ]
+        },
+        {
+          "callee": "dirname",
+          "strings": []
+        },
+        {
+          "callee": "define",
+          "strings": [
+            {
+              "text": "\"SHOP_VERSION\"",
+              "start": {
+                "line": 9,
+                "column": 7
+              },
+              "end": {
+                "line": 9,
+                "column": 21
+              }
+            },
+            {
+              "text": "'1.0'",
+              "start": {
+                "line": 9,
+                "column": 23
+              },
+              "end": {
+                "line": 9,
+                "column": 28
+              }
+            }
+          ]
+        },
+        {
+          "callee": "define",
+          "strings": []
+        },
+        {
+          "callee": "defined",
+          "strings": [
+            {
+              "text": "'SHOP_DEBUG'",
+              "start": {
+                "line": 12,
+                "column": 13
+              },
+              "end": {
+                "line": 12,
+                "column": 25
+              }
+            }
+          ]
+        },
+        {
+          "callee": "define",
+          "strings": [
+            {
+              "text": "'SHOP_DEBUG'",
+              "start": {
+                "line": 13,
+                "column": 11
+              },
+              "end": {
+                "line": 13,
+                "column": 23
+              }
+            }
+          ]
+        },
+        {
+          "callee": "file_exists",
+          "strings": []
+        },
+        {
+          "callee": "function_exists",
+          "strings": [
+            {
+              "text": "'json_encode'",
+              "start": {
+                "line": 24,
+                "column": 16
+              },
+              "end": {
+                "line": 24,
+                "column": 29
+              }
+            }
+          ]
+        },
+        {
+          "callee": "die",
+          "strings": [
+            {
+              "text": "'boot failed'",
+              "start": {
+                "line": 26,
+                "column": 26
+              },
+              "end": {
+                "line": 26,
+                "column": 39
+              }
+            }
+          ]
+        },
+        {
+          "callee": "Shop_Cart",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "addItem",
+          "receiver": "$cart",
+          "strings": [
+            {
+              "text": "'sku-1'",
+              "start": {
+                "line": 39,
+                "column": 15
+              },
+              "end": {
+                "line": 39,
+                "column": 22
+              }
+            }
+          ]
+        },
+        {
+          "callee": "format",
+          "receiver": "Shop_Cart",
+          "strings": []
+        },
+        {
+          "callee": "total",
+          "receiver": "$cart",
+          "strings": []
+        },
+        {
+          "callee": "mysql_query",
+          "strings": []
+        },
+        {
+          "callee": "query",
+          "receiver": "$db",
+          "strings": []
+        },
+        {
+          "callee": "htmlspecialchars",
+          "strings": []
+        },
+        {
+          "callee": "getName",
+          "receiver": "$user",
+          "strings": []
+        },
+        {
+          "callee": "items",
+          "receiver": "$cart",
+          "strings": []
+        },
+        {
+          "callee": "format_price",
+          "strings": [
+            {
+              "text": "\"USD\"",
+              "start": {
+                "line": 56,
+                "column": 46
+              },
+              "end": {
+                "line": 56,
+                "column": 51
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "php52/lib/Shop/Cart.php",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "dirname(__FILE__) . '/../Shop.php'",
+            "names": [],
+            "position": {
+              "line": 2,
+              "column": 13
+            },
+            "form": "require_once"
+          },
+          {
+            "specifier": "'Shop/Pricing.php'",
+            "names": [],
+            "position": {
+              "line": 23,
+              "column": 21
+            },
+            "form": "require_once",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "dirname(__FILE__) . '/money.inc'",
+            "names": [],
+            "position": {
+              "line": 49,
+              "column": 21
+            },
+            "form": "include_once",
+            "guard": "conditional"
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "Shop_Cart",
+          "kind": "class",
+          "position": {
+            "line": 4,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 31,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "Shop_Cart",
+          "kind": "constructor",
+          "position": {
+            "line": 8,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 5
+            }
+          },
+          "container": "Shop_Cart"
+        },
+        {
+          "name": "addItem",
+          "kind": "method",
+          "position": {
+            "line": 14,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 14,
+              "column": 4
+            },
+            "end": {
+              "line": 19,
+              "column": 5
+            }
+          },
+          "container": "Shop_Cart"
+        },
+        {
+          "name": "total",
+          "kind": "method",
+          "position": {
+            "line": 21,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 21,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 5
+            }
+          },
+          "container": "Shop_Cart"
+        },
+        {
+          "name": "format",
+          "kind": "method",
+          "position": {
+            "line": 27,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 5
+            }
+          },
+          "container": "Shop_Cart"
+        },
+        {
+          "name": "Shop_Order",
+          "kind": "class",
+          "position": {
+            "line": 33,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 33,
+              "column": 0
+            },
+            "end": {
+              "line": 44,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "__construct",
+          "kind": "constructor",
+          "position": {
+            "line": 35,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 35,
+              "column": 4
+            },
+            "end": {
+              "line": 38,
+              "column": 5
+            }
+          },
+          "container": "Shop_Order"
+        },
+        {
+          "name": "Shop_Order",
+          "kind": "method",
+          "position": {
+            "line": 40,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 40,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 5
+            }
+          },
+          "container": "Shop_Order"
+        },
+        {
+          "name": "format_price",
+          "kind": "function",
+          "position": {
+            "line": 46,
+            "column": 9
+          },
+          "span": {
+            "start": {
+              "line": 46,
+              "column": 0
+            },
+            "end": {
+              "line": 52,
+              "column": 1
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "dirname",
+          "strings": []
+        },
+        {
+          "callee": "Shop_Base",
+          "receiver": "parent",
+          "strings": []
+        },
+        {
+          "callee": "log",
+          "receiver": "$this",
+          "strings": []
+        },
+        {
+          "callee": "write",
+          "receiver": "Shop_Logger",
+          "strings": [
+            {
+              "text": "'cart'",
+              "start": {
+                "line": 18,
+                "column": 27
+              },
+              "end": {
+                "line": 18,
+                "column": 33
+              }
+            }
+          ]
+        },
+        {
+          "callee": "sum",
+          "receiver": "Shop_Pricing",
+          "strings": []
+        },
+        {
+          "callee": "sprintf",
+          "strings": [
+            {
+              "text": "'%.2f'",
+              "start": {
+                "line": 29,
+                "column": 23
+              },
+              "end": {
+                "line": 29,
+                "column": 29
+              }
+            }
+          ]
+        },
+        {
+          "callee": "__construct",
+          "receiver": "$this",
+          "strings": []
+        },
+        {
+          "callee": "function_exists",
+          "strings": [
+            {
+              "text": "'money_format'",
+              "start": {
+                "line": 48,
+                "column": 25
+              },
+              "end": {
+                "line": 48,
+                "column": 39
+              }
+            }
+          ]
+        },
+        {
+          "callee": "dirname",
+          "strings": []
+        },
+        {
+          "callee": "number_format",
+          "strings": []
+        }
+      ]
+    },
+    {
+      "path": "php53/src/Shop/Order.php",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "Acme\\Billing\\Invoice",
+            "names": [],
+            "position": {
+              "line": 5,
+              "column": 4
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "Acme\\Billing\\Gateway",
+            "names": [],
+            "position": {
+              "line": 6,
+              "column": 4
+            },
+            "form": "use",
+            "alias": "PaymentGateway"
+          },
+          {
+            "specifier": "Acme\\Support\\Clock",
+            "names": [],
+            "position": {
+              "line": 6,
+              "column": 44
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "Acme\\Support\\money_format",
+            "names": [],
+            "position": {
+              "line": 7,
+              "column": 13
+            },
+            "form": "use function"
+          },
+          {
+            "specifier": "Acme\\Support\\CURRENCY",
+            "names": [],
+            "position": {
+              "line": 8,
+              "column": 10
+            },
+            "form": "use const"
+          },
+          {
+            "specifier": "Acme\\Shipping\\Carrier",
+            "names": [],
+            "position": {
+              "line": 9,
+              "column": 19
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "Acme\\Shipping\\Parcel",
+            "names": [],
+            "position": {
+              "line": 9,
+              "column": 28
+            },
+            "form": "use",
+            "alias": "Box"
+          },
+          {
+            "specifier": "Acme\\Shipping\\weigh",
+            "names": [],
+            "position": {
+              "line": 9,
+              "column": 52
+            },
+            "form": "use function"
+          },
+          {
+            "specifier": "Acme\\Shipping\\MAX_WEIGHT",
+            "names": [],
+            "position": {
+              "line": 9,
+              "column": 65
+            },
+            "form": "use const"
+          },
+          {
+            "specifier": "\\Psr\\Log\\LoggerInterface",
+            "names": [],
+            "position": {
+              "line": 10,
+              "column": 4
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "__DIR__ . '/../bootstrap.php'",
+            "names": [],
+            "position": {
+              "line": 12,
+              "column": 13
+            },
+            "form": "require_once"
+          },
+          {
+            "specifier": "$file",
+            "names": [],
+            "position": {
+              "line": 75,
+              "column": 20
+            },
+            "form": "require",
+            "guard": "conditional"
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "Acme\\Shop",
+          "kind": "namespace",
+          "position": {
+            "line": 3,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 20
+            }
+          }
+        },
+        {
+          "name": "STATUS_OPEN",
+          "kind": "constant",
+          "position": {
+            "line": 14,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 26
+            }
+          }
+        },
+        {
+          "name": "STATUS_PAID",
+          "kind": "constant",
+          "position": {
+            "line": 14,
+            "column": 28
+          },
+          "span": {
+            "start": {
+              "line": 14,
+              "column": 28
+            },
+            "end": {
+              "line": 14,
+              "column": 48
+            }
+          }
+        },
+        {
+          "name": "Payable",
+          "kind": "interface",
+          "position": {
+            "line": 16,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 16,
+              "column": 0
+            },
+            "end": {
+              "line": 21,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "CURRENCY",
+          "kind": "constant",
+          "position": {
+            "line": 18,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 26
+            }
+          },
+          "container": "Payable"
+        },
+        {
+          "name": "pay",
+          "kind": "method",
+          "position": {
+            "line": 20,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 20,
+              "column": 49
+            }
+          },
+          "container": "Payable"
+        },
+        {
+          "name": "Timestamps",
+          "kind": "trait",
+          "position": {
+            "line": 23,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 23,
+              "column": 0
+            },
+            "end": {
+              "line": 31,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "touch",
+          "kind": "method",
+          "position": {
+            "line": 27,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 5
+            }
+          },
+          "container": "Timestamps"
+        },
+        {
+          "name": "Model",
+          "kind": "class",
+          "position": {
+            "line": 33,
+            "column": 15
+          },
+          "span": {
+            "start": {
+              "line": 33,
+              "column": 0
+            },
+            "end": {
+              "line": 36,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "id",
+          "kind": "method",
+          "position": {
+            "line": 35,
+            "column": 29
+          },
+          "span": {
+            "start": {
+              "line": 35,
+              "column": 4
+            },
+            "end": {
+              "line": 35,
+              "column": 34
+            }
+          },
+          "container": "Model"
+        },
+        {
+          "name": "Order",
+          "kind": "class",
+          "position": {
+            "line": 38,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 38,
+              "column": 0
+            },
+            "end": {
+              "line": 80,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "TABLE",
+          "kind": "constant",
+          "position": {
+            "line": 42,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 26
+            }
+          },
+          "container": "Order"
+        },
+        {
+          "name": "__construct",
+          "kind": "constructor",
+          "position": {
+            "line": 46,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 46,
+              "column": 4
+            },
+            "end": {
+              "line": 50,
+              "column": 5
+            }
+          },
+          "container": "Order"
+        },
+        {
+          "name": "Order",
+          "kind": "method",
+          "position": {
+            "line": 52,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 52,
+              "column": 4
+            },
+            "end": {
+              "line": 55,
+              "column": 5
+            }
+          },
+          "container": "Order"
+        },
+        {
+          "name": "id",
+          "kind": "method",
+          "position": {
+            "line": 57,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 57,
+              "column": 4
+            },
+            "end": {
+              "line": 60,
+              "column": 5
+            }
+          },
+          "container": "Order"
+        },
+        {
+          "name": "pay",
+          "kind": "method",
+          "position": {
+            "line": 62,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 62,
+              "column": 4
+            },
+            "end": {
+              "line": 70,
+              "column": 5
+            }
+          },
+          "container": "Order"
+        },
+        {
+          "name": "load",
+          "kind": "method",
+          "position": {
+            "line": 72,
+            "column": 27
+          },
+          "span": {
+            "start": {
+              "line": 72,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 5
+            }
+          },
+          "container": "Order"
+        },
+        {
+          "name": "order_total",
+          "kind": "function",
+          "position": {
+            "line": 82,
+            "column": 9
+          },
+          "span": {
+            "start": {
+              "line": 82,
+              "column": 0
+            },
+            "end": {
+              "line": 85,
+              "column": 1
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "now",
+          "receiver": "Clock",
+          "strings": []
+        },
+        {
+          "callee": "touch",
+          "receiver": "$this",
+          "strings": []
+        },
+        {
+          "callee": "spl_object_hash",
+          "strings": []
+        },
+        {
+          "callee": "Invoice",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "array_reduce",
+          "strings": []
+        },
+        {
+          "callee": "price",
+          "receiver": "$invoice",
+          "strings": []
+        },
+        {
+          "callee": "info",
+          "receiver": "$this->logger",
+          "strings": [
+            {
+              "text": "'paid'",
+              "start": {
+                "line": 68,
+                "column": 28
+              },
+              "end": {
+                "line": 68,
+                "column": 34
+              }
+            }
+          ]
+        },
+        {
+          "callee": "charge",
+          "receiver": "$gateway",
+          "strings": []
+        },
+        {
+          "callee": "money_format",
+          "strings": []
+        },
+        {
+          "callee": "Box",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "weigh",
+          "strings": []
+        },
+        {
+          "strings": []
+        },
+        {
+          "callee": "static",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "call_user_func",
+          "strings": []
+        }
+      ]
+    },
+    {
+      "path": "php53/src/Shop/braced.php",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "Acme\\Shop\\Order",
+            "names": [],
+            "position": {
+              "line": 3,
+              "column": 8
+            },
+            "form": "use"
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "Acme\\Shop\\Legacy",
+          "kind": "namespace",
+          "position": {
+            "line": 2,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "Cart",
+          "kind": "class",
+          "position": {
+            "line": 5,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 11,
+              "column": 5
+            }
+          }
+        },
+        {
+          "name": "Cart",
+          "kind": "method",
+          "position": {
+            "line": 7,
+            "column": 17
+          },
+          "span": {
+            "start": {
+              "line": 7,
+              "column": 8
+            },
+            "end": {
+              "line": 10,
+              "column": 9
+            }
+          },
+          "container": "Cart"
+        },
+        {
+          "name": "helper",
+          "kind": "function",
+          "position": {
+            "line": 13,
+            "column": 13
+          },
+          "span": {
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 5
+            }
+          }
+        },
+        {
+          "name": "GlobalCart",
+          "kind": "class",
+          "position": {
+            "line": 20,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 5
+            }
+          }
+        },
+        {
+          "name": "GlobalCart",
+          "kind": "constructor",
+          "position": {
+            "line": 22,
+            "column": 17
+          },
+          "span": {
+            "start": {
+              "line": 22,
+              "column": 8
+            },
+            "end": {
+              "line": 24,
+              "column": 9
+            }
+          },
+          "container": "GlobalCart"
+        },
+        {
+          "name": "GLOBAL_CART",
+          "kind": "constant",
+          "position": {
+            "line": 27,
+            "column": 11
+          },
+          "span": {
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 27,
+              "column": 31
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "Order",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "\\strlen",
+          "strings": [
+            {
+              "text": "'x'",
+              "start": {
+                "line": 15,
+                "column": 23
+              },
+              "end": {
+                "line": 15,
+                "column": 26
+              }
+            }
+          ]
+        },
+        {
+          "callee": "define",
+          "strings": [
+            {
+              "text": "'GLOBAL_CART'",
+              "start": {
+                "line": 27,
+                "column": 11
+              },
+              "end": {
+                "line": 27,
+                "column": 24
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "php8/src/Orders/OrderService.php",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "App\\Billing\\Invoice",
+            "names": [],
+            "position": {
+              "line": 7,
+              "column": 4
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "App\\Orders\\Events\\OrderPaid",
+            "names": [],
+            "position": {
+              "line": 8,
+              "column": 23
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "App\\Orders\\Events\\OrderShipped",
+            "names": [],
+            "position": {
+              "line": 8,
+              "column": 34
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "Attribute",
+            "names": [],
+            "position": {
+              "line": 9,
+              "column": 4
+            },
+            "form": "use"
+          },
+          {
+            "specifier": "App\\Support\\money",
+            "names": [],
+            "position": {
+              "line": 11,
+              "column": 13
+            },
+            "form": "use function"
+          },
+          {
+            "specifier": "__DIR__ . '/plugins/windows.php'",
+            "names": [],
+            "position": {
+              "line": 66,
+              "column": 33
+            },
+            "form": "require",
+            "guard": "conditional"
+          },
+          {
+            "specifier": "__DIR__ . '/plugins/posix.php'",
+            "names": [],
+            "position": {
+              "line": 67,
+              "column": 31
+            },
+            "form": "require",
+            "guard": "conditional"
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "App\\Orders",
+          "kind": "namespace",
+          "position": {
+            "line": 5,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 21
+            }
+          }
+        },
+        {
+          "name": "Audited",
+          "kind": "class",
+          "position": {
+            "line": 14,
+            "column": 12
+          },
+          "span": {
+            "start": {
+              "line": 13,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "__construct",
+          "kind": "constructor",
+          "position": {
+            "line": 16,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 16,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 78
+            }
+          },
+          "container": "Audited"
+        },
+        {
+          "name": "Status",
+          "kind": "enum",
+          "position": {
+            "line": 19,
+            "column": 5
+          },
+          "span": {
+            "start": {
+              "line": 19,
+              "column": 0
+            },
+            "end": {
+              "line": 33,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "DEFAULT",
+          "kind": "constant",
+          "position": {
+            "line": 24,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 30
+            }
+          },
+          "container": "Status"
+        },
+        {
+          "name": "label",
+          "kind": "method",
+          "position": {
+            "line": 26,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 26,
+              "column": 4
+            },
+            "end": {
+              "line": 32,
+              "column": 5
+            }
+          },
+          "container": "Status"
+        },
+        {
+          "name": "OrderService",
+          "kind": "class",
+          "position": {
+            "line": 36,
+            "column": 12
+          },
+          "span": {
+            "start": {
+              "line": 35,
+              "column": 0
+            },
+            "end": {
+              "line": 71,
+              "column": 1
+            }
+          }
+        },
+        {
+          "name": "MAX_LINES",
+          "kind": "constant",
+          "position": {
+            "line": 38,
+            "column": 21
+          },
+          "span": {
+            "start": {
+              "line": 38,
+              "column": 21
+            },
+            "end": {
+              "line": 38,
+              "column": 36
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "__construct",
+          "kind": "constructor",
+          "position": {
+            "line": 40,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 40,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 8
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "label",
+          "kind": "method",
+          "position": {
+            "line": 45,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 45,
+              "column": 4
+            },
+            "end": {
+              "line": 52,
+              "column": 5
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "events",
+          "kind": "method",
+          "position": {
+            "line": 54,
+            "column": 20
+          },
+          "span": {
+            "start": {
+              "line": 54,
+              "column": 4
+            },
+            "end": {
+              "line": 70,
+              "column": 5
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "__construct",
+          "kind": "constructor",
+          "position": {
+            "line": 58,
+            "column": 28
+          },
+          "span": {
+            "start": {
+              "line": 58,
+              "column": 12
+            },
+            "end": {
+              "line": 58,
+              "column": 70
+            }
+          }
+        },
+        {
+          "name": "handle",
+          "kind": "method",
+          "position": {
+            "line": 60,
+            "column": 28
+          },
+          "span": {
+            "start": {
+              "line": 60,
+              "column": 12
+            },
+            "end": {
+              "line": 63,
+              "column": 13
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "ucfirst",
+          "strings": []
+        },
+        {
+          "callee": "status",
+          "receiver": "$invoice",
+          "strings": []
+        },
+        {
+          "callee": "money",
+          "strings": []
+        },
+        {
+          "callee": "total",
+          "receiver": "$invoice",
+          "strings": []
+        },
+        {
+          "callee": "OrderPaid",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "find",
+          "receiver": "$this->orders",
+          "strings": []
+        },
+        {
+          "callee": "ship",
+          "receiver": "$this->orders->find($id)",
+          "strings": []
+        },
+        {
+          "strings": [
+            {
+              "text": "'a'",
+              "start": {
+                "line": 69,
+                "column": 22
+              },
+              "end": {
+                "line": 69,
+                "column": 25
+              }
+            }
+          ]
+        },
+        {
+          "callee": "OrderShipped",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "Repository",
+          "construct": true,
+          "strings": []
+        },
+        {
+          "callee": "all",
+          "receiver": "(new Repository)",
+          "strings": []
+        }
+      ]
+    }
+  ],
+  "unparsed": []
+}

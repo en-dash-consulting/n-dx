@@ -64,6 +64,18 @@ Python file with routes (and `totalServerRoutes`), and
 outbound.json a dependency per Python outbound call; no sourcevision code
 is Python-specific.
 
+### PHP
+
+`@n-dx/lang-php` is an opt-in `KNOWN_PACKS` entry with no fallback parser.
+It reports imports as written and resolves none, so with or without it
+imports.json is unchanged; installed and running, it joins
+`analysedLanguages` with no edges, and missing and unlisted, it is only
+suggested (`tests/integration/php-pack-imports.test.ts`). Over the pinned
+corpus (`php-corpus.json`, `php5` marking the PHP 5 era repositories),
+`scripts/php-corpus-report.mjs` measures the clean-parse rate of the files
+analyze would parse, per repository and for the PHP 5 repositories against
+decision D4's 99.5% bar.
+
 ### The Terraform model in infrastructure.json
 
 The Terraform pack produces `resources` facts, not imports.

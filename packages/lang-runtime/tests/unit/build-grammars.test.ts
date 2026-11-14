@@ -1,17 +1,19 @@
 /** The grammar build script's options: where grammars land and which are built. */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   GRAMMARS,
   TOOLCHAIN_PLATFORM,
   TREE_SITTER_CLI,
   WASM_TOOLCHAIN,
+  grammarBuildSteps,
+  grammarSourceDir,
   grammarWasmPath,
   isMainModule,
   parseBuildArgs,
@@ -75,6 +77,70 @@ describe("build-grammars main-module guard", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("build-grammars grammar subdirectory", () => {
+  const source = resolve("build/src/tree-sitter-php-0.25.1");
+
+  it("builds at the archive root when the grammar names no subdir", () => {
+    expect(grammarSourceDir(source, GRAMMARS["tree-sitter-python"])).toBe(source);
+  });
+
+  it("builds tree-sitter-php from its php/ grammar (PHP mixed with HTML), not php_only/", () => {
+    expect(GRAMMARS["tree-sitter-php"].subdir).toBe("php");
+    expect(grammarSourceDir(source, GRAMMARS["tree-sitter-php"])).toBe(join(source, "php"));
+  });
+
+  it("refuses a subdir that leaves the archive", () => {
+    expect(() => grammarSourceDir(source, { subdir: "../elsewhere" })).toThrow(/not inside its archive/);
+    expect(() => grammarSourceDir(source, { subdir: "." })).toThrow(/not inside its archive/);
+    expect(() => grammarSourceDir(source, { subdir: resolve("/abs") })).toThrow(/not inside its archive/);
+  });
+
+  it("names only relative subdirs inside the archive in GRAMMARS", () => {
+    for (const [name, grammar] of Object.entries(GRAMMARS)) {
+      expect(() => grammarSourceDir(source, grammar), name).not.toThrow();
+    }
+  });
+
+  describe("build steps over an extracted archive", () => {
+    let archive = "";
+    beforeEach(() => {
+      archive = mkdtempSync(join(tmpdir(), "build-grammars-src-"));
+    });
+    afterEach(() => rmSync(archive, { recursive: true, force: true }));
+
+    const write = (rel: string): void => {
+      mkdirSync(dirname(join(archive, rel)), { recursive: true });
+      writeFileSync(join(archive, rel), "");
+    };
+
+    it("checks for parser.c and builds in the subdir, not at the archive root", () => {
+      write("php/src/parser.c");
+      write("php_only/src/parser.c");
+      const dir = join(archive, "php");
+      expect(grammarBuildSteps(archive, { subdir: "php" }, "/out/tree-sitter-php.wasm")).toEqual([
+        { args: ["build", "--wasm", "--output", "/out/tree-sitter-php.wasm", dir], cwd: dir },
+      ]);
+    });
+
+    it("generates in the subdir when its parser.c is missing, even with one at the root", () => {
+      write("src/parser.c");
+      write("php/grammar.js");
+      const dir = join(archive, "php");
+      expect(grammarBuildSteps(archive, { subdir: "php" }, "/out/x.wasm")).toEqual([
+        { args: ["generate"], cwd: dir },
+        { args: ["build", "--wasm", "--output", "/out/x.wasm", dir], cwd: dir },
+      ]);
+    });
+
+    it("builds at the root without a subdir", () => {
+      write("src/parser.c");
+      expect(grammarBuildSteps(archive, {}, "/out/x.wasm")).toEqual([
+        { args: ["build", "--wasm", "--output", "/out/x.wasm", archive], cwd: archive },
+      ]);
+    });
   });
 });
 

@@ -1,15 +1,53 @@
 schema: "rex/v2"
 items:
+  "2104cdb9-fd29-4472-9c32-8e2b74f973e5":
+    status: "completed"
+    startedAt: "2026-11-14T07:06:34.713Z"
+    completedAt: "2026-11-14T07:09:52.459Z"
+    endedAt: "2026-11-14T07:09:52.459Z"
+    activeIntervals: [{"end":"2026-11-14T07:09:52.459Z","start":"2026-11-14T07:06:34.713Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "callSites falls back to the invocation's own name ending last before the list; commit 4f6895488"
+    lastModified: "2026-11-14T07:09:52.459Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "220d4f19-4cf3-488b-baae-bd894498844b":
-    lastModified: "2026-11-14T05:22:20.070Z"
+    status: "completed"
+    startedAt: "2026-11-14T07:11:21.382Z"
+    completedAt: "2026-11-14T07:16:10.327Z"
+    endedAt: "2026-11-14T07:16:10.327Z"
+    activeIntervals: [{"end":"2026-11-14T07:16:10.327Z","start":"2026-11-14T07:11:21.382Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PHP corpus pins (10 repos, operator SHAs, php5 flag), clone script, report with per-repo clean-parse rate, top-10 error parents, parse time, overall and PHP 5 (D4 99.5%) lines. Operator still clones, runs and logs the measured rates."
+    lastModified: "2026-11-14T07:16:10.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5cd796e9-6177-4d40-8439-b1678e700322":
-    lastModified: "2026-11-14T05:22:16.333Z"
+    status: "completed"
+    startedAt: "2026-11-14T06:48:33.246Z"
+    completedAt: "2026-11-14T07:04:23.721Z"
+    endedAt: "2026-11-14T07:04:23.721Z"
+    activeIntervals: [{"end":"2026-11-14T07:04:23.721Z","start":"2026-11-14T06:48:33.246Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "queries/php (imports, guards, definitions, calls), php-imports.ts (written imports + no-edge resolver), php-symbols.ts (rules + constructor/global refine), goldens for php52/php53/php8 fixtures; lang-kit WrittenImport.form/alias and CallFact.construct; lang-runtime groupCalls reads new expressions and picks the nearest chained receiver."
+    lastModified: "2026-11-14T07:04:23.721Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aac5fad8-89d8-4cd4-8e2e-d1edf328c2ad":
-    lastModified: "2026-11-14T05:19:23.221Z"
+    status: "completed"
+    startedAt: "2026-11-14T06:36:47.010Z"
+    completedAt: "2026-11-14T06:45:48.389Z"
+    endedAt: "2026-11-14T06:45:48.389Z"
+    activeIntervals: [{"end":"2026-11-14T06:45:48.389Z","start":"2026-11-14T06:36:47.010Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php scaffolded with pinned tree-sitter-php (php/ subdir) and registered as an opt-in pack; build-grammars supports subdir"
+    lastModified: "2026-11-14T06:45:48.389Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd04acac-099e-4ea0-8364-84298a85678a":
+    status: "completed"
+    startedAt: "2026-11-14T07:16:10.327Z"
+    completedAt: "2026-11-14T07:16:10.327Z"
+    endedAt: "2026-11-14T07:16:10.327Z"
+    activeIntervals: [{"end":"2026-11-14T07:16:10.327Z","start":"2026-11-14T07:16:10.327Z"}]
+    appliedAt: "2026-11-14T07:16:10.327Z"
+    appliedAmendsHash: "b82d7ed24987f2362f5fde01bcd1c90fcd15f5cc1fc62e71c480246fc3728099"
     createdAt: "2026-11-14T05:17:52.622Z"
-    lastModified: "2026-11-14T05:23:50.733Z"
+    lastModified: "2026-11-14T07:16:10.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

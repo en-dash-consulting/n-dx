@@ -37,6 +37,7 @@ released together; the member list is the `fixed` group in
 | `packages/lang-java` | `@n-dx/lang-java` | Elastic-2.0 | Java language pack for sourcevision |
 | `packages/lang-go` | `@n-dx/lang-go` | Elastic-2.0 | Go language pack for sourcevision |
 | `packages/lang-python` | `@n-dx/lang-python` | Elastic-2.0 | Python language pack for sourcevision |
+| `packages/lang-php` | `@n-dx/lang-php` | Elastic-2.0 | PHP language pack for sourcevision |
 | `packages/lang-sql` | `@n-dx/lang-sql` | Elastic-2.0 | SQL language pack for sourcevision |
 | `packages/lang-terraform` | `@n-dx/lang-terraform` | Elastic-2.0 | Terraform language pack for sourcevision |
 | `packages/graview` | `@n-dx/graview` | Elastic-2.0 | Graview projection of the PRD, analysis and runs |
