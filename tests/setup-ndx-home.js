@@ -18,6 +18,8 @@
  * name and wins: the hub and token e2e tests pass `N_DX_HOME` to the CLIs they
  * spawn, which an `NDX_HOME` set here would silently override.
  *
+ * It also clears the inherited validation-slot variables; see below.
+ *
  * Once per worker process: the shared (`isolate: false`) projects re-run
  * setupFiles before every test file in the same process, and a directory and
  * exit listener per file would pile up (Node warns past ten listeners).
@@ -36,3 +38,11 @@ if (globalThis[KEY] === undefined) {
 }
 process.env.N_DX_HOME = globalThis[KEY];
 delete process.env.NDX_HOME;
+
+// The validation slot lives under the ndx home, so a test's slot is under the
+// temp home too. A suite started by a hench gate or inside hench's sandbox
+// inherits NDX_VALIDATION_SLOT_DIR (with or without the gate's token), which
+// names the real slot and wins over the ndx home: a test that takes a slot
+// for itself would then queue behind the gate that is running it.
+delete process.env.NDX_VALIDATION_SLOT;
+delete process.env.NDX_VALIDATION_SLOT_DIR;

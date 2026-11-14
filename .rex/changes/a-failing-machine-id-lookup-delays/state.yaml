@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "2387d5ba-7b2a-4886-a4a2-b58fe3f2a70d":
+    status: "completed"
+    startedAt: "2026-11-14T06:34:57.236Z"
+    completedAt: "2026-11-14T06:34:57.236Z"
+    endedAt: "2026-11-14T06:34:57.236Z"
+    activeIntervals: [{"end":"2026-11-14T06:34:57.236Z","start":"2026-11-14T06:34:57.236Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed in e1ccf4e2b (task 5e14adef): a transient lookup failure is remembered for 60 s in both copies; reclaimHostValidationSlot uses peekValidationSlotDir, which starts a lookup without waiting and skips that reclaim. Tests count one lookup across repeated reclaims and show reclaim returns at once while a lookup never answers."
+    appliedAt: "2026-11-14T06:34:57.236Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-14T06:17:49.506Z"
+    lastModified: "2026-11-14T06:34:57.236Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

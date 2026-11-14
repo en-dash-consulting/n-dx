@@ -31,9 +31,11 @@ import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
-import { createVendorCliSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
+import { createVendorCliSandbox, isSelfConfinedVendorSession, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
+import type { CreateToolSandboxOptions } from "../../guard/index.js";
 import { trackVendorProcess, terminateTrackedVendorProcess, describeAbortReason } from "../../process/run-interrupt.js";
-import { validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
+import { startHostIdentityLookup, validationSlotFromConfig, withSessionValidationSlotDir, type ValidationSlotRunOptions } from "../../process/validation-run.js";
+import type { HostIdentityCache } from "../../process/validation-slot-dir.js";
 import { createSpendGate, priceRunUsd } from "./spend-cap.js";
 import type { SpendCapExceeded, SpendGate } from "./spend-cap.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
@@ -816,6 +818,14 @@ export interface SpawnWithAdapterOptions {
    * completion check or test gate. Writes found are reported at finalization.
    */
   configBackstop?: ConfigBackstop;
+  /**
+   * Injected for tests: the vendor sandbox's setting, backend and slot seams.
+   * `hostIdentity` is also what the session's slot-directory wait reads.
+   * Production resolves the operator's setting and probes this host.
+   */
+  vendorSandbox?: Pick<CreateToolSandboxOptions, "setting" | "backend" | "reclaimSlot"> & {
+    hostIdentity?: HostIdentityCache;
+  };
 }
 
 /** Mid-spawn counters. Mutated in place; read by the heartbeat. */
@@ -906,7 +916,7 @@ function emptySpawnResult(): SpawnResult {
   return { turns: 0, toolCalls: [], tokenUsage: { input: 0, output: 0 }, turnTokenUsage: [] };
 }
 
-function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
   const {
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress, abortSignal,
@@ -917,21 +927,42 @@ function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult>
   // Vendors without a turn flag are capped here, from the event stream.
   const countSteps = maxTurns > 0 && adapter.enforcesTurnCap !== true;
 
+  // OS confinement for the vendor CLI and everything it starts; null for
+  // Codex (it confines itself) and when the operator turned the sandbox off
+  // or no backend is usable. The argv passes through verbatim.
+  const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { ...opts.vendorSandbox, cliBinary });
+  // A confined session (ours, or Codex's own under a setting that is not
+  // off) and everything it
+  // starts (an agent's own `pnpm test`) get the host-resolved slot directory,
+  // so none of them runs the host lookup. The session keeps its environment
+  // for its whole life, so this one spawn waits for the lookup (bounded,
+  // abortable) where per-command spawns only peek.
+  const sessionEnv = sandbox || isSelfConfinedVendorSession(cwd, adapter.vendor, opts.vendorSandbox)
+    ? await withSessionValidationSlotDir(cliEnv, {
+      cache: opts.vendorSandbox?.hostIdentity,
+      signal: abortSignal,
+      warn: (line) => info(`⚠ ${line}`),
+    })
+    : cliEnv;
+  const spawnEnv = sandbox ? await sandbox.prepareSpawn(sessionEnv) : sessionEnv;
+  // An abort that fired during the await above has no listener to reach yet.
+  if (abortSignal?.aborted) {
+    sandbox?.dispose();
+    const reason = describeAbortReason(abortSignal.reason);
+    return { ...emptySpawnResult(), error: reason, aborted: { reason } };
+  }
+
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
     // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
     // with a self-quoted verbatim command line instead of shell:true+args.
-    // OS confinement for the vendor CLI and everything it starts; null for
-    // Codex (it confines itself) and when the operator turned the sandbox off
-    // or no backend is usable. The argv passes through verbatim.
-    const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { cliBinary });
     const inv = sandbox
       ? sandbox.wrap(cliBinary, [...spawnConfig.args])
       : { file: cliBinary, args: [...spawnConfig.args], env: {} };
     const proc = spawnCli(inv.file, inv.args, {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: { ...cliEnv, ...inv.env },
+      env: { ...spawnEnv, ...inv.env },
     });
     if (sandbox) proc.once("close", () => sandbox.dispose());
 
@@ -2581,8 +2612,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     const sandboxPosture = resolveSandboxPosture(projectDir).posture;
     assertSandboxReady(sandboxPosture, autonomous);
     stream("Guard", formatSandboxPosture(sandboxPosture));
+    // Read on the host now, so the confined CLI is handed the slot directory.
+    if (sandboxPosture.state === "confined") startHostIdentityLookup();
   } else {
     stream("Guard", `sandbox: managed by the ${vendor} CLI`);
+    // A self-confined session gets the slot directory too; see `spawnVendorProcess`.
+    if (isSelfConfinedVendorSession(projectDir, vendor)) startHostIdentityLookup();
   }
 
   await transitionToInProgress(store, taskId, brief.task.status);

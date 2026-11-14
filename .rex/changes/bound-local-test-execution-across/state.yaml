@@ -1,7 +1,12 @@
 schema: "rex/v2"
 items:
   "115f26b3-76f5-4714-b171-160e12c2bcab":
-    lastModified: "2026-11-12T17:28:27.063Z"
+    status: "completed"
+    startedAt: "2026-11-12T18:52:24.775Z"
+    completedAt: "2026-11-12T18:54:11.451Z"
+    endedAt: "2026-11-12T18:54:11.451Z"
+    activeIntervals: [{"end":"2026-11-12T18:54:11.451Z","start":"2026-11-12T18:52:24.775Z"}]
+    lastModified: "2026-11-12T18:54:11.451Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1bb5db41-3b76-446f-92b9-dda76a5f0b54":
     status: "completed"
@@ -56,6 +61,26 @@ items:
     resolutionDetail: "Documented NDX_TEST_MAX_WORKERS (TESTING.md) and hench.testGate.maxWorkers (configuration.md, packages/hench.md); added patch changeset for @n-dx/hench."
     lastModified: "2026-11-12T17:53:30.628Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3ab4bb09-5f4b-4127-bb01-8aca612cd9b4":
+    status: "completed"
+    startedAt: "2026-11-14T06:07:20.192Z"
+    completedAt: "2026-11-14T06:18:22.855Z"
+    endedAt: "2026-11-14T06:18:22.855Z"
+    activeIntervals: [{"end":"2026-11-14T06:18:22.855Z","start":"2026-11-14T06:07:20.192Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "reclaimIfStale + prepareSpawn hook at every confined spawn and hench validation step; rule 4a documents namespace reuse"
+    lastModified: "2026-11-14T06:18:22.855Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3f564624-cbee-4520-b9f6-247ccfc8e92a":
+    status: "completed"
+    startedAt: "2026-11-12T22:19:06.222Z"
+    completedAt: "2026-11-12T22:31:03.630Z"
+    endedAt: "2026-11-12T22:31:03.630Z"
+    activeIntervals: [{"end":"2026-11-12T22:31:03.630Z","start":"2026-11-12T22:19:06.222Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot protocol rule 4a: records carry the writer's PID namespace and enclosing chain; the bwrap sandbox sets NDX_OUTER_PID_NAMESPACES; both implementations judge foreign-namespace pids by namespace, so nesting and waiting work under bubblewrap."
+    lastModified: "2026-11-12T22:31:03.630Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "40b7cd84-8bcc-4175-8bd0-92b8ea8ea290":
     status: "completed"
     startedAt: "2026-11-12T17:55:08.873Z"
@@ -92,6 +117,36 @@ items:
   "53be00af-2a22-4259-a5ce-ef69d8171b17":
     lastModified: "2026-11-12T18:42:07.287Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "58c29a6c-14b2-474e-acfb-237613391f80":
+    status: "completed"
+    startedAt: "2026-11-14T06:38:34.411Z"
+    completedAt: "2026-11-14T06:50:55.347Z"
+    endedAt: "2026-11-14T06:50:55.347Z"
+    activeIntervals: [{"end":"2026-11-14T06:50:55.347Z","start":"2026-11-14T06:38:34.411Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "9d828a7fd: the vendor CLI session spawn waits for the host lookup (withSessionValidationSlotDir, bounded by LOOKUP_TIMEOUT_MS, abortable) and passes NDX_VALIDATION_SLOT_DIR; Codex sessions get it unless the sandbox setting is off; failure spawns without it with one warning; per-command spawns still peek."
+    lastModified: "2026-11-14T06:50:55.347Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5bd00ff5-6790-498b-be8c-123681df0b4b":
+    status: "completed"
+    startedAt: "2026-11-14T06:02:27.114Z"
+    completedAt: "2026-11-14T06:07:10.035Z"
+    endedAt: "2026-11-14T06:07:10.035Z"
+    activeIntervals: [{"end":"2026-11-14T06:07:10.035Z","start":"2026-11-14T06:02:27.114Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Runner fails open, awaits child records before release, skips the slot for empty selections; parity pid case skipped on win32; TESTING.md updated"
+    lastModified: "2026-11-14T06:07:10.035Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5e14adef-7996-48b2-a2bd-4681c6e1f85b":
+    status: "completed"
+    startedAt: "2026-11-14T06:20:13.784Z"
+    completedAt: "2026-11-14T06:37:16.038Z"
+    endedAt: "2026-11-14T06:37:16.038Z"
+    activeIntervals: [{"end":"2026-11-14T06:37:16.038Z","start":"2026-11-14T06:20:13.784Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "e1ccf4e2b: host-resolved NDX_VALIDATION_SLOT_DIR handed to every confined command and honoured without lookup in both copies; 60 s failure memory; non-waiting pre-spawn reclaim; seam tests and parity. Closed 0ccd7aa6, 2387d5ba, 3455bc3c."
+    lastModified: "2026-11-14T06:37:16.038Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
     status: "completed"
     startedAt: "2026-11-14T05:08:40.369Z"
@@ -111,6 +166,16 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "HENCH_VALIDATORS gains testGate.maxWorkers (requirePositiveInteger, now isSafeInteger); withTestMaxWorkers keeps the lower of config and a valid inherited cap; docs, TESTING.md, changesets updated."
     lastModified: "2026-11-14T05:03:31.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "74838585-5fc7-436e-ba6c-f378be47807f":
+    status: "completed"
+    startedAt: "2026-11-13T22:12:41.225Z"
+    completedAt: "2026-11-13T22:14:20.312Z"
+    endedAt: "2026-11-13T22:14:20.312Z"
+    activeIntervals: [{"end":"2026-11-13T22:14:20.312Z","start":"2026-11-13T22:12:41.225Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot test builds the namespace variant from an object; sandbox live probe takes paths via argv. Commit 141608352."
+    lastModified: "2026-11-13T22:14:20.312Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "823880dc-c2ca-4221-8fae-5a413a0eed80":
     status: "completed"
@@ -161,6 +226,16 @@ items:
     resolutionDetail: "Option A: run.ts passes its abortSignal to agentLoop; loop.ts passes it to finalizeRun, the completion check's slot options and the tool context's slot options in the Claude API, Gemini and local loops. Test in local-tool-loop.test.ts: a gate queued behind another holder ends when the signal aborts."
     lastModified: "2026-11-12T18:38:24.093Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a683873b-dd71-4e72-a959-b09d287aa00d":
+    status: "completed"
+    startedAt: "2026-11-13T23:14:17.661Z"
+    completedAt: "2026-11-13T23:17:30.248Z"
+    endedAt: "2026-11-13T23:17:30.248Z"
+    activeIntervals: [{"end":"2026-11-13T23:17:30.248Z","start":"2026-11-13T23:14:17.661Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Both slot implementations read /proc/<n>/status first and skip single-NSpid entries before readlinking ns/pid; nested unreadable own-user entries still count as alive. Rule 4a header updated, tests and hench patch changeset added."
+    lastModified: "2026-11-13T23:17:30.248Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adb92a12-af68-4f9a-b28b-310fb0ea9980":
     status: "completed"
     startedAt: "2026-11-12T18:10:17.703Z"
@@ -173,7 +248,17 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     createdAt: "2026-11-12T17:26:37.734Z"
-    lastModified: "2026-11-14T05:44:21.947Z"
+    lastModified: "2026-11-14T06:38:12.036Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c1e742ad-552e-47c7-8587-b0d5212cde09":
+    status: "completed"
+    startedAt: "2026-11-14T05:54:26.229Z"
+    completedAt: "2026-11-14T06:02:17.667Z"
+    endedAt: "2026-11-14T06:02:17.667Z"
+    activeIntervals: [{"end":"2026-11-14T06:02:17.667Z","start":"2026-11-14T05:54:26.229Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench: rule 5a live lease/reclaim token sets (namespace-aware, live child respected), reclaim-lock ownership check in finally, machine-id per-host dir (same sources/order/hash/10 s timeout/cache rule), NDX_VALIDATION_SLOT_DIR nesting + export, holderPath in wait report. Parity test extended both directions; runner exports both variables."
+    lastModified: "2026-11-14T06:02:17.667Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d34d2902-408a-4b05-9de9-7b2932aae778":
     status: "completed"
@@ -184,6 +269,16 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "tests/test-max-workers.mjs reads NDX_TEST_MAX_WORKERS; root and every package vitest config (rex bench excepted) sets test.maxWorkers from it; unit + config policy tests added."
     lastModified: "2026-11-12T17:37:23.271Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d8a7343d-275f-4a4d-a782-c06c1a08f585":
+    status: "completed"
+    startedAt: "2026-11-12T21:30:37.432Z"
+    completedAt: "2026-11-12T22:18:22.009Z"
+    endedAt: "2026-11-12T22:18:22.009Z"
+    activeIntervals: [{"end":"2026-11-12T22:18:22.009Z","start":"2026-11-12T21:30:37.432Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sandbox grants exactly <ndx home>/validation-slot/ (Seatbelt allow after the ndx-home deny; bwrap bind over the mask) for tool and vendor-cli kinds, creates it before spawn; nested acquire reads before any write in both slot implementations; runner names sandbox and slot dir on EPERM/EACCES. Live Seatbelt tests cover gate nesting and no-token take/release. Linux PID-namespace liveness split into its own task."
+    lastModified: "2026-11-12T22:18:22.009Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "de29498f-6556-4355-b68b-d5c4b3c11129":
     status: "completed"
@@ -216,7 +311,14 @@ items:
     lastModified: "2026-11-12T18:10:08.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee944d3b-6829-4cac-901a-427b91170c79":
-    lastModified: "2026-11-12T17:54:26.294Z"
+    status: "completed"
+    startedAt: "2026-11-12T18:43:21.415Z"
+    completedAt: "2026-11-12T18:52:16.095Z"
+    endedAt: "2026-11-12T18:52:16.095Z"
+    activeIntervals: [{"end":"2026-11-12T18:52:16.095Z","start":"2026-11-12T18:43:21.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench's protocol v1; run-all-tests.mjs takes the slot before rebuild, releases after summary or on SIGINT/SIGTERM after the suite exits, nests on a live holder's token, --list/--no-slot skip it; parity drift test in ROOT_DRIFT_TEST_FILES."
+    lastModified: "2026-11-12T18:52:16.095Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2aa9f8c-556b-453f-bc9d-7fa9af4fa7a2":
     status: "completed"

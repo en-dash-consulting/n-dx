@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -6,6 +6,8 @@ import {
   hostIdentity,
   HostIdentityLookupError,
   LINUX_MACHINE_ID_FILES,
+  LOOKUP_RETRY_AFTER_MS,
+  peekValidationSlotDir,
   readHostIdentity,
   resolveValidationSlotDir,
   runLookup,
@@ -14,7 +16,7 @@ import {
   type HostIdentitySources,
   type LookupRun,
 } from "../../../src/process/validation-slot-dir.js";
-import { VALIDATION_SLOT_DIRNAME } from "../../../src/process/validation-slot.js";
+import { VALIDATION_SLOT_DIR_ENV, VALIDATION_SLOT_DIRNAME } from "../../../src/process/validation-slot.js";
 
 const LINUX_ID = "0123456789abcdef0123456789abcdef";
 const MAC_UUID = "7A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9";
@@ -163,19 +165,74 @@ describe("runLookup", () => {
   });
 });
 
+/** Darwin sources answering each `ioreg` run with the next of `results`, counting runs. */
+function scriptedIoreg(results: LookupRun[]): HostIdentitySources & { runs: string[][] } {
+  const src = sources({ platform: "darwin" });
+  src.run = async (file, args) => {
+    src.runs.push([file, ...args]);
+    return results.shift() ?? exited("");
+  };
+  return src;
+}
+
+const TIMED_OUT: LookupRun = { kind: "failed", reason: "Command timed out after 10000ms" };
+
 describe("createHostIdentityCache", () => {
-  it("does not keep a transient failure: the next call retries and gets the machine id", async () => {
-    const results: LookupRun[] = [{ kind: "failed", reason: "Command timed out after 10000ms" }, exited(IOREG_OUTPUT)];
-    const src = sources({ platform: "darwin" });
-    src.run = async (file, args) => {
-      src.runs.push([file, ...args]);
-      return results.shift() ?? exited("");
-    };
-    const identity = createHostIdentityCache(src);
+  it("remembers a transient failure for 60 s without running the lookup again, then retries and gets the machine id", async () => {
+    const src = scriptedIoreg([TIMED_OUT, exited(IOREG_OUTPUT)]);
+    let clock = 1_000;
+    const identity = createHostIdentityCache(src, { now: () => clock });
     await expect(identity()).rejects.toBeInstanceOf(HostIdentityLookupError);
+    clock += LOOKUP_RETRY_AFTER_MS - 1;
+    await expect(identity()).rejects.toBeInstanceOf(HostIdentityLookupError);
+    expect(src.runs).toHaveLength(1);
+    clock += 1;
     expect(await identity()).toEqual({ kind: "machine", id: MAC_UUID });
     expect(await identity()).toEqual({ kind: "machine", id: MAC_UUID });
     expect(src.runs).toHaveLength(2);
+  });
+
+  it("never keeps a transient failure as the hostname", async () => {
+    const src = scriptedIoreg([TIMED_OUT, exited(IOREG_OUTPUT)]);
+    let clock = 0;
+    const identity = createHostIdentityCache(src, { now: () => clock });
+    await expect(identity()).rejects.toThrow(/it is read again after 60 s/);
+    expect(identity.peek()).toBeUndefined();
+    clock = LOOKUP_RETRY_AFTER_MS;
+    expect(await identity()).toEqual({ kind: "machine", id: MAC_UUID });
+  });
+
+  it("peek returns at once: undefined while a lookup runs, then the identity, and starts at most one lookup", async () => {
+    let answer: (run: LookupRun) => void = () => {};
+    const src = sources({ platform: "darwin" });
+    src.run = (file, args) => {
+      src.runs.push([file, ...args]);
+      return new Promise((resolve) => { answer = resolve; });
+    };
+    const identity = createHostIdentityCache(src);
+    expect(identity.peek()).toBeUndefined();
+    expect(identity.peek()).toBeUndefined();
+    await vi.waitFor(() => expect(src.runs).toHaveLength(1));
+    answer(exited(IOREG_OUTPUT));
+    await identity();
+    expect(identity.peek()).toEqual({ kind: "machine", id: MAC_UUID });
+    expect(src.runs).toHaveLength(1);
+  });
+
+  it("peek starts no lookup while a failure is remembered", async () => {
+    const src = scriptedIoreg([TIMED_OUT, exited(IOREG_OUTPUT)]);
+    let clock = 0;
+    const identity = createHostIdentityCache(src, { now: () => clock });
+    expect(identity.peek()).toBeUndefined();
+    await expect(identity()).rejects.toBeInstanceOf(HostIdentityLookupError);
+    expect(identity.peek()).toBeUndefined();
+    expect(identity.peek()).toBeUndefined();
+    expect(src.runs).toHaveLength(1);
+    clock = LOOKUP_RETRY_AFTER_MS;
+    expect(identity.peek()).toBeUndefined();
+    await identity();
+    expect(src.runs).toHaveLength(2);
+    expect(identity.peek()).toEqual({ kind: "machine", id: MAC_UUID });
   });
 
   it("keeps a no-source answer: the hostname is read once", async () => {
@@ -254,6 +311,35 @@ describe("resolveValidationSlotDir", () => {
   it("gives machines sharing one ndx home separate directories", async () => {
     expect(await resolveValidationSlotDir({ NDX_HOME: home }, { kind: "machine", id: LINUX_ID })).not.toBe(
       await resolveValidationSlotDir({ NDX_HOME: home }, { kind: "machine", id: WIN_GUID }),
+    );
+  });
+
+  it("uses an absolute NDX_VALIDATION_SLOT_DIR without a token, and runs no lookup", async () => {
+    const handed = join(tmpdir(), "handed-slot");
+    const failing = async (): Promise<HostIdentity> => {
+      throw new HostIdentityLookupError("running ioreg -rd1 -c IOPlatformExpertDevice", "exited with code 1");
+    };
+    expect(await resolveValidationSlotDir({ NDX_HOME: home, [VALIDATION_SLOT_DIR_ENV]: handed }, failing)).toBe(handed);
+    expect(peekValidationSlotDir({ NDX_HOME: home, [VALIDATION_SLOT_DIR_ENV]: handed }, { peek: () => { throw new Error("looked up"); } }))
+      .toBe(handed);
+  });
+
+  it("ignores a relative NDX_VALIDATION_SLOT_DIR", async () => {
+    const identity: HostIdentity = { kind: "machine", id: LINUX_ID };
+    expect(await resolveValidationSlotDir({ NDX_HOME: home, [VALIDATION_SLOT_DIR_ENV]: "slot" }, identity)).toBe(
+      join(home, VALIDATION_SLOT_DIRNAME, validationSlotHostDirname(identity)),
+    );
+  });
+});
+
+describe("peekValidationSlotDir", () => {
+  const home = join(tmpdir(), "ndx-home");
+
+  it("is undefined until the identity is known, then the host directory", () => {
+    expect(peekValidationSlotDir({ NDX_HOME: home }, { peek: () => undefined })).toBeUndefined();
+    const identity: HostIdentity = { kind: "machine", id: LINUX_ID };
+    expect(peekValidationSlotDir({ NDX_HOME: home }, { peek: () => identity })).toBe(
+      join(home, VALIDATION_SLOT_DIRNAME, validationSlotHostDirname(identity)),
     );
   });
 });

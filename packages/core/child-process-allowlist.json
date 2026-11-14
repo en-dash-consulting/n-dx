@@ -106,6 +106,10 @@
       "reason": "Release workflow step: asks the `npm`, `git` and `gh` CLIs whether each published version is on npm, tagged on origin and released on GitHub. It runs in CI after a publish and must not depend on llm-client being built; the lookups are injected so its unit test spawns nothing."
     },
     {
+      "path": "scripts/lib/validation-slot.mjs",
+      "reason": "The test runner's copy of hench's validation slot: reads the machine id with `ioreg` (macOS) or `reg` (Windows) exactly as hench's `runLookup` does through llm-client's exec — no shell, so a missing binary is ENOENT on every platform, which the shared directory rule depends on. It runs before the runner rebuilds stale packages, so it cannot depend on llm-client being built. The lookups are injectable, so the parity test compares both copies on fake sources and runs the real lookup only once per copy."
+    },
+    {
       "path": "packages/hench/src/process/memory-monitor.ts",
       "reason": "Process monitoring \u2014 needs raw execFile for system commands (vm_stat, sysctl)"
     },
