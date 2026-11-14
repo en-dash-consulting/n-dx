@@ -4,9 +4,9 @@
  * the plan `--dry-run` prints. Nothing here spawns a benchmark.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   ancestorPids,
   findBusyProcesses,
@@ -37,6 +37,7 @@ import {
 } from "../../scripts/bench/lib/plan.mjs";
 import { readWorkspaceManifests } from "../../scripts/lib/workspace-manifests.mjs";
 import { settleAll } from "../../scripts/bench/lib/settle.mjs";
+import { createSignalHandler, sleep } from "../../scripts/bench/lib/stop.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
 const REPO = "/work/n-dx";
@@ -235,6 +236,79 @@ describe("summary arithmetic", () => {
     expect(md).toContain("- Commit: `abc123`");
     expect(md).toContain("| web | C | 2 | 9.2 min | 10.0 min | 8.38 GiB | 2.79 GiB | 0.09 GiB | 800 | 30.0 | 1 | 0/2 | – | – |");
     expect(md).toContain("| web | D | 3 | 13.3 min | 28.3 min | 3.73 GiB | 0.93 GiB | 2.79 GiB | 15 | 7.0 | 1 | 1/0 | 400 s | 300 s |");
+    expect(md).not.toContain("Interrupted");
+  });
+
+  it("says at the top when a signal stopped the run", () => {
+    const md = renderSummaryMarkdown([], {
+      commit: "abc123", machine: "10 cores", startedAt: "s", finishedAt: "f",
+      cases: ["C"], fixtures: ["web"], repeat: 1, concurrency: 3, stoppedBy: "SIGINT",
+    });
+    expect(md.split("\n").slice(0, 3)).toEqual([
+      "# Validation benchmark",
+      "",
+      "Interrupted by SIGINT: partial results. The batch running at the time is left out.",
+    ]);
+  });
+});
+
+describe("stopping", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("sleeps until the timer, or not at all once aborted", async () => {
+    vi.useFakeTimers();
+    let woke = false;
+    const pending = sleep(5_000, new AbortController().signal).then(() => { woke = true; });
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(woke).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(woke).toBe(true);
+
+    const aborted = new AbortController();
+    aborted.abort("SIGINT");
+    let early = false;
+    const now = sleep(60_000, aborted.signal).then(() => { early = true; });
+    await Promise.resolve();
+    await now;
+    expect(early).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  function stopper() {
+    vi.useFakeTimers();
+    const abort = new AbortController();
+    const children = new Set(["run-1", "run-2"]);
+    const kills = [];
+    const onSignal = createSignalHandler({
+      abort,
+      children: () => children,
+      killTree: (child, signal) => kills.push([child, signal]),
+      graceMs: 10_000,
+      log: () => {},
+    });
+    return { abort, children, kills, onSignal };
+  }
+
+  it("sends SIGTERM on the first signal and SIGKILL to the runs left after the grace period", () => {
+    const { abort, children, kills, onSignal } = stopper();
+    onSignal("SIGINT");
+    expect(abort.signal.reason).toBe("SIGINT");
+    expect(kills).toEqual([["run-1", "SIGTERM"], ["run-2", "SIGTERM"]]);
+    children.delete("run-1");
+    vi.advanceTimersByTime(9_999);
+    expect(kills).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(kills.slice(2)).toEqual([["run-2", "SIGKILL"]]);
+  });
+
+  it("sends SIGKILL at once on a second signal", () => {
+    const { kills, onSignal } = stopper();
+    onSignal("SIGINT");
+    onSignal("SIGINT");
+    expect(kills.slice(2)).toEqual([["run-1", "SIGKILL"], ["run-2", "SIGKILL"]]);
   });
 });
 
@@ -350,6 +424,27 @@ describe("batch slot use", () => {
     }
   });
 
+  it("returns no records for a no-slot batch whose runs a Ctrl-C killed", async () => {
+    const abort = new AbortController();
+    let finished = 0;
+    const batch = runBatch({
+      batch: { caseId: "C", fixture: "hench", repeat: 1, batchId: "1-C", worktrees: 3 },
+      worktrees: ["/wt/1", "/wt/2", "/wt/3"],
+      slotApi: null,
+      signal: abort.signal,
+      baseEnv: {},
+      launch: async () => {
+        await new Promise((r) => setImmediate(r));
+        abort.abort("SIGINT");
+        finished++;
+        // What a run stopped by the bench's SIGTERM reports: a short failure.
+        return { exitCode: null, signal: "SIGTERM" };
+      },
+    });
+    await expect(batch).rejects.toThrow("Stopped by SIGINT.");
+    expect(finished).toBe(3);
+  });
+
   it("refuses to run any slot case without a slot module", async () => {
     for (const caseId of ["D", "E", "G", "H"]) {
       await expect(run(caseId, { withSlot: false })).rejects.toThrow(`Case ${caseId} takes the host slot`);
@@ -367,7 +462,8 @@ describe("plan and flags", () => {
 
   it("defaults to the baseline cases A–D, the first three fixtures, one repeat and three worktrees", () => {
     expect(parse(["--out", "/tmp/b"])).toMatchObject({
-      out: "/tmp/b", cases: ["A", "B", "C", "D"], fixtures: DEFAULT_FIXTURES, repeat: 1, concurrency: 3, dryRun: false, keep: false,
+      // resolve, not the literal: on win32 "/tmp/b" resolves against the drive.
+      out: resolve("/home/u", "/tmp/b"), cases: ["A", "B", "C", "D"], fixtures: DEFAULT_FIXTURES, repeat: 1, concurrency: 3, dryRun: false, keep: false,
     });
   });
 

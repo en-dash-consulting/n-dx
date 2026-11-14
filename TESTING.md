@@ -359,10 +359,15 @@ instead of competing:
 ndx config hench.testGate.hostSlot true .
 ```
 
-The slot alone had no failed runs in the [benchmark](#validation-benchmark)
-and took 19–48% less batch time than the slot with a worker cap, so this repository
-sets no cap. Use the cap ([above](#capping-test-workers)) only for runs the
-slot does not cover.
+This repository sets the slot and no cap. In one [benchmark](#validation-benchmark)
+run (2026-11-13, one repeat, one machine), the slot alone had no failed runs and
+took 19–48% less batch time than the slot with a worker cap; that is one
+measurement, not a rule, so re-run the benchmark on your machine before relying
+on it. The trade-off of no cap: a suite an agent starts directly (for example
+`pnpm --filter <pkg> exec vitest`) is neither capped nor queued here, while
+`scripts/run-all-tests.mjs`, inside hench's sandbox too, does take the slot.
+To cap an agent's shell runs, export `NDX_TEST_MAX_WORKERS`
+([above](#capping-test-workers)).
 
 With `hench.testGate.hostSlot` on (default off), the test gate (each attempt and
 the re-run), the post-task tests and the completion test run each take one slot
@@ -451,6 +456,9 @@ node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the defa
   `~/.cache/ndx-bench/<run id>/`, then installs and builds each one. Each
   fixture rebuilds the packages it touches, so no measured run pays a
   stale-dist rebuild. The worktrees are removed on exit, on Ctrl-C and on error.
+- **Ctrl-C** sends SIGTERM to the running suites and SIGKILL 10 s later; a
+  second Ctrl-C kills them at once. The batch running at the time is not
+  recorded, and `summary.md` opens with `Interrupted by <signal>: partial results`.
 - **It refuses to start** while a `hench … run`, `run-all-tests`, `vitest` or
   `ndx work` process is running, or while the 1-minute load average exceeds
   the core count. Run it on a quiet machine from a plain terminal, not from an
