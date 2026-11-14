@@ -19,7 +19,9 @@ import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
  * `hench.testGate.maxWorkers` is pinned elsewhere: finalizeRun's gate and
  * post-task tests in test-gate-flaky-rerun.test.ts ("hench.testGate.maxWorkers
  * through finalizeRun"), and the vendor CLI session's environment in
- * tests/unit/agent/vendor-cli-env.test.ts (`resolveSessionCliEnv`).
+ * tests/unit/agent/vendor-cli-env.test.ts (`resolveSessionCliEnv`) and, through
+ * cliLoop's own spawns, tests/integration/vendor-cli-env.test.ts. The pair
+ * reviewer's environment goes through the same helper; no test pins that call.
  *
  * Each command is a probe that exits 0 only when it sees the expected value.
  * The lower of the cap and a valid inherited value wins, so the cap used is 1:
