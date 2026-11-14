@@ -12,7 +12,8 @@
  * - the Composer manifests found, or `no composer` when there is none;
  * - internal references resolved / internal total, and how they resolved
  *   (PSR-4, PSR-0, classmap, declared). A reference is internal when it
- *   resolved or names the project's own namespace. A repository without
+ *   resolved or is the project's own (its namespace declared, or under a
+ *   project autoload prefix; see lang-php's php-resolver.ts). A repository without
  *   Composer prints its reference count instead of a rate;
  * - externals (matched to a composer.lock package / total), PHP built-ins
  *   and global functions or constants;

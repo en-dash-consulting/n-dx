@@ -54,9 +54,13 @@ describe("php pack facts", () => {
     expect(references).toEqual([
       // `new Shop_Cart()`; the require_once of lib/Shop/Cart.php is not an edge.
       "php52/index.php -> php52/lib/Shop/Cart.php Shop_Cart",
-      // The other names Order.php imports are under Acme, the fixture's own namespace, and missing: unresolved, not external.
+      // The fixture declares Acme\Shop only, so the missing Acme\Billing, Acme\Shipping and Acme\Support names share its
+      // root namespace but not its namespace: a library's, external.
+      "php53/src/Shop/Order.php => php:Acme Acme\\Billing\\Gateway,Acme\\Billing\\Invoice,Acme\\Shipping\\Carrier,Acme\\Shipping\\MAX_WEIGHT,Acme\\Shipping\\Parcel,Acme\\Shipping\\weigh,Acme\\Support\\CURRENCY,Acme\\Support\\Clock,Acme\\Support\\money_format",
       "php53/src/Shop/Order.php => php:Psr Psr\\Log\\LoggerInterface",
       "php53/src/Shop/braced.php -> php53/src/Shop/Order.php Acme\\Shop\\Order",
+      // Likewise App\Billing, App\Orders\Events and App\Support beside the declared App\Orders.
+      "php8/src/Orders/OrderService.php => php:App App\\Billing\\Invoice,App\\Orders\\Events\\OrderPaid,App\\Orders\\Events\\OrderShipped,App\\Support\\money",
     ]);
   });
 

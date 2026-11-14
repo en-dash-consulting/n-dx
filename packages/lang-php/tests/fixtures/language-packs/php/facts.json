@@ -703,6 +703,20 @@
         "files": [],
         "external": [
           {
+            "package": "php:Acme",
+            "symbols": [
+              "Acme\\Billing\\Gateway",
+              "Acme\\Billing\\Invoice",
+              "Acme\\Shipping\\Carrier",
+              "Acme\\Shipping\\MAX_WEIGHT",
+              "Acme\\Shipping\\Parcel",
+              "Acme\\Shipping\\weigh",
+              "Acme\\Support\\CURRENCY",
+              "Acme\\Support\\Clock",
+              "Acme\\Support\\money_format"
+            ]
+          },
+          {
             "package": "php:Psr",
             "symbols": [
               "Psr\\Log\\LoggerInterface"
@@ -1435,7 +1449,17 @@
       "path": "php8/src/Orders/OrderService.php",
       "imports": {
         "files": [],
-        "external": [],
+        "external": [
+          {
+            "package": "php:App",
+            "symbols": [
+              "App\\Billing\\Invoice",
+              "App\\Orders\\Events\\OrderPaid",
+              "App\\Orders\\Events\\OrderShipped",
+              "App\\Support\\money"
+            ]
+          }
+        ],
         "written": [
           {
             "specifier": "App\\Billing\\Invoice",

@@ -37,9 +37,14 @@
  * external: PHP's, the extensions' and the project's own all live there. A
  * name a `composer.lock` package's autoload prefix covers is external with
  * that package as its `module` (version in memory only). Otherwise a name
- * whose first segment is the project's (a declared namespace or class, or a
- * project autoload prefix) is unresolved `internal-not-found`; any other is
- * external, named `php:<first namespace segment>` (`php:Monolog` for
+ * that is the project's is unresolved `internal-not-found`: a namespaced
+ * name whose namespace (all but its last segment) the project declares, that
+ * a project PSR-4 or PSR-0 prefix covers, or that is itself a declared
+ * namespace or a leading part of one; an un-namespaced class whose PSR-0
+ * prefix (`Zend` of `Zend_Gdata_YouTube`) is the first segment of a declared
+ * namespace or class or of a project autoload prefix. Sharing only the root
+ * namespace is not enough: `Acme\Shared\Money` beside the project's
+ * `Acme\Billing` is a library's. Any other name is external, named `php:<first namespace segment>` (`php:Monolog` for
  * `Monolog\Logger`), or for an un-namespaced class its PSR-0 prefix
  * (`php:Zend` for `Zend_Db_Table`). Edge and external symbols are the
  * qualified names.
@@ -84,6 +89,12 @@ function headOf(qualified: string): string {
   if (sep >= 0) return qualified.slice(0, sep);
   const underscore = qualified.indexOf("_");
   return underscore > 0 ? qualified.slice(0, underscore) : qualified;
+}
+
+/** The namespace of a qualified name: all but its last segment; "" for an un-namespaced name. */
+function namespaceOf(qualified: string): string {
+  const sep = qualified.lastIndexOf("\\");
+  return sep < 0 ? "" : qualified.slice(0, sep);
 }
 
 /** PSR-0's logical path: the namespace's `\` and the class name's `_` become `/`. */
@@ -324,7 +335,13 @@ class Index {
   private readonly functions = new Map<string, string[]>();
   private readonly constants = new Map<string, string[]>();
   private readonly lock: readonly LockPrefix[];
-  /** First segments, lowercase, that are the project's. */
+  /** Namespaces, lowercase, that the project declares (a `namespace` statement or a declared class's). */
+  private readonly ownNamespaces = new Set<string>();
+  /** Every leading run of segments of {@link ownNamespaces}: a `use` of one names a namespace, not a missing class. */
+  private readonly ownNamespacePrefixes = new Set<string>();
+  /** PSR-4 and PSR-0 prefixes of the project's autoload, lowercase. */
+  private readonly ownPrefixes: readonly string[];
+  /** First segments or PSR-0 prefixes, lowercase, that are the project's; for un-namespaced names only. */
   private readonly ownHeads = new Set<string>();
 
   constructor(projects: readonly ComposerProject[], declared: readonly Declared[], paths: readonly string[]) {
@@ -345,7 +362,15 @@ class Index {
       for (const c of d.constants) add(this.constants, c.name, c.file);
       for (const n of d.namespaces) this.ownHeads.add(headOf(n).toLowerCase());
       for (const c of d.classes) this.ownHeads.add(headOf(c.name).toLowerCase());
+      for (const n of [...d.namespaces, ...d.classes.map((c) => namespaceOf(c.name))]) {
+        if (n === "") continue;
+        const lower = n.toLowerCase();
+        this.ownNamespaces.add(lower);
+        for (let sep = lower.indexOf("\\"); sep >= 0; sep = lower.indexOf("\\", sep + 1)) this.ownNamespacePrefixes.add(lower.slice(0, sep));
+        this.ownNamespacePrefixes.add(lower);
+      }
     }
+    this.ownPrefixes = [...this.psr4, ...this.psr0].map((m) => m.prefix.toLowerCase()).filter((p) => p !== "");
     for (const m of [...this.psr4, ...this.psr0]) {
       const head = headOf(m.prefix.replace(/[\\_]+$/, ""));
       if (head !== "") this.ownHeads.add(head.toLowerCase());
@@ -411,8 +436,22 @@ class Index {
     return this.lock.find((l) => qualified.startsWith(l.prefix))?.module;
   }
 
+  /**
+   * Whether a name no file holds is the project's: a namespaced name when the
+   * project declares its namespace, a project autoload prefix covers it, or
+   * it is itself a declared namespace or a leading part of one; an
+   * un-namespaced name when its PSR-0 prefix is a project head. A library
+   * sharing the project's root namespace (`Acme\Shared` beside `Acme\Billing`)
+   * is not the project's.
+   */
   isOwn(qualified: string): boolean {
-    return this.ownHeads.has(headOf(qualified).toLowerCase());
+    const lower = qualified.toLowerCase();
+    if (!lower.includes("\\")) return this.ownHeads.has(headOf(lower));
+    return (
+      this.ownNamespaces.has(namespaceOf(lower)) ||
+      this.ownNamespacePrefixes.has(lower) ||
+      this.ownPrefixes.some((p) => lower.startsWith(p))
+    );
   }
 }
 

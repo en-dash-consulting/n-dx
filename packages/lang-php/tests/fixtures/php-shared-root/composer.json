@@ -1,0 +1,14 @@
+{
+    "name": "acme/billing",
+    "require": {
+        "acme/shared": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Tools\\": "tools/"
+        },
+        "psr-0": {
+            "Zend_": "library/"
+        }
+    }
+}
