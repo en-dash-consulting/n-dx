@@ -61,18 +61,20 @@
  *    5a. **Own pid.** A process knows the tokens it holds: its unreleased
  *    leases and the `reclaim.lock` it is writing. A `holder.json` or
  *    `reclaim.lock` naming this process's own pid with a token it does not
- *    hold is stale, whatever rule 4 says. It was left by an earlier process
- *    whose pid the OS has since given to this one (Windows reuses pids within
- *    moments), or by this process's own failed release. A token is live from
- *    just before its file is created until its release starts. Other
- *    processes cannot tell such a record apart: they wait until it is
- *    reclaimed or its pid exits. A wedged slot is cleared by deleting the
- *    `holder.json` the wait report names, once no validation run is active.
+ *    hold names a dead process, whatever rule 4 says: the lock is stale, and
+ *    the record is stale unless its `child` is alive (rule 5 still applies to
+ *    the child). It was left by an earlier process whose pid the OS has since
+ *    given to this one (Windows reuses pids within moments), or by this
+ *    process's own failed release. A token is live from just before its file
+ *    is created until its release starts. Other processes cannot tell such a
+ *    record apart: they wait until it is reclaimed or its pid exits. A wedged
+ *    slot is cleared by deleting the `holder.json` the wait report names,
+ *    once no validation run is active.
  * 6. **Re-entrancy.** The holder exports its token to its children as
  *    `NDX_VALIDATION_SLOT`. An acquire that finds that variable naming the
- *    token in this directory's `holder.json`, with a live `pid`, is nested:
- *    it returns at once and neither takes nor releases the slot. A token for
- *    a dead or stale (rule 5a) holder, or another directory's holder, is
+ *    token in this directory's `holder.json`, with a live `pid` (rules 4 and
+ *    5a), is nested: it returns at once and neither takes nor releases the
+ *    slot. A token for a dead holder or another directory's holder is
  *    ignored.
  * 7. **Waiting.** Poll at a bounded interval; report the holder (pid,
  *    project directory, since when, and the `holder.json` path) on the first
@@ -301,6 +303,11 @@ function isUnheldByThisProcess(pid: unknown, token: unknown, live: ReadonlySet<s
   return pid === process.pid && !(typeof token === "string" && live.has(token));
 }
 
+/** Whether the process a record names still holds it (rules 4 and 5a). */
+function isHolderProcessAlive(holder: ValidationSlotHolder): boolean {
+  return !isUnheldByThisProcess(holder.pid, holder.token, liveLeaseTokens) && isPidAlive(holder.pid);
+}
+
 /** Whether a record no longer occupies the slot (rules 5 and 5a). */
 export function isValidationSlotHolderStale(
   holder: ValidationSlotHolder,
@@ -308,8 +315,7 @@ export function isValidationSlotHolderStale(
 ): boolean {
   // Written before a reboot: its pids may belong to unrelated processes now.
   if (Math.abs(holder.bootedAt - bootTimeMs) > BOOT_TIME_TOLERANCE_MS) return true;
-  if (isUnheldByThisProcess(holder.pid, holder.token, liveLeaseTokens)) return true;
-  if (isPidAlive(holder.pid)) return false;
+  if (isHolderProcessAlive(holder)) return false;
   return holder.child === null || !isChildAlive(holder.child);
 }
 
@@ -540,9 +546,7 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
     const current = await readValidationSlotHolder(slotDir);
-    if (current?.token === inherited && isPidAlive(current.pid) && !isValidationSlotHolderStale(current)) {
-      return nestedLease(slotDir, inherited);
-    }
+    if (current?.token === inherited && isHolderProcessAlive(current)) return nestedLease(slotDir, inherited);
   }
 
   const record: ValidationSlotHolder = {
@@ -586,7 +590,7 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
       lastReport = waitedMs;
       onWait({
         holder: observed.holder,
-        holderAlive: isPidAlive(observed.holder.pid),
+        holderAlive: isHolderProcessAlive(observed.holder),
         waitedMs,
         holderPath: holderPath(slotDir),
       });
