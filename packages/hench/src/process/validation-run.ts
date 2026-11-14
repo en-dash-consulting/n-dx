@@ -83,6 +83,7 @@ export async function runInValidationSlot<T>(
   if (!slot) return { ok: true, value: await fn((options) => options) };
 
   let lease: ValidationSlotLease;
+  const queueStarted = Date.now();
   try {
     lease = await acquireValidationSlot({
       slotDir: slot.slotDir,
@@ -97,6 +98,16 @@ export async function runInValidationSlot<T>(
         ok: false,
         queueMs: err.queueWaitMs,
         error: `stopped waiting for the validation slot after ${formatSeconds(err.queueWaitMs)} (${describeReason(err.cause)})`,
+      };
+    }
+    // An interrupt that fired before the slot failed (acquire creates the
+    // directory before it checks the signal) still stops without running.
+    if (slot.signal?.aborted) {
+      const queueMs = Date.now() - queueStarted;
+      return {
+        ok: false,
+        queueMs,
+        error: `stopped waiting for the validation slot after ${formatSeconds(queueMs)} (${describeReason(slot.signal.reason)})`,
       };
     }
     // A slot that cannot be taken (EACCES, EROFS or ENOSPC under the ndx home,
