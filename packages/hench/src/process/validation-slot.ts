@@ -53,22 +53,31 @@
  *    dead holder whose child still runs is NOT stale: its tests still load
  *    the machine. A record whose `bootedAt` differs from the current boot
  *    time by more than five minutes was written before a reboot and is stale
- *    whatever its pids say: they may since have been reused. To reclaim, create `reclaim.lock` as in rule 1 (if it
- *    exists and its pid is dead, unlink it and retry later), re-read
- *    `holder.json`, unlink it only if its bytes equal the stale bytes
- *    observed, then unlink `reclaim.lock`.
- *    5a. A holder whose release failed (the record may remain, naming its
- *    live pid) remembers the token; its own next acquire treats that record
- *    as stale and reclaims it, rather than waiting on itself. Other processes
- *    wait until then or until the holder exits.
+ *    whatever its pids say: they may since have been reused. To reclaim,
+ *    create `reclaim.lock` as in rule 1 (if it exists and is stale — its pid
+ *    dead, or rule 5a — unlink it and retry later), re-read `holder.json`,
+ *    unlink it only if its bytes equal the stale bytes observed, then unlink
+ *    `reclaim.lock`.
+ *    5a. **Own pid.** A process knows the tokens it holds: its unreleased
+ *    leases and the `reclaim.lock` it is writing. A `holder.json` or
+ *    `reclaim.lock` naming this process's own pid with a token it does not
+ *    hold is stale, whatever rule 4 says. It was left by an earlier process
+ *    whose pid the OS has since given to this one (Windows reuses pids within
+ *    moments), or by this process's own failed release. A token is live from
+ *    just before its file is created until its release starts. Other
+ *    processes cannot tell such a record apart: they wait until it is
+ *    reclaimed or its pid exits. A wedged slot is cleared by deleting the
+ *    `holder.json` the wait report names, once no validation run is active.
  * 6. **Re-entrancy.** The holder exports its token to its children as
  *    `NDX_VALIDATION_SLOT`. An acquire that finds that variable naming the
  *    token in this directory's `holder.json`, with a live `pid`, is nested:
  *    it returns at once and neither takes nor releases the slot. A token for
- *    a dead holder or another directory's holder is ignored.
+ *    a dead or stale (rule 5a) holder, or another directory's holder, is
+ *    ignored.
  * 7. **Waiting.** Poll at a bounded interval; report the holder (pid,
- *    project directory, since when) on the first wait and then periodically;
- *    stop when the caller's abort signal fires.
+ *    project directory, since when, and the `holder.json` path) on the first
+ *    wait and then periodically. Only the caller's abort signal stops a
+ *    wait; there is no maximum wait.
  *
  * @module hench/process/validation-slot
  */
@@ -143,6 +152,8 @@ export interface ValidationSlotWait {
   holderAlive: boolean;
   /** Milliseconds this acquire has waited so far. */
   waitedMs: number;
+  /** The `holder.json` to delete by hand when the slot is wedged (rule 5a). */
+  holderPath: string;
 }
 
 export interface AcquireValidationSlotOptions {
@@ -152,7 +163,7 @@ export interface AcquireValidationSlotOptions {
   projectDir: string;
   /** Environment to read `NDX_VALIDATION_SLOT` from. Defaults to `process.env`. */
   env?: NodeJS.ProcessEnv;
-  /** Stops waiting (Ctrl-C, the run's deadline). */
+  /** The only thing that stops a wait (Ctrl-C, SIGTERM); there is no maximum wait. */
   signal?: AbortSignal;
   /** Poll interval while waiting; clamped to 10 ms – 10 s. Default 1 s. */
   pollIntervalMs?: number;
@@ -271,13 +282,33 @@ export function parseValidationSlotHolder(raw: string): ValidationSlotHolder | n
   };
 }
 
-/** Whether a record no longer occupies the slot (rule 5). */
+// ---------------------------------------------------------------------------
+// Tokens this process holds (rule 5a)
+// ---------------------------------------------------------------------------
+
+/** Tokens of this process's unreleased leases. */
+const liveLeaseTokens = new Set<string>();
+
+/** Tokens of the `reclaim.lock` files this process is writing or holds. */
+const liveReclaimTokens = new Set<string>();
+
+/**
+ * Whether a file names this process's pid with a token this process does not
+ * hold: a leftover whose pid the OS reused, or this process's own failed
+ * release (rule 5a).
+ */
+function isUnheldByThisProcess(pid: unknown, token: unknown, live: ReadonlySet<string>): boolean {
+  return pid === process.pid && !(typeof token === "string" && live.has(token));
+}
+
+/** Whether a record no longer occupies the slot (rules 5 and 5a). */
 export function isValidationSlotHolderStale(
   holder: ValidationSlotHolder,
   bootTimeMs: number = currentBootTimeMs(),
 ): boolean {
   // Written before a reboot: its pids may belong to unrelated processes now.
   if (Math.abs(holder.bootedAt - bootTimeMs) > BOOT_TIME_TOLERANCE_MS) return true;
+  if (isUnheldByThisProcess(holder.pid, holder.token, liveLeaseTokens)) return true;
   if (isPidAlive(holder.pid)) return false;
   return holder.child === null || !isChildAlive(holder.child);
 }
@@ -372,31 +403,46 @@ export async function readValidationSlotHolder(slotDir: string): Promise<Validat
  */
 async function reclaimStale(slotDir: string, staleRaw: string): Promise<boolean> {
   const lockPath = join(slotDir, VALIDATION_SLOT_RECLAIM_FILE);
-  const lock = JSON.stringify({ pid: process.pid, token: randomUUID(), startedAt: new Date().toISOString() });
-  if (!(await createExclusive(slotDir, lockPath, lock))) {
-    // Another process is reclaiming. If it died doing so, clear its lock; the
-    // next poll retries.
-    const raw = await readIfExists(lockPath);
-    if (raw === null) return true;
-    let pid: unknown;
-    try {
-      pid = (JSON.parse(raw) as { pid?: unknown }).pid;
-    } catch {
-      pid = undefined; // An unreadable lock has no live owner.
-    }
-    if (!isPositiveInt(pid) || !isPidAlive(pid)) {
-      await unlinkIfExists(lockPath);
-      return true;
-    }
-    return false;
-  }
+  const token = randomUUID();
+  const lock = JSON.stringify({ pid: process.pid, token, startedAt: new Date().toISOString() });
+  // Live before the lock exists, so a concurrent reclaim in this process
+  // never takes it for a leftover (rule 5a).
+  liveReclaimTokens.add(token);
   try {
-    const current = await readIfExists(holderPath(slotDir));
-    if (current === staleRaw) await unlinkIfExists(holderPath(slotDir));
+    if (!(await createExclusive(slotDir, lockPath, lock))) {
+      // Another reclaimer holds the lock. If it died doing so, or left it
+      // under a pid this process now has, clear it; the next poll retries.
+      const raw = await readIfExists(lockPath);
+      if (raw === null) return true;
+      if (isReclaimLockStale(raw)) {
+        await unlinkIfExists(lockPath);
+        return true;
+      }
+      return false;
+    }
+    try {
+      const current = await readIfExists(holderPath(slotDir));
+      if (current === staleRaw) await unlinkIfExists(holderPath(slotDir));
+    } finally {
+      await unlinkIfExists(lockPath);
+    }
+    return true;
   } finally {
-    await unlinkIfExists(lockPath);
+    liveReclaimTokens.delete(token);
   }
-  return true;
+}
+
+/** Whether a `reclaim.lock` has no live owner (rules 5 and 5a). */
+function isReclaimLockStale(raw: string): boolean {
+  let owner: { pid?: unknown; token?: unknown };
+  try {
+    owner = JSON.parse(raw) as typeof owner;
+  } catch {
+    return true; // An unreadable lock has no live owner.
+  }
+  if (typeof owner !== "object" || owner === null) return true;
+  if (!isPositiveInt(owner.pid) || !isPidAlive(owner.pid)) return true;
+  return isUnheldByThisProcess(owner.pid, owner.token, liveReclaimTokens);
 }
 
 // ---------------------------------------------------------------------------
@@ -445,14 +491,6 @@ function nestedLease(slotDir: string, token: string): ValidationSlotLease {
   };
 }
 
-/** Tokens of this process's leases whose release failed (rule 5a). */
-const orphanedTokens = new Set<string>();
-
-/** Whether `holder` is a record this process could not release (rule 5a). */
-function isOrphanedByThisProcess(holder: ValidationSlotHolder): boolean {
-  return holder.pid === process.pid && orphanedTokens.has(holder.token);
-}
-
 function heldLease(slotDir: string, record: ValidationSlotHolder, queueWaitMs: number): ValidationSlotLease {
   let released = false;
   return {
@@ -471,14 +509,11 @@ function heldLease(slotDir: string, record: ValidationSlotHolder, queueWaitMs: n
     async release() {
       if (released) return;
       released = true;
-      try {
-        const current = await readValidationSlotHolder(slotDir);
-        if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
-      } catch (err) {
-        // The record may still be on disk naming this live process (rule 5a).
-        orphanedTokens.add(record.token);
-        throw err;
-      }
+      // No longer live even if the unlink below fails: a record left on disk
+      // is then this process's own to reclaim (rule 5a).
+      liveLeaseTokens.delete(record.token);
+      const current = await readValidationSlotHolder(slotDir);
+      if (current?.token === record.token) await unlinkIfExists(holderPath(slotDir));
     },
   };
 }
@@ -505,7 +540,9 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
     const current = await readValidationSlotHolder(slotDir);
-    if (current?.token === inherited && isPidAlive(current.pid)) return nestedLease(slotDir, inherited);
+    if (current?.token === inherited && isPidAlive(current.pid) && !isValidationSlotHolderStale(current)) {
+      return nestedLease(slotDir, inherited);
+    }
   }
 
   const record: ValidationSlotHolder = {
@@ -523,17 +560,20 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
     if (signal?.aborted) throw new ValidationSlotAbortedError(now() - started, signal.reason);
 
     record.startedAt = new Date(now()).toISOString();
-    if (await createExclusive(slotDir, holderPath(slotDir), JSON.stringify(record))) {
-      return heldLease(slotDir, { ...record }, now() - started);
+    // Live before the record exists, so a concurrent acquire in this process
+    // waits on it rather than reclaiming it (rule 5a).
+    liveLeaseTokens.add(record.token);
+    let created = false;
+    try {
+      created = await createExclusive(slotDir, holderPath(slotDir), JSON.stringify(record));
+    } finally {
+      if (!created) liveLeaseTokens.delete(record.token);
     }
+    if (created) return heldLease(slotDir, { ...record }, now() - started);
 
     const observed = await readHolder(slotDir);
     if (observed === null) continue; // Released between the create and the read.
-    if (
-      observed.holder === null ||
-      isOrphanedByThisProcess(observed.holder) ||
-      isValidationSlotHolderStale(observed.holder)
-    ) {
+    if (observed.holder === null || isValidationSlotHolderStale(observed.holder)) {
       // Retry at once when this process cleared the record; another
       // reclaimer's record is waited out like a holder.
       if (await reclaimStale(slotDir, observed.raw)) continue;
@@ -544,7 +584,12 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
     const waitedMs = now() - started;
     if (onWait && (lastReport === undefined || waitedMs - lastReport >= reportIntervalMs)) {
       lastReport = waitedMs;
-      onWait({ holder: observed.holder, holderAlive: isPidAlive(observed.holder.pid), waitedMs });
+      onWait({
+        holder: observed.holder,
+        holderAlive: isPidAlive(observed.holder.pid),
+        waitedMs,
+        holderPath: holderPath(slotDir),
+      });
     }
     await sleep(pollIntervalMs, signal);
   }

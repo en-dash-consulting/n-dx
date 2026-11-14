@@ -1006,7 +1006,7 @@ interface GateCommandOutcome {
  * Run one gate command, inside the validation slot when one is given, and
  * judge it. The slot is taken for this command alone and released once its
  * process tree has stopped; the timeout starts after admission. A wait given
- * up on (Ctrl-C, the run's deadline) is `ran: false` with an error.
+ * up on (the run's interrupt: Ctrl-C, SIGTERM) is `ran: false` with an error.
  */
 async function runGateCommand(
   command: string,

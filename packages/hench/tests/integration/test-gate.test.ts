@@ -312,7 +312,8 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
       projectDir, filesChanged: ["src/a.ts"], testCommand: probe,
       validationSlot: slot({ onWait: (w) => waits.push(describeValidationSlotWait(w)) }),
     });
-    expect(waits[0]).toMatch(/^Waiting for the validation slot held by pid \d+ in \/elsewhere since /);
+    expect(waits[0]).toMatch(/^Waiting for the validation slot held by pid \d+ in \/elsewhere since \S+ \(.+\)$/);
+    expect(waits[0]).toContain(`(${join(slotDir, "holder.json")})`);
   });
 
   it("stops waiting when the run is interrupted, and runs nothing", async () => {

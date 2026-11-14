@@ -31,7 +31,7 @@ export interface ValidationSlotRunOptions {
   slotDir: string;
   /** The project the validation runs for, recorded for whoever waits. */
   projectDir: string;
-  /** Stops waiting: the run's interrupt (Ctrl-C, SIGTERM) or deadline. */
+  /** The only thing that stops a wait: the run's interrupt (Ctrl-C, SIGTERM). There is no maximum wait. */
   signal?: AbortSignal;
   /** Called on the first wait and then periodically. */
   onWait?: (wait: ValidationSlotWait) => void;
@@ -207,7 +207,7 @@ export function validationSlotFromConfig(
 export function describeValidationSlotWait(wait: ValidationSlotWait): string {
   const { holder } = wait;
   const who = wait.holderAlive ? `pid ${holder.pid}` : `pid ${holder.pid} (exited; its tests still run)`;
-  return `Waiting for the validation slot held by ${who} in ${holder.projectDir} since ${holder.startedAt}`;
+  return `Waiting for the validation slot held by ${who} in ${holder.projectDir} since ${holder.startedAt} (${wait.holderPath})`;
 }
 
 /** The queue/execution split printed after a validation run. */
