@@ -69,10 +69,23 @@ export interface LanguageConfig {
   /**
    * Directories skipped like `skipDirectories` unless they directly hold one
    * of the listed files, which makes them source: Python's `env/` is a
-   * virtualenv, but `env/__init__.py` makes it a package. A name in
+   * virtualenv, but `env/__init__.py` makes it a package. A listed file of
+   * the form `*.ext` stands for any file with that extension (PHP's `cache/`
+   * holding a `.php` file); see {@link markerMatches}. A name in
    * `skipDirectories` is always skipped. Read with {@link skipsDirectory}.
    */
   readonly skipUnlessContains?: ReadonlyMap<string, readonly string[]>;
+
+  /**
+   * Directories skipped only when their parent directly holds one of the
+   * listed files, wherever they sit: PHP's `vendor/` beside `composer.json`
+   * is Composer's install directory, while a `vendor/` with no Composer file
+   * beside it holds hand-copied libraries that are source. A walk's own
+   * always-skipped names (sourcevision's vendored set) yield to this rule;
+   * a name in `skipDirectories` is always skipped. Read with
+   * {@link skipsDirectory}.
+   */
+  readonly skipOnlyBeside?: ReadonlyMap<string, readonly string[]>;
 
   /**
    * Directories skipped only where they are build output: directly under the
@@ -97,7 +110,16 @@ export interface LanguageConfig {
   readonly moduleFile?: string;
 }
 
-/** Where a directory sits, for a `skipBesideMarker` name. */
+/**
+ * Whether `fileName` is the `skipUnlessContains` marker `marker`: equal to
+ * it, or, for a marker of the form `*.ext`, ending in `.ext`. A `holds`
+ * callback that lists a directory answers a pattern marker with this.
+ */
+export function markerMatches(fileName: string, marker: string): boolean {
+  return marker.startsWith("*.") ? fileName.endsWith(marker.slice(1)) : fileName === marker;
+}
+
+/** Where a directory sits, for a `skipBesideMarker` or `skipOnlyBeside` name. */
 export interface DirectoryPlace {
   /** The directory's POSIX path relative to the project root (`"sub/target"`). */
   readonly path: string;
@@ -106,14 +128,18 @@ export interface DirectoryPlace {
 }
 
 /** The skip rules {@link skipsDirectory} reads. */
-export type DirectorySkipRules = Pick<LanguageConfig, "skipDirectories" | "skipUnlessContains" | "skipBesideMarker">;
+export type DirectorySkipRules = Pick<
+  LanguageConfig,
+  "skipDirectories" | "skipUnlessContains" | "skipBesideMarker" | "skipOnlyBeside"
+>;
 
 /**
  * Whether a traversal skips the directory `name` under `config`'s rules.
- * `holds(file)` answers whether the directory directly holds `file`, and
- * `place` where it sits; they are asked only for a `skipUnlessContains` or
- * `skipBesideMarker` name, so the caller does the I/O. Without `place`, a
- * `skipBesideMarker` name is taken to sit at the project root (skipped).
+ * `holds(file)` answers whether the directory directly holds `file` (or, for
+ * a `*.ext` marker, any file with that extension), and `place` where it sits;
+ * they are asked only for a conditional name, so the caller does the I/O.
+ * Without `place`, a `skipBesideMarker` name is taken to sit at the project
+ * root, and a `skipOnlyBeside` name beside its marker (both skipped).
  *
  * A name in `skipDirectories` is always skipped. A name the conditional rules
  * list is skipped only when every rule listing it says so: a directory one
@@ -128,9 +154,11 @@ export function skipsDirectory(
   if (config.skipDirectories.has(name)) return true;
   const unless = config.skipUnlessContains?.get(name);
   const beside = config.skipBesideMarker?.get(name);
-  if (unless === undefined && beside === undefined) return false;
+  const onlyBeside = config.skipOnlyBeside?.get(name);
+  if (unless === undefined && beside === undefined && onlyBeside === undefined) return false;
   if (unless !== undefined && unless.some(holds)) return false;
   if (beside !== undefined && place !== undefined && !isBuildOutputPlace(place, beside)) return false;
+  if (onlyBeside !== undefined && place !== undefined && !onlyBeside.some(place.parentHolds)) return false;
   return true;
 }
 

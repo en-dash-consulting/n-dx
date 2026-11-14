@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { goConfig, isLanguagePackEntry } from "@n-dx/lang-kit";
 import { createPackEntry } from "../../src/pack-entry.js";
-import { factGaps, mergeFileFacts, readSymbols, type PackSymbolRules } from "../../src/pack-facts.js";
+import { factGaps, mergeFileFacts, readPackFacts, readSymbols, type PackSymbolRules } from "../../src/pack-facts.js";
 import { packPackage, type PackPackage } from "../../src/pack-package.js";
 import type { Capture, FrameworkPack, LanguagePack, PackSourceFile } from "../../src/pack.js";
 
@@ -162,6 +162,68 @@ describe("readSymbols refine", () => {
 
   it("returns the rule-read symbols unchanged without refine", () => {
     expect(readSymbols(pack, file, rules).map((s) => s.name)).toEqual(["A", "B"]);
+  });
+});
+
+describe("readPackFacts with PHP's symbol kinds and import guard", () => {
+  const capture = (name: string, text: string, line: number, endLine: number): Capture => ({
+    name,
+    nodeType: "x",
+    text,
+    start: { line, column: 0 },
+    end: { line: endLine, column: 1 },
+  });
+  const decl = (kind: string, text: string, line: number, endLine: number): Capture[] => [
+    capture(`${kind}.decl`, text, line, endLine),
+    capture(`${kind}.name`, text, line, line),
+  ];
+  // namespace App { trait Greets { const GREETING; function hello() {} } const VERSION; }
+  const file: PackSourceFile = {
+    path: "src/Greets.php",
+    captures: {
+      decls: [
+        ...decl("namespace", "App", 1, 9),
+        ...decl("trait", "Greets", 2, 6),
+        ...decl("constant", "GREETING", 3, 3),
+        ...decl("method", "hello", 4, 5),
+        ...decl("constant", "VERSION", 8, 8),
+      ],
+    },
+  };
+  const rule = (kind: "namespace" | "trait" | "constant" | "method") => ({ query: "decls", declaration: `${kind}.decl`, name: `${kind}.name`, kind });
+  const symbolRules: PackSymbolRules = { rules: [rule("namespace"), rule("trait"), rule("constant"), rule("method")] };
+  const imports = {
+    files: [{ to: "src/boot.php", symbols: [] }],
+    external: [],
+    written: [
+      { specifier: "src/boot.php", names: [], position: { line: 1, column: 8 } },
+      {
+        specifier: "config/",
+        names: [],
+        position: { line: 7, column: 10 },
+        guard: "conditional" as const,
+        candidates: ["config/a.example.php", "config/b.example.php"],
+      },
+    ],
+  };
+  // Taken before any read, so the adapter handing back the same object cannot hide an in-place edit.
+  const expectedImports = structuredClone(imports);
+  const phpLike: LanguagePack ={ ...pack, produces: ["imports", "symbols"] };
+
+  it("reads trait, namespace and constant symbols; a trait contains its members, a namespace does not", () => {
+    const facts = readPackFacts(phpLike, file, { resolver: { resolve: () => imports }, symbolRules });
+    expect(facts.symbols?.map((s) => [s.kind, s.name, s.container ?? null])).toEqual([
+      ["namespace", "App", null],
+      ["trait", "Greets", null],
+      ["constant", "GREETING", "Greets"],
+      ["method", "hello", "Greets"],
+      ["constant", "VERSION", null],
+    ]);
+  });
+
+  it("hands the resolver's conditional import and its candidates over unchanged", () => {
+    const facts = readPackFacts(phpLike, file, { resolver: { resolve: () => imports }, symbolRules });
+    expect(facts.imports).toEqual(expectedImports);
   });
 });
 

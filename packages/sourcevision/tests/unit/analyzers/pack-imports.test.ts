@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { goConfig, javaConfig, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
+import { goConfig, javaConfig, type FileFacts, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../../src/analyzers/inventory.js";
 import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts } from "../../../src/analyzers/pack-imports.js";
@@ -160,6 +160,50 @@ describe("buildPackImportGraph", () => {
       unparsed: [],
     });
     expect(messages).toEqual([]);
+  });
+
+  describe("PHP's symbol kinds, conditional guard and include candidates", () => {
+    const at = { line: 1, column: 0 };
+    const span = { start: at, end: { line: 9, column: 1 } };
+    const facts: FileFacts[] = [
+      {
+        path: "src/A.java",
+        imports: {
+          files: [{ to: "src/B.java", symbols: [] }],
+          external: [],
+          written: [
+            { specifier: "src/B.java", names: [], position: at, guard: "conditional" },
+            { specifier: "config/", names: [], position: at, guard: "conditional", candidates: ["config/a.php", "config/b.php"] },
+          ],
+        },
+        symbols: [
+          { name: "App", kind: "namespace", position: at, span },
+          { name: "Greets", kind: "trait", position: at, span },
+          { name: "GREETING", kind: "constant", position: at, span, container: "Greets" },
+        ],
+      },
+    ];
+    // Taken before any run, so a sink handed the same objects cannot hide an in-place edit.
+    const expected = structuredClone(facts);
+    const graphOf = async (collected: FileFacts[]) => {
+      const entry = { ...stubEntry(javaConfig, { facts, unparsed: [] }), produces: ["imports", "routes"] as const };
+      return buildPackImportGraph([file("src/A.java"), file("src/B.java"), file("config/a.php"), file("config/b.php")], "/project", {
+        packs: [knownPack(javaConfig, { entry: entry as LanguagePackEntry })],
+        loader: { packDir, version: VERSION },
+        framework: (f) => collected.push(...f),
+      });
+    };
+
+    it("hands the facts over unchanged", async () => {
+      const collected: FileFacts[] = [];
+      await graphOf(collected);
+      expect(collected).toEqual(expected);
+    });
+
+    it("never turns include candidates into import edges", async () => {
+      const graph = await graphOf([]);
+      expect(graph.edges).toEqual([{ from: "src/A.java", to: "src/B.java", type: "static", symbols: [] }]);
+    });
   });
 
   it("lists the files a pack that ran could not parse, for the caller's fallback parser", async () => {

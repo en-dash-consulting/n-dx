@@ -3,8 +3,9 @@ import { goConfig } from "../../src/go.js";
 import { typescriptConfig } from "../../src/typescript.js";
 import { pythonConfig } from "../../src/python.js";
 import { javaConfig, javaSecondaryConfig } from "../../src/java.js";
+import { phpConfig, PHP_REPOSITORY_ONLY_EXTENSIONS } from "../../src/php.js";
 import { getLanguageConfig, mergeLanguageConfigs } from "../../src/detect.js";
-import { skipsDirectory, type LanguageConfig } from "../../src/registry.js";
+import { markerMatches, skipsDirectory, type LanguageConfig } from "../../src/registry.js";
 
 // ── Go config ────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,100 @@ describe("skipsDirectory", () => {
   it("a merge with no conditional rules has no skipUnlessContains", () => {
     expect(mergeLanguageConfigs([goConfig, typescriptConfig])).not.toHaveProperty("skipUnlessContains");
     expect(mergeLanguageConfigs([goConfig, typescriptConfig])).not.toHaveProperty("skipBesideMarker");
+  });
+});
+
+describe("skipsDirectory — PHP", () => {
+  const at = (path: string, parentFiles: string[] = []) => ({
+    path,
+    parentHolds: (file: string) => parentFiles.includes(file),
+  });
+  const holdsNothing = () => false;
+
+  it("skips vendor only beside composer.json, at any depth", () => {
+    expect(skipsDirectory(phpConfig, "vendor", holdsNothing, at("vendor", ["composer.json"]))).toBe(true);
+    expect(skipsDirectory(phpConfig, "vendor", holdsNothing, at("modules/shop/vendor", ["composer.json"]))).toBe(true);
+    expect(skipsDirectory(phpConfig, "vendor", holdsNothing, at("vendor"))).toBe(false);
+    expect(skipsDirectory(phpConfig, "vendor", holdsNothing, at("lib/vendor", ["index.php"]))).toBe(false);
+  });
+
+  it("without a place, a skipOnlyBeside name is skipped", () => {
+    expect(skipsDirectory(phpConfig, "vendor", holdsNothing)).toBe(true);
+  });
+
+  it.each([".phpunit.cache", "cache", "tmp"])("skips %s unless it holds a .php file", (name) => {
+    expect(skipsDirectory(phpConfig, name, holdsNothing)).toBe(true);
+    expect(skipsDirectory(phpConfig, name, (marker) => markerMatches("Cache.php", marker))).toBe(false);
+    expect(skipsDirectory(phpConfig, name, (marker) => markerMatches("page.html", marker))).toBe(true);
+  });
+
+  it("merged with TypeScript, cache and tmp are kept by TypeScript source too", () => {
+    const merged = mergeLanguageConfigs([typescriptConfig, phpConfig]);
+    const holdsTs = (marker: string) => markerMatches("index.ts", marker);
+    for (const name of ["cache", "tmp", ".phpunit.cache"]) {
+      expect(skipsDirectory(merged, name, holdsTs)).toBe(false);
+      expect(skipsDirectory(merged, name, (marker) => markerMatches("Cache.php", marker))).toBe(false);
+      expect(skipsDirectory(merged, name, (marker) => markerMatches("data.json", marker))).toBe(true);
+    }
+  });
+
+  it("merged with Python, literal markers gain no extension patterns", () => {
+    const merged = mergeLanguageConfigs([pythonConfig, phpConfig]);
+    expect(merged.skipUnlessContains?.get("env")).toEqual(["__init__.py", "__init__.pyi"]);
+  });
+
+  it("merged with Go, vendor is always skipped", () => {
+    const merged = mergeLanguageConfigs([phpConfig, goConfig]);
+    expect(skipsDirectory(merged, "vendor", holdsNothing, at("vendor"))).toBe(true);
+  });
+
+  it("merging keeps skipOnlyBeside only when a config has it", () => {
+    expect(mergeLanguageConfigs([typescriptConfig, phpConfig]).skipOnlyBeside).toEqual(new Map([["vendor", ["composer.json"]]]));
+    expect(mergeLanguageConfigs([goConfig, typescriptConfig])).not.toHaveProperty("skipOnlyBeside");
+  });
+});
+
+describe("markerMatches", () => {
+  it("matches a file name exactly, or by extension for a *.ext marker", () => {
+    expect(markerMatches("__init__.py", "__init__.py")).toBe(true);
+    expect(markerMatches("x__init__.py", "__init__.py")).toBe(false);
+    expect(markerMatches("Cache.php", "*.php")).toBe(true);
+    expect(markerMatches("Cache.phpx", "*.php")).toBe(false);
+  });
+});
+
+describe("phpConfig", () => {
+  it("lists the ambiguous extensions as PHP extensions, and .module and .install as not parseable", () => {
+    for (const ext of PHP_REPOSITORY_ONLY_EXTENSIONS) expect(phpConfig.extensions.has(ext)).toBe(true);
+    expect(phpConfig.parseableExtensions.has(".inc")).toBe(true);
+    expect(phpConfig.parseableExtensions.has(".module")).toBe(false);
+    expect(phpConfig.parseableExtensions.has(".install")).toBe(false);
+  });
+
+  it("no other config claims an extension only PHP repositories own", () => {
+    for (const config of [typescriptConfig, goConfig, pythonConfig, javaConfig]) {
+      for (const ext of PHP_REPOSITORY_ONLY_EXTENSIONS) expect(config.extensions.has(ext)).toBe(false);
+    }
+  });
+
+  it.each([
+    ["tests/Unit/UserTest.php", true],
+    ["src/UserTest.php", true],
+    ["lib/user_test.php", true],
+    ["phpunit.xml.dist", true],
+    ["src/User.php", false],
+  ])("treats %s as a test file: %s", (path, expected) => {
+    expect(phpConfig.testFilePatterns.some((p) => p.test(path))).toBe(expected);
+  });
+
+  it.each([
+    ["index.php", true],
+    ["public/index.php", true],
+    ["web/index.php", true],
+    ["htdocs/index.php", true],
+    ["admin/index.php", false],
+  ])("treats %s as an entry point: %s", (path, expected) => {
+    expect(phpConfig.entryPointPatterns.some((p) => p.test(path))).toBe(expected);
   });
 });
 

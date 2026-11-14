@@ -31,7 +31,11 @@ resolution, each attribute's `written` expression kept in `instance.resolved`). 
 `FileReference.typeOnly` (a target reached only under `if TYPE_CHECKING:`,
 recorded by sourcevision as a `type` edge), `FileReferences.written` (imports as written, each with an `ImportGuard` when
 it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
-(`__all__`), and the `variable` symbol kind. The contract names no parser type; `@n-dx/lang-runtime`'s
+(`__all__`), and the `variable` symbol kind. For PHP (no pack fills them
+yet) it declares the `trait`, `namespace` and `constant` symbol kinds (a trait
+contains its members, a namespace does not), the `conditional` `ImportGuard`,
+and `WrittenImport.candidates`: a dynamic include's possible files, held in
+memory, never import edges. The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports
@@ -60,7 +64,14 @@ hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`).
 `skipBesideMarker` names directories skipped only as build output: under the
 project root or a directory holding a marker, never below `src/` (Java's
 `target`, `build`, `out` and `generated` beside `pom.xml` or `build.gradle*`,
-so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
+so `src/main/java/…/target/` stays a package). `skipOnlyBeside` names
+directories skipped only when their parent holds a marker (PHP's `vendor`
+beside `composer.json`); sourcevision's always-skipped vendored set yields to
+it. A `*.ext` marker means any file with that extension (`markerMatches`;
+PHP's `cache`, `tmp`, `.phpunit.cache` without a `.php` file).
+`.inc`, `.module` and `.install` (`PHP_REPOSITORY_ONLY_EXTENSIONS`) are PHP
+only in a repository detected as PHP; detection never counts them.
+`skipsDirectory` applies these rules
 and `skipDirectories`, the caller doing the I/O and passing the directory's
 place; a name both conditional rules list is kept if either keeps it.
 
@@ -86,7 +97,8 @@ project file search as arguments (`detectLanguage(rootDir, { override,
 searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
 the search being the inventory's own walk. A markerless repository is
 Terraform alone only when that walk finds Terraform files and no
-`isFallbackSourceFile` file (JS/TS, or a language with no config); counts
+`isFallbackSourceFile` file (JS/TS, a language with no config, or PHP with
+no weak PHP marker: a root `.php` or a docroot `index.php`); counts
 are not weighed. Before deciding Terraform alone it searches again with no
 other config, so source only the fallback skips (`dist/`) keeps the fallback
 and the result's inventory never lists source detection did not count.

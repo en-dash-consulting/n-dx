@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { toCanonicalJSON } from "@n-dx/llm-client";
 import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
-import { terraformConfig, isTerraformFile, javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
+import { terraformConfig, isTerraformFile, javaConfig, javaSecondaryConfig, phpConfig, typescriptConfig } from "@n-dx/lang-kit";
 import { analyzeInventory, classifyRole, detectLanguage as inventoryLanguage } from "../../../src/analyzers/inventory.js";
 import { computeInfrastructure, toInfrastructureData, isTerraformPath } from "../../../src/analyzers/infrastructure.js";
 
@@ -178,6 +178,21 @@ describe("terraform language config", () => {
       await touch("examples/role-association-postgres/fixtures/lambda_function.py");
       expect(await detectLanguage(dir)).toBe(terraformConfig);
       expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+    });
+
+    it("puts a PHP site under a docroot ahead of Terraform", async () => {
+      await touch("htdocs/index.php", "<?php\n");
+      await touch("htdocs/lib/db.inc", "<?php\n");
+      await touch("infra/main.tf");
+      expect(await detectLanguage(dir)).toBe(phpConfig);
+      expect(await detectLanguages(dir)).toEqual([phpConfig, terraformConfig]);
+    });
+
+    it("never makes a markerless repository with PHP below the root Terraform alone", async () => {
+      await touch("app/lib/db.php", "<?php\n");
+      await touch("infra/main.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      expect(await detectLanguages(dir)).toEqual([typescriptConfig, terraformConfig]);
     });
 
     /** Detection says Terraform exactly when the analyze-phase inventory lists a Terraform file. */

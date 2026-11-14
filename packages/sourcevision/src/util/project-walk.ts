@@ -9,11 +9,11 @@
  * @module sourcevision/util/project-walk
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { PROJECT_DIRS } from "@n-dx/llm-client";
-import { skipsDirectory, type DirectorySkipRules } from "@n-dx/lang-kit";
+import { markerMatches, skipsDirectory, type DirectorySkipRules } from "@n-dx/lang-kit";
 import { toPosix } from "./paths.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
@@ -63,18 +63,36 @@ export type ProjectSkip = DirectorySkipRules;
 
 /**
  * What the walk skips: the base and vendored sets, the language config's own
- * `skipDirectories`, `skipUnlessContains` and `skipBesideMarker`, and the
- * user's `extraSkipDirs`.
+ * `skipDirectories`, `skipUnlessContains`, `skipBesideMarker` and
+ * `skipOnlyBeside`, and the user's `extraSkipDirs`. A vendored name the
+ * language lists in `skipOnlyBeside` (PHP's `vendor`, beside `composer.json`)
+ * follows that rule instead; the language's own `skipDirectories` (Go's
+ * `vendor`) and the user's still skip it everywhere.
  */
 export function projectSkip(
   language: ProjectSkip,
   extraSkipDirs: Iterable<string> = [],
 ): ProjectSkip {
+  const vendored = [...VENDOR_SKIP_DIRS].filter((name) => !language.skipOnlyBeside?.has(name));
   return {
-    skipDirectories: new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...language.skipDirectories, ...extraSkipDirs]),
+    skipDirectories: new Set([...BASE_SKIP_DIRS, ...vendored, ...language.skipDirectories, ...extraSkipDirs]),
     ...(language.skipUnlessContains ? { skipUnlessContains: language.skipUnlessContains } : {}),
     ...(language.skipBesideMarker ? { skipBesideMarker: language.skipBesideMarker } : {}),
+    ...(language.skipOnlyBeside ? { skipOnlyBeside: language.skipOnlyBeside } : {}),
   };
+}
+
+/**
+ * Whether `dir` directly holds the marker `file`: that file, or for a `*.ext`
+ * marker any file with the extension (lang-kit's `markerMatches`).
+ */
+function directoryHolds(dir: string, file: string): boolean {
+  if (!file.startsWith("*.")) return existsSync(join(dir, file));
+  try {
+    return readdirSync(dir, { withFileTypes: true }).some((e) => e.isFile() && markerMatches(e.name, file));
+  } catch {
+    return false; // Unreadable — holds nothing, so the directory stays skipped.
+  }
 }
 
 // ── Ignore filter ────────────────────────────────────────────────────────────
@@ -220,7 +238,7 @@ export async function* walkProjectFiles(
   skip: ProjectSkip,
 ): AsyncGenerator<string> {
   const entries = await readdir(dir, { withFileTypes: true });
-  const parentHolds = (file: string): boolean => existsSync(join(dir, file));
+  const parentHolds = (file: string): boolean => directoryHolds(dir, file);
 
   for (const entry of entries) {
     if (entry.name === ".gitkeep") continue;
@@ -229,7 +247,7 @@ export async function* walkProjectFiles(
     const relPath = toPosix(relative(rootDir, fullPath));
 
     if (entry.isDirectory()) {
-      const holds = (file: string): boolean => existsSync(join(fullPath, file));
+      const holds = (file: string): boolean => directoryHolds(fullPath, file);
       if (skipsDirectory(skip, entry.name, holds, { path: relPath, parentHolds })) continue;
       if (ig.ignores(relPath + "/")) continue;
       yield* walkProjectFiles(fullPath, rootDir, ig, skip);
@@ -237,7 +255,8 @@ export async function* walkProjectFiles(
       if (
         skip.skipDirectories.has(entry.name) ||
         skip.skipUnlessContains?.has(entry.name) ||
-        skip.skipBesideMarker?.has(entry.name)
+        skip.skipBesideMarker?.has(entry.name) ||
+        skip.skipOnlyBeside?.has(entry.name)
       ) continue;
       if (ig.ignores(relPath)) continue;
       yield relPath;
