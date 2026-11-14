@@ -60,7 +60,14 @@ hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`).
 `skipBesideMarker` names directories skipped only as build output: under the
 project root or a directory holding a marker, never below `src/` (Java's
 `target`, `build`, `out` and `generated` beside `pom.xml` or `build.gradle*`,
-so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
+so `src/main/java/…/target/` stays a package). `skipOnlyBeside` names
+directories skipped only when their parent holds a marker (PHP's `vendor`
+beside `composer.json`); sourcevision's always-skipped vendored set yields to
+it. A `*.ext` marker means any file with that extension (`markerMatches`;
+PHP's `cache`, `tmp`, `.phpunit.cache` without a `.php` file).
+`.inc`, `.module` and `.install` (`PHP_REPOSITORY_ONLY_EXTENSIONS`) are PHP
+only in a repository detected as PHP; detection never counts them.
+`skipsDirectory` applies these rules
 and `skipDirectories`, the caller doing the I/O and passing the directory's
 place; a name both conditional rules list is kept if either keeps it.
 

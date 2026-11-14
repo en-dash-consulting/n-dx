@@ -98,7 +98,7 @@ describe("detectLanguage", () => {
 
 describe("VALID_LANGUAGE_IDS", () => {
   it("contains the expected values", () => {
-    expect(VALID_LANGUAGE_IDS).toEqual(["typescript", "javascript", "go", "swift", "python", "csharp", "java", "auto"]);
+    expect(VALID_LANGUAGE_IDS).toEqual(["typescript", "javascript", "go", "swift", "python", "csharp", "java", "php", "auto"]);
   });
 });
 

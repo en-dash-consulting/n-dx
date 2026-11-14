@@ -9,10 +9,12 @@
  * 2. Single language marker present → that language
  *    (`go.mod` → Go, `package.json` → TS/JS, `Package.swift`/`*.xcodeproj` → Swift,
  *     `pyproject.toml`/`setup.py`/`requirements.txt`/`Pipfile` → Python,
- *     `*.sln`/`*.csproj` within three levels of the root → C#)
+ *     `*.sln`/`*.csproj` within three levels of the root → C#,
+ *     `composer.json` → PHP)
  * 3. Multiple markers present → file-count tiebreak (whichever has more source files)
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. Fallback → TypeScript/JS (backward-compatible default)
+ * 5. No other marker, a `.php` file at the root → PHP
+ * 6. Fallback → TypeScript/JS (backward-compatible default)
  *
  * Multi-language detection (`detectLanguages`) returns ALL detected language
  * configs rather than picking a winner. `mergeLanguageConfigs` combines
@@ -34,6 +36,7 @@ import { pythonConfig } from "./python.js";
 import { javaConfig, javaSecondaryConfig } from "./java.js";
 import { terraformConfig } from "./terraform.js";
 import { csharpConfig } from "./csharp.js";
+import { phpConfig, PHP_REPOSITORY_ONLY_EXTENSIONS } from "./php.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -44,6 +47,7 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
   ["java", javaConfig],
   ["terraform", terraformConfig],
   ["csharp", csharpConfig],
+  ["php", phpConfig],
   ["typescript", typescriptConfig],
   ["javascript", typescriptConfig],
 ]);
@@ -66,7 +70,7 @@ export function languageConfigsFromIds(ids: readonly string[]): LanguageConfig[]
  * Valid language identifiers accepted by the project config's `language` field.
  * Includes `"auto"` which triggers marker-based detection.
  */
-export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "swift", "python", "csharp", "java", "auto"] as const;
+export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "swift", "python", "csharp", "java", "php", "auto"] as const;
 
 /**
  * Look up a language config by id. Returns `undefined` for unknown ids.
@@ -152,6 +156,25 @@ async function hasPythonMarker(rootDir: string): Promise<boolean> {
     if (await fileExists(join(rootDir, m))) return true;
   }
   return false;
+}
+
+/** PHP marker present? A Composer manifest at the root. */
+async function hasPhpMarker(rootDir: string): Promise<boolean> {
+  return fileExists(join(rootDir, "composer.json"));
+}
+
+/**
+ * A `.php` file at the root (`index.php`, or any other)? The weak PHP marker:
+ * consulted only when no other language's marker matched, so a TypeScript
+ * repository with a few PHP files keeps its detection.
+ */
+async function hasRootPhpFile(rootDir: string): Promise<boolean> {
+  try {
+    const entries = await readdir(rootDir, { withFileTypes: true });
+    return entries.some((e) => e.isFile() && e.name.endsWith(".php"));
+  } catch {
+    return false; // Unreadable — no marker.
+  }
 }
 
 /**
@@ -249,14 +272,17 @@ async function walkBounded(rootDir: string, visit: (fileName: string) => boolean
  */
 async function countSourceFiles(
   rootDir: string,
-): Promise<{ go: number; ts: number; swift: number; py: number; cs: number }> {
-  const counts = { go: 0, ts: 0, swift: 0, py: 0, cs: 0 };
+): Promise<{ go: number; ts: number; swift: number; py: number; cs: number; php: number }> {
+  const counts = { go: 0, ts: 0, swift: 0, py: 0, cs: 0, php: 0 };
+  // Extensions other ecosystems share are PHP only once the repository is PHP.
+  const phpExtensions = new Set([...phpConfig.extensions].filter((ext) => !PHP_REPOSITORY_ONLY_EXTENSIONS.has(ext)));
   const families: Array<[keyof typeof counts, ReadonlySet<string>]> = [
     ["go", goConfig.extensions],
     ["ts", typescriptConfig.extensions],
     ["swift", swiftConfig.extensions],
     ["py", pythonConfig.extensions],
     ["cs", csharpConfig.extensions],
+    ["php", phpExtensions],
   ];
   await walkBounded(rootDir, (name) => {
     if (name.endsWith(".min.js")) return false;
@@ -268,12 +294,12 @@ async function countSourceFiles(
 }
 
 /**
- * Program-code extensions of languages with no config here (Ruby, Rust, PHP,
+ * Program-code extensions of languages with no config here (Ruby, Rust,
  * Elixir, Kotlin, C/C++ and others). A markerless repository in one of them
  * is analysed with the TypeScript fallback config.
  */
 const FALLBACK_LANGUAGE_EXTENSIONS: ReadonlySet<string> = new Set([
-  ".rb", ".rs", ".php", ".ex", ".exs", ".erl", ".hrl", ".scala", ".kt", ".kts",
+  ".rb", ".rs", ".ex", ".exs", ".erl", ".hrl", ".scala", ".kt", ".kts",
   ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".lua", ".dart", ".hs", ".ml",
   ".mli", ".clj", ".cljs", ".zig", ".nim", ".pl", ".pm", ".r", ".R",
 ]);
@@ -321,12 +347,13 @@ async function markerlessTerraform(search: ProjectFileSearch): Promise<"none" | 
 /**
  * Detect the primary project language.
  *
- * Five-step chain:
+ * Six-step chain:
  * 1. `options.override`
  * 2. Exactly one language marker present → that language
  * 3. Several markers present → file-count tiebreak
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No markers → TypeScript/JS fallback (Terraform when the repository
+ * 5. No other marker, a `.php` file at the root → PHP
+ * 6. No markers → TypeScript/JS fallback (Terraform when the repository
  *    has Terraform files and no source the fallback is for)
  */
 export async function detectLanguage(rootDir: string, options: DetectLanguageOptions): Promise<LanguageConfig> {
@@ -339,21 +366,23 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   }
 
   // Step 2 & 3: Check for language markers
-  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp] = await Promise.all([
+  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp] = await Promise.all([
     fileExists(join(rootDir, "go.mod")),
     fileExists(join(rootDir, "package.json")),
     hasSwiftMarker(rootDir),
     hasPythonMarker(rootDir),
     hasCSharpMarker(rootDir),
+    hasPhpMarker(rootDir),
   ]);
 
   // Single-marker fast path.
-  const markers = [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp].filter(Boolean).length;
+  const markers = [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp].filter(Boolean).length;
   if (markers === 1) {
     if (hasGoMod) return goConfig;
     if (hasSwift) return swiftConfig;
     if (hasPython) return pythonConfig;
     if (hasCSharp) return csharpConfig;
+    if (hasPhp) return phpConfig;
     return typescriptConfig;
   }
 
@@ -365,6 +394,7 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
     if (hasSwift) candidates.push([counts.swift, swiftConfig]);
     if (hasPython) candidates.push([counts.py, pythonConfig]);
     if (hasCSharp) candidates.push([counts.cs, csharpConfig]);
+    if (hasPhp) candidates.push([counts.php, phpConfig]);
     if (hasPackageJson) candidates.push([counts.ts, typescriptConfig]);
     candidates.sort((a, b) => {
       if (a[0] !== b[0]) return b[0] - a[0];
@@ -377,10 +407,13 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   // mixed repositories keep their existing primary language.
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
-  // Java outranks Terraform, and so does any of the fallback's source.
+  // Step 6: Then a `.php` file at the root, which outranks Terraform too.
+  if (await hasRootPhpFile(rootDir)) return phpConfig;
+
+  // Java and PHP outrank Terraform, and so does any of the fallback's source.
   if ((await markerlessTerraform(options.searchProjectFiles)) === "alone") return terraformConfig;
 
-  // Step 6: No markers → fallback to TypeScript/JS
+  // Step 7: No markers → fallback to TypeScript/JS
   return typescriptConfig;
 }
 
@@ -400,12 +433,13 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
 export async function detectLanguages(rootDir: string, options: DetectLanguagesOptions): Promise<LanguageConfig[]> {
   // Check for language markers (Swift adds Package.swift / .xcodeproj /
   // .xcworkspace; only one needs to be present).
-  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp] = await Promise.all([
+  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp] = await Promise.all([
     fileExists(join(rootDir, "go.mod")),
     fileExists(join(rootDir, "package.json")),
     hasSwiftMarker(rootDir),
     hasPythonMarker(rootDir),
     hasCSharpMarker(rootDir),
+    hasPhpMarker(rootDir),
   ]);
 
   const hasJava = await hasJavaMarker(rootDir);
@@ -413,23 +447,26 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
 
   // When any markers are present, count source files so we can order by
   // primary. countSourceFiles is cheap (shallow scan).
-  if (hasGoMod || hasPackageJson || hasSwift || hasPython || hasCSharp) {
+  if (hasGoMod || hasPackageJson || hasSwift || hasPython || hasCSharp || hasPhp) {
     const counts = await countSourceFiles(rootDir);
     if (hasGoMod) present.push({ config: goConfig, count: counts.go });
     if (hasSwift) present.push({ config: swiftConfig, count: counts.swift });
     if (hasPython) present.push({ config: pythonConfig, count: counts.py });
     if (hasCSharp) present.push({ config: csharpConfig, count: counts.cs });
+    if (hasPhp) present.push({ config: phpConfig, count: counts.php });
     if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
   }
 
-  // No markers → fallback to TypeScript/JS for backward compatibility, with
-  // Terraform beside it; Terraform alone only when there is no fallback
-  // source at all (never beside Java). Searched with the skip set of the
-  // result (see markerlessTerraform).
+  // No markers → Java, then PHP (a `.php` file at the root), then the
+  // TypeScript/JS fallback for backward compatibility, with Terraform beside
+  // it; Terraform alone only when there is no fallback source at all (never
+  // beside Java or PHP). Searched with the skip set of the result (see
+  // markerlessTerraform).
   if (present.length === 0) {
-    if (hasJava) {
-      const { terraform } = await options.searchProjectFiles([javaConfig], { count: false });
-      return terraform > 0 ? [javaConfig, terraformConfig] : [javaConfig];
+    const markerless = hasJava ? javaConfig : (await hasRootPhpFile(rootDir)) ? phpConfig : undefined;
+    if (markerless) {
+      const { terraform } = await options.searchProjectFiles([markerless], { count: false });
+      return terraform > 0 ? [markerless, terraformConfig] : [markerless];
     }
     const terraform = await markerlessTerraform(options.searchProjectFiles);
     if (terraform === "none") return [typescriptConfig];
@@ -465,6 +502,7 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
  * - `skipUnlessContains`: union of the marker files per name (omitted when
  *   none); a name another config lists in `skipDirectories` stays skipped
  * - `skipBesideMarker`: likewise (omitted when none)
+ * - `skipOnlyBeside`: likewise (omitted when none)
  * - `generatedFilePatterns`: concatenation of all patterns
  * - `generatedHeaders`: concatenation of all rules (omitted when none)
  * - `entryPointPatterns`: concatenation of all patterns
@@ -488,6 +526,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
   const skipDirectories = new Set<string>();
   const skipUnlessContains = new Map<string, string[]>();
   const skipBesideMarker = new Map<string, string[]>();
+  const skipOnlyBeside = new Map<string, string[]>();
   const generatedFilePatterns: RegExp[] = [];
   const generatedHeaders: GeneratedHeaderRule[] = [];
   const entryPointPatterns: RegExp[] = [];
@@ -505,6 +544,9 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const [d, markers] of config.skipBesideMarker ?? []) {
       skipBesideMarker.set(d, [...new Set([...(skipBesideMarker.get(d) ?? []), ...markers])]);
     }
+    for (const [d, markers] of config.skipOnlyBeside ?? []) {
+      skipOnlyBeside.set(d, [...new Set([...(skipOnlyBeside.get(d) ?? []), ...markers])]);
+    }
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
     for (const r of config.generatedHeaders ?? []) generatedHeaders.push(r);
     for (const p of config.entryPointPatterns) entryPointPatterns.push(p);
@@ -521,6 +563,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     skipDirectories,
     ...(skipUnlessContains.size > 0 ? { skipUnlessContains } : {}),
     ...(skipBesideMarker.size > 0 ? { skipBesideMarker } : {}),
+    ...(skipOnlyBeside.size > 0 ? { skipOnlyBeside } : {}),
     generatedFilePatterns,
     ...(generatedHeaders.length > 0 ? { generatedHeaders } : {}),
     entryPointPatterns,

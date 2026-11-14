@@ -12,6 +12,7 @@ export * from "./typescript.js";
 export * from "./go.js";
 export * from "./swift.js";
 export * from "./python.js";
+export * from "./php.js";
 export * from "./csharp.js";
 export * from "./java.js";
 export * from "./terraform.js";

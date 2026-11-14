@@ -26,6 +26,7 @@ export const PROJECT_LANGUAGES: readonly ProjectLanguage[] = [
   { id: "python", label: "Python" },
   { id: "csharp", label: "C#" },
   { id: "java", label: "Java" },
+  { id: "php", label: "PHP" },
 ];
 
 /** True when `id` is a language the setting accepts. */

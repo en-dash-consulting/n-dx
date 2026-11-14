@@ -513,6 +513,87 @@ describe("analyzeInventory", () => {
     expect(paths).toContain("vendors/registry.ts");
   });
 
+  /** Write `files` (path → text) under a fresh temp directory and return it. */
+  async function project(prefix: string, files: Record<string, string>): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), prefix));
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(join(dir, path, ".."), { recursive: true });
+      await writeFile(join(dir, path), text);
+    }
+    return dir;
+  }
+
+  it("labels PHP files, .inc/.module/.install included, in a PHP repository and lists no PHP as analysed", async () => {
+    tmpDir = await project("sv-inv-php-", {
+      "index.php": "<?php\n",
+      "lib/db.inc": "<?php\n",
+      "modules/shop/shop.module": "<?php\n",
+      "modules/shop/shop.install": "<?php\n",
+      "views/page.phtml": "<p></p>\n",
+      "tests/UserTest.php": "<?php\n",
+    });
+    const inv = await analyzeInventory(tmpDir);
+    const byPath = Object.fromEntries(inv.files.map((f) => [f.path, f]));
+    expect(Object.keys(byPath).sort()).toEqual([
+      "index.php",
+      "lib/db.inc",
+      "modules/shop/shop.install",
+      "modules/shop/shop.module",
+      "tests/UserTest.php",
+      "views/page.phtml",
+    ]);
+    for (const file of inv.files) expect(file.language).toBe("PHP");
+    expect(byPath["tests/UserTest.php"].role).toBe("test");
+    expect(inv.summary.analysedLanguages).toEqual([]);
+  });
+
+  it("does not count .inc, .module or .install as PHP outside a PHP repository", async () => {
+    tmpDir = await project("sv-inv-inc-ts-", {
+      "package.json": '{ "name": "test" }\n',
+      "src/app.ts": "export {};\n",
+      "asm/macros.inc": "; macros\n",
+      "drupal/x.module": "\n",
+      "drupal/x.install": "\n",
+      "legacy/proxy.php": "<?php\n",
+    });
+    const inv = await analyzeInventory(tmpDir);
+    expect(inv.files.map((f) => f.path).sort()).toEqual(["legacy/proxy.php", "src/app.ts"]);
+    expect(inv.summary.skippedExtensions).toEqual({ ".inc": 1, ".install": 1, ".json": 1, ".module": 1 });
+  });
+
+  it("skips vendor beside composer.json in a PHP repository", async () => {
+    tmpDir = await project("sv-inv-php-composer-", {
+      "composer.json": "{}\n",
+      "src/App.php": "<?php\n",
+      "vendor/autoload.php": "<?php\n",
+      "vendor/acme/lib/src/Lib.php": "<?php\n",
+    });
+    const inv = await analyzeInventory(tmpDir);
+    expect(inv.files.map((f) => f.path)).toEqual(["src/App.php"]);
+  });
+
+  it("inventories a vendor directory with no composer.json beside it in a PHP repository", async () => {
+    tmpDir = await project("sv-inv-php-legacy-vendor-", {
+      "index.php": "<?php\n",
+      "vendor/smarty/Smarty.class.php": "<?php\n",
+    });
+    const inv = await analyzeInventory(tmpDir);
+    expect(inv.files.map((f) => f.path).sort()).toEqual(["index.php", "vendor/smarty/Smarty.class.php"]);
+  });
+
+  it("skips PHP cache and tmp directories unless they hold .php source", async () => {
+    tmpDir = await project("sv-inv-php-cache-", {
+      "index.php": "<?php\n",
+      "cache/Cache.php": "<?php\n",
+      "app/cache/prod/container.php": "<?php\n",
+      "tmp/session.php.bak": "\n",
+      "tmp/views/compiled.php": "<?php\n",
+      ".phpunit.cache/test-results": "{}\n",
+    });
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
+    expect(inv.files.map((f) => f.path).sort()).toEqual(["cache/Cache.php", "index.php"]);
+  });
+
   it("produces deterministic output across runs", async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-det-"));
     await mkdir(join(tmpDir, "src"), { recursive: true });
