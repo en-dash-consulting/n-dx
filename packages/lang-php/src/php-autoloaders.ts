@@ -264,21 +264,30 @@ export class PhpAutoloaders {
     this.noticeList.push(`${file}:${at.line}: ${text}.`);
   }
 
-  /** A variable's value at `at` in a loader's body when PHP loads `className`. */
-  private valueAt(loader: Loader, name: string, at: SourcePosition, className: string): string | undefined {
+  /**
+   * A variable's value at `at` in a loader's body when PHP loads `className`.
+   * `memo` holds the values already worked out for this class, keyed by
+   * name and position: without it, a variable reassigned from itself k times
+   * (`$p = $p . 'x';`) is evaluated 2^k times.
+   */
+  private valueAt(loader: Loader, name: string, at: SourcePosition, className: string, memo: Map<string, string | undefined>): string | undefined {
+    const key = `${name}@${at.line}:${at.column}`;
+    if (memo.has(key)) return memo.get(key);
     let value = name === loader.body.parameter ? className : undefined;
     for (const a of loader.assignments) {
       if (!before(a.start, at)) break;
       if (a.name !== name) continue;
-      const assigned = this.includes.evaluate(a.value, loader.body.file, (n) => this.valueAt(loader, n, a.start, className));
+      const assigned = this.includes.evaluate(a.value, loader.body.file, (n) => this.valueAt(loader, n, a.start, className, memo));
       if (a.operator === undefined) value = assigned;
       else value = a.operator === ".=" && value !== undefined && assigned !== undefined ? value + assigned : undefined;
     }
+    memo.set(key, value);
     return value;
   }
 
   private pathFor(loader: Loader, include: WrittenImport, className: string): string | undefined {
-    return this.includes.evaluate(include.specifier, loader.body.file, (n) => this.valueAt(loader, n, include.position, className));
+    const memo = new Map<string, string | undefined>();
+    return this.includes.evaluate(include.specifier, loader.body.file, (n) => this.valueAt(loader, n, include.position, className, memo));
   }
 
   /** The files the autoloaders would include for `className`, in the order their files set them up. */

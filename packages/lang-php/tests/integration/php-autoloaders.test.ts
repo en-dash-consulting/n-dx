@@ -8,6 +8,8 @@
  * pack; skips when the grammar is not built.
  */
 
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTreeSitterRunner, listFixtureFiles, skipUnlessGrammar, type PackSourceFile } from "@n-dx/lang-runtime";
@@ -79,6 +81,26 @@ describe("php legacy class resolution", () => {
       "PHP: bootstrap.php:17: spl_autoload_register('missing_loader') names nothing the repository declares; not followed.",
       "PHP: bootstrap.php:18: spl_autoload_register() registers PHP's default spl_autoload; not followed.",
     ]);
+  });
+
+  it("follows a path variable reassigned from itself many times in linear time", { timeout: 10_000 }, async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const root = await mkdtemp(join(tmpdir(), "php-autoload-chain-"));
+    try {
+      // 40 reassignments: evaluating each from scratch is 2^40 steps.
+      const chain = Array.from({ length: 40 }, () => "    $path = $path . '';").join("\n");
+      await mkdir(join(root, "lib"));
+      await writeFile(
+        join(root, "boot.php"),
+        `<?php\nspl_autoload_register(function ($class) {\n    $path = __DIR__ . '/lib/';\n${chain}\n    require $path . $class . '.php';\n});\nnew Chained();\n`,
+      );
+      await writeFile(join(root, "lib", "Chained.php"), "<?php\nclass Chained {}\n");
+      const result = await pack.analyzeProject({ projectDir: root, files: ["boot.php", "lib/Chained.php"], kinds: ["imports"] });
+      const boot = result.facts.find((f) => f.path === "boot.php");
+      expect(boot?.imports?.files).toEqual([{ to: "lib/Chained.php", symbols: ["Chained"] }]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("takes a pattern's file that failed to parse only when no file declares the class", async (ctx) => {

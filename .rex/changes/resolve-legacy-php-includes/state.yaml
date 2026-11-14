@@ -15,10 +15,14 @@ items:
     lastModified: "2026-11-14T05:23:54.107Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "973d69dd-ecc6-4a80-8b4a-38f3fff87e09":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T08:19:53.855Z"
-    activeIntervals: [{"start":"2026-11-14T08:19:53.855Z"}]
-    lastModified: "2026-11-14T08:19:54.560Z"
+    completedAt: "2026-11-14T08:34:39.084Z"
+    endedAt: "2026-11-14T08:34:39.084Z"
+    activeIntervals: [{"end":"2026-11-14T08:34:39.084Z","start":"2026-11-14T08:19:53.855Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Declared-type index plus legacy autoloader patterns and the PSR-0 path in lang-php's resolver"
+    lastModified: "2026-11-14T08:34:39.084Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd220c20-0191-4388-b858-0a1454884daa":
     lastModified: "2026-11-14T05:22:31.059Z"
