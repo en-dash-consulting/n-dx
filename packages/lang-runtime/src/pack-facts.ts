@@ -58,8 +58,11 @@ export interface PackSymbolRules {
   readonly refine?: (symbols: readonly SymbolFact[], file: PackSourceFile) => SymbolFact[];
 }
 
-/** Kinds whose symbols contain members: a member without an explicit container belongs to the nearest one. */
-const TYPE_KINDS: ReadonlySet<SymbolKind> = new Set(["class", "interface", "enum", "record", "annotation", "struct"]);
+/**
+ * Kinds whose symbols contain members: a member without an explicit container
+ * belongs to the nearest one. A PHP `namespace` is not one of them.
+ */
+const TYPE_KINDS: ReadonlySet<SymbolKind> = new Set(["class", "interface", "enum", "record", "annotation", "struct", "trait"]);
 
 const span = (capture: Capture): SourceSpan => ({ start: capture.start, end: capture.end });
 

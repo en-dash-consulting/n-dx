@@ -70,12 +70,18 @@ export interface ExternalReference {
 }
 
 /**
- * Why an import might not run when its module loads. `type-checking`: under
- * `if TYPE_CHECKING:` (Python), seen by type checkers only. `optional`: inside
- * a `try:` whose handler catches the import's failure (Python's `ImportError`
- * or `ModuleNotFoundError`).
+ * Why an import might not run when its module loads.
+ *
+ * - `type-checking`: under `if TYPE_CHECKING:` (Python), seen by type checkers only.
+ * - `optional`: inside a `try:` whose handler catches the import's failure
+ *   (Python's `ImportError` or `ModuleNotFoundError`).
+ * - `conditional`: runs only under a condition. PHP `include`/`require` inside
+ *   `if`/`else`/`switch` or a loop, inside a function or method body, or
+ *   behind a `function_exists`/`class_exists`/`defined` check.
  */
-export type ImportGuard = "type-checking" | "optional";
+export const IMPORT_GUARDS = ["type-checking", "optional", "conditional"] as const;
+
+export type ImportGuard = (typeof IMPORT_GUARDS)[number];
 
 /** One import as the file writes it, before resolution. */
 export interface WrittenImport {
@@ -87,6 +93,18 @@ export interface WrittenImport {
   readonly position: SourcePosition;
   /** Absent for an import that always runs. */
   readonly guard?: ImportGuard;
+  /**
+   * For an include whose path is built at run time but starts with a literal
+   * prefix (PHP `"config/" . $_SERVER['HTTP_HOST'] . ".php"`): the project
+   * files it could load (here, files under `config/` ending in `.php`).
+   * Sorted, distinct, project-relative. Absent when the path is fully literal
+   * or has no literal prefix.
+   *
+   * Candidates are evidence, not edges: consumers must never turn them into
+   * import edges. Held in memory only; no persisted artifact has a field for
+   * them.
+   */
+  readonly candidates?: readonly string[];
 }
 
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
@@ -114,6 +132,13 @@ export interface FileReferences {
  *   its receiver's base type; a Java method's is its enclosing type.
  * - `table`: a SQL table created by `CREATE TABLE`.
  * - `variable`: a name assigned at module level (Python).
+ * - `trait`: a PHP `trait T {}`. Not reported as a `class` or `interface`; its
+ *   methods take it as their container.
+ * - `namespace`: a PHP `namespace A\B;` (or braced `namespace A\B {…}`), named
+ *   as written. It is not a container: a class inside keeps no container.
+ * - `constant`: a PHP `const X = 1;` at namespace level, a class constant
+ *   (container: its class, interface, trait or enum), or `define('X', …)`
+ *   whose name is a literal.
  *
  * Python uses `class`, `function` (sync or async) and `method` (a function
  * defined directly in a class body).
@@ -131,6 +156,9 @@ export const SYMBOL_KINDS = [
   "constructor",
   "table",
   "variable",
+  "trait",
+  "namespace",
+  "constant",
 ] as const;
 
 export type SymbolKind = (typeof SYMBOL_KINDS)[number];
