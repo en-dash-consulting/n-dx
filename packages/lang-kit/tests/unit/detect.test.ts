@@ -201,8 +201,57 @@ describe("PHP detection", () => {
     expect(all.calls).toEqual([{ others: [phpConfig], count: false }]);
   });
 
-  it("no longer counts .php as source for the TypeScript fallback", () => {
-    expect(isFallbackSourceFile("index.php")).toBe(false);
+  it.each(["public", "web", "htdocs", "www", "public_html"])(
+    "detects a site whose code sits only under %s/ from its index.php",
+    async (docroot) => {
+      await mkdir(join(dir, docroot, "lib"), { recursive: true });
+      await writeFile(join(dir, docroot, "index.php"), "<?php\n");
+      await writeFile(join(dir, docroot, "lib", "db.inc"), "<?php\n");
+      expect(await detectLanguage(dir, recordingSearch(0))).toBe(phpConfig);
+      expect(await detectLanguages(dir, recordingSearch(0))).toEqual([phpConfig]);
+    },
+  );
+
+  it("puts a docroot index.php ahead of Terraform, with Terraform beside it", async () => {
+    await mkdir(join(dir, "htdocs"));
+    await writeFile(join(dir, "htdocs", "index.php"), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(4, 0))).toBe(phpConfig);
+    expect(await detectLanguages(dir, recordingSearch(4, 0))).toEqual([phpConfig, terraformConfig]);
+  });
+
+  it.each([
+    ["an index.php below a directory that is no docroot", join("src", "index.php")],
+    ["a docroot with PHP but no index.php", join("public", "api.php")],
+    ["an index.php two levels down", join("site", "htdocs", "index.php")],
+  ])("takes no weak PHP marker from %s", async (_, file) => {
+    await mkdir(join(dir, file, ".."), { recursive: true });
+    await writeFile(join(dir, file), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+  });
+
+  it("keeps a package.json repository with public/index.php TypeScript", async () => {
+    await writeFile(join(dir, "package.json"), "{}\n");
+    await mkdir(join(dir, "public"));
+    await writeFile(join(dir, "public", "index.php"), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([typescriptConfig]);
+  });
+
+  it("lets a Java root outrank a docroot index.php", async () => {
+    await writeFile(join(dir, "pom.xml"), "<project/>\n");
+    await mkdir(join(dir, "web"));
+    await writeFile(join(dir, "web", "index.php"), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(javaConfig);
+  });
+
+  it.each([
+    ["index.php", true],
+    ["src/view.phtml", true],
+    ["lib/old.php4", true],
+    ["lib/consts.inc", false],
+    ["sites/x.module", false],
+  ])("counts %s as source that keeps a markerless repository from being Terraform alone: %s", (file, expected) => {
+    expect(isFallbackSourceFile(file)).toBe(expected);
   });
 
   it("is a valid override", async () => {
