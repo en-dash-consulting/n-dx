@@ -99,23 +99,21 @@ posixOnly("confined execRepoShellCmd", () => {
   });
 });
 
-/** A host identity cache whose lookup is still running until `resolve()`; `peek` sees it after. */
-function slowIdentity(): HostIdentityCache & { resolve(): void } {
+/**
+ * A host identity cache whose lookup is still running when the spawn begins:
+ * `peek` sees nothing until a caller awaits the lookup, which then resolves
+ * a little later. A spawn that only peeks never gets the identity, whatever
+ * the timing.
+ */
+function slowIdentity(): HostIdentityCache {
   let resolved: HostIdentity | undefined;
-  let release!: () => void;
-  const ready = new Promise<void>((r) => { release = r; });
   const lookup = async (): Promise<HostIdentity> => {
-    await ready;
+    await new Promise((r) => setTimeout(r, 10));
+    events.push("identity");
+    resolved = IDENTITY;
     return IDENTITY;
   };
-  return Object.assign(lookup, {
-    peek: () => resolved,
-    resolve: () => {
-      events.push("identity");
-      resolved = IDENTITY;
-      release();
-    },
-  });
+  return Object.assign(lookup, { peek: () => resolved });
 }
 
 function stubChild(): void {
@@ -161,7 +159,6 @@ posixOnly("vendor CLI spawn", () => {
   it("waits for a host lookup still running when the spawn begins, then hands the session the directory", async () => {
     stubChild();
     const identity = slowIdentity();
-    setTimeout(() => identity.resolve(), 30);
     await spawnWithAdapter(spawnOptions(claudeCliAdapter, "claude", {
       vendorSandbox: { setting: on, backend: seatbelt, reclaimSlot: slowReclaim, hostIdentity: identity },
     }));
@@ -208,7 +205,6 @@ describe("Codex CLI spawn", () => {
   it("waits for the host lookup and hands the Codex session the slot directory", async () => {
     stubChild();
     const identity = slowIdentity();
-    setTimeout(() => identity.resolve(), 10);
     await spawnWithAdapter(spawnOptions(codexCliAdapter, "codex", { vendorSandbox: { setting: on, hostIdentity: identity } }));
     expect(events).toEqual(["identity", "spawn"]);
     expect(spawnedEnv()[VALIDATION_SLOT_DIR_ENV]).toBe(hostSlotDir());
