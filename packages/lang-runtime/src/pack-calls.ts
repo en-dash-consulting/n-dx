@@ -97,15 +97,22 @@ export interface CallSite {
 export function groupCalls(captures: readonly Capture[]): CallFact[] {
   const constructs = captures.filter((c) => c.name === "call.construct");
   const constructAt = new Map(constructs.map((c) => [spanKey(c), c]));
+  const classes = captures.filter((c) => c.name === "call.class");
+  const classOf = new Map<Capture, Capture>();
+  innermostEach(constructs, classes).forEach((owner, i) => {
+    if (owner && !classOf.has(owner)) classOf.set(owner, classes[i]!);
+  });
   const calls: { readonly at: SourcePosition; readonly fact: CallFact }[] = [];
   const withList = new Set<Capture>();
   for (const site of callSites(captures)) {
     const construct = site.invocation ? constructAt.get(spanKey(site.invocation)) : undefined;
     if (construct) withList.add(construct);
+    // A creation's class names it even when the name rule cannot pair it (`new Foo ($x)`).
+    const callee = site.name ?? (construct ? classOf.get(construct) : undefined);
     calls.push({
       at: site.arguments.start,
       fact: {
-        ...(site.name ? { callee: site.name.text } : {}),
+        ...(callee ? { callee: callee.text } : {}),
         ...(site.receiver ? { receiver: site.receiver.text } : {}),
         ...(construct ? { construct: true } : {}),
         strings: site.strings.map(stringArgument),
@@ -115,11 +122,6 @@ export function groupCalls(captures: readonly Capture[]): CallFact[] {
   const bare = constructs.filter((c) => !withList.has(c));
   if (bare.length === 0) return calls.map((c) => c.fact);
 
-  const classes = captures.filter((c) => c.name === "call.class");
-  const classOf = new Map<Capture, Capture>();
-  innermostEach(constructs, classes).forEach((owner, i) => {
-    if (owner && !classOf.has(owner)) classOf.set(owner, classes[i]!);
-  });
   for (const construct of bare) {
     const cls = classOf.get(construct);
     calls.push({
