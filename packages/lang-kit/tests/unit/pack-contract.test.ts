@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DECLARED_FACT_KINDS,
   FACT_KINDS,
+  IMPORT_GUARDS,
   PRODUCED_FACT_KINDS,
   SYMBOL_KINDS,
   isFactKind,
@@ -47,6 +48,15 @@ describe("pack contract", () => {
     expect(SYMBOL_KINDS).toContain("struct");
     expect(SYMBOL_KINDS).toContain("variable");
     expect(new Set(SYMBOL_KINDS).size).toBe(SYMBOL_KINDS.length);
+  });
+
+  it("keeps PHP traits, namespaces and constants as their own symbol kinds", () => {
+    for (const kind of ["trait", "namespace", "constant"]) expect(SYMBOL_KINDS).toContain(kind);
+    expect(new Set(SYMBOL_KINDS).size).toBe(SYMBOL_KINDS.length);
+  });
+
+  it("guards an import that runs only under a condition", () => {
+    expect([...IMPORT_GUARDS]).toEqual(["type-checking", "optional", "conditional"]);
   });
 
   it("mentions no parser machinery", () => {
