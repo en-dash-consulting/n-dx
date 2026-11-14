@@ -70,7 +70,11 @@ is Python-specific.
 It reports imports as written and resolves none, so with or without it
 imports.json is unchanged; installed and running, it joins
 `analysedLanguages` with no edges, and missing and unlisted, it is only
-suggested (`tests/integration/php-pack-imports.test.ts`).
+suggested (`tests/integration/php-pack-imports.test.ts`). Over the pinned
+corpus (`php-corpus.json`, `php5` marking the PHP 5 era repositories),
+`scripts/php-corpus-report.mjs` measures the clean-parse rate of the files
+analyze would parse, per repository and for the PHP 5 repositories against
+decision D4's 99.5% bar.
 
 ### The Terraform model in infrastructure.json
 
