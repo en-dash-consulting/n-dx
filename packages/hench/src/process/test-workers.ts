@@ -7,9 +7,13 @@
  * tests, the completion check's test run, requirement validation commands and
  * the agent session's shell.
  *
+ * The lower value wins: a valid inherited `NDX_TEST_MAX_WORKERS` below the
+ * configured cap is kept, so repository config can only lower how many
+ * workers a suite starts, never raise a cap the user exported. Vitest does
+ * not clamp the value to the core count, so overwriting it could widen a run.
+ *
  * Applied after the environment is sanitized, so a `guard.env` deny glob
- * cannot drop it. That is safe to take from repository config: the value can
- * only lower how many workers a suite starts, never widen what runs.
+ * cannot drop it.
  *
  * @module hench/process/test-workers
  */
@@ -18,10 +22,24 @@
 export const TEST_MAX_WORKERS_ENV = "NDX_TEST_MAX_WORKERS";
 
 /**
- * `env` with `NDX_TEST_MAX_WORKERS` set to `maxWorkers`, or `env` itself
- * when no cap is configured, so an unset cap changes nothing.
+ * A positive integer cap from `raw`, parsed as `tests/test-max-workers.mjs`
+ * parses it, or undefined when it is absent or invalid.
+ */
+function parseInheritedCap(raw: string | undefined): number | undefined {
+  const trimmed = (raw ?? "").trim();
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  const cap = Number(trimmed);
+  return cap > 0 && Number.isSafeInteger(cap) ? cap : undefined;
+}
+
+/**
+ * `env` with `NDX_TEST_MAX_WORKERS` set to the lower of `maxWorkers` and a
+ * valid inherited value, or `env` itself when no cap is configured, so an
+ * unset cap changes nothing.
  */
 export function withTestMaxWorkers(env: NodeJS.ProcessEnv, maxWorkers: number | undefined): NodeJS.ProcessEnv {
   if (maxWorkers === undefined) return env;
-  return { ...env, [TEST_MAX_WORKERS_ENV]: String(maxWorkers) };
+  const inherited = parseInheritedCap(env[TEST_MAX_WORKERS_ENV]);
+  const cap = inherited === undefined ? maxWorkers : Math.min(inherited, maxWorkers);
+  return { ...env, [TEST_MAX_WORKERS_ENV]: String(cap) };
 }

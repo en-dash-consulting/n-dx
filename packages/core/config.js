@@ -1349,6 +1349,7 @@ const HENCH_VALIDATORS = {
   },
   "escalation.after": (value) => requirePositiveInteger("escalation.after", value),
   "escalation.maxAttempts": (value) => requirePositiveInteger("escalation.maxAttempts", value),
+  "testGate.maxWorkers": (value) => requirePositiveInteger("testGate.maxWorkers", value),
   "escalation.vendor": (value) => {
     if (!ESCALATION_VENDORS.includes(value)) {
       throw new Error(`Invalid escalation vendor "${value}". Expected one of: ${ESCALATION_VENDORS.join(", ")}.`);
@@ -1361,7 +1362,7 @@ const ESCALATION_VENDORS = ["claude", "codex", "google", "local"];
 
 /** Refuse anything but a whole number of at least 1, as hench's schema does. */
 function requirePositiveInteger(key, value) {
-  if (!Number.isInteger(value) || value < 1) {
+  if (!Number.isSafeInteger(value) || value < 1) {
     throw new Error(`Invalid ${key} "${value}". Expected a whole number of at least 1.`);
   }
 }
