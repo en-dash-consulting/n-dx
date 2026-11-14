@@ -1,0 +1,19 @@
+---
+id: "1bb5db41-3b76-446f-92b9-dda76a5f0b54"
+type: "task"
+title: "Stop a recycled pid from wedging the validation slot"
+slug: "stop-a-recycled-pid-from-wedging-the"
+summary: "If hench dies without giving back the shared validation slot and the operating system hands its process number to another program, every later test run on the machine can wait forever. This makes a restarted hench recognise its own leftover record, and makes the waiting message say exactly which file to clear."
+description: "PR 2 (#1034) review by Hal, 2026-11-14 (thread 4570835450), [P1]. After the boot check, pid liveness is the only staleness signal in `packages/hench/src/process/validation-slot.ts` (around line 281).\n\nProblem: when hench dies without releasing (`taskkill /F`, tree-kill after a second Ctrl-C, OOM, a closed terminal), the OS may hand the freed holder or child pid to an unrelated live process. Windows does this within moments; see bc27aa0dd (`fix/ci-flake-hardening`). Then:\n- Every gate, post-task run and completion check on the host waits behind that process.\n- The queue wait is excluded from the gate timeout, and `installRunInterrupt` has no deadline.\n- Two variants:\n  - A restarted hench can be handed the dead holder's pid. `isOrphanedByThisProcess` only matches tokens from a failed release, so it waits on its own stale record forever.\n  - The liveness check on `reclaim.lock` (around line 387) can wedge the same way.\n\nDo Hal's options (a) and (c):\n- (a) Keep a per-process set of this process's live lease tokens, and of its in-flight reclaim-lock tokens. A record, or a `reclaim.lock`, with `pid === process.pid` whose token is not live in this process is stale. Document this as a rule in the module header's protocol (rules 4/5); the header is the protocol spec that PR 3's `scripts/lib/validation-slot.mjs` mirrors.\n- (c) Name the full `holder.json` path in the wait message (\"Waiting for the validation slot held by pid N in <project> since … (<path>)\"). Document how to clear a wedged slot in TESTING.md's \"Running Several Worktrees at Once\" and in docs/packages/hench.md: confirm no ndx test run is active, then delete the `holder.json` named in the message.\n\nAlso fix the docs that promise a deadline that does not exist:\n- `validation-run.ts:34` (\"Stops waiting: the run's interrupt (Ctrl-C, SIGTERM) or deadline\");\n- the \"run's deadline\" wording in docs/packages/hench.md.\n\nSay what actually stops a wait: an interrupt or abort signal. Do not add a maximum queue wait (option d) or a heartbeat (option b) in this task.\n\nTests (in `packages/hench/tests/unit/process/validation-slot.test.ts`):\n- a record written with this process's pid and an unknown token is reclaimed at once;\n- a record with this process's pid and a live lease token still blocks a second acquire, or nests with the token;\n- a `reclaim.lock` with this process's pid and an unknown token does not block;\n- the wait report includes the `holder.json` path.\n\nOperator notes: run the slot unit tests, `tests/integration/test-gate.test.ts` and the static root policy tests. Add a patch changeset for `@n-dx/hench`. Do not edit `scripts/lib/validation-slot.mjs`; it does not exist on this branch, and PR 3 mirrors the change. No `process.env.NDX_*` writes in tests."
+acceptanceCriteria:
+  - "A holder.json or reclaim.lock naming this process's pid with a token this process does not hold is treated as stale; unit tests cover both and the live-token case"
+  - "The wait message names the holder.json path; TESTING.md and docs/packages/hench.md say how to clear a wedged slot"
+  - "No doc or comment claims a run deadline stops the wait; the module header states the new rule; a patch changeset for @n-dx/hench"
+priority: "high"
+tags:
+  - "validation-gate"
+  - "wave-1"
+  - "pr-2-host-slot"
+  - "review-fix"
+source: "ndx-capture"
+---
