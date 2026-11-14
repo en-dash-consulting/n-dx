@@ -107,7 +107,7 @@
     },
     {
       "path": "scripts/lib/validation-slot.mjs",
-      "reason": "The test runner's copy of hench's validation slot: reads the machine id with `ioreg` (macOS) or `reg` (Windows) exactly as hench's `runLookup` does through llm-client's exec — no shell, so a missing binary is ENOENT on every platform, which the shared directory rule depends on. It runs before the runner rebuilds stale packages, so it cannot depend on llm-client being built; the lookups are injectable so the parity test spawns none."
+      "reason": "The test runner's copy of hench's validation slot: reads the machine id with `ioreg` (macOS) or `reg` (Windows) exactly as hench's `runLookup` does through llm-client's exec — no shell, so a missing binary is ENOENT on every platform, which the shared directory rule depends on. It runs before the runner rebuilds stale packages, so it cannot depend on llm-client being built. The lookups are injectable, so the parity test compares both copies on fake sources and runs the real lookup only once per copy."
     },
     {
       "path": "packages/hench/src/process/memory-monitor.ts",
