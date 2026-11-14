@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "a3e16b11-5cc3-44ff-9112-9d50aa55f988":
+    status: "completed"
+    startedAt: "2026-11-14T05:41:24.342Z"
+    completedAt: "2026-11-14T05:41:24.342Z"
+    endedAt: "2026-11-14T05:41:24.342Z"
+    activeIntervals: [{"end":"2026-11-14T05:41:24.342Z","start":"2026-11-14T05:41:24.342Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed by task 96357e8a in commit a75d03b6f: slot dir keyed on hashed machine id (hostname fallback), NDX_VALIDATION_SLOT_DIR exported beside the token and used by nested acquires."
+    appliedAt: "2026-11-14T05:41:24.342Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-14T05:29:04.962Z"
+    lastModified: "2026-11-14T05:41:24.342Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

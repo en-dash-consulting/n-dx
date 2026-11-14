@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runTestGate } from "../../src/tools/test-runner.js";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { runPostTaskTests, runTestGate } from "../../src/tools/test-runner.js";
 import type { TestGateResult } from "../../src/schema/v1.js";
+import { validateCompletion } from "../../src/validation/completion.js";
+import {
+  acquireValidationSlot,
+  VALIDATION_SLOT_ENV,
+  VALIDATION_SLOT_HOLDER_FILE,
+} from "../../src/process/validation-slot.js";
+import { describeValidationSlotWait, runInValidationSlot, type ValidationSlotRunOptions } from "../../src/process/validation-run.js";
+import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
 
 describe("Test Suite Gate Integration", () => {
   let projectDir: string;
@@ -178,5 +188,347 @@ describe("Test Suite Gate Integration", () => {
       expect(result.ran).toBe(true);
       expect(result.passed).toBe(true);
     });
+  });
+});
+
+/**
+ * `hench.testGate.hostSlot`: each validation command takes the host-wide slot
+ * for itself, sees its token as NDX_VALIDATION_SLOT, and gives it back
+ * afterwards whatever the outcome. Uses a temp slot directory, never the
+ * real ndx home.
+ */
+describeNeedsPosixShell("validation commands inside the host slot", () => {
+  let projectDir: string;
+  let slotDir: string;
+  let probe: string;
+  let childProbe: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-gate-slot-"));
+    slotDir = join(projectDir, ".slot");
+    await mkdir(join(projectDir, "src"));
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 1;\n");
+    // Exits 0 only when it runs as the slot's holder: holder.json exists and
+    // its token is the one in NDX_VALIDATION_SLOT.
+    const holderFile = JSON.stringify(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
+    await writeFile(
+      join(projectDir, "probe.cjs"),
+      [
+        `const fs = require("fs");`,
+        `const token = process.env.${VALIDATION_SLOT_ENV};`,
+        `let holder = null;`,
+        `try { holder = JSON.parse(fs.readFileSync(${holderFile}, "utf-8")); } catch (err) { process.exit(6); }`,
+        `process.exit(token && holder.token === token ? 0 : 5);`,
+      ].join("\n"),
+    );
+    probe = `node ${JSON.stringify(join(projectDir, "probe.cjs"))}`;
+    // Exits 0 only when holder.json names the command this probe runs in: on
+    // POSIX its process group (the shell exec spawned leads it), on Windows a
+    // plain pid. The record is written just after the spawn, so it polls; a
+    // record that never comes is bounded by the command's own timeout.
+    await writeFile(
+      join(projectDir, "child-probe.cjs"),
+      [
+        `const fs = require("fs");`,
+        `const { execFileSync } = require("child_process");`,
+        `let child = null;`,
+        `while (!child) {`,
+        `  try { child = JSON.parse(fs.readFileSync(${holderFile}, "utf-8")).child; } catch (err) { child = null; }`,
+        `  if (!child) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);`,
+        `}`,
+        `if (process.platform === "win32") process.exit(child.group === false ? 0 : 8);`,
+        `const pgid = Number(execFileSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf-8" }).trim());`,
+        `process.exit(child.group === true && child.pid === pgid ? 0 : 9);`,
+      ].join("\n"),
+    );
+    childProbe = `node ${JSON.stringify(join(projectDir, "child-probe.cjs"))}`;
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  const slot = (extra: Partial<ValidationSlotRunOptions> = {}): ValidationSlotRunOptions =>
+    ({ slotDir, projectDir, pollIntervalMs: 20, ...extra });
+  const slotHeld = () => existsSync(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
+  /** Hold the slot as another holder would, for `ms`. */
+  async function holdSlotFor(ms: number): Promise<void> {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/elsewhere", env: {} });
+    setTimeout(() => void lease.release(), ms);
+  }
+
+  it("runs the gate inside the slot, records queue and execution time, and releases it", async () => {
+    const result = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: probe, validationSlot: slot() });
+    expect(result.passed).toBe(true);
+    expect(result.queueMs).toBeGreaterThanOrEqual(0);
+    expect(result.executionMs).toBeGreaterThanOrEqual(0);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("takes the slot again for the re-run and records both commands' time", async () => {
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/a.ts"],
+      testCommand: `node -e "console.log('test-gate: failed-suites=root'); process.exit(1)"`,
+      rerunTemplate: `${probe} {suites}`,
+      validationSlot: slot(),
+    });
+    expect(result.rerun?.passed).toBe(true);
+    expect(result.executionMs).toBeGreaterThanOrEqual(0);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("releases the slot after a failing gate", async () => {
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "process.exit(1)"`, validationSlot: slot(),
+    });
+    expect(result.passed).toBe(false);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("releases the slot after a timeout, once the command has been stopped", async () => {
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "setTimeout(() => {}, 30000)"`,
+      timeout: 300, validationSlot: slot(),
+    });
+    expect(result.passed).toBe(false);
+    expect(result.error).toMatch(/did not finish within/);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("starts the gate's timeout after admission: queue wait does not count", async () => {
+    await holdSlotFor(3_000);
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: probe, timeout: 2_500, validationSlot: slot(),
+    });
+    expect(result.passed).toBe(true);
+    // Longer than the timeout, so a timeout that counted the wait would have fired.
+    expect(result.queueMs).toBeGreaterThanOrEqual(2_900);
+  });
+
+  it("reports the holder while waiting", async () => {
+    await holdSlotFor(300);
+    const waits: string[] = [];
+    await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: probe,
+      validationSlot: slot({ onWait: (w) => waits.push(describeValidationSlotWait(w)) }),
+    });
+    expect(waits[0]).toMatch(/^Waiting for the validation slot held by pid \d+ in \/elsewhere since \S+ \(.+\)$/);
+    expect(waits[0]).toContain(`(${join(slotDir, "holder.json")})`);
+  });
+
+  it("stops waiting when the run is interrupted, and runs nothing", async () => {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/elsewhere", env: {} });
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new Error("interrupted")), 100);
+      const result = await runTestGate({
+        projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "require('fs').writeFileSync('ran', '')"`,
+        validationSlot: slot({ signal: controller.signal }),
+      });
+      expect(result.ran).toBe(false);
+      expect(result.error).toMatch(/validation slot.*interrupted/);
+      expect(result.queueMs).toBeGreaterThanOrEqual(50);
+      expect(existsSync(join(projectDir, "ran"))).toBe(false);
+    } finally {
+      await lease.release();
+    }
+  });
+
+  it("records the gate command's child in holder.json while it runs, for each attempt and the re-run", async () => {
+    const gate = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: childProbe, validationSlot: slot() });
+    expect(gate.passed).toBe(true);
+
+    const rerun = await runTestGate({
+      projectDir,
+      filesChanged: ["src/a.ts"],
+      testCommand: `node -e "console.log('test-gate: failed-suites=root'); process.exit(1)"`,
+      rerunTemplate: `${childProbe} {suites}`,
+      validationSlot: slot(),
+    });
+    expect(rerun.rerun?.passed).toBe(true);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("records the post-task and completion test commands' child in holder.json while they run", async () => {
+    const postTask = await runPostTaskTests({ projectDir, filesChanged: ["src/a.ts"], testCommand: childProbe, validationSlot: slot() });
+    expect(postTask.passed).toBe(true);
+
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
+    git("init", "-q");
+    git("add", "src");
+    git("commit", "-qm", "init");
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
+    const completion = await validateCompletion(projectDir, { testCommand: childProbe, validationSlot: slot() });
+    expect(completion.testsPassed).toBe(true);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("runs post-task tests inside the slot", async () => {
+    const result = await runPostTaskTests({ projectDir, filesChanged: ["src/a.ts"], testCommand: probe, validationSlot: slot() });
+    expect(result.passed).toBe(true);
+    expect(result.queueMs).toBeGreaterThanOrEqual(0);
+    expect(result.executionMs).toBeGreaterThanOrEqual(0);
+    expect(slotHeld()).toBe(false);
+  });
+
+  it("runs the completion check's test run inside the slot", async () => {
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
+    git("init", "-q");
+    git("add", "src");
+    git("commit", "-qm", "init");
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
+    const result = await validateCompletion(projectDir, { testCommand: probe, validationSlot: slot() });
+    expect(result.testsPassed).toBe(true);
+    expect(slotHeld()).toBe(false);
+  });
+
+  /** A slot directory that cannot be created: its parent is a regular file. */
+  const unwritableSlotDir = () => join(projectDir, "src", "a.ts", "slot");
+  const unwritableSlot = (warnings: string[]) =>
+    slot({ slotDir: unwritableSlotDir(), onWarning: (w) => warnings.push(w) });
+  /** Writes `ran`, then exits with `code`. */
+  const writesRan = (code: number) => `node -e "require('fs').writeFileSync('ran', ''); process.exit(${code})"`;
+  const expectSkippedSlotWarning = (warnings: string[]) => {
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/skipped the validation slot and ran without it/);
+    expect(warnings[0]).toContain(unwritableSlotDir());
+  };
+
+  it("returns the skipped slot as a slotWarning beside the command's result", async () => {
+    const run = await runInValidationSlot(unwritableSlot([]), async (withSlot) => withSlot({ env: {} }).env);
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(run.value[VALIDATION_SLOT_ENV]).toBeUndefined();
+    expect(run.timing).toBeUndefined();
+    expect(run.slotWarning).toMatch(/skipped the validation slot and ran without it/);
+    expect(run.slotWarning).toContain(unwritableSlotDir());
+  });
+
+  it("runs nothing when the run was interrupted before a slot that cannot be taken failed", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("interrupted"));
+    const warnings: string[] = [];
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan(0),
+      validationSlot: { ...unwritableSlot(warnings), signal: controller.signal },
+    });
+    expect(result.ran).toBe(false);
+    expect(result.error).toMatch(/validation slot.*interrupted/);
+    expect(existsSync(join(projectDir, "ran"))).toBe(false);
+    expect(warnings).toEqual([]);
+  });
+
+  it.each([
+    { code: 0, passed: true },
+    { code: 1, passed: false },
+  ])("runs the gate without a slot that cannot be taken and reports its real result (exit $code)", async ({ code, passed }) => {
+    const warnings: string[] = [];
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan(code), validationSlot: unwritableSlot(warnings),
+    });
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(passed);
+    expect(existsSync(join(projectDir, "ran"))).toBe(true);
+    expectSkippedSlotWarning(warnings);
+  });
+
+  it("runs post-task tests without a slot that cannot be taken", async () => {
+    const warnings: string[] = [];
+    const post = await runPostTaskTests({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan(1), validationSlot: unwritableSlot(warnings),
+    });
+    expect(post.ran).toBe(true);
+    expect(post.passed).toBe(false);
+    expectSkippedSlotWarning(warnings);
+  });
+
+  it.each([
+    { code: 0, valid: true },
+    { code: 1, valid: false },
+  ])("runs the completion check without a slot that cannot be taken and reports its real result (exit $code)", async ({ code, valid }) => {
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: projectDir });
+    git("init", "-q");
+    git("add", "src");
+    git("commit", "-qm", "init");
+    await writeFile(join(projectDir, "src", "a.ts"), "export const a = 2;\n");
+    const warnings: string[] = [];
+    const completion = await validateCompletion(projectDir, { testCommand: writesRan(code), validationSlot: unwritableSlot(warnings) });
+    expect(completion.valid).toBe(valid);
+    expect(completion.testsRan).toBe(true);
+    expect(completion.testsPassed).toBe(valid);
+    expect(existsSync(join(projectDir, "ran"))).toBe(true);
+    expectSkippedSlotWarning(warnings);
+  });
+
+  it("keeps the command's result when the slot cannot be released, and warns", async () => {
+    // The command replaces holder.json with a directory, so release cannot read
+    // it (EISDIR on every platform). A file in place of the slot directory
+    // fails only on POSIX: Windows reports ENOENT, which reads as already free.
+    const holderFile = JSON.stringify(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
+    await writeFile(
+      join(projectDir, "break-slot.cjs"),
+      `const fs = require("fs");\n` +
+        `fs.rmSync(${holderFile});\n` +
+        `fs.mkdirSync(${holderFile});\n`,
+    );
+    const warnings: string[] = [];
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: `node ${JSON.stringify(join(projectDir, "break-slot.cjs"))}`,
+      validationSlot: slot({ onWarning: (w) => warnings.push(w) }),
+    });
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/could not release the validation slot/);
+  });
+
+  // Root ignores directory permissions, so the read-only slot cannot fail its
+  // release. Windows has no equivalent that keeps holder.json readable: a
+  // read-only directory does not stop deletion there, and Node's unlink clears
+  // a file's read-only attribute before deleting it.
+  it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+    "reclaims a record it could not release on its next validation instead of waiting on itself",
+    async () => {
+      // The command makes the slot directory read-only: release cannot unlink
+      // holder.json, which stays behind naming this process.
+      await writeFile(
+        join(projectDir, "lock-slot.cjs"),
+        `require("fs").chmodSync(${JSON.stringify(slotDir)}, 0o555);\n`,
+      );
+      const warnings: string[] = [];
+      const first = await runTestGate({
+        projectDir, filesChanged: ["src/a.ts"], testCommand: `node ${JSON.stringify(join(projectDir, "lock-slot.cjs"))}`,
+        validationSlot: slot({ onWarning: (w) => warnings.push(w) }),
+      });
+      await chmod(slotDir, 0o755);
+      expect(first.passed).toBe(true);
+      expect(warnings[0]).toMatch(/could not release the validation slot/);
+      expect(slotHeld()).toBe(true);
+
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(new Error("waited on its own record")), 5_000);
+      try {
+        const second = await runTestGate({
+          projectDir, filesChanged: ["src/a.ts"], testCommand: probe, validationSlot: slot({ signal: controller.signal }),
+        });
+        expect(second.error).toBeUndefined();
+        expect(second.passed).toBe(true);
+        expect(slotHeld()).toBe(false);
+      } finally {
+        clearTimeout(deadline);
+      }
+    },
+  );
+
+  it("without a slot, takes none and records no timing", async () => {
+    const result = await runTestGate({ projectDir, filesChanged: ["src/a.ts"], testCommand: `node -e "process.exit(0)"` });
+    expect(result.passed).toBe(true);
+    expect(result).not.toHaveProperty("queueMs");
+    expect(result).not.toHaveProperty("executionMs");
+    expect(existsSync(slotDir)).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } f
 import { repoCommandEnv, resolveLayout } from "../prd/llm-gateway.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 import { withTestMaxWorkers } from "../process/test-workers.js";
+import type { ValidationSlotRunOptions } from "../process/validation-run.js";
 import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import { isFinalizeReadyParent } from "../validation/finalize-ready.js";
@@ -26,6 +27,8 @@ export interface UpdateStatusOptions {
   selfHeal?: boolean;
   /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
   testMaxWorkers?: number;
+  /** `hench.testGate.hostSlot`: the completion check's test run takes the validation slot. */
+  validationSlot?: ValidationSlotRunOptions;
   /**
    * Set on the agent's own tool call, never on hench's internal writes: a
    * completion that passes validation is recorded on the run's claim for the
@@ -56,6 +59,7 @@ export async function toolRexUpdateStatus(
       startingHead: options.startingHead,
       selfHeal: options.selfHeal,
       testMaxWorkers: options.testMaxWorkers,
+      validationSlot: options.validationSlot,
       finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
     });
 
@@ -365,6 +369,7 @@ export const rexToolHandlers: RexToolHandlers = {
         startingHead: ctx.startingHead,
         selfHeal: ctx.selfHeal,
         testMaxWorkers: ctx.testMaxWorkers,
+        validationSlot: ctx.validationSlot,
         holdCompletionForRun: true,
       },
     ),

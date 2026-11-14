@@ -143,6 +143,21 @@ describe("loadConfig", () => {
       expect(config.testGate?.maxWorkers).toBe(2);
     });
 
+    it("keeps hench.testGate.hostSlot from .n-dx.json beside the other testGate keys", async () => {
+      await writeProjectConfig({ hench: { testGate: { hostSlot: true, maxWorkers: 2 } } });
+      const config = await loadConfig(henchDir);
+      expect(config.testGate?.hostSlot).toBe(true);
+      expect(config.testGate?.maxWorkers).toBe(2);
+    });
+
+    it("reverts a non-boolean hench.testGate.hostSlot and warns", async () => {
+      await writeProjectConfig({ hench: { testGate: { hostSlot: "yes" } } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, { onWarning: (message) => warnings.push(message) });
+      expect(config.testGate?.hostSlot).toBeUndefined();
+      expect(warnings.join("\n")).toContain("hostSlot");
+    });
+
     it.each([0, -1, 1.5, "2"])("reverts an invalid hench.testGate.maxWorkers (%s) and warns", async (value) => {
       await writeProjectConfig({ hench: { testGate: { maxWorkers: value } } });
       const warnings: string[] = [];

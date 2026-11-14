@@ -2,6 +2,7 @@ import { exec } from "../process/exec.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { withTestMaxWorkers } from "../process/test-workers.js";
+import { runInValidationSlot, type ValidationSlotRunOptions } from "../process/validation-run.js";
 import { BOOKKEEPING_PATHS } from "../store/paths.js";
 import { discoverChangedFiles } from "./changed-files.js";
 
@@ -40,6 +41,8 @@ export interface CompletionValidationOptions {
   finalizeReadyParent?: boolean;
   /** `hench.testGate.maxWorkers`: sets `NDX_TEST_MAX_WORKERS` for the test run. */
   testMaxWorkers?: number;
+  /** `hench.testGate.hostSlot`: run the test command inside the host-wide validation slot. */
+  validationSlot?: ValidationSlotRunOptions;
 }
 
 const DEFAULT_TIMEOUT = 30_000;
@@ -142,11 +145,26 @@ export async function validateCompletion(
 
   // Run tests if configured
   if (options?.testCommand) {
+    const testCommand = options.testCommand;
     // Agent-written tests: confined like the agent's own run_command.
-    const { error: testError, stderr: testStderr, launched } = await execRepoShellCmd(
-      options.testCommand,
-      { cwd: projectDir, timeout, env: withTestMaxWorkers(repoCommandEnv(projectDir), options.testMaxWorkers) },
-    );
+    const slotRun = await runInValidationSlot(options.validationSlot, (withSlot) =>
+      execRepoShellCmd(
+        testCommand,
+        withSlot({ cwd: projectDir, timeout, env: withTestMaxWorkers(repoCommandEnv(projectDir), options.testMaxWorkers) }),
+      ));
+    // Only an interrupted slot wait lands here (a slot that cannot be taken
+    // runs the command without it). Fails closed: nothing was tested.
+    if (!slotRun.ok) {
+      return {
+        valid: false,
+        hasChanges: true,
+        diffSummary,
+        testsRan: false,
+        testsPassed: false,
+        reason: `Tests did not run: ${slotRun.error}`,
+      };
+    }
+    const { error: testError, stderr: testStderr, launched } = slotRun.value;
 
     // A command that never launched also arrives here with a non-null `error`,
     // and reporting it as `testsRan: true` / "Tests failed" claimed a verdict on

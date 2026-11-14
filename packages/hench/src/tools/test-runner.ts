@@ -30,6 +30,10 @@ export interface PostRunTestResult {
   targetedFiles: string[];
   /** Error message if tests couldn't be run. */
   error?: string;
+  /** Milliseconds spent waiting for the validation slot; set only with a slot. */
+  queueMs?: number;
+  /** Milliseconds the command ran inside the validation slot; set only with a slot. */
+  executionMs?: number;
 }
 
 export interface TestRunnerOptions {
@@ -43,6 +47,8 @@ export interface TestRunnerOptions {
   timeout?: number;
   /** `hench.testGate.maxWorkers`: sets `NDX_TEST_MAX_WORKERS` for the command. */
   testMaxWorkers?: number;
+  /** `hench.testGate.hostSlot`: run the command inside the host-wide validation slot. */
+  validationSlot?: ValidationSlotRunOptions;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,6 +347,12 @@ import { execRepoShellCmd } from "../guard/sandbox.js";
 // The environment every repository-owned command below runs with (#686).
 import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { withTestMaxWorkers } from "../process/test-workers.js";
+import {
+  addValidationSlotTiming,
+  runInValidationSlot,
+  type ValidationSlotRunOptions,
+  type ValidationSlotTiming,
+} from "../process/validation-run.js";
 import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
@@ -359,7 +371,7 @@ import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
 export async function runPostTaskTests(
   options: TestRunnerOptions,
 ): Promise<PostRunTestResult> {
-  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TIMEOUT, testMaxWorkers } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TIMEOUT, testMaxWorkers, validationSlot } = options;
 
   if (!testCommand) {
     return { ran: false, passed: false, targetedFiles: [], error: "No test command configured" };
@@ -392,18 +404,34 @@ export async function runPostTaskTests(
     targetedFiles = [];
   }
 
-  const startMs = Date.now();
-  // Confined like the agent's own run_command: the suite is agent-written code.
-  const { stdout, stderr, exitCode, launched, error } = await execRepoShellCmd(
-    command,
-    {
-      cwd: projectDir,
-      timeout,
-      maxBuffer: 2 * 1024 * 1024,
-      env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
-    },
-  );
-  const durationMs = Date.now() - startMs;
+  // With a slot, the timeout starts after admission: `exec` arms it inside.
+  const slotRun = await runInValidationSlot(validationSlot, async (withSlot) => {
+    const startMs = Date.now();
+    // Confined like the agent's own run_command: the suite is agent-written code.
+    const result = await execRepoShellCmd(
+      command,
+      withSlot({
+        cwd: projectDir,
+        timeout,
+        maxBuffer: 2 * 1024 * 1024,
+        env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
+      }),
+    );
+    return { result, durationMs: Date.now() - startMs };
+  });
+  if (!slotRun.ok) {
+    return {
+      ran: false,
+      passed: false,
+      command,
+      targetedFiles,
+      error: `Tests did not run: ${slotRun.error}`,
+      queueMs: slotRun.queueMs,
+    };
+  }
+  const { stdout, stderr, exitCode, launched, error } = slotRun.value.result;
+  const { durationMs } = slotRun.value;
+  const timing = slotRun.timing ?? {};
 
   // Same hazard as runTestGate: a command that could not be spawned comes back
   // as exitCode 1 with empty output, so inferring from exitCode alone records a
@@ -419,6 +447,7 @@ export async function runPostTaskTests(
       error:
         `Tests could not be executed — the command was never launched ` +
         `(${error?.message ?? "spawn failed"})`,
+      ...timing,
     };
   }
 
@@ -426,6 +455,7 @@ export async function runPostTaskTests(
   const output = truncateOutput(stdout, stderr, 2000);
 
   return {
+    ...timing,
     ran: true,
     passed,
     command,
@@ -622,6 +652,12 @@ export interface TestGateOptions {
   rerunTemplate?: string;
   /** `hench.testGate.maxWorkers`: sets `NDX_TEST_MAX_WORKERS` for the gate and its re-run. */
   testMaxWorkers?: number;
+  /**
+   * `hench.testGate.hostSlot`: the gate and its re-run each take the
+   * host-wide validation slot for their command alone. The timeout starts
+   * after admission.
+   */
+  validationSlot?: ValidationSlotRunOptions;
 }
 
 /**
@@ -843,7 +879,8 @@ function parseVitestOutput(
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS, rerunTemplate, testMaxWorkers } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS, rerunTemplate, testMaxWorkers, validationSlot } = options;
+  const run = (cmd: string) => runGateCommand(cmd, projectDir, timeout, testMaxWorkers, validationSlot);
 
   // Skip if no files were modified
   if (filesChanged.length === 0) {
@@ -857,7 +894,7 @@ export async function runTestGate(
 
   // Use provided command or default to pnpm test with JSON reporter
   const command = testCommand || "pnpm test --reporter=json";
-  const first = await runGateCommand(command, projectDir, timeout, testMaxWorkers);
+  const first = await run(command);
   if (!rerunTemplate || first.result.passed || !first.result.ran || first.timedOut) {
     return first.result;
   }
@@ -865,8 +902,12 @@ export async function runTestGate(
   const plan = planRerun(rerunTemplate, first.output);
   if (!plan.ok) return { ...first.result, rerunSkipped: plan.reason };
 
-  // One re-run, same timeout and process-tree kill as the gate itself.
-  const second = await runGateCommand(plan.command, projectDir, timeout, testMaxWorkers);
+  // One re-run, same timeout and process-tree kill as the gate itself. It
+  // takes the slot again: the first attempt gave it back.
+  const second = await run(plan.command);
+  // Top-level queue/execution time covers both commands.
+  const timing = addValidationSlotTiming(first.timing, second.timing);
+  const withTiming = <R extends TestGateResult>(result: R): R => (timing ? { ...result, ...timing } : result);
   const rerun = {
     command: plan.command,
     suites: plan.suites,
@@ -880,7 +921,7 @@ export async function runTestGate(
     // failed subset and live on `rerun.suites`.
     const selected = first.result.suites;
     const { suites: _rerunSuites, ...rerunResult } = second.result;
-    return {
+    return withTiming({
       ...rerunResult,
       ...(selected ? { suites: selected } : {}),
       flakyRerun: plan.suites.map((suite) => ({
@@ -894,18 +935,18 @@ export async function runTestGate(
         ...(selected ? { suites: selected } : {}),
       },
       rerun,
-    };
+    });
   }
 
   // Failed twice: the gate's verdict stands, with what the re-run said.
   const { outputTail, failureDigest, packages } = second.result;
-  return {
+  return withTiming({
     ...first.result,
     ...(packages.length > 0 ? { packages } : {}),
     ...(outputTail ? { outputTail } : {}),
     ...(failureDigest ? { failureDigest } : {}),
     rerun,
-  };
+  });
 }
 
 /** Longest `firstFailure` kept on an absorbed flake. */
@@ -957,15 +998,51 @@ interface GateCommandOutcome {
   output: string;
   /** Killed at the deadline. */
   timedOut: boolean;
+  /** Queue and execution time; set only when the command took the validation slot. */
+  timing?: ValidationSlotTiming;
 }
 
-/** Run one gate command and judge it. Never throws. */
+/**
+ * Run one gate command, inside the validation slot when one is given, and
+ * judge it. The slot is taken for this command alone and released once its
+ * process tree has stopped; the timeout starts after admission. A wait given
+ * up on (the run's interrupt: Ctrl-C, SIGTERM) is `ran: false` with an error.
+ */
 async function runGateCommand(
   command: string,
   projectDir: string,
   timeout: number,
   testMaxWorkers: number | undefined,
+  slot: ValidationSlotRunOptions | undefined,
 ): Promise<GateCommandOutcome> {
+  const env = withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers);
+  const slotRun = await runInValidationSlot(slot, (withSlot) =>
+    executeGateCommand(command, withSlot({ cwd: projectDir, timeout, env })));
+  if (!slotRun.ok) {
+    return {
+      output: "",
+      timedOut: false,
+      result: {
+        ran: false,
+        passed: false,
+        packages: [],
+        command,
+        error: `Test gate did not run: ${slotRun.error}`,
+        queueMs: slotRun.queueMs,
+      },
+    };
+  }
+  const { timing } = slotRun;
+  if (!timing) return slotRun.value;
+  return { ...slotRun.value, timing, result: { ...slotRun.value.result, ...timing } };
+}
+
+/** Run one gate command and judge it. Never throws. */
+async function executeGateCommand(
+  command: string,
+  execOptions: Pick<ExecOptions, "cwd" | "timeout" | "env" | "onSpawn">,
+): Promise<GateCommandOutcome> {
+  const { timeout } = execOptions;
   const startMs = Date.now();
 
   // The gate's own view of the deadline, beside the one `exec` enforces. Armed
@@ -989,9 +1066,7 @@ async function runGateCommand(
   // The suite is agent-written code, so it runs inside the same OS sandbox
   // the agent's run_command does (see execRepoShellCmd).
   const execResult = await execRepoShellCmd(command, {
-    cwd: projectDir,
-    timeout,
-    env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
+    ...execOptions,
     // A full-monorepo run writes megabytes, mostly stderr from passing tests.
     // Past this ceiling exec stops the suite and keeps only what came first —
     // everything but the failure summary at the end — so it is a guard against
@@ -1206,7 +1281,7 @@ function formatMs(ms: number): string {
 // Dependency audit (pre-loop validation for self-heal mode)
 // ---------------------------------------------------------------------------
 
-import type { ExecResult } from "../process/exec.js";
+import type { ExecOptions, ExecResult } from "../process/exec.js";
 import type {
   DependencyAuditResult,
   DependencyAuditCommandRecord,

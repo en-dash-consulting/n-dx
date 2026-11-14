@@ -9,6 +9,13 @@ import { formatTokenReport } from "../token-logging.js";
 import { formatSessionDecision } from "../session-report.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { repointRun, formatRunRepointReport } from "../../store/repoint-runs.js";
+import { describeValidationSlotTiming } from "../../process/validation-run.js";
+
+/** The queue/execution split of a run that took the validation slot; undefined for one that did not. */
+export function formatSlotTiming(timing: { queueMs?: number; executionMs?: number }): string | undefined {
+  if (timing.queueMs === undefined || timing.executionMs === undefined) return undefined;
+  return describeValidationSlotTiming({ queueMs: timing.queueMs, executionMs: timing.executionMs });
+}
 
 export async function cmdShow(
   dir: string,
@@ -144,8 +151,14 @@ export async function cmdShow(
       } else {
         info(`    ⊘ Not run: ${pt.error ?? "unknown reason"}`);
       }
+      const ptSlot = formatSlotTiming(pt);
+      if (ptSlot) info(`    ${ptSlot}`);
     }
   }
+
+  // Present only when the run took the host-wide validation slot.
+  const gateSlot = run.testGate ? formatSlotTiming(run.testGate) : undefined;
+  if (gateSlot) info(`\nTest gate: ${gateSlot}`);
 
   // Runtime diagnostics snapshot
   const diag = run.diagnostics;

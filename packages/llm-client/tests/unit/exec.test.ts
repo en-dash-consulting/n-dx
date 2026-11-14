@@ -143,6 +143,39 @@ describe("exec", () => {
     expect(spawned.calls[0]!.opts).not.toHaveProperty("detached");
   });
 
+  it("reports the spawned pid to onSpawn, as a process group exactly when the child was detached", async () => {
+    const cases = [
+      { platform: "linux", treeKill: true, group: true },
+      { platform: "linux", treeKill: false, group: false },
+      { platform: "win32", treeKill: true, group: false },
+    ] as const;
+    for (const { platform, treeKill, group } of cases) {
+      mockSpawn.mockReset();
+      mockSpawn.mockImplementation((() => {
+        const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+        Object.assign(child, { pid: 4242, exitCode: null, signalCode: null, stdout: null, stderr: null, stdin: null });
+        setImmediate(() => child.emit("close", 0, null));
+        return child as unknown as ReturnType<typeof spawn>;
+      }) as unknown as typeof spawn);
+      const onSpawn = vi.fn();
+
+      await exec("ls", [], { cwd: "/tmp", timeout: 5000, treeKill, onSpawn, _platform: platform });
+
+      expect(onSpawn).toHaveBeenCalledTimes(1);
+      expect(onSpawn).toHaveBeenCalledWith({ pid: 4242, group });
+    }
+  });
+
+  it("does not call onSpawn when nothing was spawned", async () => {
+    const onSpawn = vi.fn();
+    const failure = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+    mockSpawn.mockImplementation(fakeSpawn({ spawnError: failure }).impl);
+    await exec("nope", [], { cwd: "/tmp", timeout: 5000, onSpawn });
+    await exec("nope", [], { cwd: "/tmp", timeout: 5000, onSpawn, signal: AbortSignal.abort() });
+
+    expect(onSpawn).not.toHaveBeenCalled();
+  });
+
   it("closes stdin immediately so a child reading stdin cannot hang", async () => {
     // Regression: stdio is piped, and a child that reads stdin in a non-TTY (e.g.
     // `rex add` calling readStdin()) waits forever for an EOF nobody sends.

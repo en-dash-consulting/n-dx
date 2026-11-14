@@ -336,6 +336,60 @@ value wins: an exported cap below the configured one is kept, so repository
 config can never raise it. A new vitest
 config must read it with `testMaxWorkers()` at the top level of `test`.
 
+## Running Several Worktrees at Once
+
+Set `NDX_TEST_MAX_WORKERS` (above) and turn on the host-wide validation slot so
+the gates of several worktrees queue instead of competing:
+
+```sh
+ndx config hench.testGate.hostSlot true .
+```
+
+With `hench.testGate.hostSlot` on (default off), the test gate (each attempt and
+the re-run), the post-task tests and the completion test run each take one slot
+per OS user, shared by every hench process on the host. An agent's own shell
+commands are not serialized; only the worker cap bounds those.
+
+- **Is a run waiting?** It prints `Waiting for the validation slot held by pid
+  <n> in <project> since <time> (<path to holder.json>)`, repeated about every
+  30 s. A holder marked `(exited; its tests still run)` has died but its test
+  child is still alive. Only an interrupt (Ctrl-C, SIGTERM) stops a wait; there
+  is no maximum wait, and the gate's timeout starts after admission.
+- **How long did it wait?** `hench show <run-id> .` prints
+  `Validation slot: queued <n>s, ran <n>s`; the run record stores `queueMs` and
+  `executionMs`.
+- **Where is it?** `<ndx home>/validation-slot/<host>/`
+  (`~/.ndx/validation-slot/<host>/` by default). `<host>` is keyed on the
+  machine id, not the hostname, which macOS changes with the network: `m-`
+  and the first 16 hex characters of the SHA-256 of the id (Linux
+  `/etc/machine-id`, else `/var/lib/dbus/machine-id`; macOS `IOPlatformUUID`;
+  Windows `MachineGuid`), or `h-` and a hash of the hostname when the host has
+  no id source (the files or command are absent, or the command answers
+  without an id). A lookup that times out (10 s) or fails another way never
+  falls back to the hostname, since every other process on the host uses the
+  `m-` directory: that one validation runs without the slot and warns
+  `skipped the validation slot and ran without it: … could not read this
+  host's machine id (…)`, and the next validation retries the lookup. Hosts
+  sharing one ndx home (a network home) each get their own slot.
+  The command hench runs inside the slot gets the slot's token as
+  `NDX_VALIDATION_SLOT` and its directory as `NDX_VALIDATION_SLOT_DIR`; a
+  slot acquire under them nests in that directory instead of waiting.
+  `holder.json` exists exactly while the slot is held and names the
+  pid, project and start time. If the directory cannot be used (permissions,
+  a read-only or full disk, no hard links), hench runs the command without the
+  slot and warns `skipped the validation slot and ran without it`, naming the
+  directory and the error.
+- **Stale holders.** A record whose process and test child are dead, that does
+  not parse, or that predates a reboot is reclaimed automatically by the next
+  waiter. So is one naming the waiter's own pid with a token it does not hold,
+  unless its test child is still alive.
+  Do not delete the directory by hand while a run is active.
+- **A wedged slot.** If a holder died without releasing and the OS gave its
+  pid to an unrelated process (Windows reuses pids within moments), every run
+  on the host waits behind that process. Confirm no ndx test run is active
+  (`hench`, `ndx work`, `run-all-tests.mjs`), then delete the `holder.json`
+  named in the wait message.
+
 ## Timeout Guardrails
 
 Timeouts are allowed only as **guardrails against hangs**, not as a way to turn an

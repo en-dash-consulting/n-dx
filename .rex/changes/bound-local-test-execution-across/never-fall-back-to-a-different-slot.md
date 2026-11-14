@@ -1,0 +1,19 @@
+---
+id: "dec010f7-03e8-41d5-85c8-d40526f58c0e"
+type: "task"
+title: "Never fall back to a different slot directory on a transient machine-id failure"
+slug: "never-fall-back-to-a-different-slot"
+summary: "If the quick lookup of the machine's id is slow once, a hench process currently switches to a different slot for good, and its tests can run beside everyone else's. This retries the lookup instead, and runs that one test without the slot, with a warning, rather than in the wrong place."
+description: "Fixes change 10a4e198 (\"A machine-id lookup that times out once…\"), found by the review of task 96357e8a (commit a75d03b6f). Read its intent and acceptance criteria. This task carries them out inside PR 2 (#1034), together with a stricter fallback rule.\n\nProblem: in `packages/hench/src/process/validation-slot-dir.ts`, `runLookup` runs `ioreg` (macOS) or `reg query` (Windows) with `LOOKUP_TIMEOUT_MS` = 2 s. On a timeout or transient failure, `readHostIdentity` falls back to `{ kind: \"hostname\" }`, and `hostIdentity()` caches that promise for the life of the process. That process then uses `h-<hash>` while every other process uses `m-<hash>`, so the slot is split.\n\nFix:\n1. **Classify each lookup outcome:**\n   - (a) **found**: a machine id was read;\n   - (b) **no source**: the platform has none, the files are absent (ENOENT), or the command answered without an id;\n   - (c) **transient**: timeout, spawn error other than ENOENT, or a non-zero exit with no parseable id.\n2. **Cache only found and no-source:**\n   - (a) caches the machine identity;\n   - (b) caches the hostname identity once, as today;\n   - (c) is NOT cached: the next `hostIdentity()` call retries.\n3. **On a transient outcome, do not use the hostname directory.** Throw a slot error that names the lookup and its failure, so the existing fail-open path (task f2aa9f8c: run the command without the slot and return a `slotWarning`) handles it. That one validation runs unslotted with a clear warning instead of in a different slot. Check the call path from `validationSlotOptions` / `runInValidationSlot` actually reaches the fail-open handling for this error.\n4. **Timeout:** raise `LOOKUP_TIMEOUT_MS` to 10 s and document the reason in the module header. It runs at most once per process when it succeeds.\n5. **Docs:** update the module header's identity section and the docs that name the fallback (TESTING.md, docs/packages/hench.md).\n\nTests (through the injected sources in `validation-slot-dir.test.ts`; add a seam if the exec is not injectable):\n- a transient failure is not cached and a later call returns the machine identity;\n- a no-source outcome caches the hostname identity once;\n- a transient outcome surfaces as a slot error, and the gate runs without the slot with a `slotWarning` (one integration-level case in `test-gate.test.ts` or a validation-run unit test).\n\nClose change 10a4e198 as done by this task (the resolution names the commit).\n\nOperator notes: run the slot-dir, slot and test-gate tests and the static root policy tests. Update the existing `.changeset/hench-slot-per-host.md` if its text changes. Do not create `scripts/lib/validation-slot.mjs`. No `process.env.NDX_*` writes in tests."
+acceptanceCriteria:
+  - "A transient machine-id lookup failure is not cached and is retried on the next call; a no-source outcome caches the hostname identity once"
+  - "A transient failure never puts a process in a different slot directory: the validation runs without the slot and reports a slotWarning naming the lookup failure"
+  - "The lookup timeout is 10 s with the reason in the module header; docs name the fallback rule; change 10a4e198 is closed"
+priority: "high"
+tags:
+  - "validation-gate"
+  - "wave-1"
+  - "pr-2-host-slot"
+  - "review-fix"
+source: "ndx-capture"
+---

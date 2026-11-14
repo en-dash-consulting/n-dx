@@ -2376,6 +2376,11 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      NDX_TEST_MAX_WORKERS to it for the gate and its re-run,
                                      post-task tests, the completion check's test run and the
                                      agent session's shell. Unset sets nothing.
+  hench.testGate.hostSlot
+                           boolean   Run the gate, its re-run, post-task tests and the
+                                     completion check's test run one at a time per OS user,
+                                     across worktrees (default: false). Queue wait does not
+                                     count against fullTestTimeoutMs; Ctrl-C stops it.
   hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
                                      run fails (default: 900000 — 15 minutes; 0 means no limit).
                                      Raise it for a large monorepo: the gate runs while an agent
