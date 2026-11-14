@@ -97,6 +97,7 @@ export type { EnvPolicy } from "./env.js";
 export {
   createToolSandbox,
   createVendorCliSandbox,
+  isSelfConfinedVendorSession,
   resolveSandboxPosture,
   assertSandboxReady,
   formatSandboxPosture,
