@@ -13,6 +13,8 @@ include THEME . '/layout.php';
 include '/usr/share/php/PEAR.php';
 include 'missing.php';
 include $page;
+include dirname(ROOT . '/') . '/header.php';
+include dirname(__FILE__, 0) . '/partials/header.php';
 ?>
 <p>Welcome</p>
 <?php include "partials/footer.php"; ?>

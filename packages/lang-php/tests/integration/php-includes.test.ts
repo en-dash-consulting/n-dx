@@ -62,6 +62,10 @@ describe("php include resolver", () => {
       "'/usr/share/php/PEAR.php' outside",
       "'missing.php' not-found",
       "$page dynamic",
+      // ROOT is the repository root: a trailing slash does not keep dirname() inside it.
+      "dirname(ROOT . '/') . '/header.php' outside",
+      // dirname() with levels 0 is an error in PHP.
+      "dirname(__FILE__, 0) . '/partials/header.php' dynamic",
       "\"partials/footer.php\" htdocs/partials/footer.php (include-path)",
     ]);
     expect(await includeOutcomes("inc/db.php")).toEqual([

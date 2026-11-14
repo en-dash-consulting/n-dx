@@ -70,8 +70,8 @@ const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** PHP's `dirname()` on a computed path. */
 function dirname(path: string): string {
-  if (path === REPO || path === OUTSIDE || path.startsWith(OUTSIDE)) return OUTSIDE;
   const trimmed = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  if (trimmed === REPO || trimmed.startsWith(OUTSIDE)) return OUTSIDE;
   const slash = trimmed.lastIndexOf("/");
   if (slash < 0) return ".";
   if (slash === 0) return "/";
@@ -207,7 +207,11 @@ function evaluatePath(text: string, file: string, constant: ConstantLookup): str
     if (eat("(")) {
       if (lower === "dirname") {
         let value = dirname(expression());
-        if (eat(",")) for (let levels = integer(); levels > 1; levels -= 1) value = dirname(value);
+        if (eat(",")) {
+          const levels = integer();
+          if (levels < 1) throw new NotComputable(); // PHP throws a ValueError
+          for (let level = 1; level < levels; level += 1) value = dirname(value);
+        }
         if (!eat(")")) throw new NotComputable();
         return value;
       }
