@@ -1,6 +1,6 @@
 /**
  * What the goldens hold, stated as rules: which includes are conditional,
- * that no import becomes an edge, which methods are constructors, and that
+ * which references become edges, which methods are constructors, and that
  * `new` is a call. Runs the pack entry over the golden fixture; skips when the
  * grammar is not built.
  */
@@ -45,11 +45,23 @@ describe("php pack facts", () => {
     ]);
   });
 
-  it("produces no import edges", async (ctx) => {
+  it("resolves class references to declared classes without Composer, never includes", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
-    for (const file of (await facts()).values()) {
-      expect([file.path, file.imports?.files, file.imports?.external]).toEqual([file.path, [], []]);
-    }
+    const references = [...(await facts()).values()].flatMap((f) => [
+      ...(f.imports?.files ?? []).map((r) => `${f.path} -> ${r.to} ${r.symbols.join(",")}`),
+      ...(f.imports?.external ?? []).map((e) => `${f.path} => ${e.package} ${e.symbols.join(",")}`),
+    ]);
+    expect(references).toEqual([
+      // `new Shop_Cart()`; the require_once of lib/Shop/Cart.php is not an edge.
+      "php52/index.php -> php52/lib/Shop/Cart.php Shop_Cart",
+      // The fixture declares Acme\Shop only, so the missing Acme\Billing, Acme\Shipping and Acme\Support names share its
+      // root namespace but not its namespace: a library's, external.
+      "php53/src/Shop/Order.php => php:Acme Acme\\Billing\\Gateway,Acme\\Billing\\Invoice,Acme\\Shipping\\Carrier,Acme\\Shipping\\MAX_WEIGHT,Acme\\Shipping\\Parcel,Acme\\Shipping\\weigh,Acme\\Support\\CURRENCY,Acme\\Support\\Clock,Acme\\Support\\money_format",
+      "php53/src/Shop/Order.php => php:Psr Psr\\Log\\LoggerInterface",
+      "php53/src/Shop/braced.php -> php53/src/Shop/Order.php Acme\\Shop\\Order",
+      // Likewise App\Billing, App\Orders\Events and App\Support beside the declared App\Orders.
+      "php8/src/Orders/OrderService.php => php:App App\\Billing\\Invoice,App\\Orders\\Events\\OrderPaid,App\\Orders\\Events\\OrderShipped,App\\Support\\money",
+    ]);
   });
 
   it("finds __construct and PHP 4 constructors, but not a same-named method in a namespace or beside __construct", async (ctx) => {

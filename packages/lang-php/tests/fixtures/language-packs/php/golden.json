@@ -1630,6 +1630,34 @@
               "column": 51
             }
           }
+        ],
+        "references": [
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "Shop_Cart",
+            "start": {
+              "line": 38,
+              "column": 12
+            },
+            "end": {
+              "line": 38,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Shop_Cart",
+            "start": {
+              "line": 40,
+              "column": 9
+            },
+            "end": {
+              "line": 40,
+              "column": 18
+            }
+          }
         ]
       }
     },
@@ -2554,6 +2582,47 @@
             "end": {
               "line": 51,
               "column": 35
+            }
+          }
+        ],
+        "references": [
+          {
+            "name": "reference.extends",
+            "nodeType": "name",
+            "text": "Shop_Base",
+            "start": {
+              "line": 4,
+              "column": 24
+            },
+            "end": {
+              "line": 4,
+              "column": 33
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Shop_Logger",
+            "start": {
+              "line": 18,
+              "column": 8
+            },
+            "end": {
+              "line": 18,
+              "column": 19
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Shop_Pricing",
+            "start": {
+              "line": 24,
+              "column": 15
+            },
+            "end": {
+              "line": 24,
+              "column": 27
             }
           }
         ]
@@ -4327,6 +4396,164 @@
               "column": 46
             }
           }
+        ],
+        "references": [
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "PaymentGateway",
+            "start": {
+              "line": 20,
+              "column": 24
+            },
+            "end": {
+              "line": 20,
+              "column": 38
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Clock",
+            "start": {
+              "line": 29,
+              "column": 27
+            },
+            "end": {
+              "line": 29,
+              "column": 32
+            }
+          },
+          {
+            "name": "reference.extends",
+            "nodeType": "name",
+            "text": "Model",
+            "start": {
+              "line": 38,
+              "column": 20
+            },
+            "end": {
+              "line": 38,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.implements",
+            "nodeType": "name",
+            "text": "Payable",
+            "start": {
+              "line": 38,
+              "column": 37
+            },
+            "end": {
+              "line": 38,
+              "column": 44
+            }
+          },
+          {
+            "name": "reference.trait",
+            "nodeType": "name",
+            "text": "Timestamps",
+            "start": {
+              "line": 40,
+              "column": 8
+            },
+            "end": {
+              "line": 40,
+              "column": 18
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "LoggerInterface",
+            "start": {
+              "line": 46,
+              "column": 32
+            },
+            "end": {
+              "line": 46,
+              "column": 47
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "PaymentGateway",
+            "start": {
+              "line": 62,
+              "column": 24
+            },
+            "end": {
+              "line": 62,
+              "column": 38
+            }
+          },
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "Invoice",
+            "start": {
+              "line": 64,
+              "column": 23
+            },
+            "end": {
+              "line": 64,
+              "column": 30
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Invoice",
+            "start": {
+              "line": 68,
+              "column": 53
+            },
+            "end": {
+              "line": 68,
+              "column": 60
+            }
+          },
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "Box",
+            "start": {
+              "line": 69,
+              "column": 58
+            },
+            "end": {
+              "line": 69,
+              "column": 61
+            }
+          },
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "static",
+            "start": {
+              "line": 78,
+              "column": 19
+            },
+            "end": {
+              "line": 78,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "Order",
+            "start": {
+              "line": 82,
+              "column": 21
+            },
+            "end": {
+              "line": 82,
+              "column": 26
+            }
+          }
         ]
       }
     },
@@ -4796,6 +5023,21 @@
             "end": {
               "line": 27,
               "column": 24
+            }
+          }
+        ],
+        "references": [
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "Order",
+            "start": {
+              "line": 9,
+              "column": 31
+            },
+            "end": {
+              "line": 9,
+              "column": 36
             }
           }
         ]
@@ -6140,13 +6382,178 @@
               "column": 98
             }
           }
+        ],
+        "references": [
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Attribute",
+            "start": {
+              "line": 13,
+              "column": 12
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Status",
+            "start": {
+              "line": 29,
+              "column": 12
+            },
+            "end": {
+              "line": 29,
+              "column": 18
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Status",
+            "start": {
+              "line": 30,
+              "column": 12
+            },
+            "end": {
+              "line": 30,
+              "column": 18
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "Repository",
+            "start": {
+              "line": 41,
+              "column": 25
+            },
+            "end": {
+              "line": 41,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "Notifier",
+            "start": {
+              "line": 42,
+              "column": 17
+            },
+            "end": {
+              "line": 42,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "Invoice",
+            "start": {
+              "line": 45,
+              "column": 27
+            },
+            "end": {
+              "line": 45,
+              "column": 34
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Status",
+            "start": {
+              "line": 47,
+              "column": 41
+            },
+            "end": {
+              "line": 47,
+              "column": 47
+            }
+          },
+          {
+            "name": "reference.static",
+            "nodeType": "name",
+            "text": "Status",
+            "start": {
+              "line": 49,
+              "column": 12
+            },
+            "end": {
+              "line": 49,
+              "column": 18
+            }
+          },
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "OrderPaid",
+            "start": {
+              "line": 56,
+              "column": 39
+            },
+            "end": {
+              "line": 56,
+              "column": 48
+            }
+          },
+          {
+            "name": "reference.type",
+            "nodeType": "name",
+            "text": "Repository",
+            "start": {
+              "line": 58,
+              "column": 48
+            },
+            "end": {
+              "line": 58,
+              "column": 58
+            }
+          },
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "OrderShipped",
+            "start": {
+              "line": 69,
+              "column": 32
+            },
+            "end": {
+              "line": 69,
+              "column": 44
+            }
+          },
+          {
+            "name": "reference.new",
+            "nodeType": "name",
+            "text": "Repository",
+            "start": {
+              "line": 69,
+              "column": 80
+            },
+            "end": {
+              "line": 69,
+              "column": 90
+            }
+          }
         ]
       }
     }
   ],
   "references": {
     "php52/index.php": {
-      "files": [],
+      "files": [
+        {
+          "to": "php52/lib/Shop/Cart.php",
+          "symbols": [
+            "Shop_Cart"
+          ]
+        }
+      ],
       "external": [],
       "written": [
         {
@@ -6322,7 +6729,28 @@
     },
     "php53/src/Shop/Order.php": {
       "files": [],
-      "external": [],
+      "external": [
+        {
+          "package": "php:Acme",
+          "symbols": [
+            "Acme\\Billing\\Gateway",
+            "Acme\\Billing\\Invoice",
+            "Acme\\Shipping\\Carrier",
+            "Acme\\Shipping\\MAX_WEIGHT",
+            "Acme\\Shipping\\Parcel",
+            "Acme\\Shipping\\weigh",
+            "Acme\\Support\\CURRENCY",
+            "Acme\\Support\\Clock",
+            "Acme\\Support\\money_format"
+          ]
+        },
+        {
+          "package": "php:Psr",
+          "symbols": [
+            "Psr\\Log\\LoggerInterface"
+          ]
+        }
+      ],
       "written": [
         {
           "specifier": "Acme\\Billing\\Invoice",
@@ -6438,7 +6866,14 @@
       ]
     },
     "php53/src/Shop/braced.php": {
-      "files": [],
+      "files": [
+        {
+          "to": "php53/src/Shop/Order.php",
+          "symbols": [
+            "Acme\\Shop\\Order"
+          ]
+        }
+      ],
       "external": [],
       "written": [
         {
@@ -6454,7 +6889,17 @@
     },
     "php8/src/Orders/OrderService.php": {
       "files": [],
-      "external": [],
+      "external": [
+        {
+          "package": "php:App",
+          "symbols": [
+            "App\\Billing\\Invoice",
+            "App\\Orders\\Events\\OrderPaid",
+            "App\\Orders\\Events\\OrderShipped",
+            "App\\Support\\money"
+          ]
+        }
+      ],
       "written": [
         {
           "specifier": "App\\Billing\\Invoice",

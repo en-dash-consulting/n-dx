@@ -3,14 +3,14 @@
  * (`queries/php/`): each include with its path expression as written, and
  * each `use` import with its qualified name, form and alias.
  *
- * Nothing is resolved: {@link phpResolver} reports the written imports and
- * no file or package, so the pack yields no import edges.
+ * `php-resolver.ts` resolves the `use` imports; includes are reported as
+ * written and not resolved.
  *
  * @module lang-php/php-imports
  */
 
-import type { FileReferences, ImportForm, WrittenImport } from "@n-dx/lang-kit";
-import { contains, innermost, type Capture, type PackResolver, type PackSourceFile, type PreparedResolver } from "@n-dx/lang-runtime";
+import type { ImportForm, WrittenImport } from "@n-dx/lang-kit";
+import { contains, innermost, type Capture, type PackSourceFile } from "@n-dx/lang-runtime";
 
 const INCLUDE_FORMS: Readonly<Record<string, ImportForm>> = {
   "import.include": "include",
@@ -89,18 +89,3 @@ export function readWrittenImports(file: PackSourceFile): WrittenImport[] {
 
   return written.sort(before);
 }
-
-/**
- * The PHP resolver reports each file's imports as written and resolves none:
- * no file and no external package, so no import edge. Resolution comes later.
- */
-export const phpResolver: PackResolver = {
-  prepare(files: readonly PackSourceFile[]): PreparedResolver {
-    const written = new Map(files.map((file) => [file.path, readWrittenImports(file)]));
-    return {
-      resolve(fromFile: string): FileReferences {
-        return { files: [], external: [], written: written.get(fromFile) ?? [] };
-      },
-    };
-  },
-};

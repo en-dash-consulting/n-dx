@@ -1,0 +1,10 @@
+{
+    "name": "legacy/zf1-app",
+    "autoload": {
+        "psr-0": {
+            "Zend_": "library/",
+            "App_": ["application/models/", "application/forms/"],
+            "": "fallback/"
+        }
+    }
+}

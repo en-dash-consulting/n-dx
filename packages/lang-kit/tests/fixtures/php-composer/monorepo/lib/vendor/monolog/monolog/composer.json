@@ -1,0 +1,1 @@
+{ "name": "monolog/monolog", "autoload": { "psr-4": { "Monolog\\": "src/Monolog" } } }

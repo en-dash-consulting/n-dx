@@ -107,7 +107,12 @@ describe("tree-sitter-php grammar (WASM)", () => {
         ["include 'config.inc'", 'require_once "lib/db.php"'],
         ["use App\\Billing\\Invoice", "use function App\\Support\\money"],
       ]);
-      for (const f of result.facts) expect([f.imports?.files, f.imports?.external]).toEqual([[], []]);
+      for (const f of result.facts) expect(f.imports?.files).toEqual([]);
+      // No file declares App\Billing or App\Support, only App\Orders: they are a library's.
+      expect(result.facts.map((f) => f.imports?.external)).toEqual([
+        [],
+        [{ package: "php:App", symbols: ["App\\Billing\\Invoice", "App\\Support\\money"] }],
+      ]);
       expect(result.facts[0]?.symbols?.map((s) => `${s.kind} ${s.name}`)).toEqual(["function list_users"]);
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
