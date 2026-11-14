@@ -11,7 +11,7 @@
  */
 
 import { join, posix } from "node:path";
-import { type OversizedBuildFile, oversizedNotice, readBuildFile } from "./build-file.js";
+import { MAX_BUILD_FILE_BYTES, type OversizedBuildFile, oversizedNotice, readBuildFile } from "./build-file.js";
 
 /** One namespace prefix (`App\\`, `Zend_`, or `""` for the fallback) and its directories. */
 export interface ComposerNamespaceMapping {
@@ -81,9 +81,20 @@ export interface ComposerProject {
 /** Repository text by repository-relative path; `undefined` when unreadable. */
 export type ReadComposerText = (path: string) => Promise<string | OversizedBuildFile | undefined>;
 
+/**
+ * The cap for `composer.lock`: a lock lists every installed package with its
+ * metadata, so it outgrows other build files (koel's is about 605 KB).
+ */
+export const MAX_COMPOSER_LOCK_BYTES = 16 * 1024 * 1024;
+
 const MANIFEST = "composer.json";
 const LOCK = "composer.lock";
 const DEFAULT_VENDOR_DIR = "vendor";
+
+/** The size cap a Composer file is read with: the lock's own, every other file the build file cap. */
+function capOf(path: string): number {
+  return posix.basename(path) === LOCK ? MAX_COMPOSER_LOCK_BYTES : MAX_BUILD_FILE_BYTES;
+}
 
 const EMPTY_AUTOLOAD: ComposerAutoload = { psr4: [], psr0: [], classmap: [], files: [], excludeFromClassmap: [] };
 
@@ -95,7 +106,7 @@ const EMPTY_AUTOLOAD: ComposerAutoload = { psr4: [], psr0: [], classmap: [], fil
 export async function readComposerProjects(projectDir: string, files: readonly string[]): Promise<ComposerProject[]> {
   return composerProjectsFrom(files, async (path) => {
     try {
-      return await readBuildFile(join(projectDir, path));
+      return await readBuildFile(join(projectDir, path), capOf(path));
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "ENOENT" || code === "EACCES" || code === "EISDIR" || code === "EPERM") return undefined;
@@ -174,7 +185,7 @@ function parseObject(file: string, text: string | OversizedBuildFile | undefined
     return undefined;
   }
   if (typeof text !== "string") {
-    notices.push(oversizedNotice(file, text.oversized));
+    notices.push(oversizedNotice(file, text.oversized, capOf(file)));
     return undefined;
   }
   let value: unknown;

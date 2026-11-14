@@ -1,8 +1,11 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { MAX_BUILD_FILE_BYTES } from "../../src/build-file.js";
-import { type ComposerProject, composerProjectsFrom, readComposerProjects } from "../../src/php-composer.js";
+import { type ComposerProject, MAX_COMPOSER_LOCK_BYTES, composerProjectsFrom, readComposerProjects } from "../../src/php-composer.js";
 
 const FIXTURES = fileURLToPath(new URL("../fixtures/php-composer", import.meta.url));
 
@@ -145,6 +148,46 @@ describe("Composer projects: malformed input", () => {
       ["d", ["d/composer.lock: packages is not an array", "d/composer.lock: packages-dev[0] has no name"]],
     ]);
     expect(byDir(projects)["d"].lockPackages).toEqual([]);
+  });
+
+  describe("size caps on the disk", () => {
+    let dir: string;
+    beforeEach(async () => {
+      dir = await mkdtemp(join(tmpdir(), "lang-kit-composer-"));
+    });
+    afterEach(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    const lock = { packages: [{ name: "acme/big", version: "1.0.0", autoload: { "psr-4": { "Acme\\": "src/" } } }] };
+    const padded = (bytes: number): string => {
+      const head = JSON.stringify(lock);
+      return head + " ".repeat(bytes - head.length);
+    };
+
+    it("reads a composer.lock over the build file cap, up to the lock cap", async () => {
+      await writeFile(join(dir, "composer.json"), "{}");
+      await writeFile(join(dir, "composer.lock"), padded(MAX_BUILD_FILE_BYTES * 2));
+      const [p] = await readComposerProjects(dir, ["composer.json", "composer.lock"]);
+      expect(p.notices).toEqual([]);
+      expect(p.lockPackages?.map((pkg) => pkg.name)).toEqual(["acme/big"]);
+    });
+
+    it("skips a composer.lock over the lock cap with a notice", async () => {
+      const size = MAX_COMPOSER_LOCK_BYTES + 1;
+      await writeFile(join(dir, "composer.json"), "{}");
+      await writeFile(join(dir, "composer.lock"), padded(size));
+      const [p] = await readComposerProjects(dir, ["composer.json", "composer.lock"]);
+      expect(p.lockPackages).toBeUndefined();
+      expect(p.notices).toEqual([`composer.lock is ${size} bytes, over the ${MAX_COMPOSER_LOCK_BYTES}-byte build file limit; skipped`]);
+    });
+
+    it("keeps the build file cap for composer.json", async () => {
+      const size = MAX_BUILD_FILE_BYTES + 1;
+      await writeFile(join(dir, "composer.json"), `{}${" ".repeat(size - 2)}`);
+      const [p] = await readComposerProjects(dir, ["composer.json"]);
+      expect(p.notices).toEqual([`composer.json is ${size} bytes, over the ${MAX_BUILD_FILE_BYTES}-byte build file limit; skipped`]);
+    });
   });
 
   it("a manifest missing from the disk is unreadable", async () => {

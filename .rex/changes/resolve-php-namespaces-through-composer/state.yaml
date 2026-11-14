@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-14T05:22:23.771Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5da69852-d9e7-4026-b5e5-ec644f1b1cb6":
-    lastModified: "2026-11-14T07:28:57.867Z"
+    status: "completed"
+    startedAt: "2026-11-14T07:29:21.712Z"
+    completedAt: "2026-11-14T07:31:57.778Z"
+    endedAt: "2026-11-14T07:31:57.778Z"
+    activeIntervals: [{"end":"2026-11-14T07:31:57.778Z","start":"2026-11-14T07:29:21.712Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "composer.lock read with MAX_COMPOSER_LOCK_BYTES (16 MiB); readBuildFile/oversizedNotice take an optional cap defaulting to 1 MiB, so other build files are unchanged."
+    lastModified: "2026-11-14T07:31:57.778Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "78cf4f7d-2b28-4263-bde2-bbc7995f7632":
     createdAt: "2026-11-14T05:17:54.146Z"
