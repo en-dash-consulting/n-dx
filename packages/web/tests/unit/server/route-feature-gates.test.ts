@@ -65,8 +65,6 @@ function collectNavFeatureGates(dir: string): Set<string> {
 const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/capture-ask", "sourcevision.ask"],
   ["/api/rex/apply-refinements", "sourcevision.ask"],
-  ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
-  ["/api/sv/pr-markdown/state", "sourcevision.prMarkdown"],
   ["/api/sidecar/sessions", "web.sidecar"],
   ["/api/sidecar/sessions/abc/turns", "web.sidecar"],
   ["/api/sidecar/sessions/abc/frames", "web.sidecar"],
@@ -176,9 +174,9 @@ describe("route feature gates", () => {
   it("gates listed paths exactly, so a subpath or near-miss is ungated", async () => {
     // An exact list: an unlisted subpath falls through to the router's own
     // 404 rather than answering 403 for a feature it is not part of.
-    expect(findRouteFeatureGate("/api/sv/pr-markdown")).not.toBeNull();
-    expect(findRouteFeatureGate("/api/sv/pr-markdown/unlisted")).toBeNull();
-    expect(findRouteFeatureGate("/api/sv/pr-markdown-extra")).toBeNull();
+    expect(findRouteFeatureGate("/api/rex/capture-ask")).not.toBeNull();
+    expect(findRouteFeatureGate("/api/rex/capture-ask/unlisted")).toBeNull();
+    expect(findRouteFeatureGate("/api/rex/capture-ask-extra")).toBeNull();
   });
 
   it("gates a prefix with everything beneath it, but not a near-miss", () => {
@@ -188,15 +186,15 @@ describe("route feature gates", () => {
   });
 
   it("gates on the path alone, ignoring the query string", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown?_=1`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/capture-ask?_=1`);
     expect(res.status).toBe(403);
-    expect((await res.json()).feature).toBe("sourcevision.prMarkdown");
+    expect((await res.json()).feature).toBe("sourcevision.ask");
   });
 
   it("refuses when .n-dx.json is unreadable rather than opening the gate", async () => {
     await writeFile(join(tmpDir, ".n-dx.json"), "{ not json", "utf-8");
 
-    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/capture-ask`);
     expect(res.status).toBe(403);
   });
 

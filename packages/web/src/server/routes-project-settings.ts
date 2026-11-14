@@ -6,6 +6,8 @@
  * - language (project language override)
  * - sourcevision.zones.mergeThreshold (small-zone merge threshold, in files)
  * - sourcevision.zones.pins (file → zone override map)
+ * - web.sidecarGithubReads, which lives in the user's local config and is
+ *   written by the Sidecar settings writer (sidecar/settings.ts)
  *
  * GET /api/project-settings   — current project settings
  * PUT /api/project-settings   — update project settings
@@ -16,7 +18,9 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
+import { planSidecarSettings, readSidecarSettings, saveSidecarSettings } from "./sidecar/settings.js";
+import { PROJECT_LANGUAGES, isProjectLanguage } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +36,18 @@ export interface ProjectSettingsResponse {
   sourcevisionMergeThreshold: number | null;
   /** Sourcevision zone pin overrides: file path → zone ID. */
   sourcevisionPins: Record<string, string>;
+  /**
+   * `web.sidecarGithubReads` in force: whether branch health and the Sidecar
+   * may run gh. Served here as well as by /api/sidecar/settings because branch
+   * health reads it with the Sidecar off, when the Sidecar routes refuse.
+   * False when it could not be read.
+   */
+  githubReads: boolean;
+  /**
+   * Why `githubReads` could not be read (a config file that does not parse),
+   * else null. Only that setting fails: the rest of the response still loads.
+   */
+  githubReadsError: string | null;
 }
 
 /** Shape expected by PUT /api/project-settings. */
@@ -41,13 +57,14 @@ interface ProjectSettingsPutBody {
   sourcevisionMergeThreshold?: number | null;
   /** Per-pin updates: file path → zone ID (or null to remove). */
   sourcevisionPins?: Record<string, string | null>;
+  /** `web.sidecarGithubReads`, saved to the local config as the Sidecar route saves it; null clears it. */
+  githubReads?: boolean | null;
 }
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
@@ -99,7 +116,20 @@ function extractProjectSettings(projectDir: string): ProjectSettingsResponse {
     if (typeof v === "string") sourcevisionPins[k] = v;
   }
 
-  return { port, language, sourcevisionMergeThreshold, sourcevisionPins };
+  return { port, language, sourcevisionMergeThreshold, sourcevisionPins, ...readGithubReads(projectDir) };
+}
+
+/**
+ * GitHub reads, read apart from the project's own keys: it parses the local
+ * config as well, and a half-edited one must not take Analysis and Dashboard
+ * settings down with it. Unreadable, it stays off, and the error says why.
+ */
+function readGithubReads(projectDir: string): Pick<ProjectSettingsResponse, "githubReads" | "githubReadsError"> {
+  try {
+    return { githubReads: readSidecarSettings(projectDir).githubReads, githubReadsError: null };
+  } catch (err) {
+    return { githubReads: false, githubReadsError: `GitHub reads could not be read from the project config: ${errorMessage(err)}` };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -145,11 +175,11 @@ export async function handleProjectSettingsRoute(
       // Validate language
       if ("language" in parsed) {
         const v = parsed.language;
-        if (v !== null && v !== undefined && !VALID_LANGUAGES.has(v)) {
+        if (v !== null && v !== undefined && (typeof v !== "string" || !isProjectLanguage(v))) {
           errorResponse(
             res,
             400,
-            `language must be one of: ${[...VALID_LANGUAGES].join(", ")}`,
+            `language must be one of: ${PROJECT_LANGUAGES.map((l) => l.id).join(", ")}`,
           );
           return true;
         }
@@ -178,6 +208,13 @@ export async function handleProjectSettingsRoute(
             return true;
           }
         }
+      }
+
+      // Validate GitHub reads (the Sidecar settings planner owns the rule).
+      const githubReadsPlan = "githubReads" in parsed ? planSidecarSettings({ githubReads: parsed.githubReads }) : null;
+      if (githubReadsPlan && "error" in githubReadsPlan) {
+        errorResponse(res, 400, githubReadsPlan.error);
+        return true;
       }
 
       // Apply changes
@@ -245,13 +282,26 @@ export async function handleProjectSettingsRoute(
         applied.push("sourcevision.zones.pins");
       }
 
-      writeNdxConfig(ctx.projectDir, config);
-      // Fail-forward commits the change; a no-op when the mode is off.
-      await commitSettingsChange(
-        ctx.projectDir,
-        resolveLayout(ctx.projectDir).configFile,
-        "project",
-      );
+      // Only rewrite (and commit) the project config when one of its own keys changed.
+      if (applied.length > 0) {
+        writeNdxConfig(ctx.projectDir, config);
+        // Fail-forward commits the change; a no-op when the mode is off.
+        await commitSettingsChange(
+          ctx.projectDir,
+          resolveLayout(ctx.projectDir).configFile,
+          "project",
+        );
+      }
+
+      // GitHub reads lands in the user's local config, never the shared one.
+      if (githubReadsPlan) {
+        const saved = saveSidecarSettings(ctx.projectDir, { githubReads: parsed.githubReads });
+        if ("error" in saved) {
+          errorResponse(res, 400, saved.error);
+          return true;
+        }
+        applied.push("web.sidecarGithubReads");
+      }
       jsonResponse(res, 200, {
         applied,
         settings: extractProjectSettings(ctx.projectDir),

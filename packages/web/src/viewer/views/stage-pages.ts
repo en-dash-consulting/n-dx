@@ -194,7 +194,6 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
   const product = stageProduct(stage);
   const cliName = useCliName();
   const gates: Record<string, boolean> = {
-    "sourcevision.prMarkdown": useFeatureToggle("sourcevision.prMarkdown", false),
     "sourcevision.ask": useFeatureToggle("sourcevision.ask", false),
   };
   const deployed = isDeployedMode();

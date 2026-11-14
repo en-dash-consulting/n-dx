@@ -173,12 +173,6 @@ export const VIEW_META = {
     product: "sourcevision",
     blurb: "Improvements the analysis proposes.",
   },
-  "pr-markdown": {
-    label: "PR Markdown",
-    glyph: "✍",
-    product: "sourcevision",
-    blurb: "The analysis as a pull-request summary.",
-  },
   // Once Ask works here, the same panel is wanted on the Rex and Hench
   // surfaces. That is deliberately not tracked in the PRD yet: generalise this
   // one first, then lift the shared piece out. Adoption markers for the other

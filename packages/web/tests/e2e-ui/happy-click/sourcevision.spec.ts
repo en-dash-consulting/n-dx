@@ -2,7 +2,7 @@
  * Happy-click: the SourceVision pages.
  *
  * Overview, Repository Map, Zones, Isometric Map, Files, Routes, the three
- * enrichment-gated views, PR Markdown and Ask. The fixture has a `--fast`
+ * enrichment-gated views and Ask. The fixture has a `--fast`
  * analysis, so Architecture / Problems / Suggestions show the enrichment
  * gate (asserted, never unlocked — that spawns an LLM pass), and Ask's
  * intended outcome against the dead local vendor is its failure card.
@@ -28,7 +28,7 @@ test.beforeAll(async () => {
   const res = await fetch(`${dashboard.baseUrl}/api/features`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ changes: { "sourcevision.prMarkdown": true, "sourcevision.ask": true } }),
+    body: JSON.stringify({ changes: { "sourcevision.ask": true } }),
   });
   if (!res.ok) throw new Error(`Failed to enable feature toggles: ${res.status}`);
 });
@@ -245,23 +245,6 @@ for (const view of ["architecture", "problems", "suggestions"] as const) {
     expect(tracker.errors).toEqual([]);
   });
 }
-
-test("pr markdown: preview/raw tabs switch and the choice persists for the session", async ({ page }) => {
-  const tracker = trackConsoleErrors(page);
-  await gotoView(page, "pr-markdown");
-  const raw = page.locator("#pr-markdown-tab-raw");
-  const preview = page.locator("#pr-markdown-tab-preview");
-  await expect(raw.or(page.locator(".pr-markdown-empty")).first()).toBeVisible({ timeout: 10_000 });
-  if (await raw.count()) {
-    await raw.click();
-    await expect(raw).toHaveAttribute("aria-selected", "true");
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("#pr-markdown-tab-raw")).toHaveAttribute("aria-selected", "true", { timeout: 10_000 });
-    await preview.click();
-    await expect(preview).toHaveAttribute("aria-selected", "true");
-  }
-  expect(tracker.errors).toEqual([]);
-});
 
 test("ask: submitting a question against the dead vendor shows the failure card", async ({ page }) => {
   const tracker = trackConsoleErrors(page);

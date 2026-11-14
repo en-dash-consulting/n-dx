@@ -684,15 +684,7 @@ export async function runExport(args) {
 
   writeJSON(join(outDir, "api", "features.json"), {
     features: {
-      "sourcevision.callGraph": { enabled: true },
-      "sourcevision.enrichment": { enabled: true },
-      "sourcevision.componentCatalog": { enabled: true },
-      "rex.autoComplete": { enabled: true },
       "rex.showTokenBudget": { enabled: true },
-      "rex.budgetEnforcement": { enabled: false },
-      "hench.autoRetry": { enabled: true },
-      "hench.guardRails": { enabled: true },
-      "hench.adaptiveWorkflow": { enabled: true },
     },
   });
 

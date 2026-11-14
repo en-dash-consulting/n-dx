@@ -25,9 +25,8 @@
  * ## Answer actions
  *
  * Two actions sit under an answer. **Copy** goes through
- * {@link copyTextToClipboard}, the copy path lifted out of `pr-markdown.ts`, so
- * both surfaces fall back to `execCommand` identically and word a permission
- * denial identically. **Capture to PRD** is confirm-guarded: the first press
+ * {@link copyTextToClipboard}, which falls back to `execCommand` and names a
+ * permission denial. **Capture to PRD** is confirm-guarded: the first press
  * only arms it, and nothing is written until Confirm — the same shape as the
  * Overview Next Steps panel, and for the same reason, since the action mutates
  * the PRD.
@@ -114,11 +113,9 @@
  *
  * ## Deliberately not here yet
  *
- * Markdown in the answer is currently shown as-is in a pre-wrapped block. The
- * renderer that would format it lives in `pr-markdown.ts` behind
- * `pr-markdown-*` class names; lifting it out is a separate shared-module
- * change, and unlike the clipboard path it has only one would-be second
- * consumer, so it stays where it is for now.
+ * Markdown in the answer is currently shown as-is in a pre-wrapped block.
+ * `renderMarkdown` in `utils/markdown.ts` could format it; wiring it in is a
+ * separate change.
  *
  * @module web/viewer/views/ask
  * @see ../../server/routes-sourcevision-ask.ts -- the endpoint this consumes
@@ -190,7 +187,7 @@ export const FEEDBACK_MARK_FAIL = "⚠";
 /** What the copy action's manual-copy guidance tells the user to select. */
 const COPY_SUBJECT = "answer";
 
-/** How long a "Copied" confirmation stays up. Matches the PR Markdown view. */
+/** How long a "Copied" confirmation stays up. */
 const COPY_FEEDBACK_MS = 2_000;
 
 /**

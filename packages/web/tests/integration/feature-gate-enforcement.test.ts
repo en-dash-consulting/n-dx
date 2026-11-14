@@ -41,7 +41,6 @@ const SERVER_ENTRY_URL = pathToFileURL(SERVER_ENTRY).href;
 /** One endpoint per gated toggle. */
 const PROBES: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/capture-ask", "sourcevision.ask"],
-  ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
   ["/api/sidecar/sessions", "web.sidecar"],
   ["/api/branch-health", "git.branchHealth"],
 ];

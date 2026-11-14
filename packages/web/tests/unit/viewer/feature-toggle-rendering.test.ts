@@ -1,58 +1,35 @@
 /**
  * Every feature toggle actually reaches the settings page.
  *
- * The settings page renders package sections in a fixed order and **drops any
- * package missing from that order**:
- *
- *   PACKAGE_ORDER.filter((pkg) => byPackage.has(pkg)).map(...)
- *
- * so a toggle whose package the viewer does not list is silently invisible —
- * no error, no empty section, nothing. That is exactly what happened when the
- * `git` package was added to the registry and to PACKAGE_META but not to
- * PACKAGE_ORDER: two toggles shipped that no user could reach, and the only
- * server test of one of them passed *because* it could not be turned on
- * (`isFeatureEnabled` returns false for a key it cannot find, which is the
- * same answer as "the toggle is off").
+ * Settings › Project renders a section per entry of PROJECT_SECTIONS and puts
+ * each toggle in the section its registry `group` names, so a toggle in a group
+ * the page does not list would be silently invisible: no error, no empty
+ * section, nothing. That happened once already, under the old by-package
+ * layout, when the `git` package was added to the registry but not to the
+ * page's order: two toggles shipped that no user could reach.
  *
  * A toggle nobody can switch is worse than no toggle, so this is a guard
  * rather than a style check.
  */
 import { describe, it, expect } from "vitest";
 
-import { featureRegistryPackages } from "../../../src/server/routes-features.js";
-import { PACKAGE_ORDER, PACKAGE_META } from "../../../src/viewer/views/feature-toggles.js";
+import { featureRegistryGroups } from "../../../src/server/routes-features.js";
+import { PROJECT_SECTIONS } from "../../../src/viewer/views/project-sections.js";
 
 describe("feature toggle rendering reach", () => {
-  it("renders a section for every package the registry uses", () => {
-    const missing = featureRegistryPackages().filter((pkg) => !PACKAGE_ORDER.includes(pkg));
+  const sectionIds = PROJECT_SECTIONS.map((s) => s.id as string);
+
+  it("has a section for every group the registry uses", () => {
+    const missing = featureRegistryGroups().filter((group) => !sectionIds.includes(group));
     expect(
       missing,
-      `These packages have toggles in the registry but are not in PACKAGE_ORDER, ` +
-        `so their toggles never render on the settings page: ${missing.join(", ")}`,
+      `These groups have toggles in the registry but no section on Settings › Project, ` +
+        `so their toggles never render: ${missing.join(", ")}`,
     ).toEqual([]);
   });
 
-  it("has a heading and description for every package it renders", () => {
-    // A package in the order but not in META falls back to the bare package
-    // name with a bullet glyph, which reads as a bug on the page.
-    const unlabelled = PACKAGE_ORDER.filter((pkg) => !(pkg in PACKAGE_META));
-    expect(
-      unlabelled,
-      `These packages render without a label or description: ${unlabelled.join(", ")}`,
-    ).toEqual([]);
-  });
-
-  it("does not order a package that has no toggles and no metadata", () => {
-    // Keeps the order list honest as packages come and go.
-    const known = new Set(featureRegistryPackages());
-    const stale = PACKAGE_ORDER.filter((pkg) => !known.has(pkg) && !(pkg in PACKAGE_META));
-    expect(stale, `PACKAGE_ORDER names packages that no longer exist: ${stale.join(", ")}`)
-      .toEqual([]);
-  });
-
-  it("reaches the git toggles specifically", () => {
-    // The regression this file exists for.
-    expect(featureRegistryPackages()).toContain("git");
-    expect(PACKAGE_ORDER).toContain("git");
+  it("gives every section a title and lists each once", () => {
+    expect(PROJECT_SECTIONS.every((s) => s.title.trim() !== "")).toBe(true);
+    expect(new Set(sectionIds).size).toBe(sectionIds.length);
   });
 });

@@ -5,7 +5,7 @@ export type ViewerScope = "sourcevision" | "rex" | "hench";
 
 export type SourcevisionScopeViewId = Extract<
   ViewId,
-  "analyze" | "overview" | "graph" | "iso-map" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown" | "ask"
+  "analyze" | "overview" | "graph" | "iso-map" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "ask"
 >;
 
 // Each stage page belongs to the scope whose views it composes, so a scoped
@@ -21,7 +21,6 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
   "architecture",
   "problems",
   "suggestions",
-  "pr-markdown",
   "ask",
 ];
 
@@ -113,6 +112,8 @@ const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   "feature-toggles": "project",
   "notion-config": "project",
   integrations: "project",
+  // The PR Markdown page was retired on 2026-11-12; `sv pr-markdown` still writes the file.
+  "pr-markdown": "analyze",
 };
 
 /**

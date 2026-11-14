@@ -119,7 +119,6 @@
         "packages/web/src/server/index.ts": "web-server",
         "packages/web/src/server/merge-history.ts": "web-server",
         "packages/web/src/server/port.ts": "web-server",
-        "packages/web/src/server/pr-markdown-refresh-diagnostics.ts": "web-server",
         "packages/web/src/server/prd-io.ts": "web-server",
         "packages/web/src/server/process-memory-tracker.ts": "web-server",
         "packages/web/src/server/mcp-schema-watcher.ts": "web-server",

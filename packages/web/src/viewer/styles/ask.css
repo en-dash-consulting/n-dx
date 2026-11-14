@@ -2,8 +2,8 @@
  *
  * Uses the tokens defined in tokens.css (--bg-surface, --border, --red,
  * --brand-teal, --space-*, --radius-*). Note for anyone copying from
- * pr-markdown.css or commands.css: those files reference --panel2, --line and
- * --mono, none of which tokens.css defines, so those declarations are dropped
+ * commands.css: it references --panel2, --line and --mono, none of which
+ * tokens.css defines, so those declarations are dropped
  * by the browser. Do not propagate them here.
  */
 

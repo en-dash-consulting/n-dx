@@ -929,9 +929,9 @@ describe("Ask view registration", () => {
     expect(renderActiveView("ask", ctx)).not.toBeNull();
   });
 
-  it("is the Analysis tile after PR Markdown", () => {
+  it("is the last Analysis tile", () => {
     const ids = STAGES.analyze.tiles!.map((t) => t.panel ?? t.view);
-    expect(ids.indexOf("ask")).toBe(ids.indexOf("pr-markdown") + 1);
+    expect(ids.at(-1)).toBe("ask");
   });
 
   it("is gated and server-built, as the retired tab table recorded", () => {

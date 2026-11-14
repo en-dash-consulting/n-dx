@@ -150,7 +150,8 @@ export { GhostCardsContext, ghostChanges, ghostCountsByTarget, ghostStripCounts 
 export type { GhostChange } from "./ghost-changes.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
-export { SettingsOverlay } from "./settings-overlay.js";
+export { SettingsOverlay, useSettingsSections, settingsSectionAnchor } from "./settings-overlay.js";
+export type { SettingsSection } from "./settings-overlay.js";
 export type { SettingsOverlayProps } from "./settings-overlay.js";
 export { SettingsFrame } from "./settings-frame.js";
 export type { SettingsFrameProps } from "./settings-frame.js";

@@ -10,6 +10,13 @@
  * with the web-shared foundation layer governance rules.
  */
 
+/**
+ * Where Settings › Project shows a toggle: by what it changes, not by the
+ * package that owns it. Every registry entry names one, so a new toggle cannot
+ * be left off the page.
+ */
+export type FeatureGroup = "git" | "display" | "optional" | "connections";
+
 export interface FeatureToggle {
   /** Dot-notation key (e.g., "sourcevision.showCallGraph"). */
   key: string;
@@ -27,6 +34,10 @@ export interface FeatureToggle {
   details?: string;
   /** Which package owns this toggle. */
   package: "sourcevision" | "rex" | "hench" | "git" | "web";
+  /** The Project settings section that shows it. */
+  group: FeatureGroup;
+  /** True when turning it on lets the dashboard spend tokens (each use is an LLM call). */
+  costsTokens?: boolean;
   /** Whether this is experimental, stable, or deprecated. */
   stability: "experimental" | "stable" | "deprecated";
   /** Current value (true = enabled). */

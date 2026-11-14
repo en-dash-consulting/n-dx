@@ -56,6 +56,20 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     }
   });
 
+  it("redirects the retired /pr-markdown, and any path below it, to /analyze", async () => {
+    const { baseUrl, close } = await startFor(baseCtx());
+    try {
+      const res = await fetch(`${baseUrl}/pr-markdown`, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("analyze");
+      const deep = await fetch(`${baseUrl}/pr-markdown/raw`, { redirect: "manual" });
+      expect(deep.status).toBe(302);
+      expect(deep.headers.get("location")).toBe("../analyze/raw");
+    } finally {
+      await close();
+    }
+  });
+
   it("redirects /rex-dashboard to /work", async () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {

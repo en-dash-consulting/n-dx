@@ -159,7 +159,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | Command | Coverage | Impact | Notes |
 |---------|----------|--------|-------|
 | `sourcevision analyze` | full | high | Run Analysis trigger + eight data views |
-| `sourcevision pr-markdown` | full | medium | PR Markdown tab with per-section copy + freshness state |
+| `sourcevision pr-markdown` | none | low | The PR Markdown page was retired on 2026-11-12; the command writes `.sourcevision/pr-markdown.md` for the CLI and `ndx refresh` |
 | `sourcevision validate` | none | low | No UI to validate `.sourcevision/` outputs; freshness indicator partially covers intent |
 | `sourcevision export-pdf` | **full** | medium | "Export PDF report" beside the Export panel; reports the written path (the viewer sandbox blocks page-initiated downloads) |
 | `sourcevision workspace` | none | low | Multi-repo aggregation has no dashboard concept yet; `GET /api/worktrees` covers worktrees of the served repo only, and cross-project switching is the 0.7.0 hub's job |
@@ -236,7 +236,7 @@ Roughly 2,900 lines of built view code were unreachable; both views are now regi
 |-------------|------|------|
 | ~~`/api/hench/adaptive/*`~~ | 873 lines, 10 endpoints | **Done 2026-08-13**: Adaptive Optimization view (HENCH → Adaptive) consumes all 10 endpoints |
 | ~~`/api/rex/requirements/*`~~ | 575 lines | **Done 2026-08-13**: Requirements page (REX → Requirements) renders coverage + traceability; per-item CRUD deferred to the task detail panel |
-| `/api/sv/*` (all except `pr-markdown`) | 8 endpoints | Viewer reads `/data/*.json` directly; these serve external/MCP consumers — **document as external API, not a UI gap** |
+| `/api/sv/*` | 8 endpoints | Viewer reads `/data/*.json` directly; these serve external/MCP consumers — **document as external API, not a UI gap** |
 | `/api/token/{summary,events,by-command,by-period,budget}` | 5 endpoints | **Not a UI gap (verified 2026-08-14).** `utilization` returns `commands`, `budget` and `trend` in one response, and the Token Usage view already renders all three — a day/week/month toggle (`ndx usage --group` parity), a per-command table with package filtering, and budget alerts by severity. These five are the granular/external split of the same data; wiring them separately would duplicate working UI and add redundant requests. |
 | `/api/hench/{metrics,metrics/snapshots,memory/history,memory/leaks,runs/health}` | 5 endpoints | Panels exist for live memory/concurrency; historical metrics unexposed |
 | `/api/rex/{next,stats}` | 2 endpoints | Dashboard consumes `/api/rex/dashboard` instead; candidates for removal or documentation |

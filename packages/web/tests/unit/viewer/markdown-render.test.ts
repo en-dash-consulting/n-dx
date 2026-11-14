@@ -82,14 +82,14 @@ describe("Sidecar reply markdown", () => {
   });
 });
 
-describe("PR preview rendering", () => {
-  it("keeps the pr-markdown-preview class names", () => {
+describe("class prefix", () => {
+  it("names each block with the given prefix", () => {
     act(() => {
-      render(h("div", null, renderMarkdown("# H\n\npara one\nline two\n\n- a\n\n```\nx\n```", { classPrefix: "pr-markdown-preview" })), host);
+      render(h("div", null, renderMarkdown("# H\n\npara one\nline two\n\n- a\n\n```\nx\n```", { classPrefix: "md-test" })), host);
     });
-    expect(host.querySelector("h1.pr-markdown-preview-heading")).not.toBeNull();
-    expect(host.querySelector("p.pr-markdown-preview-paragraph")?.textContent).toBe("para one line two");
-    expect(host.querySelector("ul.pr-markdown-preview-list li")?.textContent).toBe("a");
-    expect(host.querySelector("pre.pr-markdown-preview-code")).not.toBeNull();
+    expect(host.querySelector("h1.md-test-heading")).not.toBeNull();
+    expect(host.querySelector("p.md-test-paragraph")?.textContent).toBe("para one line two");
+    expect(host.querySelector("ul.md-test-list li")?.textContent).toBe("a");
+    expect(host.querySelector("pre.md-test-code")).not.toBeNull();
   });
 });
