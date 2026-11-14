@@ -8,5 +8,12 @@ items:
     lastModified: "2026-11-14T05:23:52.405Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a34d8b17-2c8d-49d8-8c29-d5ac378cfd0c":
-    lastModified: "2026-11-14T05:19:27.635Z"
+    status: "completed"
+    startedAt: "2026-11-14T07:21:19.863Z"
+    completedAt: "2026-11-14T07:27:27.766Z"
+    endedAt: "2026-11-14T07:27:27.766Z"
+    activeIntervals: [{"end":"2026-11-14T07:27:27.766Z","start":"2026-11-14T07:21:19.863Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/lang-kit/src/php-composer.ts (readComposerProjects / composerProjectsFrom), exported from the index, with fixtures and unit tests."
+    lastModified: "2026-11-14T07:27:27.766Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

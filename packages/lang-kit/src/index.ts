@@ -31,6 +31,7 @@ export * from "./gradle-catalog.js";
 export * from "./python-build.js";
 export * from "./python-requirements.js";
 export * from "./python-setup-py.js";
+export * from "./php-composer.js";
 
 // IaC resource kinds
 export * from "./iac-kinds.js";
