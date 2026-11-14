@@ -13,8 +13,14 @@ describe("isPhpBuiltinClass", () => {
     expect(isPhpBuiltinClass("Dom\\HTMLDocument")).toBe(true);
   });
 
-  it("does not claim libraries, PECL extensions or namespaced look-alikes", () => {
-    for (const name of ["Monolog\\Logger", "Zend_Db_Table", "Memcached", "Redis", "App\\Exception", "Smarty"]) {
+  it("knows common PECL extensions' classes, which D5 keeps out of externals", () => {
+    for (const name of ["Memcached", "Redis", "Imagick", "MongoDB\\Driver\\Manager", "MongoDB\\BSON\\ObjectId"]) {
+      expect(isPhpBuiltinClass(name), name).toBe(true);
+    }
+  });
+
+  it("does not claim libraries or namespaced look-alikes", () => {
+    for (const name of ["Monolog\\Logger", "Zend_Db_Table", "MongoDB\\Client", "App\\Exception", "Smarty"]) {
       expect(isPhpBuiltinClass(name), name).toBe(false);
     }
   });

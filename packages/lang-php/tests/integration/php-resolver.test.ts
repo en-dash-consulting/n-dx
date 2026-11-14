@@ -57,6 +57,13 @@ describe("php namespace resolver", () => {
     expect(all.get("src/PaymentFailed.php")?.imports?.external).toEqual([]);
   });
 
+  it("never makes an external of a scalar type in any letter case, self or static, or an extension's class", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const globals = (await facts()).get("globals.php");
+    expect(globals?.imports?.external).toEqual([]);
+    expect(globals?.imports?.files).toEqual([]);
+  });
+
   it("resolves autoload-dev prefixes and keeps a missing project name internal", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     expect(edges((await facts()).get("tests/OrderTest.php"))).toEqual(["src/Order.php Acme\\Shop\\Order"]);
