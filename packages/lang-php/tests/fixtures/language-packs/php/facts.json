@@ -1843,5 +1843,8 @@
       ]
     }
   ],
-  "unparsed": []
+  "unparsed": [],
+  "notices": [
+    "PHP: [php-dynamic-include] 4 includes build their path at run time and give no edge: php52/index.php:26, php52/index.php:30, php52/index.php:35, php53/src/Shop/Order.php:75."
+  ]
 }

@@ -12,8 +12,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { phpConfig } from "@n-dx/lang-kit";
+import { phpConfig, type LanguagePackEntry } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../src/analyzers/imports.js";
+import { analyzeZones } from "../../src/analyzers/zones.js";
 import { analyzeInventory, withPackAnalysedLanguages } from "../../src/analyzers/inventory.js";
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
@@ -42,6 +43,82 @@ const PHP_MISSING: KnownPack[] = KNOWN_PACKS.map((p) =>
           Promise.reject(Object.assign(new Error("Cannot find package '@n-dx/lang-php' imported from /x.js"), { code: "ERR_MODULE_NOT_FOUND" })),
       },
 );
+
+/** The PHP pack's facts with every written import's `candidates` removed; `seen` counts the lists removed. */
+function withoutCandidates(seen: { lists: number }): KnownPack[] {
+  return KNOWN_PACKS.map((p) => {
+    if (p.id !== phpConfig.id) return p;
+    return {
+      ...p,
+      importByResolution: async () => {
+        const mod = (await p.importByResolution()) as { pack: LanguagePackEntry };
+        const analyzeProject: LanguagePackEntry["analyzeProject"] = async (request) => {
+          const result = await mod.pack.analyzeProject(request);
+          const facts = result.facts.map((f) => {
+            const written = f.imports?.written;
+            if (f.imports === undefined || written === undefined) return f;
+            return {
+              ...f,
+              imports: {
+                ...f.imports,
+                written: written.map(({ candidates, ...w }) => {
+                  if (candidates !== undefined) seen.lists++;
+                  return w;
+                }),
+              },
+            };
+          });
+          return { ...result, facts };
+        };
+        return { ...mod, pack: { ...mod.pack, analyzeProject } };
+      },
+    };
+  });
+}
+
+describe("PHP dynamic include candidates", () => {
+  const SITE: Record<string, string> = {
+    "htdocs/index.php": "<?php\ninclude 'lang/' . $code . '.php';\ninclude \"modules/$name/index.php\";\ninclude 'lib/db.php';\n",
+    "htdocs/lang/en.php": "<?php\n$strings = array();\n",
+    "htdocs/lang/fr.php": "<?php\n$strings = array();\n",
+    "htdocs/modules/blog/index.php": "<?php\necho 'blog';\n",
+    "htdocs/modules/shop/index.php": "<?php\necho 'shop';\n",
+    "htdocs/lib/db.php": "<?php\n$db = null;\n",
+  };
+  let dir: string;
+  let emptyPackDir: string;
+  let inventory: Inventory;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "sv-php-candidates-"));
+    emptyPackDir = mkdtempSync(join(tmpdir(), "sv-php-no-packs-"));
+    for (const [path, source] of Object.entries(SITE)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), source);
+    }
+    inventory = await analyzeInventory(dir, { languageConfig: phpConfig });
+  });
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(emptyPackDir, { recursive: true, force: true });
+  });
+
+  const run = (packs: KnownPack[]): Promise<Imports> =>
+    analyzeImports(dir, inventory, { language: "php", packs: { packs, loader: { packDir: emptyPackDir }, warn: () => {} } });
+
+  it("leaves imports.json and the zones as they are without them", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const seen = { lists: 0 };
+    const withThem = await run(KNOWN_PACKS.slice());
+    const without = await run(withoutCandidates(seen));
+    expect(seen.lists).toBe(2);
+    expect(withThem.edges.map((e) => `${e.from} -> ${e.to}`)).toEqual(["htdocs/index.php -> htdocs/lib/db.php"]);
+    expect(toCanonicalJSON(withThem)).toBe(toCanonicalJSON(without));
+    const zonesWith = await analyzeZones(inventory, withThem, { enrich: false });
+    const zonesWithout = await analyzeZones(inventory, without, { enrich: false });
+    expect(toCanonicalJSON(zonesWith.zones)).toBe(toCanonicalJSON(zonesWithout.zones));
+  });
+});
 
 describe("PHP files with the PHP pack registered", () => {
   let dir: string;

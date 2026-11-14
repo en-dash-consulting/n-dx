@@ -345,6 +345,136 @@ function evaluatePath(text: string, file: string, constant: ConstantLookup, vari
   }
 }
 
+// ── Literal ends of a dynamic path ──────────────────────────────────────────
+
+/** The index of the quote closing the string opened at `start`, or -1. */
+function stringEnd(text: string, start: number): number {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i += 1) {
+    if (text[i] === "\\") i += 1;
+    else if (text[i] === quote) return i;
+  }
+  return -1;
+}
+
+/** The operands of a path expression's top-level `.` concatenation, as written; undefined when it does not scan. */
+function concatenationOperands(text: string): string[] | undefined {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (c === "'" || c === '"') {
+      i = stringEnd(text, i);
+      if (i < 0) return undefined;
+    } else if (c === "/" && text[i + 1] === "*") {
+      i = text.indexOf("*/", i + 2) + 1;
+      if (i <= 0) return undefined;
+    } else if ((c === "/" && text[i + 1] === "/") || (c === "#" && text[i + 1] !== "[")) {
+      const end = text.indexOf("\n", i);
+      i = end < 0 ? text.length : end;
+    } else if (c === "(" || c === "[" || c === "{") depth += 1;
+    else if (c === ")" || c === "]" || c === "}") {
+      depth -= 1;
+      if (depth < 0) return undefined;
+    } else if (c === "." && depth === 0 && !(/[0-9]/.test(text[i - 1] ?? "") && /[0-9]/.test(text[i + 1] ?? ""))) {
+      out.push(text.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  if (depth !== 0) return undefined;
+  out.push(text.slice(start).trim());
+  return out.every((o) => o !== "") ? out : undefined;
+}
+
+/** Where the interpolation starting at `inner[at]` ends (exclusive); -1 when `at` starts none. */
+function interpolationEnd(inner: string, at: number): number {
+  const brace = inner[at] === "{" && inner[at + 1] === "$" ? at : inner[at] === "$" && inner[at + 1] === "{" ? at + 1 : -1;
+  if (brace >= 0) {
+    let depth = 0;
+    for (let i = brace; i < inner.length; i += 1) {
+      if (inner[i] === "'" || inner[i] === '"') i = Math.max(stringEnd(inner, i), i);
+      else if (inner[i] === "{") depth += 1;
+      else if (inner[i] === "}" && --depth === 0) return i + 1;
+    }
+    return inner.length;
+  }
+  const name = /^\$[A-Za-z_\x80-￿][\w\x80-￿]*/.exec(inner.slice(at));
+  if (!name) return -1;
+  let end = at + name[0].length;
+  if (inner[end] === "[") {
+    const close = inner.indexOf("]", end);
+    end = close < 0 ? inner.length : close + 1;
+  } else {
+    const property = /^->[A-Za-z_\x80-￿][\w\x80-￿]*/.exec(inner.slice(end));
+    if (property) end += property[0].length;
+  }
+  return end;
+}
+
+/**
+ * The literal text before the first and after the last interpolation of a
+ * double-quoted string operand (`"lang/$code.php"` gives `lang/` and `.php`);
+ * undefined for any other operand.
+ */
+function interpolatedEnds(operand: string): { head: string; tail: string } | undefined {
+  if (!operand.startsWith('"') || stringEnd(operand, 0) !== operand.length - 1) return undefined;
+  const inner = operand.slice(1, -1);
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < inner.length; ) {
+    if (inner[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    const end = interpolationEnd(inner, i);
+    if (end < 0) {
+      i += 1;
+      continue;
+    }
+    if (first < 0) first = i;
+    last = end;
+    i = end;
+  }
+  if (first < 0) return undefined;
+  const literal = (piece: string): string => evaluatePath(`"${piece}"`, "", () => undefined) ?? "";
+  return { head: literal(inner.slice(0, first)), tail: literal(inner.slice(last)) };
+}
+
+/** The computable text a dynamic path starts and ends with. */
+interface LiteralEnds {
+  readonly prefix: string;
+  readonly suffix: string;
+}
+
+/**
+ * The computable prefix and suffix of a path expression that is not
+ * computable as a whole: the leading and trailing operands of its `.`
+ * concatenation that are, plus the literal ends of an interpolated string at
+ * the boundary. Undefined when the whole path is computable or does not scan.
+ */
+function literalEnds(text: string, file: string, constant: ConstantLookup): LiteralEnds | undefined {
+  const operands = concatenationOperands(text);
+  if (operands === undefined) return undefined;
+  const values = operands.map((o) => evaluatePath(o, file, constant));
+  const first = values.indexOf(undefined);
+  if (first < 0) return undefined;
+  const last = values.lastIndexOf(undefined);
+  return {
+    prefix: values.slice(0, first).join("") + (interpolatedEnds(operands[first]!)?.head ?? ""),
+    suffix: (interpolatedEnds(operands[last]!)?.tail ?? "") + values.slice(last + 1).join(""),
+  };
+}
+
+/** How many candidate files a dynamic include lists; the rest are counted in `total`. */
+export const MAX_INCLUDE_CANDIDATES = 50;
+
+/** The files a dynamic include could load: at most {@link MAX_INCLUDE_CANDIDATES}, sorted, out of `total`. */
+export interface PhpIncludeCandidates {
+  readonly files: readonly string[];
+  readonly total: number;
+}
+
 // ── Constants ───────────────────────────────────────────────────────────────
 
 interface ConstantDefinition {
@@ -491,8 +621,10 @@ export type PhpIncludeResolution = "anchored" | "relative" | "include-path" | "i
 /** What one include resolved to. */
 export type PhpIncludeOutcome =
   | { readonly kind: "internal"; readonly target: string; readonly via: PhpIncludeResolution }
-  /** `dynamic`: the path is not computable; `outside`: it names a file outside the repository; `not-found`: no pack file is there. */
-  | { readonly kind: "unresolved"; readonly reason: "dynamic" | "outside" | "not-found" };
+  /** `outside`: the path names a file outside the repository; `not-found`: no pack file is there. */
+  | { readonly kind: "unresolved"; readonly reason: "outside" | "not-found" }
+  /** The path is not computable; `candidates` when its literal ends match pack files. */
+  | { readonly kind: "unresolved"; readonly reason: "dynamic"; readonly candidates?: PhpIncludeCandidates };
 
 const INCLUDE_FORMS = new Set(["include", "include_once", "require", "require_once"]);
 
@@ -502,6 +634,7 @@ export const isInclude = (w: WrittenImport): boolean => w.form !== undefined && 
 /** Every include of a project, resolved against its files, constants and include-path roots. */
 export class PhpIncludes {
   private readonly files: ReadonlySet<string>;
+  private readonly sortedFiles: readonly string[];
   private readonly docroot: string;
   private readonly constants = new Map<string, ConstantDefinition[]>();
   private readonly constantValues = new Map<string, string | undefined>();
@@ -513,6 +646,7 @@ export class PhpIncludes {
 
   constructor(sources: readonly PackSourceFile[], files: ReadonlySet<string>, configs: readonly PhpIncludeConfig[]) {
     this.files = files;
+    this.sortedFiles = [...files].sort(compare);
     this.docroot = PHP_DOCROOT_DIRECTORIES.find((d) => files.has(`${d}/index.php`)) ?? "";
     const ordered = [...sources].sort((a, b) => compare(a.path, b.path));
     for (const file of ordered) {
@@ -588,9 +722,85 @@ export class PhpIncludes {
     return evaluatePath(text, file, this.constant, variable);
   }
 
-  /** What an include written in `file` resolves to. */
+  /** What an include written in `file` resolves to; a dynamic one carries its candidates. */
   resolve(file: string, include: WrittenImport): PhpIncludeOutcome {
-    return this.resolveValue(file, this.evaluate(include.specifier, file));
+    const outcome = this.resolveValue(file, this.evaluate(include.specifier, file));
+    if (outcome.kind !== "unresolved" || outcome.reason !== "dynamic") return outcome;
+    const candidates = this.candidates(file, include.specifier);
+    return candidates === undefined ? outcome : { ...outcome, candidates };
+  }
+
+  /**
+   * The pack files a dynamic include written in `file` could load: those
+   * that start with its computable prefix, looked up as {@link resolveValue}
+   * would look up a path (anchored, `./`, or under each include-path root and
+   * then the including directory), and end with its computable suffix.
+   * Without a prefix the whole repository is searched, but only for a suffix
+   * holding a `/` (`/index.php`); a bare extension constrains nothing.
+   * Undefined when nothing matches.
+   */
+  candidates(file: string, specifier: string): PhpIncludeCandidates | undefined {
+    const ends = literalEnds(specifier, file, this.constant);
+    if (ends === undefined) return undefined;
+    const { suffix } = ends;
+    const found = new Set<string>();
+    for (const start of this.candidateStarts(file, ends.prefix)) {
+      if (start === "" && !suffix.includes("/")) continue;
+      for (const f of this.startingWith(start)) {
+        if (f.length >= start.length + suffix.length && f.endsWith(suffix)) found.add(f);
+      }
+    }
+    if (found.size === 0) return undefined;
+    return { files: [...found].sort(compare).slice(0, MAX_INCLUDE_CANDIDATES), total: found.size };
+  }
+
+  /** The repository-relative text a candidate starts with, for each place a path with this prefix is looked up. */
+  private candidateStarts(file: string, prefix: string): string[] {
+    if (prefix === "") return [""];
+    const located = locate(prefix);
+    if (located === undefined || located.kind === "outside") return [];
+    const here = dirOf(file);
+    let path: string;
+    let bases: Array<string | undefined>;
+    if (located.kind === "repo") {
+      path = prefix.slice(REPO.length);
+      bases = [""];
+    } else {
+      path = located.path;
+      bases = /^\.\.?(\/|$)/.test(path)
+        ? [here, this.docroot]
+        : [
+            ...this.rootsFor(file).flatMap((root) =>
+              root.kind === "repo" ? [root.path] : [normalize(here, root.path), normalize(this.docroot, root.path)],
+            ),
+            here,
+          ];
+    }
+    const slash = path.lastIndexOf("/");
+    const name = path.slice(slash + 1);
+    const starts: string[] = [];
+    for (const base of bases) {
+      const dir = base === undefined ? undefined : normalize(base, path.slice(0, slash + 1));
+      if (dir === undefined) continue;
+      const start = dir === "" ? name : `${dir}/${name}`;
+      if (!starts.includes(start)) starts.push(start);
+    }
+    return starts;
+  }
+
+  /** The pack files starting with `start`, in order. */
+  private startingWith(start: string): readonly string[] {
+    if (start === "") return this.sortedFiles;
+    let low = 0;
+    let high = this.sortedFiles.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (this.sortedFiles[mid]! < start) low = mid + 1;
+      else high = mid;
+    }
+    const out: string[] = [];
+    for (let i = low; i < this.sortedFiles.length && this.sortedFiles[i]!.startsWith(start); i += 1) out.push(this.sortedFiles[i]!);
+    return out;
   }
 
   /** What an include in `file` of a path with value `value` (from {@link evaluate}) resolves to. */

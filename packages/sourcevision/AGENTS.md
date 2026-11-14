@@ -78,8 +78,9 @@ repositories), `scripts/php-corpus-report.mjs` measures the clean-parse rate
 of the files analyze would parse, per repository and for the PHP 5
 repositories against decision D4's 99.5% bar, and
 `scripts/php-resolve-report.mjs` the resolver: internal resolution rate per
-repository (`no composer` without a manifest), unresolved names and a seeded
-hand-check sample.
+repository (`no composer` without a manifest), unresolved names, include
+resolution (resolved, computable-unresolved, dynamic with or without
+candidates, host-based) and seeded hand-check samples.
 
 ### The Terraform model in infrastructure.json
 

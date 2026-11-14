@@ -99,6 +99,11 @@ describe("php include resolver", () => {
     expect(notices).toEqual([
       'PHP: include path root "/usr/share/pear" (php.ini) is outside the repository; ignored.',
       'PHP: include path root "/usr/share/php" (htdocs/.htaccess) is outside the repository; ignored.',
+      // THEME (defined twice), $page and dirname(__FILE__, 0); the last's suffix matches htdocs/partials/header.php.
+      "PHP: [php-dynamic-include] 3 includes build their path at run time and give no edge: htdocs/index.php:12, htdocs/index.php:15, htdocs/index.php:17; 1 with candidate files, never edges.",
+    ]);
+    expect(index?.imports?.written?.find((w) => w.specifier === "dirname(__FILE__, 0) . '/partials/header.php'")?.candidates).toEqual([
+      "htdocs/partials/header.php",
     ]);
   });
 });

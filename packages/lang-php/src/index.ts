@@ -11,6 +11,7 @@ export { PHP_PACKAGE } from "./package-paths.js";
 export * from "./php-pack.js";
 export * from "./php-builtins.js";
 export * from "./php-imports.js";
+export * from "./php-include-notices.js";
 export * from "./php-includes.js";
 export * from "./php-resolver.js";
 export * from "./php-symbols.js";

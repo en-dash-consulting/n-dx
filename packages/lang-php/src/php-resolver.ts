@@ -57,7 +57,9 @@
  *
  * Includes (`include`, `require` and their `_once` forms) whose path is
  * computable resolve to files through `php-includes.ts`, with symbol `*`;
- * the written include keeps its guard.
+ * the written include keeps its guard. A dynamic include gives no edge: its
+ * written import carries its candidate files, and a notice counts it
+ * (`php-include-notices.ts`).
  *
  * @module lang-php/php-resolver
  */
@@ -78,6 +80,7 @@ import { contains, type Capture, type PackResolver, type PackSourceFile, type Pr
 import { isPhpBuiltinClass } from "./php-builtins.js";
 import { readWrittenImports } from "./php-imports.js";
 import { PhpAutoloaders } from "./php-autoloaders.js";
+import { dynamicIncludeNotices, type DynamicInclude } from "./php-include-notices.js";
 import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
 
 // ── Names and paths ─────────────────────────────────────────────────────────
@@ -640,20 +643,35 @@ export function preparePhpImports(
   const refs = new Map<string, FileReferences>();
   const outcomes = new Map<string, ResolvedPhpReference[]>();
   const includeOutcomes = new Map<string, ResolvedPhpInclude[]>();
+  const dynamic: DynamicInclude[] = [];
   for (const file of files) {
-    const written = readWrittenImports(file);
     const out = new Collector(file.path);
-    const resolved = readPhpReferences(file, written).map((reference) => ({ reference, outcome: resolveReference(index, reference, file.path, legacy, out) }));
-    const resolvedIncludes = written.filter(isInclude).map((include) => {
-      const outcome = includes.resolve(file.path, include);
+    const resolvedIncludes: ResolvedPhpInclude[] = [];
+    // A dynamic include's candidates go on its written import only: they are never edges.
+    const written = readWrittenImports(file).map((w) => {
+      if (!isInclude(w)) return w;
+      const outcome = includes.resolve(file.path, w);
       if (outcome.kind === "internal") out.file(outcome.target, "*");
-      return { include, outcome };
+      const candidates = outcome.kind === "unresolved" && outcome.reason === "dynamic" ? outcome.candidates : undefined;
+      const include = candidates === undefined ? w : { ...w, candidates: candidates.files };
+      if (outcome.kind === "unresolved" && outcome.reason === "dynamic") {
+        dynamic.push({ path: file.path, position: w.position, specifier: w.specifier, ...(candidates && { candidates }) });
+      }
+      resolvedIncludes.push({ include, outcome });
+      return include;
     });
+    const resolved = readPhpReferences(file, written).map((reference) => ({ reference, outcome: resolveReference(index, reference, file.path, legacy, out) }));
     refs.set(file.path, out.result(written));
     outcomes.set(file.path, resolved);
     includeOutcomes.set(file.path, resolvedIncludes);
   }
-  const notices = [...projects.flatMap((p) => p.notices), ...includeSettings.notices, ...includes.notices(), ...autoloaders.notices()].map((n) => `PHP: ${n}`);
+  const notices = [
+    ...projects.flatMap((p) => p.notices),
+    ...includeSettings.notices,
+    ...includes.notices(),
+    ...autoloaders.notices(),
+    ...dynamicIncludeNotices(dynamic),
+  ].map((n) => `PHP: ${n}`);
   return {
     resolve: (fromFile) => refs.get(fromFile) ?? { files: [], external: [] },
     outcomes: (fromFile) => outcomes.get(fromFile) ?? [],

@@ -34,9 +34,9 @@ it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
 (`__all__`), and the `variable` symbol kind. The PHP pack fills the `trait`,
 `namespace` and `constant` symbol kinds (a trait contains its members, a
 namespace does not), the `conditional` `ImportGuard`, `WrittenImport.form`
-(`IMPORT_FORMS`) and `alias`, and `CallFact.construct` (`new`). Nothing fills
-`WrittenImport.candidates` yet: a dynamic include's possible files, held in
-memory, never import edges. The contract names no parser type; `@n-dx/lang-runtime`'s
+(`IMPORT_FORMS`) and `alias`, `WrittenImport.candidates` (a dynamic
+include's possible files, held in memory, never import edges), and
+`CallFact.construct` (`new`). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

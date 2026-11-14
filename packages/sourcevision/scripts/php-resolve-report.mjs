@@ -20,7 +20,12 @@
  * - the most frequent unresolved names, and the most referenced externals;
  * - a random sample of N resolved and N unresolved references (default 20,
  *   seeded so a re-run picks the same ones) with file:line and the line as
- *   written, for checking by hand.
+ *   written, for checking by hand;
+ * - includes (with php.ini, `.user.ini` and `.htaccess` read as analyze
+ *   does): resolved / total and how, computable but unresolved, dynamic with
+ *   candidate files (and lists cut at the cap), dynamic without, host-based,
+ *   and a sample of N resolved and N unresolved includes drawn after the
+ *   reference samples, so those stay as they were.
  * Exits 2 when the corpus, a build or the grammar is missing. Never touches
  * the network; clone with php-corpus-clone.mjs. Not part of the test run.
  *
@@ -69,7 +74,7 @@ if (!existsSync(walkDist)) {
 const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { loadIgnoreFilter, projectSkip, walkProjectFiles } = await import(walkDist.href);
 const { phpConfig } = await importWorkspacePack("@n-dx/lang-kit");
-const { phpGrammarPath, phpPack, preparePhpImports, readPhpResolveProjects } = await importWorkspacePack("@n-dx/lang-php");
+const { isHostInclude, phpGrammarPath, phpPack, preparePhpImports, readPhpProjectFacts } = await importWorkspacePack("@n-dx/lang-php");
 const wasm = phpGrammarPath();
 if (!existsSync(wasm)) {
   console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-php build:grammars\``);
@@ -115,7 +120,8 @@ try {
     }
     walked.sort();
     const t0 = performance.now();
-    const projects = await readPhpResolveProjects(dir, walked);
+    const facts = await readPhpProjectFacts(dir, walked);
+    const { projects } = facts;
     const vendorDirs = projects.map((p) => p.vendorDir);
     const paths = walked.filter((p) => !vendorDirs.some((v) => under(p, v)));
     const parsed = [];
@@ -127,7 +133,7 @@ try {
     }
     const parseSeconds = (performance.now() - t0) / 1000;
     const t1 = performance.now();
-    const prepared = preparePhpImports(projects, parsed, unparsed);
+    const prepared = preparePhpImports(projects, parsed, unparsed, facts);
     const resolveSeconds = (performance.now() - t1) / 1000;
 
     const counts = { references: 0, internal: 0, internalResolved: 0, builtin: 0, global: 0, external: 0, matched: 0 };
@@ -168,6 +174,33 @@ try {
         }
       }
     }
+    const includes = { total: 0, resolved: 0, computableUnresolved: 0, dynamicWithCandidates: 0, dynamicWithout: 0, host: 0, cut: 0 };
+    const includeVia = {};
+    const includeResolved = [];
+    const includeUnresolved = [];
+    for (const file of parsed) {
+      for (const { include, outcome } of prepared.includes(file.path)) {
+        includes.total++;
+        const at = { file: file.path, line: include.position.line, form: include.form, specifier: include.specifier };
+        if (outcome.kind === "internal") {
+          includes.resolved++;
+          includeVia[outcome.via] = (includeVia[outcome.via] ?? 0) + 1;
+          includeResolved.push({ ...at, to: outcome.target, via: outcome.via });
+          continue;
+        }
+        if (outcome.reason !== "dynamic") includes.computableUnresolved++;
+        else {
+          if (isHostInclude(include.specifier)) includes.host++;
+          if (outcome.candidates === undefined) includes.dynamicWithout++;
+          else {
+            includes.dynamicWithCandidates++;
+            if (outcome.candidates.total > outcome.candidates.files.length) includes.cut++;
+          }
+        }
+        const candidates = outcome.reason === "dynamic" ? outcome.candidates?.total ?? 0 : undefined;
+        includeUnresolved.push({ ...at, reason: outcome.reason, ...(candidates !== undefined && { candidates }) });
+      }
+    }
     const random = seeded(SEED);
     const lineOf = (s) => readFileSync(join(dir, s.file), "utf8").split("\n")[s.line - 1]?.trim();
     results.push({
@@ -188,6 +221,10 @@ try {
       notices: prepared.notices?.() ?? [],
       sampleResolved: sample(resolvedList, SAMPLE, random).map((s) => ({ ...s, text: lineOf(s) })),
       sampleUnresolved: sample(unresolvedList, SAMPLE, random).map((s) => ({ ...s, text: lineOf(s) })),
+      includes,
+      includeVia,
+      sampleIncludesResolved: sample(includeResolved, SAMPLE, random).map((s) => ({ ...s, text: lineOf(s) })),
+      sampleIncludesUnresolved: sample(includeUnresolved, SAMPLE, random).map((s) => ({ ...s, text: lineOf(s) })),
     });
   }
 } finally {
@@ -223,5 +260,15 @@ if (json) {
     for (const s of r.sampleResolved) console.log(`    ${s.file}:${s.line}  ${s.text}  [${s.form} ${s.qualified}]  ->  ${s.to} (${s.via})`);
     console.log("  sample, unresolved:");
     for (const s of r.sampleUnresolved) console.log(`    ${s.file}:${s.line}  ${s.text}  [${s.form} ${s.qualified}]  ${s.reason}`);
+    const i = r.includes;
+    console.log(`  includes: ${i.total}; resolved: ${i.resolved}/${i.total} = ${pct(i.resolved, i.total)}`);
+    console.log(`    by: ${Object.entries(r.includeVia).map(([k, v]) => `${k}=${v}`).join(" ") || "none"}`);
+    console.log(`    computable, unresolved: ${i.computableUnresolved}; dynamic with candidates: ${i.dynamicWithCandidates} (lists cut: ${i.cut}); dynamic without: ${i.dynamicWithout}; host-based: ${i.host}`);
+    console.log("  sample, includes resolved:");
+    for (const s of r.sampleIncludesResolved) console.log(`    ${s.file}:${s.line}  ${s.text}  ->  ${s.to} (${s.via})`);
+    console.log("  sample, includes unresolved:");
+    for (const s of r.sampleIncludesUnresolved) {
+      console.log(`    ${s.file}:${s.line}  ${s.text}  ${s.reason}${s.candidates === undefined ? "" : ` (${s.candidates} candidates)`}`);
+    }
   }
 }

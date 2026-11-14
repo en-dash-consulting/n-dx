@@ -112,11 +112,12 @@ export interface WrittenImport {
   /** Absent for an import that always runs. */
   readonly guard?: ImportGuard;
   /**
-   * For an include whose path is built at run time but starts with a literal
-   * prefix (PHP `"config/" . $_SERVER['HTTP_HOST'] . ".php"`): the project
-   * files it could load (here, files under `config/` ending in `.php`).
-   * Sorted, distinct, project-relative. Absent when the path is fully literal
-   * or has no literal prefix.
+   * For an include whose path is built at run time but starts or ends with
+   * literal text (PHP `"config/" . $_SERVER['HTTP_HOST'] . ".php"`): the
+   * project files it could load (here, files under `config/` ending in
+   * `.php`). Sorted, distinct, project-relative; a pack may cap the list.
+   * Absent when the path is fully literal, its literal text matches no file,
+   * or that text does not narrow the files down.
    *
    * Candidates are evidence, not edges: consumers must never turn them into
    * import edges. Held in memory only; no persisted artifact has a field for

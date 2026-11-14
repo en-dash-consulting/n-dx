@@ -80,6 +80,8 @@ describe("php legacy class resolution", () => {
       "PHP: bootstrap.php:16: spl_autoload_register($loader) is not a closure or a function or method named in the repository; not followed.",
       "PHP: bootstrap.php:17: spl_autoload_register('missing_loader') names nothing the repository declares; not followed.",
       "PHP: bootstrap.php:18: spl_autoload_register() registers PHP's default spl_autoload; not followed.",
+      // An autoloader's own include is dynamic as written, followed or not.
+      "PHP: [php-dynamic-include] 4 includes build their path at run time and give no edge: bootstrap.php:4, bootstrap.php:11, bootstrap.php:26, lib/Legacy/Autoloader.php:13; 1 with candidate files, never edges.",
     ]);
   });
 
