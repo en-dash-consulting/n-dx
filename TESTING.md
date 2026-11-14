@@ -358,8 +358,11 @@ commands are not serialized; only the worker cap bounds those.
 - **How long did it wait?** `hench show <run-id> .` prints
   `Validation slot: queued <n>s, ran <n>s`; the run record stores `queueMs` and
   `executionMs`.
-- **Where is it?** `<ndx home>/validation-slot/` (`~/.ndx/validation-slot/` by
-  default). `holder.json` exists exactly while the slot is held and names the
+- **Where is it?** `<ndx home>/validation-slot/<host>/`
+  (`~/.ndx/validation-slot/<host>/` by default), where `<host>` is the
+  hostname lower-cased with characters outside `[a-z0-9._-]` replaced by `-`.
+  Hosts sharing one ndx home (a network home) each get their own slot.
+  `holder.json` exists exactly while the slot is held and names the
   pid, project and start time. If the directory cannot be used (permissions,
   a read-only or full disk, no hard links), hench runs the command without the
   slot and warns `skipped the validation slot and ran without it`, naming the
