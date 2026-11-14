@@ -154,6 +154,13 @@ const REFERENCE_FORMS: Readonly<Record<string, PhpReferenceForm>> = {
 /** The enclosing class, not a reference. */
 const RELATIVE_CLASSES = new Set(["self", "static", "parent"]);
 
+/**
+ * Type keywords. The grammar matches some only in lower case (`array`,
+ * `bool`, `float`, `int`, `null`, `object`, `string`), but PHP reads them in
+ * any case, so `String $s` reaches the resolver as a class name.
+ */
+const SCALAR_TYPES = new Set(["array", "bool", "callable", "false", "float", "int", "iterable", "mixed", "never", "null", "object", "string", "true", "void"]);
+
 /** A namespace region: a braced block, or an unbraced statement up to the next. */
 interface Region {
   readonly name: string;
@@ -229,12 +236,13 @@ export function readPhpReferences(file: PackSourceFile, written: readonly Writte
   return refs.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
 }
 
-/** A class name qualified as PHP does; undefined for `self`, `static` and `parent`. */
+/** A class name qualified as PHP does; undefined for `self`, `static`, `parent` and a type keyword in any case. */
 function qualifyClass(capture: Capture, region: Region | undefined, aliases: ReadonlyMap<Region | undefined, ReadonlyMap<string, string>>): string | undefined {
   const name = tidy(capture.text);
   if (name.startsWith("\\")) return name.slice(1);
   if (/^namespace\\/i.test(name)) return inNamespace(region, name.slice("namespace\\".length));
-  if (RELATIVE_CLASSES.has(name.toLowerCase())) return undefined;
+  const lower = name.toLowerCase();
+  if (RELATIVE_CLASSES.has(lower) || (capture.name === "reference.type" && SCALAR_TYPES.has(lower))) return undefined;
   const sep = name.indexOf("\\");
   const head = sep < 0 ? name : name.slice(0, sep);
   const imported = aliases.get(region)?.get(head.toLowerCase());

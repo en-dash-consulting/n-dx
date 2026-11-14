@@ -1,10 +1,14 @@
 schema: "rex/v2"
 items:
   "461493c0-1b3c-46a2-bbe5-2d85163df8b7":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T07:32:53.062Z"
-    activeIntervals: [{"start":"2026-11-14T07:32:53.062Z"}]
-    lastModified: "2026-11-14T07:32:53.753Z"
+    completedAt: "2026-11-14T07:48:43.526Z"
+    endedAt: "2026-11-14T07:48:43.526Z"
+    activeIntervals: [{"end":"2026-11-14T07:48:43.526Z","start":"2026-11-14T07:32:53.062Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PHP namespace resolver (PSR-4, PSR-0, classmap, unique declared) with D5 php: externals, references query, built-in class list, php-resolve-report.mjs; edges reach imports.json via buildPackImportGraph."
+    lastModified: "2026-11-14T07:48:43.526Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5da69852-d9e7-4026-b5e5-ec644f1b1cb6":
     status: "completed"
@@ -17,8 +21,15 @@ items:
     lastModified: "2026-11-14T07:31:57.778Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "78cf4f7d-2b28-4263-bde2-bbc7995f7632":
+    status: "completed"
+    startedAt: "2026-11-14T07:48:43.526Z"
+    completedAt: "2026-11-14T07:48:43.526Z"
+    endedAt: "2026-11-14T07:48:43.526Z"
+    activeIntervals: [{"end":"2026-11-14T07:48:43.526Z","start":"2026-11-14T07:48:43.526Z"}]
+    appliedAt: "2026-11-14T07:48:43.526Z"
+    appliedAmendsHash: "1f0060a451fe8c8db1fbde61e67ae6efe6400e2ad2dccab586e12a7147bdb80b"
     createdAt: "2026-11-14T05:17:54.146Z"
-    lastModified: "2026-11-14T07:28:57.867Z"
+    lastModified: "2026-11-14T07:48:43.526Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a34d8b17-2c8d-49d8-8c29-d5ac378cfd0c":
     status: "completed"
