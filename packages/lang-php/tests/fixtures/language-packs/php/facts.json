@@ -3,7 +3,14 @@
     {
       "path": "php52/index.php",
       "imports": {
-        "files": [],
+        "files": [
+          {
+            "to": "php52/lib/Shop/Cart.php",
+            "symbols": [
+              "Shop_Cart"
+            ]
+          }
+        ],
         "external": [],
         "written": [
           {
@@ -694,7 +701,14 @@
       "path": "php53/src/Shop/Order.php",
       "imports": {
         "files": [],
-        "external": [],
+        "external": [
+          {
+            "package": "php:Psr",
+            "symbols": [
+              "Psr\\Log\\LoggerInterface"
+            ]
+          }
+        ],
         "written": [
           {
             "specifier": "Acme\\Billing\\Invoice",
@@ -1226,7 +1240,14 @@
     {
       "path": "php53/src/Shop/braced.php",
       "imports": {
-        "files": [],
+        "files": [
+          {
+            "to": "php53/src/Shop/Order.php",
+            "symbols": [
+              "Acme\\Shop\\Order"
+            ]
+          }
+        ],
         "external": [],
         "written": [
           {
