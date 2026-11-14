@@ -61,15 +61,6 @@ function stopChild(child: ValidationSlotChild): void {
   }
 }
 
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
-
 /** The child the holder records, or a rejection when the holder exits first. */
 async function recordedChild(proc: ChildProcess, stderr: () => string): Promise<ValidationSlotChild> {
   for (;;) {
@@ -107,10 +98,15 @@ describe("validation slot after its holder is killed", () => {
     if (process.platform === "win32") {
       // libuv puts a non-detached child in a kill-on-close job object its
       // parent owns, so killing the holder ends the child too: the record is
-      // stale and the next acquire reclaims it.
-      const lease = await acquireValidationSlot({ slotDir, projectDir: "/second", env: {}, pollIntervalMs: 20 });
-      expect(isAlive(recorded.pid)).toBe(false);
-      expect(await readValidationSlotHolder(slotDir)).toMatchObject({ projectDir: "/second", child: null });
+      // stale and the next acquire reclaims it. The freed pid is not checked:
+      // Windows can hand it to another process at once.
+      const lease = await acquireValidationSlot({
+        slotDir, projectDir: "/second", env: {}, pollIntervalMs: 20, signal: AbortSignal.timeout(30_000),
+      });
+      expect(lease.nested).toBe(false);
+      expect(await readValidationSlotHolder(slotDir)).toMatchObject({
+        projectDir: "/second", pid: process.pid, token: lease.token, child: null,
+      });
       await lease.release();
       return;
     }

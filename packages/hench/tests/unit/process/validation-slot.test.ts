@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile, access } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,10 +42,18 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-/** A pid that existed and has exited. */
+/**
+ * A pid no process holds: above Linux's pid_max, macOS's 99999 and any
+ * Windows pid. A just-exited child's pid is not safe, because Windows hands
+ * freed pids out again quickly under load.
+ */
 function deadPid(): number {
-  const result = spawnSync(process.execPath, ["-e", "0"], { windowsHide: true });
-  return result.pid;
+  return 2 ** 30;
+}
+
+/** Bounds an acquire that must not wait, so a regression fails instead of hanging the suite. */
+function bounded(): AbortSignal {
+  return AbortSignal.timeout(10_000);
 }
 
 /** A child that runs until killed; its own process group on POSIX. */
@@ -208,7 +216,7 @@ describe("acquireValidationSlot — stale recovery", () => {
   it("reclaims a record whose holder is dead and has no child", async () => {
     await writeHolder({});
     const waits: ValidationSlotWait[] = [];
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: (w) => waits.push(w) });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, signal: bounded(), onWait: (w) => waits.push(w) });
     expect(waits).toEqual([]);
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
     await lease.release();
@@ -216,7 +224,7 @@ describe("acquireValidationSlot — stale recovery", () => {
 
   it("reclaims a record whose holder and recorded child are both dead", async () => {
     await writeHolder({ child: { pid: deadPid(), group: false } });
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: () => {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, signal: bounded(), onWait: () => {
       throw new Error("should not wait");
     } });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
@@ -232,7 +240,7 @@ describe("acquireValidationSlot — stale recovery", () => {
       child: { pid: live.pid!, group: false },
       bootedAt: currentBootTimeMs() - 24 * 60 * 60_000,
     });
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: () => {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, signal: bounded(), onWait: () => {
       throw new Error("a record from a previous boot must not be waited on");
     } });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
@@ -250,7 +258,7 @@ describe("acquireValidationSlot — stale recovery", () => {
   it("reclaims a record that does not parse", async () => {
     await mkdir(slotDir, { recursive: true });
     await writeFile(join(slotDir, VALIDATION_SLOT_HOLDER_FILE), "{not json", "utf-8");
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {} });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, signal: bounded() });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
     await lease.release();
   });
@@ -280,7 +288,7 @@ describe("acquireValidationSlot — this process's own pid (rule 5a)", () => {
 
   it("reclaims at once a record naming this pid with a token this process does not hold", async () => {
     await writeHolder({ pid: process.pid, token: "previous-owner", child: { pid: deadPid(), group: false } });
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: () => {
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, signal: bounded(), onWait: () => {
       throw new Error("a leftover under this process's pid must not be waited on");
     } });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
@@ -312,7 +320,7 @@ describe("acquireValidationSlot — this process's own pid (rule 5a)", () => {
 
   it("does not nest on a token whose record names this pid but is no longer live here", async () => {
     await writeHolder({ pid: process.pid, token: "previous-owner" });
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: { [VALIDATION_SLOT_ENV]: "previous-owner" } });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: { [VALIDATION_SLOT_ENV]: "previous-owner" }, signal: bounded() });
     expect(lease.nested).toBe(false);
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
     await lease.release();
@@ -326,13 +334,12 @@ describe("acquireValidationSlot — this process's own pid (rule 5a)", () => {
       JSON.stringify({ pid: process.pid, token: "previous-reclaimer", startedAt: "2026-11-12T00:00:00.000Z" }),
       "utf-8",
     );
-    // Bounded so a regression fails here instead of hanging the suite.
     const lease = await acquireValidationSlot({
       slotDir,
       projectDir: "/proj",
       env: {},
       pollIntervalMs: 10,
-      signal: AbortSignal.timeout(10_000),
+      signal: bounded(),
     });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
     await expect(access(lockPath)).rejects.toThrow();
@@ -362,7 +369,7 @@ describe("acquireValidationSlot — nesting", () => {
 
   it("ignores a token whose holder is dead", async () => {
     await writeHolder({ token: "dead-holder" });
-    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: { [VALIDATION_SLOT_ENV]: "dead-holder" } });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: { [VALIDATION_SLOT_ENV]: "dead-holder" }, signal: bounded() });
     expect(lease.nested).toBe(false);
     expect(lease.token).not.toBe("dead-holder");
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);

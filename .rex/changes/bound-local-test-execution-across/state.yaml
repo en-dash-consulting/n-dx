@@ -14,7 +14,14 @@ items:
     lastModified: "2026-11-14T05:20:57.400Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ec3f9f1-5362-4345-8cce-0b7910813b27":
-    lastModified: "2026-11-14T05:13:49.076Z"
+    status: "completed"
+    startedAt: "2026-11-14T05:29:57.800Z"
+    completedAt: "2026-11-14T05:33:10.316Z"
+    endedAt: "2026-11-14T05:33:10.316Z"
+    activeIntervals: [{"end":"2026-11-14T05:33:10.316Z","start":"2026-11-14T05:29:57.800Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot tests use 2**30 dead pid with bounded acquires; crash test Windows branch asserts the new lease instead of a freed pid; admission-timeout test 3 s hold / 2.5 s timeout; hench.md Ctrl-C sentence corrected."
+    lastModified: "2026-11-14T05:33:10.316Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "24e3c609-310d-41d1-b65f-26d8c55656cd":
     status: "completed"
