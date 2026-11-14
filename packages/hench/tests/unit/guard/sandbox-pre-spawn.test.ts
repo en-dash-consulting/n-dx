@@ -2,7 +2,9 @@
  * The two confined spawn sites that hench starts itself — the vendor CLI
  * session and a confined `execRepoShellCmd` — must clear a stale slot holder
  * from the host before the child starts, and hand it the host-resolved slot
- * directory. Both spawns are stubbed, so the order is observed directly.
+ * directory. The vendor session, Codex's included, waits for a host lookup
+ * still running (abortably) and falls through with one warning on a failure.
+ * Both spawns are stubbed, so the order is observed directly.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
@@ -31,16 +33,23 @@ vi.mock("../../../src/process/exec.js", async (importOriginal) => ({
   exec,
 }));
 
-import { spawnWithAdapter } from "../../../src/agent/lifecycle/cli-loop.js";
+import { spawnWithAdapter, type SpawnWithAdapterOptions } from "../../../src/agent/lifecycle/cli-loop.js";
 import { claudeCliAdapter } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import { codexCliAdapter } from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
+import type { VendorAdapter } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import { execRepoShellCmd } from "../../../src/guard/sandbox.js";
 import { VALIDATION_SLOT_DIR_ENV, VALIDATION_SLOT_ENV } from "../../../src/process/validation-slot.js";
-import { peekValidationSlotDir, type HostIdentity } from "../../../src/process/validation-slot-dir.js";
+import {
+  HostIdentityLookupError,
+  peekValidationSlotDir,
+  type HostIdentity,
+  type HostIdentityCache,
+} from "../../../src/process/validation-slot-dir.js";
 
 const seatbelt = { name: "seatbelt" as const, available: true };
 const on = { mode: "on" as const, toolNetwork: "none" as const, source: "default" as const };
 const IDENTITY: HostIdentity = { kind: "machine", id: "0123456789abcdef0123456789abcdef" };
-const known = { peek: () => IDENTITY };
+const known = Object.assign(async () => IDENTITY, { peek: () => IDENTITY });
 
 /** A reclaim that finishes a tick later: a spawn that does not await it starts first. */
 const slowReclaim = async (): Promise<void> => {
@@ -90,27 +99,130 @@ posixOnly("confined execRepoShellCmd", () => {
   });
 });
 
+/** A host identity cache whose lookup is still running until `resolve()`; `peek` sees it after. */
+function slowIdentity(): HostIdentityCache & { resolve(): void } {
+  let resolved: HostIdentity | undefined;
+  let release!: () => void;
+  const ready = new Promise<void>((r) => { release = r; });
+  const lookup = async (): Promise<HostIdentity> => {
+    await ready;
+    return IDENTITY;
+  };
+  return Object.assign(lookup, {
+    peek: () => resolved,
+    resolve: () => {
+      events.push("identity");
+      resolved = IDENTITY;
+      release();
+    },
+  });
+}
+
+function stubChild(): void {
+  const child = Object.assign(new EventEmitter(), {
+    stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), pid: 123,
+  });
+  spawnCli.mockImplementation(() => {
+    events.push("spawn");
+    queueMicrotask(() => child.emit("close", 0));
+    return child;
+  });
+}
+
+function spawnOptions(
+  adapter: VendorAdapter,
+  vendor: string,
+  extra: Partial<SpawnWithAdapterOptions>,
+): SpawnWithAdapterOptions {
+  const project = tempProject();
+  return {
+    adapter,
+    spawnConfig: { binary: vendor, args: [], env: {}, stdinContent: null, cwd: project },
+    cliBinary: process.execPath, cwd: project, tokenMetadata: { vendor, model: "m" },
+    cliEnv: { PATH: process.env.PATH },
+    ...extra,
+  };
+}
+
+const spawnedEnv = (): NodeJS.ProcessEnv => spawnCli.mock.calls[0][2].env;
+const hostSlotDir = (): string | undefined => peekValidationSlotDir(process.env, known);
+
 posixOnly("vendor CLI spawn", () => {
   it("clears a stale holder before the CLI spawns, and hands the session the host-resolved slot directory", async () => {
-    const child = Object.assign(new EventEmitter(), {
-      stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), pid: 123,
-    });
-    spawnCli.mockImplementation(() => {
-      events.push("spawn");
-      queueMicrotask(() => child.emit("close", 0));
-      return child;
-    });
-    const project = tempProject();
-    await spawnWithAdapter({
-      adapter: claudeCliAdapter,
-      spawnConfig: { binary: "claude", args: [], env: {}, stdinContent: null, cwd: project },
-      cliBinary: process.execPath, cwd: project, tokenMetadata: { vendor: "claude", model: "sonnet" },
-      cliEnv: { PATH: process.env.PATH },
+    stubChild();
+    await spawnWithAdapter(spawnOptions(claudeCliAdapter, "claude", {
       vendorSandbox: { setting: on, backend: seatbelt, reclaimSlot: slowReclaim, hostIdentity: known },
-    });
+    }));
     expect(events).toEqual(["reclaim", "spawn"]);
-    const env: NodeJS.ProcessEnv = spawnCli.mock.calls[0][2].env;
-    expect(env[VALIDATION_SLOT_DIR_ENV]).toBe(peekValidationSlotDir(process.env, known));
-    expect(env[VALIDATION_SLOT_ENV]).toBeUndefined();
+    expect(spawnedEnv()[VALIDATION_SLOT_DIR_ENV]).toBe(hostSlotDir());
+    expect(spawnedEnv()[VALIDATION_SLOT_ENV]).toBeUndefined();
+  });
+
+  it("waits for a host lookup still running when the spawn begins, then hands the session the directory", async () => {
+    stubChild();
+    const identity = slowIdentity();
+    setTimeout(() => identity.resolve(), 30);
+    await spawnWithAdapter(spawnOptions(claudeCliAdapter, "claude", {
+      vendorSandbox: { setting: on, backend: seatbelt, reclaimSlot: slowReclaim, hostIdentity: identity },
+    }));
+    expect(events).toEqual(["identity", "reclaim", "spawn"]);
+    expect(spawnedEnv()[VALIDATION_SLOT_DIR_ENV]).toBe(hostSlotDir());
+  });
+
+  it("does not spawn when the run is aborted during that wait", async () => {
+    stubChild();
+    const never = Object.assign(() => new Promise<HostIdentity>(() => {}), { peek: () => undefined });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error("stopped by the operator")), 20);
+    const result = await spawnWithAdapter(spawnOptions(claudeCliAdapter, "claude", {
+      abortSignal: controller.signal,
+      vendorSandbox: { setting: on, backend: seatbelt, reclaimSlot: async () => {}, hostIdentity: never },
+    }));
+    expect(spawnCli).not.toHaveBeenCalled();
+    expect(result.aborted?.reason).toContain("stopped by the operator");
+  });
+
+  it("spawns without the directory, warning once, when the lookup fails transiently", async () => {
+    stubChild();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const failing = Object.assign(
+      () => Promise.reject(new HostIdentityLookupError("running ioreg", "timed out")),
+      { peek: () => undefined },
+    );
+    try {
+      await spawnWithAdapter(spawnOptions(claudeCliAdapter, "claude", {
+        vendorSandbox: { setting: on, backend: seatbelt, reclaimSlot: async () => {}, hostIdentity: failing },
+      }));
+      expect(spawnCli).toHaveBeenCalledOnce();
+      expect(spawnedEnv()[VALIDATION_SLOT_DIR_ENV]).toBeUndefined();
+      const warnings = log.mock.calls.map((c) => String(c[0])).filter((l) => l.includes(VALIDATION_SLOT_DIR_ENV));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("its test runs resolve the slot themselves");
+    } finally {
+      log.mockRestore();
+    }
+  });
+});
+
+describe("Codex CLI spawn", () => {
+  it("waits for the host lookup and hands the Codex session the slot directory", async () => {
+    stubChild();
+    const identity = slowIdentity();
+    setTimeout(() => identity.resolve(), 10);
+    await spawnWithAdapter(spawnOptions(codexCliAdapter, "codex", { vendorSandbox: { setting: on, hostIdentity: identity } }));
+    expect(events).toEqual(["identity", "spawn"]);
+    expect(spawnedEnv()[VALIDATION_SLOT_DIR_ENV]).toBe(hostSlotDir());
+    expect(spawnedEnv()[VALIDATION_SLOT_ENV]).toBeUndefined();
+  });
+
+  it("neither waits nor adds the directory when the operator turned confinement off", async () => {
+    stubChild();
+    const lookup = vi.fn(async () => IDENTITY);
+    const cache = Object.assign(lookup, { peek: () => undefined });
+    await spawnWithAdapter(spawnOptions(codexCliAdapter, "codex", {
+      vendorSandbox: { setting: { ...on, mode: "off" as const }, hostIdentity: cache },
+    }));
+    expect(lookup).not.toHaveBeenCalled();
+    expect(spawnedEnv()[VALIDATION_SLOT_DIR_ENV]).toBeUndefined();
   });
 });

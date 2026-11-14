@@ -28,6 +28,7 @@ import {
 } from "./validation-slot.js";
 import {
   hostIdentity,
+  LOOKUP_TIMEOUT_MS,
   peekValidationSlotDir,
   resolveValidationSlotDir,
   validationSlotDirFromEnv,
@@ -247,10 +248,74 @@ export async function reclaimHostValidationSlot(
 
 /**
  * Start reading this host's identity without waiting, so it is known by the
- * time a run's first confined command spawns. Called when a confined run starts.
+ * time a run's vendor CLI session or first confined command spawns, and the
+ * session's wait (`withSessionValidationSlotDir`) is usually zero. Called
+ * when a confined run starts.
  */
 export function startHostIdentityLookup(): void {
   hostIdentity.peek();
+}
+
+/** How `withSessionValidationSlotDir` waits; every field is optional. */
+export interface SessionSlotDirOptions {
+  /** The host's environment the directory is resolved from; defaults to `process.env`. */
+  hostEnv?: NodeJS.ProcessEnv;
+  /** Injected for tests; defaults to this process's host identity cache. */
+  cache?: HostIdentityCache;
+  /** Stops the wait; the caller checks it afterwards and does not spawn. */
+  signal?: AbortSignal;
+  /** Longest wait; defaults to the lookup command's own limit. */
+  timeoutMs?: number;
+  /** Receives the one line printed when the directory could not be resolved. */
+  warn?: (line: string) => void;
+}
+
+/**
+ * `withHostValidationSlotDir` for a vendor CLI session, which spawns once and
+ * keeps its environment for its whole life: waits for the host's identity
+ * instead of peeking, so a session started before the lookup finished still
+ * gets `NDX_VALIDATION_SLOT_DIR`. The wait ends at `timeoutMs` (the lookup
+ * command's limit) or when `signal` aborts. A transient failure, a remembered
+ * one or a timeout returns `base` unchanged and warns once: the session's own
+ * test runs resolve the slot themselves. Never throws. Per-command spawns
+ * keep the never-waiting `withHostValidationSlotDir`.
+ */
+export async function withSessionValidationSlotDir(
+  base: NodeJS.ProcessEnv,
+  options: SessionSlotDirOptions = {},
+): Promise<NodeJS.ProcessEnv> {
+  if (validationSlotDirFromEnv(base)) return base;
+  const { signal } = options;
+  if (signal?.aborted) return base;
+  const hostEnv = options.hostEnv ?? process.env;
+  const timeoutMs = options.timeoutMs ?? LOOKUP_TIMEOUT_MS;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const stopped = new Promise<{ kind: "timeout" } | { kind: "aborted" }>((resolve) => {
+    timer = setTimeout(() => resolve({ kind: "timeout" }), timeoutMs);
+    onAbort = () => resolve({ kind: "aborted" });
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+  const lookup = resolveValidationSlotDir(hostEnv, options.cache ?? hostIdentity).then(
+    (slotDir) => ({ kind: "found" as const, slotDir }),
+    (error: unknown) => ({ kind: "failed" as const, error }),
+  );
+  try {
+    const outcome = await Promise.race([lookup, stopped]);
+    if (outcome.kind === "found") return { ...base, [VALIDATION_SLOT_DIR_ENV]: outcome.slotDir };
+    if (outcome.kind === "aborted") return base;
+    const reason = outcome.kind === "timeout"
+      ? `this host's identity was not read within ${formatSeconds(timeoutMs)}`
+      : describeReason(outcome.error);
+    options.warn?.(
+      `validation slot: the session starts without NDX_VALIDATION_SLOT_DIR (${reason}); its test runs resolve the slot themselves`,
+    );
+    return base;
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 /**

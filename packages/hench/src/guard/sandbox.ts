@@ -261,6 +261,23 @@ export interface CreateVendorCliSandboxOptions extends CreateToolSandboxOptions 
 }
 
 /**
+ * Whether `vendor` runs its session inside its own sandbox under the
+ * operator's confinement setting: Codex, unless that setting is off. Such a
+ * session gets the host-resolved validation slot directory like one we
+ * confine, because a lookup inside its sandbox may be refused. No backend is
+ * needed: Codex brings its own.
+ */
+export function isSelfConfinedVendorSession(
+  projectDir: string,
+  vendor: string,
+  options: Pick<CreateToolSandboxOptions, "env" | "ndxHome" | "setting"> = {},
+): boolean {
+  if (vendor !== LLM_VENDOR.CODEX) return false;
+  const setting = options.setting ?? resolveSandboxSetting(projectDir, { env: options.env, ndxHome: options.ndxHome });
+  return setting.mode !== "off";
+}
+
+/**
  * Build the sandbox the vendor CLI runs inside, or null when it should run
  * unconfined by us:
  *
