@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-14T07:09:52.459Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "220d4f19-4cf3-488b-baae-bd894498844b":
-    lastModified: "2026-11-14T05:22:20.070Z"
+    status: "completed"
+    startedAt: "2026-11-14T07:11:21.382Z"
+    completedAt: "2026-11-14T07:16:10.327Z"
+    endedAt: "2026-11-14T07:16:10.327Z"
+    activeIntervals: [{"end":"2026-11-14T07:16:10.327Z","start":"2026-11-14T07:11:21.382Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PHP corpus pins (10 repos, operator SHAs, php5 flag), clone script, report with per-repo clean-parse rate, top-10 error parents, parse time, overall and PHP 5 (D4 99.5%) lines. Operator still clones, runs and logs the measured rates."
+    lastModified: "2026-11-14T07:16:10.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5cd796e9-6177-4d40-8439-b1678e700322":
     status: "completed"
@@ -34,6 +41,13 @@ items:
     lastModified: "2026-11-14T06:45:48.389Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd04acac-099e-4ea0-8364-84298a85678a":
+    status: "completed"
+    startedAt: "2026-11-14T07:16:10.327Z"
+    completedAt: "2026-11-14T07:16:10.327Z"
+    endedAt: "2026-11-14T07:16:10.327Z"
+    activeIntervals: [{"end":"2026-11-14T07:16:10.327Z","start":"2026-11-14T07:16:10.327Z"}]
+    appliedAt: "2026-11-14T07:16:10.327Z"
+    appliedAmendsHash: "b82d7ed24987f2362f5fde01bcd1c90fcd15f5cc1fc62e71c480246fc3728099"
     createdAt: "2026-11-14T05:17:52.622Z"
-    lastModified: "2026-11-14T07:05:13.939Z"
+    lastModified: "2026-11-14T07:16:10.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

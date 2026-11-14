@@ -1,0 +1,75 @@
+{
+  "comment": "PHP drift corpus: public repositories pinned by commit SHA at the release tag in each shape note. `php5` marks the PHP 5 era repositories the D4 clean-parse bar covers. Cloned by php-corpus-clone.mjs, measured by php-corpus-report.mjs. Neither runs in the test suite.",
+  "repositories": [
+    {
+      "name": "phpbb",
+      "url": "https://github.com/phpbb/phpbb.git",
+      "sha": "11242dd07d6359a725f22f3674028adfdddb49d6",
+      "php5": true,
+      "shape": "release-3.0.14; PHP 5 era, forum app without Composer, templates mixed with PHP"
+    },
+    {
+      "name": "oscommerce2",
+      "url": "https://github.com/osCommerce/oscommerce2.git",
+      "sha": "94e9e9efe7994bf88d8ade2e64881b4bfe1745d4",
+      "php5": true,
+      "shape": "v2.3.4.1; PHP 5 era, storefront without Composer, include-driven pages with inline HTML"
+    },
+    {
+      "name": "wordpress",
+      "url": "https://github.com/WordPress/WordPress.git",
+      "sha": "bc529f5b0ba518b6eb017a097d7516e72247022f",
+      "php5": true,
+      "shape": "3.9.40; PHP 5 era, WordPress 3.x without Composer, themes mixed with HTML"
+    },
+    {
+      "name": "drupal7",
+      "url": "https://github.com/drupal/drupal.git",
+      "sha": "e7242e52bb13286c67d27fad57915f868f50b0a9",
+      "php5": true,
+      "shape": "7.103; PHP 5 era, Drupal 7 without Composer, .module and .inc files"
+    },
+    {
+      "name": "codeigniter3",
+      "url": "https://github.com/bcit-ci/CodeIgniter.git",
+      "sha": "bcb17eb8ba53a85de154439d0ab8ff1bed047bc9",
+      "php5": true,
+      "shape": "3.1.13; PHP 5 era framework, CodeIgniter 3 application skeleton plus system/"
+    },
+    {
+      "name": "zf1",
+      "url": "https://github.com/zendframework/zf1.git",
+      "sha": "737ef159654fbbef37cf9af742b2c8f9690c2ece",
+      "php5": true,
+      "shape": "release-1.12.20; PHP 5 era framework, Zend Framework 1 with PSR-0 underscore class names"
+    },
+    {
+      "name": "cakephp2",
+      "url": "https://github.com/cakephp/cakephp.git",
+      "sha": "cf14e6546ec44e3369e3531add11fdb946656280",
+      "php5": true,
+      "shape": "2.10.24; PHP 5 era framework, CakePHP 2 app/ skeleton plus lib/Cake, .ctp views"
+    },
+    {
+      "name": "mediawiki",
+      "url": "https://github.com/wikimedia/mediawiki.git",
+      "sha": "d0d9a283f219a1c9487754dc96598080a4a4e30a",
+      "php5": false,
+      "shape": "1.46.2; modern PHP at scale, Composer autoload, large includes/ tree"
+    },
+    {
+      "name": "koel",
+      "url": "https://github.com/koel/koel.git",
+      "sha": "7f9fe1ad76aee28d5d2a808ea91890d4ef866b0b",
+      "php5": false,
+      "shape": "v9.15.0; modern control, Laravel application beside a TypeScript frontend"
+    },
+    {
+      "name": "symfony-demo",
+      "url": "https://github.com/symfony/demo.git",
+      "sha": "8f84bf89426f47125010cbf2d4c6a920787bf482",
+      "php5": false,
+      "shape": "v3.1.0; modern control, Symfony demo application"
+    }
+  ]
+}
