@@ -217,10 +217,14 @@ items:
     lastModified: "2026-11-14T05:54:01.207Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1e742ad-552e-47c7-8587-b0d5212cde09":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T05:54:26.229Z"
-    activeIntervals: [{"start":"2026-11-14T05:54:26.229Z"}]
-    lastModified: "2026-11-14T05:54:26.946Z"
+    completedAt: "2026-11-14T06:02:17.667Z"
+    endedAt: "2026-11-14T06:02:17.667Z"
+    activeIntervals: [{"end":"2026-11-14T06:02:17.667Z","start":"2026-11-14T05:54:26.229Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench: rule 5a live lease/reclaim token sets (namespace-aware, live child respected), reclaim-lock ownership check in finally, machine-id per-host dir (same sources/order/hash/10 s timeout/cache rule), NDX_VALIDATION_SLOT_DIR nesting + export, holderPath in wait report. Parity test extended both directions; runner exports both variables."
+    lastModified: "2026-11-14T06:02:17.667Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d34d2902-408a-4b05-9de9-7b2932aae778":
     status: "completed"
