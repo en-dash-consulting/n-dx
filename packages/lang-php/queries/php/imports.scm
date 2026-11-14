@@ -56,6 +56,46 @@
     (argument (_) @include.ini_value .))) @include.ini
   (#match? @_ini "^[iI][nN][iI]_[sS][eE][tT]$"))
 
+; A path kept in a variable (`$file = 'lib/' . $class . '.php'; require $file;`):
+; each assignment to a plain variable, with its operator when compound.
+;
+;   $file = 'a/' . $c;                       @include.assign, @include.assigned "$file", @include.assign_value
+;   $file .= '.php';                         ... and @include.assign_operator ".="
+(assignment_expression
+  left: (variable_name) @include.assigned
+  right: (_) @include.assign_value) @include.assign
+(augmented_assignment_expression
+  left: (variable_name) @include.assigned
+  operator: _ @include.assign_operator
+  right: (_) @include.assign_value) @include.assign
+
+; Autoloaders (php-autoloaders.ts): `spl_autoload_register()` and the
+; callback it is given first, and the first parameter of every function,
+; method, closure and arrow function, which is the class name when PHP calls
+; one as an autoloader (a function named `__autoload`, or a registered one).
+;
+;   spl_autoload_register(function ($class) { … });  @autoload.register, @autoload.callback, @autoload.parameter "$class"
+;   spl_autoload_register(array('Loader', 'load'));  @autoload.register, @autoload.callback
+;   function __autoload($name) { … }                 @autoload.parameter "$name"
+((function_call_expression
+  function: (name) @_register
+  arguments: (arguments)) @autoload.register
+  (#match? @_register "^[sS][pP][lL]_[aA][uU][tT][oO][lL][oO][aA][dD]_[rR][eE][gG][iI][sS][tT][eE][rR]$"))
+
+((function_call_expression
+  function: (name) @_register
+  arguments: (arguments . (argument (_) @autoload.callback)))
+  (#match? @_register "^[sS][pP][lL]_[aA][uU][tT][oO][lL][oO][aA][dD]_[rR][eE][gG][iI][sS][tT][eE][rR]$"))
+
+(function_definition
+  parameters: (formal_parameters . (simple_parameter name: (variable_name) @autoload.parameter)))
+(method_declaration
+  parameters: (formal_parameters . (simple_parameter name: (variable_name) @autoload.parameter)))
+(anonymous_function
+  parameters: (formal_parameters . (simple_parameter name: (variable_name) @autoload.parameter)))
+(arrow_function
+  parameters: (formal_parameters . (simple_parameter name: (variable_name) @autoload.parameter)))
+
 ; `use` imports. @use.declaration spans the statement; each @use.clause is
 ; one imported name, with @use.name its name as written and @use.alias the
 ; `as` name. A group use (`use A\{B, C as D}`) has @use.prefix, its shared

@@ -8,8 +8,9 @@
  * other PHP parser.
  *
  * `use` imports and class references resolve to files through Composer's
- * autoload rules (`php-resolver.ts`); includes with a computable path
- * resolve through PHP's include search order (`php-includes.ts`).
+ * autoload rules, legacy autoloaders and the PSR-0 path (`php-resolver.ts`,
+ * `php-autoloaders.ts`); includes with a computable path resolve through
+ * PHP's include search order (`php-includes.ts`).
  *
  * @module lang-php/php-pack
  */
@@ -110,6 +111,18 @@ export const phpPack: LanguagePack = {
       verifiedAgainst: ["PSR-0"],
       verifiedOn: "2026-11-14",
       source: "https://www.php-fig.org/psr/psr-0/",
+    },
+    // Autoloaders: functions registered with spl_autoload_register() and __autoload() (removed in PHP 8) are called with the class name.
+    autoloaders: {
+      verifiedAgainst: ["PHP manual"],
+      verifiedOn: "2026-11-14",
+      source: "https://www.php.net/manual/en/function.spl-autoload-register.php",
+    },
+    // The string functions an autoloader applies to the class name: str_replace, strtr, strtolower, strtoupper, ltrim, rtrim and trim.
+    "autoloader-strings": {
+      verifiedAgainst: ["PHP manual"],
+      verifiedOn: "2026-11-14",
+      source: "https://www.php.net/manual/en/ref.strings.php",
     },
     // Composer's autoload keys: psr-4, psr-0, classmap and exclude-from-classmap.
     "composer-autoload": {

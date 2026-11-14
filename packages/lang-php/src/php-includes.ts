@@ -114,6 +114,32 @@ function locate(value: string): Located | undefined {
 /** Looks a constant up; undefined when it is not computable. */
 type ConstantLookup = (name: string) => string | undefined;
 
+/** Looks a variable up by name, without its `$`; undefined when it is not computable. */
+export type VariableLookup = (name: string) => string | undefined;
+
+const NO_VARIABLES: VariableLookup = () => undefined;
+
+/** `str_replace()` with string or array search and replace (https://www.php.net/manual/en/function.str-replace.php). */
+function strReplace(search: readonly string[], replace: readonly string[] | string, subject: string): string {
+  let out = subject;
+  search.forEach((s, i) => {
+    if (s === "") return;
+    out = out.split(s).join(typeof replace === "string" ? replace : (replace[i] ?? ""));
+  });
+  return out;
+}
+
+/** `strtr($s, $from, $to)`: each character of `from` becomes the one at its place in `to` (https://www.php.net/manual/en/function.strtr.php). */
+function strtr(subject: string, from: string, to: string): string {
+  const length = Math.min(from.length, to.length);
+  let out = "";
+  for (const c of subject) {
+    const at = from.lastIndexOf(c);
+    out += at >= 0 && at < length ? to[at] : c;
+  }
+  return out;
+}
+
 /** Thrown inside {@link evaluatePath} when the expression is not computable. */
 class NotComputable extends Error {}
 
@@ -123,8 +149,12 @@ const DOUBLE_ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: 
 /**
  * The value of a PHP path expression written in `file`, or undefined when it
  * is not computable. `__FILE__` is the {@link REPO}-rooted path of `file`.
+ * A variable is computable only through `variable`; so are `str_replace()`,
+ * `strtr()` with three arguments, `strtolower()`, `strtoupper()` and
+ * `ltrim()`, `rtrim()` and `trim()` with a character list, which an autoloader
+ * applies to its class name.
  */
-function evaluatePath(text: string, file: string, constant: ConstantLookup): string | undefined {
+function evaluatePath(text: string, file: string, constant: ConstantLookup, variable: VariableLookup = NO_VARIABLES): string | undefined {
   let at = 0;
 
   const skip = (): void => {
@@ -188,6 +218,82 @@ function evaluatePath(text: string, file: string, constant: ConstantLookup): str
     return Number(digits[0]);
   };
 
+  /** The arguments of a call whose `(` was eaten, through its `)`. */
+  const args = (): string[] => {
+    const out: string[] = [];
+    if (eat(")")) return out;
+    do out.push(expression());
+    while (eat(","));
+    if (!eat(")")) throw new NotComputable();
+    return out;
+  };
+
+  /** A string, or an `array(\u2026)` or `[\u2026]` of strings: `str_replace()`'s search and replace. */
+  const list = (): string[] | string => {
+    skip();
+    if (eat("[")) {
+      const items: string[] = [];
+      if (!eat("]")) {
+        do items.push(expression());
+        while (eat(","));
+        if (!eat("]")) throw new NotComputable();
+      }
+      return items;
+    }
+    if (/^array\s*\(/i.test(text.slice(at))) {
+      at = text.indexOf("(", at) + 1;
+      return args();
+    }
+    return expression();
+  };
+
+  /** A character list for `trim()`; a `..` range is not followed. */
+  const characters = (value: string): string => {
+    if (value.includes("..")) throw new NotComputable();
+    return value;
+  };
+
+  const trimmed = (value: string, chars: string, start: boolean, end: boolean): string => {
+    let from = 0;
+    let to = value.length;
+    while (start && from < to && chars.includes(value[from]!)) from += 1;
+    while (end && to > from && chars.includes(value[to - 1]!)) to -= 1;
+    return value.slice(from, to);
+  };
+
+  const call = (lower: string): string => {
+    if (lower === "dirname") {
+      let value = dirname(expression());
+      if (eat(",")) {
+        const levels = integer();
+        if (levels < 1) throw new NotComputable(); // PHP throws a ValueError
+        for (let level = 1; level < levels; level += 1) value = dirname(value);
+      }
+      if (!eat(")")) throw new NotComputable();
+      return value;
+    }
+    if (lower === "get_include_path" && eat(")")) return CURRENT_INCLUDE_PATH;
+    if (lower === "str_replace") {
+      const search = list();
+      if (!eat(",")) throw new NotComputable();
+      const replace = list();
+      if (!eat(",")) throw new NotComputable();
+      const subject = expression();
+      if (!eat(")")) throw new NotComputable(); // a fourth argument, the count, is a variable
+      if (typeof replace !== "string" && typeof search === "string") throw new NotComputable(); // PHP throws a TypeError
+      return strReplace(typeof search === "string" ? [search] : search, replace, subject);
+    }
+    const values = args();
+    const [first, second, third] = values;
+    if (lower === "strtolower" && values.length === 1) return first!.toLowerCase();
+    if (lower === "strtoupper" && values.length === 1) return first!.toUpperCase();
+    if (lower === "strtr" && values.length === 3) return strtr(first!, second!, third!);
+    if ((lower === "ltrim" || lower === "rtrim" || lower === "trim") && values.length === 2) {
+      return trimmed(first!, characters(second!), lower !== "rtrim", lower !== "ltrim");
+    }
+    throw new NotComputable();
+  };
+
   const term = (): string => {
     skip();
     const c = text[at];
@@ -199,25 +305,21 @@ function evaluatePath(text: string, file: string, constant: ConstantLookup): str
       if (!eat(")")) throw new NotComputable();
       return value;
     }
+    const dollar = /^\$([A-Za-z_\x80-\uffff][\w\x80-\uffff]*)/.exec(text.slice(at));
+    if (dollar) {
+      at += dollar[0].length;
+      const value = variable(dollar[1]!);
+      if (value === undefined) throw new NotComputable();
+      skip();
+      if (/^(->|\?->|\[|::|\()/.test(text.slice(at))) throw new NotComputable(); // a property, element or call of the variable
+      return value;
+    }
     const word = /^\\?[A-Za-z_\x80-\uffff][\w\x80-\uffff]*/.exec(text.slice(at));
     if (!word) throw new NotComputable();
     at += word[0].length;
     const name = word[0].replace(/^\\/, "");
     const lower = name.toLowerCase();
-    if (eat("(")) {
-      if (lower === "dirname") {
-        let value = dirname(expression());
-        if (eat(",")) {
-          const levels = integer();
-          if (levels < 1) throw new NotComputable(); // PHP throws a ValueError
-          for (let level = 1; level < levels; level += 1) value = dirname(value);
-        }
-        if (!eat(")")) throw new NotComputable();
-        return value;
-      }
-      if (lower === "get_include_path" && eat(")")) return CURRENT_INCLUDE_PATH;
-      throw new NotComputable();
-    }
+    if (eat("(")) return call(lower);
     if (lower === "__dir__") return dirname(`${REPO}/${file}`);
     if (lower === "__file__") return `${REPO}/${file}`;
     if (name === "DIRECTORY_SEPARATOR") return "/";
@@ -252,7 +354,7 @@ interface ConstantDefinition {
 
 
 /** Each capture named `part` paired with the innermost `owner` capture holding it. */
-function owned(captures: readonly Capture[], owner: string, part: string): Map<Capture, Capture> {
+export function owned(captures: readonly Capture[], owner: string, part: string): Map<Capture, Capture> {
   const owners = captures.filter((c) => c.name === owner);
   const out = new Map<Capture, Capture>();
   for (const c of captures) {
@@ -481,9 +583,18 @@ export class PhpIncludes {
     return candidates.find((c): c is string => c !== undefined && this.files.has(c));
   }
 
+  /** The value of a path expression written in `file`, with the repository's constants and `variable`; undefined when not computable. */
+  evaluate(text: string, file: string, variable?: VariableLookup): string | undefined {
+    return evaluatePath(text, file, this.constant, variable);
+  }
+
   /** What an include written in `file` resolves to. */
   resolve(file: string, include: WrittenImport): PhpIncludeOutcome {
-    const value = evaluatePath(include.specifier, file, this.constant);
+    return this.resolveValue(file, this.evaluate(include.specifier, file));
+  }
+
+  /** What an include in `file` of a path with value `value` (from {@link evaluate}) resolves to. */
+  resolveValue(file: string, value: string | undefined): PhpIncludeOutcome {
     const located = value === undefined ? undefined : locate(value);
     if (located === undefined) return { kind: "unresolved", reason: "dynamic" };
     if (located.kind === "outside") return { kind: "unresolved", reason: "outside" };

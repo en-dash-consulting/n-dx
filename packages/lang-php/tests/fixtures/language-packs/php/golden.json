@@ -364,7 +364,46 @@
             }
           },
           {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$config = require 'settings.php'",
+            "start": {
+              "line": 25,
+              "column": 0
+            },
+            "end": {
+              "line": 25,
+              "column": 32
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$config",
+            "start": {
+              "line": 25,
+              "column": 0
+            },
+            "end": {
+              "line": 25,
+              "column": 7
+            }
+          },
+          {
             "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require 'settings.php'",
+            "start": {
+              "line": 25,
+              "column": 10
+            },
+            "end": {
+              "line": 25,
+              "column": 32
+            }
+          },
+          {
+            "name": "include.assign_value",
             "nodeType": "require_expression",
             "text": "require 'settings.php'",
             "start": {
@@ -465,6 +504,162 @@
             "end": {
               "line": 35,
               "column": 24
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$cart = new Shop_Cart",
+            "start": {
+              "line": 38,
+              "column": 0
+            },
+            "end": {
+              "line": 38,
+              "column": 21
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$cart",
+            "start": {
+              "line": 38,
+              "column": 0
+            },
+            "end": {
+              "line": 38,
+              "column": 5
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "object_creation_expression",
+            "text": "new Shop_Cart",
+            "start": {
+              "line": 38,
+              "column": 8
+            },
+            "end": {
+              "line": 38,
+              "column": 21
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$total = Shop_Cart::format($cart->total())",
+            "start": {
+              "line": 40,
+              "column": 0
+            },
+            "end": {
+              "line": 40,
+              "column": 42
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$total",
+            "start": {
+              "line": 40,
+              "column": 0
+            },
+            "end": {
+              "line": 40,
+              "column": 6
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "scoped_call_expression",
+            "text": "Shop_Cart::format($cart->total())",
+            "start": {
+              "line": 40,
+              "column": 9
+            },
+            "end": {
+              "line": 40,
+              "column": 42
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$result = mysql_query ($sql)",
+            "start": {
+              "line": 42,
+              "column": 0
+            },
+            "end": {
+              "line": 42,
+              "column": 28
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$result",
+            "start": {
+              "line": 42,
+              "column": 0
+            },
+            "end": {
+              "line": 42,
+              "column": 7
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "function_call_expression",
+            "text": "mysql_query ($sql)",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 28
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$rows = $db->query ($sql)",
+            "start": {
+              "line": 43,
+              "column": 0
+            },
+            "end": {
+              "line": 43,
+              "column": 25
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$rows",
+            "start": {
+              "line": 43,
+              "column": 0
+            },
+            "end": {
+              "line": 43,
+              "column": 5
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "member_call_expression",
+            "text": "$db->query ($sql)",
+            "start": {
+              "line": 43,
+              "column": 8
+            },
+            "end": {
+              "line": 43,
+              "column": 25
             }
           },
           {
@@ -1812,6 +2007,19 @@
             }
           },
           {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$sku",
+            "start": {
+              "line": 14,
+              "column": 21
+            },
+            "end": {
+              "line": 14,
+              "column": 25
+            }
+          },
+          {
             "name": "import.require_once",
             "nodeType": "require_once_expression",
             "text": "require_once 'Shop/Pricing.php'",
@@ -1835,6 +2043,45 @@
             "end": {
               "line": 23,
               "column": 39
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$amount",
+            "start": {
+              "line": 27,
+              "column": 20
+            },
+            "end": {
+              "line": 27,
+              "column": 27
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$cart",
+            "start": {
+              "line": 35,
+              "column": 25
+            },
+            "end": {
+              "line": 35,
+              "column": 30
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$price",
+            "start": {
+              "line": 46,
+              "column": 22
+            },
+            "end": {
+              "line": 46,
+              "column": 28
             }
           },
           {
@@ -3286,6 +3533,201 @@
             }
           },
           {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$gateway",
+            "start": {
+              "line": 20,
+              "column": 39
+            },
+            "end": {
+              "line": 20,
+              "column": 47
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$logger",
+            "start": {
+              "line": 46,
+              "column": 48
+            },
+            "end": {
+              "line": 46,
+              "column": 55
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$gateway",
+            "start": {
+              "line": 62,
+              "column": 39
+            },
+            "end": {
+              "line": 62,
+              "column": 47
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$invoice = new Invoice($this, CURRENCY)",
+            "start": {
+              "line": 64,
+              "column": 8
+            },
+            "end": {
+              "line": 64,
+              "column": 47
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$invoice",
+            "start": {
+              "line": 64,
+              "column": 8
+            },
+            "end": {
+              "line": 64,
+              "column": 16
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "object_creation_expression",
+            "text": "new Invoice($this, CURRENCY)",
+            "start": {
+              "line": 64,
+              "column": 19
+            },
+            "end": {
+              "line": 64,
+              "column": 47
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$total = array_reduce($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0)",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 67,
+              "column": 13
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$total",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 65,
+              "column": 14
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "function_call_expression",
+            "text": "array_reduce($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0)",
+            "start": {
+              "line": 65,
+              "column": 17
+            },
+            "end": {
+              "line": 67,
+              "column": 13
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$sum",
+            "start": {
+              "line": 65,
+              "column": 54
+            },
+            "end": {
+              "line": 65,
+              "column": 58
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$id",
+            "start": {
+              "line": 72,
+              "column": 32
+            },
+            "end": {
+              "line": 72,
+              "column": 35
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$loader = function ($file) {\n            require $file;\n        }",
+            "start": {
+              "line": 74,
+              "column": 8
+            },
+            "end": {
+              "line": 76,
+              "column": 9
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$loader",
+            "start": {
+              "line": 74,
+              "column": 8
+            },
+            "end": {
+              "line": 74,
+              "column": 15
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "anonymous_function",
+            "text": "function ($file) {\n            require $file;\n        }",
+            "start": {
+              "line": 74,
+              "column": 18
+            },
+            "end": {
+              "line": 76,
+              "column": 9
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$file",
+            "start": {
+              "line": 74,
+              "column": 28
+            },
+            "end": {
+              "line": 74,
+              "column": 33
+            }
+          },
+          {
             "name": "import.require",
             "nodeType": "require_expression",
             "text": "require $file",
@@ -3309,6 +3751,19 @@
             "end": {
               "line": 75,
               "column": 25
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$order",
+            "start": {
+              "line": 82,
+              "column": 27
+            },
+            "end": {
+              "line": 82,
+              "column": 33
             }
           }
         ],
@@ -5490,6 +5945,201 @@
             "end": {
               "line": 11,
               "column": 30
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$invoice",
+            "start": {
+              "line": 45,
+              "column": 35
+            },
+            "end": {
+              "line": 45,
+              "column": 43
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$status = $invoice?->status() ?? Status::Open",
+            "start": {
+              "line": 47,
+              "column": 8
+            },
+            "end": {
+              "line": 47,
+              "column": 53
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$status",
+            "start": {
+              "line": 47,
+              "column": 8
+            },
+            "end": {
+              "line": 47,
+              "column": 15
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "binary_expression",
+            "text": "$invoice?->status() ?? Status::Open",
+            "start": {
+              "line": 47,
+              "column": 18
+            },
+            "end": {
+              "line": 47,
+              "column": 53
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$make = fn (string $id) => new OrderPaid($id)",
+            "start": {
+              "line": 56,
+              "column": 8
+            },
+            "end": {
+              "line": 56,
+              "column": 53
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$make",
+            "start": {
+              "line": 56,
+              "column": 8
+            },
+            "end": {
+              "line": 56,
+              "column": 13
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "arrow_function",
+            "text": "fn (string $id) => new OrderPaid($id)",
+            "start": {
+              "line": 56,
+              "column": 16
+            },
+            "end": {
+              "line": 56,
+              "column": 53
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$id",
+            "start": {
+              "line": 56,
+              "column": 27
+            },
+            "end": {
+              "line": 56,
+              "column": 30
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$handler = new class($this->orders) {\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        }",
+            "start": {
+              "line": 57,
+              "column": 8
+            },
+            "end": {
+              "line": 64,
+              "column": 9
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$handler",
+            "start": {
+              "line": 57,
+              "column": 8
+            },
+            "end": {
+              "line": 57,
+              "column": 16
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "object_creation_expression",
+            "text": "new class($this->orders) {\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        }",
+            "start": {
+              "line": 57,
+              "column": 19
+            },
+            "end": {
+              "line": 64,
+              "column": 9
+            }
+          },
+          {
+            "name": "autoload.parameter",
+            "nodeType": "variable_name",
+            "text": "$id",
+            "start": {
+              "line": 60,
+              "column": 42
+            },
+            "end": {
+              "line": 60,
+              "column": 45
+            }
+          },
+          {
+            "name": "include.assign",
+            "nodeType": "assignment_expression",
+            "text": "$plugin = match (PHP_OS_FAMILY) {\n            'Windows' => require __DIR__ . '/plugins/windows.php',\n            default => require __DIR__ . '/plugins/posix.php',\n        }",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 68,
+              "column": 9
+            }
+          },
+          {
+            "name": "include.assigned",
+            "nodeType": "variable_name",
+            "text": "$plugin",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 65,
+              "column": 15
+            }
+          },
+          {
+            "name": "include.assign_value",
+            "nodeType": "match_expression",
+            "text": "match (PHP_OS_FAMILY) {\n            'Windows' => require __DIR__ . '/plugins/windows.php',\n            default => require __DIR__ . '/plugins/posix.php',\n        }",
+            "start": {
+              "line": 65,
+              "column": 18
+            },
+            "end": {
+              "line": 68,
+              "column": 9
             }
           },
           {

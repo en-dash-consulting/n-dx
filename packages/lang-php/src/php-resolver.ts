@@ -27,8 +27,14 @@
  *    the class part's `_` to `/`, is `<path>/<logical>.php`.
  * 3. Classmap: a class declared in a file under a `classmap` path (and not
  *    `exclude-from-classmap`), first file by path.
- * 4. A class declared in exactly one file of the repository (two or more is
- *    `ambiguous`), which also covers repositories without Composer.
+ * 4. Legacy loading, for code without Composer: a file a legacy autoloader
+ *    would include (`php-autoloaders.ts`), then the PSR-0 path
+ *    (`Vendor_Pkg_Class` is `Vendor/Pkg/Class.php`) under the referring
+ *    file's include-path roots (`php-includes.ts`) or the repository root.
+ *    The file must declare the class, or have failed to parse while no file
+ *    declares it, so a pattern picks one of several declarations.
+ * 5. A class declared in exactly one file of the repository (two or more is
+ *    `ambiguous`).
  * A file must be one of the pack's files: a vendor directory is not, so its
  * classes are externals.
  *
@@ -71,6 +77,7 @@ import {
 import { contains, type Capture, type PackResolver, type PackSourceFile, type PreparedResolver } from "@n-dx/lang-runtime";
 import { isPhpBuiltinClass } from "./php-builtins.js";
 import { readWrittenImports } from "./php-imports.js";
+import { PhpAutoloaders } from "./php-autoloaders.js";
 import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
 
 // ── Names and paths ─────────────────────────────────────────────────────────
@@ -137,8 +144,13 @@ export interface PhpReference {
   readonly position: SourcePosition;
 }
 
-/** How a resolved name was found. */
-export type PhpResolution = "psr-4" | "psr-0" | "classmap" | "declared";
+/**
+ * How a resolved name was found: Composer's `psr-4`, `psr-0` and
+ * `classmap`; an `autoloader` pattern; the PSR-0 directory convention under
+ * the include path or the repository root (`psr-0-path`); or the one file
+ * declaring it (`declared`).
+ */
+export type PhpResolution = "psr-4" | "psr-0" | "classmap" | "autoloader" | "psr-0-path" | "declared";
 
 /** What one reference resolved to. */
 export type PhpOutcome =
@@ -329,8 +341,13 @@ function excludePattern(pattern: string): RegExp {
 /** `path` is the file `entry` or lies beneath the directory `entry`. */
 const underEntry = (path: string, entry: string): boolean => entry === "" || path === entry || path.startsWith(`${entry}/`);
 
+/** Where a legacy lookup would load a class from, in the order it tries them. */
+type LegacyCandidates = (qualified: string, fromFile: string) => Iterable<{ readonly target: string; readonly via: PhpResolution }>;
+
 class Index {
   readonly files: ReadonlySet<string>;
+  /** Files with captures; a file outside it failed to parse, so what it declares is unknown. */
+  private readonly parsed: ReadonlySet<string>;
   private readonly psr4: readonly Mapping[];
   private readonly psr0: readonly Mapping[];
   private readonly classmap = new Map<string, string>();
@@ -347,8 +364,9 @@ class Index {
   /** First segments or PSR-0 prefixes, lowercase, that are the project's; for un-namespaced names only. */
   private readonly ownHeads = new Set<string>();
 
-  constructor(projects: readonly ComposerProject[], declared: readonly Declared[], paths: readonly string[]) {
-    this.files = new Set(paths);
+  constructor(projects: readonly ComposerProject[], declared: readonly Declared[], parsed: readonly string[], unparsed: readonly string[]) {
+    this.parsed = new Set(parsed);
+    this.files = new Set([...parsed, ...unparsed]);
     const autoloads = projects.flatMap(autoloadsOf);
     this.psr4 = longestFirst(autoloads.flatMap((a) => a.psr4.map((m) => ({ prefix: m.prefix, paths: m.paths }))));
     this.psr0 = longestFirst(autoloads.flatMap((a) => a.psr0.map((m) => ({ prefix: m.prefix, paths: m.paths }))));
@@ -400,8 +418,13 @@ class Index {
     );
   }
 
-  /** The file a class is in, or why not; undefined when the project has no trace of it. */
-  findClass(qualified: string): PhpOutcome | undefined {
+  /**
+   * The file a class is in, or why not; undefined when the project has no
+   * trace of it. After Composer's rules, a `legacy` candidate is taken when
+   * it declares the class (or failed to parse and no file declares it), so a
+   * pattern can pick one of several declarations.
+   */
+  findClass(qualified: string, fromFile: string, legacy?: LegacyCandidates): PhpOutcome | undefined {
     for (const m of this.psr4) {
       if (!qualified.startsWith(m.prefix)) continue;
       const rest = `${qualified.slice(m.prefix.length).replace(/\\/g, "/")}.php`;
@@ -417,6 +440,10 @@ class Index {
     const key = qualified.toLowerCase();
     const mapped = this.classmap.get(key);
     if (mapped !== undefined) return { kind: "internal", target: mapped, via: "classmap" };
+    const declaring = this.classes.get(key);
+    for (const { target, via } of legacy?.(qualified, fromFile) ?? []) {
+      if (declaring === undefined ? !this.parsed.has(target) : declaring.includes(target)) return { kind: "internal", target, via };
+    }
     return this.declared(this.classes, key);
   }
 
@@ -493,11 +520,31 @@ class Collector {
   }
 }
 
+/**
+ * A class's legacy candidates, all of them project files: each file its
+ * autoloaders would include, then its PSR-0 path (`Vendor_Pkg_Class` is
+ * `Vendor/Pkg/Class.php`) searched as an include written in `fromFile` (the
+ * include-path roots, then its directory), then at the repository root.
+ */
+function legacyCandidates(autoloaders: PhpAutoloaders, includes: PhpIncludes, files: ReadonlySet<string>): LegacyCandidates {
+  return function* (qualified, fromFile) {
+    for (const target of autoloaders.candidates(qualified)) yield { target, via: "autoloader" };
+    const path = psr0Path(qualified);
+    const found = includes.resolveValue(fromFile, path);
+    if (found.kind === "internal") yield { target: found.target, via: "psr-0-path" };
+    if (files.has(path)) yield { target: path, via: "psr-0-path" };
+  };
+}
+
 /** Record the reference's edge or external in `out`, and say what it resolved to. */
-function resolveReference(index: Index, ref: PhpReference, out: Collector): PhpOutcome {
+function resolveReference(index: Index, ref: PhpReference, fromFile: string, legacy: LegacyCandidates, out: Collector): PhpOutcome {
   const { qualified } = ref;
   const found =
-    ref.kind === "class" ? index.findClass(qualified) : ref.kind === "function" ? index.findFunction(qualified) : index.findConstant(qualified);
+    ref.kind === "class"
+      ? index.findClass(qualified, fromFile, legacy)
+      : ref.kind === "function"
+        ? index.findFunction(qualified)
+        : index.findConstant(qualified);
   if (found?.kind === "internal") {
     out.file(found.target, qualified);
     return found;
@@ -586,16 +633,17 @@ export function preparePhpImports(
   unparsed: readonly string[] = [],
   includeSettings: PhpIncludeSettings = NO_INCLUDE_SETTINGS,
 ): PreparedPhpResolver {
-  const paths = [...files.map((f) => f.path), ...unparsed];
-  const index = new Index(projects, files.map(declarationsOf), paths);
+  const index = new Index(projects, files.map(declarationsOf), files.map((f) => f.path), unparsed);
   const includes = new PhpIncludes(files, index.files, includeSettings.includeConfigs);
+  const autoloaders = new PhpAutoloaders(files, includes);
+  const legacy = legacyCandidates(autoloaders, includes, index.files);
   const refs = new Map<string, FileReferences>();
   const outcomes = new Map<string, ResolvedPhpReference[]>();
   const includeOutcomes = new Map<string, ResolvedPhpInclude[]>();
   for (const file of files) {
     const written = readWrittenImports(file);
     const out = new Collector(file.path);
-    const resolved = readPhpReferences(file, written).map((reference) => ({ reference, outcome: resolveReference(index, reference, out) }));
+    const resolved = readPhpReferences(file, written).map((reference) => ({ reference, outcome: resolveReference(index, reference, file.path, legacy, out) }));
     const resolvedIncludes = written.filter(isInclude).map((include) => {
       const outcome = includes.resolve(file.path, include);
       if (outcome.kind === "internal") out.file(outcome.target, "*");
@@ -605,7 +653,7 @@ export function preparePhpImports(
     outcomes.set(file.path, resolved);
     includeOutcomes.set(file.path, resolvedIncludes);
   }
-  const notices = [...projects.flatMap((p) => p.notices), ...includeSettings.notices, ...includes.notices()].map((n) => `PHP: ${n}`);
+  const notices = [...projects.flatMap((p) => p.notices), ...includeSettings.notices, ...includes.notices(), ...autoloaders.notices()].map((n) => `PHP: ${n}`);
   return {
     resolve: (fromFile) => refs.get(fromFile) ?? { files: [], external: [] },
     outcomes: (fromFile) => outcomes.get(fromFile) ?? [],
