@@ -8,8 +8,12 @@ items:
     lastModified: "2026-11-14T05:22:12.617Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94b212f6-fac0-4adb-8a12-814d38e792f9":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T06:07:10.184Z"
-    activeIntervals: [{"start":"2026-11-14T06:07:10.184Z"}]
-    lastModified: "2026-11-14T06:07:10.943Z"
+    completedAt: "2026-11-14T06:21:15.739Z"
+    endedAt: "2026-11-14T06:21:15.739Z"
+    activeIntervals: [{"end":"2026-11-14T06:21:15.739Z","start":"2026-11-14T06:07:10.184Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added phpConfig to lang-kit with composer.json / root .php detection, repository-scoped .inc/.module/.install, skipOnlyBeside (vendor) and *.ext markers; wired into sourcevision inventory and walk, and the core/web language lists."
+    lastModified: "2026-11-14T06:21:15.739Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
