@@ -363,8 +363,14 @@ commands are not serialized; only the worker cap bounds those.
   machine id, not the hostname, which macOS changes with the network: `m-`
   and the first 16 hex characters of the SHA-256 of the id (Linux
   `/etc/machine-id`, else `/var/lib/dbus/machine-id`; macOS `IOPlatformUUID`;
-  Windows `MachineGuid`), or `h-` and a hash of the hostname when no id can be
-  read. Hosts sharing one ndx home (a network home) each get their own slot.
+  Windows `MachineGuid`), or `h-` and a hash of the hostname when the host has
+  no id source (the files or command are absent, or the command answers
+  without an id). A lookup that times out (10 s) or fails another way never
+  falls back to the hostname, since every other process on the host uses the
+  `m-` directory: that one validation runs without the slot and warns
+  `skipped the validation slot and ran without it: … could not read this
+  host's machine id (…)`, and the next validation retries the lookup. Hosts
+  sharing one ndx home (a network home) each get their own slot.
   The command hench runs inside the slot gets the slot's token as
   `NDX_VALIDATION_SLOT` and its directory as `NDX_VALIDATION_SLOT_DIR`; a
   slot acquire under them nests in that directory instead of waiting.

@@ -10,8 +10,23 @@
  * `<host>` is keyed on the machine id, not the hostname: on macOS without a
  * fixed HostName, `os.hostname()` follows DHCP or reverse DNS, so a run
  * started after a network change would find a different, free directory and
- * run beside the holder. The id is hashed, so no raw machine id lands on
- * disk. The hostname is only the fallback when no id can be read.
+ * run beside the holder. The id is hashed, so no raw machine id lands on disk.
+ *
+ * A lookup ends one of three ways, and only the first two are cached for the
+ * life of the process:
+ * - **found**: the machine id was read; the directory is `m-<hash>`.
+ * - **no source**: the platform has none, the files are absent (ENOENT), or
+ *   the command answered without an id; the directory is `h-<hash>` of the
+ *   hostname, the answer every process on this host gets.
+ * - **transient**: a timeout, an error other than ENOENT, or a non-zero exit
+ *   with no id. This rejects with `HostIdentityLookupError` and never falls
+ *   back to the hostname, because every other process on the host read the id
+ *   and uses `m-<hash>`. The caller runs that one validation without the slot
+ *   and warns; the next call retries the lookup.
+ *
+ * The lookup command may run for 10 s: on a loaded host (swapping, exactly
+ * when the slot matters) `ioreg` or `reg` can take seconds to start, and a
+ * lookup that succeeds runs once per process, so a long limit costs nothing.
  *
  * Kept apart from `validation-slot.ts` so the protocol module imports only
  * `node:` builtins; the ndx home's lookup order is llm-client's, reached
@@ -28,31 +43,52 @@ import { resolveNdxHome } from "../prd/llm-gateway.js";
 import { exec } from "./exec.js";
 import { VALIDATION_SLOT_DIRNAME } from "./validation-slot.js";
 
-/** What names this host: a stable machine id, or the hostname when none can be read. */
+/** What names this host: a stable machine id, or the hostname when the host has none. */
 export interface HostIdentity {
   kind: "machine" | "hostname";
   id: string;
 }
 
+/**
+ * How a lookup command ended: it exited (any code) with `stdout`, its binary
+ * does not exist, or it failed another way (timeout, kill, spawn error).
+ */
+export type LookupRun =
+  | { kind: "exited"; exitCode: number; stdout: string }
+  | { kind: "missing" }
+  | { kind: "failed"; reason: string };
+
 /** The platform lookups `readHostIdentity` uses; injectable for tests. */
 export interface HostIdentitySources {
   platform: NodeJS.Platform;
-  /** A file's contents; rejects when it cannot be read. */
+  /** A file's contents; rejects with the fs error (and its `code`) when it cannot be read. */
   readFile(path: string): Promise<string>;
-  /** A command's stdout, run without a shell; undefined when it fails or times out. */
-  run(file: string, args: string[]): Promise<string | undefined>;
+  /** Run a command without a shell. */
+  run(file: string, args: string[]): Promise<LookupRun>;
   hostname(): string;
+}
+
+/** A machine-id lookup that failed in a way that may not recur. Not cached; never the hostname. */
+export class HostIdentityLookupError extends Error {
+  constructor(lookup: string, reason: string) {
+    super(`could not read this host's machine id (${lookup}: ${reason}); the next validation retries it`);
+    this.name = "HostIdentityLookupError";
+  }
 }
 
 /** Linux machine-id files, in lookup order. */
 export const LINUX_MACHINE_ID_FILES = ["/etc/machine-id", "/var/lib/dbus/machine-id"] as const;
 
-/** How long a platform lookup command may run. */
-const LOOKUP_TIMEOUT_MS = 2_000;
+/** How long a platform lookup command may run; see the module header. */
+export const LOOKUP_TIMEOUT_MS = 10_000;
 
-async function runLookup(file: string, args: string[]): Promise<string | undefined> {
+async function runLookup(file: string, args: string[]): Promise<LookupRun> {
   const result = await exec(file, args, { cwd: tmpdir(), timeout: LOOKUP_TIMEOUT_MS });
-  return result.launched && result.exitCode === 0 ? result.stdout : undefined;
+  if (result.launched && result.exitCode !== null) {
+    return { kind: "exited", exitCode: result.exitCode, stdout: result.stdout };
+  }
+  if (!result.launched && errorCode(result.error) === "ENOENT") return { kind: "missing" };
+  return { kind: "failed", reason: result.error?.message ?? "ended without an exit code" };
 }
 
 const DEFAULT_SOURCES: HostIdentitySources = {
@@ -62,24 +98,39 @@ const DEFAULT_SOURCES: HostIdentitySources = {
   hostname,
 };
 
-async function readMachineIdFile(sources: HostIdentitySources, path: string): Promise<string | undefined> {
+/** One lookup's result: an id, no id on this host, or a failure to retry. */
+type MachineIdOutcome =
+  | { kind: "found"; id: string }
+  | { kind: "none" }
+  | { kind: "transient"; lookup: string; reason: string };
+
+const NONE: MachineIdOutcome = { kind: "none" };
+
+function errorCode(err: unknown): unknown {
+  return err && typeof err === "object" ? (err as { code?: unknown }).code : undefined;
+}
+
+async function readMachineIdFile(sources: HostIdentitySources, path: string): Promise<MachineIdOutcome> {
   let id: string;
   try {
     id = (await sources.readFile(path)).trim();
-  } catch {
-    // Missing or unreadable: the caller tries the next file, then the hostname.
-    return undefined;
+  } catch (err) {
+    const code = errorCode(err);
+    if (code === "ENOENT" || code === "ENOTDIR") return NONE;
+    return { kind: "transient", lookup: `reading ${path}`, reason: err instanceof Error ? err.message : String(err) };
   }
   // An unset id ("" or "uninitialized" during first boot) is not one.
-  return /^[0-9a-f]{32}$/i.test(id) ? id : undefined;
+  return /^[0-9a-f]{32}$/i.test(id) ? { kind: "found", id } : NONE;
 }
 
-async function linuxMachineId(sources: HostIdentitySources): Promise<string | undefined> {
+async function linuxMachineId(sources: HostIdentitySources): Promise<MachineIdOutcome> {
+  let transient: MachineIdOutcome | undefined;
   for (const path of LINUX_MACHINE_ID_FILES) {
-    const id = await readMachineIdFile(sources, path);
-    if (id) return id;
+    const outcome = await readMachineIdFile(sources, path);
+    if (outcome.kind === "found") return outcome;
+    if (outcome.kind === "transient") transient ??= outcome;
   }
-  return undefined;
+  return transient ?? NONE;
 }
 
 async function commandMatch(
@@ -87,12 +138,17 @@ async function commandMatch(
   file: string,
   args: string[],
   pattern: RegExp,
-): Promise<string | undefined> {
-  const stdout = await sources.run(file, args);
-  return (stdout && pattern.exec(stdout)?.[1]?.trim()) || undefined;
+): Promise<MachineIdOutcome> {
+  const lookup = `running ${[file, ...args].join(" ")}`;
+  const run = await sources.run(file, args);
+  if (run.kind === "missing") return NONE;
+  if (run.kind === "failed") return { kind: "transient", lookup, reason: run.reason };
+  const id = pattern.exec(run.stdout)?.[1]?.trim();
+  if (id) return { kind: "found", id };
+  return run.exitCode === 0 ? NONE : { kind: "transient", lookup, reason: `exited with code ${run.exitCode}` };
 }
 
-function machineId(sources: HostIdentitySources): Promise<string | undefined> {
+function machineId(sources: HostIdentitySources): Promise<MachineIdOutcome> {
   switch (sources.platform) {
     case "linux":
       return linuxMachineId(sources);
@@ -111,23 +167,47 @@ function machineId(sources: HostIdentitySources): Promise<string | undefined> {
         /MachineGuid\s+REG_SZ\s+(\S+)/i,
       );
     default:
-      return Promise.resolve(undefined);
+      return Promise.resolve(NONE);
   }
 }
 
-/** This host's identity, read now: its machine id, else its hostname. */
+/**
+ * This host's identity, read now: its machine id, else its hostname when the
+ * host has none. Rejects with `HostIdentityLookupError` on a transient failure.
+ */
 export async function readHostIdentity(sources: HostIdentitySources = DEFAULT_SOURCES): Promise<HostIdentity> {
-  const id = await machineId(sources);
-  return id ? { kind: "machine", id } : { kind: "hostname", id: sources.hostname() };
+  const outcome = await machineId(sources);
+  switch (outcome.kind) {
+    case "found":
+      return { kind: "machine", id: outcome.id };
+    case "none":
+      return { kind: "hostname", id: sources.hostname() };
+    case "transient":
+      throw new HostIdentityLookupError(outcome.lookup, outcome.reason);
+  }
 }
 
-let cachedIdentity: Promise<HostIdentity> | undefined;
-
-/** This host's identity, read once per process. */
-export function hostIdentity(): Promise<HostIdentity> {
-  cachedIdentity ??= readHostIdentity();
-  return cachedIdentity;
+/**
+ * `readHostIdentity(sources)`, kept once it resolves. A rejected lookup is
+ * forgotten, so the next call retries it.
+ */
+export function createHostIdentityCache(sources: HostIdentitySources): () => Promise<HostIdentity> {
+  let cached: Promise<HostIdentity> | undefined;
+  return () => {
+    if (!cached) {
+      const attempt = readHostIdentity(sources);
+      cached = attempt;
+      // The caller sees the rejection through `attempt`; this only forgets it.
+      attempt.then(undefined, () => {
+        if (cached === attempt) cached = undefined;
+      });
+    }
+    return cached;
+  };
 }
+
+/** This host's identity, read once per process; a transient failure is retried on the next call. */
+export const hostIdentity: () => Promise<HostIdentity> = createHostIdentityCache(DEFAULT_SOURCES);
 
 /**
  * The host directory's name: `m-` (machine id) or `h-` (hostname) and the
