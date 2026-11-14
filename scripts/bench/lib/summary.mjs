@@ -89,6 +89,7 @@ export function renderSummaryMarkdown(rows, meta) {
   const lines = [
     "# Validation benchmark",
     "",
+    ...(meta.stoppedBy ? [`Interrupted by ${meta.stoppedBy}: partial results. The batch running at the time is left out.`, ""] : []),
     `- Commit: \`${meta.commit}\``,
     `- Machine: ${meta.machine}`,
     `- Started: ${meta.startedAt}; finished: ${meta.finishedAt}`,

@@ -269,7 +269,14 @@ items:
     lastModified: "2026-11-13T23:17:30.248Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a746220b-6a9a-4f2c-97cc-54c1790cd9bb":
-    lastModified: "2026-11-14T06:52:06.935Z"
+    status: "completed"
+    startedAt: "2026-11-14T06:52:25.910Z"
+    completedAt: "2026-11-14T06:55:31.230Z"
+    endedAt: "2026-11-14T06:55:31.230Z"
+    activeIntervals: [{"end":"2026-11-14T06:55:31.230Z","start":"2026-11-14T06:52:25.910Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "4a36e28e5: new scripts/bench/lib/stop.mjs (sleep, createSignalHandler, throwIfStopped); runBatch rejects on abort; interrupted line in summary.md; uncaughtException SIGKILL; Windows-safe test path; TESTING.md wording."
+    lastModified: "2026-11-14T06:55:31.230Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adb92a12-af68-4f9a-b28b-310fb0ea9980":
     status: "completed"

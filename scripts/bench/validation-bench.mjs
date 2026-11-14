@@ -26,7 +26,9 @@
  * The idle check runs once, at start: a run started later is not detected.
  *
  * Every worktree it created is removed on exit, on SIGINT/SIGTERM and on
- * error, unless `--keep`.
+ * error, unless `--keep`. A first Ctrl-C sends SIGTERM to the running suites
+ * and SIGKILL 10 s later; a second sends SIGKILL at once. The batch running at
+ * the time is not recorded.
  */
 
 import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -62,6 +64,7 @@ import {
 } from "./lib/samples.mjs";
 import { createLineCollector, parseGateOutput } from "./lib/gate-output.mjs";
 import { renderSummaryMarkdown, summarize } from "./lib/summary.mjs";
+import { createSignalHandler, sleep, throwIfStopped } from "./lib/stop.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SAMPLE_INTERVAL_MS = 2_000;
@@ -126,12 +129,7 @@ function removeWorktrees() {
   if (createdWorktrees.length > 0) console.log(`Removed ${createdWorktrees.length} bench worktree(s).`);
 }
 
-function onSignal(signal) {
-  if (abort.signal.aborted) return;
-  console.error(`\n${signal}: stopping the benchmark and removing its worktrees…`);
-  abort.abort(signal);
-  for (const child of activeChildren.keys()) killTree(child, "SIGTERM");
-}
+const onSignal = createSignalHandler({ abort, children: () => activeChildren.keys(), killTree, graceMs: KILL_GRACE_MS });
 
 // ---------------------------------------------------------------------------
 // Child processes
@@ -158,7 +156,7 @@ function runLogged(binary, args, { cwd, logPath, env = process.env }) {
 }
 
 function throwIfAborted() {
-  if (abort.signal.aborted) throw new Error(`Stopped by ${abort.signal.reason}.`);
+  throwIfStopped(abort.signal);
 }
 
 // ---------------------------------------------------------------------------
@@ -374,16 +372,6 @@ function keepTestLogs(record, worktree, out) {
   record.testLogs = kept;
 }
 
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    const timer = setTimeout(resolvePromise, ms);
-    abort.signal.addEventListener("abort", () => {
-      clearTimeout(timer);
-      resolvePromise();
-    }, { once: true });
-  });
-}
-
 async function loadSlotApi(slotCases) {
   if (!existsSync(HENCH_SLOT_MODULE) || !existsSync(HENCH_SLOT_DIR_MODULE)) {
     throw new BenchUsageError(slotModuleMissingMessage(slotCases, HENCH_SLOT_MODULE));
@@ -498,7 +486,7 @@ async function main() {
           const batchRecord = { batchId: batch.batchId, caseId: batch.caseId, fixture: batch.fixture, repeat, worktrees: batch.worktrees, startMs: batch.startMs, endMs: batch.endMs };
           appendFileSync(paths.batches, `${JSON.stringify(batchRecord)}\n`);
           batches.push(batchRecord);
-          await sleep(COOLDOWN_MS);
+          await sleep(COOLDOWN_MS, abort.signal);
         }
       }
     }
@@ -521,6 +509,12 @@ async function main() {
 
 process.on("SIGINT", () => onSignal("SIGINT"));
 process.on("SIGTERM", () => onSignal("SIGTERM"));
+process.on("uncaughtException", (err) => {
+  // Kill the runs before the `exit` hook removes the worktrees they run in.
+  for (const child of activeChildren.keys()) killTree(child, "SIGKILL");
+  console.error(err?.stack ?? err);
+  process.exit(1);
+});
 process.on("exit", removeWorktrees);
 
 main().then(

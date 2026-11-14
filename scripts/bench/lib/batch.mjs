@@ -6,6 +6,7 @@
 
 import { CASES, caseEnv } from "./plan.mjs";
 import { settleAll } from "./settle.mjs";
+import { throwIfStopped } from "./stop.mjs";
 
 /**
  * @typedef {object} LaunchResult what the caller's run reports; merged into the record
@@ -76,5 +77,8 @@ export async function runBatch({ batch, worktrees, slotApi, signal, baseEnv, lau
   };
 
   // Every run must have exited before an error reaches cleanup, which removes their worktrees.
-  return settleAll(worktrees.slice(0, batch.worktrees).map((worktree, i) => one(worktree, i + 1)));
+  const records = await settleAll(worktrees.slice(0, batch.worktrees).map((worktree, i) => one(worktree, i + 1)));
+  // Runs killed by a Ctrl-C would read as short failures: drop the batch, as a slot case's rejection does.
+  throwIfStopped(signal);
+  return records;
 }
