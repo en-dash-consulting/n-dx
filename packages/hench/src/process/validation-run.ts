@@ -37,7 +37,7 @@ export interface ValidationSlotRunOptions {
   onWait?: (wait: ValidationSlotWait) => void;
   /** Poll interval while waiting, for tests. */
   pollIntervalMs?: number;
-  /** Called when the slot could not be released after the command ran. */
+  /** Called with each slot warning: not taken (the command ran without it), child not recorded, not released. */
   onWarning?: (warning: string) => void;
 }
 
@@ -70,10 +70,11 @@ export type WithValidationSlot = <O extends ValidationSlotExecOptions>(options: 
  * `withSlot`; pass every validation command's exec options through it, after
  * sanitizing the environment, as `withTestMaxWorkers` is. `timing` is set only
  * when the slot was used. The slot itself never makes this throw: a wait
- * given up on, or a slot that could not be taken, is `ok: false`; a child
- * that could not be recorded, or a slot that could not be released, is
- * `slotWarning` beside the command's result. Only an error `fn` throws
- * propagates.
+ * given up on is `ok: false` and the command does not run. A slot that could
+ * not be taken runs the command without it. That, a child that could not be
+ * recorded, or a slot that could not be released, is `slotWarning` beside
+ * the command's result (and passed to `onWarning`). Only an error `fn`
+ * throws propagates.
  */
 export async function runInValidationSlot<T>(
   slot: ValidationSlotRunOptions | undefined,
@@ -82,7 +83,6 @@ export async function runInValidationSlot<T>(
   if (!slot) return { ok: true, value: await fn((options) => options) };
 
   let lease: ValidationSlotLease;
-  const queueStarted = Date.now();
   try {
     lease = await acquireValidationSlot({
       slotDir: slot.slotDir,
@@ -99,13 +99,14 @@ export async function runInValidationSlot<T>(
         error: `stopped waiting for the validation slot after ${formatSeconds(err.queueWaitMs)} (${describeReason(err.cause)})`,
       };
     }
-    // A slot directory that cannot be created or written (read-only ndx home,
-    // EACCES, ENOSPC). Fails closed: nothing ran, and the caller reports it.
-    return {
-      ok: false,
-      queueMs: Date.now() - queueStarted,
-      error: `could not take the validation slot in ${slot.slotDir}: ${describeReason(err)}`,
-    };
+    // A slot that cannot be taken (EACCES, EROFS or ENOSPC under the ndx home,
+    // no link() support, a directory where holder.json belongs). The command
+    // runs without it: a gate that skipped its tests would let the run
+    // continue unverified, while running unserialized only costs load.
+    const slotWarning =
+      `skipped the validation slot and ran without it: could not take it in ${slot.slotDir}: ${describeReason(err)}`;
+    slot.onWarning?.(slotWarning);
+    return { ok: true, value: await fn((options) => options), slotWarning };
   }
 
   // Records run in spawn order; release waits for them, so a late record

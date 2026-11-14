@@ -360,7 +360,10 @@ commands are not serialized; only the worker cap bounds those.
   `executionMs`.
 - **Where is it?** `<ndx home>/validation-slot/` (`~/.ndx/validation-slot/` by
   default). `holder.json` exists exactly while the slot is held and names the
-  pid, project and start time.
+  pid, project and start time. If the directory cannot be used (permissions,
+  a read-only or full disk, no hard links), hench runs the command without the
+  slot and warns `skipped the validation slot and ran without it`, naming the
+  directory and the error.
 - **Stale holders.** A record whose process and test child are dead, that does
   not parse, or that predates a reboot is reclaimed automatically by the next
   waiter. So is one naming the waiter's own pid with a token it does not hold,
