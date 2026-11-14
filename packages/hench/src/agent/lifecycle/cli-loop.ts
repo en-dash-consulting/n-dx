@@ -33,7 +33,6 @@ import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { createVendorCliSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
 import { trackVendorProcess, terminateTrackedVendorProcess, describeAbortReason } from "../../process/run-interrupt.js";
-import { withTestMaxWorkers } from "../../process/test-workers.js";
 import { createSpendGate, priceRunUsd } from "./spend-cap.js";
 import type { SpendCapExceeded, SpendGate } from "./spend-cap.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
@@ -109,8 +108,7 @@ import {
   resolveLLMVendor,
   withVendorOverride,
   resolveVendorCliPath,
-  resolveVendorCliEnv,
-  cliEnvReportLine,
+  resolveSessionCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
@@ -2657,12 +2655,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const cliBinary = resolveVendorCliPath(llmConfig, config);
   // The session's shell inherits this, so the agent's own test runs are
   // capped like the gate's.
-  const cliEnv = withTestMaxWorkers(
-    resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
-      detail(cliEnvReportLine("CLI environment", names, kind), { captureWhenQuiet: true });
-    }),
-    config.testGate?.maxWorkers,
-  );
+  const cliEnv = resolveSessionCliEnv(llmConfig, config, "CLI environment", (line) => {
+    detail(line, { captureWhenQuiet: true });
+  });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
   // agent's PRD writes land in the worktree the run is executing in. Without
@@ -2736,12 +2731,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         vendor: reviewVendor,
         cliBinary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
         cliEnv: pairVendor
-          ? withTestMaxWorkers(
-            resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names, kind) => {
-              detail(cliEnvReportLine(`${pairVendor} reviewer environment`, names, kind), { captureWhenQuiet: true });
-            }),
-            config.testGate?.maxWorkers,
-          )
+          ? resolveSessionCliEnv({ ...llmConfig, vendor: pairVendor }, config, `${pairVendor} reviewer environment`, (line) => {
+            detail(line, { captureWhenQuiet: true });
+          })
           : cliEnv,
         ...(pairVendor
           ? {
