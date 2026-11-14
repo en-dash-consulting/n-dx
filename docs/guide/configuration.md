@@ -280,7 +280,7 @@ Configuration is stored in `.hench/config.json`.
 
 The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
 
-`hench.testGate.maxWorkers` (a positive integer) caps the vitest workers of the test commands hench runs. Unset by default, which changes nothing. When set, hench passes it as `NDX_TEST_MAX_WORKERS` to the test gate and its re-run, the post-task tests, the completion test run and the agent's shell, so a suite the agent starts is capped too. It only helps in a project whose vitest configs read that variable (n-dx's do). An invalid value is refused by `ndx config`.
+`hench.testGate.maxWorkers` (a positive integer) caps the vitest workers of the test commands hench runs. Unset by default, which changes nothing. When set, hench passes it as `NDX_TEST_MAX_WORKERS` to the test gate and its re-run, the post-task tests, the completion test run and the agent's shell, so a suite the agent starts is capped too. A lower `NDX_TEST_MAX_WORKERS` already in the environment wins. It only helps in a project whose vitest configs read that variable (n-dx's do). An invalid value is refused by `ndx config`.
 
 ```sh
 ndx config hench.testGate.maxWorkers 2 .

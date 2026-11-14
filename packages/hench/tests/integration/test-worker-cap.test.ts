@@ -16,12 +16,14 @@ import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
  * `NDX_TEST_MAX_WORKERS`, and an unset cap leaves the environment alone.
  *
  * Each command is a probe that exits 0 only when it sees the expected value.
- * The cap used is 3, so a parent that already exports a cap (a hench gate
- * running this suite exports 2) cannot make the "set" cases pass; the "unset"
- * cases expect whatever the parent has, read and never written.
+ * The lower of the cap and a valid inherited value wins, so the cap used is 1:
+ * it is the result whatever the parent exports, and a parent that already
+ * exports a higher cap (a hench gate running this suite exports 2) cannot make
+ * the "set" cases pass. The "unset" cases expect whatever the parent has, read
+ * and never written.
  */
 
-const CAP = 3;
+const CAP = 1;
 const INHERITED = process.env[TEST_MAX_WORKERS_ENV];
 
 function probe(expected: string | undefined): string {

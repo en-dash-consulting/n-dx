@@ -331,7 +331,9 @@ A developer running several worktrees at once can export it in the shell
 profile (`export NDX_TEST_MAX_WORKERS=2`) so their suites together do not claim
 several times the machine. Hench sets it for the commands it runs from
 `hench.testGate.maxWorkers` (see
-[Configuration](docs/guide/configuration.md#hench-configuration)); a new vitest
+[Configuration](docs/guide/configuration.md#hench-configuration)). The lower
+value wins: an exported cap below the configured one is kept, so repository
+config can never raise it. A new vitest
 config must read it with `testMaxWorkers()` at the top level of `test`.
 
 ## Timeout Guardrails
