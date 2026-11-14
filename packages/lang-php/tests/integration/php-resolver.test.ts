@@ -3,7 +3,9 @@
  * PSR-4 with two paths and an autoload-dev prefix, PSR-0 with an
  * underscore-era prefix, a classmap with an excluded directory, a lock file
  * naming the package behind an external, and a file with two braced
- * namespaces. Runs the pack entry; skips when the grammar is not built.
+ * namespaces; and `tests/fixtures/php-shared-root`, a project that shares its
+ * root namespace with a library. Runs the pack entry; skips when the grammar
+ * is not built.
  */
 
 import { join } from "node:path";
@@ -13,6 +15,7 @@ import { createTreeSitterRunner, listFixtureFiles, skipUnlessGrammar, type PackS
 import { pack, phpGrammarPath, phpPack, preparePhpImports, readPhpResolveProjects } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-composer");
+const sharedRoot = join(import.meta.dirname, "..", "fixtures", "php-shared-root");
 const files = (): string[] => listFixtureFiles(dir, [...phpPack.config.extensions]);
 
 async function facts(): Promise<Map<string, FileFacts>> {
@@ -23,6 +26,27 @@ async function facts(): Promise<Map<string, FileFacts>> {
 }
 
 const edges = (f: FileFacts | undefined): string[] => (f?.imports?.files ?? []).map((r) => `${r.to} ${r.symbols.join(",")}`);
+
+/** `form qualified outcome` for every reference of a file in the fixture at `root`. */
+async function outcomesIn(root: string): Promise<(path: string) => string[]> {
+  const paths = listFixtureFiles(root, [...phpPack.config.extensions]);
+  const runner = createTreeSitterRunner();
+  const parsed: PackSourceFile[] = [];
+  try {
+    for (const path of paths) {
+      const result = await runner.parseFile({ pack: phpPack, grammarPath: phpGrammarPath() }, join(root, path));
+      if (result.status === "parsed") parsed.push({ path, captures: result.captures });
+    }
+  } finally {
+    runner.dispose();
+  }
+  const prepared = preparePhpImports(await readPhpResolveProjects(root, paths), parsed);
+  return (path) =>
+    prepared.outcomes(path).map(({ reference, outcome }) => {
+      const detail = outcome.kind === "internal" ? outcome.via : outcome.kind === "unresolved" ? outcome.reason : outcome.kind;
+      return `${reference.form} ${reference.qualified} ${detail}`;
+    });
+}
 
 describe("php namespace resolver", () => {
   it("resolves use imports and class references through PSR-4, PSR-0, the classmap and declared names", async (ctx) => {
@@ -78,22 +102,7 @@ describe("php namespace resolver", () => {
 
   it("says why a reference is not an edge", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
-    const runner = createTreeSitterRunner();
-    const parsed: PackSourceFile[] = [];
-    try {
-      for (const path of files()) {
-        const result = await runner.parseFile({ pack: phpPack, grammarPath: phpGrammarPath() }, join(dir, path));
-        if (result.status === "parsed") parsed.push({ path, captures: result.captures });
-      }
-    } finally {
-      runner.dispose();
-    }
-    const prepared = preparePhpImports(await readPhpResolveProjects(dir, files()), parsed);
-    const outcomes = (path: string) =>
-      prepared.outcomes(path).map(({ reference, outcome }) => {
-        const detail = outcome.kind === "internal" ? outcome.via : outcome.kind === "unresolved" ? outcome.reason : outcome.kind;
-        return `${reference.form} ${reference.qualified} ${detail}`;
-      });
+    const outcomes = await outcomesIn(dir);
     expect(outcomes("src/Order.php")).toEqual(
       expect.arrayContaining([
         "use Monolog\\Logger external",
@@ -115,5 +124,30 @@ describe("php namespace resolver", () => {
     expect(outcomes("src/Order.php").some((o) => / (self|static)$|\\(self|static) /i.test(o))).toBe(false);
     expect(outcomes("tests/OrderTest.php")).toContain("new Acme\\Shop\\Tests\\Fixtures\\Thing internal-not-found");
     expect(outcomes("regions.php")).toEqual(["use Acme\\Shop\\Money psr-4", "extends Acme\\Shop\\Money psr-4", "extends Acme\\Shop\\Two\\Cash internal-not-found"]);
+  });
+
+  it("counts a name as the project's only by its whole namespace or an autoload prefix", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    // php-shared-root declares Acme\Billing (no autoload prefix covers it), autoloads Acme\Tools\
+    // and Zend_, and uses Acme\Shared from a library under the same root namespace.
+    const outcomes = (await outcomesIn(sharedRoot))("src/Billing/Invoice.php");
+    expect(outcomes).toEqual([
+      "use Acme\\Shared\\Money external",
+      "use Acme\\Tools\\Clock psr-4",
+      "type Acme\\Shared\\Money external",
+      "new Acme\\Billing\\Missing internal-not-found",
+      "new Acme\\Tools\\Gone internal-not-found",
+      "new Zend_Db psr-0",
+      "new Zend_Gdata_YouTube internal-not-found",
+      "new Acme\\Shared\\Money external",
+      "static Acme\\Tools\\Clock psr-4",
+    ]);
+    const result = await pack.analyzeProject({
+      projectDir: sharedRoot,
+      files: listFixtureFiles(sharedRoot, [...phpPack.config.extensions]),
+      kinds: ["imports"],
+    });
+    const invoice = result.facts.find((f) => f.path === "src/Billing/Invoice.php");
+    expect(invoice?.imports?.external).toEqual([{ package: "php:Acme", symbols: ["Acme\\Shared\\Money"] }]);
   });
 });
