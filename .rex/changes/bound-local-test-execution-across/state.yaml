@@ -185,7 +185,14 @@ items:
     lastModified: "2026-11-12T17:54:26.294Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2aa9f8c-556b-453f-bc9d-7fa9af4fa7a2":
-    lastModified: "2026-11-14T05:13:45.922Z"
+    status: "completed"
+    startedAt: "2026-11-14T05:21:06.668Z"
+    completedAt: "2026-11-14T05:25:10.913Z"
+    endedAt: "2026-11-14T05:25:10.913Z"
+    activeIntervals: [{"end":"2026-11-14T05:25:10.913Z","start":"2026-11-14T05:21:06.668Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runInValidationSlot runs the command without the slot on a non-abort acquire error and returns a slotWarning naming the slot dir (also via onWarning); all four call sites go through it. Commit 098541acc."
+    lastModified: "2026-11-14T05:25:10.913Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "feb4f772-7b1a-4273-8365-a618fb1bdf8e":
     status: "completed"

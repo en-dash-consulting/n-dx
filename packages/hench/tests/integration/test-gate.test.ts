@@ -406,6 +406,20 @@ describeNeedsPosixShell("validation commands inside the host slot", () => {
     expect(run.slotWarning).toContain(unwritableSlotDir());
   });
 
+  it("runs nothing when the run was interrupted before a slot that cannot be taken failed", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("interrupted"));
+    const warnings: string[] = [];
+    const result = await runTestGate({
+      projectDir, filesChanged: ["src/a.ts"], testCommand: writesRan(0),
+      validationSlot: { ...unwritableSlot(warnings), signal: controller.signal },
+    });
+    expect(result.ran).toBe(false);
+    expect(result.error).toMatch(/validation slot.*interrupted/);
+    expect(existsSync(join(projectDir, "ran"))).toBe(false);
+    expect(warnings).toEqual([]);
+  });
+
   it.each([
     { code: 0, passed: true },
     { code: 1, passed: false },
