@@ -363,7 +363,8 @@ commands are not serialized; only the worker cap bounds those.
   pid, project and start time.
 - **Stale holders.** A record whose process and test child are dead, that does
   not parse, or that predates a reboot is reclaimed automatically by the next
-  waiter. So is one naming the waiter's own pid with a token it does not hold.
+  waiter. So is one naming the waiter's own pid with a token it does not hold,
+  unless its test child is still alive.
   Do not delete the directory by hand while a run is active.
 - **A wedged slot.** If a holder died without releasing and the OS gave its
   pid to an unrelated process (Windows reuses pids within moments), every run

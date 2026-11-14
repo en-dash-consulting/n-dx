@@ -4,10 +4,14 @@ items:
     lastModified: "2026-11-12T17:28:27.063Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1bb5db41-3b76-446f-92b9-dda76a5f0b54":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T05:14:33.048Z"
-    activeIntervals: [{"start":"2026-11-14T05:14:33.048Z"}]
-    lastModified: "2026-11-14T05:14:33.811Z"
+    completedAt: "2026-11-14T05:20:57.400Z"
+    endedAt: "2026-11-14T05:20:57.400Z"
+    activeIntervals: [{"end":"2026-11-14T05:20:57.400Z","start":"2026-11-14T05:14:33.048Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rule 5a: holder.json/reclaim.lock naming this pid with a token this process does not hold is stale (per-process live lease and reclaim token sets; replaces orphanedTokens). Wait line names holder.json path; TESTING.md + docs/packages/hench.md explain clearing a wedged slot; deadline wording removed; hench patch changeset."
+    lastModified: "2026-11-14T05:20:57.400Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ec3f9f1-5362-4345-8cce-0b7910813b27":
     lastModified: "2026-11-14T05:13:49.076Z"

@@ -275,13 +275,21 @@ describe("acquireValidationSlot — this process's own pid (rule 5a)", () => {
   // with a token this process never held.
 
   it("reclaims at once a record naming this pid with a token this process does not hold", async () => {
-    const live = liveChild();
-    await writeHolder({ pid: process.pid, token: "previous-owner", child: { pid: live.pid!, group: false } });
+    await writeHolder({ pid: process.pid, token: "previous-owner", child: { pid: deadPid(), group: false } });
     const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: () => {
       throw new Error("a leftover under this process's pid must not be waited on");
     } });
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
     await lease.release();
+  });
+
+  it("still waits on such a record while its recorded test child runs, reporting its holder as exited", async () => {
+    const live = liveChild();
+    const raw = await writeHolder({ pid: process.pid, token: "previous-owner", child: { pid: live.pid!, group: false } });
+    const { waits, error } = await waitThenAbort();
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(waits[0].holderAlive).toBe(false);
+    expect(await holderRaw()).toBe(raw);
   });
 
   it("still waits on a record naming this pid with one of its live lease tokens, and nests with that token", async () => {
