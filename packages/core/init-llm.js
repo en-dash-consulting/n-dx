@@ -33,17 +33,16 @@ const SUPPORTED_PROVIDERS = Object.values(LLM_PROVIDER);
  * Legacy model IDs treated as "known" during init so `validateInitFlags` does
  * not warn about model IDs shipped by prior versions.
  *
- * The `codex` list must stay in sync with the keys of `LEGACY_CODEX_MODEL_ALIASES`
- * in `packages/llm-client/src/config.ts` — that is where these IDs are actually
- * resolved to current models at runtime. This tier cannot import the foundation
- * layer, so the sets are duplicated by design.
+ * These IDs stay literal at runtime. Availability depends on the selected
+ * provider and authentication; being absent from the current picker does not
+ * make an intentional API model pin invalid.
  */
 const LEGACY_CATALOG_MODEL_ALIASES = {
   [LLM_PROVIDER.CODEX]: [
     "gpt-5-codex",
     "gpt-5.1-codex-max",
     "gpt-5.1-codex-mini",
-    // Retired / retiring from Codex — see LEGACY_CODEX_MODEL_ALIASES.
+    // Older IDs may remain available with API-key authentication.
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.3-codex",

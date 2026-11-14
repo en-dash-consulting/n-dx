@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
@@ -17,6 +17,18 @@ describe("loadLLMConfig", () => {
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
     await rm(ndxHome, { recursive: true, force: true });
+  });
+
+  it.each(["api", "cli", "auto"])("leaves stored Codex pins literal under %s auth", async auth => {
+    const llm = { vendor: "codex", model: "gpt-5.4", reviewModel: "gpt-5.2",
+      codex: { auth, model: "gpt-5.3-codex", lightModel: "gpt-5.4-mini", reviewModel: "gpt-5-codex" },
+      tiers: { codex: { light: "gpt-5.4-mini", standard: "gpt-5.4", heavy: "gpt-5.2" } } };
+    const path = join(tmpDir, ".n-dx.json");
+    const original = JSON.stringify({ llm });
+    await writeFile(path, original);
+    recordRepoTrust(tmpDir, { ndxHome });
+    expect(await loadLLMConfig(tmpDir, { trust: { ndxHome } })).toMatchObject(llm);
+    expect(await readFile(path, "utf-8")).toBe(original);
   });
 
   it("returns empty config when .n-dx.json is missing", async () => {
@@ -63,7 +75,7 @@ describe("loadLLMConfig", () => {
 
     const restricted = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
     expect(restricted.vendor).toBe("codex");
-    // The model survives (normalized as every codex model is); the binary,
+    // The model survives literally; the binary,
     // endpoint, key-variable and host choices do not.
     expect(Object.keys(restricted.codex ?? {})).toEqual(["model"]);
     expect(restricted.claude).toBeUndefined();
@@ -302,7 +314,7 @@ describe("loadLLMConfig", () => {
     expect(cfg.claude?.model).toBe("claude-sonnet-4-6");
   });
 
-  it("normalizes legacy codex aliases when read from top-level llm.model", async () => {
+  it("preserves older Codex pins when read from top-level llm.model", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
@@ -315,8 +327,7 @@ describe("loadLLMConfig", () => {
     );
 
     const cfg = await loadLLMConfig(tmpDir);
-    // gpt-5-codex is a legacy alias normalized to NEWEST_MODELS.codex
-    expect(cfg.model).toBe("gpt-5.6-terra");
+    expect(cfg.model).toBe("gpt-5-codex");
   });
 
   it("ignores non-string and empty top-level llm.model values", async () => {
@@ -399,8 +410,8 @@ describe("loadLLMConfig", () => {
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.claude?.reviewModel).toBe("opus");
     expect(cfg.google?.reviewModel).toBe("gemini-pro");
-    expect(cfg.codex?.reviewModel).toBeTruthy();
-    expect(cfg.reviewModel).toBeTruthy();
+    expect(cfg.codex?.reviewModel).toBe("gpt-5.4");
+    expect(cfg.reviewModel).toBe("gpt-5.4");
   });
 
   it("ignores an empty or non-string reviewModel", async () => {

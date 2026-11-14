@@ -104,40 +104,6 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
 };
 
 /**
- * Legacy Codex model IDs that map to current canonical models.
- *
- * Keys are model IDs shipped by prior versions (the old `gpt-5-codex` /
- * `gpt-5.1-codex-*` brand names) or since retired by OpenAI; values are the
- * current model they resolve to. `normalizeCodexModel()` applies this mapping
- * when reading config, so an existing `.n-dx.json` pinned to a dead model keeps
- * working after an upgrade instead of failing at request time.
- *
- * `gpt-5.4` and `gpt-5.4-mini` retire from Codex on 2026-08-31 for
- * ChatGPT-authenticated sessions (they remain on the OpenAI API and on Codex
- * sessions authenticated with an API key). OpenAI's documented replacements are
- * `gpt-5.6-terra` and `gpt-5.6-luna` respectively. `gpt-5.3-codex` and
- * `gpt-5.2` are already unavailable when signing in with ChatGPT.
- *
- * `gpt-5.5` is deliberately absent — it is still supported and remains a
- * selectable catalog entry rather than being silently rewritten.
- *
- * Keep in sync with the orchestration-tier legacy list in
- * `packages/core/init-llm.js` (`LEGACY_CATALOG_MODEL_ALIASES.codex`), which
- * treats these same IDs as "known" during `ndx init`. The two tiers cannot
- * import each other, so the sets are duplicated by design.
- */
-const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
-  "gpt-5-codex": NEWEST_MODELS.codex,
-  "gpt-5.1-codex-max": NEWEST_MODELS.codex,
-  "gpt-5.1-codex-mini": TIER_MODELS.codex.light,
-  // Retired / retiring from Codex — remap to OpenAI's stated replacements.
-  "gpt-5.4": NEWEST_MODELS.codex,
-  "gpt-5.4-mini": TIER_MODELS.codex.light,
-  "gpt-5.3-codex": NEWEST_MODELS.codex,
-  "gpt-5.2": NEWEST_MODELS.codex,
-};
-
-/**
  * Maximum safe prompt size per vendor (in characters).
  *
  * Used by the CLI loop to bound the brief text before sending to the
@@ -354,7 +320,9 @@ export function resolveModel(model: string): string {
 }
 
 export function normalizeCodexModel(model: string): string {
-  return LEGACY_CODEX_MODEL_ALIASES[model] ?? model;
+  // Availability depends on authentication and provider. A model ID is an
+  // operator pin, not an alias for a moving default; let the provider validate it.
+  return model;
 }
 
 /**

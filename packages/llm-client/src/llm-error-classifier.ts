@@ -317,6 +317,21 @@ export function classifyLLMError(
   const forInputIdx = cleanedMessage.search(/\bfor input:/i);
   const authCheckMessage = forInputIdx !== -1 ? cleanedMessage.slice(0, forInputIdx) : cleanedMessage;
 
+  // Use the provider's authentication-specific rejection, never a static
+  // retirement list or an inference from the presence/absence of an API key.
+  if (vendor === LLM_VENDOR.CODEX &&
+      /model[^\n]*(?:not supported|unavailable|not available)[^\n]*chatgpt/i.test(authCheckMessage)) {
+    return {
+      message: `The pinned Codex model is unavailable with ChatGPT authentication.${suffix}`,
+      suggestion: "Keep the pin and explicitly choose API-key authentication if your API project supports it " +
+        "(n-dx config llm.codex.auth api), or choose an available model and explicitly update the originating " +
+        "model pin (llm, tier, hench, task run.models.codex or reviewModels.codex). " +
+        "No model or authentication setting was changed automatically.",
+      category: "unknown",
+      code: CLI_ERROR_CODES.INVALID_CONFIGURATION,
+    };
+  }
+
   // ── Authentication (401, invalid key, expired token, lost session) ──
   if (isAuthError(authCheckMessage)) {
     // Canonical, JSON-free wording shared with the preflight and providers.

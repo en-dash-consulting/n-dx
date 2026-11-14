@@ -51,8 +51,8 @@ describe("resolveReviewModel — precedence", () => {
     expect(resolveReviewModel("claude", undefined, "opus")).toBe("claude-opus-5-5");
   });
 
-  it("normalizes a legacy codex id rather than passing it through", () => {
-    expect(resolveReviewModel("codex", undefined, "gpt-5-codex")).toBe(NEWEST_MODELS.codex);
+  it("preserves an intentional older Codex review pin", () => {
+    expect(resolveReviewModel("codex", undefined, "gpt-5-codex")).toBe("gpt-5-codex");
   });
 });
 

@@ -1973,7 +1973,13 @@ export async function runAdversarialReviewPass(
     // completing this task, and leaving it out would make `--review` look free
     // in `ndx usage`.
     chargeReviewToRun(inv.run, spawned, ctx.reviewModel);
-    if (spawned.error) return { ok: false, reason: "spawn-failed", detail: spawned.error };
+    if (spawned.error) {
+      const diagnosis = classifyLLMError(new Error(spawned.error), ctx.vendor as LLMVendor);
+      const detail = diagnosis.code === "NDX_CLI_INVALID_CONFIGURATION"
+        ? `${spawned.error}\n${diagnosis.suggestion}`
+        : spawned.error;
+      return { ok: false, reason: "spawn-failed", detail };
+    }
     return { ok: true, spawned };
   };
 
@@ -2467,16 +2473,26 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
     return "break";
   }
 
+  // A rejected model requires an explicit operator choice, not a retry.
+  const diagnosis = classifyLLMError(new Error(result.error!), vendor as LLMVendor);
+  if (diagnosis.code === "NDX_CLI_INVALID_CONFIGURATION") {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "failed";
+    run.summary = result.summary;
+    run.error = `${result.error}\n${diagnosis.suggestion}`;
+    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    return "break";
+  }
+
   // Authentication / session loss is never transient: retrying just burns
   // turns and cascades the same failure. Detect it first — before the
   // transient check that would otherwise treat a bare "claude exited with
   // code N" as retryable — and fail immediately with re-auth guidance.
   if (isAuthError(result.error!)) {
-    const classified = classifyLLMError(new Error(result.error!), vendor as LLMVendor);
     syncRunFromAccumulated(run, accumulated, attempt);
     run.status = "failed";
     run.summary = result.summary;
-    run.error = `${classified.message} ${classified.suggestion}`;
+    run.error = `${diagnosis.message} ${diagnosis.suggestion}`;
     await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
     return "break";
   }
