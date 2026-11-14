@@ -23,6 +23,7 @@ import type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
 export type VendorAuthDecision = ReturnType<typeof sharedResolveVendorAuth>;
 import type { HenchConfig } from "../schema/index.js";
 import type { EnvPolicyConfig } from "../prd/llm-gateway.js";
+import { withTestMaxWorkers } from "../process/test-workers.js";
 
 // Re-export the shared ClaudeConfig type so existing consumers keep working
 export type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
@@ -122,6 +123,26 @@ export function resolveVendorCliEnv(
   onStripped?: Parameters<typeof sharedResolveVendorCliEnv>[3],
 ): NodeJS.ProcessEnv {
   return sharedResolveVendorCliEnv(llmConfig, envConfig, process.env, onStripped);
+}
+
+/**
+ * The vendor CLI session's environment: `resolveVendorCliEnv` under
+ * `hench.guard.env`, plus `NDX_TEST_MAX_WORKERS` from
+ * `hench.testGate.maxWorkers`, so the agent's own test runs are capped like
+ * the gate's. `report` receives each `cliEnvReportLine` under `label`.
+ */
+export function resolveSessionCliEnv(
+  llmConfig: LLMConfig,
+  config: Pick<HenchConfig, "guard" | "testGate">,
+  label: string,
+  report: (line: string) => void,
+): NodeJS.ProcessEnv {
+  return withTestMaxWorkers(
+    resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
+      report(cliEnvReportLine(label, names, kind));
+    }),
+    config.testGate?.maxWorkers,
+  );
 }
 
 type EnvReportKind = Parameters<NonNullable<Parameters<typeof sharedResolveVendorCliEnv>[3]>>[1];

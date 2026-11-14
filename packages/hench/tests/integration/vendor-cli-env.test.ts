@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { cleanupProjectDir } from "../helpers/index.js";
 import { createScriptedClaudeCli, setupScriptedProject, initLine, resultLine } from "../helpers/scripted-claude-cli.js";
 import { loadConfig, saveConfig } from "../../src/store/config.js";
+import type { HenchConfig } from "../../src/schema/index.js";
+import { TEST_MAX_WORKERS_ENV } from "../../src/process/test-workers.js";
 
 describe("cliLoop credential filtering across orientation and recovery", () => {
   let projectDir: string;
@@ -32,11 +34,12 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
     await cleanupProjectDir(projectDir);
   });
 
-  async function runFixture(quiet: boolean) {
+  async function runFixture(quiet: boolean, testGate?: HenchConfig["testGate"]) {
     const config = await loadConfig(henchDir);
     await saveConfig(henchDir, {
       ...config, sessionStrategy: "fork",
       guard: { ...config.guard, env: { allow: ["TYPESAFE_API_KEY"] } },
+      ...(testGate ? { testGate } : {}),
     });
     execFileSync("git", ["commit", "-am", "fixture policy"], { cwd: projectDir, stdio: "ignore" });
     const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
@@ -90,6 +93,15 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
     expect(log).not.toContain("fixture-secret-value");
     expect(log).not.toContain("fixture-github-value");
     expect(log).not.toContain("a vendor mode is on");
+  });
+
+  // Pins cliLoop's call site, not only resolveSessionCliEnv: every session
+  // spawn carries hench.testGate.maxWorkers. The cap is 1 because the lower of
+  // the cap and a valid inherited value wins; nothing here writes the variable.
+  it("passes hench.testGate.maxWorkers to every vendor session", async () => {
+    const { envs } = await runFixture(false, { maxWorkers: 1 });
+    expect(envs).toHaveLength(3);
+    for (const env of envs) expect(env[TEST_MAX_WORKERS_ENV]).toBe("1");
   });
 
   it("says once that Vertex mode is on without its credentials, claiming no fallback", async () => {

@@ -308,6 +308,12 @@ export interface TestGateConfig {
    * no re-run.
    */
   rerunCommand?: string;
+  /**
+   * Test worker cap. When set, hench puts `NDX_TEST_MAX_WORKERS=<n>` into the
+   * environment of the gate, its re-run, post-task tests, the completion
+   * check's test run and the agent session's shell. Absent sets nothing.
+   */
+  maxWorkers?: number;
 }
 
 /** Values for {@link ReviewConfig.mode}. */

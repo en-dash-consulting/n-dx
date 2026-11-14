@@ -1,0 +1,92 @@
+schema: "rex/v2"
+items:
+  "115f26b3-76f5-4714-b171-160e12c2bcab":
+    lastModified: "2026-11-12T17:28:27.063Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "391a5838-082d-4b5d-928e-7759329ad87a":
+    lastModified: "2026-11-12T17:57:26.059Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3928f6b4-d0f8-4943-8185-f0c6cba12ddb":
+    status: "completed"
+    startedAt: "2026-11-12T17:51:47.410Z"
+    completedAt: "2026-11-12T17:53:30.628Z"
+    endedAt: "2026-11-12T17:53:30.628Z"
+    activeIntervals: [{"end":"2026-11-12T17:53:30.628Z","start":"2026-11-12T17:51:47.410Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Documented NDX_TEST_MAX_WORKERS (TESTING.md) and hench.testGate.maxWorkers (configuration.md, packages/hench.md); added patch changeset for @n-dx/hench."
+    lastModified: "2026-11-12T17:53:30.628Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "40b7cd84-8bcc-4175-8bd0-92b8ea8ea290":
+    status: "completed"
+    startedAt: "2026-11-12T17:55:08.873Z"
+    completedAt: "2026-11-12T17:57:54.099Z"
+    endedAt: "2026-11-12T17:57:54.099Z"
+    activeIntervals: [{"end":"2026-11-12T17:57:54.099Z","start":"2026-11-12T17:55:08.873Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "createCommandExecutor(projectDir, testMaxWorkers) wraps env in withTestMaxWorkers; rex_update_status passes options.testMaxWorkers. Probe cases added. Commit 9f67254e0."
+    lastModified: "2026-11-12T17:57:54.099Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4cabcef6-50cd-46b6-b78a-334e047774cb":
+    status: "completed"
+    startedAt: "2026-11-14T05:03:40.404Z"
+    completedAt: "2026-11-14T05:08:30.435Z"
+    endedAt: "2026-11-14T05:08:30.435Z"
+    activeIntervals: [{"end":"2026-11-14T05:08:30.435Z","start":"2026-11-14T05:03:40.404Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "finalizeRun-level maxWorkers cases in test-gate-flaky-rerun.test.ts (mutation-checked against both shared.ts sites); resolveSessionCliEnv extracted to store/project-config.ts with unit tests; test-worker-cap.test.ts header now points at them."
+    lastModified: "2026-11-14T05:08:30.435Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
+    status: "completed"
+    startedAt: "2026-11-14T05:08:40.369Z"
+    completedAt: "2026-11-14T05:10:35.873Z"
+    endedAt: "2026-11-14T05:10:35.873Z"
+    activeIntervals: [{"end":"2026-11-14T05:10:35.873Z","start":"2026-11-14T05:08:40.369Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml test matrix and release.yml validate matrix: hench+web split into hench and web groups; leg-count and Windows timeout comments updated (timeout stays 20)."
+    lastModified: "2026-11-14T05:10:35.873Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "61977eb2-9bdc-4f1d-9bf0-5be0fc593e0b":
+    status: "completed"
+    startedAt: "2026-11-14T04:59:12.140Z"
+    completedAt: "2026-11-14T05:03:31.649Z"
+    endedAt: "2026-11-14T05:03:31.649Z"
+    activeIntervals: [{"end":"2026-11-14T05:03:31.649Z","start":"2026-11-14T04:59:12.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "HENCH_VALIDATORS gains testGate.maxWorkers (requirePositiveInteger, now isSafeInteger); withTestMaxWorkers keeps the lower of config and a valid inherited cap; docs, TESTING.md, changesets updated."
+    lastModified: "2026-11-14T05:03:31.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "85839d4a-3b74-4e79-bb93-838726de17cf":
+    lastModified: "2026-11-12T17:28:05.138Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9861a7ad-5ff9-47b7-863e-b38ac6cd5da1":
+    status: "completed"
+    startedAt: "2026-11-12T17:37:34.236Z"
+    completedAt: "2026-11-12T17:51:36.753Z"
+    endedAt: "2026-11-12T17:51:36.753Z"
+    activeIntervals: [{"end":"2026-11-12T17:41:46.505Z","start":"2026-11-12T17:37:34.236Z"},{"end":"2026-11-12T17:51:36.753Z","start":"2026-11-12T17:43:23.296Z"}]
+    lastModified: "2026-11-12T17:51:39.396Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "adb92a12-af68-4f9a-b28b-310fb0ea9980":
+    lastModified: "2026-11-12T17:54:20.111Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b772b0c5-c910-4e92-83bf-776a266c413a":
+    createdAt: "2026-11-12T17:26:37.734Z"
+    lastModified: "2026-11-14T04:58:43.847Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d34d2902-408a-4b05-9de9-7b2932aae778":
+    status: "completed"
+    startedAt: "2026-11-12T17:32:11.607Z"
+    completedAt: "2026-11-12T17:37:23.271Z"
+    endedAt: "2026-11-12T17:37:23.271Z"
+    activeIntervals: [{"end":"2026-11-12T17:37:23.271Z","start":"2026-11-12T17:32:11.607Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tests/test-max-workers.mjs reads NDX_TEST_MAX_WORKERS; root and every package vitest config (rex bench excepted) sets test.maxWorkers from it; unit + config policy tests added."
+    lastModified: "2026-11-12T17:37:23.271Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ed2f3d51-97a5-4f5b-8b98-2ff2e2667a10":
+    lastModified: "2026-11-12T17:54:23.203Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ee944d3b-6829-4cac-901a-427b91170c79":
+    lastModified: "2026-11-12T17:54:26.294Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

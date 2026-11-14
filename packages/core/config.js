@@ -1349,6 +1349,7 @@ const HENCH_VALIDATORS = {
   },
   "escalation.after": (value) => requirePositiveInteger("escalation.after", value),
   "escalation.maxAttempts": (value) => requirePositiveInteger("escalation.maxAttempts", value),
+  "testGate.maxWorkers": (value) => requirePositiveInteger("testGate.maxWorkers", value),
   "escalation.vendor": (value) => {
     if (!ESCALATION_VENDORS.includes(value)) {
       throw new Error(`Invalid escalation vendor "${value}". Expected one of: ${ESCALATION_VENDORS.join(", ")}.`);
@@ -1361,7 +1362,7 @@ const ESCALATION_VENDORS = ["claude", "codex", "google", "local"];
 
 /** Refuse anything but a whole number of at least 1, as hench's schema does. */
 function requirePositiveInteger(key, value) {
-  if (!Number.isInteger(value) || value < 1) {
+  if (!Number.isSafeInteger(value) || value < 1) {
     throw new Error(`Invalid ${key} "${value}". Expected a whole number of at least 1.`);
   }
 }
@@ -2370,6 +2371,11 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      "node scripts/run-all-tests.mjs {suites}". A pass counts and
                                      is recorded as testGate.flakyRerun; a failure fails the run.
                                      No re-run after a timeout or on an interactive terminal.
+  hench.testGate.maxWorkers
+                           number    Test worker cap (positive integer). Hench sets
+                                     NDX_TEST_MAX_WORKERS to it for the gate and its re-run,
+                                     post-task tests, the completion check's test run and the
+                                     agent session's shell. Unset sets nothing.
   hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
                                      run fails (default: 900000 — 15 minutes; 0 means no limit).
                                      Raise it for a large monorepo: the gate runs while an agent

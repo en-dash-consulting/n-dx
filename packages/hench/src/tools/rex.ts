@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { repoCommandEnv, resolveLayout } from "../prd/llm-gateway.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
+import { withTestMaxWorkers } from "../process/test-workers.js";
 import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import { isFinalizeReadyParent } from "../validation/finalize-ready.js";
@@ -23,6 +24,8 @@ export interface UpdateStatusOptions {
   startingHead?: string;
   /** When true, reject doc-only completions. */
   selfHeal?: boolean;
+  /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
+  testMaxWorkers?: number;
   /**
    * Set on the agent's own tool call, never on hench's internal writes: a
    * completion that passes validation is recorded on the run's claim for the
@@ -52,6 +55,7 @@ export async function toolRexUpdateStatus(
       testCommand: options.testCommand,
       startingHead: options.startingHead,
       selfHeal: options.selfHeal,
+      testMaxWorkers: options.testMaxWorkers,
       finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
     });
 
@@ -73,7 +77,7 @@ export async function toolRexUpdateStatus(
     const reqSummary = await validateAutomatedRequirements(
       doc.items,
       taskId,
-      createCommandExecutor(options.projectDir),
+      createCommandExecutor(options.projectDir, options.testMaxWorkers),
     );
 
     if (reqSummary.total > 0 && !reqSummary.allPassed) {
@@ -360,6 +364,7 @@ export const rexToolHandlers: RexToolHandlers = {
         testCommand: ctx.testCommand,
         startingHead: ctx.startingHead,
         selfHeal: ctx.selfHeal,
+        testMaxWorkers: ctx.testMaxWorkers,
         holdCompletionForRun: true,
       },
     ),
@@ -376,15 +381,17 @@ const REQ_CMD_TIMEOUT = 30_000;
 /**
  * Create a CommandExecutor that runs shell commands in the project directory.
  * Used by requirements validation to execute validation commands.
+ * `testMaxWorkers` (`hench.testGate.maxWorkers`) caps a validation command's
+ * vitest workers like every other test command hench runs.
  */
-export function createCommandExecutor(projectDir: string): CommandExecutor {
+export function createCommandExecutor(projectDir: string, testMaxWorkers?: number): CommandExecutor {
   return async (command: string) => {
     // A requirement's command is PRD content the agent can edit, and it runs
     // the project's code: confined like the agent's own run_command.
     const result = await execRepoShellCmd(command, {
       cwd: projectDir,
       timeout: REQ_CMD_TIMEOUT,
-      env: repoCommandEnv(projectDir),
+      env: withTestMaxWorkers(repoCommandEnv(projectDir), testMaxWorkers),
     });
     // A command that never launched returns exitCode 1 with empty output, and
     // the CommandExecutor contract has no field to say "could not run" — so the

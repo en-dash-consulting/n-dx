@@ -108,8 +108,7 @@ import {
   resolveLLMVendor,
   withVendorOverride,
   resolveVendorCliPath,
-  resolveVendorCliEnv,
-  cliEnvReportLine,
+  resolveSessionCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
@@ -2215,6 +2214,8 @@ interface SuccessContext {
   projectDir: string;
   startingHead: string | undefined;
   testCommand?: string;
+  /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
+  testMaxWorkers?: number;
   tokenBudget?: number;
   /** Show the diff and prompt for approval before finalizing (`--approve-diff`). */
   approveDiff?: boolean;
@@ -2283,6 +2284,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     testCommand: ctx.testCommand,
     startingHead: ctx.startingHead,
     selfHeal: ctx.selfHeal,
+    testMaxWorkers: ctx.testMaxWorkers,
     baselineUntracked: ctx.baselineUntracked,
     finalizeReadyParent,
   });
@@ -2322,6 +2324,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
             testCommand: ctx.testCommand,
             startingHead: ctx.startingHead,
             selfHeal: ctx.selfHeal,
+            testMaxWorkers: ctx.testMaxWorkers,
             baselineUntracked: ctx.baselineUntracked,
             finalizeReadyParent,
           }),
@@ -2650,8 +2653,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
-  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
-    detail(cliEnvReportLine("CLI environment", names, kind), { captureWhenQuiet: true });
+  // The session's shell inherits this, so the agent's own test runs are
+  // capped like the gate's.
+  const cliEnv = resolveSessionCliEnv(llmConfig, config, "CLI environment", (line) => {
+    detail(line, { captureWhenQuiet: true });
   });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
@@ -2726,8 +2731,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         vendor: reviewVendor,
         cliBinary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
         cliEnv: pairVendor
-          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names, kind) => {
-            detail(cliEnvReportLine(`${pairVendor} reviewer environment`, names, kind), { captureWhenQuiet: true });
+          ? resolveSessionCliEnv({ ...llmConfig, vendor: pairVendor }, config, `${pairVendor} reviewer environment`, (line) => {
+            detail(line, { captureWhenQuiet: true });
           })
           : cliEnv,
         ...(pairVendor
@@ -2794,6 +2799,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
                   testCommand: brief.project.testCommand,
                   startingHead: base,
                   selfHeal: config.selfHeal,
+                  testMaxWorkers: config.testGate?.maxWorkers,
                   baselineUntracked,
                 }),
             });
@@ -3392,6 +3398,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           run, result, accumulated, attempt,
           store, taskId, projectDir, startingHead,
           testCommand: brief.project.testCommand,
+          testMaxWorkers: config.testGate?.maxWorkers,
           tokenBudget: config.tokenBudget,
           approveDiff: opts.approveDiff,
           reviewPass: reviewPassContext,

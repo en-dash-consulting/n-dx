@@ -158,6 +158,8 @@ Two config templates let a project gate less than its whole suite. Both are abse
 - **`hench.testGate.command`** replaces the gate command. It outranks `hench.fullTestCommand` and auto-detection. `{base}` becomes the commit the run started from (a hex SHA), so the project can test only what the run changed. A template without `{base}` runs as written. If it has `{base}` and no valid start commit is known, hench runs the command it would have run without the template and records `testGate.scopeFallback`.
 - **`hench.testGate.rerunCommand`** applies to unattended runs only (`--auto`, `--yes`, no TTY). When the gate fails and its output names the failed suites, hench runs this command once with `{suites}` replaced by those labels, comma-joined. A pass counts as a gate pass and is recorded as a flake; a failure fails the run. There is no re-run after a timeout, when the output names no failed suites, or on an interactive terminal (which offers rerun/abort/skip instead).
 
+- **`hench.testGate.maxWorkers`** is a positive integer, absent by default. Hench passes it as `NDX_TEST_MAX_WORKERS` to the gate and its re-run, post-task tests, the completion test run and the agent's shell, so the project's vitest configs start at most that many workers. Unset leaves the environment as it was. Several worktrees gating at once are otherwise each free to claim every core.
+
 **Output-line protocol.** The project's runner tells hench what it did with lines in its output. `scripts/run-all-tests.mjs` emits both:
 
 ```

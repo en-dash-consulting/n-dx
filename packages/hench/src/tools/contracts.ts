@@ -65,6 +65,8 @@ export interface ToolContext {
   memoryMonitor?: SystemMemoryMonitor;
   /** When true, the agent is in self-heal mode (stricter completion validation). */
   selfHeal?: boolean;
+  /** `hench.testGate.maxWorkers`, passed to the completion check's test run. */
+  testMaxWorkers?: number;
   /**
    * The run's snapshot of n-dx's own config files. `dispatchTool` puts back
    * whatever a call changed before the next call can read it.
