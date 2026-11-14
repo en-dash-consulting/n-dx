@@ -115,7 +115,14 @@ items:
     lastModified: "2026-11-12T18:09:39.348Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "53be00af-2a22-4259-a5ce-ef69d8171b17":
-    lastModified: "2026-11-12T18:42:07.287Z"
+    status: "completed"
+    startedAt: "2026-11-13T18:36:26.387Z"
+    completedAt: "2026-11-13T18:36:26.387Z"
+    endedAt: "2026-11-13T18:36:26.387Z"
+    activeIntervals: [{"end":"2026-11-13T18:36:26.387Z","start":"2026-11-13T18:36:26.387Z"}]
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Default matrix run 2026-11-13 on a quiet M2/16 GiB at 7a0f45ef0. Note: ~/ndx-core/local-design-workshop/docs/analysis/task-prep/04-validation-bench-2026-11-13.md (raw data in validation-bench-2026-11-13/). D vs C: 0/9 vs 4/9 failures, test RSS -75-78%, swap -0.3-0.7 GiB, ~2x batch time. B vs A: +43-94% per run. Keep the slot; measure slot-only (case E) before keeping the cap of 2."
+    lastModified: "2026-11-13T18:36:26.387Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "58c29a6c-14b2-474e-acfb-237613391f80":
     status: "completed"
@@ -167,6 +174,24 @@ items:
     resolutionDetail: "HENCH_VALIDATORS gains testGate.maxWorkers (requirePositiveInteger, now isSafeInteger); withTestMaxWorkers keeps the lower of config and a valid inherited cap; docs, TESTING.md, changesets updated."
     lastModified: "2026-11-14T05:03:31.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6b308b56-b70f-4490-ae86-bd1e421dc074":
+    status: "completed"
+    startedAt: "2026-11-13T22:06:38.320Z"
+    completedAt: "2026-11-13T22:08:34.822Z"
+    endedAt: "2026-11-13T22:08:34.822Z"
+    activeIntervals: [{"end":"2026-11-13T22:08:34.822Z","start":"2026-11-13T22:06:38.320Z"}]
+    lastModified: "2026-11-13T22:08:34.822Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6d28d3dc-e91b-4b6c-98f7-ea4a9ed8c63b":
+    status: "completed"
+    startedAt: "2026-11-13T19:06:08.949Z"
+    completedAt: "2026-11-13T19:10:20.706Z"
+    endedAt: "2026-11-13T19:10:20.706Z"
+    activeIntervals: [{"end":"2026-11-13T19:10:20.706Z","start":"2026-11-13T19:06:08.949Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added cases E–H to the benchmark; default stays A–D; slot handling keys on the slot flag; tests and TESTING.md updated."
+    lastModified: "2026-11-13T19:10:20.706Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "74838585-5fc7-436e-ba6c-f378be47807f":
     status: "completed"
     startedAt: "2026-11-13T22:12:41.225Z"
@@ -196,7 +221,14 @@ items:
     lastModified: "2026-11-12T18:29:10.211Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "92b189a1-8d77-463f-b524-a29b015eb6f9":
-    lastModified: "2026-11-12T18:41:56.169Z"
+    status: "completed"
+    startedAt: "2026-11-12T18:54:53.413Z"
+    completedAt: "2026-11-12T19:08:41.728Z"
+    endedAt: "2026-11-12T19:08:41.728Z"
+    activeIntervals: [{"end":"2026-11-12T19:08:41.728Z","start":"2026-11-12T18:54:53.413Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added scripts/bench/validation-bench.mjs with pure helpers in scripts/bench/lib/ (plan, samples, gate-output, summary). It covers cases A–D and five fixtures, with A–C passing --no-slot and D holding the slot through hench's dist module so the runner nests. The dry run prints the matrix, the fixture files and an estimate, and creates nothing. Other parts: a preflight refusal, 2 s samples, JSONL plus summary.md output, and worktree cleanup on exit, signal and error. scripts/lib/workspace-manifests.mjs is now shared with run-all-tests.mjs. There are 24 unit tests and a TESTING.md section."
+    lastModified: "2026-11-12T19:08:41.728Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96357e8a-d040-477a-9f0d-d75fea4656ef":
     status: "completed"
@@ -236,6 +268,16 @@ items:
     resolutionDetail: "Both slot implementations read /proc/<n>/status first and skip single-NSpid entries before readlinking ns/pid; nested unreadable own-user entries still count as alive. Rule 4a header updated, tests and hench patch changeset added."
     lastModified: "2026-11-13T23:17:30.248Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a746220b-6a9a-4f2c-97cc-54c1790cd9bb":
+    status: "completed"
+    startedAt: "2026-11-14T06:52:25.910Z"
+    completedAt: "2026-11-14T06:55:31.230Z"
+    endedAt: "2026-11-14T06:55:31.230Z"
+    activeIntervals: [{"end":"2026-11-14T06:55:31.230Z","start":"2026-11-14T06:52:25.910Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "4a36e28e5: new scripts/bench/lib/stop.mjs (sleep, createSignalHandler, throwIfStopped); runBatch rejects on abort; interrupted line in summary.md; uncaughtException SIGKILL; Windows-safe test path; TESTING.md wording."
+    lastModified: "2026-11-14T06:55:31.230Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adb92a12-af68-4f9a-b28b-310fb0ea9980":
     status: "completed"
     startedAt: "2026-11-12T18:10:17.703Z"
@@ -248,7 +290,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     createdAt: "2026-11-12T17:26:37.734Z"
-    lastModified: "2026-11-14T06:38:12.036Z"
+    lastModified: "2026-11-14T06:52:06.935Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1e742ad-552e-47c7-8587-b0d5212cde09":
     status: "completed"
@@ -319,6 +361,14 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench's protocol v1; run-all-tests.mjs takes the slot before rebuild, releases after summary or on SIGINT/SIGTERM after the suite exits, nests on a live holder's token, --list/--no-slot skip it; parity drift test in ROOT_DRIFT_TEST_FILES."
     lastModified: "2026-11-12T18:52:16.095Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f24532f0-6032-46dd-b167-e684c54e0a5d":
+    status: "completed"
+    startedAt: "2026-11-12T22:32:04.595Z"
+    completedAt: "2026-11-12T22:36:24.813Z"
+    endedAt: "2026-11-12T22:36:24.813Z"
+    activeIntervals: [{"end":"2026-11-12T22:36:24.813Z","start":"2026-11-12T22:32:04.595Z"}]
+    lastModified: "2026-11-12T22:36:24.813Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2aa9f8c-556b-453f-bc9d-7fa9af4fa7a2":
     status: "completed"
