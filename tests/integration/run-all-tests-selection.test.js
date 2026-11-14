@@ -242,7 +242,9 @@ if (process.env.FAKE_PNPM === "build") {
       // The fake pnpm and the logs a run writes are untracked files that would
       // select root; ignored, an unedited tree selects no suite and the run exits 0.
       write(".gitignore", "fakebin/\npnpm-calls.log\nsuite-started\nclaude_commands.log\n.test-logs/\n", 0);
-      git("add", ".gitignore");
+      // Root subsets run this script; the stand-in passes at once.
+      write("scripts/run-vitest-bind-aware.mjs", "process.exit(0);\n", 0);
+      git("add", ".gitignore", "scripts/run-vitest-bind-aware.mjs");
       git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "ignore");
     });
     afterEach(async () => {
@@ -260,6 +262,12 @@ if (process.env.FAKE_PNPM === "build") {
     const readHolderRecord = () => JSON.parse(readFileSync(holderFile(), "utf-8"));
     // tests/setup-ndx-home.js clears NDX_HOME, so N_DX_HOME decides the ndx home.
     const homeEnv = (extra = {}) => ({ N_DX_HOME: home, ...extra });
+    /**
+     * A tests-only edit: selects llm-client and root-policy, both stand-ins
+     * that pass at once, and nothing to rebuild. Without it nothing is
+     * selected, and the runner does not take the slot.
+     */
+    const selectTinySuites = () => write("packages/llm-client/tests/unit/slot.test.ts", "\n", 0);
 
     /** Start the runner without waiting for it; `output()` is what it has printed so far. */
     const startGate = (mode, extraEnv = {}) => {
@@ -279,6 +287,7 @@ if (process.env.FAKE_PNPM === "build") {
     };
 
     it("waits while another process holds the slot, names the holder, and reports the queue time", async () => {
+      selectTinySuites();
       await hold();
       const run = startGate("noop");
       await vi.waitFor(
@@ -288,12 +297,25 @@ if (process.env.FAKE_PNPM === "build") {
       expect(run.output()).not.toContain("selected-suites=");
       await held.release();
       const result = await run.done;
-      expect(result.code).toBe(0);
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.stdout).toContain("test-gate: selected-suites=root-policy,llm-client");
+      expect(result.stdout).toContain("2/2 suites passed");
       expect(result.stdout).toMatch(/Validation slot: queued \d+\.\ds/);
       expect(existsSync(holderFile())).toBe(false);
     });
 
+    it("neither takes nor waits for the slot when nothing is selected and nothing needs rebuilding", async () => {
+      const lease = await hold();
+      const result = gate("noop", [], homeEnv());
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("test-gate: selected-suites=\n");
+      expect(result.stdout).not.toContain("Waiting for the validation slot");
+      expect(result.stdout).toContain("Validation slot: not taken (nothing to run)");
+      expect(readHolderRecord().token).toBe(lease.token);
+    });
+
     it("runs inside the holder's slot when NDX_VALIDATION_SLOT names that live holder", async () => {
+      selectTinySuites();
       const lease = await hold();
       const result = gate("noop", [], homeEnv(lease.childEnv({})));
       expect(result.status).toBe(0);
@@ -304,16 +326,19 @@ if (process.env.FAKE_PNPM === "build") {
     // A home it may not write stands in for a sandbox that does not grant the
     // slot. POSIX permission bits, and root ignores them.
     it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
-      "names the slot directory and the sandbox when it may not use the slot",
+      "runs the suites without the slot, warning with the slot directory and the sandbox, when it may not use the slot",
       () => {
+        selectTinySuites();
         chmodSync(home, 0o500);
         try {
           const result = gate("noop", [], homeEnv());
-          expect(result.status).toBe(1);
-          expect(result.stderr).toContain(`Could not take the validation slot in ${slotDir}`);
+          expect(result.status, result.stderr).toBe(0);
+          expect(result.stderr).toContain(`WARNING: Could not take the validation slot in ${slotDir}`);
           expect(result.stderr).toContain(`This process may not read or write ${slotDir}`);
           expect(result.stderr).toContain("sandbox must grant this directory read and write access");
-          expect(result.stderr).toContain("Pass --no-slot to run without it.");
+          expect(result.stderr).toContain("WARNING: running the suites without the validation slot.");
+          expect(result.stdout).toContain("2/2 suites passed");
+          expect(result.stdout).toContain(`Validation slot: skipped (could not take it in ${slotDir}: `);
         } finally {
           chmodSync(home, 0o700);
         }

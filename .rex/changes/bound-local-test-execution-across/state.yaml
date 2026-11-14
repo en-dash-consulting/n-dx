@@ -111,7 +111,14 @@ items:
     lastModified: "2026-11-12T18:42:07.287Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5bd00ff5-6790-498b-be8c-123681df0b4b":
-    lastModified: "2026-11-14T05:53:59.680Z"
+    status: "completed"
+    startedAt: "2026-11-14T06:02:27.114Z"
+    completedAt: "2026-11-14T06:07:10.035Z"
+    endedAt: "2026-11-14T06:07:10.035Z"
+    activeIntervals: [{"end":"2026-11-14T06:07:10.035Z","start":"2026-11-14T06:02:27.114Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Runner fails open, awaits child records before release, skips the slot for empty selections; parity pid case skipped on win32; TESTING.md updated"
+    lastModified: "2026-11-14T06:07:10.035Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
     status: "completed"

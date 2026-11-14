@@ -49,15 +49,16 @@ const on = { mode: "on" as const, toolNetwork: "none" as const, source: "env" as
 const TAKE_SLOT = `
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { acquireValidationSlot, describeValidationSlotFailure, resolveValidationSlotDir } from "./scripts/lib/validation-slot.mjs";
+import { acquireValidationSlot, describeValidationSlotFailure, resolveValidationSlotDir, validationSlotRootDir } from "./scripts/lib/validation-slot.mjs";
 import { resolveNdxHome } from "./packages/core/layout.js";
 
 const unreadable = (name) => { try { readFileSync(join(resolveNdxHome(), name)); return false; } catch { return true; } };
 if (!unreadable("auth.token") || !unreadable("credentials.json")) { console.error("ndx home secrets were readable"); process.exit(5); }
 
-const slotDir = resolveValidationSlotDir();
+let slotDir = validationSlotRootDir();
 let lease;
 try {
+  slotDir = await resolveValidationSlotDir();
   // A marker in the project (writable) once it queues behind another holder.
   lease = await acquireValidationSlot({
     slotDir, projectDir: process.cwd(), pollIntervalMs: 20,
@@ -80,7 +81,7 @@ describe.skipIf(!live)("the test runner's validation slot inside hench's sandbox
   let slotDir: string;
   const planted: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     project = realpathSync(mkdtempSync(join(tmpdir(), "hench-slot-sbx-")));
     mkdirSync(join(project, "scripts", "lib"), { recursive: true });
     mkdirSync(join(project, "packages", "core"), { recursive: true });
@@ -95,7 +96,7 @@ describe.skipIf(!live)("the test runner's validation slot inside hench's sandbox
       writeFileSync(join(ndxHome, name), "secret");
       planted.push(join(ndxHome, name));
     }
-    slotDir = resolveValidationSlotDir();
+    slotDir = await resolveValidationSlotDir();
   });
 
   afterEach(() => {

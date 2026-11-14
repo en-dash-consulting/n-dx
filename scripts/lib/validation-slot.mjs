@@ -783,7 +783,7 @@ export async function acquireValidationSlot(options) {
 }
 
 /**
- * The lines the runner prints when it cannot take the slot. A permission
+ * The lines the runner warns with when it cannot take the slot. A permission
  * error almost always means a sandbox that does not grant the slot directory:
  * n-dx's own sandbox grants it (packages/llm-client/src/sandbox.ts), a
  * vendor's or an operator's may not.
@@ -801,7 +801,6 @@ export function describeValidationSlotFailure(err, slotDir) {
         "(an n-dx tool or agent sandbox, or the vendor CLI's own), that sandbox must grant this directory read and write access.",
     );
   }
-  lines.push("Pass --no-slot to run without it.");
   return lines;
 }
 
