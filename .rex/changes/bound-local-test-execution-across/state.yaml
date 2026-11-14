@@ -61,6 +61,9 @@ items:
     resolutionDetail: "Documented NDX_TEST_MAX_WORKERS (TESTING.md) and hench.testGate.maxWorkers (configuration.md, packages/hench.md); added patch changeset for @n-dx/hench."
     lastModified: "2026-11-12T17:53:30.628Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3ab4bb09-5f4b-4127-bb01-8aca612cd9b4":
+    lastModified: "2026-11-14T05:54:01.207Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3f564624-cbee-4520-b9f6-247ccfc8e92a":
     status: "completed"
     startedAt: "2026-11-12T22:19:06.222Z"
@@ -106,6 +109,9 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "53be00af-2a22-4259-a5ce-ef69d8171b17":
     lastModified: "2026-11-12T18:42:07.287Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5bd00ff5-6790-498b-be8c-123681df0b4b":
+    lastModified: "2026-11-14T05:53:59.680Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
     status: "completed"
@@ -208,7 +214,10 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     createdAt: "2026-11-12T17:26:37.734Z"
-    lastModified: "2026-11-14T05:44:21.947Z"
+    lastModified: "2026-11-14T05:54:01.207Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c1e742ad-552e-47c7-8587-b0d5212cde09":
+    lastModified: "2026-11-14T05:53:58.080Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d34d2902-408a-4b05-9de9-7b2932aae778":
     status: "completed"
