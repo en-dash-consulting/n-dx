@@ -12,6 +12,7 @@ import {
   VALIDATION_SLOT_ENV,
   VALIDATION_SLOT_HOLDER_FILE,
   VALIDATION_SLOT_DIRNAME,
+  VALIDATION_SLOT_RECLAIM_FILE,
   type ValidationSlotHolder,
   type ValidationSlotWait,
 } from "../../../src/process/validation-slot.js";
@@ -160,6 +161,7 @@ describe("acquireValidationSlot — contention in one process", () => {
     expect(waits).toHaveLength(1);
     expect(waits[0].holder).toMatchObject({ pid: process.pid, projectDir: "/first", token: first.token });
     expect(waits[0].holderAlive).toBe(true);
+    expect(waits[0].holderPath).toBe(join(slotDir, VALIDATION_SLOT_HOLDER_FILE));
     expect(second.token).not.toBe(first.token);
     expect(second.queueWaitMs).toBe(750);
     expect((await readValidationSlotHolder(slotDir))?.token).toBe(second.token);
@@ -265,6 +267,64 @@ describe("acquireValidationSlot — stale recovery", () => {
     const { error } = await waitThenAbort();
     expect(error).toBeInstanceOf(ValidationSlotAbortedError);
     expect(await holderRaw()).toBe(raw);
+  });
+});
+
+describe("acquireValidationSlot — this process's own pid (rule 5a)", () => {
+  // A pid the OS reused for this process: the leftover names a live pid (ours)
+  // with a token this process never held.
+
+  it("reclaims at once a record naming this pid with a token this process does not hold", async () => {
+    const live = liveChild();
+    await writeHolder({ pid: process.pid, token: "previous-owner", child: { pid: live.pid!, group: false } });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {}, onWait: () => {
+      throw new Error("a leftover under this process's pid must not be waited on");
+    } });
+    expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
+    await lease.release();
+  });
+
+  it("still waits on a record naming this pid with one of its live lease tokens, and nests with that token", async () => {
+    const outer = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: {} });
+    const before = await holderRaw();
+
+    const { waits, error } = await waitThenAbort();
+    expect(error).toBeInstanceOf(ValidationSlotAbortedError);
+    expect(waits[0].holder).toMatchObject({ pid: process.pid, token: outer.token });
+
+    const inner = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: outer.childEnv({}) });
+    expect(inner.nested).toBe(true);
+    expect(await holderRaw()).toBe(before);
+    await outer.release();
+  });
+
+  it("does not nest on a token whose record names this pid but is no longer live here", async () => {
+    await writeHolder({ pid: process.pid, token: "previous-owner" });
+    const lease = await acquireValidationSlot({ slotDir, projectDir: "/proj", env: { [VALIDATION_SLOT_ENV]: "previous-owner" } });
+    expect(lease.nested).toBe(false);
+    expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
+    await lease.release();
+  });
+
+  it("clears a reclaim.lock naming this pid with a token this process does not hold", async () => {
+    await writeHolder({});
+    const lockPath = join(slotDir, VALIDATION_SLOT_RECLAIM_FILE);
+    await writeFile(
+      lockPath,
+      JSON.stringify({ pid: process.pid, token: "previous-reclaimer", startedAt: "2026-11-12T00:00:00.000Z" }),
+      "utf-8",
+    );
+    // Bounded so a regression fails here instead of hanging the suite.
+    const lease = await acquireValidationSlot({
+      slotDir,
+      projectDir: "/proj",
+      env: {},
+      pollIntervalMs: 10,
+      signal: AbortSignal.timeout(10_000),
+    });
+    expect((await readValidationSlotHolder(slotDir))?.token).toBe(lease.token);
+    await expect(access(lockPath)).rejects.toThrow();
+    await lease.release();
   });
 });
 

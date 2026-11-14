@@ -351,8 +351,10 @@ per OS user, shared by every hench process on the host. An agent's own shell
 commands are not serialized; only the worker cap bounds those.
 
 - **Is a run waiting?** It prints `Waiting for the validation slot held by pid
-  <n> in <project> since <time>`, repeated about every 30 s. A holder marked
-  `(exited; its tests still run)` has died but its test child is still alive.
+  <n> in <project> since <time> (<path to holder.json>)`, repeated about every
+  30 s. A holder marked `(exited; its tests still run)` has died but its test
+  child is still alive. Only an interrupt (Ctrl-C, SIGTERM) stops a wait; there
+  is no maximum wait, and the gate's timeout starts after admission.
 - **How long did it wait?** `hench show <run-id> .` prints
   `Validation slot: queued <n>s, ran <n>s`; the run record stores `queueMs` and
   `executionMs`.
@@ -361,7 +363,13 @@ commands are not serialized; only the worker cap bounds those.
   pid, project and start time.
 - **Stale holders.** A record whose process and test child are dead, that does
   not parse, or that predates a reboot is reclaimed automatically by the next
-  waiter. Do not delete the directory by hand while a run is active.
+  waiter. So is one naming the waiter's own pid with a token it does not hold.
+  Do not delete the directory by hand while a run is active.
+- **A wedged slot.** If a holder died without releasing and the OS gave its
+  pid to an unrelated process (Windows reuses pids within moments), every run
+  on the host waits behind that process. Confirm no ndx test run is active
+  (`hench`, `ndx work`, `run-all-tests.mjs`), then delete the `holder.json`
+  named in the wait message.
 
 ## Timeout Guardrails
 
