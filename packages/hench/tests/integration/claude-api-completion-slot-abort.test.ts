@@ -115,7 +115,7 @@ describe("Claude API completion check inside the validation slot", () => {
     const store = createStore("file", join(projectDir, ".rex"));
 
     // The slot directory is the per-worker temp ndx home (tests/setup-ndx-home.js).
-    const lease = await acquireValidationSlot({ slotDir: resolveValidationSlotDir(), projectDir: "/elsewhere", env: {} });
+    const lease = await acquireValidationSlot({ slotDir: await resolveValidationSlotDir(), projectDir: "/elsewhere", env: {} });
     const controller = new AbortController();
     let waits = 0;
     let releaseTimer: NodeJS.Timeout | undefined;

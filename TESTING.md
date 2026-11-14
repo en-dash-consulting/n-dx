@@ -359,9 +359,15 @@ commands are not serialized; only the worker cap bounds those.
   `Validation slot: queued <n>s, ran <n>s`; the run record stores `queueMs` and
   `executionMs`.
 - **Where is it?** `<ndx home>/validation-slot/<host>/`
-  (`~/.ndx/validation-slot/<host>/` by default), where `<host>` is the
-  hostname lower-cased with characters outside `[a-z0-9._-]` replaced by `-`.
-  Hosts sharing one ndx home (a network home) each get their own slot.
+  (`~/.ndx/validation-slot/<host>/` by default). `<host>` is keyed on the
+  machine id, not the hostname, which macOS changes with the network: `m-`
+  and the first 16 hex characters of the SHA-256 of the id (Linux
+  `/etc/machine-id`, else `/var/lib/dbus/machine-id`; macOS `IOPlatformUUID`;
+  Windows `MachineGuid`), or `h-` and a hash of the hostname when no id can be
+  read. Hosts sharing one ndx home (a network home) each get their own slot.
+  The command hench runs inside the slot gets the slot's token as
+  `NDX_VALIDATION_SLOT` and its directory as `NDX_VALIDATION_SLOT_DIR`; a
+  slot acquire under them nests in that directory instead of waiting.
   `holder.json` exists exactly while the slot is held and names the
   pid, project and start time. If the directory cannot be used (permissions,
   a read-only or full disk, no hard links), hench runs the command without the

@@ -14,11 +14,16 @@
  * ## On-disk protocol (version 1)
  *
  * Everything lives in one directory, `<slot dir>` (normally
- * `<ndx home>/validation-slot/<host>/`, created on first use). `<host>` is
- * `os.hostname()` lower-cased with each character outside `[a-z0-9._-]`
- * replaced by `-`, or `unknown-host` when that is empty or only dots. Liveness
- * (rules 4 and 5) only holds on one host, so hosts sharing an ndx home must
- * never share a slot directory:
+ * `<ndx home>/validation-slot/<host>/`, created on first use). `<host>` names
+ * the machine, not its network name, which macOS changes with the network:
+ * `m-` and the first 16 hex characters of the SHA-256 of the machine id,
+ * trimmed and lower-cased (Linux `/etc/machine-id`, else
+ * `/var/lib/dbus/machine-id`; macOS `IOPlatformUUID` from
+ * `ioreg -rd1 -c IOPlatformExpertDevice`; Windows `MachineGuid` under
+ * `HKLM\SOFTWARE\Microsoft\Cryptography`), or `h-` and the same hash of the
+ * trimmed, lower-cased `os.hostname()` when no machine id can be read. A
+ * process reads it once. Liveness (rules 4 and 5) only holds on one host, so
+ * hosts sharing an ndx home must never share a slot directory:
  *
  * - `holder.json` — present exactly while the slot is held. JSON object:
  *   ```json
@@ -76,11 +81,15 @@
  *    slot is cleared by deleting the `holder.json` the wait report names,
  *    once no validation run is active.
  * 6. **Re-entrancy.** The holder exports its token to its children as
- *    `NDX_VALIDATION_SLOT`. An acquire that finds that variable naming the
- *    token in this directory's `holder.json`, with a live `pid` (rules 4 and
- *    5a), is nested: it returns at once and neither takes nor releases the
- *    slot. A token for a dead holder or another directory's holder is
- *    ignored.
+ *    `NDX_VALIDATION_SLOT` and its absolute slot directory as
+ *    `NDX_VALIDATION_SLOT_DIR`. An acquire that finds the token in the
+ *    `holder.json` of that directory (of its own directory when the variable
+ *    is unset or not absolute), with a live `pid` (rules 4 and 5a), is
+ *    nested: it returns at once, neither takes nor releases the slot, and
+ *    passes both variables on unchanged. So a nested run stays on its
+ *    parent's slot even when its own directory would resolve differently. A
+ *    token for a dead holder, or for a holder in another directory, is
+ *    ignored: the acquire takes its own directory's slot.
  * 7. **Waiting.** Poll at a bounded interval; report the holder (pid,
  *    project directory, since when, and the `holder.json` path) on the first
  *    wait and then periodically. Only the caller's abort signal stops a
@@ -92,7 +101,7 @@
 import { randomUUID } from "node:crypto";
 import { link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { uptime } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Protocol constants
@@ -100,6 +109,9 @@ import { join } from "node:path";
 
 /** The environment variable a holder exports its token to children under. */
 export const VALIDATION_SLOT_ENV = "NDX_VALIDATION_SLOT";
+
+/** The environment variable a holder exports its absolute slot directory under (rule 6). */
+export const VALIDATION_SLOT_DIR_ENV = "NDX_VALIDATION_SLOT_DIR";
 
 /** The slot root's name inside the ndx home; each host's slot is a subdirectory. */
 export const VALIDATION_SLOT_DIRNAME = "validation-slot";
@@ -168,7 +180,7 @@ export interface AcquireValidationSlotOptions {
   slotDir: string;
   /** The project this validation runs for; recorded for whoever waits. */
   projectDir: string;
-  /** Environment to read `NDX_VALIDATION_SLOT` from. Defaults to `process.env`. */
+  /** Environment to read `NDX_VALIDATION_SLOT` and `NDX_VALIDATION_SLOT_DIR` from. Defaults to `process.env`. */
   env?: NodeJS.ProcessEnv;
   /** The only thing that stops a wait (Ctrl-C, SIGTERM); there is no maximum wait. */
   signal?: AbortSignal;
@@ -190,7 +202,7 @@ export interface ValidationSlotLease {
   readonly nested: boolean;
   /** Milliseconds spent waiting for the slot. 0 when nested. */
   readonly queueWaitMs: number;
-  /** `base` with `NDX_VALIDATION_SLOT` set, for the validation command's children. */
+  /** `base` with `NDX_VALIDATION_SLOT` and `NDX_VALIDATION_SLOT_DIR` set, for the validation command's children. */
   childEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv;
   /** Record the launched validation command so a crash cannot free the slot under it. */
   recordChild(pid: number, options?: { group?: boolean }): Promise<void>;
@@ -487,8 +499,8 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
 // Leases
 // ---------------------------------------------------------------------------
 
-function withToken(base: NodeJS.ProcessEnv, token: string): NodeJS.ProcessEnv {
-  return { ...base, [VALIDATION_SLOT_ENV]: token };
+function withToken(base: NodeJS.ProcessEnv, slotDir: string, token: string): NodeJS.ProcessEnv {
+  return { ...base, [VALIDATION_SLOT_ENV]: token, [VALIDATION_SLOT_DIR_ENV]: slotDir };
 }
 
 function nestedLease(slotDir: string, token: string): ValidationSlotLease {
@@ -497,7 +509,7 @@ function nestedLease(slotDir: string, token: string): ValidationSlotLease {
     token,
     nested: true,
     queueWaitMs: 0,
-    childEnv: (base) => withToken(base, token),
+    childEnv: (base) => withToken(base, slotDir, token),
     // The enclosing holder owns the record and its child.
     recordChild: async () => {},
     release: async () => {},
@@ -511,7 +523,7 @@ function heldLease(slotDir: string, record: ValidationSlotHolder, queueWaitMs: n
     token: record.token,
     nested: false,
     queueWaitMs,
-    childEnv: (base) => withToken(base, record.token),
+    childEnv: (base) => withToken(base, slotDir, record.token),
     async recordChild(pid, options = {}) {
       if (released) throw new ValidationSlotLostError(slotDir);
       const current = await readValidationSlotHolder(slotDir);
@@ -534,8 +546,9 @@ function heldLease(slotDir: string, record: ValidationSlotHolder, queueWaitMs: n
 /**
  * Take the host's validation slot, waiting while another process holds it.
  *
- * Returns at once as a nested lease when `env` carries the token of this
- * slot's live holder (rule 6). Otherwise waits until the slot is free or
+ * Returns at once as a nested lease when `env` carries the token of the live
+ * holder of the slot `NDX_VALIDATION_SLOT_DIR` names, or of `slotDir` when it
+ * names none (rule 6); that lease's `slotDir` is the holder's. Otherwise waits until the slot is free or
  * stale, takes it, and reports the time spent waiting as `queueWaitMs`.
  *
  * @throws {ValidationSlotAbortedError} when `signal` fires while waiting.
@@ -552,8 +565,10 @@ export async function acquireValidationSlot(options: AcquireValidationSlotOption
 
   const inherited = env[VALIDATION_SLOT_ENV];
   if (inherited) {
-    const current = await readValidationSlotHolder(slotDir);
-    if (current?.token === inherited && isHolderProcessAlive(current)) return nestedLease(slotDir, inherited);
+    const inheritedDir = env[VALIDATION_SLOT_DIR_ENV];
+    const parentDir = inheritedDir && isAbsolute(inheritedDir) ? inheritedDir : slotDir;
+    const current = await readValidationSlotHolder(parentDir);
+    if (current?.token === inherited && isHolderProcessAlive(current)) return nestedLease(parentDir, inherited);
   }
 
   const record: ValidationSlotHolder = {

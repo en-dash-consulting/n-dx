@@ -27,8 +27,8 @@ import { resolveValidationSlotDir } from "./validation-slot-dir.js";
 
 /** Where and how a validation run takes the slot. */
 export interface ValidationSlotRunOptions {
-  /** The slot directory; `resolveValidationSlotDir()` in production. */
-  slotDir: string;
+  /** The slot directory. Omitted in production: `resolveValidationSlotDir()` when the slot is taken. */
+  slotDir?: string;
   /** The project the validation runs for, recorded for whoever waits. */
   projectDir: string;
   /** The only thing that stops a wait: the run's interrupt (Ctrl-C, SIGTERM). There is no maximum wait. */
@@ -58,8 +58,8 @@ export interface ValidationSlotExecOptions {
 }
 
 /**
- * Puts a command's exec options inside the slot: `NDX_VALIDATION_SLOT` into
- * its environment, and an `onSpawn` that records the spawned child in
+ * Puts a command's exec options inside the slot: `NDX_VALIDATION_SLOT` and
+ * `NDX_VALIDATION_SLOT_DIR` into its environment, and an `onSpawn` that records the spawned child in
  * `holder.json`, so a holder that crashes while the child runs does not free
  * the slot under it.
  */
@@ -83,10 +83,12 @@ export async function runInValidationSlot<T>(
   if (!slot) return { ok: true, value: await fn((options) => options) };
 
   let lease: ValidationSlotLease;
+  let slotDir = slot.slotDir;
   const queueStarted = Date.now();
   try {
+    slotDir ??= await resolveValidationSlotDir();
     lease = await acquireValidationSlot({
-      slotDir: slot.slotDir,
+      slotDir,
       projectDir: slot.projectDir,
       signal: slot.signal,
       onWait: slot.onWait,
@@ -114,8 +116,9 @@ export async function runInValidationSlot<T>(
     // no link() support, a directory where holder.json belongs). The command
     // runs without it: a gate that skipped its tests would let the run
     // continue unverified, while running unserialized only costs load.
+    const where = slotDir ?? "the ndx home";
     const slotWarning =
-      `skipped the validation slot and ran without it: could not take it in ${slot.slotDir}: ${describeReason(err)}`;
+      `skipped the validation slot and ran without it: could not take it in ${where}: ${describeReason(err)}`;
     slot.onWarning?.(slotWarning);
     return { ok: true, value: await fn((options) => options), slotWarning };
   }
@@ -172,7 +175,7 @@ async function recordChildReportingFailure(
     await lease.recordChild(child.pid, { group: child.group });
     return undefined;
   } catch (err) {
-    const warning = `could not record the validation command (pid ${child.pid}) in ${slot.slotDir}: ${describeReason(err)}`;
+    const warning = `could not record the validation command (pid ${child.pid}) in ${lease.slotDir}: ${describeReason(err)}`;
     slot.onWarning?.(warning);
     return warning;
   }
@@ -192,7 +195,7 @@ async function releaseReportingFailure(
     await lease.release();
     return undefined;
   } catch (err) {
-    const warning = `could not release the validation slot in ${slot.slotDir}: ${describeReason(err)}`;
+    const warning = `could not release the validation slot in ${lease.slotDir}: ${describeReason(err)}`;
     slot.onWarning?.(warning);
     return warning;
   }
@@ -207,7 +210,6 @@ export function validationSlotFromConfig(
   if (config?.testGate?.hostSlot !== true) return undefined;
   const print = options.print;
   return {
-    slotDir: resolveValidationSlotDir(),
     projectDir,
     signal: options.signal,
     onWait: print ? (wait) => print(describeValidationSlotWait(wait)) : undefined,
