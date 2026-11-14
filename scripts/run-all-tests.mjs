@@ -49,7 +49,9 @@
  * `NDX_VALIDATION_SLOT` names the live holder of the slot directory in
  * `NDX_VALIDATION_SLOT_DIR`) runs inside that holder's slot. The suites it
  * runs get both variables, so a nested gate or runner nests on this one.
- * `--list` never takes it. Always on here: the runner is repository tooling,
+ * `--list` never takes it, nor does an affected run with nothing to run or
+ * rebuild. A slot that cannot be taken is skipped with a warning and the
+ * suites run without it. Always on here: the runner is repository tooling,
  * not hench config.
  */
 
@@ -125,7 +127,15 @@ function runSuite(label, binary, args) {
     });
     runningChild = child;
     // A runner killed outright must not free the slot under a suite still running.
-    if (child.pid) slot?.recordChild(child.pid).catch((err) => warnSlot("record the running suite in", err));
+    // Chained, and awaited before release, so a late record cannot recreate
+    // holder.json after the slot was given back.
+    const held = slot;
+    if (held && child.pid) {
+      const pid = child.pid;
+      recording = recording.then(() =>
+        held.recordChild(pid).catch((err) => warnSlot("record the running suite in", err)),
+      );
+    }
 
     for (const [stream, sink] of [
       [child.stdout, process.stdout],
@@ -263,8 +273,15 @@ async function rebuildStalePackages(changed) {
   for (const s of stale) console.log(`test-gate: rebuilt ${s.name}`);
 }
 
-/** The held (or nested) validation slot; null before it is taken, with --list, or with --no-slot. */
+/**
+ * The held (or nested) validation slot; null before it is taken, with --list,
+ * with --no-slot, with nothing to run, or when it could not be taken.
+ */
 let slot = null;
+/** Why the run has no slot, for the summary line; null while it holds one. */
+let slotNotTaken = null;
+/** The suites' holder.json records, in spawn order; release waits for them. */
+let recording = Promise.resolve();
 /** The suite running now, so SIGTERM can be passed on to it. */
 let runningChild = null;
 /** The signal that stopped this run, if one did. */
@@ -276,6 +293,7 @@ function warnSlot(action, err) {
 
 /** Give the slot back, then exit. Every exit after the slot is taken goes through here. */
 async function finish(code) {
+  await recording;
   if (slot) await slot.release().catch((err) => warnSlot("release", err));
   process.exit(code);
 }
@@ -288,6 +306,12 @@ const signalExitCode = (signal) => 128 + osConstants.signals[signal];
  * SIGINT/SIGTERM while waiting gives up. Once it is held they stop the run
  * after the running suite exits: Ctrl-C reaches the suite through the
  * terminal already, and SIGTERM is passed on to it.
+ *
+ * A slot that cannot be taken (EACCES or ENOSPC under the ndx home, a sandbox
+ * that does not grant it, a failed host lookup) is skipped with a warning and
+ * the suites run without it, as hench's gate does: a run that skipped its
+ * suites would leave the change unverified, while an unserialized one only
+ * costs load. Returns null then.
  */
 async function takeSlot() {
   const controller = new AbortController();
@@ -300,6 +324,7 @@ async function takeSlot() {
   process.on("SIGTERM", onSignal);
   // The slot root names the failure until the host directory resolves.
   let slotDir = validationSlotRootDir();
+  const started = Date.now();
   try {
     slotDir = await resolveValidationSlotDir();
     return await acquireValidationSlot({
@@ -309,12 +334,16 @@ async function takeSlot() {
       onWait: (wait) => console.log(describeValidationSlotWait(wait)),
     });
   } catch (err) {
-    if (err instanceof ValidationSlotAbortedError) {
-      console.error(`Stopped waiting for the validation slot after ${seconds(err.queueWaitMs)} (${interruptedBy}).`);
+    // An interrupt that fired before the slot failed still stops without running.
+    if (err instanceof ValidationSlotAbortedError || controller.signal.aborted) {
+      const waited = err instanceof ValidationSlotAbortedError ? err.queueWaitMs : Date.now() - started;
+      console.error(`Stopped waiting for the validation slot after ${seconds(waited)} (${interruptedBy}).`);
       process.exit(signalExitCode(interruptedBy));
     }
-    for (const line of describeValidationSlotFailure(err, slotDir)) console.error(line);
-    process.exit(1);
+    for (const line of describeValidationSlotFailure(err, slotDir)) console.warn(`WARNING: ${line}`);
+    console.warn("WARNING: running the suites without the validation slot.");
+    slotNotTaken = `skipped (could not take it in ${slotDir}: ${err?.message ?? err})`;
+    return null;
   }
 }
 
@@ -365,7 +394,13 @@ if (positional[0] === "affected") {
   labels = resolved.labels;
 }
 
-if (!listOnly && !noSlot) slot = await takeSlot();
+// An affected run that selects nothing and has nothing to rebuild loads
+// nothing, so it does not queue behind another run.
+const nothingToRun =
+  labels.length === 0 && !(changedForRebuild && staleChangedPackages(ROOT, changedForRebuild, manifests).length > 0);
+if (noSlot) slotNotTaken = "not taken (--no-slot)";
+else if (nothingToRun) slotNotTaken = "not taken (nothing to run)";
+else if (!listOnly) slot = await takeSlot();
 if (changedForRebuild) await rebuildStalePackages(changedForRebuild);
 
 // Machine-readable protocol lines: hench parses these.
@@ -407,7 +442,7 @@ console.log(
   (failed.length > 0 ? ` — failed: ${failed.map((f) => f.label).join(", ")}` : ""),
 );
 console.log(`test-gate: failed-suites=${failed.map((f) => f.short).join(",")}`);
-if (!slot) console.log("Validation slot: not taken (--no-slot)");
+if (!slot) console.log(`Validation slot: ${slotNotTaken}`);
 else if (slot.nested) console.log("Validation slot: ran inside the slot of the process that started this runner");
 else console.log(`Validation slot: queued ${seconds(slot.queueWaitMs)}`);
 
