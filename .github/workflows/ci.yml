@@ -6,13 +6,13 @@
 #   → (macOS/Windows: smoke collect)
 # then smoke-parity compares the macOS and Windows smoke artifacts.
 #
-# The test suites run in a separate `test` matrix job: three suite groups per
-# OS, nine jobs in all, each doing its own install and build. They used to be
+# The test suites run in a separate `test` matrix job: four suite groups per
+# OS, twelve jobs in all, each doing its own install and build. They used to be
 # two steps at the end of `build`, which ran the root suite and then every
 # package suite in series on one runner: 28 to 29 minutes on Windows against a
 # 30 minute timeout (run 38193308009). Splitting by suite group turns that
-# into three jobs of roughly a third each, for about the same billed minutes
-# plus one install and build per job.
+# into four shorter jobs, for about the same billed minutes plus one install
+# and build per job.
 #
 # Node 22 LTS. Exact pnpm version managed by corepack via packageManager
 # field in package.json.
@@ -299,14 +299,16 @@ jobs:
         if: runner.os == 'Linux'
         run: pnpm exec changeset status --since=origin/main
 
-  # THE TEST SUITES: THREE GROUPS PER OS, NINE JOBS, ALL IN PARALLEL.
+  # THE TEST SUITES: FOUR GROUPS PER OS, TWELVE JOBS, ALL IN PARALLEL.
   #
   # Each group is a comma list of suite labels that scripts/run-all-tests.mjs
   # already accepts (`root` is tests/**, the rest are package directory names).
-  # The groups pair a long suite with a short one so the three jobs on a given
-  # OS finish close together; measured per-suite seconds on run 38193308009
+  # The groups pair a long suite with a short one so the jobs on a given OS
+  # finish close together; measured per-suite seconds on run 38193308009
   # (Windows): root 484, rex 423, hench 366, web 266, sourcevision 98,
-  # llm-client 29. Rebalance when those move.
+  # llm-client 29. hench and web run alone: paired, they outgrew the Windows
+  # timeout once hench reached 703-711 s beside web's ~400 s (2026-11-13).
+  # Rebalance when those move.
   #
   # Every group runs on EVERY OS and EVERY event, macOS included. macOS bills at
   # 10x Linux minutes, but coverage is not traded for speed here: tests/** is
@@ -327,7 +329,7 @@ jobs:
   # loopback-bind suites when the runner can't bind a local socket.
   #
   # No `needs: build`: each job installs and builds for itself (about a minute
-  # and a half on Windows) so the nine start together rather than queueing
+  # and a half on Windows) so the twelve start together rather than queueing
   # behind the validate leg.
   test:
     name: Tests (${{ matrix.runner }}, ${{ matrix.group }})
@@ -336,19 +338,21 @@ jobs:
     if: github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'ci:run')
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
-      # The default would cancel the other eight the moment one fails, hiding
+      # The default would cancel the other eleven the moment one fails, hiding
       # whether a defect is platform-specific or suite-specific.
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        group: [root+llm-client, rex+sourcevision, hench+web]
+        group: [root+llm-client, rex+sourcevision, hench, web]
         include:
           - group: root+llm-client
             suites: root,llm-client,lang-kit,lang-runtime,lang-java,lang-go,lang-sql,lang-terraform,lang-python
           - group: rex+sourcevision
             suites: rex,sourcevision,graview,graview-face
-          - group: hench+web
-            suites: hench,web
+          - group: hench
+            suites: hench
+          - group: web
+            suites: web
           - os: ubuntu-latest
             runner: Linux
             timeout: 15
@@ -357,8 +361,9 @@ jobs:
             timeout: 15
           # Windows gets 20 rather than 15: the heaviest group measured 10.4
           # minutes of suite time, 11.9 for the job (run 38274629084), and a
-          # timeout kill presents as a red job. Lower it once the later layers
-          # of this series land and real runs sit comfortably under 15.
+          # timeout kill presents as a red job. hench alone has since taken
+          # 703-711 s of suite time there (2026-11-13). Lower it once real
+          # runs sit comfortably under 15.
           - os: windows-latest
             runner: Windows
             timeout: 20

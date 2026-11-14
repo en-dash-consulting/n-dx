@@ -37,7 +37,14 @@ items:
     lastModified: "2026-11-14T05:08:30.435Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
-    lastModified: "2026-11-14T04:58:43.847Z"
+    status: "completed"
+    startedAt: "2026-11-14T05:08:40.369Z"
+    completedAt: "2026-11-14T05:10:35.873Z"
+    endedAt: "2026-11-14T05:10:35.873Z"
+    activeIntervals: [{"end":"2026-11-14T05:10:35.873Z","start":"2026-11-14T05:08:40.369Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml test matrix and release.yml validate matrix: hench+web split into hench and web groups; leg-count and Windows timeout comments updated (timeout stays 20)."
+    lastModified: "2026-11-14T05:10:35.873Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "61977eb2-9bdc-4f1d-9bf0-5be0fc593e0b":
     status: "completed"
