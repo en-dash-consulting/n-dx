@@ -125,6 +125,18 @@ describe("spawnWithAdapter session bounds", () => {
     await expect(readFile(pidFile, "utf-8")).rejects.toThrow();
   });
 
+  it("an abort while the spawn is being prepared starts no process", async () => {
+    const controller = new AbortController();
+    const pending = spawn("forever", { abortSignal: controller.signal, timeoutMs: 10_000 });
+    // Before any listener is attached: the spawn awaits its pre-spawn step first.
+    controller.abort(new Error("Interrupted by SIGINT"));
+    const result = await pending;
+
+    expect(result.aborted?.reason).toBe("Interrupted by SIGINT");
+    expect(result.timedOut).toBeUndefined();
+    await expect(readFile(pidFile, "utf-8")).rejects.toThrow();
+  });
+
   it("the session time limit terminates the tree and marks the result timed out", async () => {
     const result = await spawn("slow", { timeoutMs: 300 });
 
