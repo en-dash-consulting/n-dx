@@ -370,14 +370,14 @@ describe("TIER_MODELS", () => {
 });
 
 describe("normalizeCodexModel", () => {
-  it("maps legacy codex brand IDs to current canonical models", () => {
-    expect(normalizeCodexModel("gpt-5-codex")).toBe(NEWEST_MODELS.codex);
-    expect(normalizeCodexModel("gpt-5.1-codex-max")).toBe(NEWEST_MODELS.codex);
-    expect(normalizeCodexModel("gpt-5.1-codex-mini")).toBe(TIER_MODELS.codex.light);
+  it("preserves intentional older Codex IDs", () => {
+    expect(normalizeCodexModel("gpt-5-codex")).toBe("gpt-5-codex");
+    expect(normalizeCodexModel("gpt-5.1-codex-max")).toBe("gpt-5.1-codex-max");
+    expect(normalizeCodexModel("gpt-5.1-codex-mini")).toBe("gpt-5.1-codex-mini");
   });
 
   it("passes through current catalog model IDs unchanged", () => {
-    for (const id of ["gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
+    for (const id of ["gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
       expect(normalizeCodexModel(id)).toBe(id);
     }
   });

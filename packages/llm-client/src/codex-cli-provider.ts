@@ -28,7 +28,8 @@ import type {
   CompletionRequest,
   CompletionResult,
 } from "./types.js";
-import { ClaudeClientError } from "./types.js";
+import { classifyLLMError } from "./llm-error-classifier.js";
+import { CLI_ERROR_CODES, ClaudeClientError } from "./types.js";
 import type { CodexConfig } from "./llm-types.js";
 import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-contract.js";
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
@@ -397,6 +398,12 @@ async function spawnOnce(
         const notFoundMessage = diagnoseCliNotFound(detail, cliBinary, "llm.codex.cli_path");
         if (notFoundMessage) {
           reject(new ClaudeClientError(notFoundMessage, "not-found", false));
+          return;
+        }
+
+        const diagnosis = classifyLLMError(new Error(detail), "codex");
+        if (diagnosis.code === CLI_ERROR_CODES.INVALID_CONFIGURATION) {
+          reject(new ClaudeClientError(`${detail}\n${diagnosis.suggestion}`, "unknown", false));
           return;
         }
 
