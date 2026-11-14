@@ -6,10 +6,10 @@ items:
     completedAt: "2026-11-14T06:32:37.981Z"
     endedAt: "2026-11-14T06:32:37.981Z"
     activeIntervals: [{"end":"2026-11-14T06:32:37.981Z","start":"2026-11-14T06:32:37.981Z"}]
-    appliedAt: "2026-11-14T06:32:37.981Z"
-    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     resolutionType: "code-change"
     resolutionDetail: "Fixed by task 6af46475 (change 4335fd54, run 1123a421, commit 54f045a81): an index.php in public/, web/, htdocs/, www/ or public_html/ is a weak PHP marker."
+    appliedAt: "2026-11-14T06:32:37.981Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-14T06:20:21.248Z"
     lastModified: "2026-11-14T06:32:37.981Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

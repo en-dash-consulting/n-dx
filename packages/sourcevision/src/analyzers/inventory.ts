@@ -124,7 +124,7 @@ function languageNames(extensions: Iterable<string>): Set<string> {
 /**
  * Languages parsed only through an opt-in pack with no fallback parser
  * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`; PHP: `@n-dx/lang-php`,
- * not yet published, so PHP is never listed). `javaSecondaryConfig`
+ * which produces no imports yet, so PHP is never listed). `javaSecondaryConfig`
  * shares `javaConfig`'s id and extensions, so a Java secondary is covered too.
  * The inventory phase runs before anything loads the pack, so it leaves them
  * out of `analysedLanguages`; listing them would claim analysis the pack may

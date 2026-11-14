@@ -7,7 +7,14 @@ items:
     lastModified: "2026-11-14T05:22:16.333Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aac5fad8-89d8-4cd4-8e2e-d1edf328c2ad":
-    lastModified: "2026-11-14T05:19:23.221Z"
+    status: "completed"
+    startedAt: "2026-11-14T06:36:47.010Z"
+    completedAt: "2026-11-14T06:45:48.389Z"
+    endedAt: "2026-11-14T06:45:48.389Z"
+    activeIntervals: [{"end":"2026-11-14T06:45:48.389Z","start":"2026-11-14T06:36:47.010Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php scaffolded with pinned tree-sitter-php (php/ subdir) and registered as an opt-in pack; build-grammars supports subdir"
+    lastModified: "2026-11-14T06:45:48.389Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd04acac-099e-4ea0-8364-84298a85678a":
     createdAt: "2026-11-14T05:17:52.622Z"
