@@ -8,6 +8,7 @@ import {
   LINUX_MACHINE_ID_FILES,
   readHostIdentity,
   resolveValidationSlotDir,
+  runLookup,
   validationSlotHostDirname,
   type HostIdentity,
   type HostIdentitySources,
@@ -140,6 +141,25 @@ describe("readHostIdentity", () => {
       },
     });
     expect(await readHostIdentity(src)).toEqual({ kind: "machine", id: LINUX_ID });
+  });
+});
+
+describe("runLookup", () => {
+  const node = process.execPath;
+
+  it("reports a command's exit code and stdout, zero or not", async () => {
+    expect(await runLookup(node, ["-e", "process.stdout.write('id'); process.exit(0)"])).toEqual(exited("id"));
+    expect(await runLookup(node, ["-e", "process.exit(3)"])).toEqual(exited("", 3));
+  });
+
+  it("reports a missing binary as missing, so the host has no source", async () => {
+    expect(await runLookup(join(tmpdir(), "ndx-no-such-lookup-binary"), [])).toEqual({ kind: "missing" });
+  });
+
+  it("reports a timeout as failed, never as missing or an exit", async () => {
+    const run = await runLookup(node, ["-e", "setTimeout(() => {}, 30000)"], 200);
+    expect(run.kind).toBe("failed");
+    if (run.kind === "failed") expect(run.reason).toMatch(/timed out/);
   });
 });
 

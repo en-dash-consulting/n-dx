@@ -82,8 +82,9 @@ export const LINUX_MACHINE_ID_FILES = ["/etc/machine-id", "/var/lib/dbus/machine
 /** How long a platform lookup command may run; see the module header. */
 export const LOOKUP_TIMEOUT_MS = 10_000;
 
-async function runLookup(file: string, args: string[]): Promise<LookupRun> {
-  const result = await exec(file, args, { cwd: tmpdir(), timeout: LOOKUP_TIMEOUT_MS });
+/** Run a lookup command through `exec` and say how it ended; the default `HostIdentitySources.run`. */
+export async function runLookup(file: string, args: string[], timeoutMs = LOOKUP_TIMEOUT_MS): Promise<LookupRun> {
+  const result = await exec(file, args, { cwd: tmpdir(), timeout: timeoutMs });
   if (result.launched && result.exitCode !== null) {
     return { kind: "exited", exitCode: result.exitCode, stdout: result.stdout };
   }
@@ -94,7 +95,7 @@ async function runLookup(file: string, args: string[]): Promise<LookupRun> {
 const DEFAULT_SOURCES: HostIdentitySources = {
   platform: process.platform,
   readFile: (path) => readFile(path, "utf-8"),
-  run: runLookup,
+  run: (file, args) => runLookup(file, args),
   hostname,
 };
 
