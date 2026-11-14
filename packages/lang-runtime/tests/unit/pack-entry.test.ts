@@ -206,7 +206,9 @@ describe("readPackFacts with PHP's symbol kinds and import guard", () => {
       },
     ],
   };
-  const phpLike: LanguagePack = { ...pack, produces: ["imports", "symbols"] };
+  // Taken before any read, so the adapter handing back the same object cannot hide an in-place edit.
+  const expectedImports = structuredClone(imports);
+  const phpLike: LanguagePack ={ ...pack, produces: ["imports", "symbols"] };
 
   it("reads trait, namespace and constant symbols; a trait contains its members, a namespace does not", () => {
     const facts = readPackFacts(phpLike, file, { resolver: { resolve: () => imports }, symbolRules });
@@ -221,7 +223,7 @@ describe("readPackFacts with PHP's symbol kinds and import guard", () => {
 
   it("hands the resolver's conditional import and its candidates over unchanged", () => {
     const facts = readPackFacts(phpLike, file, { resolver: { resolve: () => imports }, symbolRules });
-    expect(facts.imports).toEqual(imports);
+    expect(facts.imports).toEqual(expectedImports);
   });
 });
 

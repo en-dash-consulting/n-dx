@@ -183,6 +183,8 @@ describe("buildPackImportGraph", () => {
         ],
       },
     ];
+    // Taken before any run, so a sink handed the same objects cannot hide an in-place edit.
+    const expected = structuredClone(facts);
     const graphOf = async (collected: FileFacts[]) => {
       const entry = { ...stubEntry(javaConfig, { facts, unparsed: [] }), produces: ["imports", "routes"] as const };
       return buildPackImportGraph([file("src/A.java"), file("src/B.java"), file("config/a.php"), file("config/b.php")], "/project", {
@@ -195,7 +197,7 @@ describe("buildPackImportGraph", () => {
     it("hands the facts over unchanged", async () => {
       const collected: FileFacts[] = [];
       await graphOf(collected);
-      expect(collected).toEqual(facts);
+      expect(collected).toEqual(expected);
     });
 
     it("never turns include candidates into import edges", async () => {
