@@ -92,7 +92,7 @@ the listed packs.
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
 the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
 python, php, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today, and
-php produces no facts yet). npm
+php reports its imports as written but resolves none into edges yet). npm
 never runs lifecycle scripts: no pack needs one (grammars are prebuilt WASM),
 and a script anywhere in the dependency tree would otherwise run with the
 user's privileges.

@@ -16,7 +16,13 @@
 
 ### What it reads
 
-Nothing yet: `phpPack` has no queries and `produces` is empty, so sourcevision degrades PHP with `the pack does not produce "imports"` and PHP files keep inventory only.
+`produces` is `imports`, `symbols` and `calls`, from `queries/php/` (provenance per rule in `src/php-pack.ts`). Inline HTML is never captured.
+
+- **Imports** (`src/php-imports.ts`): `FileReferences.written` only, each with its `form` (the four include forms, `use`, `use function`, `use const`). An include's specifier is its path expression as written, quotes included (the parentheses of `require_once("x")` dropped); a `use` gives the qualified name (a group use's prefix joined to each entry) and any `alias`. An include inside a branch, `switch`, loop, function or method body, a short-circuit right operand, `?:` or `match` carries the `conditional` guard (`guards.scm`). `phpResolver` resolves nothing: `files` and `external` are always empty, so sourcevision records PHP as analysed with no edges. Candidate files for dynamic includes are not filled yet.
+- **Symbols** (`src/php-symbols.ts`): class, interface, trait, enum, function, method, namespace (not a container) and constant (`const` elements, class constants, `define()` with a literal name). `__construct`, and a method named as its class in a class outside any namespace with no `__construct`, are constructors; functions and `define()` constants are never members.
+- **Calls**: function, method, nullsafe and static calls with the receiver or scope as written, and `new` (`construct: true`, the class as callee), with or without an argument list.
+
+Goldens: `tests/fixtures/language-packs/php/` (`php52/`, `php53/`, `php8/`), updated with `test:update-goldens`.
 
 ### Scripts
 

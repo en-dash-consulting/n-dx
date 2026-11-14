@@ -1,0 +1,6436 @@
+{
+  "pack": "php",
+  "grammar": {
+    "name": "tree-sitter-php",
+    "version": "0.25.1"
+  },
+  "files": [
+    {
+      "status": "parsed",
+      "path": "php52/index.php",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "import.require_once",
+            "nodeType": "require_once_expression",
+            "text": "require_once(dirname(__FILE__) . '/lib/Shop/Cart.php')",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 54
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "parenthesized_expression",
+            "text": "(dirname(__FILE__) . '/lib/Shop/Cart.php')",
+            "start": {
+              "line": 3,
+              "column": 12
+            },
+            "end": {
+              "line": 3,
+              "column": 54
+            }
+          },
+          {
+            "name": "import.inner_path",
+            "nodeType": "binary_expression",
+            "text": "dirname(__FILE__) . '/lib/Shop/Cart.php'",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 53
+            }
+          },
+          {
+            "name": "import.require_once",
+            "nodeType": "require_once_expression",
+            "text": "require_once dirname(__FILE__) . \"/config.inc.php\"",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 50
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "dirname(__FILE__) . \"/config.inc.php\"",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 50
+            }
+          },
+          {
+            "name": "import.include",
+            "nodeType": "include_expression",
+            "text": "include 'header.php'",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'header.php'",
+            "start": {
+              "line": 5,
+              "column": 8
+            },
+            "end": {
+              "line": 5,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.include_once",
+            "nodeType": "include_once_expression",
+            "text": "include_once('optional.php')",
+            "start": {
+              "line": 6,
+              "column": 1
+            },
+            "end": {
+              "line": 6,
+              "column": 29
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "parenthesized_expression",
+            "text": "('optional.php')",
+            "start": {
+              "line": 6,
+              "column": 13
+            },
+            "end": {
+              "line": 6,
+              "column": 29
+            }
+          },
+          {
+            "name": "import.inner_path",
+            "nodeType": "string",
+            "text": "'optional.php'",
+            "start": {
+              "line": 6,
+              "column": 14
+            },
+            "end": {
+              "line": 6,
+              "column": 28
+            }
+          },
+          {
+            "name": "import.include",
+            "nodeType": "include_expression",
+            "text": "include SHOP_ROOT . '/local.php'",
+            "start": {
+              "line": 17,
+              "column": 4
+            },
+            "end": {
+              "line": 17,
+              "column": 36
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "SHOP_ROOT . '/local.php'",
+            "start": {
+              "line": 17,
+              "column": 12
+            },
+            "end": {
+              "line": 17,
+              "column": 36
+            }
+          },
+          {
+            "name": "import.include",
+            "nodeType": "include_expression",
+            "text": "include 'fallback.php'",
+            "start": {
+              "line": 19,
+              "column": 4
+            },
+            "end": {
+              "line": 19,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'fallback.php'",
+            "start": {
+              "line": 19,
+              "column": 12
+            },
+            "end": {
+              "line": 19,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require 'defaults.php'",
+            "start": {
+              "line": 21,
+              "column": 4
+            },
+            "end": {
+              "line": 21,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'defaults.php'",
+            "start": {
+              "line": 21,
+              "column": 12
+            },
+            "end": {
+              "line": 21,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.require_once",
+            "nodeType": "require_once_expression",
+            "text": "require_once 'compat/json.php'",
+            "start": {
+              "line": 24,
+              "column": 34
+            },
+            "end": {
+              "line": 24,
+              "column": 64
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'compat/json.php'",
+            "start": {
+              "line": 24,
+              "column": 47
+            },
+            "end": {
+              "line": 24,
+              "column": 64
+            }
+          },
+          {
+            "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require 'settings.php'",
+            "start": {
+              "line": 25,
+              "column": 10
+            },
+            "end": {
+              "line": 25,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'settings.php'",
+            "start": {
+              "line": 25,
+              "column": 18
+            },
+            "end": {
+              "line": 25,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require 'boot.php' or die('boot failed')",
+            "start": {
+              "line": 26,
+              "column": 0
+            },
+            "end": {
+              "line": 26,
+              "column": 40
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "'boot.php' or die('boot failed')",
+            "start": {
+              "line": 26,
+              "column": 8
+            },
+            "end": {
+              "line": 26,
+              "column": 40
+            }
+          },
+          {
+            "name": "import.include",
+            "nodeType": "include_expression",
+            "text": "include 'pages/' . $page . '.php'",
+            "start": {
+              "line": 30,
+              "column": 8
+            },
+            "end": {
+              "line": 30,
+              "column": 41
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "'pages/' . $page . '.php'",
+            "start": {
+              "line": 30,
+              "column": 16
+            },
+            "end": {
+              "line": 30,
+              "column": 41
+            }
+          },
+          {
+            "name": "import.include_once",
+            "nodeType": "include_once_expression",
+            "text": "include_once $plugin",
+            "start": {
+              "line": 35,
+              "column": 4
+            },
+            "end": {
+              "line": 35,
+              "column": 24
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "variable_name",
+            "text": "$plugin",
+            "start": {
+              "line": 35,
+              "column": 17
+            },
+            "end": {
+              "line": 35,
+              "column": 24
+            }
+          },
+          {
+            "name": "import.include",
+            "nodeType": "include_expression",
+            "text": "include 'partials/user.php'",
+            "start": {
+              "line": 46,
+              "column": 8
+            },
+            "end": {
+              "line": 46,
+              "column": 35
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'partials/user.php'",
+            "start": {
+              "line": 46,
+              "column": 16
+            },
+            "end": {
+              "line": 46,
+              "column": 35
+            }
+          },
+          {
+            "name": "import.include",
+            "nodeType": "include_expression",
+            "text": "include 'partials/login.php'",
+            "start": {
+              "line": 49,
+              "column": 8
+            },
+            "end": {
+              "line": 49,
+              "column": 36
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'partials/login.php'",
+            "start": {
+              "line": 49,
+              "column": 16
+            },
+            "end": {
+              "line": 49,
+              "column": 36
+            }
+          }
+        ],
+        "guards": [
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    define('SHOP_DEBUG', false);\n}",
+            "start": {
+              "line": 12,
+              "column": 28
+            },
+            "end": {
+              "line": 14,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    include SHOP_ROOT . '/local.php';\n}",
+            "start": {
+              "line": 16,
+              "column": 43
+            },
+            "end": {
+              "line": 18,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    include 'fallback.php';\n}",
+            "start": {
+              "line": 18,
+              "column": 21
+            },
+            "end": {
+              "line": 20,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    require 'defaults.php';\n}",
+            "start": {
+              "line": 20,
+              "column": 7
+            },
+            "end": {
+              "line": 22,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "require_once_expression",
+            "text": "require_once 'compat/json.php'",
+            "start": {
+              "line": 24,
+              "column": 34
+            },
+            "end": {
+              "line": 24,
+              "column": 64
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "function_call_expression",
+            "text": "die('boot failed')",
+            "start": {
+              "line": 26,
+              "column": 22
+            },
+            "end": {
+              "line": 26,
+              "column": 40
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "switch_block",
+            "text": "{\n    case 'cart':\n        include 'pages/' . $page . '.php';\n        break;\n}",
+            "start": {
+              "line": 28,
+              "column": 15
+            },
+            "end": {
+              "line": 32,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    include_once $plugin;\n}",
+            "start": {
+              "line": 34,
+              "column": 30
+            },
+            "end": {
+              "line": 36,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "colon_block",
+            "text": ": ?>\n  <?php include 'partials/user.php'; ?>\n  <p>Hello, <?= $user->getName()",
+            "start": {
+              "line": 45,
+              "column": 16
+            },
+            "end": {
+              "line": 47,
+              "column": 32
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "colon_block",
+            "text": ": ?>\n  <?php include 'partials/login.php';",
+            "start": {
+              "line": 48,
+              "column": 10
+            },
+            "end": {
+              "line": 49,
+              "column": 37
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{ ?>\n  <li><?php echo format_price($item[\"price\"], \"USD\"); ?></li>\n<?php }",
+            "start": {
+              "line": 52,
+              "column": 40
+            },
+            "end": {
+              "line": 54,
+              "column": 7
+            }
+          }
+        ],
+        "definitions": [
+          {
+            "name": "define.declaration",
+            "nodeType": "function_call_expression",
+            "text": "define('SHOP_ROOT', dirname(__FILE__))",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 38
+            }
+          },
+          {
+            "name": "define.name",
+            "nodeType": "string",
+            "text": "'SHOP_ROOT'",
+            "start": {
+              "line": 8,
+              "column": 7
+            },
+            "end": {
+              "line": 8,
+              "column": 18
+            }
+          },
+          {
+            "name": "define.declaration",
+            "nodeType": "function_call_expression",
+            "text": "define(\"SHOP_VERSION\", '1.0')",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 29
+            }
+          },
+          {
+            "name": "define.name",
+            "nodeType": "encapsed_string",
+            "text": "\"SHOP_VERSION\"",
+            "start": {
+              "line": 9,
+              "column": 7
+            },
+            "end": {
+              "line": 9,
+              "column": 21
+            }
+          },
+          {
+            "name": "define.declaration",
+            "nodeType": "function_call_expression",
+            "text": "define('SHOP_DEBUG', false)",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 31
+            }
+          },
+          {
+            "name": "define.name",
+            "nodeType": "string",
+            "text": "'SHOP_DEBUG'",
+            "start": {
+              "line": 13,
+              "column": 11
+            },
+            "end": {
+              "line": 13,
+              "column": 23
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "dirname(__FILE__)",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "dirname",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(__FILE__)",
+            "start": {
+              "line": 3,
+              "column": 20
+            },
+            "end": {
+              "line": 3,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "dirname(__FILE__)",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "dirname",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(__FILE__)",
+            "start": {
+              "line": 4,
+              "column": 20
+            },
+            "end": {
+              "line": 4,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "define('SHOP_ROOT', dirname(__FILE__))",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 38
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "define",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 6
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('SHOP_ROOT', dirname(__FILE__))",
+            "start": {
+              "line": 8,
+              "column": 6
+            },
+            "end": {
+              "line": 8,
+              "column": 38
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'SHOP_ROOT'",
+            "start": {
+              "line": 8,
+              "column": 7
+            },
+            "end": {
+              "line": 8,
+              "column": 18
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "dirname(__FILE__)",
+            "start": {
+              "line": 8,
+              "column": 20
+            },
+            "end": {
+              "line": 8,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "dirname",
+            "start": {
+              "line": 8,
+              "column": 20
+            },
+            "end": {
+              "line": 8,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(__FILE__)",
+            "start": {
+              "line": 8,
+              "column": 27
+            },
+            "end": {
+              "line": 8,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "define(\"SHOP_VERSION\", '1.0')",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "define",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 6
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(\"SHOP_VERSION\", '1.0')",
+            "start": {
+              "line": 9,
+              "column": 6
+            },
+            "end": {
+              "line": 9,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "encapsed_string",
+            "text": "\"SHOP_VERSION\"",
+            "start": {
+              "line": 9,
+              "column": 7
+            },
+            "end": {
+              "line": 9,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'1.0'",
+            "start": {
+              "line": 9,
+              "column": 23
+            },
+            "end": {
+              "line": 9,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "define($dynamicName, 1)",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "define",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 6
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($dynamicName, 1)",
+            "start": {
+              "line": 10,
+              "column": 6
+            },
+            "end": {
+              "line": 10,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "defined('SHOP_DEBUG')",
+            "start": {
+              "line": 12,
+              "column": 5
+            },
+            "end": {
+              "line": 12,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "defined",
+            "start": {
+              "line": 12,
+              "column": 5
+            },
+            "end": {
+              "line": 12,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('SHOP_DEBUG')",
+            "start": {
+              "line": 12,
+              "column": 12
+            },
+            "end": {
+              "line": 12,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'SHOP_DEBUG'",
+            "start": {
+              "line": 12,
+              "column": 13
+            },
+            "end": {
+              "line": 12,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "define('SHOP_DEBUG', false)",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "define",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 10
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('SHOP_DEBUG', false)",
+            "start": {
+              "line": 13,
+              "column": 10
+            },
+            "end": {
+              "line": 13,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'SHOP_DEBUG'",
+            "start": {
+              "line": 13,
+              "column": 11
+            },
+            "end": {
+              "line": 13,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "file_exists(SHOP_ROOT . '/local.php')",
+            "start": {
+              "line": 16,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "file_exists",
+            "start": {
+              "line": 16,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 15
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(SHOP_ROOT . '/local.php')",
+            "start": {
+              "line": 16,
+              "column": 15
+            },
+            "end": {
+              "line": 16,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "function_exists('json_encode')",
+            "start": {
+              "line": 24,
+              "column": 0
+            },
+            "end": {
+              "line": 24,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "function_exists",
+            "start": {
+              "line": 24,
+              "column": 0
+            },
+            "end": {
+              "line": 24,
+              "column": 15
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('json_encode')",
+            "start": {
+              "line": 24,
+              "column": 15
+            },
+            "end": {
+              "line": 24,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'json_encode'",
+            "start": {
+              "line": 24,
+              "column": 16
+            },
+            "end": {
+              "line": 24,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "die('boot failed')",
+            "start": {
+              "line": 26,
+              "column": 22
+            },
+            "end": {
+              "line": 26,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "die",
+            "start": {
+              "line": 26,
+              "column": 22
+            },
+            "end": {
+              "line": 26,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('boot failed')",
+            "start": {
+              "line": 26,
+              "column": 25
+            },
+            "end": {
+              "line": 26,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'boot failed'",
+            "start": {
+              "line": 26,
+              "column": 26
+            },
+            "end": {
+              "line": 26,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new Shop_Cart",
+            "start": {
+              "line": 38,
+              "column": 8
+            },
+            "end": {
+              "line": 38,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "Shop_Cart",
+            "start": {
+              "line": 38,
+              "column": 12
+            },
+            "end": {
+              "line": 38,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$cart->addItem('sku-1', 2)",
+            "start": {
+              "line": 39,
+              "column": 0
+            },
+            "end": {
+              "line": 39,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$cart",
+            "start": {
+              "line": 39,
+              "column": 0
+            },
+            "end": {
+              "line": 39,
+              "column": 5
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "addItem",
+            "start": {
+              "line": 39,
+              "column": 7
+            },
+            "end": {
+              "line": 39,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('sku-1', 2)",
+            "start": {
+              "line": 39,
+              "column": 14
+            },
+            "end": {
+              "line": 39,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'sku-1'",
+            "start": {
+              "line": 39,
+              "column": 15
+            },
+            "end": {
+              "line": 39,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "scoped_call_expression",
+            "text": "Shop_Cart::format($cart->total())",
+            "start": {
+              "line": 40,
+              "column": 9
+            },
+            "end": {
+              "line": 40,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "name",
+            "text": "Shop_Cart",
+            "start": {
+              "line": 40,
+              "column": 9
+            },
+            "end": {
+              "line": 40,
+              "column": 18
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "format",
+            "start": {
+              "line": 40,
+              "column": 20
+            },
+            "end": {
+              "line": 40,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($cart->total())",
+            "start": {
+              "line": 40,
+              "column": 26
+            },
+            "end": {
+              "line": 40,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$cart->total()",
+            "start": {
+              "line": 40,
+              "column": 27
+            },
+            "end": {
+              "line": 40,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$cart",
+            "start": {
+              "line": 40,
+              "column": 27
+            },
+            "end": {
+              "line": 40,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "total",
+            "start": {
+              "line": 40,
+              "column": 34
+            },
+            "end": {
+              "line": 40,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 40,
+              "column": 39
+            },
+            "end": {
+              "line": 40,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "htmlspecialchars($title)",
+            "start": {
+              "line": 43,
+              "column": 24
+            },
+            "end": {
+              "line": 43,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "htmlspecialchars",
+            "start": {
+              "line": 43,
+              "column": 24
+            },
+            "end": {
+              "line": 43,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($title)",
+            "start": {
+              "line": 43,
+              "column": 40
+            },
+            "end": {
+              "line": 43,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$user->getName()",
+            "start": {
+              "line": 47,
+              "column": 16
+            },
+            "end": {
+              "line": 47,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$user",
+            "start": {
+              "line": 47,
+              "column": 16
+            },
+            "end": {
+              "line": 47,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "getName",
+            "start": {
+              "line": 47,
+              "column": 23
+            },
+            "end": {
+              "line": 47,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 47,
+              "column": 30
+            },
+            "end": {
+              "line": 47,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$cart->items()",
+            "start": {
+              "line": 52,
+              "column": 15
+            },
+            "end": {
+              "line": 52,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$cart",
+            "start": {
+              "line": 52,
+              "column": 15
+            },
+            "end": {
+              "line": 52,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "items",
+            "start": {
+              "line": 52,
+              "column": 22
+            },
+            "end": {
+              "line": 52,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 52,
+              "column": 27
+            },
+            "end": {
+              "line": 52,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "format_price($item[\"price\"], \"USD\")",
+            "start": {
+              "line": 53,
+              "column": 17
+            },
+            "end": {
+              "line": 53,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "format_price",
+            "start": {
+              "line": 53,
+              "column": 17
+            },
+            "end": {
+              "line": 53,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($item[\"price\"], \"USD\")",
+            "start": {
+              "line": 53,
+              "column": 29
+            },
+            "end": {
+              "line": 53,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "encapsed_string",
+            "text": "\"USD\"",
+            "start": {
+              "line": 53,
+              "column": 46
+            },
+            "end": {
+              "line": 53,
+              "column": 51
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "php52/lib/Shop/Cart.php",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "import.require_once",
+            "nodeType": "require_once_expression",
+            "text": "require_once dirname(__FILE__) . '/../Shop.php'",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 47
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "dirname(__FILE__) . '/../Shop.php'",
+            "start": {
+              "line": 2,
+              "column": 13
+            },
+            "end": {
+              "line": 2,
+              "column": 47
+            }
+          },
+          {
+            "name": "import.require_once",
+            "nodeType": "require_once_expression",
+            "text": "require_once 'Shop/Pricing.php'",
+            "start": {
+              "line": 23,
+              "column": 8
+            },
+            "end": {
+              "line": 23,
+              "column": 39
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "string",
+            "text": "'Shop/Pricing.php'",
+            "start": {
+              "line": 23,
+              "column": 21
+            },
+            "end": {
+              "line": 23,
+              "column": 39
+            }
+          },
+          {
+            "name": "import.include_once",
+            "nodeType": "include_once_expression",
+            "text": "include_once dirname(__FILE__) . '/money.inc'",
+            "start": {
+              "line": 49,
+              "column": 8
+            },
+            "end": {
+              "line": 49,
+              "column": 53
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "dirname(__FILE__) . '/money.inc'",
+            "start": {
+              "line": 49,
+              "column": 21
+            },
+            "end": {
+              "line": 49,
+              "column": 53
+            }
+          }
+        ],
+        "guards": [
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        parent::Shop_Base();\n        $this->items = array();\n    }",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $this->items[$sku] = $quantity;\n        $this->log(\"added $sku\");\n        Shop_Logger::write('cart', $sku);\n    }",
+            "start": {
+              "line": 15,
+              "column": 4
+            },
+            "end": {
+              "line": 19,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        require_once 'Shop/Pricing.php';\n        return Shop_Pricing::sum($this->items);\n    }",
+            "start": {
+              "line": 22,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        return sprintf('%.2f', $amount);\n    }",
+            "start": {
+              "line": 28,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $this->cart = $cart;\n    }",
+            "start": {
+              "line": 36,
+              "column": 4
+            },
+            "end": {
+              "line": 38,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $this->__construct(null);\n    }",
+            "start": {
+              "line": 41,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    if (!function_exists('money_format')) {\n        include_once dirname(__FILE__) . '/money.inc';\n    }\n    return number_format($price, 2) . ' ' . $currency;\n}",
+            "start": {
+              "line": 47,
+              "column": 0
+            },
+            "end": {
+              "line": 52,
+              "column": 1
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        include_once dirname(__FILE__) . '/money.inc';\n    }",
+            "start": {
+              "line": 48,
+              "column": 42
+            },
+            "end": {
+              "line": 50,
+              "column": 5
+            }
+          }
+        ],
+        "definitions": [
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "class Shop_Cart extends Shop_Base\n{\n    var $items;\n\n    function Shop_Cart()\n    {\n        parent::Shop_Base();\n        $this->items = array();\n    }\n\n    function addItem($sku, $quantity)\n    {\n        $this->items[$sku] = $quantity;\n        $this->log(\"added $sku\");\n        Shop_Logger::write('cart', $sku);\n    }\n\n    function total()\n    {\n        require_once 'Shop/Pricing.php';\n        return Shop_Pricing::sum($this->items);\n    }\n\n    function format($amount)\n    {\n        return sprintf('%.2f', $amount);\n    }\n}",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 31,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "Shop_Cart",
+            "start": {
+              "line": 4,
+              "column": 6
+            },
+            "end": {
+              "line": 4,
+              "column": 15
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function Shop_Cart()\n    {\n        parent::Shop_Base();\n        $this->items = array();\n    }",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "Shop_Cart",
+            "start": {
+              "line": 8,
+              "column": 13
+            },
+            "end": {
+              "line": 8,
+              "column": 22
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function addItem($sku, $quantity)\n    {\n        $this->items[$sku] = $quantity;\n        $this->log(\"added $sku\");\n        Shop_Logger::write('cart', $sku);\n    }",
+            "start": {
+              "line": 14,
+              "column": 4
+            },
+            "end": {
+              "line": 19,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "addItem",
+            "start": {
+              "line": 14,
+              "column": 13
+            },
+            "end": {
+              "line": 14,
+              "column": 20
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function total()\n    {\n        require_once 'Shop/Pricing.php';\n        return Shop_Pricing::sum($this->items);\n    }",
+            "start": {
+              "line": 21,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "total",
+            "start": {
+              "line": 21,
+              "column": 13
+            },
+            "end": {
+              "line": 21,
+              "column": 18
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function format($amount)\n    {\n        return sprintf('%.2f', $amount);\n    }",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "format",
+            "start": {
+              "line": 27,
+              "column": 13
+            },
+            "end": {
+              "line": 27,
+              "column": 19
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "class Shop_Order\n{\n    function __construct($cart)\n    {\n        $this->cart = $cart;\n    }\n\n    function Shop_Order()\n    {\n        $this->__construct(null);\n    }\n}",
+            "start": {
+              "line": 33,
+              "column": 0
+            },
+            "end": {
+              "line": 44,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "Shop_Order",
+            "start": {
+              "line": 33,
+              "column": 6
+            },
+            "end": {
+              "line": 33,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function __construct($cart)\n    {\n        $this->cart = $cart;\n    }",
+            "start": {
+              "line": 35,
+              "column": 4
+            },
+            "end": {
+              "line": 38,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "__construct",
+            "start": {
+              "line": 35,
+              "column": 13
+            },
+            "end": {
+              "line": 35,
+              "column": 24
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function Shop_Order()\n    {\n        $this->__construct(null);\n    }",
+            "start": {
+              "line": 40,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "Shop_Order",
+            "start": {
+              "line": 40,
+              "column": 13
+            },
+            "end": {
+              "line": 40,
+              "column": 23
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "function format_price($price, $currency)\n{\n    if (!function_exists('money_format')) {\n        include_once dirname(__FILE__) . '/money.inc';\n    }\n    return number_format($price, 2) . ' ' . $currency;\n}",
+            "start": {
+              "line": 46,
+              "column": 0
+            },
+            "end": {
+              "line": 52,
+              "column": 1
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "name",
+            "text": "format_price",
+            "start": {
+              "line": 46,
+              "column": 9
+            },
+            "end": {
+              "line": 46,
+              "column": 21
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "dirname(__FILE__)",
+            "start": {
+              "line": 2,
+              "column": 13
+            },
+            "end": {
+              "line": 2,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "dirname",
+            "start": {
+              "line": 2,
+              "column": 13
+            },
+            "end": {
+              "line": 2,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(__FILE__)",
+            "start": {
+              "line": 2,
+              "column": 20
+            },
+            "end": {
+              "line": 2,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "scoped_call_expression",
+            "text": "parent::Shop_Base()",
+            "start": {
+              "line": 10,
+              "column": 8
+            },
+            "end": {
+              "line": 10,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "relative_scope",
+            "text": "parent",
+            "start": {
+              "line": 10,
+              "column": 8
+            },
+            "end": {
+              "line": 10,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "Shop_Base",
+            "start": {
+              "line": 10,
+              "column": 16
+            },
+            "end": {
+              "line": 10,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 10,
+              "column": 25
+            },
+            "end": {
+              "line": 10,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$this->log(\"added $sku\")",
+            "start": {
+              "line": 17,
+              "column": 8
+            },
+            "end": {
+              "line": 17,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$this",
+            "start": {
+              "line": 17,
+              "column": 8
+            },
+            "end": {
+              "line": 17,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "log",
+            "start": {
+              "line": 17,
+              "column": 15
+            },
+            "end": {
+              "line": 17,
+              "column": 18
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(\"added $sku\")",
+            "start": {
+              "line": 17,
+              "column": 18
+            },
+            "end": {
+              "line": 17,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "scoped_call_expression",
+            "text": "Shop_Logger::write('cart', $sku)",
+            "start": {
+              "line": 18,
+              "column": 8
+            },
+            "end": {
+              "line": 18,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "name",
+            "text": "Shop_Logger",
+            "start": {
+              "line": 18,
+              "column": 8
+            },
+            "end": {
+              "line": 18,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "write",
+            "start": {
+              "line": 18,
+              "column": 21
+            },
+            "end": {
+              "line": 18,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('cart', $sku)",
+            "start": {
+              "line": 18,
+              "column": 26
+            },
+            "end": {
+              "line": 18,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'cart'",
+            "start": {
+              "line": 18,
+              "column": 27
+            },
+            "end": {
+              "line": 18,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "scoped_call_expression",
+            "text": "Shop_Pricing::sum($this->items)",
+            "start": {
+              "line": 24,
+              "column": 15
+            },
+            "end": {
+              "line": 24,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "name",
+            "text": "Shop_Pricing",
+            "start": {
+              "line": 24,
+              "column": 15
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "sum",
+            "start": {
+              "line": 24,
+              "column": 29
+            },
+            "end": {
+              "line": 24,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($this->items)",
+            "start": {
+              "line": 24,
+              "column": 32
+            },
+            "end": {
+              "line": 24,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "sprintf('%.2f', $amount)",
+            "start": {
+              "line": 29,
+              "column": 15
+            },
+            "end": {
+              "line": 29,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "sprintf",
+            "start": {
+              "line": 29,
+              "column": 15
+            },
+            "end": {
+              "line": 29,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('%.2f', $amount)",
+            "start": {
+              "line": 29,
+              "column": 22
+            },
+            "end": {
+              "line": 29,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'%.2f'",
+            "start": {
+              "line": 29,
+              "column": 23
+            },
+            "end": {
+              "line": 29,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$this->__construct(null)",
+            "start": {
+              "line": 42,
+              "column": 8
+            },
+            "end": {
+              "line": 42,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$this",
+            "start": {
+              "line": 42,
+              "column": 8
+            },
+            "end": {
+              "line": 42,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "__construct",
+            "start": {
+              "line": 42,
+              "column": 15
+            },
+            "end": {
+              "line": 42,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(null)",
+            "start": {
+              "line": 42,
+              "column": 26
+            },
+            "end": {
+              "line": 42,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "function_exists('money_format')",
+            "start": {
+              "line": 48,
+              "column": 9
+            },
+            "end": {
+              "line": 48,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "function_exists",
+            "start": {
+              "line": 48,
+              "column": 9
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('money_format')",
+            "start": {
+              "line": 48,
+              "column": 24
+            },
+            "end": {
+              "line": 48,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'money_format'",
+            "start": {
+              "line": 48,
+              "column": 25
+            },
+            "end": {
+              "line": 48,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "dirname(__FILE__)",
+            "start": {
+              "line": 49,
+              "column": 21
+            },
+            "end": {
+              "line": 49,
+              "column": 38
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "dirname",
+            "start": {
+              "line": 49,
+              "column": 21
+            },
+            "end": {
+              "line": 49,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(__FILE__)",
+            "start": {
+              "line": 49,
+              "column": 28
+            },
+            "end": {
+              "line": 49,
+              "column": 38
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "number_format($price, 2)",
+            "start": {
+              "line": 51,
+              "column": 11
+            },
+            "end": {
+              "line": 51,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "number_format",
+            "start": {
+              "line": 51,
+              "column": 11
+            },
+            "end": {
+              "line": 51,
+              "column": 24
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($price, 2)",
+            "start": {
+              "line": 51,
+              "column": 24
+            },
+            "end": {
+              "line": 51,
+              "column": 35
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "php53/src/Shop/Order.php",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use Acme\\Billing\\Invoice;",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 25
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Acme\\Billing\\Invoice",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 5,
+              "column": 24
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "Acme\\Billing\\Invoice",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 5,
+              "column": 24
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use Acme\\Billing\\Gateway as PaymentGateway, Acme\\Support\\Clock;",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 63
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Acme\\Billing\\Gateway as PaymentGateway",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 42
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "Acme\\Billing\\Gateway",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 24
+            }
+          },
+          {
+            "name": "use.alias",
+            "nodeType": "name",
+            "text": "PaymentGateway",
+            "start": {
+              "line": 6,
+              "column": 28
+            },
+            "end": {
+              "line": 6,
+              "column": 42
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Acme\\Support\\Clock",
+            "start": {
+              "line": 6,
+              "column": 44
+            },
+            "end": {
+              "line": 6,
+              "column": 62
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "Acme\\Support\\Clock",
+            "start": {
+              "line": 6,
+              "column": 44
+            },
+            "end": {
+              "line": 6,
+              "column": 62
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use function Acme\\Support\\money_format;",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 39
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "function Acme\\Support\\money_format",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 38
+            }
+          },
+          {
+            "name": "use.type",
+            "nodeType": "function",
+            "text": "function",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 12
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "Acme\\Support\\money_format",
+            "start": {
+              "line": 7,
+              "column": 13
+            },
+            "end": {
+              "line": 7,
+              "column": 38
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use const Acme\\Support\\CURRENCY;",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 32
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "const Acme\\Support\\CURRENCY",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 31
+            }
+          },
+          {
+            "name": "use.type",
+            "nodeType": "const",
+            "text": "const",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 9
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "Acme\\Support\\CURRENCY",
+            "start": {
+              "line": 8,
+              "column": 10
+            },
+            "end": {
+              "line": 8,
+              "column": 31
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use Acme\\Shipping\\{Carrier, Parcel as Box, function weigh, const MAX_WEIGHT};",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 77
+            }
+          },
+          {
+            "name": "use.prefix",
+            "nodeType": "namespace_name",
+            "text": "Acme\\Shipping",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 9,
+              "column": 17
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Carrier",
+            "start": {
+              "line": 9,
+              "column": 19
+            },
+            "end": {
+              "line": 9,
+              "column": 26
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "Carrier",
+            "start": {
+              "line": 9,
+              "column": 19
+            },
+            "end": {
+              "line": 9,
+              "column": 26
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Parcel as Box",
+            "start": {
+              "line": 9,
+              "column": 28
+            },
+            "end": {
+              "line": 9,
+              "column": 41
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "Parcel",
+            "start": {
+              "line": 9,
+              "column": 28
+            },
+            "end": {
+              "line": 9,
+              "column": 34
+            }
+          },
+          {
+            "name": "use.alias",
+            "nodeType": "name",
+            "text": "Box",
+            "start": {
+              "line": 9,
+              "column": 38
+            },
+            "end": {
+              "line": 9,
+              "column": 41
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "function weigh",
+            "start": {
+              "line": 9,
+              "column": 43
+            },
+            "end": {
+              "line": 9,
+              "column": 57
+            }
+          },
+          {
+            "name": "use.type",
+            "nodeType": "function",
+            "text": "function",
+            "start": {
+              "line": 9,
+              "column": 43
+            },
+            "end": {
+              "line": 9,
+              "column": 51
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "weigh",
+            "start": {
+              "line": 9,
+              "column": 52
+            },
+            "end": {
+              "line": 9,
+              "column": 57
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "const MAX_WEIGHT",
+            "start": {
+              "line": 9,
+              "column": 59
+            },
+            "end": {
+              "line": 9,
+              "column": 75
+            }
+          },
+          {
+            "name": "use.type",
+            "nodeType": "const",
+            "text": "const",
+            "start": {
+              "line": 9,
+              "column": 59
+            },
+            "end": {
+              "line": 9,
+              "column": 64
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "MAX_WEIGHT",
+            "start": {
+              "line": 9,
+              "column": 65
+            },
+            "end": {
+              "line": 9,
+              "column": 75
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use \\Psr\\Log\\LoggerInterface;",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 29
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "\\Psr\\Log\\LoggerInterface",
+            "start": {
+              "line": 10,
+              "column": 4
+            },
+            "end": {
+              "line": 10,
+              "column": 28
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "\\Psr\\Log\\LoggerInterface",
+            "start": {
+              "line": 10,
+              "column": 4
+            },
+            "end": {
+              "line": 10,
+              "column": 28
+            }
+          },
+          {
+            "name": "import.require_once",
+            "nodeType": "require_once_expression",
+            "text": "require_once __DIR__ . '/../bootstrap.php'",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "__DIR__ . '/../bootstrap.php'",
+            "start": {
+              "line": 12,
+              "column": 13
+            },
+            "end": {
+              "line": 12,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require $file",
+            "start": {
+              "line": 75,
+              "column": 12
+            },
+            "end": {
+              "line": 75,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "variable_name",
+            "text": "$file",
+            "start": {
+              "line": 75,
+              "column": 20
+            },
+            "end": {
+              "line": 75,
+              "column": 25
+            }
+          }
+        ],
+        "guards": [
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $this->createdAt = Clock::now();\n    }",
+            "start": {
+              "line": 28,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $this->logger = $logger;\n        $this->touch();\n    }",
+            "start": {
+              "line": 47,
+              "column": 4
+            },
+            "end": {
+              "line": 50,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        return 'not a constructor: the class is namespaced';\n    }",
+            "start": {
+              "line": 53,
+              "column": 4
+            },
+            "end": {
+              "line": 55,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        return static::TABLE . ':' . spl_object_hash($this);\n    }",
+            "start": {
+              "line": 58,
+              "column": 4
+            },
+            "end": {
+              "line": 60,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $invoice = new Invoice($this, CURRENCY);\n        $total = array_reduce($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0);\n        $this->logger->info('paid', array('class' => Invoice::class));\n        return $gateway->charge(money_format($total), new Box(weigh($this->lines)));\n    }",
+            "start": {
+              "line": 63,
+              "column": 4
+            },
+            "end": {
+              "line": 70,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n            return $sum + $invoice->price($line);\n        }",
+            "start": {
+              "line": 65,
+              "column": 82
+            },
+            "end": {
+              "line": 67,
+              "column": 9
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $loader = function ($file) {\n            require $file;\n        };\n        $loader(__DIR__ . \"/orders/{$id}.php\");\n        return new static();\n    }",
+            "start": {
+              "line": 73,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n            require $file;\n        }",
+            "start": {
+              "line": 74,
+              "column": 35
+            },
+            "end": {
+              "line": 76,
+              "column": 9
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n    return call_user_func(array($order, 'id'));\n}",
+            "start": {
+              "line": 83,
+              "column": 0
+            },
+            "end": {
+              "line": 85,
+              "column": 1
+            }
+          }
+        ],
+        "definitions": [
+          {
+            "name": "namespace.declaration",
+            "nodeType": "namespace_definition",
+            "text": "namespace Acme\\Shop;",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 20
+            }
+          },
+          {
+            "name": "namespace.name",
+            "nodeType": "namespace_name",
+            "text": "Acme\\Shop",
+            "start": {
+              "line": 3,
+              "column": 10
+            },
+            "end": {
+              "line": 3,
+              "column": 19
+            }
+          },
+          {
+            "name": "constant.declaration",
+            "nodeType": "const_element",
+            "text": "STATUS_OPEN = 'open'",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 26
+            }
+          },
+          {
+            "name": "constant.name",
+            "nodeType": "name",
+            "text": "STATUS_OPEN",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 17
+            }
+          },
+          {
+            "name": "constant.declaration",
+            "nodeType": "const_element",
+            "text": "STATUS_PAID = 'paid'",
+            "start": {
+              "line": 14,
+              "column": 28
+            },
+            "end": {
+              "line": 14,
+              "column": 48
+            }
+          },
+          {
+            "name": "constant.name",
+            "nodeType": "name",
+            "text": "STATUS_PAID",
+            "start": {
+              "line": 14,
+              "column": 28
+            },
+            "end": {
+              "line": 14,
+              "column": 39
+            }
+          },
+          {
+            "name": "interface.declaration",
+            "nodeType": "interface_declaration",
+            "text": "interface Payable\n{\n    const CURRENCY = 'EUR';\n\n    public function pay(PaymentGateway $gateway);\n}",
+            "start": {
+              "line": 16,
+              "column": 0
+            },
+            "end": {
+              "line": 21,
+              "column": 1
+            }
+          },
+          {
+            "name": "interface.name",
+            "nodeType": "name",
+            "text": "Payable",
+            "start": {
+              "line": 16,
+              "column": 10
+            },
+            "end": {
+              "line": 16,
+              "column": 17
+            }
+          },
+          {
+            "name": "constant.declaration",
+            "nodeType": "const_element",
+            "text": "CURRENCY = 'EUR'",
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 26
+            }
+          },
+          {
+            "name": "constant.name",
+            "nodeType": "name",
+            "text": "CURRENCY",
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 18
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function pay(PaymentGateway $gateway);",
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 20,
+              "column": 49
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "pay",
+            "start": {
+              "line": 20,
+              "column": 20
+            },
+            "end": {
+              "line": 20,
+              "column": 23
+            }
+          },
+          {
+            "name": "trait.declaration",
+            "nodeType": "trait_declaration",
+            "text": "trait Timestamps\n{\n    protected $createdAt;\n\n    public function touch()\n    {\n        $this->createdAt = Clock::now();\n    }\n}",
+            "start": {
+              "line": 23,
+              "column": 0
+            },
+            "end": {
+              "line": 31,
+              "column": 1
+            }
+          },
+          {
+            "name": "trait.name",
+            "nodeType": "name",
+            "text": "Timestamps",
+            "start": {
+              "line": 23,
+              "column": 6
+            },
+            "end": {
+              "line": 23,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function touch()\n    {\n        $this->createdAt = Clock::now();\n    }",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "touch",
+            "start": {
+              "line": 27,
+              "column": 20
+            },
+            "end": {
+              "line": 27,
+              "column": 25
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "abstract class Model\n{\n    abstract public function id();\n}",
+            "start": {
+              "line": 33,
+              "column": 0
+            },
+            "end": {
+              "line": 36,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "Model",
+            "start": {
+              "line": 33,
+              "column": 15
+            },
+            "end": {
+              "line": 33,
+              "column": 20
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "abstract public function id();",
+            "start": {
+              "line": 35,
+              "column": 4
+            },
+            "end": {
+              "line": 35,
+              "column": 34
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "id",
+            "start": {
+              "line": 35,
+              "column": 29
+            },
+            "end": {
+              "line": 35,
+              "column": 31
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "class Order extends Model implements Payable\n{\n    use Timestamps;\n\n    const TABLE = 'orders';\n\n    private $lines = array();\n\n    public function __construct(LoggerInterface $logger)\n    {\n        $this->logger = $logger;\n        $this->touch();\n    }\n\n    public function Order()\n    {\n        return 'not a constructor: the class is namespaced';\n    }\n\n    public function id()\n    {\n        return static::TABLE . ':' . spl_object_hash($this);\n    }\n\n    public function pay(PaymentGateway $gateway)\n    {\n        $invoice = new Invoice($this, CURRENCY);\n        $total = array_reduce($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0);\n        $this->logger->info('paid', array('class' => Invoice::class));\n        return $gateway->charge(money_format($total), new Box(weigh($this->lines)));\n    }\n\n    public static function load($id)\n    {\n        $loader = function ($file) {\n            require $file;\n        };\n        $loader(__DIR__ . \"/orders/{$id}.php\");\n        return new static();\n    }\n}",
+            "start": {
+              "line": 38,
+              "column": 0
+            },
+            "end": {
+              "line": 80,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "Order",
+            "start": {
+              "line": 38,
+              "column": 6
+            },
+            "end": {
+              "line": 38,
+              "column": 11
+            }
+          },
+          {
+            "name": "constant.declaration",
+            "nodeType": "const_element",
+            "text": "TABLE = 'orders'",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 26
+            }
+          },
+          {
+            "name": "constant.name",
+            "nodeType": "name",
+            "text": "TABLE",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 15
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function __construct(LoggerInterface $logger)\n    {\n        $this->logger = $logger;\n        $this->touch();\n    }",
+            "start": {
+              "line": 46,
+              "column": 4
+            },
+            "end": {
+              "line": 50,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "__construct",
+            "start": {
+              "line": 46,
+              "column": 20
+            },
+            "end": {
+              "line": 46,
+              "column": 31
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function Order()\n    {\n        return 'not a constructor: the class is namespaced';\n    }",
+            "start": {
+              "line": 52,
+              "column": 4
+            },
+            "end": {
+              "line": 55,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "Order",
+            "start": {
+              "line": 52,
+              "column": 20
+            },
+            "end": {
+              "line": 52,
+              "column": 25
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function id()\n    {\n        return static::TABLE . ':' . spl_object_hash($this);\n    }",
+            "start": {
+              "line": 57,
+              "column": 4
+            },
+            "end": {
+              "line": 60,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "id",
+            "start": {
+              "line": 57,
+              "column": 20
+            },
+            "end": {
+              "line": 57,
+              "column": 22
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function pay(PaymentGateway $gateway)\n    {\n        $invoice = new Invoice($this, CURRENCY);\n        $total = array_reduce($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0);\n        $this->logger->info('paid', array('class' => Invoice::class));\n        return $gateway->charge(money_format($total), new Box(weigh($this->lines)));\n    }",
+            "start": {
+              "line": 62,
+              "column": 4
+            },
+            "end": {
+              "line": 70,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "pay",
+            "start": {
+              "line": 62,
+              "column": 20
+            },
+            "end": {
+              "line": 62,
+              "column": 23
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static function load($id)\n    {\n        $loader = function ($file) {\n            require $file;\n        };\n        $loader(__DIR__ . \"/orders/{$id}.php\");\n        return new static();\n    }",
+            "start": {
+              "line": 72,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "load",
+            "start": {
+              "line": 72,
+              "column": 27
+            },
+            "end": {
+              "line": 72,
+              "column": 31
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "function order_total(Order $order)\n{\n    return call_user_func(array($order, 'id'));\n}",
+            "start": {
+              "line": 82,
+              "column": 0
+            },
+            "end": {
+              "line": 85,
+              "column": 1
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "name",
+            "text": "order_total",
+            "start": {
+              "line": 82,
+              "column": 9
+            },
+            "end": {
+              "line": 82,
+              "column": 20
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "scoped_call_expression",
+            "text": "Clock::now()",
+            "start": {
+              "line": 29,
+              "column": 27
+            },
+            "end": {
+              "line": 29,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "name",
+            "text": "Clock",
+            "start": {
+              "line": 29,
+              "column": 27
+            },
+            "end": {
+              "line": 29,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "now",
+            "start": {
+              "line": 29,
+              "column": 34
+            },
+            "end": {
+              "line": 29,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 29,
+              "column": 37
+            },
+            "end": {
+              "line": 29,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$this->touch()",
+            "start": {
+              "line": 49,
+              "column": 8
+            },
+            "end": {
+              "line": 49,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$this",
+            "start": {
+              "line": 49,
+              "column": 8
+            },
+            "end": {
+              "line": 49,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "touch",
+            "start": {
+              "line": 49,
+              "column": 15
+            },
+            "end": {
+              "line": 49,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 49,
+              "column": 20
+            },
+            "end": {
+              "line": 49,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "spl_object_hash($this)",
+            "start": {
+              "line": 59,
+              "column": 37
+            },
+            "end": {
+              "line": 59,
+              "column": 59
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "spl_object_hash",
+            "start": {
+              "line": 59,
+              "column": 37
+            },
+            "end": {
+              "line": 59,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($this)",
+            "start": {
+              "line": 59,
+              "column": 52
+            },
+            "end": {
+              "line": 59,
+              "column": 59
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new Invoice($this, CURRENCY)",
+            "start": {
+              "line": 64,
+              "column": 19
+            },
+            "end": {
+              "line": 64,
+              "column": 47
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "object_creation_expression",
+            "text": "new Invoice($this, CURRENCY)",
+            "start": {
+              "line": 64,
+              "column": 19
+            },
+            "end": {
+              "line": 64,
+              "column": 47
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "Invoice",
+            "start": {
+              "line": 64,
+              "column": 23
+            },
+            "end": {
+              "line": 64,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "Invoice",
+            "start": {
+              "line": 64,
+              "column": 23
+            },
+            "end": {
+              "line": 64,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($this, CURRENCY)",
+            "start": {
+              "line": 64,
+              "column": 30
+            },
+            "end": {
+              "line": 64,
+              "column": 47
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "array_reduce($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0)",
+            "start": {
+              "line": 65,
+              "column": 17
+            },
+            "end": {
+              "line": 67,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "array_reduce",
+            "start": {
+              "line": 65,
+              "column": 17
+            },
+            "end": {
+              "line": 65,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($this->lines, function ($sum, $line) use ($invoice) {\n            return $sum + $invoice->price($line);\n        }, 0)",
+            "start": {
+              "line": 65,
+              "column": 29
+            },
+            "end": {
+              "line": 67,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$invoice->price($line)",
+            "start": {
+              "line": 66,
+              "column": 26
+            },
+            "end": {
+              "line": 66,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$invoice",
+            "start": {
+              "line": 66,
+              "column": 26
+            },
+            "end": {
+              "line": 66,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "price",
+            "start": {
+              "line": 66,
+              "column": 36
+            },
+            "end": {
+              "line": 66,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($line)",
+            "start": {
+              "line": 66,
+              "column": 41
+            },
+            "end": {
+              "line": 66,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$this->logger->info('paid', array('class' => Invoice::class))",
+            "start": {
+              "line": 68,
+              "column": 8
+            },
+            "end": {
+              "line": 68,
+              "column": 69
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "member_access_expression",
+            "text": "$this->logger",
+            "start": {
+              "line": 68,
+              "column": 8
+            },
+            "end": {
+              "line": 68,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "info",
+            "start": {
+              "line": 68,
+              "column": 23
+            },
+            "end": {
+              "line": 68,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('paid', array('class' => Invoice::class))",
+            "start": {
+              "line": 68,
+              "column": 27
+            },
+            "end": {
+              "line": 68,
+              "column": 69
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'paid'",
+            "start": {
+              "line": 68,
+              "column": 28
+            },
+            "end": {
+              "line": 68,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$gateway->charge(money_format($total), new Box(weigh($this->lines)))",
+            "start": {
+              "line": 69,
+              "column": 15
+            },
+            "end": {
+              "line": 69,
+              "column": 83
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$gateway",
+            "start": {
+              "line": 69,
+              "column": 15
+            },
+            "end": {
+              "line": 69,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "charge",
+            "start": {
+              "line": 69,
+              "column": 25
+            },
+            "end": {
+              "line": 69,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(money_format($total), new Box(weigh($this->lines)))",
+            "start": {
+              "line": 69,
+              "column": 31
+            },
+            "end": {
+              "line": 69,
+              "column": 83
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "money_format($total)",
+            "start": {
+              "line": 69,
+              "column": 32
+            },
+            "end": {
+              "line": 69,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "money_format",
+            "start": {
+              "line": 69,
+              "column": 32
+            },
+            "end": {
+              "line": 69,
+              "column": 44
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($total)",
+            "start": {
+              "line": 69,
+              "column": 44
+            },
+            "end": {
+              "line": 69,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new Box(weigh($this->lines))",
+            "start": {
+              "line": 69,
+              "column": 54
+            },
+            "end": {
+              "line": 69,
+              "column": 82
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "object_creation_expression",
+            "text": "new Box(weigh($this->lines))",
+            "start": {
+              "line": 69,
+              "column": 54
+            },
+            "end": {
+              "line": 69,
+              "column": 82
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "Box",
+            "start": {
+              "line": 69,
+              "column": 58
+            },
+            "end": {
+              "line": 69,
+              "column": 61
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "Box",
+            "start": {
+              "line": 69,
+              "column": 58
+            },
+            "end": {
+              "line": 69,
+              "column": 61
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(weigh($this->lines))",
+            "start": {
+              "line": 69,
+              "column": 61
+            },
+            "end": {
+              "line": 69,
+              "column": 82
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "weigh($this->lines)",
+            "start": {
+              "line": 69,
+              "column": 62
+            },
+            "end": {
+              "line": 69,
+              "column": 81
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "weigh",
+            "start": {
+              "line": 69,
+              "column": 62
+            },
+            "end": {
+              "line": 69,
+              "column": 67
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($this->lines)",
+            "start": {
+              "line": 69,
+              "column": 67
+            },
+            "end": {
+              "line": 69,
+              "column": 81
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "$loader(__DIR__ . \"/orders/{$id}.php\")",
+            "start": {
+              "line": 77,
+              "column": 8
+            },
+            "end": {
+              "line": 77,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(__DIR__ . \"/orders/{$id}.php\")",
+            "start": {
+              "line": 77,
+              "column": 15
+            },
+            "end": {
+              "line": 77,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new static()",
+            "start": {
+              "line": 78,
+              "column": 15
+            },
+            "end": {
+              "line": 78,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "object_creation_expression",
+            "text": "new static()",
+            "start": {
+              "line": 78,
+              "column": 15
+            },
+            "end": {
+              "line": 78,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "static",
+            "start": {
+              "line": 78,
+              "column": 19
+            },
+            "end": {
+              "line": 78,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "static",
+            "start": {
+              "line": 78,
+              "column": 19
+            },
+            "end": {
+              "line": 78,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 78,
+              "column": 25
+            },
+            "end": {
+              "line": 78,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "call_user_func(array($order, 'id'))",
+            "start": {
+              "line": 84,
+              "column": 11
+            },
+            "end": {
+              "line": 84,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "call_user_func",
+            "start": {
+              "line": 84,
+              "column": 11
+            },
+            "end": {
+              "line": 84,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(array($order, 'id'))",
+            "start": {
+              "line": 84,
+              "column": 25
+            },
+            "end": {
+              "line": 84,
+              "column": 46
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "php53/src/Shop/braced.php",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use Acme\\Shop\\Order;",
+            "start": {
+              "line": 3,
+              "column": 4
+            },
+            "end": {
+              "line": 3,
+              "column": 24
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Acme\\Shop\\Order",
+            "start": {
+              "line": 3,
+              "column": 8
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "Acme\\Shop\\Order",
+            "start": {
+              "line": 3,
+              "column": 8
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          }
+        ],
+        "guards": [
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n            $this->order = new Order(null);\n        }",
+            "start": {
+              "line": 8,
+              "column": 8
+            },
+            "end": {
+              "line": 10,
+              "column": 9
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        return \\strlen('x');\n    }",
+            "start": {
+              "line": 14,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        }",
+            "start": {
+              "line": 23,
+              "column": 8
+            },
+            "end": {
+              "line": 24,
+              "column": 9
+            }
+          }
+        ],
+        "definitions": [
+          {
+            "name": "namespace.declaration",
+            "nodeType": "namespace_definition",
+            "text": "namespace Acme\\Shop\\Legacy {\n    use Acme\\Shop\\Order;\n\n    class Cart\n    {\n        function Cart()\n        {\n            $this->order = new Order(null);\n        }\n    }\n\n    function helper()\n    {\n        return \\strlen('x');\n    }\n}",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          },
+          {
+            "name": "namespace.name",
+            "nodeType": "namespace_name",
+            "text": "Acme\\Shop\\Legacy",
+            "start": {
+              "line": 2,
+              "column": 10
+            },
+            "end": {
+              "line": 2,
+              "column": 26
+            }
+          },
+          {
+            "name": "namespace.body",
+            "nodeType": "compound_statement",
+            "text": "{\n    use Acme\\Shop\\Order;\n\n    class Cart\n    {\n        function Cart()\n        {\n            $this->order = new Order(null);\n        }\n    }\n\n    function helper()\n    {\n        return \\strlen('x');\n    }\n}",
+            "start": {
+              "line": 2,
+              "column": 27
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "class Cart\n    {\n        function Cart()\n        {\n            $this->order = new Order(null);\n        }\n    }",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 11,
+              "column": 5
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "Cart",
+            "start": {
+              "line": 5,
+              "column": 10
+            },
+            "end": {
+              "line": 5,
+              "column": 14
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function Cart()\n        {\n            $this->order = new Order(null);\n        }",
+            "start": {
+              "line": 7,
+              "column": 8
+            },
+            "end": {
+              "line": 10,
+              "column": 9
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "Cart",
+            "start": {
+              "line": 7,
+              "column": 17
+            },
+            "end": {
+              "line": 7,
+              "column": 21
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "function helper()\n    {\n        return \\strlen('x');\n    }",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 5
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "name",
+            "text": "helper",
+            "start": {
+              "line": 13,
+              "column": 13
+            },
+            "end": {
+              "line": 13,
+              "column": 19
+            }
+          },
+          {
+            "name": "namespace.body",
+            "nodeType": "compound_statement",
+            "text": "{\n    class GlobalCart\n    {\n        function GlobalCart()\n        {\n        }\n    }\n\n    define('GLOBAL_CART', true);\n}",
+            "start": {
+              "line": 19,
+              "column": 10
+            },
+            "end": {
+              "line": 28,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "class GlobalCart\n    {\n        function GlobalCart()\n        {\n        }\n    }",
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 5
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "GlobalCart",
+            "start": {
+              "line": 20,
+              "column": 10
+            },
+            "end": {
+              "line": 20,
+              "column": 20
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "function GlobalCart()\n        {\n        }",
+            "start": {
+              "line": 22,
+              "column": 8
+            },
+            "end": {
+              "line": 24,
+              "column": 9
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "GlobalCart",
+            "start": {
+              "line": 22,
+              "column": 17
+            },
+            "end": {
+              "line": 22,
+              "column": 27
+            }
+          },
+          {
+            "name": "define.declaration",
+            "nodeType": "function_call_expression",
+            "text": "define('GLOBAL_CART', true)",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 27,
+              "column": 31
+            }
+          },
+          {
+            "name": "define.name",
+            "nodeType": "string",
+            "text": "'GLOBAL_CART'",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 24
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new Order(null)",
+            "start": {
+              "line": 9,
+              "column": 27
+            },
+            "end": {
+              "line": 9,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "object_creation_expression",
+            "text": "new Order(null)",
+            "start": {
+              "line": 9,
+              "column": 27
+            },
+            "end": {
+              "line": 9,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "Order",
+            "start": {
+              "line": 9,
+              "column": 31
+            },
+            "end": {
+              "line": 9,
+              "column": 36
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "Order",
+            "start": {
+              "line": 9,
+              "column": 31
+            },
+            "end": {
+              "line": 9,
+              "column": 36
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(null)",
+            "start": {
+              "line": 9,
+              "column": 36
+            },
+            "end": {
+              "line": 9,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "\\strlen('x')",
+            "start": {
+              "line": 15,
+              "column": 15
+            },
+            "end": {
+              "line": 15,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "qualified_name",
+            "text": "\\strlen",
+            "start": {
+              "line": 15,
+              "column": 15
+            },
+            "end": {
+              "line": 15,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('x')",
+            "start": {
+              "line": 15,
+              "column": 22
+            },
+            "end": {
+              "line": 15,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'x'",
+            "start": {
+              "line": 15,
+              "column": 23
+            },
+            "end": {
+              "line": 15,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "define('GLOBAL_CART', true)",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 27,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "define",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 27,
+              "column": 10
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('GLOBAL_CART', true)",
+            "start": {
+              "line": 27,
+              "column": 10
+            },
+            "end": {
+              "line": 27,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'GLOBAL_CART'",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 24
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "php8/src/Orders/OrderService.php",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use App\\Billing\\Invoice;",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 24
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "App\\Billing\\Invoice",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 23
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "App\\Billing\\Invoice",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 23
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use App\\Orders\\Events\\{OrderPaid, OrderShipped};",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 48
+            }
+          },
+          {
+            "name": "use.prefix",
+            "nodeType": "namespace_name",
+            "text": "App\\Orders\\Events",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 21
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "OrderPaid",
+            "start": {
+              "line": 8,
+              "column": 23
+            },
+            "end": {
+              "line": 8,
+              "column": 32
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "OrderPaid",
+            "start": {
+              "line": 8,
+              "column": 23
+            },
+            "end": {
+              "line": 8,
+              "column": 32
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "OrderShipped",
+            "start": {
+              "line": 8,
+              "column": 34
+            },
+            "end": {
+              "line": 8,
+              "column": 46
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "OrderShipped",
+            "start": {
+              "line": 8,
+              "column": 34
+            },
+            "end": {
+              "line": 8,
+              "column": 46
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use Attribute;",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 14
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "Attribute",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 9,
+              "column": 13
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "name",
+            "text": "Attribute",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 9,
+              "column": 13
+            }
+          },
+          {
+            "name": "use.declaration",
+            "nodeType": "namespace_use_declaration",
+            "text": "use function App\\Support\\money;",
+            "start": {
+              "line": 11,
+              "column": 0
+            },
+            "end": {
+              "line": 11,
+              "column": 31
+            }
+          },
+          {
+            "name": "use.clause",
+            "nodeType": "namespace_use_clause",
+            "text": "function App\\Support\\money",
+            "start": {
+              "line": 11,
+              "column": 4
+            },
+            "end": {
+              "line": 11,
+              "column": 30
+            }
+          },
+          {
+            "name": "use.type",
+            "nodeType": "function",
+            "text": "function",
+            "start": {
+              "line": 11,
+              "column": 4
+            },
+            "end": {
+              "line": 11,
+              "column": 12
+            }
+          },
+          {
+            "name": "use.name",
+            "nodeType": "qualified_name",
+            "text": "App\\Support\\money",
+            "start": {
+              "line": 11,
+              "column": 13
+            },
+            "end": {
+              "line": 11,
+              "column": 30
+            }
+          },
+          {
+            "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require __DIR__ . '/plugins/windows.php'",
+            "start": {
+              "line": 66,
+              "column": 25
+            },
+            "end": {
+              "line": 66,
+              "column": 65
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "__DIR__ . '/plugins/windows.php'",
+            "start": {
+              "line": 66,
+              "column": 33
+            },
+            "end": {
+              "line": 66,
+              "column": 65
+            }
+          },
+          {
+            "name": "import.require",
+            "nodeType": "require_expression",
+            "text": "require __DIR__ . '/plugins/posix.php'",
+            "start": {
+              "line": 67,
+              "column": 23
+            },
+            "end": {
+              "line": 67,
+              "column": 61
+            }
+          },
+          {
+            "name": "import.path",
+            "nodeType": "binary_expression",
+            "text": "__DIR__ . '/plugins/posix.php'",
+            "start": {
+              "line": 67,
+              "column": 31
+            },
+            "end": {
+              "line": 67,
+              "column": 61
+            }
+          }
+        ],
+        "guards": [
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{}",
+            "start": {
+              "line": 16,
+              "column": 76
+            },
+            "end": {
+              "line": 16,
+              "column": 78
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        return match ($this) {\n            Status::Open => 'Open',\n            Status::Paid => ucfirst($this->value),\n        };\n    }",
+            "start": {
+              "line": 27,
+              "column": 4
+            },
+            "end": {
+              "line": 32,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "match_block",
+            "text": "{\n            Status::Open => 'Open',\n            Status::Paid => ucfirst($this->value),\n        }",
+            "start": {
+              "line": 28,
+              "column": 29
+            },
+            "end": {
+              "line": 31,
+              "column": 9
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{}",
+            "start": {
+              "line": 43,
+              "column": 6
+            },
+            "end": {
+              "line": 43,
+              "column": 8
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $status = $invoice?->status() ?? Status::Open;\n        return match ($status) {\n            Status::Paid => money(amount: $invoice->total()),\n            default => 'pending',\n        };\n    }",
+            "start": {
+              "line": 46,
+              "column": 4
+            },
+            "end": {
+              "line": 52,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "class_constant_access_expression",
+            "text": "Status::Open",
+            "start": {
+              "line": 47,
+              "column": 41
+            },
+            "end": {
+              "line": 47,
+              "column": 53
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "match_block",
+            "text": "{\n            Status::Paid => money(amount: $invoice->total()),\n            default => 'pending',\n        }",
+            "start": {
+              "line": 48,
+              "column": 31
+            },
+            "end": {
+              "line": 51,
+              "column": 9
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n        $make = fn (string $id) => new OrderPaid($id);\n        $handler = new class($this->orders) {\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        };\n        $plugin = match (PHP_OS_FAMILY) {\n            'Windows' => require __DIR__ . '/plugins/windows.php',\n            default => require __DIR__ . '/plugins/posix.php',\n        };\n        return [$make('a'), new OrderShipped(...['b']), $handler, $plugin, (new Repository)->all()];\n    }",
+            "start": {
+              "line": 55,
+              "column": 4
+            },
+            "end": {
+              "line": 70,
+              "column": 5
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "object_creation_expression",
+            "text": "new OrderPaid($id)",
+            "start": {
+              "line": 56,
+              "column": 35
+            },
+            "end": {
+              "line": 56,
+              "column": 53
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{}",
+            "start": {
+              "line": 58,
+              "column": 68
+            },
+            "end": {
+              "line": 58,
+              "column": 70
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "compound_statement",
+            "text": "{\n                $this->orders->find($id)?->ship();\n            }",
+            "start": {
+              "line": 61,
+              "column": 12
+            },
+            "end": {
+              "line": 63,
+              "column": 13
+            }
+          },
+          {
+            "name": "guard.conditional",
+            "nodeType": "match_block",
+            "text": "{\n            'Windows' => require __DIR__ . '/plugins/windows.php',\n            default => require __DIR__ . '/plugins/posix.php',\n        }",
+            "start": {
+              "line": 65,
+              "column": 40
+            },
+            "end": {
+              "line": 68,
+              "column": 9
+            }
+          }
+        ],
+        "definitions": [
+          {
+            "name": "namespace.declaration",
+            "nodeType": "namespace_definition",
+            "text": "namespace App\\Orders;",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 21
+            }
+          },
+          {
+            "name": "namespace.name",
+            "nodeType": "namespace_name",
+            "text": "App\\Orders",
+            "start": {
+              "line": 5,
+              "column": 10
+            },
+            "end": {
+              "line": 5,
+              "column": 20
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "#[Attribute(Attribute::TARGET_CLASS)]\nfinal class Audited\n{\n    public function __construct(public readonly string $channel = 'orders') {}\n}",
+            "start": {
+              "line": 13,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "Audited",
+            "start": {
+              "line": 14,
+              "column": 12
+            },
+            "end": {
+              "line": 14,
+              "column": 19
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function __construct(public readonly string $channel = 'orders') {}",
+            "start": {
+              "line": 16,
+              "column": 4
+            },
+            "end": {
+              "line": 16,
+              "column": 78
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "__construct",
+            "start": {
+              "line": 16,
+              "column": 20
+            },
+            "end": {
+              "line": 16,
+              "column": 31
+            }
+          },
+          {
+            "name": "enum.declaration",
+            "nodeType": "enum_declaration",
+            "text": "enum Status: string\n{\n    case Open = 'open';\n    case Paid = 'paid';\n\n    const DEFAULT = self::Open;\n\n    public function label(): string\n    {\n        return match ($this) {\n            Status::Open => 'Open',\n            Status::Paid => ucfirst($this->value),\n        };\n    }\n}",
+            "start": {
+              "line": 19,
+              "column": 0
+            },
+            "end": {
+              "line": 33,
+              "column": 1
+            }
+          },
+          {
+            "name": "enum.name",
+            "nodeType": "name",
+            "text": "Status",
+            "start": {
+              "line": 19,
+              "column": 5
+            },
+            "end": {
+              "line": 19,
+              "column": 11
+            }
+          },
+          {
+            "name": "constant.declaration",
+            "nodeType": "const_element",
+            "text": "DEFAULT = self::Open",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 30
+            }
+          },
+          {
+            "name": "constant.name",
+            "nodeType": "name",
+            "text": "DEFAULT",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 17
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function label(): string\n    {\n        return match ($this) {\n            Status::Open => 'Open',\n            Status::Paid => ucfirst($this->value),\n        };\n    }",
+            "start": {
+              "line": 26,
+              "column": 4
+            },
+            "end": {
+              "line": 32,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "label",
+            "start": {
+              "line": 26,
+              "column": 20
+            },
+            "end": {
+              "line": 26,
+              "column": 25
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_declaration",
+            "text": "#[Audited(channel: 'billing')]\nfinal class OrderService\n{\n    public const int MAX_LINES = 100;\n\n    public function __construct(\n        private readonly Repository $orders,\n        private ?Notifier $notifier = null,\n    ) {}\n\n    public function label(?Invoice $invoice): string\n    {\n        $status = $invoice?->status() ?? Status::Open;\n        return match ($status) {\n            Status::Paid => money(amount: $invoice->total()),\n            default => 'pending',\n        };\n    }\n\n    public function events(): array\n    {\n        $make = fn (string $id) => new OrderPaid($id);\n        $handler = new class($this->orders) {\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        };\n        $plugin = match (PHP_OS_FAMILY) {\n            'Windows' => require __DIR__ . '/plugins/windows.php',\n            default => require __DIR__ . '/plugins/posix.php',\n        };\n        return [$make('a'), new OrderShipped(...['b']), $handler, $plugin, (new Repository)->all()];\n    }\n}",
+            "start": {
+              "line": 35,
+              "column": 0
+            },
+            "end": {
+              "line": 71,
+              "column": 1
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "name",
+            "text": "OrderService",
+            "start": {
+              "line": 36,
+              "column": 12
+            },
+            "end": {
+              "line": 36,
+              "column": 24
+            }
+          },
+          {
+            "name": "constant.declaration",
+            "nodeType": "const_element",
+            "text": "MAX_LINES = 100",
+            "start": {
+              "line": 38,
+              "column": 21
+            },
+            "end": {
+              "line": 38,
+              "column": 36
+            }
+          },
+          {
+            "name": "constant.name",
+            "nodeType": "name",
+            "text": "MAX_LINES",
+            "start": {
+              "line": 38,
+              "column": 21
+            },
+            "end": {
+              "line": 38,
+              "column": 30
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function __construct(\n        private readonly Repository $orders,\n        private ?Notifier $notifier = null,\n    ) {}",
+            "start": {
+              "line": 40,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 8
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "__construct",
+            "start": {
+              "line": 40,
+              "column": 20
+            },
+            "end": {
+              "line": 40,
+              "column": 31
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function label(?Invoice $invoice): string\n    {\n        $status = $invoice?->status() ?? Status::Open;\n        return match ($status) {\n            Status::Paid => money(amount: $invoice->total()),\n            default => 'pending',\n        };\n    }",
+            "start": {
+              "line": 45,
+              "column": 4
+            },
+            "end": {
+              "line": 52,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "label",
+            "start": {
+              "line": 45,
+              "column": 20
+            },
+            "end": {
+              "line": 45,
+              "column": 25
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function events(): array\n    {\n        $make = fn (string $id) => new OrderPaid($id);\n        $handler = new class($this->orders) {\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        };\n        $plugin = match (PHP_OS_FAMILY) {\n            'Windows' => require __DIR__ . '/plugins/windows.php',\n            default => require __DIR__ . '/plugins/posix.php',\n        };\n        return [$make('a'), new OrderShipped(...['b']), $handler, $plugin, (new Repository)->all()];\n    }",
+            "start": {
+              "line": 54,
+              "column": 4
+            },
+            "end": {
+              "line": 70,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "events",
+            "start": {
+              "line": 54,
+              "column": 20
+            },
+            "end": {
+              "line": 54,
+              "column": 26
+            }
+          },
+          {
+            "name": "class.anonymous_body",
+            "nodeType": "declaration_list",
+            "text": "{\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        }",
+            "start": {
+              "line": 57,
+              "column": 44
+            },
+            "end": {
+              "line": 64,
+              "column": 9
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function __construct(private Repository $orders) {}",
+            "start": {
+              "line": 58,
+              "column": 12
+            },
+            "end": {
+              "line": 58,
+              "column": 70
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "__construct",
+            "start": {
+              "line": 58,
+              "column": 28
+            },
+            "end": {
+              "line": 58,
+              "column": 39
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }",
+            "start": {
+              "line": 60,
+              "column": 12
+            },
+            "end": {
+              "line": 63,
+              "column": 13
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "name",
+            "text": "handle",
+            "start": {
+              "line": 60,
+              "column": 28
+            },
+            "end": {
+              "line": 60,
+              "column": 34
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "ucfirst($this->value)",
+            "start": {
+              "line": 30,
+              "column": 28
+            },
+            "end": {
+              "line": 30,
+              "column": 49
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "ucfirst",
+            "start": {
+              "line": 30,
+              "column": 28
+            },
+            "end": {
+              "line": 30,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($this->value)",
+            "start": {
+              "line": 30,
+              "column": 35
+            },
+            "end": {
+              "line": 30,
+              "column": 49
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'billing'",
+            "start": {
+              "line": 35,
+              "column": 19
+            },
+            "end": {
+              "line": 35,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "nullsafe_member_call_expression",
+            "text": "$invoice?->status()",
+            "start": {
+              "line": 47,
+              "column": 18
+            },
+            "end": {
+              "line": 47,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$invoice",
+            "start": {
+              "line": 47,
+              "column": 18
+            },
+            "end": {
+              "line": 47,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "status",
+            "start": {
+              "line": 47,
+              "column": 29
+            },
+            "end": {
+              "line": 47,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 47,
+              "column": 35
+            },
+            "end": {
+              "line": 47,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "money(amount: $invoice->total())",
+            "start": {
+              "line": 49,
+              "column": 28
+            },
+            "end": {
+              "line": 49,
+              "column": 60
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "money",
+            "start": {
+              "line": 49,
+              "column": 28
+            },
+            "end": {
+              "line": 49,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(amount: $invoice->total())",
+            "start": {
+              "line": 49,
+              "column": 33
+            },
+            "end": {
+              "line": 49,
+              "column": 60
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$invoice->total()",
+            "start": {
+              "line": 49,
+              "column": 42
+            },
+            "end": {
+              "line": 49,
+              "column": 59
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "variable_name",
+            "text": "$invoice",
+            "start": {
+              "line": 49,
+              "column": 42
+            },
+            "end": {
+              "line": 49,
+              "column": 50
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "total",
+            "start": {
+              "line": 49,
+              "column": 52
+            },
+            "end": {
+              "line": 49,
+              "column": 57
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 49,
+              "column": 57
+            },
+            "end": {
+              "line": 49,
+              "column": 59
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new OrderPaid($id)",
+            "start": {
+              "line": 56,
+              "column": 35
+            },
+            "end": {
+              "line": 56,
+              "column": 53
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "object_creation_expression",
+            "text": "new OrderPaid($id)",
+            "start": {
+              "line": 56,
+              "column": 35
+            },
+            "end": {
+              "line": 56,
+              "column": 53
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "OrderPaid",
+            "start": {
+              "line": 56,
+              "column": 39
+            },
+            "end": {
+              "line": 56,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "OrderPaid",
+            "start": {
+              "line": 56,
+              "column": 39
+            },
+            "end": {
+              "line": 56,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($id)",
+            "start": {
+              "line": 56,
+              "column": 48
+            },
+            "end": {
+              "line": 56,
+              "column": 53
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new class($this->orders) {\n            public function __construct(private Repository $orders) {}\n\n            public function handle(string $id): void\n            {\n                $this->orders->find($id)?->ship();\n            }\n        }",
+            "start": {
+              "line": 57,
+              "column": 19
+            },
+            "end": {
+              "line": 64,
+              "column": 9
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "$this->orders->find($id)",
+            "start": {
+              "line": 62,
+              "column": 16
+            },
+            "end": {
+              "line": 62,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "member_access_expression",
+            "text": "$this->orders",
+            "start": {
+              "line": 62,
+              "column": 16
+            },
+            "end": {
+              "line": 62,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "nullsafe_member_call_expression",
+            "text": "$this->orders->find($id)?->ship()",
+            "start": {
+              "line": 62,
+              "column": 16
+            },
+            "end": {
+              "line": 62,
+              "column": 49
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "member_call_expression",
+            "text": "$this->orders->find($id)",
+            "start": {
+              "line": 62,
+              "column": 16
+            },
+            "end": {
+              "line": 62,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "find",
+            "start": {
+              "line": 62,
+              "column": 31
+            },
+            "end": {
+              "line": 62,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "($id)",
+            "start": {
+              "line": 62,
+              "column": 35
+            },
+            "end": {
+              "line": 62,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "ship",
+            "start": {
+              "line": 62,
+              "column": 43
+            },
+            "end": {
+              "line": 62,
+              "column": 47
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 62,
+              "column": 47
+            },
+            "end": {
+              "line": 62,
+              "column": 49
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "function_call_expression",
+            "text": "$make('a')",
+            "start": {
+              "line": 69,
+              "column": 16
+            },
+            "end": {
+              "line": 69,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "('a')",
+            "start": {
+              "line": 69,
+              "column": 21
+            },
+            "end": {
+              "line": 69,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "'a'",
+            "start": {
+              "line": 69,
+              "column": 22
+            },
+            "end": {
+              "line": 69,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new OrderShipped(...['b'])",
+            "start": {
+              "line": 69,
+              "column": 28
+            },
+            "end": {
+              "line": 69,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "object_creation_expression",
+            "text": "new OrderShipped(...['b'])",
+            "start": {
+              "line": 69,
+              "column": 28
+            },
+            "end": {
+              "line": 69,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "OrderShipped",
+            "start": {
+              "line": 69,
+              "column": 32
+            },
+            "end": {
+              "line": 69,
+              "column": 44
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "OrderShipped",
+            "start": {
+              "line": 69,
+              "column": 32
+            },
+            "end": {
+              "line": 69,
+              "column": 44
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "(...['b'])",
+            "start": {
+              "line": 69,
+              "column": 44
+            },
+            "end": {
+              "line": 69,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "member_call_expression",
+            "text": "(new Repository)->all()",
+            "start": {
+              "line": 69,
+              "column": 75
+            },
+            "end": {
+              "line": 69,
+              "column": 98
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "parenthesized_expression",
+            "text": "(new Repository)",
+            "start": {
+              "line": 69,
+              "column": 75
+            },
+            "end": {
+              "line": 69,
+              "column": 91
+            }
+          },
+          {
+            "name": "call.construct",
+            "nodeType": "object_creation_expression",
+            "text": "new Repository",
+            "start": {
+              "line": 69,
+              "column": 76
+            },
+            "end": {
+              "line": 69,
+              "column": 90
+            }
+          },
+          {
+            "name": "call.class",
+            "nodeType": "name",
+            "text": "Repository",
+            "start": {
+              "line": 69,
+              "column": 80
+            },
+            "end": {
+              "line": 69,
+              "column": 90
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "name",
+            "text": "all",
+            "start": {
+              "line": 69,
+              "column": 93
+            },
+            "end": {
+              "line": 69,
+              "column": 96
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "arguments",
+            "text": "()",
+            "start": {
+              "line": 69,
+              "column": 96
+            },
+            "end": {
+              "line": 69,
+              "column": 98
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "references": {
+    "php52/index.php": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "dirname(__FILE__) . '/lib/Shop/Cart.php'",
+          "names": [],
+          "position": {
+            "line": 3,
+            "column": 13
+          },
+          "form": "require_once"
+        },
+        {
+          "specifier": "dirname(__FILE__) . \"/config.inc.php\"",
+          "names": [],
+          "position": {
+            "line": 4,
+            "column": 13
+          },
+          "form": "require_once"
+        },
+        {
+          "specifier": "'header.php'",
+          "names": [],
+          "position": {
+            "line": 5,
+            "column": 8
+          },
+          "form": "include"
+        },
+        {
+          "specifier": "'optional.php'",
+          "names": [],
+          "position": {
+            "line": 6,
+            "column": 14
+          },
+          "form": "include_once"
+        },
+        {
+          "specifier": "SHOP_ROOT . '/local.php'",
+          "names": [],
+          "position": {
+            "line": 17,
+            "column": 12
+          },
+          "form": "include",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "'fallback.php'",
+          "names": [],
+          "position": {
+            "line": 19,
+            "column": 12
+          },
+          "form": "include",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "'defaults.php'",
+          "names": [],
+          "position": {
+            "line": 21,
+            "column": 12
+          },
+          "form": "require",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "'compat/json.php'",
+          "names": [],
+          "position": {
+            "line": 24,
+            "column": 47
+          },
+          "form": "require_once",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "'settings.php'",
+          "names": [],
+          "position": {
+            "line": 25,
+            "column": 18
+          },
+          "form": "require"
+        },
+        {
+          "specifier": "'boot.php' or die('boot failed')",
+          "names": [],
+          "position": {
+            "line": 26,
+            "column": 8
+          },
+          "form": "require"
+        },
+        {
+          "specifier": "'pages/' . $page . '.php'",
+          "names": [],
+          "position": {
+            "line": 30,
+            "column": 16
+          },
+          "form": "include",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "$plugin",
+          "names": [],
+          "position": {
+            "line": 35,
+            "column": 17
+          },
+          "form": "include_once",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "'partials/user.php'",
+          "names": [],
+          "position": {
+            "line": 46,
+            "column": 16
+          },
+          "form": "include",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "'partials/login.php'",
+          "names": [],
+          "position": {
+            "line": 49,
+            "column": 16
+          },
+          "form": "include",
+          "guard": "conditional"
+        }
+      ]
+    },
+    "php52/lib/Shop/Cart.php": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "dirname(__FILE__) . '/../Shop.php'",
+          "names": [],
+          "position": {
+            "line": 2,
+            "column": 13
+          },
+          "form": "require_once"
+        },
+        {
+          "specifier": "'Shop/Pricing.php'",
+          "names": [],
+          "position": {
+            "line": 23,
+            "column": 21
+          },
+          "form": "require_once",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "dirname(__FILE__) . '/money.inc'",
+          "names": [],
+          "position": {
+            "line": 49,
+            "column": 21
+          },
+          "form": "include_once",
+          "guard": "conditional"
+        }
+      ]
+    },
+    "php53/src/Shop/Order.php": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "Acme\\Billing\\Invoice",
+          "names": [],
+          "position": {
+            "line": 5,
+            "column": 4
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "Acme\\Billing\\Gateway",
+          "names": [],
+          "position": {
+            "line": 6,
+            "column": 4
+          },
+          "form": "use",
+          "alias": "PaymentGateway"
+        },
+        {
+          "specifier": "Acme\\Support\\Clock",
+          "names": [],
+          "position": {
+            "line": 6,
+            "column": 44
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "Acme\\Support\\money_format",
+          "names": [],
+          "position": {
+            "line": 7,
+            "column": 13
+          },
+          "form": "use function"
+        },
+        {
+          "specifier": "Acme\\Support\\CURRENCY",
+          "names": [],
+          "position": {
+            "line": 8,
+            "column": 10
+          },
+          "form": "use const"
+        },
+        {
+          "specifier": "Acme\\Shipping\\Carrier",
+          "names": [],
+          "position": {
+            "line": 9,
+            "column": 19
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "Acme\\Shipping\\Parcel",
+          "names": [],
+          "position": {
+            "line": 9,
+            "column": 28
+          },
+          "form": "use",
+          "alias": "Box"
+        },
+        {
+          "specifier": "Acme\\Shipping\\weigh",
+          "names": [],
+          "position": {
+            "line": 9,
+            "column": 52
+          },
+          "form": "use function"
+        },
+        {
+          "specifier": "Acme\\Shipping\\MAX_WEIGHT",
+          "names": [],
+          "position": {
+            "line": 9,
+            "column": 65
+          },
+          "form": "use const"
+        },
+        {
+          "specifier": "\\Psr\\Log\\LoggerInterface",
+          "names": [],
+          "position": {
+            "line": 10,
+            "column": 4
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "__DIR__ . '/../bootstrap.php'",
+          "names": [],
+          "position": {
+            "line": 12,
+            "column": 13
+          },
+          "form": "require_once"
+        },
+        {
+          "specifier": "$file",
+          "names": [],
+          "position": {
+            "line": 75,
+            "column": 20
+          },
+          "form": "require",
+          "guard": "conditional"
+        }
+      ]
+    },
+    "php53/src/Shop/braced.php": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "Acme\\Shop\\Order",
+          "names": [],
+          "position": {
+            "line": 3,
+            "column": 8
+          },
+          "form": "use"
+        }
+      ]
+    },
+    "php8/src/Orders/OrderService.php": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "App\\Billing\\Invoice",
+          "names": [],
+          "position": {
+            "line": 7,
+            "column": 4
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "App\\Orders\\Events\\OrderPaid",
+          "names": [],
+          "position": {
+            "line": 8,
+            "column": 23
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "App\\Orders\\Events\\OrderShipped",
+          "names": [],
+          "position": {
+            "line": 8,
+            "column": 34
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "Attribute",
+          "names": [],
+          "position": {
+            "line": 9,
+            "column": 4
+          },
+          "form": "use"
+        },
+        {
+          "specifier": "App\\Support\\money",
+          "names": [],
+          "position": {
+            "line": 11,
+            "column": 13
+          },
+          "form": "use function"
+        },
+        {
+          "specifier": "__DIR__ . '/plugins/windows.php'",
+          "names": [],
+          "position": {
+            "line": 66,
+            "column": 33
+          },
+          "form": "require",
+          "guard": "conditional"
+        },
+        {
+          "specifier": "__DIR__ . '/plugins/posix.php'",
+          "names": [],
+          "position": {
+            "line": 67,
+            "column": 31
+          },
+          "form": "require",
+          "guard": "conditional"
+        }
+      ]
+    }
+  }
+}

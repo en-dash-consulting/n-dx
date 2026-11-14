@@ -82,14 +82,56 @@ export interface CallSite {
   readonly strings: readonly Capture[];
 }
 
-/** Rebuild the calls of one file from its `calls` captures, as lang-kit calls facts. */
+/**
+ * Rebuild the calls of one file from its `calls` captures, as lang-kit calls
+ * facts, in the order their argument lists open.
+ *
+ * An object creation is captured as `@call.construct`, and its class, when it
+ * is a name, as `@call.class` directly inside it (PHP's `new Foo\Bar(…)`).
+ * The call whose `@call.invocation` has the creation's span is marked
+ * `construct`; a creation with no argument list (`new Foo`) is a call of its
+ * own, with the class as callee and no strings, placed where its argument
+ * list would open: after the class, or at `new` when the class is not a name
+ * (`new $class`, an anonymous class).
+ */
 export function groupCalls(captures: readonly Capture[]): CallFact[] {
-  return callSites(captures).map((site) => ({
-    ...(site.name ? { callee: site.name.text } : {}),
-    ...(site.receiver ? { receiver: site.receiver.text } : {}),
-    strings: site.strings.map(stringArgument),
-  }));
+  const constructs = captures.filter((c) => c.name === "call.construct");
+  const constructAt = new Map(constructs.map((c) => [spanKey(c), c]));
+  const calls: { readonly at: SourcePosition; readonly fact: CallFact }[] = [];
+  const withList = new Set<Capture>();
+  for (const site of callSites(captures)) {
+    const construct = site.invocation ? constructAt.get(spanKey(site.invocation)) : undefined;
+    if (construct) withList.add(construct);
+    calls.push({
+      at: site.arguments.start,
+      fact: {
+        ...(site.name ? { callee: site.name.text } : {}),
+        ...(site.receiver ? { receiver: site.receiver.text } : {}),
+        ...(construct ? { construct: true } : {}),
+        strings: site.strings.map(stringArgument),
+      },
+    });
+  }
+  const bare = constructs.filter((c) => !withList.has(c));
+  if (bare.length === 0) return calls.map((c) => c.fact);
+
+  const classes = captures.filter((c) => c.name === "call.class");
+  const classOf = new Map<Capture, Capture>();
+  innermostEach(constructs, classes).forEach((owner, i) => {
+    if (owner && !classOf.has(owner)) classOf.set(owner, classes[i]!);
+  });
+  for (const construct of bare) {
+    const cls = classOf.get(construct);
+    calls.push({
+      at: cls ? cls.end : construct.start,
+      fact: { ...(cls ? { callee: cls.text } : {}), construct: true, strings: [] },
+    });
+  }
+  // Stable: calls that open together keep their order.
+  return calls.sort((a, b) => (before(a.at, b.at) ? -1 : before(b.at, a.at) ? 1 : 0)).map((c) => c.fact);
 }
+
+const spanKey = (c: Capture): string => `${c.start.line}:${c.start.column}-${c.end.line}:${c.end.column}`;
 
 /** The calls of one file from its `calls` captures, one per argument list in document order. */
 export function callSites(captures: readonly Capture[]): CallSite[] {
@@ -131,8 +173,13 @@ export function callSites(captures: readonly Capture[]): CallSite[] {
     // The invocation that closes where this list closes; the next one out ends later.
     const invocation = invocationsByEnd.get(key(list.end))?.find((i) => contains(i, list));
     const name = namesByEnd.get(key(list.start))?.find((n) => !invocation || contains(invocation, n));
-    const receiver =
-      name && invocation ? receiversByStart.get(key(invocation.start))?.find((r) => atOrBefore(r.end, name.start)) : undefined;
+    // In a chain (`a.b().c()`) several receivers start with the invocation; this call's ends last before its name.
+    let receiver: Capture | undefined;
+    if (name && invocation) {
+      for (const r of receiversByStart.get(key(invocation.start)) ?? []) {
+        if (atOrBefore(r.end, name.start) && (receiver === undefined || before(receiver.end, r.end))) receiver = r;
+      }
+    }
     return {
       ...(invocation ? { invocation } : {}),
       ...(name ? { name } : {}),

@@ -1,9 +1,9 @@
 /**
- * PHP through inventory and imports. The PHP pack is registered but produces
- * no facts yet. Without it, inventory.json and imports.json are what they were
- * before PHP was a pack, and the pack is only suggested. With it, they are
- * the same too: the pack does not produce imports, so it is reported and PHP
- * files keep inventory only.
+ * PHP through inventory and imports. Without the PHP pack, inventory.json and
+ * imports.json are what they were before PHP was a pack, and the pack is only
+ * suggested. With it, imports.json is the same too: the pack reports PHP
+ * imports as written and resolves none, so it adds no edge and no external
+ * package; the imports phase records PHP as analysed.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -17,6 +17,7 @@ import { analyzeInventory, withPackAnalysedLanguages } from "../../src/analyzers
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { toCanonicalJSON } from "../../src/util/sort.js";
+import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
 const FILES: Record<string, string> = {
   "composer.json": '{"name": "acme/shop"}\n',
@@ -92,12 +93,13 @@ describe("PHP files with the PHP pack registered", () => {
     expect(withPackAnalysedLanguages(inventory.summary, missing.analysed)).toBe(inventory.summary);
   });
 
-  it("with the workspace pack loaded, writes the same imports and says the pack produces no imports", async () => {
+  it("with the workspace pack running, writes the same imports: PHP imports are read as written, never as edges", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
     const before = await imports(WITHOUT_PHP);
     const loaded = await imports(KNOWN_PACKS.slice());
     expect(toCanonicalJSON(loaded.imports)).toBe(toCanonicalJSON(before.imports));
-    expect(loaded.notices).toEqual(['PHP: the pack does not produce "imports"; PHP files get inventory only.']);
+    expect(loaded.notices).toEqual([]);
     expect(loaded.suggested).toEqual([]);
-    expect(loaded.analysed).toEqual([]);
+    expect(loaded.analysed).toEqual(["php"]);
   });
 });

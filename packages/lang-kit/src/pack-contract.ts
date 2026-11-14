@@ -83,10 +83,28 @@ export const IMPORT_GUARDS = ["type-checking", "optional", "conditional"] as con
 
 export type ImportGuard = (typeof IMPORT_GUARDS)[number];
 
+/**
+ * Which PHP statement wrote an import: one of the four include forms, or a
+ * `use` of a class or namespace, a function or a constant.
+ */
+export const IMPORT_FORMS = ["include", "include_once", "require", "require_once", "use", "use function", "use const"] as const;
+
+export type ImportForm = (typeof IMPORT_FORMS)[number];
+
 /** One import as the file writes it, before resolution. */
 export interface WrittenImport {
-  /** The module as written; a relative import keeps its leading dots (`..pkg`, `.`). */
+  /**
+   * The module as written; a relative import keeps its leading dots (`..pkg`, `.`).
+   * A PHP include gives its path expression's source text, quotes included
+   * (`'lib/db.php'`, `dirname(__FILE__) . '/x.php'`, `$file`); a PHP `use`
+   * gives the qualified name, a group use's prefix joined to each entry
+   * (`use A\{B}` gives `A\B`).
+   */
   readonly specifier: string;
+  /** Set by a pack whose language has several import statements (PHP); absent otherwise. */
+  readonly form?: ImportForm;
+  /** The local name the import binds when the file renames it (PHP `use A\B as C` gives `C`). */
+  readonly alias?: string;
   /** Names imported from the module, as written, in order; `*` for a wildcard; empty when the module itself is imported. */
   readonly names: readonly string[];
   /** Where the specifier starts. */
@@ -206,8 +224,17 @@ export interface StringArgument {
 export interface CallFact {
   /** Called method or function; absent when the callee is not a name (`f()()`). */
   readonly callee?: string;
-  /** Receiver as written (`jdbcTemplate`, `s.db`); absent for an unqualified call. */
+  /**
+   * Receiver as written (`jdbcTemplate`, `s.db`, PHP's `$this->db` or the
+   * static scope `Foo`, `self`, `parent`); absent for an unqualified call.
+   */
   readonly receiver?: string;
+  /**
+   * Set for an object creation (PHP `new Foo\Bar(…)`, or `new Foo` with no
+   * argument list): `callee` is the class as written, absent for an
+   * anonymous class or a class that is not a name (`new $class`).
+   */
+  readonly construct?: true;
   /**
    * String literals passed directly to this call, in order. A literal inside a
    * nested call belongs to that call: `f(g("x"))` gives `"x"` to `g`.

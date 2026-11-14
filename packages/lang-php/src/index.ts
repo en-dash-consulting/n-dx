@@ -9,3 +9,5 @@
 export { pack } from "./pack.js";
 export { PHP_PACKAGE } from "./package-paths.js";
 export * from "./php-pack.js";
+export * from "./php-imports.js";
+export * from "./php-symbols.js";

@@ -44,6 +44,47 @@ describe("groupCalls", () => {
     ]);
   });
 
+  it("marks an object creation, and lists one without an argument list where its list would open", () => {
+    // f(new A(1), new B, new $c); — the creations as the PHP calls query captures them.
+    const calls = groupCalls([
+      capture("call.invocation", "f(new A(1), new B, new $c)", 1, 0, 26),
+      capture("call.name", "f", 1, 0, 1),
+      capture("call.arguments", "(new A(1), new B, new $c)", 1, 1, 26),
+      capture("call.construct", "new A(1)", 1, 2, 10),
+      capture("call.invocation", "new A(1)", 1, 2, 10),
+      capture("call.class", "A", 1, 6, 7),
+      capture("call.name", "A", 1, 6, 7),
+      capture("call.arguments", "(1)", 1, 7, 10),
+      capture("call.construct", "new B", 1, 12, 17),
+      capture("call.class", "B", 1, 16, 17),
+      capture("call.construct", "new $c", 1, 19, 25),
+    ]);
+    expect(calls).toEqual([
+      { callee: "f", strings: [] },
+      { callee: "A", construct: true, strings: [] },
+      { callee: "B", construct: true, strings: [] },
+      { construct: true, strings: [] },
+    ]);
+  });
+
+  it("gives each call in a chain the receiver that ends right before its name", () => {
+    // a.b().c() — both receivers start where both invocations start.
+    const calls = groupCalls([
+      capture("call.invocation", "a.b().c()", 1, 0, 9),
+      capture("call.receiver", "a", 1, 0, 1),
+      capture("call.invocation", "a.b()", 1, 0, 5),
+      capture("call.receiver", "a.b()", 1, 0, 5),
+      capture("call.name", "b", 1, 2, 3),
+      capture("call.arguments", "()", 1, 3, 5),
+      capture("call.name", "c", 1, 6, 7),
+      capture("call.arguments", "()", 1, 7, 9),
+    ]);
+    expect(calls).toEqual([
+      { callee: "b", receiver: "a", strings: [] },
+      { callee: "c", receiver: "a.b()", strings: [] },
+    ]);
+  });
+
   it("keeps each call's captures as call sites, for rules that need positions", () => {
     const [site] = callSites(call(3));
     expect(site?.invocation?.text).toBe('db.Query("s3")');
