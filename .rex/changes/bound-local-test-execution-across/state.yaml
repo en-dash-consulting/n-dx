@@ -134,7 +134,14 @@ items:
     lastModified: "2026-11-12T18:41:56.169Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96357e8a-d040-477a-9f0d-d75fea4656ef":
-    lastModified: "2026-11-14T05:34:27.528Z"
+    status: "completed"
+    startedAt: "2026-11-14T05:34:55.095Z"
+    completedAt: "2026-11-14T05:43:20.476Z"
+    endedAt: "2026-11-14T05:43:20.476Z"
+    activeIntervals: [{"end":"2026-11-14T05:43:20.476Z","start":"2026-11-14T05:34:55.095Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "a75d03b6f: slot dir m-/h- + sha256[:16] of machine id or hostname, cached per process; NDX_VALIDATION_SLOT_DIR beside the token, nested acquire uses it; docs, protocol header, patch changeset; change a3e16b11 closed."
+    lastModified: "2026-11-14T05:43:20.476Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9861a7ad-5ff9-47b7-863e-b38ac6cd5da1":
     status: "completed"
