@@ -26,7 +26,7 @@
  * emscripten or native compiler is needed on the developer machine; `tar` is
  * (macOS, Linux and Windows 10+ ship one).
  *
- * A grammar whose tag omits `src/parser.c` is generated first with
+ * A grammar whose tag omits `src/parser.c` (under its `subdir`, if any) is generated first with
  * `tree-sitter generate`, which evaluates the pinned `grammar.js`.
  *
  * Re-running is cheap: verified downloads are cached under this package's
@@ -36,7 +36,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
@@ -133,7 +133,13 @@ export function toolchainEnv(dirs, env = process.env) {
   return result;
 }
 
-/** Grammars to build, keyed by output name. `sha256` covers the tag's source archive. */
+/**
+ * Grammars to build, keyed by output name. `sha256` covers the tag's source
+ * archive. `subdir`, when set, is the grammar's directory inside the archive
+ * (tree-sitter-php keeps `php/` and `php_only/` side by side); the whole
+ * archive is still extracted, since a grammar there may include files beside
+ * it (`php/src/scanner.c` includes `../../common/scanner.h`).
+ */
 export const GRAMMARS = {
   "tree-sitter-java": {
     repo: "tree-sitter/tree-sitter-java",
@@ -154,6 +160,13 @@ export const GRAMMARS = {
     repo: "tree-sitter/tree-sitter-python",
     version: "0.25.0",
     sha256: "4609a3665a620e117acf795ff01b9e965880f81745f287a16336f4ca86cf270c",
+  },
+  // The `php` grammar (PHP mixed with HTML), not `php_only`: legacy PHP 5 sites interleave the two.
+  "tree-sitter-php": {
+    repo: "tree-sitter/tree-sitter-php",
+    version: "0.25.1",
+    sha256: "1377ac7d40474e002af12fe098287e065fac6d818d43376dc6617dbc94836ad8",
+    subdir: "php",
   },
   "tree-sitter-sql": {
     repo: "DerekStride/tree-sitter-sql",
@@ -338,7 +351,23 @@ export function extractTarGz(gz, dest) {
   }
 }
 
-async function buildGrammar(cli, env, name, { repo, version, sha256: expected }, outDir) {
+/**
+ * The directory `tree-sitter generate` and `build` run on: the extracted
+ * archive at `source`, or its `subdir` when the grammar names one. Throws on a
+ * `subdir` that is absolute or leaves the archive.
+ */
+export function grammarSourceDir(source, { subdir }) {
+  if (subdir === undefined) return source;
+  const root = resolve(source);
+  const dir = resolve(root, subdir);
+  if (isAbsolute(subdir) || !dir.startsWith(root + sep)) {
+    throw new Error(`Grammar subdir ${subdir} is not inside its archive`);
+  }
+  return dir;
+}
+
+async function buildGrammar(cli, env, name, grammar, outDir) {
+  const { repo, version, sha256: expected } = grammar;
   const archive = await fetchVerified(
     `https://github.com/${repo}/archive/refs/tags/v${version}.tar.gz`,
     expected,
@@ -347,20 +376,26 @@ async function buildGrammar(cli, env, name, { repo, version, sha256: expected },
   const source = join(BUILD_ROOT, "src", `${name}-${version}`);
   rmSync(source, { recursive: true, force: true });
   extractTarGz(archive, source);
-
-  // Some grammars (tree-sitter-sql) keep the generated parser out of their tags.
-  if (!existsSync(join(source, "src", "parser.c"))) {
-    const generated = spawnSync(cli, ["generate"], { cwd: source, env, stdio: "inherit" });
-    if (generated.error) throw generated.error;
-    if (generated.status !== 0) throw new Error(`tree-sitter generate failed for ${name} (exit ${generated.status})`);
-  }
-
   mkdirSync(outDir, { recursive: true });
   const output = grammarWasmPath(name, outDir);
-  const result = spawnSync(cli, ["build", "--wasm", "--output", output, source], { env, stdio: "inherit" });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`tree-sitter build --wasm failed for ${name} (exit ${result.status})`);
+  for (const step of grammarBuildSteps(source, grammar, output)) {
+    const result = spawnSync(cli, step.args, { cwd: step.cwd, env, stdio: "inherit" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`tree-sitter ${step.args[0]} failed for ${name} (exit ${result.status})`);
+  }
   console.log(`built ${output}`);
+}
+
+/**
+ * The CLI runs that build the grammar extracted at `source` into `output`:
+ * `generate` first when its directory ({@link grammarSourceDir}) has no
+ * `src/parser.c` — some grammars (tree-sitter-sql) keep the generated parser
+ * out of their tags — then `build --wasm`.
+ */
+export function grammarBuildSteps(source, grammar, output) {
+  const dir = grammarSourceDir(source, grammar);
+  const build = { args: ["build", "--wasm", "--output", output, dir], cwd: dir };
+  return existsSync(join(dir, "src", "parser.c")) ? [build] : [{ args: ["generate"], cwd: dir }, build];
 }
 
 /**

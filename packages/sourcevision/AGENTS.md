@@ -64,6 +64,14 @@ Python file with routes (and `totalServerRoutes`), and
 outbound.json a dependency per Python outbound call; no sourcevision code
 is Python-specific.
 
+### PHP
+
+`@n-dx/lang-php` is an opt-in `KNOWN_PACKS` entry with no fallback parser.
+It produces no facts yet, so with or without it PHP files get inventory only
+and every artifact is unchanged; installed, it is reported as not producing
+imports, and missing and unlisted, it is only suggested
+(`tests/integration/php-pack-imports.test.ts`).
+
 ### The Terraform model in infrastructure.json
 
 The Terraform pack produces `resources` facts, not imports.
