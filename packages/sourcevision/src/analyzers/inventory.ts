@@ -13,7 +13,17 @@ import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { sourcevisionVersion } from "../language/package-paths.js";
-import { csharpConfig, javaConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
+import {
+  csharpConfig,
+  javaConfig,
+  phpConfig,
+  PHP_REPOSITORY_ONLY_EXTENSIONS,
+  pythonConfig,
+  typescriptConfig,
+  terraformConfig,
+  isTerraformFile,
+  type LanguageConfig,
+} from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -49,6 +59,10 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".asmx": "ASP.NET",
   ".master": "ASP.NET",
   ".php": "PHP",
+  ".phtml": "PHP",
+  ".php3": "PHP",
+  ".php4": "PHP",
+  ".php5": "PHP",
   ".lua": "Lua",
   ".r": "R",
   ".R": "R",
@@ -109,14 +123,15 @@ function languageNames(extensions: Iterable<string>): Set<string> {
 
 /**
  * Languages parsed only through an opt-in pack with no fallback parser
- * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`). `javaSecondaryConfig`
+ * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`; PHP: `@n-dx/lang-php`,
+ * not yet published, so PHP is never listed). `javaSecondaryConfig`
  * shares `javaConfig`'s id and extensions, so a Java secondary is covered too.
  * The inventory phase runs before anything loads the pack, so it leaves them
  * out of `analysedLanguages`; listing them would claim analysis the pack may
  * not do. The imports phase sets them with {@link withPackAnalysedLanguages}
  * from the packs that ran.
  */
-const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [javaConfig, pythonConfig];
+const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [javaConfig, pythonConfig, phpConfig];
 
 const packOnlyLanguages = (configs: readonly LanguageConfig[]): Set<string> =>
   languageNames(configs.flatMap((c) => [...c.parseableExtensions]));
@@ -138,7 +153,13 @@ export function withPackAnalysedLanguages(summary: Inventory["summary"], packIds
   return { ...summary, analysedLanguages: [...kept, ...added].sort() };
 }
 
-export function detectLanguage(filePath: string): string {
+/**
+ * Inventory language of `filePath`. `config` is the project's language
+ * config: an extension other ecosystems share (`.inc`, `.module`,
+ * `.install`) is PHP only when `config` lists it, which it does only in a
+ * repository detected as PHP; without `config` it is never PHP.
+ */
+export function detectLanguage(filePath: string, config?: Pick<LanguageConfig, "extensions">): string {
   const name = basename(filePath);
   const ext = extname(filePath).toLowerCase();
 
@@ -153,6 +174,7 @@ export function detectLanguage(filePath: string): string {
 
   // Extension-based detection
   if (ext && EXT_TO_LANGUAGE[ext]) return EXT_TO_LANGUAGE[ext];
+  if (PHP_REPOSITORY_ONLY_EXTENSIONS.has(ext) && config?.extensions.has(ext)) return "PHP";
 
   return "Other";
 }
@@ -482,7 +504,7 @@ export async function analyzeInventory(
   // is false (legacy: inventory every file).
   const acceptFile = (relPath: string): boolean => {
     if (!codeOnly) return true;
-    if (PROGRAMMING_LANGUAGES.has(detectLanguage(relPath))) return true;
+    if (PROGRAMMING_LANGUAGES.has(detectLanguage(relPath, langConfig))) return true;
     const ext = extname(relPath).toLowerCase();
     if (extraExtensions.has(ext)) return true;
     if (ext) skippedExtensions.set(ext, (skippedExtensions.get(ext) ?? 0) + 1);
@@ -536,7 +558,7 @@ export async function analyzeInventory(
     // Cache miss: read and process the file
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
-    const language = detectLanguage(relPath);
+    const language = detectLanguage(relPath, langConfig);
     const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig));
     const category = deriveCategory(relPath);
 

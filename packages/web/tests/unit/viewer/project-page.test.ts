@@ -261,7 +261,7 @@ describe("ProjectView", () => {
 
     const select = root.querySelector<HTMLSelectElement>("#ps-language")!;
     expect([...select.options].map((o) => o.textContent)).toEqual(
-      ["Auto-detect", "TypeScript", "JavaScript", "Go", "Swift", "Python", "C#", "Java"]);
+      ["Auto-detect", "TypeScript", "JavaScript", "Go", "Swift", "Python", "C#", "Java", "PHP"]);
     await act(async () => {
       select.value = "python";
       select.dispatchEvent(new Event("change", { bubbles: true }));
