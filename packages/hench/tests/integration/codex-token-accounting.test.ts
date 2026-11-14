@@ -100,6 +100,28 @@ describe("codex token accounting integration", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
+  it("fails a ChatGPT model rejection once with an explicit migration choice", async () => {
+    const mockSpawn = vi.fn(() => mockCliProcess({ code: 1,
+      stderr: "The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account." }));
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
+    });
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+    const config = await loadConfig(henchDir);
+    const result = await cliLoop({ config: { ...config, model: "gpt-5.4" }, spawnModel: "gpt-5.4",
+      store: createStore("file", rexDir), projectDir, henchDir, taskId: "task-1" });
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    const args = mockSpawn.mock.calls[0] as unknown as [string, string[]];
+    expect(args[1]).toContain("gpt-5.4");
+    expect(result.run.model).toBe("gpt-5.4");
+    expect(result.run.status).toBe("failed");
+    expect(result.run.error).toContain("explicitly update the originating model pin");
+    expect(result.run.error).toContain("n-dx config llm.codex.auth api");
+  });
+
   it("accumulates Codex token totals across retries and enforces budget using cumulative totals", async () => {
     const baselineRun: RunRecord = {
       id: "baseline-run",

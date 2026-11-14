@@ -100,19 +100,17 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
     expect(resolveFor({ item: task({ models: { claude: "opus" } }) }).model.value).toBe(
       resolveModel("opus"),
     );
-    // … and a Codex id retired by OpenAI remaps to its replacement. Resolving
-    // the pin with `resolveModel` alone knew only Claude's aliases, so this was
-    // sent to Codex unchanged and the run failed on a withdrawn model.
+    // Codex IDs remain literal; availability depends on authentication.
     const codex = resolveFor({
       vendor: "codex",
       llm: { vendor: "codex" },
       item: task({ models: { codex: "gpt-5.4" } }),
     });
-    expect(codex.model).toMatchObject({ value: NEWEST_MODELS.codex, source: "task.run.models" });
+    expect(codex.model).toMatchObject({ value: "gpt-5.4", source: "task.run.models" });
     expect(codex.warnings).toEqual([]);
   });
 
-  it("maps a retired Codex pin to the tier its replacement belongs to", () => {
+  it("preserves an older pin and reports a custom weight", () => {
     // The weight follows the model that will actually run, not the id typed.
     const light = resolveFor({
       vendor: "codex",
@@ -120,8 +118,8 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
       item: task({ models: { codex: "gpt-5.4-mini" } }),
     });
 
-    expect(light.model.value).toBe(TIER_MODELS.codex.light);
-    expect(light.model.weight).toBe("light");
+    expect(light.model.value).toBe("gpt-5.4-mini");
+    expect(light.model.weight).toBe("custom");
   });
 
   it("judges vendor compatibility on the normalized id, not the one that was typed", () => {
@@ -787,5 +785,22 @@ describe("ndx work --resolve reports the task's saved settings", () => {
 
     expect(r.resolved.model).toEqual({ value: TIER_MODELS.claude.light, source: "cli-flag" });
     expect(r.resolved.maxTurns).toEqual({ value: 4, source: "cli-flag" });
+  });
+});
+
+describe("literal Codex execution and review precedence", () => {
+  it.each(["api", "cli", "auto"] as const)("preserves all pins under %s authentication", auth => {
+    const llm: LLMConfig = { vendor: "codex", model: "gpt-5.2", codex: { auth, model: "gpt-5.3-codex", reviewModel: "gpt-5.4-mini" } };
+    const base = { vendor: "codex" as const, llm };
+    expect(resolveFor(base).model.value).toBe("gpt-5.2");
+    expect(resolveFor(base).reviewModel.value).toBe("gpt-5.4-mini");
+    expect(resolveFor({ ...base, config: { models: { codex: "gpt-5.4" } } }).model.value).toBe("gpt-5.4");
+    const item = task({ models: { codex: "gpt-5.4-mini" }, reviewModels: { codex: "gpt-5.4" } });
+    const resolved = resolveFor({ ...base, item });
+    expect(resolved.model.value).toBe("gpt-5.4-mini");
+    expect(resolved.reviewModel.value).toBe("gpt-5.4");
+    expect(resolveFor({ ...base, item, flags: { review: "true", model: "gpt-5-codex", "review-model": "gpt-5.2" } }).model.value).toBe("gpt-5-codex");
+    expect(resolveFor({ ...base, item, flags: { review: "true", "review-model": "gpt-5.2" } }).reviewModel.value).toBe("gpt-5.2");
+    expect(resolveFor({ ...base, item: task({ tier: "light" }), llm: { ...llm, tiers: { codex: { light: "gpt-5.4-mini" } } } }).model.value).toBe("gpt-5.4-mini");
   });
 });

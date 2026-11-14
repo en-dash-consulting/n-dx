@@ -861,3 +861,17 @@ describe("classifyAuthError", () => {
     expect(r).toBeNull();
   });
 });
+
+describe("Codex authentication-specific model availability", () => {
+  it("offers an explicit choice without treating model availability as expired credentials", () => {
+    const result = classifyLLMError(new Error("The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account."), "codex");
+    expect(result.code).toBe("NDX_CLI_INVALID_CONFIGURATION");
+    expect(result.category).not.toBe("auth");
+    expect(result.suggestion).toContain("n-dx config llm.codex.auth api");
+    expect(result.suggestion).toContain("explicitly update");
+    expect(result.suggestion).toContain("No model or authentication setting was changed");
+  });
+  it.each(["model not found", "ChatGPT login required", "model is not supported for this API project"])("does not infer ChatGPT model retirement from %s", message => {
+    expect(classifyLLMError(new Error(message), "codex").code).not.toBe("NDX_CLI_INVALID_CONFIGURATION");
+  });
+});

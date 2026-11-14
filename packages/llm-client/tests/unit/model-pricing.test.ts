@@ -105,10 +105,9 @@ describe("resolveModelPricing", () => {
     }
   });
 
-  it("remaps a retired Codex model to its replacement's rates", () => {
+  it("does not attribute replacement-model prices to an older literal pin", () => {
     const resolved = resolveModelPricing("gpt-5.1-codex-mini");
-    expect(resolved.known).toBe(true);
-    expect(resolved.pricing).toEqual(resolveModelPricing("gpt-5.6-luna").pricing);
+    expect(resolved.known).toBe(false);
   });
 
   it("prices a dated model snapshot at its base model", () => {
