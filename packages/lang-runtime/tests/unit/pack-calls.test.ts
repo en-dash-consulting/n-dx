@@ -97,6 +97,52 @@ describe("groupCalls", () => {
     ]);
   });
 
+  it("names a call written with a space before its argument list", () => {
+    // foo ($x); $db->query ($sql); — each name ends before its list opens.
+    const calls = groupCalls([
+      capture("call.invocation", "foo ($x)", 1, 0, 8),
+      capture("call.name", "foo", 1, 0, 3),
+      capture("call.arguments", "($x)", 1, 4, 8),
+      capture("call.invocation", "$db->query ($sql)", 2, 0, 17),
+      capture("call.receiver", "$db", 2, 0, 3),
+      capture("call.name", "query", 2, 5, 10),
+      capture("call.arguments", "($sql)", 2, 11, 17),
+    ]);
+    expect(calls).toEqual([
+      { callee: "foo", strings: [] },
+      { callee: "query", receiver: "$db", strings: [] },
+    ]);
+  });
+
+  it("does not name a spaced call after a name in an inner call or argument list", () => {
+    // $a->b (g($x)) ->c ($y); then foo() ($z), whose own callee is not a name.
+    const calls = groupCalls([
+      capture("call.invocation", "$a->b (g($x)) ->c ($y)", 1, 0, 22),
+      capture("call.receiver", "$a", 1, 0, 2),
+      capture("call.invocation", "$a->b (g($x))", 1, 0, 13),
+      capture("call.receiver", "$a->b (g($x))", 1, 0, 13),
+      capture("call.name", "b", 1, 4, 5),
+      capture("call.arguments", "(g($x))", 1, 6, 13),
+      capture("call.invocation", "g($x)", 1, 7, 12),
+      capture("call.name", "g", 1, 7, 8),
+      capture("call.arguments", "($x)", 1, 8, 12),
+      capture("call.name", "c", 1, 16, 17),
+      capture("call.arguments", "($y)", 1, 18, 22),
+      capture("call.invocation", "foo() ($z)", 2, 0, 10),
+      capture("call.invocation", "foo()", 2, 0, 5),
+      capture("call.name", "foo", 2, 0, 3),
+      capture("call.arguments", "()", 2, 3, 5),
+      capture("call.arguments", "($z)", 2, 6, 10),
+    ]);
+    expect(calls).toEqual([
+      { callee: "b", receiver: "$a", strings: [] },
+      { callee: "g", strings: [] },
+      { callee: "c", receiver: "$a->b (g($x))", strings: [] },
+      { callee: "foo", strings: [] },
+      { strings: [] },
+    ]);
+  });
+
   it("keeps each call's captures as call sites, for rules that need positions", () => {
     const [site] = callSites(call(3));
     expect(site?.invocation?.text).toBe('db.Query("s3")');

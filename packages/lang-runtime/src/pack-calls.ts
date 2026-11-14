@@ -5,7 +5,10 @@
  * call's parts are paired by position, following the rules written in
  * `queries/<lang>/calls.scm`: a string argument belongs to the innermost
  * `@call.arguments` containing it, and a call's name is the `@call.name`
- * that ends exactly where its argument list starts.
+ * that ends exactly where its argument list starts. When space or a comment
+ * separates them (`foo ($x)`), it is the name its `@call.invocation` holds
+ * directly, outside any inner call, that ends last before the list starts;
+ * a call whose callee is not a name (`foo() ($x)`) has none.
  *
  * @module lang-runtime/pack-calls
  */
@@ -170,11 +173,29 @@ export function callSites(captures: readonly Capture[]): CallSite[] {
   const invocationsByEnd = bucket(invocations, (c) => c.end);
   const namesByEnd = bucket(names, (c) => c.end);
   const receiversByStart = bucket(receivers, (c) => c.start);
+  // Each name under the invocation that holds it most closely: its own, since a name is captured with its call.
+  const namesByInvocation = new Map<string, Capture[]>();
+  innermostEach(invocations, names).forEach((owner, i) => {
+    if (!owner) return;
+    const list = namesByInvocation.get(spanKey(owner));
+    if (list) list.push(names[i]!);
+    else namesByInvocation.set(spanKey(owner), [names[i]!]);
+  });
+  // Space or a comment before the list (`foo ($x)`): the invocation's own name that ends last before it.
+  const spacedName = (invocation: Capture, list: Capture): Capture | undefined => {
+    let found: Capture | undefined;
+    for (const n of namesByInvocation.get(spanKey(invocation)) ?? []) {
+      if (atOrBefore(n.end, list.start) && (found === undefined || before(found.end, n.end))) found = n;
+    }
+    return found;
+  };
 
   return argumentLists.map((list) => {
     // The invocation that closes where this list closes; the next one out ends later.
     const invocation = invocationsByEnd.get(key(list.end))?.find((i) => contains(i, list));
-    const name = namesByEnd.get(key(list.start))?.find((n) => !invocation || contains(invocation, n));
+    const name =
+      namesByEnd.get(key(list.start))?.find((n) => !invocation || contains(invocation, n)) ??
+      (invocation ? spacedName(invocation, list) : undefined);
     // In a chain (`a.b().c()`) several receivers start with the invocation; this call's ends last before its name.
     let receiver: Capture | undefined;
     if (name && invocation) {
