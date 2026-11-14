@@ -1,6 +1,15 @@
 schema: "rex/v2"
 items:
   "0ccd7aa6-6de3-45d5-9618-ea9f245a3891":
+    status: "completed"
+    startedAt: "2026-11-14T06:34:53.673Z"
+    completedAt: "2026-11-14T06:34:53.673Z"
+    endedAt: "2026-11-14T06:34:53.673Z"
+    activeIntervals: [{"end":"2026-11-14T06:34:53.673Z","start":"2026-11-14T06:34:53.673Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed in e1ccf4e2b (task 5e14adef): both copies' resolveValidationSlotDir return an absolute NDX_VALIDATION_SLOT_DIR without a lookup, so nested runner and hench acquires never look up. Tests: runner nests under a failing fake ioreg (macOS), runInValidationSlot nests under an injected failing lookup, parity covers both copies."
+    appliedAt: "2026-11-14T06:34:53.673Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-14T06:01:41.382Z"
-    lastModified: "2026-11-14T06:01:49.981Z"
+    lastModified: "2026-11-14T06:34:53.673Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

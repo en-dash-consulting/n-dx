@@ -128,7 +128,14 @@ items:
     lastModified: "2026-11-14T06:07:10.035Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5e14adef-7996-48b2-a2bd-4681c6e1f85b":
-    lastModified: "2026-11-14T06:19:50.884Z"
+    status: "completed"
+    startedAt: "2026-11-14T06:20:13.784Z"
+    completedAt: "2026-11-14T06:37:16.038Z"
+    endedAt: "2026-11-14T06:37:16.038Z"
+    activeIntervals: [{"end":"2026-11-14T06:37:16.038Z","start":"2026-11-14T06:20:13.784Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "e1ccf4e2b: host-resolved NDX_VALIDATION_SLOT_DIR handed to every confined command and honoured without lookup in both copies; 60 s failure memory; non-waiting pre-spawn reclaim; seam tests and parity. Closed 0ccd7aa6, 2387d5ba, 3455bc3c."
+    lastModified: "2026-11-14T06:37:16.038Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
     status: "completed"
