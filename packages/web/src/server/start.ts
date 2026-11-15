@@ -620,26 +620,6 @@ function registerWatchers(
 }
 
 /**
- * Re-register the file watchers that {@link registerWatchers} skipped at
- * server startup because their target directory (`.sourcevision`, `.rex`,
- * `.hench/runs`) didn't exist yet — the project was uninitialized, so the
- * server was showing the landing page rather than the dashboard.
- *
- * Called once, right after a successful `ndx init` triggered from the
- * dashboard's setup wizard (see `handleInit` in routes-commands.ts). Without
- * this, the dashboard the client reloads into after init would work for its
- * initial data load (every route reads straight from disk), but live
- * updates — WebSocket broadcasts on PRD/SourceVision changes — would stay
- * silently dead until the server was restarted by hand, since `fs.watch`
- * only gets set up once per directory.
- *
- * Safe to call exactly once per directory: each of the three registration
- * functions already no-ops (returns null/[]) when its target still doesn't
- * exist, so calling this on a directory that already has a watcher would be
- * the only way to double up — which the setup wizard's own pre-init-only
- * gating (see `isProjectInitialized`) rules out in practice.
- */
-/**
  * Re-resolve the project's layout after a successful `ndx init`.
  *
  * `ctx.svDir` / `ctx.rexDir` and the hench runs directory are resolved once in
@@ -665,6 +645,26 @@ export function refreshProjectLayout(ctx: ServerContext, handles: WatcherHandles
   handles.henchRunsDir = join(layout.henchDir, "runs");
 }
 
+/**
+ * Re-register the file watchers that {@link registerWatchers} skipped at
+ * server startup because their target directory (`.sourcevision`, `.rex`,
+ * `.hench/runs`) didn't exist yet — the project was uninitialized, so the
+ * server was showing the landing page rather than the dashboard.
+ *
+ * Called once, right after a successful `ndx init` triggered from the
+ * dashboard's setup wizard (see `handleInit` in routes-commands.ts). Without
+ * this, the dashboard the client reloads into after init would work for its
+ * initial data load (every route reads straight from disk), but live
+ * updates — WebSocket broadcasts on PRD/SourceVision changes — would stay
+ * silently dead until the server was restarted by hand, since `fs.watch`
+ * only gets set up once per directory.
+ *
+ * Safe to call exactly once per directory: each of the three registration
+ * functions already no-ops (returns null/[]) when its target still doesn't
+ * exist, so calling this on a directory that already has a watcher would be
+ * the only way to double up — which the setup wizard's own pre-init-only
+ * gating (see `isProjectInitialized`) rules out in practice.
+ */
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,

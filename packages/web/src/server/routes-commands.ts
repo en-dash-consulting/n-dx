@@ -2275,7 +2275,6 @@ const TRUST_GATED_POSTS = new Set([
   "reshape",
 ]);
 
-/** Handle command trigger API requests. Returns true if the request was handled. */
 /** Options threaded into {@link handleCommandsRoute} from start.ts, beyond the plain ctx/broadcast pair. */
 export interface CommandsRouteOptions {
   /**
@@ -2287,6 +2286,7 @@ export interface CommandsRouteOptions {
   onProjectInitialized?: () => void;
 }
 
+/** Handle command trigger API requests. Returns true if the request was handled. */
 export function handleCommandsRoute(
   req: IncomingMessage,
   res: ServerResponse,

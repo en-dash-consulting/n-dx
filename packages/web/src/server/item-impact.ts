@@ -114,14 +114,14 @@ export function securityTerms(title: string, body = ""): string[] {
 /** Root files every build or install reads, whatever imports them. */
 const ROOT_ESSENTIAL = /^(?:package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|pnpm-workspace\.yaml|tsconfig(?:\.[\w-]+)?\.json|Dockerfile|\.github\/workflows\/[^/]+)$/;
 
+/** Product names that read as a file name: "Node.js", "Vue.js". */
+const NOT_A_FILE = /^(?:node|next|nuxt|vue|react|express|deno|bun|d3|three|chart|ember|backbone|angular|svelte|solid|alpine)\.js$/i;
+
 /**
  * Path-like tokens in free text: anything with a slash and an extension
  * (`packages/web/src/x.ts`), or a bare file name with a known extension
  * (`ready-to-run.ts`, `.n-dx.json`). URLs are skipped.
  */
-/** Product names that read as a file name: "Node.js", "Vue.js". */
-const NOT_A_FILE = /^(?:node|next|nuxt|vue|react|express|deno|bun|d3|three|chart|ember|backbone|angular|svelte|solid|alpine)\.js$/i;
-
 export function mentionedPaths(text: string): string[] {
   const out = new Set<string>();
   const withoutUrls = text.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ");
