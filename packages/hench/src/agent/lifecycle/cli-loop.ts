@@ -23,10 +23,12 @@
  */
 
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import type { PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
+import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
-import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import { checkTokenBudget, formatBudgetExceeded } from "./token-budget.js";
+import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
@@ -161,7 +163,7 @@ import {
   type PriorAttemptWork,
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
-import type { PromptSectionDiagnostic, PersistedRuntimeEvent, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
+import type { PromptSectionDiagnostic, PersistedRuntimeEvent, RunReviewMode } from "../../schema/index.js";
 import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";

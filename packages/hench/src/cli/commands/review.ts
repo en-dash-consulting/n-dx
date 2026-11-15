@@ -18,7 +18,6 @@
  * @module hench/cli/commands/review
  */
 
-import { join } from "node:path";
 
 import { loadRun } from "../../store/runs.js";
 import { resolveHenchPaths } from "../../store/paths.js";

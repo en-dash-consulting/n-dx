@@ -394,7 +394,6 @@ function suggestConfigTuning(
 
   // Check retry config against transient error frequency
   const transientErrors = runs.filter((r) => r.status === "error_transient");
-  const retriedRuns = runs.filter((r) => (r.retryAttempts ?? 0) > 0);
   const maxRetries = config?.retry?.maxRetries ?? 3;
 
   if (transientErrors.length >= 3 && maxRetries < 5) {

@@ -4463,7 +4463,6 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Full test suite gate (mandatory before commit, unless skipped via flag).
   // Runs whenever the run completed successfully and gate is not explicitly skipped.
   // On failure, prompts for rerun/abort/skip actions with interactive feedback.
-  let testGateSkipped = false;
   let testGateFailed = false;
   let resolvedTestCommand: string | undefined;
   let gateBase: string | undefined;
@@ -4660,7 +4659,6 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             });
           } else if (action === "skip") {
             // User chose to skip gate and continue to commit
-            testGateSkipped = true;
             stream("Test Gate", "Skipped by user");
             gateComplete = true;
           } else {

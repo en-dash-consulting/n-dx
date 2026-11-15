@@ -17,7 +17,7 @@
  * refused run still exits 0 with a complete report.
  */
 
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, RunSettings, V2Tree } from "../../prd/rex-gateway.js";
 import { LLM_VENDOR, getGitCommonDir } from "../../prd/llm-gateway.js";
