@@ -24,6 +24,7 @@ import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type Gravi
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { describeMisfits } from "../fit.js";
+import { errorMessage } from "../error-message.js";
 import { FACE_EXTENSION, faceEnvironment, findInstalledFace, planProductFace, type FacePlan, type InstalledFace } from "../face.js";
 
 const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp", "info"] as const;
@@ -219,7 +220,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   try {
     parsed = parse(argv);
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(errorMessage(error));
     return 2;
   }
   if (parsed.sub === "help") {

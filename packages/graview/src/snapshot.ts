@@ -15,6 +15,7 @@ import { readRequirements, releaseId, RELEASE_PREFIX } from "./sources/requireme
 import { readCode, FILE_PREFIX } from "./sources/code.js";
 import { readRuns } from "./sources/runs.js";
 import { byString } from "./canonical.js";
+import { errorMessage } from "./error-message.js";
 import { loadDocument } from "./document.js";
 import { clampToCaps } from "./fit.js";
 import type { GraphSnapshot, SnapshotEdge, SnapshotNode, Warn } from "./types.js";
@@ -210,7 +211,7 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
         if (version !== undefined) edges.push({ kind: "shippedWith", from: id, to: releaseId(version) });
       }
     } catch (error) {
-      warn(`Commits and releases from git skipped: ${error instanceof Error ? error.message : String(error)}`);
+      warn(`Commits and releases from git skipped: ${errorMessage(error)}`);
     }
   }
 
@@ -260,7 +261,7 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
           for (const zone of zones) edges.push({ kind: "realizedIn", from: capabilityId, to: zone });
         }
       } catch (error) {
-        warn(`Realized-by edges skipped: ${error instanceof Error ? error.message : String(error)}`);
+        warn(`Realized-by edges skipped: ${errorMessage(error)}`);
       }
     }
   }

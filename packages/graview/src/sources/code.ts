@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_FILES, type Components, type Inventory, type Zone, type Zones } from "../sourcevision-gateway.js";
+import { errorMessage } from "../error-message.js";
 import type { SnapshotEdge, SnapshotNode, SourceSlice, Warn } from "../types.js";
 
 export interface CodeSlice extends SourceSlice {
@@ -29,7 +30,7 @@ function readJson<T>(path: string, warn: Warn): T | undefined {
   try {
     return JSON.parse(readFileSync(path, "utf-8")) as T;
   } catch (error) {
-    warn(`Could not read ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    warn(`Could not read ${path}: ${errorMessage(error)}`);
     return undefined;
   }
 }
