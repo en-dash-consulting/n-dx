@@ -99,7 +99,8 @@ export function useDOMPerformanceMonitor(
   containerRef: RefObject<Element>,
   options: UseDOMPerformanceMonitorOptions = {},
 ): UseDOMPerformanceMonitorResult {
-  const { intervalMs = 2000, maxSnapshots, enabled = true } = options;
+  // An omitted interval falls through to the monitor's own default.
+  const { intervalMs, maxSnapshots, enabled = true } = options;
 
   const [snapshot, setSnapshot] = useState<DOMNodeSnapshot | null>(
     getLatestDOMSnapshot,

@@ -64,7 +64,8 @@ export interface UseRefreshThrottleResult {
 export function useRefreshThrottle(
   options: UseRefreshThrottleOptions = {}
 ): UseRefreshThrottleResult {
-  const { baseIntervalMs = 5000, avgRefreshMs = 800, enabled = true } = options;
+  // Omitted timings fall through to the throttle's own defaults.
+  const { baseIntervalMs, avgRefreshMs, enabled = true } = options;
 
   const [queueState, setQueueState] = useState<RefreshQueueState>(getQueueState);
 
