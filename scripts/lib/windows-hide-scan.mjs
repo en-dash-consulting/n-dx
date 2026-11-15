@@ -23,6 +23,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { invokedDirectly } from "./invoked-directly.mjs";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -136,7 +137,7 @@ export function findUnhiddenSpawns() {
   return flagged.sort();
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (invokedDirectly(import.meta.url)) {
   const flagged = findUnhiddenSpawns();
   console.log(`${flagged.length} spawn(s) without windowsHide`);
   for (const f of flagged) console.log(`  ${f}`);
