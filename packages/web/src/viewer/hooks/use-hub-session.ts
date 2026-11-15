@@ -16,7 +16,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { webSocketUrl } from "../external.js";
 import type { SidecarEndpoint } from "./use-sidecar.js";
-import { getJson } from "./json-requests.js";
+import { getJson } from "../utils/json-requests.js";
 
 /** Mirrors `HubSessionPageConfig` in server/routes-sidecar.ts. */
 export interface HubSessionPageConfig {

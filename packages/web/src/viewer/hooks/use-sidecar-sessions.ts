@@ -14,7 +14,7 @@
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { detectBasePath } from "../external.js";
 import { getWorkspaceKey } from "../base-path.js";
-import { getJson, sendJson } from "./json-requests.js";
+import { getJson, sendJson } from "../utils/json-requests.js";
 import type { SidecarCard, SidecarSessionEntry } from "./use-sidecar.js";
 
 export type SidecarSessionFilter = "this" | "all";

@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId } from "../types.js";
-import { getJson } from "./json-requests.js";
+import { getJson } from "../utils/json-requests.js";
 
 /** One entry of GET /api/sidecar/lenses. */
 export interface SidecarLensInfo {

@@ -1,6 +1,8 @@
 /**
- * The JSON requests the Sidecar hooks make (`use-sidecar`, its sessions list
- * and attachment, and the hub session page).
+ * JSON requests for callers that treat every failure alike: the Sidecar hooks
+ * (`use-sidecar`, its sessions list and attachment, and the hub session page)
+ * today. In utils/ rather than hooks/ so a component or view can import it
+ * directly, without the full hooks barrel.
  *
  * A read answers null for anything but a 2xx — and for a request that throws —
  * since every caller treats "no answer" the same way. A write answers the
