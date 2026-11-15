@@ -1319,7 +1319,7 @@ export function spawnTool(
   args: string[],
   opts: SpawnToolOptions = {},
 ): Promise<SpawnToolResult> {
-  const { cwd, env, detached = false, timeout } = opts;
+  const { cwd, env, detached = false } = opts;
 
   // Detached mode: fire and forget, optionally leaving a log behind.
   if (detached) {
@@ -1343,14 +1343,40 @@ export function spawnTool(
 
   const stdio = opts.stdio ?? "inherit";
 
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
+  let child: ChildProcess;
+  try {
+    child = spawn(cmd, args, {
       cwd,
       env,
       stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
       windowsHide: opts.windowsHide ?? true,
     });
+  } catch (err) {
+    // A synchronous spawn failure rejects; it never throws past the promise.
+    return Promise.reject(err);
+  }
+  // A child killed by a signal has no exit code; spawnTool reports it as 1.
+  return settleChild(child, stdio === "pipe", opts, 1);
+}
 
+/**
+ * Wait for a spawned child and settle with its {@link SpawnToolResult}.
+ *
+ * Shared by {@link spawnTool} and {@link spawnManaged}. With `pipe`, stdout
+ * and stderr are accumulated (each stdout chunk also goes to
+ * `opts.onStdout`). A spawn `error` settles with exit code 1; `close`
+ * settles with the child's code, or `signalExitCode` when a signal ended it.
+ * A positive `opts.timeout` settles with `exitCode: null` and sends SIGTERM,
+ * then SIGKILL after {@link KILL_ESCALATION_MS}.
+ */
+function settleChild(
+  child: ChildProcess,
+  pipe: boolean,
+  opts: SpawnToolOptions,
+  signalExitCode: number | null,
+): Promise<SpawnToolResult> {
+  const { timeout } = opts;
+  return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -1381,7 +1407,7 @@ export function spawnTool(
       }, timeout);
     }
 
-    if (stdio === "pipe") {
+    if (pipe) {
       child.stdout!.on("data", (chunk: Buffer) => {
         const text = chunk.toString();
         stdout += text;
@@ -1397,7 +1423,7 @@ export function spawnTool(
     });
 
     child.on("close", (code) => {
-      finish(code ?? 1);
+      finish(code ?? signalExitCode);
     });
   });
 }
@@ -1422,7 +1448,7 @@ export function spawnManaged(
   args: string[],
   opts: SpawnToolOptions = {},
 ): ManagedChild {
-  const { cwd, env, timeout } = opts;
+  const { cwd, env } = opts;
   const logFd = opts.logFile ? openSync(opts.logFile, "a") : undefined;
   // A log file replaces both stdio modes, so nothing is buffered either.
   const stdio = logFd === undefined ? opts.stdio ?? "inherit" : "inherit";
@@ -1440,56 +1466,8 @@ export function spawnManaged(
     if (logFd !== undefined) closeSync(logFd);
   }
 
-  const done = new Promise<SpawnToolResult>((resolve) => {
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const finish = (exitCode: number | null) => {
-      if (timer) clearTimeout(timer);
-      if (killTimer) clearTimeout(killTimer);
-      if (settled) return;
-      settled = true;
-      resolve({ exitCode, stdout, stderr });
-    };
-
-    if (timeout && timeout > 0) {
-      timer = setTimeout(() => {
-        timer = undefined;
-        child.kill("SIGTERM");
-        // Escalate to SIGKILL after grace period if still alive
-        killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_ESCALATION_MS);
-        // Resolve immediately — caller sees timeout (exitCode: null).
-        // Keep the close/error handlers active so they can clear the
-        // escalation timer if the child exits before SIGKILL is needed.
-        if (!settled) {
-          settled = true;
-          resolve({ exitCode: null, stdout, stderr });
-        }
-      }, timeout);
-    }
-
-    if (stdio === "pipe") {
-      child.stdout!.on("data", (chunk: Buffer) => {
-        const text = chunk.toString();
-        stdout += text;
-        opts.onStdout?.(text);
-      });
-      child.stderr!.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-    }
-
-    child.on("error", () => {
-      finish(1);
-    });
-
-    child.on("close", (code) => {
-      finish(code);
-    });
-  });
+  // A child killed by a signal has no exit code; spawnManaged reports null.
+  const done = settleChild(child, stdio === "pipe", opts, null);
 
   return {
     done,
