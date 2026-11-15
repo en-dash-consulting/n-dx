@@ -1421,6 +1421,63 @@ async function maybeCacheSmartAddProposals(
   }
 }
 
+/**
+ * Ask what to do about duplicate matches among the proposals about to be
+ * accepted — cancel, merge into the existing items, or proceed with override
+ * markers — then accept them and report what was added. Returns "cancelled"
+ * when the operator cancels (nothing is written), else whether they merged.
+ */
+async function resolveDuplicatesAndAccept(
+  dir: string,
+  proposals: Proposal[],
+  matches: ProposalDuplicateMatch[],
+  parentId: string | undefined,
+): Promise<{ usedMerge: boolean } | "cancelled"> {
+  let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
+  let mergeTargetsByNodeKey: Record<string, string> | undefined;
+  let mergedCount = 0;
+  let reopenedItemIds: string[] = [];
+  let usedMerge = false;
+  if (hasDuplicateMatches(matches)) {
+    info("Duplicate matches were detected in the selected proposals.");
+    info("Choose action: c=cancel / m=merge with existing / p=proceed anyway");
+    const duplicateAnswer = await promptUser("Duplicate action (c/m/p): ");
+    const duplicateDecision = parseDuplicatePromptInput(duplicateAnswer);
+    if (duplicateDecision === "merge") {
+      const mergeResult = await applyDuplicateProposalMerges(dir, proposals, matches);
+      mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
+      mergedCount = mergeResult.mergedCount;
+      reopenedItemIds = mergeResult.reopenedItemIds;
+      usedMerge = true;
+    }
+    if (duplicateDecision === "cancel") {
+      info("Cancelled. No items were created.");
+      return "cancelled";
+    }
+    if (duplicateDecision === "proceed") {
+      overrideMarkersByNodeKey = buildDuplicateOverrideMarkerIndex(
+        matches,
+        new Date().toISOString(),
+      );
+    }
+  }
+
+  const acceptResult = await acceptProposals(dir, proposals, {
+    parentId,
+    overrideMarkersByNodeKey,
+    mergeTargetsByNodeKey,
+    mergedCount,
+    reopenedItemIds,
+  });
+  emitPrdPaths(acceptResult.prdPaths);
+  if (mergedCount > 0) {
+    result(`Merged ${mergedCount} duplicate node(s) and added ${acceptResult.added} new item(s) to PRD.`);
+  } else {
+    result(`Added ${acceptResult.added} items to PRD.`);
+  }
+  return { usedMerge };
+}
+
 async function runInteractiveSmartAddApproval(params: {
   dir: string;
   existing: PRDItem[];
@@ -1503,51 +1560,7 @@ async function runInteractiveSmartAddApproval(params: {
 
     const decision = parseApprovalInput(answer, currentProposals.length);
     if (decision === "all") {
-      let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
-      let mergeTargetsByNodeKey: Record<string, string> | undefined;
-      let mergedCount = 0;
-      let reopenedItemIds: string[] = [];
-      if (hasDuplicateMatches(currentDuplicateMatches)) {
-        info("Duplicate matches were detected in the selected proposals.");
-        info("Choose action: c=cancel / m=merge with existing / p=proceed anyway");
-        const duplicateAnswer = await promptUser("Duplicate action (c/m/p): ");
-        const duplicateDecision = parseDuplicatePromptInput(duplicateAnswer);
-        if (duplicateDecision === "merge") {
-          const mergeResult = await applyDuplicateProposalMerges(
-            dir,
-            currentProposals,
-            currentDuplicateMatches,
-          );
-          mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
-          mergedCount = mergeResult.mergedCount;
-          reopenedItemIds = mergeResult.reopenedItemIds;
-        }
-        if (duplicateDecision === "cancel") {
-          info("Cancelled. No items were created.");
-          done = true;
-          continue;
-        }
-        if (duplicateDecision === "proceed") {
-          overrideMarkersByNodeKey = buildDuplicateOverrideMarkerIndex(
-            currentDuplicateMatches,
-            new Date().toISOString(),
-          );
-        }
-      }
-
-      const acceptResult = await acceptProposals(dir, currentProposals, {
-        parentId,
-        overrideMarkersByNodeKey,
-        mergeTargetsByNodeKey,
-        mergedCount,
-        reopenedItemIds,
-      });
-      emitPrdPaths(acceptResult.prdPaths);
-      if (mergedCount > 0) {
-        result(`Merged ${mergedCount} duplicate node(s) and added ${acceptResult.added} new item(s) to PRD.`);
-      } else {
-        result(`Added ${acceptResult.added} items to PRD.`);
-      }
+      await resolveDuplicatesAndAccept(dir, currentProposals, currentDuplicateMatches, parentId);
       done = true;
       continue;
     }
@@ -1566,59 +1579,17 @@ async function runInteractiveSmartAddApproval(params: {
       decision.approved,
     );
 
-    let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
-    let mergeTargetsByNodeKey: Record<string, string> | undefined;
-    let mergedCount = 0;
-    let reopenedItemIds: string[] = [];
-    let usedMergeDecision = false;
-    if (hasDuplicateMatches(selectedMatches)) {
-      info("Duplicate matches were detected in the selected proposals.");
-      info("Choose action: c=cancel / m=merge with existing / p=proceed anyway");
-      const duplicateAnswer = await promptUser("Duplicate action (c/m/p): ");
-      const duplicateDecision = parseDuplicatePromptInput(duplicateAnswer);
-      if (duplicateDecision === "merge") {
-        const mergeResult = await applyDuplicateProposalMerges(
-          dir,
-          selected,
-          selectedMatches,
-        );
-        mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
-        mergedCount = mergeResult.mergedCount;
-        reopenedItemIds = mergeResult.reopenedItemIds;
-        usedMergeDecision = true;
-      }
-      if (duplicateDecision === "cancel") {
-        info("Cancelled. No items were created.");
-        done = true;
-        continue;
-      }
-      if (duplicateDecision === "proceed") {
-        overrideMarkersByNodeKey = buildDuplicateOverrideMarkerIndex(
-          selectedMatches,
-          new Date().toISOString(),
-        );
-      }
-    }
-
-    const acceptResult = await acceptProposals(dir, selected, {
-      parentId,
-      overrideMarkersByNodeKey,
-      mergeTargetsByNodeKey,
-      mergedCount,
-      reopenedItemIds,
-    });
-    emitPrdPaths(acceptResult.prdPaths);
-    if (mergedCount > 0) {
-      result(`Merged ${mergedCount} duplicate node(s) and added ${acceptResult.added} new item(s) to PRD.`);
-    } else {
-      result(`Added ${acceptResult.added} items to PRD.`);
+    const accepted = await resolveDuplicatesAndAccept(dir, selected, selectedMatches, parentId);
+    if (accepted === "cancelled") {
+      done = true;
+      continue;
     }
 
     const rejected = currentProposals.filter((_, i) => !decision.approved.includes(i));
-    if (rejected.length > 0 && !usedMergeDecision) {
+    if (rejected.length > 0 && !accepted.usedMerge) {
       await savePending(dir, rejected, parentId, hashPRD(existing));
       info(`${rejected.length} proposal(s) saved. Run \`rex add --accept\` to accept later.`);
-    } else if (rejected.length > 0 && usedMergeDecision) {
+    } else if (rejected.length > 0 && accepted.usedMerge) {
       info(`${rejected.length} unselected proposal(s) were cancelled and not written.`);
     }
     done = true;
