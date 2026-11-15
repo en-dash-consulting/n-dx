@@ -89,6 +89,8 @@ import {
   completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
+  henchConfigPath,
+  loadHenchConfig,
 } from "./hench-config-fields.js";
 import { resolveActiveVendor } from "./routes-llm.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -314,21 +316,6 @@ function getImpact(path: string, value: unknown): string {
       return `Agent can execute: ${(value as string[]).join(", ")}`;
     default:
       return "";
-  }
-}
-
-/** The workspace's hench config file, on whichever layout the project uses (.ndx/hench or .hench). */
-function henchConfigPath(projectDir: string): string {
-  return join(resolveLayout(projectDir).henchDir, "config.json");
-}
-
-/** Read the hench config.json directly from disk. */
-export function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
-  try {
-    const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
   }
 }
 
