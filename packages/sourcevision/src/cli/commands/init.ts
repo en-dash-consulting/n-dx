@@ -1,8 +1,7 @@
 import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { getCurrentHead, getCurrentBranch, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
-import { SCHEMA_VERSION } from "../sourcevision-core.js";
-import { TOOL_VERSION } from "./constants.js";
+import { SCHEMA_VERSION, TOOL_VERSION } from "../sourcevision-core.js";
 import { info } from "../output.js";
 import { resolveSourcevisionPaths, SV_CACHE_DIRNAME } from "../../paths.js";
 
