@@ -257,9 +257,10 @@ export class AdmissionQueue {
    * double-clicked button is the common case. The re-ask's options and run mode
    * replace the queued ones: the operator changed how the run starts, not when.
    *
-   * Every field the replacement carries must be listed below. It is built from
-   * scratch rather than spread over the old entry, so a field added to
-   * {@link QueueEntry} and not added here is silently dropped on the second
+   * Every field the replacement carries must be listed below or in
+   * {@link replayedRunFields}. It is built from scratch rather than spread over
+   * the old entry, so a field added to {@link QueueEntry} and not added there
+   * is silently dropped on the second
    * ask — which is how a re-ask with `mode: "loop"` came back as one task
    * while its 202 said otherwise.
    *
