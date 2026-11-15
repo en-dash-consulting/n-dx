@@ -494,62 +494,39 @@ function extractStaticPromptText(
   /** Local helpers already inlined — guards against recursion and re-counting. */
   const followedHelpers = new Set([builderName]);
 
-  const visit = (node) => {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      parts.push(node.text);
-    } else if (ts.isTemplateExpression(node)) {
-      // Static spans only — interpolations are per-run context.
-      let joined = node.head.text;
-      for (const span of node.templateSpans) joined += span.literal.text;
-      parts.push(joined);
-      // Descend into each interpolation — `${PRD_SCHEMA}` is a bare identifier
-      // that must be visited itself, not just its children, and a ternary can
-      // pick between two fixed sentences. Calling visit() rather than
-      // forEachChild() is what makes `${CONST}` resolve.
-      for (const span of node.templateSpans) visit(span.expression);
-      return;
-    } else if (
-      ts.isIdentifier(node) &&
-      moduleConstants.has(node.text) &&
-      !pulledConstants.has(node.text) &&
-      // Skip `obj.NAME` — only a bare value reference pulls the constant in.
-      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+  const followHelperCall = (node, visit) => {
+    if (
+      !ts.isIdentifier(node.expression) ||
+      followedHelpers.has(node.expression.text) ||
+      registeredSurfaces.has(node.expression.text) ||
+      pulledConstants.has(node.expression.text)
     ) {
-      pulledConstants.set(node.text, moduleConstants.get(node.text));
-      return;
-    } else if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      !followedHelpers.has(node.expression.text) &&
-      !registeredSurfaces.has(node.expression.text) &&
-      !pulledConstants.has(node.expression.text)
-    ) {
-      // Inline a module-local helper's prompt text, so factoring a duplicated
-      // block out of three builders does not delete it from the measurement.
-      const name = node.expression.text;
-      const helper = findFunctionBody(ts, sf, name);
-      if (helper) {
-        followedHelpers.add(name);
-        const helperParts = [];
-        const helperConstants = new Map();
-        collectInto(ts, sf, helper, helperParts, helperConstants, moduleConstants);
-        // Recorded as shared, keyed by the helper's name: charged to every
-        // caller per call, edited once. Its own constant references are folded
-        // in so `placementContent` carries AUTO_PLACEMENT_INSTRUCTION with it.
-        const helperText = [
-          helperParts.join("\n"),
-          [...helperConstants.values()].join("\n"),
-        ].filter(Boolean).join("\n");
-        if (helperText.length > 0) pulledConstants.set(name, helperText);
-      }
-      // Arguments may carry literals of their own (`section("role", "…")`).
-      for (const arg of node.arguments) visit(arg);
-      return;
+      return false;
     }
-    ts.forEachChild(node, visit);
+    // Inline a module-local helper's prompt text, so factoring a duplicated
+    // block out of three builders does not delete it from the measurement.
+    const name = node.expression.text;
+    const helper = findFunctionBody(ts, sf, name);
+    if (helper) {
+      followedHelpers.add(name);
+      const helperParts = [];
+      const helperConstants = new Map();
+      collectInto(ts, helper, helperParts, helperConstants, moduleConstants);
+      // Recorded as shared, keyed by the helper's name: charged to every
+      // caller per call, edited once. Its own constant references are folded
+      // in so `placementContent` carries AUTO_PLACEMENT_INSTRUCTION with it.
+      const helperText = [
+        helperParts.join("\n"),
+        [...helperConstants.values()].join("\n"),
+      ].filter(Boolean).join("\n");
+      if (helperText.length > 0) pulledConstants.set(name, helperText);
+    }
+    // Arguments may carry literals of their own (`section("role", "…")`).
+    for (const arg of node.arguments) visit(arg);
+    return true;
   };
 
-  ts.forEachChild(target, visit);
+  ts.forEachChild(target, literalVisitor(ts, parts, pulledConstants, moduleConstants, followHelperCall));
 
   return {
     /** Literals written inside this builder — text only it can shorten. */
@@ -568,28 +545,47 @@ function extractStaticPromptText(
  * it interpolates, but does not recurse further. That bound is what keeps
  * "one level deep" true for calls as well as imports.
  */
-function collectInto(ts, sf, body, parts, constants, moduleConstants) {
+function collectInto(ts, body, parts, constants, moduleConstants) {
+  ts.forEachChild(body, literalVisitor(ts, parts, constants, moduleConstants));
+}
+
+/**
+ * The node visitor both walks share: string and template literals go to
+ * `parts`, bare references to module string constants to `constants`.
+ * `visitCall`, when given, sees each call expression first and returns true
+ * when it has handled the call itself (a builder's helper following);
+ * otherwise the walk descends into the call as into any other node.
+ */
+function literalVisitor(ts, parts, constants, moduleConstants, visitCall) {
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       parts.push(node.text);
     } else if (ts.isTemplateExpression(node)) {
+      // Static spans only — interpolations are per-run context.
       let joined = node.head.text;
       for (const span of node.templateSpans) joined += span.literal.text;
       parts.push(joined);
+      // Descend into each interpolation — `${PRD_SCHEMA}` is a bare identifier
+      // that must be visited itself, not just its children, and a ternary can
+      // pick between two fixed sentences. Calling visit() rather than
+      // forEachChild() is what makes `${CONST}` resolve.
       for (const span of node.templateSpans) visit(span.expression);
       return;
     } else if (
       ts.isIdentifier(node) &&
       moduleConstants.has(node.text) &&
       !constants.has(node.text) &&
+      // Skip `obj.NAME` — only a bare value reference pulls the constant in.
       !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
     ) {
       constants.set(node.text, moduleConstants.get(node.text));
       return;
+    } else if (visitCall && ts.isCallExpression(node) && visitCall(node, visit)) {
+      return;
     }
     ts.forEachChild(node, visit);
   };
-  ts.forEachChild(body, visit);
+  return visit;
 }
 
 /**
