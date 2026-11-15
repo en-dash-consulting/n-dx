@@ -2929,23 +2929,14 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 /**
- * Run the server command (used by both `ndx start` and `ndx web`).
+ * `ndx start` / `ndx web` arguments: `--name[=value]` flags (`-q` is
+ * `quiet`), and the first bare argument other than `dir` as the subcommand.
  *
- * @param {string} dir          Project directory
- * @param {string[]} rest       Remaining CLI arguments
- * @param {object} deps         Injected dependencies from cli.js
- * @param {Function} deps.run   Run a tool script (foreground)
- * @param {object} deps.tools   Tool script paths
- * @param {string} deps.__dir   Root directory of n-dx
- * @param {Function} deps.exit               Shared exit request helper for synchronous command flow
- * @param {Function} deps.flushExit          Shared async exit helper for signal callbacks
- * @param {string} [deps.commandName="web"]  CLI command name for messaging ("start" or "web")
- * @param {boolean} [deps.rebuiltForNonce]  Set on the one rerun after a forced rebuild ({@link shouldRebuildForNonce}).
+ * @param {string[]} rest
+ * @param {string} dir
+ * @returns {{ flags: Record<string, string | true>, subcommand: string | null }}
  */
-export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web", rebuiltForNonce = false }) {
-  const absDir = resolve(dir);
-
-  // Parse flags and detect subcommand
+function parseWebArgs(rest, dir) {
   const flags = {};
   let subcommand = null;
 
@@ -2964,6 +2955,148 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       if (!subcommand) subcommand = arg;
     }
   }
+  return { flags, subcommand };
+}
+
+/**
+ * Before a single-project or preview server starts: deal with what this
+ * directory's previous one left in `files` — a hub marker or a stale PID file
+ * is cleared, a running server is stopped.
+ *
+ * @param {string} absDir
+ * @param {string} label
+ * @param {typeof DASHBOARD_FILES} files
+ */
+async function retirePreviousHereServer(absDir, label, files) {
+  const existing = await readPidFile(absDir, files);
+  if (existing && isHubMarker(existing)) {
+    // The marker points at the hub, which keeps serving the other projects.
+    // A single-project server here just takes the marker files over. Only the
+    // dashboard is ever hub-registered, so this never fires for preview — but
+    // the file set is passed through regardless, since `files` selects which
+    // pid/port pair is being cleared.
+    log(`This directory was registered with the n-dx hub (project "${existing.projectId}"); starting a single-project server here instead.`);
+    await removePidFile(absDir, files);
+    await removePortFile(absDir, files);
+  } else if (existing && isProcessRunning(existing.pid)) {
+    // Auto-restart: stop the old server so ndx start is idempotent.
+    log(`Stopping previous ${label} (PID ${existing.pid}, port ${existing.port})…`);
+    await stopServer(absDir, label, undefined, files);
+  } else if (existing) {
+    // Stale PID file — clean up
+    await removePidFile(absDir, files);
+    await removePortFile(absDir, files);
+  }
+}
+
+/**
+ * The port a single-project or preview server should bind, starting from
+ * `port`. A busy port gets up to 2s to be released; after that an occupant
+ * that must be left alone is moved past (another port is chosen) and any
+ * other is killed. Resolves to null, after printing why, when neither works.
+ *
+ * @param {number} port
+ * @param {string} absDir
+ * @param {string} label
+ * @param {boolean} isPreview
+ * @returns {Promise<number | null>}
+ */
+async function claimHerePort(port, absDir, label, isPreview) {
+  if (!(await isPortInUse(port))) return port;
+  // Give the just-stopped process time to release the socket (up to 2s)
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    if (!(await isPortInUse(port))) return port;
+  }
+
+  if (isPreview) {
+    // Preview mode never kills whatever is on the port. The most likely
+    // occupant is the dashboard this preview is meant to sit beside, and a
+    // design-time tool must not be able to take the real server down.
+    const next = await findRelocationPort(port);
+    if (next === null) {
+      console.error(
+        `Port ${port} is in use and no free port was found near it or in ` +
+        `${PORT_RANGE_START}–${PORT_RANGE_END}. Choose one with --port=N.`,
+      );
+      return null;
+    }
+    log(`Port ${port} is in use; starting the preview on :${next}`);
+    return next;
+  }
+
+  // Ask the occupant who it is before killing it. The PID file above only
+  // knows about servers started for THIS directory, so a second project or
+  // worktree used to look like a stranger squatting on 3117 and got
+  // SIGKILLed — taking a working dashboard down with it.
+  //
+  // The hub is asked about first and is never killed: it supervises other
+  // projects' servers, and it is the default occupant of 3117 now, so a
+  // `--here` run that cleared the port would take unrelated dashboards with
+  // it. Relocating is the same answer as for a peer.
+  const hub = await probeHubEndpoint(port);
+  const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
+  const protectedNdx = occupant?.kind === "unknown" && (await probeTokenProtectedNdx(port));
+  // A protected server answers 401 to every probe, so it can only be
+  // recognised as this directory's own by its process.
+  const ownProtected = protectedNdx ? findOwnDashboardOnPort(port, absDir) : null;
+
+  // Three occupants must be left alone, and the answer for each is to move:
+  // the hub, which supervises other projects' servers; a peer dashboard
+  // serving a different directory; and an n-dx server whose token we lack,
+  // unless its process shows it is this directory's own.
+  const leaveAlone = hub
+    ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
+    : occupant.kind === "peer"
+      ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
+      : protectedNdx && !ownProtected
+        ? `A token-protected n-dx server is already on :${port}`
+        : null;
+
+  if (leaveAlone) {
+    const next = await findRelocationPort(port);
+    if (next === null) {
+      console.error(
+        `${leaveAlone}, and no port near it or in ` +
+        `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
+      );
+      return null;
+    }
+    log(`${leaveAlone}; starting this one on :${next}`);
+    return next;
+  }
+
+  // Not identifiable as the hub or a peer — either a stranger, or this
+  // directory's own untracked server, which `ndx start` restarts by
+  // contract.
+  log(ownProtected
+    ? `This directory's ${label} (PID ${ownProtected.pid}) is on :${port} without a PID file — restarting it…`
+    : `Port ${port} is in use by another process — clearing it…`);
+  const freed = await killPortOccupant(port);
+  if (!freed) {
+    console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
+    return null;
+  }
+  return port;
+}
+
+/**
+ * Run the server command (used by both `ndx start` and `ndx web`).
+ *
+ * @param {string} dir          Project directory
+ * @param {string[]} rest       Remaining CLI arguments
+ * @param {object} deps         Injected dependencies from cli.js
+ * @param {Function} deps.run   Run a tool script (foreground)
+ * @param {object} deps.tools   Tool script paths
+ * @param {string} deps.__dir   Root directory of n-dx
+ * @param {Function} deps.exit               Shared exit request helper for synchronous command flow
+ * @param {Function} deps.flushExit          Shared async exit helper for signal callbacks
+ * @param {string} [deps.commandName="web"]  CLI command name for messaging ("start" or "web")
+ * @param {boolean} [deps.rebuiltForNonce]  Set on the one rerun after a forced rebuild ({@link shouldRebuildForNonce}).
+ */
+export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web", rebuiltForNonce = false }) {
+  const absDir = resolve(dir);
+  const { flags, subcommand } = parseWebArgs(rest, dir);
 
   _quiet = !!(flags.quiet);
 
@@ -3034,104 +3167,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   }
 
   // --- Check for stale PID / already running ---
-  const existing = await readPidFile(absDir, files);
-  if (existing && isHubMarker(existing)) {
-    // The marker points at the hub, which keeps serving the other projects.
-    // A single-project server here just takes the marker files over. Only the
-    // dashboard is ever hub-registered, so this never fires for preview — but
-    // the file set is passed through regardless, since `files` selects which
-    // pid/port pair is being cleared.
-    log(`This directory was registered with the n-dx hub (project "${existing.projectId}"); starting a single-project server here instead.`);
-    await removePidFile(absDir, files);
-    await removePortFile(absDir, files);
-  } else if (existing && isProcessRunning(existing.pid)) {
-    // Auto-restart: stop the old server so ndx start is idempotent.
-    log(`Stopping previous ${label} (PID ${existing.pid}, port ${existing.port})…`);
-    await stopServer(absDir, label, undefined, files);
-  } else if (existing) {
-    // Stale PID file — clean up
-    await removePidFile(absDir, files);
-    await removePortFile(absDir, files);
-  }
+  await retirePreviousHereServer(absDir, label, files);
 
   // If port is still occupied, wait briefly for the OS to release it after the
   // graceful stop above. If it's still busy after that, force-kill the occupant.
-  if (await isPortInUse(port)) {
-    // Give the just-stopped process time to release the socket (up to 2s)
-    let portFree = false;
-    for (let i = 0; i < 10; i++) {
-      await new Promise((r) => setTimeout(r, 200));
-      if (!(await isPortInUse(port))) { portFree = true; break; }
-    }
-    if (!portFree && isPreview) {
-      // Preview mode never kills whatever is on the port. The most likely
-      // occupant is the dashboard this preview is meant to sit beside, and a
-      // design-time tool must not be able to take the real server down.
-      const next = await findRelocationPort(port);
-      if (next === null) {
-        console.error(
-          `Port ${port} is in use and no free port was found near it or in ` +
-          `${PORT_RANGE_START}–${PORT_RANGE_END}. Choose one with --port=N.`,
-        );
-        return 1;
-      }
-      log(`Port ${port} is in use; starting the preview on :${next}`);
-      port = next;
-    } else if (!portFree) {
-      // Ask the occupant who it is before killing it. The PID file above only
-      // knows about servers started for THIS directory, so a second project or
-      // worktree used to look like a stranger squatting on 3117 and got
-      // SIGKILLed — taking a working dashboard down with it.
-      //
-      // The hub is asked about first and is never killed: it supervises other
-      // projects' servers, and it is the default occupant of 3117 now, so a
-      // `--here` run that cleared the port would take unrelated dashboards with
-      // it. Relocating is the same answer as for a peer.
-      const hub = await probeHubEndpoint(port);
-      const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
-      const protectedNdx = occupant?.kind === "unknown" && (await probeTokenProtectedNdx(port));
-      // A protected server answers 401 to every probe, so it can only be
-      // recognised as this directory's own by its process.
-      const ownProtected = protectedNdx ? findOwnDashboardOnPort(port, absDir) : null;
-
-      // Three occupants must be left alone, and the answer for each is to move:
-      // the hub, which supervises other projects' servers; a peer dashboard
-      // serving a different directory; and an n-dx server whose token we lack,
-      // unless its process shows it is this directory's own.
-      const leaveAlone = hub
-        ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
-        : occupant.kind === "peer"
-          ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
-          : protectedNdx && !ownProtected
-            ? `A token-protected n-dx server is already on :${port}`
-            : null;
-
-      if (leaveAlone) {
-        const next = await findRelocationPort(port);
-        if (next === null) {
-          console.error(
-            `${leaveAlone}, and no port near it or in ` +
-            `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
-          );
-          return 1;
-        }
-        log(`${leaveAlone}; starting this one on :${next}`);
-        port = next;
-      } else {
-        // Not identifiable as the hub or a peer — either a stranger, or this
-        // directory's own untracked server, which `ndx start` restarts by
-        // contract.
-        log(ownProtected
-          ? `This directory's ${label} (PID ${ownProtected.pid}) is on :${port} without a PID file — restarting it…`
-          : `Port ${port} is in use by another process — clearing it…`);
-        const freed = await killPortOccupant(port);
-        if (!freed) {
-          console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
-          return 1;
-        }
-      }
-    }
-  }
+  const herePort = await claimHerePort(port, absDir, label, isPreview);
+  if (herePort === null) return 1;
+  port = herePort;
 
   // --- Build serve args ---
   // --debug/--verbose must be forwarded explicitly: --background spawns a
