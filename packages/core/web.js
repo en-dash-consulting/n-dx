@@ -1325,6 +1325,28 @@ export function rebuildFailedWarning(failure, webEntry) {
 }
 
 /**
+ * Bring the web build about to be spawned up to date: a source-linked dist/
+ * that lags its source would run older code than this CLI, so it is rebuilt
+ * first. Prints what the caller's user needs to know and returns the
+ * {@link ensureSourceBuild} result, or null (after printing the error) when
+ * the command cannot go on.
+ *
+ * @param {string} webEntry
+ */
+async function prepareWebBuild(webEntry) {
+  const built = await ensureSourceBuild(webEntry, { checkLag: true });
+  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
+  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
+  else if (!built.ok) {
+    console.error(`Error: ${built.message}`);
+    return null;
+  }
+  // A lagging build that could not be rebuilt still runs: say why it is older.
+  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
+  return built;
+}
+
+/**
  * Whether a missing nonce from a single-project server this command just
  * spawned is worth one forced rebuild and respawn: the route is missing (the
  * build is older than this ndx), the install is source-linked (there is
@@ -2828,15 +2850,8 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   // lags its source would start a hub older than this CLI, so it is rebuilt
   // first.
   const webEntry = resolve(__dir, tools.web);
-  const built = await ensureSourceBuild(webEntry, { checkLag: true });
-  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
-  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
-  else if (!built.ok) {
-    console.error(`Error: ${built.message}`);
-    return 1;
-  }
-  // A lagging build that could not be rebuilt still runs: say why it is older.
-  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
+  const built = await prepareWebBuild(webEntry);
+  if (!built) return 1;
   const web = packageBuildIdentity(webEntry);
   try {
     hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile, web, force: !!flags["replace-hub"], rebuildFailed: !!(built.ok && built.failed) });
@@ -3136,18 +3151,9 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   if (flags.debug) serveArgs.push("--debug");
   else if (flags.verbose) serveArgs.push("--verbose");
 
-  // The web build about to be spawned. A source-linked dist/ that lags its
-  // source would run older code than this CLI, so it is rebuilt first.
+  // The web build about to be spawned (see prepareWebBuild).
   const webEntry = resolve(__dir, tools.web);
-  const built = await ensureSourceBuild(webEntry, { checkLag: true });
-  // An install with no source cannot rebuild: say so, and let the spawn report what it can.
-  if (!built.ok && built.reinstall) console.error(`Warning: ${built.message}`);
-  else if (!built.ok) {
-    console.error(`Error: ${built.message}`);
-    return 1;
-  }
-  // A lagging build that could not be rebuilt still runs: say why it is older.
-  if (built.ok && built.failed) console.error(rebuildFailedWarning(built.failed, webEntry));
+  if (!(await prepareWebBuild(webEntry))) return 1;
   const web = packageBuildIdentity(webEntry);
   const hereServer = hereServerCommands(commandName, isPreview);
 
