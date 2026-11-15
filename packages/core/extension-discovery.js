@@ -46,7 +46,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { resolveNdxHome } from "./layout.js";
 import { isPidAlive } from "./child-lifecycle.js";
-import { validateExtensionManifest } from "./extension-manifest.js";
+import { isObject, validateExtensionManifest } from "./extension-manifest.js";
 
 /** Sources in precedence order, highest first. */
 export const EXTENSION_SOURCES = Object.freeze(["project", "user", "global", "dev"]);
@@ -725,14 +725,6 @@ function boundProjectEntries(sources, recomputed) {
   const projects = Object.keys(sources).filter((key) => key.startsWith("project:"));
   for (const key of projects.slice(0, Math.max(0, projects.length - MAX_PROJECT_ENTRIES))) delete sources[key];
   return sources;
-}
-
-/**
- * @param {unknown} value
- * @returns {value is Record<string, any>}
- */
-function isObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
