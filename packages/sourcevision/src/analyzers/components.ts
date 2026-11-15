@@ -390,6 +390,14 @@ function resolveUsageEdges(
   return Array.from(edgeMap.values());
 }
 
+/** Record a route module's convention exports, `default` aside, on the components it defines. */
+function tagConventionExports(components: ComponentDefinition[], file: string, exports: RouteExportKind[]): void {
+  const conventionNames = exports.filter((e) => e !== "default");
+  for (const def of components) {
+    if (def.file === file) def.conventionExports = conventionNames;
+  }
+}
+
 interface RouteDetectionResult {
   routeModules: RouteModule[];
   routeTree: RouteTreeNode[];
@@ -439,11 +447,7 @@ async function detectRoutes(
           if (canIncremental && changedFiles && !changedFiles.has(mod.file) && prevRouteMap.has(mod.file)) {
             const prevMod = prevRouteMap.get(mod.file)!;
             routeModules.push(prevMod);
-            const conventionNames = prevMod.exports.filter((e) => e !== "default");
-            const compDefs = allComponents.filter((c) => c.file === mod.file);
-            for (const def of compDefs) {
-              def.conventionExports = conventionNames;
-            }
+            tagConventionExports(allComponents, mod.file, prevMod.exports);
             continue;
           }
 
@@ -463,11 +467,7 @@ async function detectRoutes(
             exports: conventionExports,
           });
 
-          const compDefs = allComponents.filter((c) => c.file === mod.file);
-          const conventionNames = conventionExports.filter((e) => e !== "default");
-          for (const def of compDefs) {
-            def.conventionExports = conventionNames;
-          }
+          tagConventionExports(allComponents, mod.file, conventionExports);
         }
       }
     }
@@ -494,12 +494,7 @@ async function detectRoutes(
         if (canIncremental && changedFiles && !changedFiles.has(file.path) && prevRouteMap.has(file.path)) {
           const prevMod = prevRouteMap.get(file.path)!;
           routeModules.push(prevMod);
-
-          const conventionNames = prevMod.exports.filter((e) => e !== "default");
-          const compDefs = allComponents.filter((c) => c.file === file.path);
-          for (const def of compDefs) {
-            def.conventionExports = conventionNames;
-          }
+          tagConventionExports(allComponents, file.path, prevMod.exports);
           continue;
         }
 
@@ -540,11 +535,7 @@ async function detectRoutes(
           isLayout = true;
         }
 
-        const compDefs = allComponents.filter((c) => c.file === file.path);
-        const conventionNames = conventionExports.filter((e) => e !== "default");
-        for (const def of compDefs) {
-          def.conventionExports = conventionNames;
-        }
+        tagConventionExports(allComponents, file.path, conventionExports);
 
         routeModules.push({
           file: file.path,
