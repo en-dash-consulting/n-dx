@@ -109,6 +109,26 @@ const COPY_ATTEMPTS = 3;
 /** Pause before re-walking, so the writer that is mid-rename can finish. */
 const COPY_RETRY_MS = 5;
 
+/** The `code` of a Node system error (`ENOENT`, `EEXIST`, …), or undefined. */
+function errorCode(err: unknown): string | undefined {
+  return err && typeof err === "object" && "code" in err
+    ? (err as { code?: string }).code
+    : undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Empty the claimed directory of a failed partial copy before the walk is retried. */
+async function clearPartialSnapshot(backupPath: string): Promise<void> {
+  const entries = await readdir(backupPath);
+  await Promise.all(entries.map((entry) => rm(join(backupPath, entry), {
+    recursive: true,
+    force: true,
+  })));
+}
+
 /**
  * Copy the live tree into an already-claimed staging directory.
  *
@@ -136,14 +156,6 @@ const COPY_RETRY_MS = 5;
  * retry after a deletion could preserve an obsolete PRD item in the backup.
  * Retries are bounded; a persistent ENOENT still fails the command loudly.
  */
-async function clearPartialSnapshot(backupPath: string): Promise<void> {
-  const entries = await readdir(backupPath);
-  await Promise.all(entries.map((entry) => rm(join(backupPath, entry), {
-    recursive: true,
-    force: true,
-  })));
-}
-
 async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -153,13 +165,10 @@ async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
       });
       return;
     } catch (err) {
-      const code = err && typeof err === "object" && "code" in err
-        ? (err as { code?: string }).code
-        : undefined;
-      if (code !== "ENOENT" || attempt >= COPY_ATTEMPTS) {
+      if (errorCode(err) !== "ENOENT" || attempt >= COPY_ATTEMPTS) {
         throw new Error(`Failed to snapshot PRD tree to ${backupPath}: ${String(err)}`);
       }
-      await new Promise((resolve) => setTimeout(resolve, COPY_RETRY_MS));
+      await sleep(COPY_RETRY_MS);
       await clearPartialSnapshot(backupPath);
     }
   }
@@ -200,19 +209,16 @@ async function claimBackupDir(
       // obtain a fresh timestamp instead of allowing rename to replace it.
       if (await dirExists(backupPath)) {
         await rm(stagingPath, { recursive: true, force: true });
-        await new Promise((resolve) => setTimeout(resolve, CLAIM_RETRY_MS));
+        await sleep(CLAIM_RETRY_MS);
         continue;
       }
 
       return { timestamp, id, backupPath, stagingPath };
     } catch (err) {
-      const code = err && typeof err === "object" && "code" in err
-        ? (err as { code?: string }).code
-        : undefined;
-      if (code !== "EEXIST") {
+      if (errorCode(err) !== "EEXIST") {
         throw new Error(`Failed to create snapshot directory ${backupPath}: ${String(err)}`);
       }
-      await new Promise((resolve) => setTimeout(resolve, CLAIM_RETRY_MS));
+      await sleep(CLAIM_RETRY_MS);
     }
   }
 
