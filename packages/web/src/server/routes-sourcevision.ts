@@ -17,7 +17,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage, pageParams } from "./response-utils.js";
 import { DATA_FILES, isRecord } from "../shared/index.js";
 import { deriveNextSteps, setArchetypeOverride } from "./domain-gateway.js";
 import type { NextStep } from "./domain-gateway.js";
@@ -196,10 +196,7 @@ export function handleSourcevisionRoute(
     }
 
     // Support pagination via ?offset=N&limit=N query parameters
-    const offsetStr = params.get("offset");
-    const limitStr = params.get("limit");
-    const offset = offsetStr ? Math.max(0, parseInt(offsetStr, 10) || 0) : 0;
-    const limit = limitStr ? Math.max(0, parseInt(limitStr, 10) || 0) : 0;
+    const { offset, limit } = pageParams(params);
 
     if ((offset > 0 || limit > 0) && Array.isArray(data.files)) {
       const allFiles = data.files as unknown[];

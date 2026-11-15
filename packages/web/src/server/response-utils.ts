@@ -156,3 +156,15 @@ export async function readJsonObject(
   }
   return isRecord(parsed) ? parsed : "Request body must be a JSON object";
 }
+
+/**
+ * `?offset=N&limit=N` as non-negative integers; an absent or unparseable value
+ * is 0, which a paginating route reads as "from the start" and "no limit".
+ */
+export function pageParams(params: URLSearchParams): { offset: number; limit: number } {
+  const read = (name: string): number => {
+    const raw = params.get(name);
+    return raw ? Math.max(0, parseInt(raw, 10) || 0) : 0;
+  };
+  return { offset: read("offset"), limit: read("limit") };
+}

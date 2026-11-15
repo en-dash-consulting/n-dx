@@ -72,7 +72,7 @@ import {
 import type { ServerContext } from "./types.js";
 import { refuseWhileRestricted } from "./trust-gate.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody, readJsonBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, readJsonBody, errorMessage, pageParams } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
   fieldDefaultForProject,
@@ -895,11 +895,8 @@ function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
     let repoScope = false;
     if (rc.qIdx !== -1) {
       const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
-      const limitStr = params.get("limit");
-      const offsetStr = params.get("offset");
+      ({ offset, limit } = pageParams(params));
       const taskIdStr = params.get("taskId");
-      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
-      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
       if (taskIdStr) filterTaskId = taskIdStr;
       repoScope = params.get("scope") === "repo";
     }
