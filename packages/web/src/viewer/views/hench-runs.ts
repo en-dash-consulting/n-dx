@@ -34,7 +34,7 @@ import { usePolling } from "../hooks/index.js";
 import { useHenchRunsLiveRefresh } from "../hooks/index.js";
 import type { HenchExecutionProgress } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { fmtDuration } from "../utils/format.js";
+import { fmtDuration, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -219,12 +219,6 @@ export interface RunDetail extends RunSummary {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 function fmtTimestamp(iso: string): string {
   const d = new Date(iso);

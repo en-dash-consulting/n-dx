@@ -16,6 +16,7 @@ import { BrandedHeader, RexTaskLink, ElapsedTime, FloatingNotice } from "../comp
 import { useCliName, useToast } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { openWebSocket } from "../session.js";
+import { formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -104,12 +105,6 @@ function fmtUptime(seconds: number): string {
   const days = Math.floor(hours / 24);
   const remainHours = hours % 24;
   return `${days}d ${remainHours}h`;
-}
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
 }
 
 function fmtTimeSince(isoString: string): string {

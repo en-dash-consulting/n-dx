@@ -31,6 +31,7 @@ import { BrandedHeader } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import { TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS } from "../usage/constants.js";
 import { itemTypeOf } from "../external.js";
+import { formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirroring API response shapes)
@@ -205,12 +206,6 @@ function unattributedResidual(usage: AggregateTokenUsage): {
     cacheCreationTokens: Math.max(0, (usage.totalCacheCreationTokens ?? 0) - cacheWrite),
     cacheReadTokens: Math.max(0, (usage.totalCacheReadTokens ?? 0) - cacheRead),
   };
-}
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
 }
 
 function fmtNumber(n: number): string {
