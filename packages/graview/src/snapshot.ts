@@ -79,6 +79,47 @@ async function describeCommits(repoDir: string, nodes: Map<string, SnapshotNode>
   return known;
 }
 
+/**
+ * A release is a node for every version a change is planned for or shipped
+ * in, and for every release tag git has (`taggedAt`, version → tag date),
+ * counting both and dated by the tag.
+ */
+function releaseNodes(edges: readonly SnapshotEdge[], taggedAt: ReadonlyMap<string, string>): SnapshotNode[] {
+  const tally = new Map<string, { planned: number; shipped: number }>();
+  for (const version of taggedAt.keys()) tally.set(version, { planned: 0, shipped: 0 });
+  for (const edge of edges) {
+    if (edge.kind !== "plannedFor" && edge.kind !== "shippedWith") continue;
+    if (!edge.to.startsWith(RELEASE_PREFIX)) continue;
+    const version = edge.to.slice(RELEASE_PREFIX.length);
+    const t = tally.get(version) ?? { planned: 0, shipped: 0 };
+    if (edge.kind === "plannedFor") t.planned += 1;
+    else t.shipped += 1;
+    tally.set(version, t);
+  }
+  return [...tally].map(([version, t]) => ({
+    id: releaseId(version),
+    kind: "release",
+    version,
+    plannedChanges: t.planned,
+    shippedChanges: t.shipped,
+    taggedAt: taggedAt.get(version),
+  }));
+}
+
+/** The edges with both ends among `nodes`, each once, in their first order. */
+function connectedEdges(edges: readonly SnapshotEdge[], nodes: ReadonlyMap<string, SnapshotNode>): SnapshotEdge[] {
+  const seen = new Set<string>();
+  const kept: SnapshotEdge[] = [];
+  for (const edge of edges) {
+    if (!nodes.has(edge.from) || !nodes.has(edge.to)) continue;
+    const key = `${edge.kind}\u0000${edge.from}\u0000${edge.to}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(edge);
+  }
+  return kept;
+}
+
 export async function buildSnapshot(layout: Layout, options: BuildSnapshotOptions = {}): Promise<SnapshotReport> {
   const warnings: string[] = [];
   const warn: Warn = (message) => {
@@ -173,22 +214,7 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     }
   }
 
-  // A release is a node for every version a change is planned for or shipped
-  // in, and for every release tag git has, counting both and dated by the tag.
-  const tally = new Map<string, { planned: number; shipped: number }>();
-  for (const version of taggedAt.keys()) tally.set(version, { planned: 0, shipped: 0 });
-  for (const edge of edges) {
-    if (edge.kind !== "plannedFor" && edge.kind !== "shippedWith") continue;
-    if (!edge.to.startsWith(RELEASE_PREFIX)) continue;
-    const version = edge.to.slice(RELEASE_PREFIX.length);
-    const t = tally.get(version) ?? { planned: 0, shipped: 0 };
-    if (edge.kind === "plannedFor") t.planned += 1;
-    else t.shipped += 1;
-    tally.set(version, t);
-  }
-  for (const [version, t] of tally) {
-    add({ id: releaseId(version), kind: "release", version, plannedChanges: t.planned, shippedChanges: t.shipped, taggedAt: taggedAt.get(version) });
-  }
+  for (const release of releaseNodes(edges, taggedAt)) add(release);
 
   // Where a capability lives in code: the zones of the files changed by every
   // commit that landed for a change placed on it (amends or touches) or for
@@ -239,16 +265,7 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     }
   }
 
-  // Keep only edges with both ends present, once each.
-  const seen = new Set<string>();
-  const kept: SnapshotEdge[] = [];
-  for (const edge of edges) {
-    if (!nodes.has(edge.from) || !nodes.has(edge.to)) continue;
-    const key = `${edge.kind}\u0000${edge.from}\u0000${edge.to}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    kept.push(edge);
-  }
+  const kept = connectedEdges(edges, nodes);
 
   // Rex, git and sourcevision set no length limits and Graview does: cut to its caps rather than fail `check`.
   const cut = clampToCaps(loadDocument(), nodes.values());
