@@ -16,7 +16,7 @@
  * GET    /api/hench/adaptive/history        — adjustment history + stats
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -32,6 +32,7 @@ import {
 } from "./hench-config-fields.js";
 import { resolveActiveVendor } from "./routes-llm.js";
 import { contextWriteFloor, runBudgetedTokens } from "./token-cost.js";
+import { loadRuns, type RunData } from "./tuner-runs.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 
@@ -115,21 +116,6 @@ interface AdaptiveState {
   overrides: Record<string, unknown>;
 }
 
-interface RunData {
-  id: string;
-  taskId: string;
-  taskTitle: string;
-  startedAt: string;
-  finishedAt?: string;
-  status: string;
-  turns: number;
-  error?: string;
-  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
-  toolCalls: unknown[];
-  model: string;
-  retryAttempts?: number;
-}
-
 interface HenchConfigData {
   maxTurns?: number;
   maxTokens?: number;
@@ -141,31 +127,6 @@ interface HenchConfigData {
 }
 
 // ── Data loading helpers ─────────────────────────────────────────────
-
-function loadRuns(projectDir: string): RunData[] {
-  const runsDir = join(henchDirIn(projectDir), "runs");
-  let files: string[];
-  try {
-    files = readdirSync(runsDir);
-  } catch {
-    return [];
-  }
-
-  const runs: RunData[] = [];
-  for (const file of files.filter((f) => f.endsWith(".json"))) {
-    try {
-      const raw = readFileSync(join(runsDir, file), "utf-8");
-      const data = JSON.parse(raw) as RunData;
-      if (data.id && data.startedAt) {
-        runs.push(data);
-      }
-    } catch {
-      // skip invalid files
-    }
-  }
-
-  return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-}
 
 function loadConfig(projectDir: string): HenchConfigData | null {
   try {
