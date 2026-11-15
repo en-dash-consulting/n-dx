@@ -612,8 +612,7 @@ function fieldsSetIn(config: Record<string, unknown> | null, paths: readonly (re
 
 function readJson(path: string): Record<string, unknown> | null {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+    return asRecord(JSON.parse(readFileSync(path, "utf-8")));
   } catch {
     return null;
   }
@@ -641,8 +640,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 /** `config[key]` when it is a plain object, else null. */
 function sectionOf(config: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
-  const value = config?.[key];
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return asRecord(config?.[key]);
 }
 
 /**
@@ -845,11 +843,12 @@ function readClaudeSettings(path: string): RepoClaudeSettings | null {
   const settings = readJson(path);
   if (!settings) return null;
   const permissions = asRecord(settings.permissions);
+  const hooks = asRecord(settings.hooks);
   const env = asRecord(settings.env);
   return {
     allow: permissions ? (stringArray(permissions.allow) ?? []) : [],
     defaultMode: permissions ? optionalString(permissions.defaultMode) : null,
-    hooks: asRecord(settings.hooks) !== null && Object.keys(asRecord(settings.hooks)!).length > 0,
+    hooks: hooks !== null && Object.keys(hooks).length > 0,
     env: env ? Object.keys(env).sort() : [],
   };
 }
@@ -1076,9 +1075,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     foldHenchOverride(henchConfig ?? {}, projectHench ?? {}),
     sectionOf(localConfig, "hench") ?? {},
   );
-  const rawGuard = merged.guard && typeof merged.guard === "object" && !Array.isArray(merged.guard)
-    ? (merged.guard as Record<string, unknown>)
-    : null;
+  const rawGuard = asRecord(merged.guard);
   const guard: GuardBaseline | null = rawGuard
     ? {
         allowedCommands: stringArray(rawGuard.allowedCommands) ?? [],
@@ -1087,9 +1084,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
       }
     : null;
 
-  const rawEnv = rawGuard && rawGuard.env && typeof rawGuard.env === "object" && !Array.isArray(rawGuard.env)
-    ? (rawGuard.env as Record<string, unknown>)
-    : null;
+  const rawEnv = asRecord(rawGuard?.env);
   const envAllow = rawEnv ? stringArray(rawEnv.allow) ?? [] : [];
   const envDeny = rawEnv ? stringArray(rawEnv.deny) ?? [] : [];
 
@@ -1209,10 +1204,10 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const mcpServers: RepoMcpServer[] = [];
   if (mcpConfig) {
     sources.push(PROJECT_MCP_CONFIG);
-    const servers = mcpConfig.mcpServers;
-    if (servers && typeof servers === "object" && !Array.isArray(servers)) {
-      for (const [name, raw] of Object.entries(servers as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) {
-        const s = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+    const servers = asRecord(mcpConfig.mcpServers);
+    if (servers) {
+      for (const [name, raw] of Object.entries(servers).sort(([a], [b]) => a.localeCompare(b))) {
+        const s = asRecord(raw) ?? {};
         mcpServers.push({
           name,
           command: optionalString(s.command),
