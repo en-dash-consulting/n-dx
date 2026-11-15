@@ -695,13 +695,6 @@ function findFunctionBody(ts, sf, name) {
 // ── Representative inputs (the `--dump` fixtures) ────────────────────────────
 
 /**
- * One assembled prompt per package, from a fixed input.
- *
- * These exist so the assembled number is reproducible: the same fixture in,
- * the same token count out, on any machine, with no model call. They import
- * from `dist/`, which the package guidelines permit for repo tooling.
- */
-/**
  * Render an envelope as a dump entry: the assembled text plus its per-section
  * split.
  *
@@ -722,6 +715,13 @@ function envelopeDump(mod, { envelope, assemble }) {
   };
 }
 
+/**
+ * One assembled prompt per package, from a fixed input.
+ *
+ * These exist so the assembled number is reproducible: the same fixture in,
+ * the same token count out, on any machine, with no model call. They import
+ * from `dist/`, which the package guidelines permit for repo tooling.
+ */
 const REPRESENTATIVE = {
   rex: {
     // Names the registered *envelope* builder, not the `*Prompt` wrapper that
@@ -882,7 +882,6 @@ const FIXTURE_BRIEF = {
   recentLog: [],
 };
 
-/** Import a built module by workspace-relative path. */
 /**
  * Measure every workflow skill body.
  *
@@ -917,6 +916,7 @@ async function measureSkills(model) {
     .sort((a, b) => b.tokens - a.tokens);
 }
 
+/** Import a built module by workspace-relative path. */
 async function loadDist(relative) {
   const abs = join(ROOT, "packages", relative);
   if (!existsSync(abs)) {
