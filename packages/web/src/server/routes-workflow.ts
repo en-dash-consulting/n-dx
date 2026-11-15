@@ -22,6 +22,8 @@ import {
   getConfigValue,
   setConfigValue,
   validateConfigConstraints,
+  henchConfigPath,
+  loadHenchConfig,
 } from "./hench-config-fields.js";
 import { contextWriteFloor, contextWriteFloorFromCompletedRun, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
 import { loadRuns, type RunData } from "./tuner-runs.js";
@@ -106,15 +108,6 @@ interface HenchConfigData {
 }
 
 // ── Data loading helpers ─────────────────────────────────────────────
-
-function loadConfig(projectDir: string): HenchConfigData | null {
-  try {
-    const raw = readFileSync(join(henchDirIn(projectDir), "config.json"), "utf-8");
-    return JSON.parse(raw) as HenchConfigData;
-  } catch {
-    return null;
-  }
-}
 
 function loadSuggestionHistory(projectDir: string): SuggestionHistory {
   const path = join(henchDirIn(projectDir), "suggestions.json");
@@ -503,7 +496,7 @@ export function handleWorkflowRoute(
   // GET /api/hench/workflow/analysis — full analysis with suggestions
   if (path === "analysis" && method === "GET") {
     const runs = loadRuns(ctx.projectDir);
-    const config = loadConfig(ctx.projectDir);
+    const config = loadHenchConfig(ctx.projectDir) as HenchConfigData | null;
     const analysis = analyzeWorkflow(runs, config);
     const history = loadSuggestionHistory(ctx.projectDir);
 
@@ -629,7 +622,7 @@ async function handleApplySuggestion(
   // Preview mode: show what would change without applying
   const preview = body.preview === true;
 
-  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
   let config: Record<string, unknown>;
   try {
     config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;

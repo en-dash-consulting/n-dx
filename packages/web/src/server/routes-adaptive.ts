@@ -29,6 +29,8 @@ import {
   completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
+  henchConfigPath,
+  loadHenchConfig,
 } from "./hench-config-fields.js";
 import { resolveActiveVendor } from "./routes-llm.js";
 import { contextWriteFloor, runBudgetedTokens } from "./token-cost.js";
@@ -127,15 +129,6 @@ interface HenchConfigData {
 }
 
 // ── Data loading helpers ─────────────────────────────────────────────
-
-function loadConfig(projectDir: string): HenchConfigData | null {
-  try {
-    const raw = readFileSync(join(henchDirIn(projectDir), "config.json"), "utf-8");
-    return JSON.parse(raw) as HenchConfigData;
-  } catch {
-    return null;
-  }
-}
 
 function defaultSettings(): AdaptiveSettings {
   return {
@@ -487,7 +480,7 @@ export function handleAdaptiveRoute(
   // GET /api/hench/adaptive/analysis — full adaptive analysis
   if (path === "analysis" && method === "GET") {
     const runs = loadRuns(ctx.projectDir);
-    const config = loadConfig(ctx.projectDir);
+    const config = loadHenchConfig(ctx.projectDir) as HenchConfigData | null;
     const state = loadAdaptiveState(ctx.projectDir);
 
     if (!config) {
@@ -692,7 +685,7 @@ async function handleApplyAdjustment(
   }
 
   // Read and modify config
-  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
   let config: Record<string, unknown>;
   try {
     config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
@@ -815,7 +808,7 @@ async function handleSetOverride(
   }
 
   // Also apply the override to the actual config
-  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const previousValue = getNestedValue(config, key);
