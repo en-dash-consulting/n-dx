@@ -39,6 +39,7 @@ import {
   type BillableTokens,
 } from "@n-dx/llm-client";
 import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
+import { isRecord } from "./is-record.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
@@ -246,10 +247,6 @@ function normalizeEventMetadata(value: unknown): string | undefined {
 function normalizeBudgetKey(value: unknown): string | undefined {
   const normalized = normalizeEventMetadata(value);
   return normalized?.toLowerCase();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isValidBudget(value: unknown): value is number {
