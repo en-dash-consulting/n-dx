@@ -5,10 +5,6 @@
  * a new `llm` section and legacy `claude` settings.
  */
 
-import { access, readFile } from "node:fs/promises";
-import { resolveLayout } from "./layout.js";
-import { deepMerge } from "./project-config.js";
-import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import {
   LLM_VENDOR,
   isLLMVendor,
@@ -20,7 +16,7 @@ import {
   type LocalVerifierConfig,
 } from "./llm-types.js";
 import type { ClaudeConfig, VendorAuth } from "./types.js";
-import { clampTrackedProjectConfig, clampTrackedLocalConfig, normalizeCodexModel, type LoadProjectConfigOptions } from "./config.js";
+import { loadMergedProjectConfig, normalizeCodexModel, type LoadProjectConfigOptions } from "./config.js";
 
 /** `llm.<vendor>.auth` when it is one of the accepted values. */
 function extractAuth(value: unknown): VendorAuth | undefined {
@@ -229,20 +225,6 @@ function extractEscalation(value: unknown): LLMConfig["escalation"] {
 }
 
 /**
- * Load and parse a JSON file, returning null on failure.
- */
-async function loadJSONFile(filePath: string): Promise<Record<string, unknown> | null> {
-  try {
-    await access(filePath);
-    const raw = await readFile(filePath, "utf-8");
-    const data = JSON.parse(raw);
-    return asRecord(data) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Extract an LLMConfig from an already-merged `.n-dx.json` root object.
  *
  * The in-memory half of {@link loadLLMConfig}: a caller holding a config it has
@@ -309,18 +291,7 @@ export function parseLLMConfig(root: Record<string, unknown>): LLMConfig {
  *   {@link resolveClaudeConfig}.
  */
 export async function loadLLMConfig(dir: string, options: LoadProjectConfigOptions = {}): Promise<LLMConfig> {
-  const { root, configFile, localConfigFile } = resolveLayout(dir);
-  const projectData = clampTrackedProjectConfig(root, trustedProjectConfig(root, await loadJSONFile(configFile), options.trust), options);
-  const localData = clampTrackedLocalConfig(root, await loadJSONFile(localConfigFile), options);
-
-  // Merge project and local configs (local wins)
-  let merged: Record<string, unknown> | null = projectData;
-  if (projectData && localData) {
-    merged = deepMerge(projectData, localData);
-  } else if (localData) {
-    merged = localData;
-  }
-
+  const merged = await loadMergedProjectConfig(dir, options);
   if (!merged) return {};
   return parseLLMConfig(merged);
 }
