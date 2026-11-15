@@ -852,7 +852,6 @@ async function handleApiRoutes(
   res: ServerResponse,
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
   watcherHandles: WatcherHandles,
@@ -1051,7 +1050,7 @@ function createHttpServer(
       const broadcast = tagBroadcaster(ws.broadcast, frameTagOf(workspace));
       if (handleConfigEndpoint(req, res, ctx)) return;
       if (handleReloadSignalEndpoint(req, res, ws, broadcast)) return;
-      if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
+      if (await handleApiRoutes(req, res, ctx, watcher, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
       res.writeHead(404);
       res.end("Not found");
     } catch (err) {

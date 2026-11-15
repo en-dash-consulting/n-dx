@@ -183,15 +183,6 @@ export async function buildExternalCall(
   };
 }
 
-/** The idempotency key an arguments object carries: the first of the key properties set to a scalar. */
-export function idempotencyKeyOf(args: Json): { name: string; value: string | number | boolean } | undefined {
-  for (const name of IDEMPOTENCY_KEY_PROPERTIES) {
-    const value = args[name];
-    if (isScalar(value)) return { name, value };
-  }
-  return undefined;
-}
-
 /** One problem entry as a line: a string as it is, an object by its path/field and message. */
 function problemOf(entry: unknown): SidecarCallProblem {
   if (typeof entry === "string") return { message: entry.slice(0, MAX_PROBLEM_LENGTH) };

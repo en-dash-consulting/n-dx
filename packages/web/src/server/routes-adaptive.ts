@@ -182,8 +182,6 @@ function saveAdaptiveState(projectDir: string, state: AdaptiveState): void {
 // roughly a twelfth of what `checkTokenBudget` enforces, so every proposal
 // below was in different units from the budget it was proposing.
 
-const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded"]);
-
 const totalTokens = runBudgetedTokens;
 
 function runDurationMs(run: RunData): number {

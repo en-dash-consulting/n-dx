@@ -3,7 +3,6 @@ import { MAX_REQUEST_BODY_BYTES } from "./response-utils.js";
 import {
   isLoopbackHostOnPort,
   isLoopbackOriginOnPort,
-  isAuthenticated,
   applySecurityHeaders,
   requestAccess,
   authRouteOf,
@@ -105,11 +104,6 @@ const perUserToken = new WeakSet<object>();
  */
 export function isPerUserTokenRequest(req: object): boolean {
   return perUserToken.has(req);
-}
-
-/** Whether the request presents the per-user token in a header. */
-export function isAuthenticatedRequest(req: Pick<IncomingMessage, "headers">, token: string): boolean {
-  return isAuthenticated(req.headers, token);
 }
 
 function rejectUnauthenticated(res: ServerResponse): true {

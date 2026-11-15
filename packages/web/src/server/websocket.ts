@@ -476,21 +476,6 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     }
   }
 
-  /**
-   * Remove clients whose underlying socket is no longer writable.
-   * Called before each broadcast to catch connections that died between
-   * event-loop ticks without emitting a socket event.
-   *
-   * Uses removeClient() for full cleanup (listener removal + socket destroy).
-   */
-  function pruneDeadClients(): void {
-    for (const client of clients) {
-      if (client.socket.destroyed || !client.socket.writable) {
-        removeClient(client, "prune");
-      }
-    }
-  }
-
   // Keepalive pings — safety net for connections that go silent without
   // a TCP FIN/RST (e.g. network drops). Primary detection is event-driven.
   function startPingInterval(): void {
@@ -678,8 +663,8 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
 
     tracker?.recordBroadcast();
 
-    // Single-pass broadcast: inline health checks replace the separate
-    // pruneDeadClients() call, and JSON serialization is deferred until
+    // Single-pass broadcast: inline health checks replace a separate
+    // pruning pass, and JSON serialization is deferred until
     // the first confirmed-active connection is found. This means:
     //   1. JSON.stringify is never called unless an active client exists
     //   2. Dead connections are skipped without attempting socket writes

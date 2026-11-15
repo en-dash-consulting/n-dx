@@ -1004,11 +1004,6 @@ export function resetAggregationCache(): void {
   aggregationCache = null;
 }
 
-/** Get the current cache instance (for testing/monitoring). */
-export function getAggregationCacheInstance(): AggregationResultCache | null {
-  return aggregationCache;
-}
-
 /**
  * Build a cache key from query scope parameters.
  * Encodes all parameters that affect the events result.

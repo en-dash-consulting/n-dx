@@ -17,7 +17,6 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";

@@ -21,7 +21,6 @@ import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
   type PRDItem,
-  type TreeEntry,
   isPriority,
   validateMerge,
   previewMerge,
