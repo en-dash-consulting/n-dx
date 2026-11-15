@@ -3335,8 +3335,8 @@ async function handleTestConnection(dir) {
 
 // ── SET mode handlers ────────────────────────────────────────────────────────
 
-/** Coerce and validate a value for a project-level section key. */
-async function coerceAndValidateProjectValue(
+/** Coerce and validate a value for a project-section or package config key. */
+async function coerceAndValidateSetting(
   dir,
   pkg,
   settingPath,
@@ -3423,7 +3423,6 @@ async function runLLMVendorPreflight(dir, coerced, configs, soft = false) {
   }
 }
 
-/** Handle SET mode for a project-level section (claude, llm, web, features). */
 /**
  * Delete `[section, settingPath]` entries from the shared `.n-dx.json`.
  *
@@ -3470,6 +3469,16 @@ function pruneEmpty(obj, key) {
   if (Object.keys(value).length === 0) delete obj[key];
 }
 
+/** Report the shared-file keys {@link removeFromSharedConfig} removed in favour of the local file. */
+function printMovedToLocalConfig(dir, removed) {
+  if (removed.length === 0) return;
+  console.log(
+    `  → moved ${removed.join(", ")} out of ${projectConfigLabel(dir, PROJECT_CONFIG_FILE)}`
+    + ` into ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)}`,
+  );
+}
+
+/** Handle SET mode for a project-level section (claude, llm, web, features). */
 async function handleSetProjectSection(
   dir,
   pkg,
@@ -3487,10 +3496,11 @@ async function handleSetProjectSection(
   const legacyClaudeWrite = pkg === "claude";
   const storagePkg = legacyClaudeWrite ? "llm" : pkg;
   const storageSettingPath = legacyClaudeWrite ? `claude.${settingPath}` : settingPath;
+  const isVendorWrite = pkg === "llm" && settingPath === "vendor";
 
   if (!configs[storagePkg]) configs[storagePkg] = {};
 
-  const coerced = await coerceAndValidateProjectValue(
+  const coerced = await coerceAndValidateSetting(
     dir,
     pkg,
     settingPath,
@@ -3503,7 +3513,7 @@ async function handleSetProjectSection(
   // Vendor auth preflight for llm.vendor. `--soft-preflight` (used by `ndx init`)
   // downgrades a failed preflight from a fatal abort to a warning so the chosen
   // vendor is still persisted.
-  if (pkg === "llm" && settingPath === "vendor") {
+  if (isVendorWrite) {
     await runLLMVendorPreflight(dir, coerced, configs, flags["soft-preflight"] === "true");
   }
 
@@ -3544,49 +3554,14 @@ async function handleSetProjectSection(
     current[storagePkg] = {};
   }
 
-  // Vendor-change model reset: capture old values before setting new vendor
-  let warningMessages = [];
-  let oldVendor, oldClaudeModel, oldCodexModel;
-  if (pkg === "llm" && settingPath === "vendor") {
-    // Capture old values before overwriting
-    oldVendor = current[storagePkg].vendor;
-    oldClaudeModel = current[storagePkg].claude?.model;
-    oldCodexModel = current[storagePkg].codex?.model;
-  }
+  // Vendor-change model reset: the old vendor is captured before it is overwritten.
+  const oldVendor = isVendorWrite ? current[storagePkg].vendor : undefined;
 
   setByPath(current[storagePkg], storageSettingPath, coerced, storagePkg);
 
-  // Now perform vendor-change model reset if needed
-  if (pkg === "llm" && settingPath === "vendor") {
-    const { resetStaleModel, formatVendorChangeWarning, NEWEST_MODELS } =
-      await import("@n-dx/llm-client");
-
-    // Check if Claude model needs to be reset
-    const claudeReset = resetStaleModel(oldVendor, oldClaudeModel, coerced);
-    if (claudeReset.changed) {
-      if (current[storagePkg].claude) {
-        delete current[storagePkg].claude.model;
-      }
-      const warning = formatVendorChangeWarning(
-        claudeReset,
-        NEWEST_MODELS.claude,
-      );
-      if (warning) warningMessages.push(warning);
-    }
-
-    // Check if Codex model needs to be reset
-    const codexReset = resetStaleModel(oldVendor, oldCodexModel, coerced);
-    if (codexReset.changed) {
-      if (current[storagePkg].codex) {
-        delete current[storagePkg].codex.model;
-      }
-      const warning = formatVendorChangeWarning(
-        codexReset,
-        NEWEST_MODELS.codex,
-      );
-      if (warning) warningMessages.push(warning);
-    }
-  }
+  const warningMessages = isVendorWrite
+    ? await resetStaleVendorModels(current[storagePkg], oldVendor, coerced)
+    : [];
 
   // Writing `llm.claude.*` used to also mirror the value into the legacy
   // top-level `claude.*` key. That mirror is gone: every reader now resolves
@@ -3632,13 +3607,7 @@ async function handleSetProjectSection(
     if (storagePkg === "llm" && storageSettingPath.startsWith("claude.")) {
       sharedPaths.push(["claude", storageSettingPath.slice("claude.".length)]);
     }
-    const removed = await removeFromSharedConfig(dir, sharedPaths);
-    if (removed.length > 0) {
-      console.log(
-        `  → moved ${removed.join(", ")} out of ${projectConfigLabel(dir, PROJECT_CONFIG_FILE)}`
-        + ` into ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)}`,
-      );
-    }
+    printMovedToLocalConfig(dir, await removeFromSharedConfig(dir, sharedPaths));
   }
 
   // Print warnings for cleared models
@@ -3646,23 +3615,49 @@ async function handleSetProjectSection(
     console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
   }
 
-  // Cascade: local and google vendors require API mode — no CLI binary exists.
-  // Automatically persist hench.provider=api so `ndx work` never emits the
-  // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
-  if (pkg === "llm" && settingPath === "vendor" && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
-    const henchConfigPath = join(resolveLayout(dir).henchDir, "config.json");
-    try {
-      if (await fileExists(henchConfigPath)) {
-        const henchConfig = await loadJSON(henchConfigPath);
-        if (henchConfig.provider !== "api") {
-          henchConfig.provider = "api";
-          await saveJSON(henchConfigPath, henchConfig);
-          console.log(`  → hench.provider = "api"  (${coerced} vendor requires API mode)`);
-        }
+  if (isVendorWrite && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
+    await persistHenchApiProvider(dir, coerced);
+  }
+}
+
+/**
+ * Clear each CLI vendor's pinned model that a switch from `oldVendor` to
+ * `newVendor` leaves stale. `llm` is the `llm` section about to be written;
+ * the models are removed from it in place. Returns the warnings to print once
+ * the write is done.
+ */
+async function resetStaleVendorModels(llm, oldVendor, newVendor) {
+  const { resetStaleModel, formatVendorChangeWarning, NEWEST_MODELS } =
+    await import("@n-dx/llm-client");
+  const warnings = [];
+  for (const vendor of [LLM_VENDOR.CLAUDE, LLM_VENDOR.CODEX]) {
+    const reset = resetStaleModel(oldVendor, llm[vendor]?.model, newVendor);
+    if (!reset.changed) continue;
+    if (llm[vendor]) delete llm[vendor].model;
+    const warning = formatVendorChangeWarning(reset, NEWEST_MODELS[vendor]);
+    if (warning) warnings.push(warning);
+  }
+  return warnings;
+}
+
+/**
+ * Cascade: local and google vendors require API mode — no CLI binary exists.
+ * Automatically persist hench.provider=api so `ndx work` never emits the
+ * "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
+ */
+async function persistHenchApiProvider(dir, vendor) {
+  const henchConfigPath = join(resolveLayout(dir).henchDir, "config.json");
+  try {
+    if (await fileExists(henchConfigPath)) {
+      const henchConfig = await loadJSON(henchConfigPath);
+      if (henchConfig.provider !== "api") {
+        henchConfig.provider = "api";
+        await saveJSON(henchConfigPath, henchConfig);
+        console.log(`  → hench.provider = "api"  (${vendor} vendor requires API mode)`);
       }
-    } catch {
-      // Best-effort — don't block the vendor write if hench config is missing or invalid.
     }
+  } catch {
+    // Best-effort — don't block the vendor write if hench config is missing or invalid.
   }
 }
 
@@ -3708,38 +3703,15 @@ async function handleSetPackageConfig(
     process.exit(1);
   }
 
-  const existing = getByPath(configs[pkg], settingPath, pkg);
-  if (
-    typeof existing === "object" &&
-    existing !== null &&
-    !Array.isArray(existing)
-  ) {
-    console.error(
-      `Cannot set "${keyArg}" — it's an object. Set individual keys instead.`,
-    );
-    process.exit(1);
-  }
-
-  let coerced;
-  try {
-    coerced = coerceSettingValue(pkg, settingPath, valueArg, existing);
-  } catch (err) {
-    console.error(`Invalid value for "${keyArg}": ${err.message}`);
-    process.exit(1);
-  }
-
-  if (flags.force !== "true") {
-    const validator = getValidator(pkg, settingPath);
-    if (validator) {
-      try {
-        await validator(coerced, dir);
-      } catch (err) {
-        console.error(`Invalid value for "${keyArg}": ${err.message}`);
-        console.error("  Use --force to set this value anyway.");
-        process.exit(1);
-      }
-    }
-  }
+  const coerced = await coerceAndValidateSetting(
+    dir,
+    pkg,
+    settingPath,
+    valueArg,
+    keyArg,
+    configs,
+    flags,
+  );
 
   if (isLocalProjectSetting(pkg, settingPath)) {
     await setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, rawConfigs);
@@ -3784,13 +3756,7 @@ async function setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, 
     await saveJSON(packageConfigPath(dir, pkg), rawConfigs[pkg]);
   }
 
-  const removed = await removeFromSharedConfig(dir, [[pkg, settingPath]]);
-  if (removed.length > 0) {
-    console.log(
-      `  → moved ${removed.join(", ")} out of ${projectConfigLabel(dir, PROJECT_CONFIG_FILE)}`
-      + ` into ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)}`,
-    );
-  }
+  printMovedToLocalConfig(dir, await removeFromSharedConfig(dir, [[pkg, settingPath]]));
 }
 
 // ── GET mode handler ─────────────────────────────────────────────────────────
@@ -3840,28 +3806,18 @@ async function handleGet(keyArg, configs, flags) {
   const settingPath = keyArg.slice(dotIdx + 1);
   const sectionConfig = pkg === "claude" ? await resolveClaudeSettings(configs) : configs[pkg];
 
-  if (!sectionConfig) {
-    const defaultValue = getProjectKeyDefault(pkg, settingPath);
-    if (defaultValue !== null) {
-      printKeyDefault(defaultValue, flags);
-      return;
-    }
-    if (PROJECT_SECTIONS.has(pkg)) {
-      console.error(`Key "${keyArg}" not found.`);
-    } else {
-      console.error(`Package "${pkg}" is not initialized or has no config.`);
-    }
-    process.exit(1);
-  }
-
-  const value = getByPath(sectionConfig, settingPath, pkg);
+  const value = sectionConfig ? getByPath(sectionConfig, settingPath, pkg) : undefined;
   if (value === undefined) {
     const defaultValue = getProjectKeyDefault(pkg, settingPath);
     if (defaultValue !== null) {
       printKeyDefault(defaultValue, flags);
       return;
     }
-    console.error(`Key "${keyArg}" not found.`);
+    if (!sectionConfig && !PROJECT_SECTIONS.has(pkg)) {
+      console.error(`Package "${pkg}" is not initialized or has no config.`);
+    } else {
+      console.error(`Key "${keyArg}" not found.`);
+    }
     process.exit(1);
   }
 
