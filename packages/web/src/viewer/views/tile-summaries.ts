@@ -17,7 +17,7 @@ import type { Finding } from "../external.js";
 import type { StageTile } from "./stages.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { effectiveEnrichmentPass } from "../enrichment-pass.js";
-import { zoneNeedsAttention } from "./overview.js";
+import { zoneNeedsAttention } from "../visualization/metrics.js";
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 

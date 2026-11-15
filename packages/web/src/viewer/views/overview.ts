@@ -6,6 +6,7 @@ import {
   BarChart,
   PatternBadge,
   getZoneColorByIndex,
+  zoneNeedsAttention,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { errorMessage, formatSince } from "../utils/format.js";
@@ -297,11 +298,6 @@ const LANG_COLORS: Record<string, string> = {
   Rust: "#dea584",
   Go: "#00add8",
 };
-
-/** A zone the health views flag: cohesion under 0.4 or coupling over 0.5. */
-export function zoneNeedsAttention(zone: { cohesion: number; coupling: number }): boolean {
-  return zone.cohesion < 0.4 || zone.coupling > 0.5;
-}
 
 /** The facts the isometric map's caption lists: zones, imports and the branch, when known. */
 function isoMapFacts({ zones, imports, manifest }: LoadedData): string[] {
