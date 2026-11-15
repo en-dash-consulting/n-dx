@@ -10,6 +10,7 @@ import { findOperation } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { findingAskSeed } from "./finding-seed.js";
 import { StatCard } from "./stat-card.js";
+import { assertJobStarted } from "./response-error.js";
 
 interface SuggestionsProps {
   data: LoadedData;
@@ -43,10 +44,7 @@ function RefreshRecommendationsButton({ jobs }: { jobs: JobTray }) {
         body: JSON.stringify({}),
       });
       // 409 means one is already running — the tray reports that one.
-      if (!res.ok && res.status !== 409) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
+      await assertJobStarted(res);
     } catch (err) {
       setError(String(err));
     }

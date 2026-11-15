@@ -13,6 +13,7 @@ import { BrandedHeader } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useCliName } from "../hooks/index.js";
 import { itemTypeLabel } from "../external.js";
+import { assertJobStarted } from "./response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -717,10 +718,7 @@ export function ValidationActions({ onChanged, show }: {
     setError(null);
     try {
       const res = await postJson("/api/commands/ci", {});
-      if (!res.ok && res.status !== 409) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
+      await assertJobStarted(res);
       cancelPolls.current.push(pollJob("/api/commands/ci/status", (status) => {
         // ndx ci exits 1 when a check fails while still printing its full
         // JSON report, and the server records any non-zero exit as
@@ -752,10 +750,7 @@ export function ValidationActions({ onChanged, show }: {
     setError(null);
     try {
       const res = await postJson("/api/commands/reshape", { accept });
-      if (!res.ok && res.status !== 409) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
+      await assertJobStarted(res);
       cancelPolls.current.push(pollJob("/api/commands/reshape/status", (status) => {
         if (status.error) {
           setError(status.error);
