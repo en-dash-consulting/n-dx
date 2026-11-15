@@ -15,6 +15,11 @@ export function formatTokenCount(n: number): string {
   return String(n);
 }
 
+/** A count with its noun: `1 change`, `3 changes`. */
+export function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 /**
  * "3m ago" — coarse relative time for a past ISO timestamp.
  *
