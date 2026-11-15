@@ -18,7 +18,7 @@ import { useState, useEffect } from "preact/hooks";
 import { getWorkspaceKey } from "../base-path.js";
 import { registerPoller } from "../polling/index.js";
 import { createWSPipeline } from "./use-gateway.js";
-import { openReconnectingSocket } from "../reconnecting-socket.js";
+import { openReconnectingSocket } from "../live-feed-socket.js";
 
 // ---------------------------------------------------------------------------
 // Shape — the slice of server/routes-live.ts's LiveSnapshot the tab reads

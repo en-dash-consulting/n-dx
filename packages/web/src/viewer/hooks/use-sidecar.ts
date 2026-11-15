@@ -25,7 +25,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { openReconnectingSocket } from "../reconnecting-socket.js";
+import { openReconnectingSocket } from "../live-feed-socket.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";

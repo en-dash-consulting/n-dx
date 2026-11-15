@@ -11,12 +11,11 @@
 import { getWorkspaceKey } from "../base-path.js";
 import { useEffect } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 export function usePrdChangedRefresh(refresh: () => void): void {
   useEffect(() => {
     let live = true;
-    let ws: WebSocket | null = null;
 
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
@@ -30,25 +29,13 @@ export function usePrdChangedRefresh(refresh: () => void): void {
       maxPendingPerType: 20,
     });
 
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // ignore malformed messages
-        }
-      };
-    } catch {
-      // WebSocket not available — the view keeps what it last loaded
-    }
+    // WebSocket not available — the view keeps what it last loaded
+    const closeSocket = openFrameSocket((frame) => pipeline.push(frame));
 
     return () => {
       live = false;
       pipeline.dispose();
-      if (ws) {
-        try { ws.close(); } catch { /* ignore */ }
-      }
+      closeSocket();
     };
   }, [refresh]);
 }
