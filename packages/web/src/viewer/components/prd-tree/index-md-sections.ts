@@ -7,7 +7,6 @@
  */
 
 import { h, Fragment } from "preact";
-import type { ComponentChildren } from "preact";
 import { useState, useMemo } from "preact/hooks";
 import type {
   IndexMdSections,
@@ -18,6 +17,7 @@ import type {
   SubtaskEntry,
 } from "../../utils/index-md-parser.js";
 import { commitLinkUrl } from "../../utils/commit-link.js";
+import { TaskSection } from "./task-section.js";
 
 type SortColumn = "title" | "type" | "status" | "lastUpdated" | null;
 type SortDirection = "asc" | "desc";
@@ -302,16 +302,6 @@ export function SubtasksList({ subtasks }: { subtasks: SubtaskEntry[] }) {
   );
 }
 
-/** One labelled detail-panel section around a parsed index.md block. */
-function LabeledSection({ label, children }: { label: string; children?: ComponentChildren }) {
-  return h(
-    "div",
-    { class: "task-section" },
-    h("div", { class: "task-section-label" }, label),
-    children,
-  );
-}
-
 /**
  * Main index.md sections container
  */
@@ -324,23 +314,23 @@ export function IndexMdSectionsPanel({ sections, gitRemoteUrl }: { sections: Ind
     Fragment,
     null,
     sections.progress && sections.progress.length > 0
-      ? h(LabeledSection, { label: "Progress" }, h(ProgressTable, { rows: sections.progress }))
+      ? h(TaskSection, { label: "Progress" }, h(ProgressTable, { rows: sections.progress }))
       : null,
     sections.commits && sections.commits.length > 0
-      ? h(LabeledSection, { label: "Commits" }, h(CommitsList, { commits: sections.commits, gitRemoteUrl }))
+      ? h(TaskSection, { label: "Commits" }, h(CommitsList, { commits: sections.commits, gitRemoteUrl }))
       : null,
     sections.changes && sections.changes.length > 0
-      ? h(LabeledSection, { label: "Changes" }, h(ChangesList, { changes: sections.changes }))
+      ? h(TaskSection, { label: "Changes" }, h(ChangesList, { changes: sections.changes }))
       : null,
     sections.info && sections.info.length > 0
-      ? h(LabeledSection, { label: "Extended Info" }, h(InfoSection, { fields: sections.info }))
+      ? h(TaskSection, { label: "Extended Info" }, h(InfoSection, { fields: sections.info }))
       : null,
     sections.subtasks && sections.subtasks.length > 0
       ? h(SubtasksList, { subtasks: sections.subtasks })
       : null,
     // Fallback: raw markdown if parsing failed
     sections.rawMarkdown && !sections.progress && !sections.commits
-      ? h(LabeledSection, { label: "Schema Content (Legacy)" },
+      ? h(TaskSection, { label: "Schema Content (Legacy)" },
           h("pre", { class: "detail-raw-markdown" }, sections.rawMarkdown))
       : null,
   );

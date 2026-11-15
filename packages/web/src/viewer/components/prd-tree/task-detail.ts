@@ -25,6 +25,7 @@ import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, crit
 import { useFeatureToggle, useIndexMd } from "../../hooks/index.js";
 import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-verdict-banner.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
+import { TaskSection } from "./task-section.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
@@ -1038,9 +1039,8 @@ function HenchRunsList({
   if (runs.length === 0) return null;
 
   return h(
-    "div",
-    { class: "task-section task-runs-section" },
-    h("div", { class: "task-section-label" }, `Hench Runs (${runs.length})`),
+    TaskSection,
+    { label: `Hench Runs (${runs.length})`, class: "task-runs-section" },
     h(
       "div",
       { class: "task-runs-list" },
@@ -1098,10 +1098,7 @@ function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
 
   // Show error if parsing failed
   if (error) {
-    return h(
-      "div",
-      { class: "task-section task-index-md-error" },
-      h("div", { class: "task-section-label" }, "Schema Error"),
+    return h(TaskSection, { label: "Schema Error", class: "task-index-md-error" },
       h("p", { class: "error-message" }, error),
     );
   }
@@ -1261,10 +1258,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // In plain terms: what the item does and why it matters, for readers who do not read code.
     item.summary || onUpdate
-      ? h(
-          "div",
-          { class: "task-section task-summary-section" },
-          h("div", { class: "task-section-label" }, "In plain terms"),
+      ? h(TaskSection, { label: "In plain terms", class: "task-summary-section" },
           h(EditableDescription, {
             description: item.summary,
             noun: "plain-language summary",
@@ -1281,9 +1275,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Status selector
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, saving ? "Status (saving...)" : "Status"),
+      TaskSection,
+      { label: saving ? "Status (saving...)" : "Status" },
       h(StatusSelector, {
         current: item.status,
         onChange: handleStatusChange,
@@ -1343,9 +1336,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Description (editable)
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, "Description"),
+      TaskSection,
+      { label: "Description" },
       h(EditableDescription, {
         description: item.description,
         onUpdate: onUpdate
@@ -1371,9 +1363,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
     // Aggregated token usage across runs
     tracksRuns
       ? h(
-          "div",
-          { class: "task-section task-usage-section" },
-          h("div", { class: "task-section-label" }, "Usage"),
+          TaskSection,
+          { label: "Usage", class: "task-usage-section" },
           h("div", { class: "task-usage-row" },
             h("span", { class: "label" }, "Total Tokens"),
             h("span", { class: "task-usage-value" }, `${formatTokenCount(usageSummary.totalTokens)} tokens`),
@@ -1423,17 +1414,15 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Priority selector
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, "Priority"),
+      TaskSection,
+      { label: "Priority" },
       h(PrioritySelector, { current: item.priority, onChange: handlePriorityChange }),
     ),
 
     // Tags editor
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, "Tags"),
+      TaskSection,
+      { label: "Tags" },
       h(TagEditor, { tags: item.tags ?? [], onUpdate: handleTagsUpdate }),
     ),
 
@@ -1450,11 +1439,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Requirements
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" },
-        `Requirements (${(item.requirements ?? []).length})`,
-      ),
+      TaskSection,
+      { label: `Requirements (${(item.requirements ?? []).length})` },
       h(RequirementsList, {
         requirements: item.requirements ?? [],
         onAdd: onUpdate
@@ -1535,9 +1521,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
     // Timestamps
     (item.startedAt || item.completedAt)
       ? h(
-          "div",
-          { class: "task-section task-timestamps" },
-          h("div", { class: "task-section-label" }, "Timeline"),
+          TaskSection,
+          { label: "Timeline", class: "task-timestamps" },
           item.startedAt
             ? h("div", { class: "detail-row" },
                 h("span", { class: "label" }, "Started"),
