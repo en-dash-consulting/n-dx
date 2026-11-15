@@ -9,6 +9,9 @@ export type { GranularityAdjustmentRecord, BatchAcceptanceRecord };
 
 const DEFAULT_CHUNK_SIZE = 5;
 
+/** How many proposals per page `more` adds and `fewer` removes. */
+const CHUNK_SIZE_STEP = 5;
+
 /** Assessment of a single proposal's task granularity. */
 export interface ProposalAssessment {
   proposalIndex: number;
@@ -250,6 +253,11 @@ export function buildPrompt(state: ChunkReviewState): string {
   return "> ";
 }
 
+/** 0-based proposal indices as the 1-based numbers the operator sees, e.g. "1, 3". */
+function proposalNumbers(indices: number[]): string {
+  return indices.map((i) => i + 1).join(", ");
+}
+
 /**
  * Parse a string of comma/space-separated 1-based numbers into
  * deduplicated, sorted 0-based indices within the valid range.
@@ -390,7 +398,7 @@ export function applyAction(
           offset: newOffset,
         },
         done: false,
-        message: `Accepted proposals ${indices.map((i) => i + 1).join(", ")}.`,
+        message: `Accepted proposals ${proposalNumbers(indices)}.`,
       };
     }
 
@@ -433,7 +441,7 @@ export function applyAction(
     }
 
     case "more": {
-      const newSize = Math.min(state.chunkSize + 5, total);
+      const newSize = Math.min(state.chunkSize + CHUNK_SIZE_STEP, total);
       if (newSize === state.chunkSize) {
         return { state, done: false, message: "Already showing all proposals." };
       }
@@ -447,7 +455,7 @@ export function applyAction(
     }
 
     case "fewer": {
-      const newSize = Math.max(1, state.chunkSize - 5);
+      const newSize = Math.max(1, state.chunkSize - CHUNK_SIZE_STEP);
       if (newSize === state.chunkSize) {
         return { state, done: false, message: "Already at minimum chunk size." };
       }
@@ -477,7 +485,7 @@ export function applyAction(
       return {
         state: { ...state, accepted: newAccepted, rejected: newRejected },
         done: false,
-        message: `Toggled proposals ${action.indices.map((i) => i + 1).join(", ")}.`,
+        message: `Toggled proposals ${proposalNumbers(action.indices)}.`,
       };
     }
 
@@ -487,7 +495,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Breaking down proposal(s) ${action.indices.map((i) => i + 1).join(", ")}...`,
+        message: `Breaking down proposal(s) ${proposalNumbers(action.indices)}...`,
         granularityRequest: { kind: "break_down", indices: action.indices },
       };
     }
@@ -498,7 +506,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Consolidating proposal(s) ${action.indices.map((i) => i + 1).join(", ")}...`,
+        message: `Consolidating proposal(s) ${proposalNumbers(action.indices)}...`,
         granularityRequest: { kind: "consolidate", indices: action.indices },
       };
     }
@@ -547,14 +555,14 @@ export function applyAction(
         return {
           state,
           done: false,
-          message: `Applying assessment: breaking down proposal(s) ${breakDownIndices.map((i) => i + 1).join(", ")}...`,
+          message: `Applying assessment: breaking down proposal(s) ${proposalNumbers(breakDownIndices)}...`,
           granularityRequest: { kind: "break_down", indices: breakDownIndices },
         };
       }
       return {
         state,
         done: false,
-        message: `Applying assessment: consolidating proposal(s) ${consolidateIndices.map((i) => i + 1).join(", ")}...`,
+        message: `Applying assessment: consolidating proposal(s) ${proposalNumbers(consolidateIndices)}...`,
         granularityRequest: { kind: "consolidate", indices: consolidateIndices },
       };
     }
@@ -565,7 +573,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Breaking down all proposals in current chunk (${indices.map((i) => i + 1).join(", ")})...`,
+        message: `Breaking down all proposals in current chunk (${proposalNumbers(indices)})...`,
         granularityRequest: { kind: "break_down", indices },
       };
     }
@@ -576,7 +584,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Consolidating all proposals in current chunk (${indices.map((i) => i + 1).join(", ")})...`,
+        message: `Consolidating all proposals in current chunk (${proposalNumbers(indices)})...`,
         granularityRequest: { kind: "consolidate", indices },
       };
     }
