@@ -33,6 +33,11 @@ import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
+/** Directory entry names a source scan must not descend into. */
+function sourceScanSkipDirs() {
+  return new Set(["node_modules", "dist", ".git", ...layoutStateNames().dirNames]);
+}
+
 /**
  * Run a subprocess and capture its stdout/stderr.
  * Returns { code, stdout, stderr }.
@@ -43,11 +48,6 @@ const MONOREPO_ROOT = resolve(__dir, "../..");
  *   child process.  Callers pass a tracked wrapper so the child is
  *   registered with the global cleanup gate and terminated on SIGINT/SIGTERM.
  */
-/** Directory entry names a source scan must not descend into. */
-function sourceScanSkipDirs() {
-  return new Set(["node_modules", "dist", ".git", ...layoutStateNames().dirNames]);
-}
-
 function runCapture(script, args, spawnFn) {
   return new Promise((res) => {
     const child = spawnFn(
@@ -957,6 +957,15 @@ function checkGatewayImports(dir) {
     const file = relative(dir, path) + (isDir ? sep : "");
     unreadable.set(file, { file, message: describeUnreadable({ file, message: err.message }) });
   };
+  /** A source file's lines, or null (noted as unreadable) when it cannot be read. */
+  const readLines = (filePath) => {
+    try {
+      return readFileSync(filePath, "utf-8").split("\n");
+    } catch (err) {
+      noteUnreadable(filePath, err, false);
+      return null;
+    }
+  };
 
   // ── Cross-package gateway checks ────────────────────────────────────────
   for (const rule of GATEWAY_RULES) {
@@ -978,15 +987,8 @@ function checkGatewayImports(dir) {
       // Skip explicit per-file allowlist entries (documented in gateway-rules.json)
       if (rule.allowedNonGatewayFiles.has(ruleKey)) continue;
 
-      let content;
-      try {
-        content = readFileSync(filePath, "utf-8");
-      } catch (err) {
-        noteUnreadable(filePath, err, false);
-        continue;
-      }
-
-      const lines = content.split("\n");
+      const lines = readLines(filePath);
+      if (!lines) continue;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         // Quick pre-filter: skip lines that don't mention the package
@@ -1017,15 +1019,8 @@ function checkGatewayImports(dir) {
       checked++;
       const relPath = relative(dir, filePath);
 
-      let content;
-      try {
-        content = readFileSync(filePath, "utf-8");
-      } catch (err) {
-        noteUnreadable(filePath, err, false);
-        continue;
-      }
-
-      const lines = content.split("\n");
+      const lines = readLines(filePath);
+      if (!lines) continue;
       for (let i = 0; i < lines.length; i++) {
         if (rule.forbiddenPattern.test(lines[i])) {
           violations.push({
