@@ -48,7 +48,7 @@
  */
 
 import type { Dirent } from "node:fs";
-import { mkdir, readFile, readdir, rename, rm, rmdir } from "node:fs/promises";
+import { mkdir, readdir, rename, rm, rmdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import {
   AreaIntentSchema,
@@ -86,6 +86,7 @@ import {
   emptyStateFile,
   extraTopLevelKeys,
   loadStateFile,
+  readIfExists,
   sameTextOnDisk,
   saveStateFile,
   type ProductSpec,
@@ -714,15 +715,6 @@ async function listDir(dir: string) {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT" || code === "ENOTDIR") return null;
-    throw err;
-  }
-}
-
-async function readIfExists(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, "utf-8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;
   }
 }
