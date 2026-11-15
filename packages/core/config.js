@@ -1169,9 +1169,11 @@ async function testCliPath(cliPath, dir, vendor) {
 
 /**
  * Default global CLI timeout in milliseconds (30 minutes).
- * Matches the value in cli-timeout.js — kept in sync manually.
+ * A copy of cli-timeout.js's DEFAULT_TIMEOUT_MS, which config.js may not import
+ * (tests/e2e/domain-isolation.test.js); exported so
+ * tests/unit/cli-timeout-default-parity.test.js can pin the two equal.
  */
-const CLI_TIMEOUT_DEFAULT_MS = 1800000;
+export const CLI_TIMEOUT_DEFAULT_MS = 1800000;
 
 /**
  * Known CLI timeout keys and their default values.
@@ -4082,7 +4084,8 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
  * Finds the installed extension `name` for the project `dir` and returns the
  * checker for its `configSchema`, or why there is none. cli.js passes
  * `configCheckerByName` (extension-config-schema.js): config.js imports
- * nothing beyond node builtins and its two helpers.
+ * nothing beyond node builtins and its same-package helpers (win-spawn.js,
+ * layout.js, file-permissions.js, gitignore.js).
  *
  * @callback ExtensionConfigCheckerLookup
  * @param {string} name
