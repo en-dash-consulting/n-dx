@@ -34,11 +34,10 @@
  * @module web/hub/home
  */
 
-import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES } from "../shared/index.js";
+import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES, injectSessionScript } from "../shared/index.js";
 import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
 import type { HubUsageTotals } from "./usage-ledger.js";
-import { injectSessionScript } from "../shared/index.js";
 
 export function escapeHtml(value: string): string {
   return value

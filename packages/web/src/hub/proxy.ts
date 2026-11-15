@@ -223,9 +223,7 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     if (!project) {
       return { kind: "json", status: 404, body: { error: `No project registered as "${id}"`, projects: projectIds(hub) } };
     }
-    if (project.port === null) {
-      return { kind: "json", status: 503, body: { error: `Project "${id}" has no running server`, status: project.status } };
-    }
+    if (project.port === null) return { kind: "json", status: 503, body: noRunningServer(project) };
     return { kind: "proxy", project, path: stripBasePath(prefix, pathname) + query, prefix };
   }
 
@@ -252,9 +250,7 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
   const projects = hub.listProjects();
   if (projects.length === 1) {
     const project = projects[0];
-    if (project.port === null) {
-      return { kind: "json", status: 503, body: { error: `Project "${project.id}" has no running server`, status: project.status } };
-    }
+    if (project.port === null) return { kind: "json", status: 503, body: noRunningServer(project) };
     return { kind: "proxy", project, path: url, prefix: "" };
   }
 
@@ -289,6 +285,11 @@ function withoutTokenParam(query: string): string {
 
 function projectIds(hub: Hub): string[] {
   return hub.listProjects().map((p) => p.id);
+}
+
+/** The 503 body for a registered project whose server is not running. */
+function noRunningServer(project: ProjectView): { error: string; status: ProjectView["status"] } {
+  return { error: `Project "${project.id}" has no running server`, status: project.status };
 }
 
 /**
@@ -402,7 +403,7 @@ async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub
     return true;
   }
   if (project.port === null) {
-    writeJson(res, 503, { error: `Project "${project.id}" has no running server`, status: project.status });
+    writeJson(res, 503, noRunningServer(project));
     return true;
   }
   proxyHttp(req, res, project.port, RELOAD_PATH, "", body, upstreamAuth(hub));
@@ -511,14 +512,13 @@ export function proxyHttp(
   // Only the hub states its admission state; a client's copy never reaches the child.
   delete headers[HUB_ADMISSION_HEADER];
   if (!sidecar) {
-  // The hub judged the client's credential already. A browser session is the
-  // hub's, and means nothing to the child, so it never travels; an
-  // authenticated request goes on with the per-user token instead (passed in
-  // `extraHeaders` by the caller, see upstreamAuth), a public one with none.
-  delete headers.authorization;
-  delete headers["x-ndx-token"];
-  }
-  if (sidecar) {
+    // The hub judged the client's credential already. A browser session is the
+    // hub's, and means nothing to the child, so it never travels; an
+    // authenticated request goes on with the per-user token instead (passed in
+    // `extraHeaders` by the caller, see upstreamAuth), a public one with none.
+    delete headers.authorization;
+    delete headers["x-ndx-token"];
+  } else {
     for (const [name, value] of Object.entries(headers)) {
       if (typeof value !== "string") continue;
       const kept = sidecarHeaderValue(name, value, sidecar);
@@ -832,9 +832,7 @@ export async function handlePublicHubRequest(req: IncomingMessage, res: ServerRe
     return;
   }
   if (decision.kind === "home") {
-    const html = renderHomePage({ projects: [], generatedAt: new Date().toISOString() }, "", [], { deferred: true });
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-    res.end(html);
+    writeHtml(res, 200, renderHomePage({ projects: [], generatedAt: new Date().toISOString() }, "", [], { deferred: true }));
     return;
   }
   refusePublic(req, res);
@@ -844,6 +842,12 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(text) });
   res.end(text);
+}
+
+/** A page the hub renders itself; revalidated on every load, since its cards are live. */
+function writeHtml(res: ServerResponse, status: number, html: string): void {
+  res.writeHead(status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+  res.end(html);
 }
 
 type SessionHost = NonNullable<ReturnType<Hub["sessionHosts"]["pick"]>>;
@@ -974,8 +978,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, { ...upstreamAuth(hub), ...(await admissionHeadersFor(req, hub, decision)) });
       return;
     case "html":
-      res.writeHead(decision.status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-      res.end(decision.html);
+      writeHtml(res, decision.status, decision.html);
       return;
     case "json":
       writeJson(res, decision.status, decision.body);
@@ -998,8 +1001,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
         hubSession,
         hubSpend: readHubUsageTotals(hub.hubHome),
       });
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-      res.end(html);
+      writeHtml(res, 200, html);
       return;
     }
   }
@@ -1049,20 +1051,73 @@ async function admissionHeadersFor(
       running: snapshot.running,
       maxSessions: snapshot.limits.maxSessions,
       queued: snapshot.entries.length,
-      queue: snapshot.entries
-        .filter((entry) => entry.projectId === projectId)
-        .map((entry) => ({
-          taskId: entry.taskId,
-          workspace: entry.workspace,
-          enqueuedAt: entry.enqueuedAt,
-          ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
-          ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
-        })),
+      // The header keeps only each entry's identifying fields (formatHubAdmissionHeader),
+      // so the run options a queued entry replays never ride along.
+      queue: snapshot.entries.filter((entry) => entry.projectId === projectId),
       availableBytes: snapshot.availableBytes,
       pressure: snapshot.pressure,
       memoryPaused: snapshot.memoryPaused,
     }),
   };
+}
+
+/** What the gate reads off an execute body. */
+interface ExecuteRequest {
+  taskId: string | null;
+  /** Absent when the request carried none. */
+  options?: RunOptions;
+  /** Absent for `single`. */
+  mode?: RunMode;
+  iterations?: number;
+  saveRun?: Record<string, unknown>;
+  /** False when an option, the run mode or `saveRun` is one the project server would refuse. */
+  valid: boolean;
+}
+
+/** Read an execute body's task, run options, mode and settings to save. A body that is not JSON names no task. */
+function parseExecuteBody(body: Buffer): ExecuteRequest {
+  const request: ExecuteRequest = { taskId: null, valid: true };
+  try {
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
+      taskId?: unknown;
+      options?: unknown;
+      mode?: unknown;
+      iterations?: unknown;
+      saveRun?: unknown;
+    };
+    if (typeof parsed.taskId === "string" && parsed.taskId) request.taskId = parsed.taskId;
+    const checked = checkRunOptions(parsed.options);
+    if (checked.ok) {
+      if (Object.keys(checked.options).length > 0) request.options = checked.options;
+    } else {
+      request.valid = false;
+    }
+    // The same validator the execute route and `execute/check` use, so a mode
+    // this forwards is a mode they accept. Judging it here by hand is what let
+    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
+    // 400'd on an idle one.
+    const checkedMode = checkRunMode(parsed);
+    if (checkedMode.ok) {
+      if (checkedMode.mode !== "single") request.mode = checkedMode.mode;
+      request.iterations = checkedMode.iterations;
+    } else {
+      // Forwarded, not queued — see handleExecuteAdmission.
+      request.valid = false;
+    }
+    // Settings to save when the run starts. Only the shape is judged here; the
+    // project server checks the block (and its version) in `execute/check`
+    // before this queues it, and saves it only when the replay starts the run.
+    if (parsed.saveRun !== undefined) {
+      if (parsed.saveRun !== null && typeof parsed.saveRun === "object" && !Array.isArray(parsed.saveRun)) {
+        request.saveRun = parsed.saveRun as Record<string, unknown>;
+      } else {
+        request.valid = false;
+      }
+    }
+  } catch {
+    // not JSON — forward and let the server say so
+  }
+  return request;
 }
 
 /**
@@ -1096,56 +1151,11 @@ async function handleExecuteAdmission(
     return false; // let the project server answer for its own request
   }
 
-  let taskId: string | null = null;
-  let options: RunOptions | undefined;
-  let optionsValid = true;
-  let mode: RunMode | undefined;
-  let iterations: number | undefined;
-  let saveRun: Record<string, unknown> | undefined;
-  try {
-    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
-      taskId?: unknown;
-      options?: unknown;
-      mode?: unknown;
-      iterations?: unknown;
-      saveRun?: unknown;
-    };
-    if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
-    const checked = checkRunOptions(parsed.options);
-    if (checked.ok) {
-      if (Object.keys(checked.options).length > 0) options = checked.options;
-    } else {
-      optionsValid = false;
-    }
-    // The same validator the execute route and `execute/check` use, so a mode
-    // this forwards is a mode they accept. Judging it here by hand is what let
-    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
-    // 400'd on an idle one.
-    const checkedMode = checkRunMode(parsed);
-    if (checkedMode.ok) {
-      if (checkedMode.mode !== "single") mode = checkedMode.mode;
-      iterations = checkedMode.iterations;
-    } else {
-      // Forwarded, not queued — see the comment below the catch.
-      optionsValid = false;
-    }
-    // Settings to save when the run starts. Only the shape is judged here; the
-    // project server checks the block (and its version) in `execute/check`
-    // before this queues it, and saves it only when the replay starts the run.
-    if (parsed.saveRun !== undefined) {
-      if (parsed.saveRun !== null && typeof parsed.saveRun === "object" && !Array.isArray(parsed.saveRun)) {
-        saveRun = parsed.saveRun as Record<string, unknown>;
-      } else {
-        optionsValid = false;
-      }
-    }
-  } catch {
-    // not JSON — forward and let the server say so
-  }
+  const { taskId, options, mode, iterations, saveRun, valid } = parseExecuteBody(body);
   // A rejected option or run mode is forwarded too: queuing it would turn the
   // server's 400 into a run silently dropped minutes later, when its turn came
   // — or, worse for a mode, into a run that starts and does less than it said.
-  if (!taskId || !optionsValid) {
+  if (!taskId || !valid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));
     return true;
   }
@@ -1159,7 +1169,7 @@ async function handleExecuteAdmission(
     workspace,
     taskId,
     ...(options ? { options } : {}),
-    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(mode ? { mode } : {}),
     ...(iterations !== undefined ? { iterations } : {}),
     ...(saveRun ? { saveRun } : {}),
   });
@@ -1182,7 +1192,7 @@ async function handleExecuteAdmission(
     projectId: decision.project.id,
     workspace,
     ...(options ? { options } : {}),
-    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(mode ? { mode } : {}),
     ...(iterations !== undefined ? { iterations } : {}),
     queueLength: snapshot.entries.length,
     running: snapshot.running,
