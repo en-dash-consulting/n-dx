@@ -69,6 +69,23 @@ async function applyFailure(res: Response): Promise<string> {
     : `Apply failed (${res.status})`;
 }
 
+/** A copy of `set` with `id` added, or removed when it was there. */
+function toggled<T>(set: Set<T>, id: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  return next;
+}
+
+/** What `POST /api/rex/reorganize/apply` reports. */
+interface ApplyResult {
+  applied: number;
+  failed: number;
+}
+
 // ── Component ────────────────────────────────────────────────────
 
 export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelProps) {
@@ -112,48 +129,32 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
   }, [open, fetchProposals]);
 
   const toggleSelection = useCallback((id: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelected((prev) => toggled(prev, id));
   }, []);
 
   const toggleLlmSelection = useCallback((id: string) => {
-    setSelectedLlm((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelectedLlm((prev) => toggled(prev, id));
   }, []);
 
-  const applySelected = useCallback(async () => {
-    if (selected.size === 0 && selectedLlm.size === 0) return;
+  /**
+   * Apply the proposals in `body`, report what the server did with
+   * `describe`, and re-read the proposals when anything changed.
+   */
+  const apply = useCallback(async (body: Record<string, unknown>, describe: (data: ApplyResult) => string) => {
     setApplying(true);
     setError(null);
     try {
       const res = await fetch("/api/rex/reorganize/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          proposalIds: [...selected],
-          llmProposalIds: [...selectedLlm],
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         setError(await applyFailure(res));
         return;
       }
       const data = await res.json();
-      setResult(`Applied ${data.applied} proposal(s)${data.failed > 0 ? `, ${data.failed} failed` : ""}`);
+      setResult(describe(data));
       if (data.applied > 0) {
         onApplied?.();
         await fetchProposals();
@@ -163,35 +164,21 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
     } finally {
       setApplying(false);
     }
-  }, [selected, selectedLlm, onApplied, fetchProposals]);
+  }, [onApplied, fetchProposals]);
+
+  const applySelected = useCallback(async () => {
+    if (selected.size === 0 && selectedLlm.size === 0) return;
+    await apply(
+      { proposalIds: [...selected], llmProposalIds: [...selectedLlm] },
+      (data) => `Applied ${data.applied} proposal(s)${data.failed > 0 ? `, ${data.failed} failed` : ""}`,
+    );
+  }, [selected, selectedLlm, apply]);
 
   const applyAllLowRisk = useCallback(async () => {
     const lowRiskIds = proposals.filter((p) => p.risk === "low").map((p) => p.id);
     if (lowRiskIds.length === 0) return;
-    setApplying(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/rex/reorganize/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proposalIds: lowRiskIds }),
-      });
-      if (!res.ok) {
-        setError(await applyFailure(res));
-        return;
-      }
-      const data = await res.json();
-      setResult(`Applied ${data.applied} low-risk proposal(s)`);
-      if (data.applied > 0) {
-        onApplied?.();
-        await fetchProposals();
-      }
-    } catch {
-      setError("Failed to apply proposals.");
-    } finally {
-      setApplying(false);
-    }
-  }, [proposals, onApplied, fetchProposals]);
+    await apply({ proposalIds: lowRiskIds }, (data) => `Applied ${data.applied} low-risk proposal(s)`);
+  }, [proposals, apply]);
 
   if (!open) return null;
 
