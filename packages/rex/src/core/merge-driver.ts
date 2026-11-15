@@ -298,7 +298,12 @@ function parseList(chunk: string | undefined): string[] {
   return values;
 }
 
-function stripQuotes(value: string): string {
+/**
+ * A frontmatter value without the JSON double quotes the serializer writes
+ * around strings; shared with the post-merge validator, which reads the same
+ * fields back from merged files.
+ */
+export function stripQuotes(value: string): string {
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
     try {
       return JSON.parse(value) as string;

@@ -46,6 +46,7 @@
 
 import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { stripQuotes } from "./merge-driver.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -648,15 +649,4 @@ export function matchList(text: string, key: string): string[] {
 function frontmatterOnly(text: string): string {
   const m = /^---\r?\n([\s\S]*?)\r?\n---/m.exec(text);
   return m ? m[1] : "";
-}
-
-function stripQuotes(value: string): string {
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    try {
-      return JSON.parse(value) as string;
-    } catch {
-      return value.slice(1, -1);
-    }
-  }
-  return value;
 }
