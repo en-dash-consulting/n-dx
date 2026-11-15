@@ -16,10 +16,6 @@ export function formatTokenCount(n: number): string {
 }
 
 /**
- * Format a run duration from ISO start/end timestamps.
- * Returns "running…" when end is absent, "—" for negative durations.
- */
-/**
  * "3m ago" — coarse relative time for a past ISO timestamp.
  *
  * Null for a missing, unparseable, or future timestamp: a clock-skewed
@@ -38,6 +34,10 @@ export function formatSince(iso: string | null | undefined): string | null {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/**
+ * Format a run duration from ISO start/end timestamps.
+ * Returns "running…" when end is absent, "—" for negative durations.
+ */
 export function fmtDuration(start: string, end?: string): string {
   if (!end) return "running…";
   const ms = new Date(end).getTime() - new Date(start).getTime();
