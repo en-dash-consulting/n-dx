@@ -27,7 +27,7 @@ import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { handleLiveWorkRoute } from "./routes-live-work.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
-import { guardWatcher } from "./watcher-guard.js";
+import { debounce, guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
@@ -297,18 +297,6 @@ type RouteResult = boolean | Promise<boolean>;
 // from concurrent fetch storms.
 
 const WATCHER_DEBOUNCE_MS = 500;
-
-/**
- * Create a debounced version of a callback. Multiple calls within `delayMs`
- * are collapsed into a single trailing invocation.
- */
-function debounce<T extends (...args: unknown[]) => void>(fn: T, delayMs: number): T {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return ((...args: unknown[]) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => { timer = null; fn(...args); }, delayMs);
-  }) as T;
-}
 
 function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
   return !scope || scope === pkg;
