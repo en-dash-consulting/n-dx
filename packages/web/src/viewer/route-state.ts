@@ -6,6 +6,17 @@ export interface ParsedRoute {
   subId: string | null;
 }
 
+/**
+ * The page a bare URL opens on, and the one shown under the settings overlay
+ * when a settings route is opened directly: the landing page whenever it
+ * exists (it is a cross-cutting view, so it does in every scope), else the
+ * first valid view.
+ */
+export function defaultView(validViews: Set<ViewId>): ViewId {
+  if (validViews.has("home")) return "home";
+  return validViews.values().next().value as ViewId;
+}
+
 const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs", "commands"]);
 
 /**

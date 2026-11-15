@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
-import { isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, routeTab, viewPathname } from "../route-state.js";
+import { defaultView, isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, routeTab, viewPathname } from "../route-state.js";
 import type { ParsedRoute } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
 import { resolveViewAliasRoute } from "../external.js";
@@ -75,15 +75,6 @@ export function entryUrl(entry: HistoryEntry): string {
 /** The `?area=` of the address the viewer opened on or was popped to. */
 function locationArea(view: ViewId): string | null {
   return routeArea(view, new URLSearchParams(location.search).get("area"));
-}
-
-/**
- * The page a bare URL opens on: the landing page whenever it exists (it is a
- * cross-cutting view, so it does in every scope), else the first valid view.
- */
-function defaultView(validViews: Set<ViewId>): ViewId {
-  if (validViews.has("home")) return "home";
-  return validViews.values().next().value as ViewId;
 }
 
 /** The route the current address names (path, or a legacy hash), or null. */
