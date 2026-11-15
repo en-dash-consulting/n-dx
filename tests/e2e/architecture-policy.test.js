@@ -1724,17 +1724,13 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/hench/src/cli/commands/task-lookup.ts", "Lazy-loads rex gateway for task resolution"],
   // Rex CLI — lazy-loads command handlers and heavy dependencies
   ["packages/rex/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
+  ["packages/rex/src/cli/prompt.ts", "Lazy-loads node:readline on the first interactive prompt — commands that never ask (--yes, off a TTY, JSON output) never load it"],
   ["packages/rex/src/cli/commands/analyze.ts", "Chunked-review lazy import — loaded only during interactive proposal review"],
-  ["packages/rex/src/cli/commands/migrate-to-folder-tree.ts", "Lazy-loads node:readline only for the interactive legacy-file cleanup prompt"],
-  ["packages/rex/src/cli/commands/import-bundle.ts", "Lazy-loads node:readline only for the interactive --replace confirmation prompt — skipped entirely with --yes or off a TTY"],
   ["packages/rex/src/cli/commands/migrate-plan.ts", "Lazy-loads the LLM client and the text placement/spec models only when model passes run — skipped entirely with --rules-only"],
   ["packages/rex/src/cli/commands/prune.ts", "Lazy-loads LLM client for smart prune proposals"],
-  ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
   ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],
   ["packages/rex/src/cli/commands/reshape.ts", "Lazy-loads LLM client for reshape analysis"],
-  ["packages/rex/src/cli/commands/restore.ts", "Lazy-loads node:readline only for the interactive restore confirmation prompt — skipped entirely with --yes"],
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
-  ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
   // Sourcevision CLI — lazy-loads the isometric renderer
   ["packages/sourcevision/src/cli/commands/iso.ts", "Lazy-loads the iso model builder and HTML renderer — only needed for the opt-in `sv iso` command, never during analyze"],

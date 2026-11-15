@@ -1,7 +1,6 @@
 import { join, resolve } from "node:path";
 import { access, readFile, unlink } from "node:fs/promises";
 import { atomicWriteJSON } from "../../store/atomic-write.js";
-import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import {
   resolveStore,
@@ -19,6 +18,7 @@ import { cascadeParentReset } from "../../core/parent-reset.js";
 import { CLIError } from "../errors.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { info, warn, result, startSpinner } from "../output.js";
+import { promptLine } from "../prompt.js";
 import {
   reasonFromDescriptions,
   reasonFromIdeasFile,
@@ -238,14 +238,8 @@ export function filterProposalsByIndex(
     .map((i) => proposals[i]);
 }
 
-function promptUser(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim().toLowerCase());
-    });
-  });
+async function promptUser(question: string): Promise<string> {
+  return (await promptLine(question)).toLowerCase();
 }
 
 /**

@@ -15,9 +15,9 @@
  * @module rex/cli/commands/decomposition-review
  */
 
-import { createInterface } from "node:readline";
 import type { Proposal, ProposalTask, ProposalFeature } from "../../analyze/index.js";
 import { info } from "../output.js";
+import { promptLine } from "../prompt.js";
 
 // ── Types ──
 
@@ -224,16 +224,6 @@ export async function autoResolveDecompositions(
 }
 
 // ── Interactive I/O ──
-
-function promptLine(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
 
 /**
  * Parse user input for the decomposition choice prompt.
