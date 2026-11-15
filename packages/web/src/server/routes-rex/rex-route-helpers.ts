@@ -12,6 +12,7 @@ import type { ServerContext } from "../types.js";
 import { loadPRDSync } from "../prd-io.js";
 import type { CachedPRDDocument } from "../prd-io.js";
 import { errorResponse } from "../response-utils.js";
+import type { WebSocketBroadcaster } from "../websocket.js";
 
 import {
   type PRDItem,
@@ -98,6 +99,14 @@ export function findNextTask(
 /** Extract the parent ID from a TreeEntry's parent chain. */
 export function parentIdOf(entry: TreeEntry): string | null {
   return entry.parents.length > 0 ? entry.parents[entry.parents.length - 1].id : null;
+}
+
+/**
+ * Tell the open viewers the PRD changed, stamped now, so the PRD views re-read
+ * it. Nothing to tell without a broadcaster.
+ */
+export function broadcastPrdChanged(broadcast: WebSocketBroadcaster | undefined): void {
+  broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
 }
 
 /** Append to execution log (sync, best-effort). */

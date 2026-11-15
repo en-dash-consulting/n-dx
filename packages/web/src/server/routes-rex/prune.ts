@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog, parentIdOf, dashboardBranchRefusal, loadPRDOr404 } from "./rex-route-helpers.js";
+import { findItemById, appendLog, parentIdOf, dashboardBranchRefusal, loadPRDOr404, broadcastPrdChanged } from "./rex-route-helpers.js";
 import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
 
@@ -495,12 +495,7 @@ async function handlePruneExecute(
       detail: `Pruned ${prunedCount} items: ${titles} (via web, criteria: statuses=${criteria.statuses.join(",")}, minAge=${criteria.minAgeDays}d)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, {
       ok: true,

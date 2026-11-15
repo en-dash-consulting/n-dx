@@ -13,7 +13,7 @@ import { itemLinkRefs, type LinkFields } from "../tracker/link-refs.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, updateInTree,
-  appendLog, API_SETTABLE_STATUSES, loadPRDOr404,
+  appendLog, API_SETTABLE_STATUSES, loadPRDOr404, broadcastPrdChanged,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
 import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode } from "../rex-gateway.js";
@@ -280,7 +280,7 @@ async function handleItemPatch(
     await publishItemUpdate(ctx, store, itemId, updates, broadcast);
     // The item event names one item; the ancestors that closed with it need a
     // whole-tree refresh in every open viewer.
-    if (autoCompleted.length > 0) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+    if (autoCompleted.length > 0) broadcastPrdChanged(broadcast);
     // Say why a change was held open or left unapplied (rex.applyOn), so the dashboard can.
     jsonResponse(res, 200, {
       ok: true,
@@ -545,12 +545,7 @@ async function handleItemAdd(
       detail: `Added ${type}: ${item.title} (via web)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     // `level` rides along for a client still reading the v1 spelling.
     jsonResponse(res, 201, { ok: true, id, type, level, title: item.title });
@@ -597,7 +592,7 @@ async function addInboxChange(
     itemId: id,
     detail: `Added change: ${input.title} (via web)`,
   });
-  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  broadcastPrdChanged(broadcast);
   jsonResponse(res, 201, { ok: true, id, type: "change", title: input.title, needsPlacement: true });
   return true;
 }
@@ -742,7 +737,7 @@ async function addV2Child(
     itemId: node.id,
     detail: `Added ${type}: ${node.title} (via web)`,
   });
-  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  broadcastPrdChanged(broadcast);
   jsonResponse(res, 201, { ok: true, id: node.id, type, title: node.title, parentId: parent.id });
   return true;
 }
@@ -876,12 +871,7 @@ async function handleBulkUpdate(
       detail: `Bulk updated ${successCount}/${input.ids.length} items (via web)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, results, ...(autoCompleteError ? { autoCompleteError } : {}) });
   } catch (err) {
@@ -973,12 +963,7 @@ async function handleItemMerge(
       detail: `Merged ${input.sourceIds.length} items into "${input.targetId}". Absorbed: ${result.absorbedIds.join(", ")}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency refs rewritten (via web).`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, ...result });
   } catch (err) {

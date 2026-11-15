@@ -14,7 +14,7 @@ import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { appendLog } from "./rex-route-helpers.js";
+import { appendLog, broadcastPrdChanged } from "./rex-route-helpers.js";
 import { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "../rex-gateway.js";
 
 /** Render a snapshot id back into a readable ISO timestamp for display. */
@@ -150,9 +150,7 @@ async function handleRestore(
       detail: `Restored PRD tree from snapshot ${formatSnapshotId(input.id)} (${fileCount} files, via web)`,
     });
 
-    if (broadcast) {
-      broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, restored: input.id, files: fileCount });
   } catch (err) {

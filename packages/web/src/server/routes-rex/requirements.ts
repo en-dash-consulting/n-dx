@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog, loadPRDOr404 } from "./rex-route-helpers.js";
+import { findItemById, appendLog, loadPRDOr404, broadcastPrdChanged } from "./rex-route-helpers.js";
 import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
 import { itemTypeOf } from "../../shared/index.js";
@@ -240,12 +240,7 @@ async function handleAddRequirement(
       detail: `Added ${input.category} requirement "${input.title}" to item "${item.title}" (via web)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 201, { ok: true, id, requirement });
   } catch (err) {
@@ -312,12 +307,7 @@ async function handleUpdateRequirement(
       detail: `Updated requirement "${existing.title}" on item "${item.title}" (via web)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, requirement: existing });
   } catch (err) {
@@ -366,12 +356,7 @@ async function handleDeleteRequirement(
     detail: `Deleted requirement "${removed.title}" from item "${item.title}" (via web)`,
   });
 
-  if (broadcast) {
-    broadcast({
-      type: "rex:prd-changed",
-      timestamp: new Date().toISOString(),
-    });
-  }
+  broadcastPrdChanged(broadcast);
 
   jsonResponse(res, 200, { ok: true });
   return true;

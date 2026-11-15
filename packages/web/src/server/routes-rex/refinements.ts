@@ -38,7 +38,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { appendLog } from "./rex-route-helpers.js";
+import { appendLog, broadcastPrdChanged } from "./rex-route-helpers.js";
 import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore, isChangeLayerStore } from "../rex-gateway.js";
 import {
@@ -173,9 +173,7 @@ async function handleApplyRefinements(
 
     // The PRD views re-read on this broadcast, which is what makes an applied
     // refinement visible without restarting the server.
-    if (broadcast) {
-      broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-    }
+    broadcastPrdChanged(broadcast);
   }
 
   jsonResponse(res, 200, {

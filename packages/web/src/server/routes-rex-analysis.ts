@@ -14,7 +14,7 @@ import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { appendLog, loadPRDOr404 } from "./routes-rex/rex-route-helpers.js";
+import { appendLog, loadPRDOr404, broadcastPrdChanged } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { resolveOwnPackageCli } from "./own-cli.js";
@@ -523,12 +523,7 @@ async function handleCaptureNextSteps(
       detail: `Captured ${created} next step${created === 1 ? "" : "s"} to PRD (${skipped} duplicate${skipped === 1 ? "" : "s"} skipped) via web`,
     });
 
-    if (created > 0 && broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    if (created > 0) broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, created, skipped, epicId: created > 0 ? epicId : undefined });
   } catch (err) {
@@ -666,12 +661,7 @@ async function handleCaptureAsk(
       detail: `Captured an Ask answer as task "${item.title}" under "${ASK_CAPTURE_EPIC_TITLE}" via web`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, {
       ok: true,
@@ -1024,12 +1014,7 @@ async function handleAcceptProposals(
         : `Accepted ${toAccept.length} proposals (${addedCount} items) via web`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     // On v2 the counts say why an accept may add nothing: every proposal
     // described code that already exists (skippedCount).
@@ -1203,12 +1188,7 @@ async function handleAcceptEditedProposals(
       detail: `Accepted ${selectedProposals.length} edited proposals (${addedCount} items) via proposal editor`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, acceptedCount: selectedProposals.length, addedCount });
   } catch (err) {
@@ -1267,7 +1247,7 @@ async function acceptEditedAsChanges(
     event: "proposals_edited_accept",
     detail: `Accepted ${selected.length} edited proposals via proposal editor: ${v2AcceptSummary(outcome)}`,
   });
-  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  broadcastPrdChanged(broadcast);
   jsonResponse(res, 200, {
     ok: true,
     acceptedCount: selected.length,
@@ -1500,9 +1480,7 @@ async function handleSmartAddAccept(
           .join(", ")}`,
       });
 
-      if (broadcast) {
-        broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-      }
+      broadcastPrdChanged(broadcast);
 
       jsonResponse(res, 200, { ok: true, changes });
     } finally {
@@ -1628,9 +1606,7 @@ async function handleBatchImport(
             detail: `Batch imported ${input.items.length} items (${changes.length} changes added) from: ${itemSources.join(", ")}`,
           });
 
-          if (broadcast) {
-            broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-          }
+          broadcastPrdChanged(broadcast);
         }
 
         jsonResponse(res, 200, {
@@ -1659,12 +1635,7 @@ async function handleBatchImport(
           detail: `Batch imported ${input.items.length} items (${output.added} PRD items added) from: ${itemSources.join(", ")}`,
         });
 
-        if (broadcast) {
-          broadcast({
-            type: "rex:prd-changed",
-            timestamp: new Date().toISOString(),
-          });
-        }
+        broadcastPrdChanged(broadcast);
       }
 
       jsonResponse(res, 200, {
