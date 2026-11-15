@@ -328,6 +328,26 @@ export function exec(
       else child.kill("SIGKILL");
     };
 
+    /**
+     * Settle as killed once {@link stopChild} is done, however the kill went —
+     * the timeout and abort paths both resolve this way (see the timeout path
+     * for why). A tree that outlived its kill is surfaced by child-lifecycle's
+     * diagnostics, not by hanging the caller.
+     */
+    const stopThenFinish = (killed: () => Error): void => {
+      void stopChild()
+        .catch(() => { /* best effort — see above */ })
+        .then(() => {
+          finish({
+            stdout: text(stdoutChunks),
+            stderr: text(stderrChunks),
+            exitCode: null,
+            error: killed(),
+            launched: true,
+          });
+        });
+    };
+
     // maxBuffer is a ceiling, not a suggestion: past it, stop the command rather
     // than accumulate without bound. Counted in bytes, and chunks are concatenated
     // as Buffers rather than decoded per chunk so a multi-byte character split
@@ -427,20 +447,8 @@ export function exec(
         // defers to it (see there for why). So it must always settle, including when
         // the kill itself fails: a rejected stopChild used to leave nothing to
         // resolve the promise, which only went unnoticed because "close" was
-        // finishing first. Report the timeout regardless of how the kill went; a
-        // tree that outlived its kill is surfaced by child-lifecycle's diagnostics,
-        // not by hanging the caller.
-        void stopChild()
-          .catch(() => { /* best effort — see above */ })
-          .then(() => {
-            finish({
-              stdout: text(stdoutChunks),
-              stderr: text(stderrChunks),
-              exitCode: null,
-              error: killedError(display, timeout, true, null),
-              launched: true,
-            });
-          });
+        // finishing first. Report the timeout regardless of how the kill went.
+        stopThenFinish(() => killedError(display, timeout, true, null));
       }, timeout);
     }
 
@@ -449,17 +457,7 @@ export function exec(
         if (settled || timedOut) return;
         aborted = true;
         // Like the timeout path, settle only once the tree has been stopped.
-        void stopChild()
-          .catch(() => { /* best effort — see the timeout path */ })
-          .then(() => {
-            finish({
-              stdout: text(stdoutChunks),
-              stderr: text(stderrChunks),
-              exitCode: null,
-              error: killedError(display, timeout, false, "SIGTERM"),
-              launched: true,
-            });
-          });
+        stopThenFinish(() => killedError(display, timeout, false, "SIGTERM"));
       };
       abortSignal.addEventListener("abort", onAbort, { once: true });
       detachAbort = () => abortSignal.removeEventListener("abort", onAbort);
