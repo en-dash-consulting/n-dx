@@ -215,6 +215,23 @@ function offsetFromDrag(dx: number, dy: number, view: Viewport): Point {
   return { x: dx / view.k, y: dy / view.k };
 }
 
+/** Distance between a pinch's two fingers; 0 when fewer than two are down. */
+function touchDistance(touches: TouchList): number {
+  return touches.length < 2
+    ? 0
+    : Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY,
+      );
+}
+
+function touchMidpoint(touches: TouchList): Point {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2,
+  };
+}
+
 /**
  * Deterministic grouped grid/shelf pack for the Codebase Map.
  *
@@ -768,19 +785,6 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
 
   // ── Canvas zoom: wheel (trackpad pinch === ctrl/meta wheel) + touch pinch ──
   const pinchRef = useRef<{ surface: SurfaceKind; startDist: number; startK: number } | null>(null);
-
-  const touchDistance = (touches: TouchList): number =>
-    touches.length < 2
-      ? 0
-      : Math.hypot(
-          touches[0].clientX - touches[1].clientX,
-          touches[0].clientY - touches[1].clientY,
-        );
-
-  const touchMidpoint = (touches: TouchList): { x: number; y: number } => ({
-    x: (touches[0].clientX + touches[1].clientX) / 2,
-    y: (touches[0].clientY + touches[1].clientY) / 2,
-  });
 
   const handleSurfaceWheel = useCallback((surface: SurfaceKind, event: WheelEvent) => {
     event.preventDefault();
