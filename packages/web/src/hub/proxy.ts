@@ -82,7 +82,8 @@ import {
   authRequiredPage,
   wantsHtml,
   injectSessionScript,
-  AUTH_HINT,
+  authRequiredBody,
+  BEARER_CHALLENGE,
   TICKET_QUERY_PARAM,
   removeTokenParam,
   tokensEqual,
@@ -569,9 +570,7 @@ export function proxyHttp(
   upstream.on("error", (err) => {
     onUpstreamError?.();
     if (!res.headersSent) {
-      const body = JSON.stringify({ error: `Project server unreachable: ${err.message}` });
-      res.writeHead(502, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) });
-      res.end(body);
+      writeJson(res, 502, { error: `Project server unreachable: ${err.message}` });
     } else {
       res.destroy();
     }
@@ -781,9 +780,9 @@ function refusePublic(req: IncomingMessage, res: ServerResponse): void {
   res.writeHead(401, {
     "Content-Type": html ? "text/html; charset=utf-8" : "application/json",
     "Cache-Control": "no-store",
-    "WWW-Authenticate": 'Bearer realm="n-dx"',
+    "WWW-Authenticate": BEARER_CHALLENGE,
   });
-  res.end(html ? authRequiredPage() : JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
+  res.end(html ? authRequiredPage() : JSON.stringify(authRequiredBody()));
 }
 
 /**

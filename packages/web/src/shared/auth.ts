@@ -495,18 +495,20 @@ export function answerAuthRoute(
 }
 
 function unauthenticatedAnswer(): AuthRouteAnswer {
-  return {
-    status: 401,
-    body: {
-      error: "Authentication required",
-      hint: AUTH_HINT,
-    },
-  };
+  return { status: 401, body: authRequiredBody() };
 }
 
 /** The hint every 401 carries. */
 export const AUTH_HINT =
   "Open the URL printed by `ndx start` (run it again for a fresh link), or send the token from <ndx home>/auth.token as `Authorization: Bearer <token>` or `X-Ndx-Token`.";
+
+/** The `WWW-Authenticate` challenge a 401 for a missing credential carries. */
+export const BEARER_CHALLENGE = 'Bearer realm="n-dx"';
+
+/** The JSON body of a 401 for a request that carried no credential. */
+export function authRequiredBody(): { error: string; hint: string } {
+  return { error: "Authentication required", hint: AUTH_HINT };
+}
 
 /**
  * The page a browser navigation without a credential gets when it asked for

@@ -58,7 +58,8 @@ import {
   detectBasePath,
   stripBasePath,
   stripWorkspaceSlot,
-  AUTH_HINT,
+  authRequiredBody,
+  BEARER_CHALLENGE,
 } from "../shared/index.js";
 import type { CredentialStore, RequestAccess } from "../shared/index.js";
 
@@ -85,9 +86,6 @@ export function classifyOrigin(req: Pick<IncomingMessage, "headers">, hubPort: n
   return isLoopbackOriginOnPort(origin, hubPort) ? "trusted" : "untrusted";
 }
 
-/** The challenge a 401 carries. */
-const BEARER_CHALLENGE = 'Bearer realm="n-dx"';
-
 /** Answer the gate's own JSON, never cached; true, so a guard can return it as "answered". */
 function answer(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): true {
   res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers });
@@ -106,7 +104,7 @@ function rejectHost(res: ServerResponse): true {
 }
 
 function rejectUnauthenticated(res: ServerResponse): true {
-  return answer(res, 401, { error: "Authentication required", hint: AUTH_HINT }, { "WWW-Authenticate": BEARER_CHALLENGE });
+  return answer(res, 401, authRequiredBody(), { "WWW-Authenticate": BEARER_CHALLENGE });
 }
 
 /** Requests the gate let through without a credential. */
