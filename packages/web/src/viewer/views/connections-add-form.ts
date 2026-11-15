@@ -11,7 +11,8 @@
 import { h } from "preact";
 import { useState } from "preact/hooks";
 import { ToolsTable } from "./connections-details.js";
-import { errorText, readError, send, type ConnectionRow, type ReportNotice, type ToolRow } from "./connections-api.js";
+import { readError, send, type ConnectionRow, type ReportNotice, type ToolRow } from "./connections-api.js";
+import { errorMessage } from "../utils/format.js";
 
 type Transport = "http" | "stdio";
 type Auth = "none" | "token" | "oauth";
@@ -129,7 +130,7 @@ export function AddConnectionForm({ onAdded, onNotice }: AddConnectionFormProps)
       if (!res.ok) setProblem(await readError(res));
       else setTested((await res.json()) as TestResult);
     } catch (err) {
-      setProblem(errorText(err));
+      setProblem(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -159,7 +160,7 @@ export function AddConnectionForm({ onAdded, onNotice }: AddConnectionFormProps)
       close();
     } catch (err) {
       setToken("");
-      setProblem(errorText(err));
+      setProblem(errorMessage(err));
     } finally {
       setBusy(false);
     }

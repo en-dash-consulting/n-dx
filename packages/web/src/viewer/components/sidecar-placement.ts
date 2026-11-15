@@ -28,6 +28,7 @@ import type {
 import { useProductRead } from "../hooks/sidecar.js";
 import type { ChangePlacement, PlacementCandidate, ProductMap } from "../views/product-model.js";
 import { StrengthChip } from "./strength-chip.js";
+import { errorMessage } from "../utils/format.js";
 
 export const PROPOSE_ROW = "__propose__";
 
@@ -271,7 +272,7 @@ function useShortlist(change: string, enabled: boolean): Shortlist {
         if (!live) return;
         setState(res.ok ? { state: "ready", read: (await res.json()) as ChangePlacement } : { state: "error", message: await errorOf(res) });
       } catch (err) {
-        if (live) setState({ state: "error", message: err instanceof Error ? err.message : String(err) });
+        if (live) setState({ state: "error", message: errorMessage(err) });
       }
     })();
     return () => { live = false; };
@@ -290,7 +291,7 @@ export async function checkPlacementRequest(change: string, body: PlacementEditB
     if (!res.ok) return { ok: false, kind: "invalid", error: await errorOf(res) };
     return ((await res.json()) as { check: SidecarPlacementCheck }).check;
   } catch (err) {
-    return { ok: false, kind: "unreachable", error: err instanceof Error ? err.message : String(err) };
+    return { ok: false, kind: "unreachable", error: errorMessage(err) };
   }
 }
 

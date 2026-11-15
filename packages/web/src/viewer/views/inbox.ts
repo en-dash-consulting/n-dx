@@ -32,6 +32,7 @@ import { placementTab } from "../route-state.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
 import { shortChangeId } from "./product-model.js";
+import { errorMessage } from "../utils/format.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
@@ -307,7 +308,7 @@ async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<strin
       else reads.set(id, { placement: read });
     }
   } catch (err) {
-    failAll(err instanceof Error ? err.message : String(err));
+    failAll(errorMessage(err));
   }
   return reads;
 }

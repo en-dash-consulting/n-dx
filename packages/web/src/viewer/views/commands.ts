@@ -20,6 +20,7 @@ import type { ActiveOperation, JobTray } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { CommandReferenceView } from "./command-reference.js";
 import { assertJobStarted } from "./response-error.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -224,7 +225,7 @@ function ExportPanel() {
       setPdfOutput(body.output ?? "PDF written.");
       setPdfState("done");
     } catch (err) {
-      setPdfOutput(err instanceof Error ? err.message : String(err));
+      setPdfOutput(errorMessage(err));
       setPdfState("error");
     }
   }, []);

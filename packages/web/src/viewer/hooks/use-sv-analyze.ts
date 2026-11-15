@@ -17,6 +17,7 @@
  */
 
 import { useState, useCallback, useEffect } from "preact/hooks";
+import { errorMessage } from "../utils/format.js";
 
 /** Status payload from `/api/commands/sv-analyze/status`. */
 interface SvAnalyzeStatusData {
@@ -97,7 +98,7 @@ export function useSvAnalyze(pollIntervalMs = 3000): SvAnalyzeController {
       }
       // 202 accepted — the polling loop handles the rest.
     } catch (err) {
-      setError(String(err instanceof Error ? err.message : err));
+      setError(errorMessage(err));
       setState("error");
     }
   }, []);

@@ -23,6 +23,7 @@ import { useState, useEffect, useCallback } from "preact/hooks";
 import { FloatingNotice } from "../components/index.js";
 import { useToast } from "../hooks/index.js";
 import { responseError } from "./response-error.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ function SaveTemplateForm({ onSave, saving, blocked }: {
       setDescription("");
       setTags("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     }
   }, [id, name, description, tags, onSave]);
 
@@ -307,7 +308,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
       showToast(`Applied template "${result.templateName}"`);
       await onApplied();
     } catch (err) {
-      showToast(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error: ${errorMessage(err)}`);
     } finally {
       setApplying(null);
     }
@@ -322,7 +323,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
       showToast(`Deleted template "${id}"`);
       await fetchTemplates();
     } catch (err) {
-      showToast(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      showToast(`Error: ${errorMessage(err)}`);
     }
   }, [showToast, fetchTemplates]);
 

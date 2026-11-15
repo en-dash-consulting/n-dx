@@ -28,6 +28,7 @@ import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from 
 import { PlanWithSidecarButton } from "../plan-with-sidecar.js";
 import { useProductRead } from "../../hooks/index.js";
 import type { AreaDetail, PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
+import { errorMessage } from "../../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -520,7 +521,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
             }, "Add failed")];
           } catch (err) {
             if (!created.length) throw err;
-            const message = err instanceof Error ? err.message : String(err);
+            const message = errorMessage(err);
             throw new Error(`${message} (${created.length} of ${changes.length} changes were added before it failed)`);
           }
         }

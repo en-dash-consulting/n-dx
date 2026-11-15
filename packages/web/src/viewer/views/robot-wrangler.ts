@@ -19,6 +19,7 @@ import { ROBOT_WRANGLER_SECTIONS, robotWranglerSectionId } from "./robot-wrangle
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { responseError } from "./response-error.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -1157,7 +1158,7 @@ function useAuthCheck(): { state: AuthState; detail: string | null; check: (forc
       }
     } catch (err) {
       setState("bad");
-      setDetail(err instanceof Error ? err.message : String(err));
+      setDetail(errorMessage(err));
     }
   }, []);
 

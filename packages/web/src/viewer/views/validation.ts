@@ -14,6 +14,7 @@ import type { NavigateTo } from "../types.js";
 import { useCliName } from "../hooks/index.js";
 import { itemTypeLabel } from "../external.js";
 import { assertJobStarted } from "./response-error.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -708,7 +709,7 @@ export function ValidationActions({ onChanged, show }: {
       setFixState(dryRun ? "previewed" : "done");
       if (!dryRun) onChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       setFixState("error");
     }
   }, [onChanged]);
@@ -740,7 +741,7 @@ export function ValidationActions({ onChanged, show }: {
         setCiState("done");
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       setCiState("error");
     }
   }, []);
@@ -762,7 +763,7 @@ export function ValidationActions({ onChanged, show }: {
         if (accept) onChanged?.();
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       setReshapeState("error");
     }
   }, [onChanged]);

@@ -6,6 +6,7 @@ import { ALL_STATE_DIRS, stateDirPrefixes } from "../state-paths.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine, InfoTip } from "../components/index.js";
+import { errorMessage } from "../utils/format.js";
 
 const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
 const FILE_SEARCH_MAX_OPTIONS = 10;
@@ -69,7 +70,7 @@ export function ArchetypeCell({ path, archetype, validArchetypes }: ArchetypeCel
       setCurrent(next);
       setNote("saved — re-analyze to apply");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     }
   }, [path, current]);
 

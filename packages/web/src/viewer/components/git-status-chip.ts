@@ -17,6 +17,7 @@ import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { GitStatus, GitStatusFile } from "../hooks/index.js";
+import { errorMessage } from "../utils/format.js";
 
 export interface GitStatusChipProps {
   status: GitStatus | null;
@@ -101,7 +102,7 @@ function FileRow({ file, onIgnored }: { file: GitStatusFile; onIgnored: () => vo
       await postGit("/api/git/ignore", { file: file.path });
       onIgnored();
     } catch (err) {
-      setIgnoreError(err instanceof Error ? err.message : String(err));
+      setIgnoreError(errorMessage(err));
     } finally {
       setIgnoring(false);
     }
@@ -183,7 +184,7 @@ function GitStatusPanel({
       setMessage("");
       onCommitted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setCommitting(false);
     }
@@ -205,7 +206,7 @@ function GitStatusPanel({
       await postGit("/api/git/commit", { scope: status.scope });
       onCommitted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setCommitting(false);
     }
@@ -218,7 +219,7 @@ function GitStatusPanel({
       await postGit("/api/git/discard", { confirmCount: status.files.length });
       onCommitted();
     } catch (err) {
-      setDiscardError(err instanceof Error ? err.message : String(err));
+      setDiscardError(errorMessage(err));
       setConfirmingDiscard(false);
     } finally {
       setDiscarding(false);

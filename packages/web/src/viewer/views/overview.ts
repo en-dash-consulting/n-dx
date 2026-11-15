@@ -8,7 +8,7 @@ import {
   getZoneColorByIndex,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { formatSince } from "../utils/format.js";
+import { errorMessage, formatSince } from "../utils/format.js";
 import { narrationNotice } from "./narration-notice.js";
 import { IsoMapHero } from "./iso-map.js";
 import { DeliveryPanel, deliveryAnalysisStamp } from "./delivery.js";
@@ -151,7 +151,7 @@ export function NextStepsPanel({ embedded = false }: { embedded?: boolean } = {}
       );
       setCapture("done");
     } catch (err) {
-      setCaptureMsg(String(err instanceof Error ? err.message : err));
+      setCaptureMsg(errorMessage(err));
       setCapture("error");
     }
   }, [steps]);

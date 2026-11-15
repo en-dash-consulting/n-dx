@@ -62,10 +62,6 @@ export function send(method: "POST" | "PUT" | "DELETE", path: string, body?: Rec
 
 export const connectionPath = (id: string): string => `/api/connections/${encodeURIComponent(id)}`;
 
-export function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 /** The state as Settings words it. */
 export function connectionStateLabel(row: Pick<ConnectionRow, "state" | "reason" | "signIn">): string {
   if (row.state === "connected") return "connected";

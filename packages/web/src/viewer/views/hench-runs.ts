@@ -34,7 +34,7 @@ import { usePolling } from "../hooks/index.js";
 import { useHenchRunsLiveRefresh } from "../hooks/index.js";
 import type { HenchExecutionProgress } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { fmtDuration, formatTokenCount as fmtTokens } from "../utils/format.js";
+import { errorMessage, fmtDuration, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1016,7 +1016,7 @@ function ValidateTokensTrigger() {
       setOutput(body.output ?? "Token reporting verified.");
       setState("done");
     } catch (err) {
-      setOutput(err instanceof Error ? err.message : String(err));
+      setOutput(errorMessage(err));
       setState("error");
     }
   }, []);

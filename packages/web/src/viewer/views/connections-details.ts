@@ -12,7 +12,6 @@ import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import {
   connectionPath,
-  errorText,
   readError,
   send,
   TOOL_CLASSES,
@@ -22,6 +21,7 @@ import {
   type ReportNotice,
   type ToolRow,
 } from "./connections-api.js";
+import { errorMessage } from "../utils/format.js";
 
 /** The profile's validation as one line. */
 export function profileLine(profile: ConnectionProfile): string {
@@ -105,7 +105,7 @@ export function ConnectionDetails({ row, onNotice, onChanged }: ConnectionDetail
       setTools(body.tools);
       changed(body.connection);
     } catch (err) {
-      notify({ kind: "error", text: `Could not list the tools of ${current.label}: ${errorText(err)}` });
+      notify({ kind: "error", text: `Could not list the tools of ${current.label}: ${errorMessage(err)}` });
     }
   }, [base]);
 
@@ -132,7 +132,7 @@ export function ConnectionDetails({ row, onNotice, onChanged }: ConnectionDetail
       const { tool: changed } = (await res.json()) as { tool: ToolRow };
       setTools((current) => current?.map((t) => (t.tool === changed.tool ? { ...t, ...changed } : t)) ?? current);
     } catch (err) {
-      onNotice({ kind: "error", text: `Could not change ${tool.tool}: ${errorText(err)}` });
+      onNotice({ kind: "error", text: `Could not change ${tool.tool}: ${errorMessage(err)}` });
     }
   };
 
@@ -147,7 +147,7 @@ export function ConnectionDetails({ row, onNotice, onChanged }: ConnectionDetail
       }
       onChanged(((await res.json()) as { connection: ConnectionRow }).connection);
     } catch (err) {
-      onNotice({ kind: "error", text: `Could not set the profile of ${row.label}: ${errorText(err)}` });
+      onNotice({ kind: "error", text: `Could not set the profile of ${row.label}: ${errorMessage(err)}` });
     } finally {
       setBusy(false);
     }
@@ -171,7 +171,7 @@ export function ConnectionDetails({ row, onNotice, onChanged }: ConnectionDetail
       await loadTools();
     } catch (err) {
       setToken("");
-      onNotice({ kind: "error", text: `Could not store the token for ${row.label}: ${errorText(err)}` });
+      onNotice({ kind: "error", text: `Could not store the token for ${row.label}: ${errorMessage(err)}` });
     } finally {
       setBusy(false);
     }

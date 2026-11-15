@@ -18,6 +18,7 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types (wire shapes from routes-adaptive.ts) ──────────────────────
 
@@ -130,7 +131,7 @@ export function AdaptiveOptimizationView() {
           setError(null);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) setError(errorMessage(err));
       }
     })();
     return () => { cancelled = true; };
@@ -147,7 +148,7 @@ export function AdaptiveOptimizationView() {
       setActionNote(`${label} ✓`);
       reload();
     } catch (err) {
-      setActionNote(`${label} failed: ${err instanceof Error ? err.message : String(err)}`);
+      setActionNote(`${label} failed: ${errorMessage(err)}`);
     }
   }, [reload]);
 

@@ -31,7 +31,7 @@ import { BrandedHeader } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import { TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS } from "../usage/constants.js";
 import { itemTypeOf } from "../external.js";
-import { formatTokenCount as fmtTokens } from "../utils/format.js";
+import { errorMessage, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirroring API response shapes)
@@ -620,7 +620,7 @@ export function TokenUsageView() {
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
