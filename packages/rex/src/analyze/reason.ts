@@ -1067,10 +1067,6 @@ export interface AddPromptOptions {
 }
 
 /**
- * Build the LLM prompt for a natural-language add command.
- * Exported separately so it can be tested without spawning claude.
- */
-/**
  * Content for the `placement` section: where the model may put new items.
  *
  * Two mutually exclusive shapes. With an explicit parent the response is
@@ -1160,6 +1156,10 @@ export function buildAddEnvelope(
   ]);
 }
 
+/**
+ * Build the LLM prompt for a natural-language add command.
+ * Exported separately so it can be tested without spawning claude.
+ */
 export async function buildAddPrompt(
   description: string,
   existingItems: PRDItem[],
@@ -1205,12 +1205,6 @@ export async function reasonFromDescription(
 
 // ── Multiple descriptions ──
 
-/**
- * Build the LLM prompt for multiple natural-language descriptions in a single
- * add call. Each description is treated as a distinct idea; the LLM is
- * instructed to produce a coherent, de-duplicated structure that covers them
- * all.
- */
 /** Prompt for turning several natural-language descriptions into one PRD. */
 export function buildMultiAddEnvelope(
   descriptions: string[],
@@ -1261,6 +1255,12 @@ export function buildMultiAddEnvelope(
   ]);
 }
 
+/**
+ * Build the LLM prompt for multiple natural-language descriptions in a single
+ * add call. Each description is treated as a distinct idea; the LLM is
+ * instructed to produce a coherent, de-duplicated structure that covers them
+ * all.
+ */
 export async function buildMultiAddPrompt(
   descriptions: string[],
   existingItems: PRDItem[],

@@ -395,14 +395,6 @@ function collectActionable(
 }
 
 /**
- * Collect ALL actionable tasks flattened and sorted globally by priority.
- * Returns every leaf task that is pending/in_progress with resolved
- * dependencies, sorted by: in_progress status, priority, requirements score,
- * ancestor priority, sibling completion ratio, unblock potential, then alphabetically.
- *
- * @param options.riskTolerance — Controls how much requirements influence ordering.
- */
-/**
  * Resolve the subtree for a featureId filter.
  * Returns the feature's children wrapped in an array for collectActionable,
  * or null if the feature is not found or has no children.
@@ -486,6 +478,14 @@ function selectActionable(
   return filterExcluded(results, options?.excludeIds);
 }
 
+/**
+ * Collect ALL actionable tasks flattened and sorted globally by priority.
+ * Returns every leaf task that is pending/in_progress with resolved
+ * dependencies, sorted by: in_progress status, priority, requirements score,
+ * ancestor priority, sibling completion ratio, unblock potential, then alphabetically.
+ *
+ * @param options.riskTolerance — Controls how much requirements influence ordering.
+ */
 export function findActionableTasks(
   items: PRDItem[],
   completedIds: Set<string>,

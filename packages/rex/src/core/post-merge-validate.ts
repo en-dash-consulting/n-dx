@@ -415,13 +415,6 @@ function detectChildrenTableDrift(entries: ScannedEntry[]): PostMergeIssue[] {
 }
 
 /**
- * The child links the serializer would write for the item owning `dir`:
- * `<name>/index.md` for each subdirectory that is itself an item, and
- * `<name>.md` for each sibling leaf file. Ordered the way the parser builds
- * `children` — subdirectories alphabetically, then leaf files alphabetically —
- * so a repaired table matches what the next save produces.
- */
-/**
  * The directory a file owns as its item's folder, or `null` when the file is
  * not an `index.md`. Matches the basename exactly — `my-index.md` is a leaf
  * child, not a folder item's own file.
@@ -432,6 +425,13 @@ function owningDirOfIndex(relPath: string): string | null {
   return relPath.slice(0, -"/index.md".length);
 }
 
+/**
+ * The child links the serializer would write for the item owning `dir`:
+ * `<name>/index.md` for each subdirectory that is itself an item, and
+ * `<name>.md` for each sibling leaf file. Ordered the way the parser builds
+ * `children` — subdirectories alphabetically, then leaf files alphabetically —
+ * so a repaired table matches what the next save produces.
+ */
 function childLinksOnDisk(dir: string, entries: ScannedEntry[]): string[] {
   const prefix = dir === "" ? "" : `${dir}/`;
   const branches: string[] = [];

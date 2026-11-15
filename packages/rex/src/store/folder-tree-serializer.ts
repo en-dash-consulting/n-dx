@@ -511,7 +511,6 @@ export async function findNonConformingSlugs(
   return mismatches;
 }
 
-/** Entry in `dir` whose front-matter id is `id`, or undefined. */
 /** Two items claiming one id, or one path carrying an unexpected id. */
 export interface TreeIdentityFault {
   kind: "duplicate-id" | "path-id-mismatch";
@@ -596,6 +595,7 @@ export async function findTreeIdentityFaults(
   return faults;
 }
 
+/** Entry in `dir` whose front-matter id is `id`, or undefined. */
 async function locateById(
   dir: string,
   entries: readonly string[],

@@ -97,18 +97,6 @@ export function isValidSnapshotId(id: string): boolean {
   return true;
 }
 
-/**
- * Create a timestamped snapshot of the PRD tree.
- *
- * The snapshot is stored at `.rex/.backups/prd_tree_<ISO-timestamp>/`.
- * If the tree doesn't exist or is empty, returns null (no-op).
- *
- * The timestamp format is ISO-8601 (e.g., `2026-05-07T22:15:00.000Z`).
- *
- * @param rexDir  The `.rex/` directory
- * @returns Backup snapshot info, or null if tree doesn't exist
- * @throws If the backup operation fails
- */
 /** How many clock re-reads before a colliding snapshot gives up. */
 const CLAIM_ATTEMPTS = 20;
 
@@ -234,6 +222,18 @@ async function claimBackupDir(
   );
 }
 
+/**
+ * Create a timestamped snapshot of the PRD tree.
+ *
+ * The snapshot is stored at `.rex/.backups/prd_tree_<ISO-timestamp>/`.
+ * If the tree doesn't exist or is empty, returns null (no-op).
+ *
+ * The timestamp format is ISO-8601 (e.g., `2026-05-07T22:15:00.000Z`).
+ *
+ * @param rexDir  The `.rex/` directory
+ * @returns Backup snapshot info, or null if tree doesn't exist
+ * @throws If the backup operation fails
+ */
 export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | null> {
   const treeRoot = join(rexDir, "prd_tree");
   const backupsDir = join(rexDir, ".backups");
