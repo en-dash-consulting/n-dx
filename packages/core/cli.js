@@ -2119,50 +2119,38 @@ async function handlePlan(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * Run the work behind one refresh step. Resolves to its exit code (0 for the
+ * in-process artifact step), or null for a step kind this runner does not know.
+ */
+async function runRefreshStepWork(step, plan, dir) {
+  switch (step.kind) {
+    case "sourcevision-analyze":
+      return run(tools.sourcevision, ["analyze", ...plan.analyzeFlags, dir]);
+    case "sourcevision-pr-markdown":
+      return run(tools.sourcevision, ["pr-markdown", ...plan.quietFlags, dir]);
+    case "sourcevision-dashboard-artifacts":
+      refreshSourcevisionDashboardArtifacts(dir);
+      return 0;
+    case "web-build":
+      return run(resolvePackageFile("packages/web", "build.js"), []);
+    default:
+      return null;
+  }
+}
+
 /** Execute one refresh pipeline step; returns true on success, false on failure. */
 async function runRefreshStep(step, plan, dir, stepStatuses) {
-  if (step.kind === "sourcevision-analyze") {
-    const code = await run(tools.sourcevision, ["analyze", ...plan.analyzeFlags, dir]);
-    if (code !== 0) {
-      const detail = `exit code ${code}`;
-      printRefreshStepTransition(step.kind, "failed", detail);
-      stepStatuses.push({ kind: step.kind, status: "failed", detail });
-      return false;
-    }
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
+  const code = await runRefreshStepWork(step, plan, dir);
+  if (code === null) return true;
+  if (code !== 0) {
+    const detail = `exit code ${code}`;
+    printRefreshStepTransition(step.kind, "failed", detail);
+    stepStatuses.push({ kind: step.kind, status: "failed", detail });
+    return false;
   }
-  if (step.kind === "sourcevision-pr-markdown") {
-    const code = await run(tools.sourcevision, ["pr-markdown", ...plan.quietFlags, dir]);
-    if (code !== 0) {
-      const detail = `exit code ${code}`;
-      printRefreshStepTransition(step.kind, "failed", detail);
-      stepStatuses.push({ kind: step.kind, status: "failed", detail });
-      return false;
-    }
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
-  }
-  if (step.kind === "sourcevision-dashboard-artifacts") {
-    refreshSourcevisionDashboardArtifacts(dir);
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
-  }
-  if (step.kind === "web-build") {
-    const code = await run(resolvePackageFile("packages/web", "build.js"), []);
-    if (code !== 0) {
-      const detail = `exit code ${code}`;
-      printRefreshStepTransition(step.kind, "failed", detail);
-      stepStatuses.push({ kind: step.kind, status: "failed", detail });
-      return false;
-    }
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
-  }
+  printRefreshStepTransition(step.kind, "succeeded");
+  stepStatuses.push({ kind: step.kind, status: "succeeded" });
   return true;
 }
 
