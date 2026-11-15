@@ -17,6 +17,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { isTrustedBrowserOrigin, isTrustedHost, authorizeUpgrade } from "./request-security.js";
 import type { CredentialStore } from "../shared/index.js";
+import { isRecord } from "../shared/index.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -328,8 +329,8 @@ export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: strin
       broadcast(data);
       return;
     }
-    if (data && typeof data === "object" && !Array.isArray(data) && !("workspace" in data)) {
-      broadcast({ ...(data as Record<string, unknown>), workspace });
+    if (isRecord(data) && !("workspace" in data)) {
+      broadcast({ ...data, workspace });
       return;
     }
     broadcast(data);

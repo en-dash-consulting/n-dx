@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
-import { DATA_FILES } from "../shared/index.js";
+import { DATA_FILES, isRecord } from "../shared/index.js";
 import { deriveNextSteps, setArchetypeOverride } from "./domain-gateway.js";
 import type { NextStep } from "./domain-gateway.js";
 
@@ -30,7 +30,7 @@ function loadZonePins(ctx: ServerContext): Record<string, string> | null {
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8"));
     const pins = config?.sourcevision?.zones?.pins;
-    if (pins && typeof pins === "object" && !Array.isArray(pins)) {
+    if (isRecord(pins)) {
       return pins as Record<string, string>;
     }
     return null;

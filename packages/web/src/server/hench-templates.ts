@@ -30,6 +30,7 @@ import {
   henchConfigPath,
   loadHenchConfig,
 } from "./hench-config-fields.js";
+import { isRecord } from "../shared/index.js";
 
 // ── Workflow template types (duplicated from hench to avoid runtime coupling) ──
 
@@ -161,8 +162,8 @@ function findTemplate(projectDir: string, id: string): WorkflowTemplateData | nu
 function flattenTemplateOverlay(overlay: Record<string, unknown>): Array<[string, unknown]> {
   const pairs: Array<[string, unknown]> = [];
   for (const [key, value] of Object.entries(overlay)) {
-    if ((key === "guard" || key === "retry") && value && typeof value === "object" && !Array.isArray(value)) {
-      for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
+    if ((key === "guard" || key === "retry") && isRecord(value)) {
+      for (const [inner, innerValue] of Object.entries(value)) {
         pairs.push([`${key}.${inner}`, innerValue]);
       }
       continue;

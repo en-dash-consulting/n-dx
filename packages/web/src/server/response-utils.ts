@@ -3,6 +3,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isRecord } from "../shared/index.js";
 
 /**
  * Largest request body any dashboard route will buffer, in bytes.
@@ -153,7 +154,5 @@ export async function readJsonObject(
   } catch (err) {
     return `Invalid request body: ${errorMessage(err)}`;
   }
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : "Request body must be a JSON object";
+  return isRecord(parsed) ? parsed : "Request body must be a JSON object";
 }

@@ -16,6 +16,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PROJECT_DIRS, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
+import { isRecord } from "../shared/index.js";
 
 /** The workspace's hench config file, on whichever layout the project uses (.ndx/hench or .hench). */
 export function henchConfigPath(projectDir: string): string {
@@ -268,8 +269,8 @@ export const CONFIG_GROUP_DEFAULTS: Record<string, Record<string, unknown>> = {
  */
 export function validateConfigConstraints(config: Record<string, unknown>): string | null {
   const prune = config["prune"];
-  if (prune && typeof prune === "object" && !Array.isArray(prune)) {
-    const { triggerPairs, retainPairs } = prune as Record<string, unknown>;
+  if (isRecord(prune)) {
+    const { triggerPairs, retainPairs } = prune;
     if (
       typeof triggerPairs === "number" &&
       typeof retainPairs === "number" &&

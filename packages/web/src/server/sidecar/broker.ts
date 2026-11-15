@@ -580,7 +580,7 @@ export class SidecarBroker {
 function ruleInput(key: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(key);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : { argv: parsed };
+    return isRecord(parsed) ? parsed : { argv: parsed };
   } catch {
     return { argv: undefined };
   }

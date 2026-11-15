@@ -87,6 +87,7 @@ import {
   TICKET_QUERY_PARAM,
   removeTokenParam,
   tokensEqual,
+  isRecord,
 } from "../shared/index.js";
 import type { RunMode, RunOptions, CredentialStore } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
@@ -1107,8 +1108,8 @@ function parseExecuteBody(body: Buffer): ExecuteRequest {
     // project server checks the block (and its version) in `execute/check`
     // before this queues it, and saves it only when the replay starts the run.
     if (parsed.saveRun !== undefined) {
-      if (parsed.saveRun !== null && typeof parsed.saveRun === "object" && !Array.isArray(parsed.saveRun)) {
-        request.saveRun = parsed.saveRun as Record<string, unknown>;
+      if (isRecord(parsed.saveRun)) {
+        request.saveRun = parsed.saveRun;
       } else {
         request.valid = false;
       }

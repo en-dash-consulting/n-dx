@@ -45,7 +45,7 @@ import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { bareResponse, handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
 import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
 import { answerOAuthCallback, type CallbackProjects } from "./oauth-callback.js";
-import { CredentialStore } from "../shared/index.js";
+import { CredentialStore, isRecord } from "../shared/index.js";
 import { FrameKeys, parseKeyedPath } from "./frame-keys.js";
 import type { FrameKeyOptions } from "./frame-keys.js";
 import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
@@ -232,7 +232,7 @@ function callbackProjects(hub: Hub): CallbackProjects {
 async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await res.json();
-    return body !== null && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
+    return isRecord(body) ? body : null;
   } catch {
     return null; // not JSON: the caller falls back to the status alone
   }

@@ -35,6 +35,7 @@ import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { isRecord } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,21 +85,19 @@ interface RexSettingsPutBody {
 /** The project config, or an empty object when it is absent, unparseable or not an object. */
 function readConfigObject(projectDir: string): Record<string, unknown> {
   const parsed: unknown = readNdxConfig(projectDir);
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : {};
+  return isRecord(parsed) ? parsed : {};
 }
 
 /** The `rex` section of the config, or an empty one. */
 function rexSectionOf(config: Record<string, unknown>): Record<string, unknown> {
   const raw = config["rex"];
-  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return isRecord(raw) ? raw : {};
 }
 
 /** The `rex.placement` sub-section, or an empty one. */
 function placementSectionOf(rex: Record<string, unknown>): Record<string, unknown> {
   const raw = rex["placement"];
-  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return isRecord(raw) ? raw : {};
 }
 
 export function extractRexSettings(projectDir: string): RexSettingsResponse {
