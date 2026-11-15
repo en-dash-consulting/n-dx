@@ -460,35 +460,16 @@ function filterByAssignee(entries: TreeEntry[], assignee: string): TreeEntry[] {
   return entries.filter((e) => matchesAssignee(e.item, e.parents, assignee));
 }
 
-export function findActionableTasks(
-  items: PRDItem[],
-  completedIds: Set<string>,
-  limit = 20,
-  options?: PrioritizationOptions,
-): TreeEntry[] {
-  let scope = items;
-  if (options?.featureId) {
-    const subtree = resolveFeatureSubtree(items, options.featureId);
-    if (!subtree || subtree.length === 0) return [];
-    scope = subtree;
-  }
-  let results = collectActionable(scope, completedIds);
-  if (options?.tags?.length) {
-    results = filterByTags(results, options.tags);
-  }
-  if (options?.assignee) {
-    results = filterByAssignee(results, options.assignee);
-  }
-  results = filterExcluded(results, options?.excludeIds);
-  results.sort(makeComparator(items, options));
-  return results.slice(0, limit);
-}
-
-export function findNextTask(
+/**
+ * The actionable entries the options select, unsorted: scoped to the
+ * feature subtree, then filtered by tags, assignee and exclusions. Null when
+ * the feature scope resolves to nothing.
+ */
+function selectActionable(
   items: PRDItem[],
   completedIds: Set<string>,
   options?: PrioritizationOptions,
-): TreeEntry | null {
+): TreeEntry[] | null {
   let scope = items;
   if (options?.featureId) {
     const subtree = resolveFeatureSubtree(items, options.featureId);
@@ -502,8 +483,28 @@ export function findNextTask(
   if (options?.assignee) {
     results = filterByAssignee(results, options.assignee);
   }
-  results = filterExcluded(results, options?.excludeIds);
-  if (results.length === 0) return null;
+  return filterExcluded(results, options?.excludeIds);
+}
+
+export function findActionableTasks(
+  items: PRDItem[],
+  completedIds: Set<string>,
+  limit = 20,
+  options?: PrioritizationOptions,
+): TreeEntry[] {
+  const results = selectActionable(items, completedIds, options);
+  if (!results) return [];
+  results.sort(makeComparator(items, options));
+  return results.slice(0, limit);
+}
+
+export function findNextTask(
+  items: PRDItem[],
+  completedIds: Set<string>,
+  options?: PrioritizationOptions,
+): TreeEntry | null {
+  const results = selectActionable(items, completedIds, options);
+  if (!results || results.length === 0) return null;
   results.sort(makeComparator(items, options));
   return results[0];
 }
