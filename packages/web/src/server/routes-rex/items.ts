@@ -609,36 +609,17 @@ async function addPlacedChange(
   input: { title: string; summary?: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches: string[] },
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  let node: { id: string; title: string };
-  try {
-    ({ result: node } = await store.withModelTransaction((model) => {
-      const added = addChangeNode(
-        model.tree,
-        {
-          type: "change",
-          title: input.title,
-          touches: input.touches.map((t) => t.trim()),
-          ...summaryField(input),
-          description: input.description || undefined,
-          acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
-          tags: Array.isArray(input.tags) ? input.tags : undefined,
-          priority: input.priority && isPriority(input.priority) ? input.priority : undefined,
-        },
-        { now: new Date() },
-      );
-      return { tree: added.tree, result: added.node };
-    }));
-  } catch (err) {
-    const message = errorMessage(err);
-    if (message.includes("Could not acquire PRD lock")) {
-      errorResponse(res, 409, message);
-    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
-      errorResponse(res, 400, message);
-    } else {
-      errorResponse(res, 500, message);
-    }
-    return true;
-  }
+  const node = await addV2NodeOrRefuse(res, store, {
+    type: "change",
+    title: input.title,
+    touches: input.touches.map((t) => t.trim()),
+    ...summaryField(input),
+    description: input.description || undefined,
+    acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
+    tags: Array.isArray(input.tags) ? input.tags : undefined,
+    priority: input.priority && isPriority(input.priority) ? input.priority : undefined,
+  });
+  if (!node) return true;
 
   refreshPRDCache(ctx.rexDir, await store.loadDocument());
   const timestamp = new Date().toISOString();
@@ -654,6 +635,39 @@ const V2_CHILD_TYPE: Readonly<Record<string, "task" | "subtask">> = { change: "t
 
 /** Rex's own refusals of an add, matched by name so no error class crosses the gateway. */
 const V2_ADD_REFUSALS: ReadonlySet<string> = new Set(["AddChangeNodeError", "ClosedChangeError", "ChangeLayerWriteError"]);
+
+/** What rex's add rule takes for one node. */
+type V2AddInput = Parameters<typeof addChangeNode>[1];
+
+/**
+ * Add one node through rex's add rule inside the change-layer store's
+ * transaction, or answer why not and resolve null. As PATCH: a held lock is
+ * 409 and names the holder's PID; rex's refusal (a closed change, a broken v2
+ * rule) is 400 with its reason; anything else is 500.
+ */
+async function addV2NodeOrRefuse(
+  res: ServerResponse,
+  store: Parameters<typeof completeV2Work>[0],
+  input: V2AddInput,
+): Promise<{ id: string; title: string } | null> {
+  try {
+    const { result } = await store.withModelTransaction((model) => {
+      const added = addChangeNode(model.tree, input, { now: new Date() });
+      return { tree: added.tree, result: added.node };
+    });
+    return result;
+  } catch (err) {
+    const message = errorMessage(err);
+    if (message.includes("Could not acquire PRD lock")) {
+      errorResponse(res, 409, message);
+    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
+      errorResponse(res, 400, message);
+    } else {
+      errorResponse(res, 500, message);
+    }
+    return null;
+  }
+}
 
 /**
  * Add a task under a change (or a subtask under a task) on a v2 tree, through
@@ -692,43 +706,22 @@ async function addV2Child(
     return true;
   }
 
-  let node: { id: string; title: string };
-  try {
-    ({ result: node } = await store.withModelTransaction((model) => {
-      const added = addChangeNode(
-        model.tree,
-        {
-          type,
-          title: input.title,
-          parentId: parent.id,
-          ...summaryField(input),
-          description: input.description || undefined,
-          acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
-          tags: Array.isArray(input.tags) ? input.tags : undefined,
-          // A subtask carries no priority: a sent one goes through so rex's add
-          // rule refuses it (400, "A subtask does not carry priority") rather
-          // than the route answering 201 with the pick silently dropped.
-          priority: type === "subtask"
-            ? (input.priority ? input.priority as Parameters<typeof addChangeNode>[1]["priority"] : undefined)
-            : input.priority && isPriority(input.priority) ? input.priority : undefined,
-        },
-        { now: new Date() },
-      );
-      return { tree: added.tree, result: added.node };
-    }));
-  } catch (err) {
-    // As PATCH: a held lock is 409 and names the holder's PID; rex's refusal (a
-    // closed change, a broken v2 rule) is 400 with its reason; anything else is 500.
-    const message = errorMessage(err);
-    if (message.includes("Could not acquire PRD lock")) {
-      errorResponse(res, 409, message);
-    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
-      errorResponse(res, 400, message);
-    } else {
-      errorResponse(res, 500, message);
-    }
-    return true;
-  }
+  const node = await addV2NodeOrRefuse(res, store, {
+    type,
+    title: input.title,
+    parentId: parent.id,
+    ...summaryField(input),
+    description: input.description || undefined,
+    acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
+    tags: Array.isArray(input.tags) ? input.tags : undefined,
+    // A subtask carries no priority: a sent one goes through so rex's add
+    // rule refuses it (400, "A subtask does not carry priority") rather
+    // than the route answering 201 with the pick silently dropped.
+    priority: type === "subtask"
+      ? (input.priority ? input.priority as V2AddInput["priority"] : undefined)
+      : input.priority && isPriority(input.priority) ? input.priority : undefined,
+  });
+  if (!node) return true;
 
   refreshPRDCache(ctx.rexDir, await store.loadDocument());
   appendLog(ctx, {
