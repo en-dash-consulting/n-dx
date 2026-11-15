@@ -334,31 +334,18 @@ export function parseChunkInput(
   }
 
   // Numeric selection (1-based, comma or space separated)
-  const nums = trimmed
-    .split(/[\s,]+/)
-    .map((s) => parseInt(s, 10))
-    .filter((n) => !isNaN(n));
-
-  if (nums.length > 0) {
-    // Convert to 0-based indices, filter valid range
-    const indices = [...new Set(
-      nums
-        .filter((n) => n >= 1 && n <= state.proposals.length)
-        .map((n) => n - 1),
-    )].sort((a, b) => a - b);
-
-    if (indices.length > 0) {
-      return { kind: "select", indices };
-    }
+  const indices = parseNumericIndices(trimmed, state.proposals.length);
+  if (indices.length > 0) {
+    return { kind: "select", indices };
   }
 
   // Natural language modification detection:
   // If the input contains a recognized action verb (add, remove, change, split, etc.)
   // treat it as a modification request rather than unknown.
-  if (raw.trim()) {
-    const classification = classifyModificationRequest(raw.trim());
+  if (raw) {
+    const classification = classifyModificationRequest(raw);
     if (classification.intent !== "unknown") {
-      return { kind: "modify", request: raw.trim() };
+      return { kind: "modify", request: raw };
     }
   }
 
