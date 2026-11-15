@@ -39,3 +39,18 @@ export async function errorOf(res: Response, fallback: string): Promise<string> 
   const body = await res.json().catch(() => null) as { error?: string } | null;
   return body?.error ?? `${fallback} (HTTP ${res.status})`;
 }
+
+/**
+ * The body's `error` when it is a non-empty string, or `fallback` with the
+ * bare status ("Could not run the call (502)") for anything else, a body that
+ * is not JSON included.
+ */
+export async function stringErrorOf(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    if (typeof body.error === "string" && body.error) return body.error;
+  } catch {
+    // Not JSON: the fallback says enough.
+  }
+  return `${fallback} (${res.status})`;
+}

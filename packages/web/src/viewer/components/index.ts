@@ -127,7 +127,7 @@ export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
 export { PlaceWithSidecarContext, PlaceWithSidecarButton } from "./place-with-sidecar.js";
 export { SidecarPlacementContext, createCardDrafts, draftOnTarget, useCardDraft, useCardDrafts } from "./sidecar-placement.js";
 export type { CardDrafts, PlacementDraft, SidecarPlacementShare } from "./sidecar-placement.js";
-export { TrackerCardForm, errorOf as trackerErrorOf } from "./tracker-card-form.js";
+export { TrackerCardForm } from "./tracker-card-form.js";
 export type { TrackerCardFormProps } from "./tracker-card-form.js";
 export { CreateInTrackerButton, TrackerChip, asTrackerChipRead, useTrackerChips } from "./tracker-chip.js";
 export type { TrackerChipRead } from "./tracker-chip.js";

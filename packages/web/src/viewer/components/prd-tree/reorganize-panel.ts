@@ -10,6 +10,7 @@ import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { toggled } from "../set-toggle.js";
+import { stringErrorOf } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -58,17 +59,6 @@ const RISK_CLASSES: Record<string, string> = {
   medium: "reorg-risk-medium",
   high: "reorg-risk-high",
 };
-
-/**
- * The message for a refused apply: the server's `error` text (the branch
- * guard's refusal names the branch), else the status code.
- */
-async function applyFailure(res: Response): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: unknown } | null;
-  return typeof body?.error === "string" && body.error
-    ? body.error
-    : `Apply failed (${res.status})`;
-}
 
 /** What `POST /api/rex/reorganize/apply` reports. */
 interface ApplyResult {
@@ -140,7 +130,9 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        setError(await applyFailure(res));
+        // The server's `error` text (the branch guard's refusal names the
+        // branch), else the status code.
+        setError(await stringErrorOf(res, "Apply failed"));
         return;
       }
       const data = await res.json();
