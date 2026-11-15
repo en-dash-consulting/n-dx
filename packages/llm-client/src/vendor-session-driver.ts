@@ -32,6 +32,7 @@ import { codexShellEnvFlags } from "./codex-cli-provider.js";
 import {
   mapCodexUsageToTokenUsage,
   parseStreamTokenUsageWithDiagnostic,
+  type TokenParseResult,
 } from "./token-usage.js";
 
 /** Default cap on assistant and completion text: hench keeps run summaries short. */
@@ -537,11 +538,15 @@ function claudeUsageEvent(
   if (!usage) return null;
   if (!seen.accept(rawJson)) return null;
 
-  const parsed = parseStreamTokenUsageWithDiagnostic(usage);
+  return tokenUsageEvent(LLM_VENDOR.CLAUDE, turn, parseStreamTokenUsageWithDiagnostic(usage));
+}
+
+/** The `token_usage` event for a turn's parsed usage; null when none was reported. */
+function tokenUsageEvent(vendor: LLMVendor, turn: number, parsed: TokenParseResult): RuntimeEvent | null {
   if (parsed.diagnosticStatus === "unavailable") return null;
   return {
     type: "token_usage",
-    vendor: LLM_VENDOR.CLAUDE,
+    vendor,
     turn,
     timestamp: new Date().toISOString(),
     tokenUsage: parsed.usage,
@@ -1200,17 +1205,7 @@ function codexUsageEvent(
   if (!raw || !usageRecord(raw.usage)) return null;
   if (!seen.accept(rawJson)) return null;
 
-  const mapped = mapCodexUsageToTokenUsage(raw);
-  if (mapped.diagnosticStatus === "unavailable") return null;
-  return {
-    type: "token_usage",
-    vendor: LLM_VENDOR.CODEX,
-    turn,
-    timestamp: new Date().toISOString(),
-    tokenUsage: mapped.usage,
-    tokenDiagnosticStatus: mapped.diagnosticStatus,
-    tokenCacheProvenance: mapped.cacheProvenance,
-  };
+  return tokenUsageEvent(LLM_VENDOR.CODEX, turn, mapCodexUsageToTokenUsage(raw));
 }
 
 export const codexSessionDriver: VendorSessionDriver = {
