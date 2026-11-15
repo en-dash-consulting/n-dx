@@ -74,6 +74,44 @@ export function parseOpenAiTokenUsage(
   return { input, output };
 }
 
+// ── Response reading ──────────────────────────────────────────────────────
+// The local provider speaks the same Chat Completions format and reads its
+// responses through these too.
+
+/**
+ * Read a Chat Completions response: the first choice's message content
+ * (empty when there is none) and the token usage, when reported.
+ */
+export function readChatCompletion(data: Record<string, unknown>): CompletionResult {
+  const choices = data.choices as Array<Record<string, unknown>> | undefined;
+  let text = "";
+
+  if (choices && choices.length > 0) {
+    const message = choices[0].message as Record<string, unknown> | undefined;
+    if (message && typeof message.content === "string") {
+      text = message.content;
+    }
+  }
+
+  const tokenUsage = data.usage
+    ? parseOpenAiTokenUsage(data.usage as Record<string, unknown>)
+    : undefined;
+
+  return { text, tokenUsage };
+}
+
+/** The first choice's delta content in a streamed Chat Completions chunk, if it carries one. */
+export function readChatDeltaText(data: Record<string, unknown>): string | undefined {
+  const choices = data.choices as Array<Record<string, unknown>> | undefined;
+  if (choices && choices.length > 0) {
+    const delta = choices[0].delta as Record<string, unknown> | undefined;
+    if (delta && typeof delta.content === "string") {
+      return delta.content;
+    }
+  }
+  return undefined;
+}
+
 // ── Auth resolution ───────────────────────────────────────────────────────
 
 /**
@@ -185,23 +223,7 @@ export function createOpenAiApiProvider(
         maxRetries,
         baseDelayMs,
         throwForStatus: (status, body) => throwHttpStatusError(status, `OpenAI API error ${status}: ${body}`),
-        read: (data) => {
-          const choices = data.choices as Array<Record<string, unknown>> | undefined;
-          let text = "";
-
-          if (choices && choices.length > 0) {
-            const message = choices[0].message as Record<string, unknown> | undefined;
-            if (message && typeof message.content === "string") {
-              text = message.content;
-            }
-          }
-
-          const tokenUsage = data.usage
-            ? parseOpenAiTokenUsage(data.usage as Record<string, unknown>)
-            : undefined;
-
-          return { text, tokenUsage };
-        },
+        read: readChatCompletion,
       });
     },
 
@@ -263,13 +285,9 @@ export function createOpenAiApiProvider(
             if (trimmed.startsWith("data: ")) {
               try {
                 const data = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
-                const choices = data.choices as Array<Record<string, unknown>> | undefined;
-
-                if (choices && choices.length > 0) {
-                  const delta = choices[0].delta as Record<string, unknown> | undefined;
-                  if (delta && typeof delta.content === "string") {
-                    yield { text: delta.content };
-                  }
+                const text = readChatDeltaText(data);
+                if (text !== undefined) {
+                  yield { text };
                 }
 
                 // Some OpenAI-compatible endpoints include usage in stream chunks
