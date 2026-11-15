@@ -65,6 +65,44 @@ const EPIC_STATUS_LABELS: Record<string, string> = {
   failed: "Failed",
 };
 
+// ── Epic row ─────────────────────────────────────────────────────────
+
+/**
+ * One epic's row. While the run is live the row also marks a running epic,
+ * names its status for assistive tech and draws its task bar; a finished
+ * run's summary shows the row alone.
+ */
+function EpicRow({ epic, live }: { epic: EpicProgress; live: boolean }) {
+  return h("div", {
+    class: [
+      "exec-panel-epic",
+      live && epic.status === "running" ? "exec-panel-epic-running" : "",
+      epic.status === "completed" ? "exec-panel-epic-done" : "",
+      epic.status === "skipped" ? "exec-panel-epic-skipped" : "",
+      epic.status === "failed" ? "exec-panel-epic-failed" : "",
+    ].filter(Boolean).join(" "),
+  },
+    h("div", { class: "exec-panel-epic-row" },
+      h("span", {
+        class: `exec-panel-epic-icon exec-panel-epic-icon-${epic.status}`,
+        "aria-label": live ? EPIC_STATUS_LABELS[epic.status] ?? epic.status : undefined,
+      }, EPIC_STATUS_ICONS[epic.status] ?? "○"),
+      h("span", { class: "exec-panel-epic-title", title: epic.title }, epic.title),
+      h("span", { class: "exec-panel-epic-count" },
+        `${epic.tasksCompleted}/${epic.tasksTotal}`,
+      ),
+    ),
+    live && epic.tasksTotal > 0
+      ? h("div", { class: "exec-panel-epic-bar" },
+          h("div", {
+            class: `exec-panel-epic-fill${epic.status === "completed" ? " done" : epic.tasksCompleted > 0 ? " mid" : ""}`,
+            style: `width: ${epic.tasksTotal > 0 ? Math.round((epic.tasksCompleted / epic.tasksTotal) * 100) : 0}%`,
+          }),
+        )
+      : null,
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
@@ -199,13 +237,14 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
     }
   }, [fetchStatus]);
 
-  const handlePause = useCallback(async () => {
+  /** Pause or resume the run, then re-read its status; `refused` stands in for a refusal without an error. */
+  const control = useCallback(async (action: "pause" | "resume", refused: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/rex/execute/pause", { method: "POST" });
+      const res = await fetch(`/api/rex/execute/${action}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to pause");
+        setError(data.error || refused);
       } else {
         await fetchStatus();
       }
@@ -216,22 +255,8 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
     }
   }, [fetchStatus]);
 
-  const handleResume = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/rex/execute/resume", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to resume");
-      } else {
-        await fetchStatus();
-      }
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchStatus]);
+  const handlePause = useCallback(() => control("pause", "Failed to pause"), [control]);
+  const handleResume = useCallback(() => control("resume", "Failed to resume"), [control]);
 
   // ── Render: idle state ─────────────────────────────────────────────
 
@@ -321,37 +346,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
 
           // Epic list
           h("div", { class: "exec-panel-epic-list" },
-            ...status!.epics.map((epic) =>
-              h("div", {
-                key: epic.id,
-                class: [
-                  "exec-panel-epic",
-                  epic.status === "running" ? "exec-panel-epic-running" : "",
-                  epic.status === "completed" ? "exec-panel-epic-done" : "",
-                  epic.status === "skipped" ? "exec-panel-epic-skipped" : "",
-                  epic.status === "failed" ? "exec-panel-epic-failed" : "",
-                ].filter(Boolean).join(" "),
-              },
-                h("div", { class: "exec-panel-epic-row" },
-                  h("span", {
-                    class: `exec-panel-epic-icon exec-panel-epic-icon-${epic.status}`,
-                    "aria-label": EPIC_STATUS_LABELS[epic.status] ?? epic.status,
-                  }, EPIC_STATUS_ICONS[epic.status] ?? "○"),
-                  h("span", { class: "exec-panel-epic-title", title: epic.title }, epic.title),
-                  h("span", { class: "exec-panel-epic-count" },
-                    `${epic.tasksCompleted}/${epic.tasksTotal}`,
-                  ),
-                ),
-                epic.tasksTotal > 0
-                  ? h("div", { class: "exec-panel-epic-bar" },
-                      h("div", {
-                        class: `exec-panel-epic-fill${epic.status === "completed" ? " done" : epic.tasksCompleted > 0 ? " mid" : ""}`,
-                        style: `width: ${epic.tasksTotal > 0 ? Math.round((epic.tasksCompleted / epic.tasksTotal) * 100) : 0}%`,
-                      }),
-                    )
-                  : null,
-              ),
-            ),
+            ...status!.epics.map((epic) => h(EpicRow, { key: epic.id, epic, live: true })),
           ),
         )
       : null,
@@ -373,27 +368,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
           // Show epic results
           status!.epics.length > 0
             ? h("div", { class: "exec-panel-epic-list" },
-                ...status!.epics.map((epic) =>
-                  h("div", {
-                    key: epic.id,
-                    class: [
-                      "exec-panel-epic",
-                      epic.status === "completed" ? "exec-panel-epic-done" : "",
-                      epic.status === "skipped" ? "exec-panel-epic-skipped" : "",
-                      epic.status === "failed" ? "exec-panel-epic-failed" : "",
-                    ].filter(Boolean).join(" "),
-                  },
-                    h("div", { class: "exec-panel-epic-row" },
-                      h("span", {
-                        class: `exec-panel-epic-icon exec-panel-epic-icon-${epic.status}`,
-                      }, EPIC_STATUS_ICONS[epic.status] ?? "○"),
-                      h("span", { class: "exec-panel-epic-title", title: epic.title }, epic.title),
-                      h("span", { class: "exec-panel-epic-count" },
-                        `${epic.tasksCompleted}/${epic.tasksTotal}`,
-                      ),
-                    ),
-                  ),
-                ),
+                ...status!.epics.map((epic) => h(EpicRow, { key: epic.id, epic, live: false })),
               )
             : null,
 
