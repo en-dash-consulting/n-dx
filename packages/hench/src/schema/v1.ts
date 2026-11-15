@@ -162,7 +162,7 @@ export interface PruneConfig {
  * number trades a known cadence for an unmeasured one, so it wants a batch
  * that actually exercises an API loop first.
  *
- * `2000`: matches `MAX_TOOL_OUTPUT_STORED` in `agent/lifecycle/loop.ts`, the
+ * `2000`: matches {@link MAX_TOOL_OUTPUT_STORED}, the
  * size at which hench truncates a tool result for the run record. Below that the
  * summarizer sees less of a tool result than the run itself keeps — at the
  * original 800 a 2,000-character result lost 60% of its characters before
@@ -841,6 +841,9 @@ export interface ToolCallRecord {
   output: string;
   durationMs: number;
 }
+
+/** How much of a tool's output a run record keeps in {@link ToolCallRecord.output}. */
+export const MAX_TOOL_OUTPUT_STORED = 2000;
 
 export interface TokenUsage {
   input: number;
@@ -1749,6 +1752,9 @@ export interface RunEscalation {
   /** One line saying why, as logged. */
   reason: string;
 }
+
+/** How much of the agent's closing message a run record keeps as {@link RunRecord.summary}. */
+export const MAX_SUMMARY_LENGTH = 500;
 
 export interface RunRecord {
   id: string;

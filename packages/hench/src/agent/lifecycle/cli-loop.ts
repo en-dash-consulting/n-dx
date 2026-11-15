@@ -164,7 +164,7 @@ import {
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent, RunReviewMode } from "../../schema/index.js";
-import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS } from "../../schema/index.js";
+import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS, MAX_SUMMARY_LENGTH, MAX_TOOL_OUTPUT_STORED } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
 import {
@@ -315,9 +315,7 @@ export interface SpawnTokenMetadata {
   model: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
-const MAX_SUMMARY_LENGTH = 500;
+// ── Formatting ────────────────────────────────────────────────────────────
 
 /** `90000` → `"90s"`, for limit messages. */
 function formatSeconds(ms: number): string {
@@ -486,9 +484,9 @@ function applyRuntimeEvent(
       const resultId = event.toolResult?.id;
       const answered = resultId ? toolCallsById?.get(resultId) : undefined;
       if (answered) {
-        answered.output = output.slice(0, 2000);
+        answered.output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
       } else if (!resultId && result.toolCalls.length > 0) {
-        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
       }
       const preview = output.slice(0, 200);
       stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);

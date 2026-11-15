@@ -5,7 +5,7 @@ import { GuardRails, createToolSandbox, resolveSandboxPosture, assertSandboxRead
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
-import { RUN_GUARD_AUDIT_MAX_DENIALS } from "../../schema/index.js";
+import { MAX_SUMMARY_LENGTH, MAX_TOOL_OUTPUT_STORED, RUN_GUARD_AUDIT_MAX_DENIALS } from "../../schema/index.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
@@ -89,8 +89,6 @@ export interface AgentLoopResult {
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
-const MAX_SUMMARY_LENGTH = 500;
-const MAX_TOOL_OUTPUT_STORED = 2000;
 /**
  * How many times an API tool loop re-prompts a model that claims completion
  * while the run has changed nothing. The counterpart of the Claude API loop's

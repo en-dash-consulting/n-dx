@@ -19,6 +19,7 @@
  * @see packages/hench/src/agent/lifecycle/cli-loop.ts — generic spawn function
  */
 
+import { MAX_SUMMARY_LENGTH, MAX_TOOL_OUTPUT_STORED } from "../../schema/index.js";
 import type { ToolCallRecord, TurnTokenUsage, TokenUsage } from "../../schema/index.js";
 import { parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import type { TokenDiagnosticStatus } from "./token-usage.js";
@@ -27,8 +28,6 @@ import type { LLMVendor, RuntimeEvent, FailureCategory } from "../../prd/llm-gat
 import { parseMaybeJson } from "./adapters/codex-cli-adapter.js";
 
 // ── Shared types ──────────────────────────────────────────────────────────
-
-const MAX_SUMMARY_LENGTH = 500;
 
 /** @internal Exported for testing. */
 export interface CliRunResult {
@@ -332,7 +331,7 @@ export class EventAccumulator {
         if (callId) {
           const byId = resultsById.get(callId);
           if (byId) {
-            record.output = byId.output.slice(0, 2000);
+            record.output = byId.output.slice(0, MAX_TOOL_OUTPUT_STORED);
             record.durationMs = byId.durationMs;
           }
           calls.push(record);
@@ -346,7 +345,7 @@ export class EventAccumulator {
           if (next.type === "tool_result" && next.toolResult && !next.toolResult.id) {
             // Match by tool name or assume sequential pairing
             if (next.toolResult.tool === event.toolCall.tool || next.toolResult.tool === "") {
-              record.output = next.toolResult.output.slice(0, 2000);
+              record.output = next.toolResult.output.slice(0, MAX_TOOL_OUTPUT_STORED);
               record.durationMs = next.toolResult.durationMs;
               break;
             }
@@ -438,7 +437,7 @@ function recordToolUse(
 /** Attach a tool's output to the last recorded call, if any, and print its preview. */
 function recordToolOutput(result: CliRunResult, output: string): void {
   if (result.toolCalls.length > 0) {
-    result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+    result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
   }
   const preview = output.slice(0, 200);
   stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
@@ -661,7 +660,7 @@ export function processCodexJsonLine(
           (typeof item.text === "string" && item.text) ||
           "";
         if (result.toolCalls.length > 0) {
-          result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+          result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
         }
         const preview = output.slice(0, 200);
         if (preview) {
