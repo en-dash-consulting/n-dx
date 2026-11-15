@@ -22,6 +22,8 @@ import { itemTypeLabel, itemTypePlural } from "../../external.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
 import { statusOptions } from "./status-display.js";
+import { formatByteSize } from "./format-usage.js";
+
 // ── Helpers (inlined to avoid cross-zone import from ../../utils) ────
 
 /** Extract the filename from a path (last segment after '/'). */
@@ -104,13 +106,6 @@ const STATUS_OPTIONS = statusOptions(["completed", "deferred", "deleted"]);
 type PruneStep = "criteria" | "preview" | "confirm" | "result";
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-/** Format byte size to human-readable string. */
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** Format age in days to human-readable string. */
 function formatAge(completedAt: string | undefined): string {
@@ -464,7 +459,7 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
       // Storage savings estimation
       h("div", { class: "prune-storage-stat" },
         h("span", { class: "prune-storage-savings" },
-          formatBytes(preview.estimatedBytes),
+          formatByteSize(preview.estimatedBytes),
         ),
         h("span", null, " estimated savings"),
         preview.totalPrdBytes > 0

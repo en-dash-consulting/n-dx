@@ -16,6 +16,7 @@ import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef } from "preact/hooks";
 import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
+import { formatByteSize } from "./format-usage.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -57,13 +58,6 @@ function inferFormat(fileName: string): "text" | "markdown" | "json" {
   if (lower.endsWith(".json")) return "json";
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "markdown";
   return "text";
-}
-
-/** Format byte size to human-readable string. */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Count lines in a string. */
@@ -549,7 +543,7 @@ export function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
       h("span", { class: "batch-import-item-source" }, item.source),
       !isTextEntry
         ? h("span", { class: "batch-import-item-meta" },
-            h("span", { class: "batch-import-item-size" }, formatSize(size)),
+            h("span", { class: "batch-import-item-size" }, formatByteSize(size)),
             h("span", { class: "batch-import-item-meta-sep" }, "\u00B7"),
             h("span", null, `${lines} line${lines !== 1 ? "s" : ""}`),
             h("span", { class: "batch-import-item-meta-sep" }, "\u00B7"),
