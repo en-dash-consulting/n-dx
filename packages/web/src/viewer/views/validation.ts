@@ -15,6 +15,7 @@ import { useCliName } from "../hooks/index.js";
 import { itemTypeLabel } from "../external.js";
 import { errorOrHttpStatus, assertJobStarted } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
+import { fetchWithJsonBody } from "../utils/json-requests.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -640,14 +641,6 @@ interface AsyncJobWire {
   error: string | null;
 }
 
-async function postJson(url: string, body: unknown): Promise<Response> {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
 /** Poll an async job's status endpoint until it reports finished. */
 function pollJob(
   statusUrl: string,
@@ -702,7 +695,7 @@ export function ValidationActions({ onChanged, show }: {
     setFixState("running");
     setError(null);
     try {
-      const res = await postJson("/api/commands/fix", { dryRun });
+      const res = await fetchWithJsonBody("POST", "/api/commands/fix", { dryRun });
       const body = await res.json() as { error?: string; report?: unknown; output?: string };
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setFixReport(body.report ?? body.output ?? null);
@@ -718,7 +711,7 @@ export function ValidationActions({ onChanged, show }: {
     setCiState("running");
     setError(null);
     try {
-      const res = await postJson("/api/commands/ci", {});
+      const res = await fetchWithJsonBody("POST", "/api/commands/ci", {});
       await assertJobStarted(res);
       cancelPolls.current.push(pollJob("/api/commands/ci/status", (status) => {
         // ndx ci exits 1 when a check fails while still printing its full
@@ -750,7 +743,7 @@ export function ValidationActions({ onChanged, show }: {
     setReshapeState("running");
     setError(null);
     try {
-      const res = await postJson("/api/commands/reshape", { accept });
+      const res = await fetchWithJsonBody("POST", "/api/commands/reshape", { accept });
       await assertJobStarted(res);
       cancelPolls.current.push(pollJob("/api/commands/reshape/status", (status) => {
         if (status.error) {

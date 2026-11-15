@@ -19,6 +19,7 @@ import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { errorMessage } from "../utils/format.js";
+import { fetchWithJsonBody } from "../utils/json-requests.js";
 
 // ── Types (wire shapes from routes-adaptive.ts) ──────────────────────
 
@@ -93,14 +94,6 @@ function trendLabel(v: number): string {
   return "—";
 }
 
-async function postJson(url: string, body?: unknown, method = "POST"): Promise<Response> {
-  return fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-}
-
 // ── View ─────────────────────────────────────────────────────────────
 
 export function AdaptiveOptimizationView() {
@@ -153,7 +146,7 @@ export function AdaptiveOptimizationView() {
   }, [reload]);
 
   const applyAdjustment = useCallback((adj: WorkflowAdjustment) =>
-    runAction(`Applied "${adj.title}"`, () => postJson("/api/hench/adaptive/apply", {
+    runAction(`Applied "${adj.title}"`, () => fetchWithJsonBody("POST", "/api/hench/adaptive/apply", {
       adjustmentId: adj.id,
       configKey: adj.configKey,
       newValue: adj.proposedValue,
@@ -164,23 +157,23 @@ export function AdaptiveOptimizationView() {
 
   const dismissAdjustment = useCallback((adj: WorkflowAdjustment) =>
     runAction(`Dismissed "${adj.title}"`, () =>
-      postJson(`/api/hench/adaptive/dismiss/${adj.id}`)), [runAction]);
+      fetchWithJsonBody("POST", `/api/hench/adaptive/dismiss/${adj.id}`)), [runAction]);
 
   const lockKey = useCallback((key: string) =>
     runAction(`Locked ${key}`, () =>
-      postJson(`/api/hench/adaptive/lock/${encodeURIComponent(key)}`)), [runAction]);
+      fetchWithJsonBody("POST", `/api/hench/adaptive/lock/${encodeURIComponent(key)}`)), [runAction]);
 
   const unlockKey = useCallback((key: string) =>
     runAction(`Unlocked ${key}`, () =>
-      postJson(`/api/hench/adaptive/unlock/${encodeURIComponent(key)}`)), [runAction]);
+      fetchWithJsonBody("POST", `/api/hench/adaptive/unlock/${encodeURIComponent(key)}`)), [runAction]);
 
   const removeOverride = useCallback((key: string) =>
     runAction(`Removed override ${key}`, () =>
-      postJson(`/api/hench/adaptive/override/${encodeURIComponent(key)}`, undefined, "DELETE")), [runAction]);
+      fetchWithJsonBody("DELETE", `/api/hench/adaptive/override/${encodeURIComponent(key)}`)), [runAction]);
 
   const updateSettings = useCallback((patch: Partial<AdaptiveSettings>) =>
     runAction("Settings updated", () =>
-      postJson("/api/hench/adaptive/settings", patch)), [runAction]);
+      fetchWithJsonBody("POST", "/api/hench/adaptive/settings", patch)), [runAction]);
 
   const settings = analysis?.settings;
 
