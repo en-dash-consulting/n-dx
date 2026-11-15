@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readJsonBody, errorMessage } from "./response-utils.js";
 import { safeDecodeSegment } from "../shared/index.js";
 import {
   validateConfigKeyValue,
@@ -675,14 +675,8 @@ async function handleUpdateSettings(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const state = loadAdaptiveState(ctx.projectDir);
 
@@ -715,14 +709,8 @@ async function handleApplyAdjustment(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const adjustmentId = body.adjustmentId as string;
   const configKey = body.configKey as string;
@@ -808,14 +796,8 @@ async function handleDismissAdjustment(
   ctx: ServerContext,
   adjustmentId: string,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const title = (body.title as string) || adjustmentId;
   const category = (body.category as string) || "unknown";
@@ -848,14 +830,8 @@ async function handleSetOverride(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const key = body.key as string;
   const value = body.value;

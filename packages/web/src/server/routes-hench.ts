@@ -78,7 +78,7 @@ import {
 import type { ServerContext } from "./types.js";
 import { refuseWhileRestricted } from "./trust-gate.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, readJsonBody, errorMessage } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
   fieldDefaultForProject,
@@ -1139,14 +1139,8 @@ async function handleConfigUpdate(
   }
 
   // Parse request body
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const changes = body.changes as Record<string, unknown> | undefined;
   if (!changes || typeof changes !== "object") {
@@ -1459,14 +1453,8 @@ async function handleTemplateCreate(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const id = body.id as string | undefined;
   if (!id || typeof id !== "string" || !/^[a-z][a-z0-9-]{1,49}$/.test(id)) {
@@ -2300,17 +2288,6 @@ async function judgeExecuteRequest(
   };
 }
 
-/** Parse an execute-shaped body, answering 400 itself when it is not JSON. */
-async function readExecuteBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
-  try {
-    const raw = await readBody(req, res);
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return null;
-  }
-}
-
 /**
  * POST /api/hench/execute/check — would this execute request start?
  *
@@ -2325,7 +2302,7 @@ async function readExecuteBody(req: IncomingMessage, res: ServerResponse): Promi
  * verdict" and queues as before — never as a start).
  */
 async function handleExecuteCheck(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
-  const body = await readExecuteBody(req, res);
+  const body = await readJsonBody(req, res);
   if (!body) return true;
   const verdict = await judgeExecuteRequest(ctx, body);
   if (verdict.kind === "refused") {
@@ -2343,7 +2320,7 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const body = await readExecuteBody(req, res);
+  const body = await readJsonBody(req, res);
   if (!body) return true;
   const outcome = await reserveAndStart(ctx, body, broadcast);
   if (outcome.kind === "migrate") return await runTreeMigration(res, ctx);
@@ -4314,14 +4291,8 @@ async function handleThrottleUpdate(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const value = body.maxConcurrent;
   if (value === null || value === undefined) {
@@ -4414,14 +4385,8 @@ async function handleEmergencyStop(
   ctx?: ServerContext,
   onStatusInvalidate?: () => void,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   if (body.confirm !== true) {
     errorResponse(res, 400, "Emergency stop requires { confirm: true } in request body");

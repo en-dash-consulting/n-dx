@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readJsonBody, errorMessage } from "./response-utils.js";
 import {
   FORBIDDEN_CONFIG_SEGMENTS,
   completeConfigGroups,
@@ -607,14 +607,8 @@ async function handleSuggestionDecision(
   ctx: ServerContext,
   suggestionId: string,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const decision = body.decision as string;
   if (!decision || !["accepted", "rejected", "deferred"].includes(decision)) {
@@ -653,14 +647,8 @@ async function handleApplySuggestion(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const changes = body.changes as Record<string, unknown> | undefined;
   if (!changes || typeof changes !== "object" || Object.keys(changes).length === 0) {
