@@ -3401,14 +3401,15 @@ async function handlePairProgramming(rest) {
     // ── Step 0: create temporary task in PRD ────────────────────────────────
     process.stderr.write("⚠ pair-programming: creating temporary task...\n");
 
-    // Get PRD status to find an epic to use as parent
-    const statusOutput = execFileSync(process.execPath, [
+    const readRexStatus = () => JSON.parse(execFileSync(process.execPath, [
       resolve(__dir, "../rex/dist/cli/index.js"),
       "status",
       "--format=json",
       dir,
-    ], { encoding: "utf-8", stdio: "pipe" });
-    const statusData = JSON.parse(statusOutput);
+    ], { encoding: "utf-8", stdio: "pipe" }));
+
+    // Get PRD status to find an epic to use as parent
+    const statusData = readRexStatus();
     const firstEpic = statusData.items?.find((item) => item.level === "epic");
     const epicId = firstEpic?.id;
     if (!epicId) {
@@ -3432,13 +3433,7 @@ async function handlePairProgramming(rest) {
     }
 
     // Get the task ID by querying the PRD again and finding the newest pending task
-    const updatedStatusOutput = execFileSync(process.execPath, [
-      resolve(__dir, "../rex/dist/cli/index.js"),
-      "status",
-      "--format=json",
-      dir,
-    ], { encoding: "utf-8", stdio: "pipe" });
-    const updatedStatusData = JSON.parse(updatedStatusOutput);
+    const updatedStatusData = readRexStatus();
 
     // Find the task we just created by searching through all tasks
     const findTask = (items) => {
