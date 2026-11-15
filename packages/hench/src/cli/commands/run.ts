@@ -44,7 +44,7 @@ import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
-import { section, detail } from "../../types/output.js";
+import { section, detail, formatDuration } from "../../types/output.js";
 import { ConfigBackstop, ConfigBackstopError, formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -179,14 +179,6 @@ async function assertSchemaCompatibility(store: PRDStore): Promise<void> {
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}m ${remaining}s`;
-}
 
 /**
  * Format an inter-task or inter-epic pause notification.

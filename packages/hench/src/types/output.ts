@@ -47,6 +47,15 @@ import { isQuiet, isVerbose, verbose, bold, dim, yellow, red, colorDim, colorWar
  * under --verbose so a slow step can be told apart from a hung one. No-op
  * (besides awaiting) unless verbose mode is active.
  */
+/** A duration as `42s`, or `3m 7s` from a minute up; partial seconds are dropped. */
+export function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}m ${remaining}s`;
+}
+
 export async function withHeartbeat<T>(label: string, promise: Promise<T>, intervalMs = 15_000): Promise<T> {
   if (!isVerbose()) return promise;
   const startMs = Date.now();
