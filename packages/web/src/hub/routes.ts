@@ -61,14 +61,13 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { mkdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute } from "node:path";
 import { detectBasePath, projectIdFromBasePath, requestAccess, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
-import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject, writeHubMarkerFiles } from "./new-project.js";
+import { deriveProjectId, isDirectory, isReservedProjectId, planNewProject, suggestedParentDir, writeHubMarkerFiles } from "./new-project.js";
 import type { NewProjectPlan } from "./new-project.js";
 import { EXTENSION_API_VERSION, buildExtensionsAnswer, resolveFrameUrl } from "./extensions.js";
 import { SidecarManager } from "./sidecars.js";
@@ -107,6 +106,14 @@ function error(res: ServerResponse, status: number, message: string): void {
   json(res, status, { error: message });
 }
 
+function noSuchProject(res: ServerResponse, id: string): void {
+  error(res, 404, `No project registered as "${id}"`);
+}
+
+function noSuchExtension(res: ServerResponse, name: string): void {
+  error(res, 404, `No extension is named "${name}"`);
+}
+
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -136,11 +143,13 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
-function isDirectory(path: string): boolean {
+/** The request's JSON body, or undefined once a 400 naming what was wrong with it has been sent. */
+async function readJsonBodyOr400(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
+    return await readJsonBody(req);
+  } catch (err) {
+    error(res, 400, (err as Error).message);
+    return undefined;
   }
 }
 
@@ -243,7 +252,7 @@ function newProjectAnswer(plan: NewProjectPlan, defaultParent: string): Record<s
  * it re-plans rather than trusting this answer.
  */
 function handleNewProjectPreview(res: ServerResponse, hub: Hub, query: URLSearchParams): boolean {
-  const defaultParent = defaultParentDir(hub.listProjects().map((p) => p.repoRoot), homedir());
+  const defaultParent = suggestedParentDir(hub.listProjects());
   const parent = query.get("parent") ?? "";
   const name = query.get("name") ?? "";
   const plan = planNewProject({ parent: parent || defaultParent, name });
@@ -260,15 +269,10 @@ function handleNewProjectPreview(res: ServerResponse, hub: Hub, query: URLSearch
  * already asks about assistants, the LLM vendor and git.
  */
 async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
-  let body: unknown;
-  try {
-    body = await readJsonBody(req);
-  } catch (err) {
-    error(res, 400, (err as Error).message);
-    return true;
-  }
+  const body = await readJsonBodyOr400(req, res);
+  if (body === undefined) return true;
   const b = (body ?? {}) as Record<string, unknown>;
-  const defaultParent = defaultParentDir(hub.listProjects().map((p) => p.repoRoot), homedir());
+  const defaultParent = suggestedParentDir(hub.listProjects());
   const parent = typeof b.parent === "string" && b.parent.trim() ? b.parent : defaultParent;
   const name = typeof b.name === "string" ? b.name : "";
 
@@ -351,7 +355,7 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
 async function handleExtensions(res: ServerResponse, hub: Hub, projectId: string | null): Promise<boolean> {
   const project = projectId !== null ? hub.getProject(projectId) : null;
   if (projectId !== null && !project) {
-    error(res, 404, `No project registered as "${projectId}"`);
+    noSuchProject(res, projectId);
     return true;
   }
   const listed = await hub.listExtensions();
@@ -376,11 +380,11 @@ async function handleFrameKey(res: ServerResponse, hub: Hub, name: string, proje
   }
   const project = hub.getProject(projectId);
   if (!project) {
-    error(res, 404, `No project registered as "${projectId}"`);
+    noSuchProject(res, projectId);
     return true;
   }
   if (!SidecarManager.isName(name)) {
-    error(res, 404, `No extension is named "${name}"`);
+    noSuchExtension(res, name);
     return true;
   }
   const listed = await hub.listExtensions();
@@ -391,7 +395,7 @@ async function handleFrameKey(res: ServerResponse, hub: Hub, name: string, proje
   const ext = listed.extensions.find((e) => e.name === name);
   if (!ext) {
     hub.frameKeys.revoke(name);
-    error(res, 404, `No extension is named "${name}"`);
+    noSuchExtension(res, name);
     return true;
   }
   if (ext.state !== "enabled") {
@@ -439,11 +443,12 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   if (url !== HUB_PREFIX && !url.startsWith(`${HUB_PREFIX}/`)) return false;
   const path = url.slice(HUB_PREFIX.length);
   const method = req.method || "GET";
+  const query = new URLSearchParams(rawQuery);
 
   // An unknown id under the prefix is the proxy's 404 to give, not a silent
   // answer about some other project.
   if (scopedProjectId !== null && !hub.getProject(scopedProjectId)) {
-    error(res, 404, `No project registered as "${scopedProjectId}"`);
+    noSuchProject(res, scopedProjectId);
     return true;
   }
 
@@ -483,14 +488,14 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   }
 
   if (path === "/extensions" && method === "GET") {
-    return handleExtensions(res, hub, new URLSearchParams(rawQuery).get("project") ?? scopedProjectId);
+    return handleExtensions(res, hub, query.get("project") ?? scopedProjectId);
   }
 
   const stopMatch = path.match(/^\/extensions\/([^/]+)\/stop$/);
   if (stopMatch && method === "POST") {
     const name = safeDecodeSegment(stopMatch[1]);
     if (!SidecarManager.isName(name)) {
-      error(res, 404, `No extension is named "${name}"`);
+      noSuchExtension(res, name);
       return true;
     }
     // Stopping one that is not running is not an error: the caller wants it
@@ -504,7 +509,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
 
   const frameMatch = path.match(/^\/extensions\/([^/]+)\/frame$/);
   if (frameMatch && method === "POST") {
-    return handleFrameKey(res, hub, safeDecodeSegment(frameMatch[1]), new URLSearchParams(rawQuery).get("project") ?? scopedProjectId);
+    return handleFrameKey(res, hub, safeDecodeSegment(frameMatch[1]), query.get("project") ?? scopedProjectId);
   }
 
   // The sign-in page at `/x/<name>/` asks for the keyed mount here, with the
@@ -514,7 +519,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   if (mountMatch && method === "POST") {
     const name = safeDecodeSegment(mountMatch[1]);
     if (!SidecarManager.isName(name)) {
-      error(res, 404, `No extension is named "${name}"`);
+      noSuchExtension(res, name);
       return true;
     }
     json(res, 200, { name, path: hub.sidecars.mountBase(name) });
@@ -528,7 +533,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // session's host whether it can run the hub lens, as the served page does.
   if (path === "/overview" && method === "GET") {
     const projects = hub.listProjects();
-    const withSession = new URLSearchParams(rawQuery).get("hubSession") === "1";
+    const withSession = query.get("hubSession") === "1";
     const [overview, hubSession] = await Promise.all([
       buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token)),
       withSession ? probeHubLens(hub.sessionHosts, projects, { token: hub.token }) : undefined,
@@ -547,7 +552,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   }
 
   if (path === "/new-project" && method === "GET") {
-    return handleNewProjectPreview(res, hub, new URLSearchParams(rawQuery));
+    return handleNewProjectPreview(res, hub, query);
   }
 
   if (path === "/projects/new" && method === "POST") {
@@ -555,13 +560,8 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   }
 
   if (path === "/projects" && method === "POST") {
-    let body: unknown;
-    try {
-      body = await readJsonBody(req);
-    } catch (err) {
-      error(res, 400, (err as Error).message);
-      return true;
-    }
+    const body = await readJsonBodyOr400(req, res);
+    if (body === undefined) return true;
     hub.repairSelfBin();
     const parsed = parseRegisterInput(body, hub.selfBin);
     if ("problem" in parsed) {
@@ -579,7 +579,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     if (method === "GET") {
       const project = hub.getProject(id);
       if (!project) {
-        error(res, 404, `No project registered as "${id}"`);
+        noSuchProject(res, id);
         return true;
       }
       json(res, 200, { project });
@@ -588,7 +588,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     if (method === "DELETE") {
       const removed = await hub.removeProject(id);
       if (!removed) {
-        error(res, 404, `No project registered as "${id}"`);
+        noSuchProject(res, id);
         return true;
       }
       json(res, 200, { removed: id, hubExiting: hub.projectCount === 0 && !hub.keepAlive });
@@ -605,7 +605,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     const worktree = safeDecodeSegment(worktreeMatch[2]);
     const result = await hub.removeWorktree(id, worktree);
     if (!result.projectKnown) {
-      error(res, 404, `No project registered as "${id}"`);
+      noSuchProject(res, id);
       return true;
     }
     json(res, 200, {

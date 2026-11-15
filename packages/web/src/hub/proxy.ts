@@ -90,11 +90,10 @@ import {
 import type { RunMode, RunOptions, CredentialStore } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
-import { homedir } from "node:os";
 import { HOME_EXTENSIONS_WAIT_MS, renderHomePage } from "./home.js";
 import { buildExtensionsAnswer } from "./extensions.js";
 import type { ExtensionView } from "./extensions.js";
-import { defaultParentDir } from "./new-project.js";
+import { suggestedParentDir } from "./new-project.js";
 import { hubRoutePath } from "./request-guard.js";
 import { SidecarManager } from "./sidecars.js";
 import { HUB_SESSION_FEATURE, probeHubLens } from "./session-host.js";
@@ -995,7 +994,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       ]);
       // Where the "New project" form offers to create: wherever most of the
       // registered projects already live, else the user's home.
-      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions, {
+      const html = renderHomePage(overview, suggestedParentDir(projects), extensions, {
         hubSession,
         hubSpend: readHubUsageTotals(hub.hubHome),
       });
