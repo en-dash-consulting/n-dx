@@ -356,13 +356,8 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
   const lead = variant === "lead";
   const { manifest, inventory, imports, zones } = data;
 
-  if (!manifest && !inventory && !imports && !zones) {
-    return h("div", { class: "loading" }, "No data loaded. Use 'sourcevision serve' or drop files.");
-  }
-
-  const hasZones = zones && zones.zones.length > 0;
-  const hasImports = imports && imports.edges.length > 0;
-  const showGettingStarted = manifest && (!hasImports || !hasZones);
+  // The memos run before the no-data return below, so every render calls the
+  // same hooks in the same order.
 
   // Top zones by size
   const topZones = useMemo(() => {
@@ -380,6 +375,14 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
     if (!zones) return 0;
     return zones.zones.filter(zoneNeedsAttention).length;
   }, [zones]);
+
+  if (!manifest && !inventory && !imports && !zones) {
+    return h("div", { class: "loading" }, "No data loaded. Use 'sourcevision serve' or drop files.");
+  }
+
+  const hasZones = zones && zones.zones.length > 0;
+  const hasImports = imports && imports.edges.length > 0;
+  const showGettingStarted = manifest && (!hasImports || !hasZones);
 
   const narration = manifest ? narrationNotice(manifest.narration) : null;
 
