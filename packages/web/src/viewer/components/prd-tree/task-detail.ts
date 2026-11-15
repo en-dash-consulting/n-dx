@@ -20,7 +20,7 @@ import { TrackerLinksEditor } from "../tracker-links.js";
 import { ChangeTrackerChip } from "../tracker-chip.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
-import { statusOptions } from "./status-display.js";
+import { PRIORITY_OPTIONS, statusOptions } from "./status-display.js";
 import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { useFeatureToggle, useIndexMd } from "../../hooks/index.js";
 import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-verdict-banner.js";
@@ -62,13 +62,6 @@ export interface TaskDetailProps {
 const STATUS_OPTIONS = statusOptions([
   "pending", "in_progress", "completed", "failing", "blocked", "deferred", "cancelled", "deleted",
 ]);
-
-const PRIORITY_OPTIONS: Array<{ value: Priority; label: string }> = [
-  { value: "critical", label: "Critical" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
 
 /** The items that link to a tracker work item: work, never the product layer. */
 const LINKABLE_TYPES: ReadonlySet<string> = new Set(["change", "epic", "feature", "task", "subtask"]);

@@ -5,9 +5,25 @@
  * picker, the bulk-actions bar and the facet filter all read this one table,
  * so a status looks the same wherever it appears. Each picker chooses which
  * statuses it offers, and in what order, with `statusOptions`.
+ *
+ * The priority choices every priority select and filter offers live here too.
  */
 
-import type { ItemStatus } from "./types.js";
+import type { ItemStatus, Priority } from "./types.js";
+
+/** The priorities, highest first, as the selects and the search filter offer them. */
+export const PRIORITY_OPTIONS: ReadonlyArray<{ value: Priority; label: string }> = [
+  { value: "critical", label: "Critical" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+/** `PRIORITY_OPTIONS` behind a "None" choice, for a form where priority is optional. */
+export const OPTIONAL_PRIORITY_OPTIONS: ReadonlyArray<{ value: Priority | ""; label: string }> = [
+  { value: "", label: "None" },
+  ...PRIORITY_OPTIONS,
+];
 
 export interface StatusDisplay {
   icon: string;
