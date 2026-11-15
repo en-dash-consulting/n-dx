@@ -569,6 +569,14 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     onPrdChanged();
   }, [onPrdChanged, refreshScopes]);
 
+  // Scope label for display. Read before the editor's early return, so the
+  // hooks run in the same order on every render.
+  const scopeLabel = useMemo(() => {
+    if (!selectedScope) return null;
+    const opt = scopeOptions.find((o) => o.id === selectedScope);
+    return opt ? `${opt.itemType}: ${opt.title}` : null;
+  }, [selectedScope, scopeOptions]);
+
   // ── Render: Proposal editor mode ─────────────────────────────────
 
   if (editing && proposals.length > 0) {
@@ -586,13 +594,6 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
   // ── Render: Input + preview ──────────────────────────────────────
 
   const { features: featureCount, tasks: taskCount } = proposalCounts(proposals);
-
-  // Scope label for display
-  const scopeLabel = useMemo(() => {
-    if (!selectedScope) return null;
-    const opt = scopeOptions.find((o) => o.id === selectedScope);
-    return opt ? `${opt.itemType}: ${opt.title}` : null;
-  }, [selectedScope, scopeOptions]);
 
   const panelClass = bar ? "smart-add-panel smart-add-panel-bar" : "smart-add-panel";
 

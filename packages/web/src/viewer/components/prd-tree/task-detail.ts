@@ -474,21 +474,32 @@ function addedChildCarriesPriority(item: PRDItemData, itemType: ItemType, allIte
   return childCarriesPriority(itemType, parentTypeIn(allItems, item.id));
 }
 
-/** Inline form for adding a child item within the detail panel. */
-function AddChildForm({
-  parentId,
-  parentType,
-  offerPriority,
-  onSubmit,
-  onCancel,
-}: {
+interface AddChildFormProps {
   parentId: string;
   parentType: ItemType;
   /** False when the child carries no priority (a v2 subtask), so none is offered. */
   offerPriority: boolean;
   onSubmit: (data: AddChildData) => Promise<void>;
   onCancel: () => void;
-}) {
+}
+
+/**
+ * Inline form for adding a child item within the detail panel; nothing for a
+ * type that takes no children. The fields are their own component so their
+ * hooks run in the same order on every render.
+ */
+function AddChildForm(props: AddChildFormProps) {
+  const childType = childTypeOf(props.parentType);
+  return childType ? h(AddChildFields, { ...props, childType }) : null;
+}
+
+function AddChildFields({
+  parentId,
+  childType,
+  offerPriority,
+  onSubmit,
+  onCancel,
+}: AddChildFormProps & { childType: ItemType }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [criteria, setCriteria] = useState("");
@@ -496,9 +507,6 @@ function AddChildForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExtra, setShowExtra] = useState(false);
-
-  const childType = childTypeOf(parentType);
-  if (!childType) return null;
 
   const childLabel = itemTypeLabel(childType);
   const extraLabel = offerPriority ? "Show description, criteria & priority" : "Show description & criteria";

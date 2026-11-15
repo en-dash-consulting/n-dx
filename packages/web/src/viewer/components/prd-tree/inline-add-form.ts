@@ -43,7 +43,16 @@ export interface InlineAddInput {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function InlineAddForm({ parentType, parentId, grandparentType = null, depth, onSubmit, onCancel }: InlineAddFormProps) {
+/**
+ * Nothing for a parent type that nothing nests under. The fields are their
+ * own component so their hooks run in the same order on every render.
+ */
+export function InlineAddForm(props: InlineAddFormProps) {
+  const childType = childTypeOf(props.parentType);
+  return childType ? h(InlineAddFields, { ...props, childType }) : null;
+}
+
+function InlineAddFields({ parentType, parentId, grandparentType = null, depth, onSubmit, onCancel, childType }: InlineAddFormProps & { childType: ItemType }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<string>("");
@@ -60,8 +69,6 @@ export function InlineAddForm({ parentType, parentId, grandparentType = null, de
     return () => clearTimeout(timer);
   }, []);
 
-  const childType = childTypeOf(parentType);
-  if (!childType) return null; // nothing nests under this type
   const offerPriority = childCarriesPriority(parentType, grandparentType);
 
   const childLabel = itemTypeLabel(childType);
