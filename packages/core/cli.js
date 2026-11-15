@@ -1621,6 +1621,37 @@ function establishInitLayout(dir) {
   return target;
 }
 
+/**
+ * The git settings init writes for `layout`: the .gitignore entries for what
+ * n-dx keeps machine-local or derived, the .gitattributes rules, and the
+ * merge driver those rules name.
+ *
+ * @param {string} dir  Project root.
+ * @param {import("./layout.js").Layout} layout
+ */
+function ensureInitGitSettings(dir, layout) {
+  ensureGitignoreEntry(dir, relativeToRoot(layout, layout.localConfigFile));
+  // `ndx export` writes ./ndx-export inside the project by default; the site
+  // it produces carries PRD data and run summaries, so it must not be
+  // committable by accident.
+  ensureGitignoreEntry(dir, "ndx-export/");
+  // The dashboard's pid/port markers and spend ledger are machine-local.
+  ensureWebRuntimeIgnores(dir, layout);
+  // Every vendor-CLI invocation appends to claude_commands.log in the project
+  // (cli-log.js); left untracked it shows in every git status, and hench's
+  // uncommitted-work gate refuses to complete a task over it.
+  ensureGitignoreEntry(dir, `${CLI_LOG_FILENAME}*`);
+  // The Graview projection is derived from the PRD, the analysis and the runs
+  // and rebuilt by every `ndx graview` command, so it is never committed.
+  ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
+  // The dashboard's pid/port/spend files and the analysis caches are rewritten
+  // on every server start and analysis. Committed — by init's own commit, or a
+  // user's first `git add .` — they dirty the tree again and block `ndx work`.
+  for (const entry of machineLocalIgnoreEntries(dir)) ensureGitignoreEntry(dir, entry);
+  ensureGitattributesRules(dir, layout);
+  ensureMergeDriverRegistered(dir);
+}
+
 async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
@@ -1666,26 +1697,7 @@ async function handleInit(rest) {
   const svExists = existsSync(layout.sourcevisionDir);
   const rexExists = existsSync(layout.rexDir);
   const henchExists = existsSync(layout.henchDir);
-  ensureGitignoreEntry(dir, relativeToRoot(layout, layout.localConfigFile));
-  // `ndx export` writes ./ndx-export inside the project by default; the site
-  // it produces carries PRD data and run summaries, so it must not be
-  // committable by accident.
-  ensureGitignoreEntry(dir, "ndx-export/");
-  // The dashboard's pid/port markers and spend ledger are machine-local.
-  ensureWebRuntimeIgnores(dir, layout);
-  // Every vendor-CLI invocation appends to claude_commands.log in the project
-  // (cli-log.js); left untracked it shows in every git status, and hench's
-  // uncommitted-work gate refuses to complete a task over it.
-  ensureGitignoreEntry(dir, `${CLI_LOG_FILENAME}*`);
-  // The Graview projection is derived from the PRD, the analysis and the runs
-  // and rebuilt by every `ndx graview` command, so it is never committed.
-  ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
-  // The dashboard's pid/port/spend files and the analysis caches are rewritten
-  // on every server start and analysis. Committed — by init's own commit, or a
-  // user's first `git add .` — they dirty the tree again and block `ndx work`.
-  for (const entry of machineLocalIgnoreEntries(dir)) ensureGitignoreEntry(dir, entry);
-  ensureGitattributesRules(dir, layout);
-  ensureMergeDriverRegistered(dir);
+  ensureInitGitSettings(dir, layout);
   // Independent of the Claude integration and of how it finds Claude: a
   // claudePath an older init discovered and wrote into .hench/config.json
   // reads as a repository-chosen binary and leaves this checkout untrusted.
@@ -3339,6 +3351,22 @@ function handleRenamedCommand(oldName, newName, aliasName) {
   exitWithCleanup(1);
 }
 
+/**
+ * The id of the first pending task titled `title` in `items`, searched depth
+ * first, or null.
+ */
+function findPendingTaskId(items, title) {
+  if (!Array.isArray(items)) return null;
+  for (const item of items) {
+    if (item.status === "pending" && item.title === title) {
+      return item.id;
+    }
+    const found = findPendingTaskId(item.children, title);
+    if (found) return found;
+  }
+  return null;
+}
+
 async function handlePairProgramming(rest) {
   const flags = extractFlags(rest);
   const positionals = rest.filter((a) => !a.startsWith("-"));
@@ -3432,23 +3460,8 @@ async function handlePairProgramming(rest) {
       return;
     }
 
-    // Get the task ID by querying the PRD again and finding the newest pending task
-    const updatedStatusData = readRexStatus();
-
-    // Find the task we just created by searching through all tasks
-    const findTask = (items) => {
-      if (!Array.isArray(items)) return null;
-      for (const item of items) {
-        if (item.status === "pending" && item.title === description) {
-          return item.id;
-        }
-        const found = findTask(item.children);
-        if (found) return found;
-      }
-      return null;
-    };
-
-    createdTaskId = findTask(updatedStatusData.items);
+    // Get the task ID by querying the PRD again for a pending task with this title
+    createdTaskId = findPendingTaskId(readRexStatus().items, description);
     if (!createdTaskId) {
       console.error("Error: could not determine created task ID");
       exitWithCleanup(1);
