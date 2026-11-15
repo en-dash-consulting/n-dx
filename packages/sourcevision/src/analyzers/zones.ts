@@ -79,7 +79,7 @@ import { recordPartitionReview, recordRerun, setRunMode } from "./run-ledger.js"
 import { computeAreas } from "./zone-areas.js";
 import { nameAreas } from "./area-naming.js";
 import { nameSubZones } from "./subzone-naming.js";
-import { emptyAnalyzeTokenUsage } from "./token-usage.js";
+import { addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
 import type { MoveContext } from "./move-recommendations.js";
@@ -3445,9 +3445,7 @@ export async function analyzeZones(
   structural.findings.push(...moves.findings);
   if (moves.calls > 0) {
     enrichTokenUsage ??= emptyAnalyzeTokenUsage();
-    enrichTokenUsage.calls += moves.calls;
-    enrichTokenUsage.inputTokens += moves.tokenUsage?.input ?? 0;
-    enrichTokenUsage.outputTokens += moves.tokenUsage?.output ?? 0;
+    addCallUsage(enrichTokenUsage, moves.calls, moves.tokenUsage);
   }
 
   // ── Judgment step (enrich-judge.ts) ──
@@ -3471,9 +3469,7 @@ export async function analyzeZones(
   for (const r of [judged, fragility]) {
     if (r.calls === 0) continue;
     enrichTokenUsage ??= emptyAnalyzeTokenUsage();
-    enrichTokenUsage.calls += r.calls;
-    enrichTokenUsage.inputTokens += r.tokenUsage?.input ?? 0;
-    enrichTokenUsage.outputTokens += r.tokenUsage?.output ?? 0;
+    addCallUsage(enrichTokenUsage, r.calls, r.tokenUsage);
   }
 
   // ── Merge insights ──
@@ -3507,9 +3503,7 @@ export async function analyzeZones(
   allFindings = heuristicJudged.findings;
   if (heuristicJudged.calls > 0) {
     enrichTokenUsage ??= emptyAnalyzeTokenUsage();
-    enrichTokenUsage.calls += heuristicJudged.calls;
-    enrichTokenUsage.inputTokens += heuristicJudged.tokenUsage?.input ?? 0;
-    enrichTokenUsage.outputTokens += heuristicJudged.tokenUsage?.output ?? 0;
+    addCallUsage(enrichTokenUsage, heuristicJudged.calls, heuristicJudged.tokenUsage);
   }
 
   // ── Typed findings (typed-findings.ts) ──
@@ -3533,9 +3527,7 @@ export async function analyzeZones(
   allFindings = [...allFindings, ...typedJudged.findings];
   if (typedJudged.calls > 0) {
     enrichTokenUsage ??= emptyAnalyzeTokenUsage();
-    enrichTokenUsage.calls += typedJudged.calls;
-    enrichTokenUsage.inputTokens += typedJudged.tokenUsage?.input ?? 0;
-    enrichTokenUsage.outputTokens += typedJudged.tokenUsage?.output ?? 0;
+    addCallUsage(enrichTokenUsage, typedJudged.calls, typedJudged.tokenUsage);
     // The band these two share was carried over from the heuristic judgment.
     // Printing how often they agree on the same zone is the measurement that
     // lets it be set from data instead.
@@ -3571,9 +3563,7 @@ export async function analyzeZones(
   allFindings = [...allFindings, ...ruleCheck.findings];
   if (ruleCheck.calls > 0) {
     enrichTokenUsage ??= emptyAnalyzeTokenUsage();
-    enrichTokenUsage.calls += ruleCheck.calls;
-    enrichTokenUsage.inputTokens += ruleCheck.tokenUsage?.input ?? 0;
-    enrichTokenUsage.outputTokens += ruleCheck.tokenUsage?.output ?? 0;
+    addCallUsage(enrichTokenUsage, ruleCheck.calls, ruleCheck.tokenUsage);
   }
 
   // ── Back-populate findings into insights for backward compatibility ──

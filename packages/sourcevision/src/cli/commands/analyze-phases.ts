@@ -57,6 +57,7 @@ import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
 import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
+import { mergeTokenUsage } from "../../analyzers/token-usage.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
 
@@ -130,21 +131,6 @@ function loadPreviousData(filePath: string): any {
     return JSON.parse(readFileSync(filePath, "utf-8"));
   } catch {
     return undefined; // Corrupted — start fresh
-  }
-}
-
-/** Merge one AnalyzeTokenUsage aggregate into another. */
-function accumulateFromAggregate(target: AnalyzeTokenUsage, source: AnalyzeTokenUsage): void {
-  target.calls += source.calls;
-  target.inputTokens += source.inputTokens;
-  target.outputTokens += source.outputTokens;
-  if (source.cacheCreationInputTokens) {
-    target.cacheCreationInputTokens =
-      (target.cacheCreationInputTokens ?? 0) + source.cacheCreationInputTokens;
-  }
-  if (source.cacheReadInputTokens) {
-    target.cacheReadInputTokens =
-      (target.cacheReadInputTokens ?? 0) + source.cacheReadInputTokens;
   }
 }
 
@@ -303,7 +289,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
         classifications = mergeClassificationResults(classifications, llmResult.updatedFiles);
         info(`  ${cyan("LLM classified")} ${bold(String(llmResult.updatedFiles.length))} additional files`);
       }
-      accumulateFromAggregate(ctx.tokenUsage, llmResult.tokenUsage);
+      mergeTokenUsage(ctx.tokenUsage, llmResult.tokenUsage);
     }
 
     const outPath = join(ctx.svDir, DATA_FILES.classifications);
@@ -434,7 +420,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     });
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
-      accumulateFromAggregate(ctx.tokenUsage, zonesResult.tokenUsage);
+      mergeTokenUsage(ctx.tokenUsage, zonesResult.tokenUsage);
     }
     if (zonesResult.pendingNarration && zonesResult.pendingNarration.length > 0) {
       ctx.pendingNarration = zonesResult.pendingNarration;
@@ -488,7 +474,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         });
         zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {
-          accumulateFromAggregate(ctx.tokenUsage, zonesResult.tokenUsage);
+          mergeTokenUsage(ctx.tokenUsage, zonesResult.tokenUsage);
         }
         writeFileSync(outPath, toCanonicalJSON(zones));
 

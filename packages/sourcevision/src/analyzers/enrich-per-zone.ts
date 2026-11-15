@@ -27,7 +27,7 @@ import {
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
-import { emptyAnalyzeTokenUsage } from "./token-usage.js";
+import { addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import { markPass, markBatch } from "./analyze-progress.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -453,10 +453,7 @@ export async function enrichZonesPerZone(
     newZoneInsights.set(result.zone.id, result.newInsights);
     allNewFindings.push(...result.newFindings);
 
-    // Accumulate token usage
-    totalTokenUsage.calls += result.tokenUsage.calls;
-    totalTokenUsage.inputTokens += result.tokenUsage.input;
-    totalTokenUsage.outputTokens += result.tokenUsage.output;
+    addCallUsage(totalTokenUsage, result.tokenUsage.calls, result.tokenUsage);
   }
 
   // Combine enriched + unchanged zones
