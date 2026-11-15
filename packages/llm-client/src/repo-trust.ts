@@ -98,7 +98,7 @@ import {
   type ResolveNdxHomeOptions,
 } from "./layout.js";
 import { gitlinkAt, gitTracksPath, insideGitWorkTree } from "./exec.js";
-import { toCanonicalJSON } from "./json.js";
+import { isRecord, toCanonicalJSON } from "./json.js";
 import { deepMerge } from "./project-config.js";
 
 /**
@@ -635,7 +635,7 @@ function optionalNumber(value: unknown): number | null {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return isRecord(value) ? value : null;
 }
 
 /** `config[key]` when it is a plain object, else null. */
@@ -938,7 +938,6 @@ const LLM_VENDOR_KEYS = ["claude", "codex", "google", "local"] as const;
 
 type FieldCheck = (value: unknown) => boolean;
 
-const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const isString = (v: unknown): v is string => typeof v === "string";
 const positive: FieldCheck = (v) => isNumber(v) && v > 0;
