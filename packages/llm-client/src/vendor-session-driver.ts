@@ -28,6 +28,7 @@ import type {
   RuntimeEventType,
 } from "./runtime-contract.js";
 import type { UsageMessageFilter } from "./usage-dedup.js";
+import { asRecord } from "./json.js";
 import { codexShellEnvFlags } from "./codex-cli-provider.js";
 import {
   mapCodexUsageToTokenUsage,
@@ -511,19 +512,13 @@ export function extractClaudeSessionId(rawJson: unknown): string | undefined {
   return typeof id === "string" && id ? id : undefined;
 }
 
-function usageRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
 function claudeUsageEvent(
   rawJson: unknown,
   turn: number,
   seen: UsageMessageFilter,
   turnHasUsage: boolean,
 ): RuntimeEvent | null {
-  const raw = usageRecord(rawJson);
+  const raw = asRecord(rawJson);
   if (!raw) return null;
 
   let usage: Record<string, unknown> | undefined;
@@ -531,9 +526,9 @@ function claudeUsageEvent(
     // The turn's total. Counting it beside the per-message usage would count
     // the turn twice, so it only stands in when no message reported any.
     if (turnHasUsage) return null;
-    usage = usageRecord(raw.usage);
+    usage = asRecord(raw.usage);
   } else {
-    usage = usageRecord(usageRecord(raw.message)?.usage);
+    usage = asRecord(asRecord(raw.message)?.usage);
   }
   if (!usage) return null;
   if (!seen.accept(rawJson)) return null;
@@ -1200,9 +1195,9 @@ function codexUsageEvent(
   turn: number,
   seen: UsageMessageFilter,
 ): RuntimeEvent | null {
-  const raw = usageRecord(rawJson);
+  const raw = asRecord(rawJson);
   // `turn.completed` carries the turn's usage; nothing else in `--json` does.
-  if (!raw || !usageRecord(raw.usage)) return null;
+  if (!raw || !asRecord(raw.usage)) return null;
   if (!seen.accept(rawJson)) return null;
 
   return tokenUsageEvent(LLM_VENDOR.CODEX, turn, mapCodexUsageToTokenUsage(raw));

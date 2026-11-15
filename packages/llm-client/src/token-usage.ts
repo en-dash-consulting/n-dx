@@ -21,6 +21,7 @@
 
 import type { TokenUsage } from "./types.js";
 import type { TokenDiagnosticStatus } from "./runtime-contract.js";
+import { asRecord } from "./json.js";
 
 // ── Diagnostic-aware result type ──────────────────────────────────────────
 
@@ -302,14 +303,6 @@ export function parseStreamTokenUsageWithDiagnostic(
 
 // ── Codex token parsing ───────────────────────────────────────────────────
 
-/** Safe cast to Record<string, unknown> or undefined. */
-function asUsageRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
-}
-
 /** Read first matching numeric field from an object. */
 function readNumber(obj: Record<string, unknown>, keys: string[]): number | undefined {
   for (const key of keys) {
@@ -354,10 +347,10 @@ export interface CodexTokenMapping {
  * When all fields are present, returns `diagnosticStatus: "complete"`.
  */
 export function mapCodexUsageToTokenUsage(raw: unknown): CodexTokenMapping {
-  const top = asUsageRecord(raw);
-  const usage = asUsageRecord(top?.usage)
-    ?? asUsageRecord(asUsageRecord(top?.response)?.usage)
-    ?? asUsageRecord(asUsageRecord(top?.data)?.usage);
+  const top = asRecord(raw);
+  const usage = asRecord(top?.usage)
+    ?? asRecord(asRecord(top?.response)?.usage)
+    ?? asRecord(asRecord(top?.data)?.usage);
 
   if (!usage && !top) {
     return {

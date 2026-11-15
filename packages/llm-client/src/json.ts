@@ -16,3 +16,10 @@
 export function toCanonicalJSON(data: unknown): string {
   return JSON.stringify(data, null, 2) + "\n";
 }
+
+/** `value` when it is a JSON object (not null or an array), else undefined. */
+export function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
