@@ -39,8 +39,7 @@ import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-inte
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 import { classifyAuthError, extractJsonErrorMessage } from "./llm-error-classifier.js";
 import { resolveClaudeCliEffort } from "./claude-effort.js";
-import { printRetryLine } from "./progress-reporter.js";
-import { formatRetryCountdown } from "./rate-limit.js";
+import { printRateLimitRetryLine } from "./progress-reporter.js";
 import { resolveVendorCliEnv } from "./child-env.js";
 
 /** Regex patterns for stderr content indicating an auth error. */
@@ -386,17 +385,12 @@ function parseStreamOutput(stdout: string): CompletionResult {
  * Claude CLI authenticates through a browser session that cannot be probed
  * programmatically without making a real completion request.
  */
-function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
-  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
-}
-
 export function createCliClient(options: CliProviderOptions): ClaudeClient & LLMProvider {
   const cliBinary = resolveCliPath(options.claudeConfig);
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
-  const onRetry = options.onRetry ?? defaultRateLimitOnRetry;
+  const onRetry = options.onRetry ?? printRateLimitRetryLine;
 
   const info: ProviderInfo = {
     vendor: LLM_VENDOR.CLAUDE,
