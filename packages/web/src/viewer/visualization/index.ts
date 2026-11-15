@@ -41,6 +41,7 @@ export {
   buildCallFlowEdges,
   buildExternalImportEdges,
   buildFlowNodes,
+  mapPackagesToZones,
 } from "./flow.js";
 
 // ── Primitive components: charts & gauges ───────────────────────────

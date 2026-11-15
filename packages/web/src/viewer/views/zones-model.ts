@@ -8,7 +8,7 @@
 
 import type { LoadedData } from "../types.js";
 import type { CallGraph, ExternalImport, Zone, ZoneCrossing } from "../external.js";
-import { getZoneColorByIndex } from "../visualization/index.js";
+import { getZoneColorByIndex, mapPackagesToZones } from "../visualization/index.js";
 import type {
   ZoneData,
   BoxRect,
@@ -368,33 +368,7 @@ export function buildFileConnectionMap(
 
   // From external imports: map package names to zones
   if (zones) {
-    const dirToZone = new Map<string, { zoneId: string; hasSrc: boolean }>();
-    for (const z of zones.zones) {
-      for (const f of z.files) {
-        const parts = f.split("/");
-        if (parts.length >= 2 && parts[0] === "packages") {
-          const dir = `packages/${parts[1]}`;
-          const isSrc = f.includes("/src/");
-          const existing = dirToZone.get(dir);
-          if (!existing || (isSrc && !existing.hasSrc)) {
-            dirToZone.set(dir, { zoneId: z.id, hasSrc: isSrc });
-          }
-        }
-      }
-    }
-
-    const pkgToZone = new Map<string, string>();
-    for (const ext of externalImports) {
-      const pkg = ext.package;
-      if (pkgToZone.has(pkg)) continue;
-      if (pkg.startsWith("@n-dx/")) {
-        const entry = dirToZone.get(`packages/${pkg.slice(6)}`);
-        if (entry) { pkgToZone.set(pkg, entry.zoneId); continue; }
-      }
-      const entry = dirToZone.get(`packages/${pkg}`);
-      if (entry) { pkgToZone.set(pkg, entry.zoneId); }
-    }
-
+    const pkgToZone = mapPackagesToZones(externalImports, zones);
     for (const ext of externalImports) {
       const targetZone = pkgToZone.get(ext.package);
       if (!targetZone) continue;

@@ -73,21 +73,13 @@ export function buildCallFlowEdges(
 }
 
 /**
- * Build cross-zone edges from external package imports.
- *
- * Static call analysis can't resolve cross-package function calls — they appear
- * as external imports (e.g. `import { ... } from "rex"`). This function maps
- * those external package names back to zones and creates weighted edges so the
- * call graph diagram shows inter-package traffic.
+ * Map the packages `external` imports to the zones that own them, by finding
+ * which zone owns files in each package's directory. E.g. "rex" →
+ * packages/rex/ → the zone whose files start with packages/rex/src/;
+ * "@n-dx/llm-client" → packages/llm-client/ → that package's zone. A package
+ * with no files in any zone is left out.
  */
-export function buildExternalImportEdges(
-  external: ExternalImport[],
-  fileToZoneMap: Map<string, FileZone>,
-  zones: Zones,
-): WeightedEdge[] {
-  // Map package names to zone IDs by finding which zone owns files in that package dir.
-  // E.g. "rex" → packages/rex/ → zone whose files start with packages/rex/src/
-  // "@n-dx/llm-client" → packages/claude-client/ → claude-client zone
+export function mapPackagesToZones(external: ExternalImport[], zones: Zones): Map<string, string> {
   const pkgToZone = new Map<string, string>();
 
   // Build directory prefix → zone mapping from zone file lists.
@@ -115,7 +107,7 @@ export function buildExternalImportEdges(
 
     // Try scoped packages: @n-dx/foo → packages/foo
     if (pkg.startsWith("@n-dx/")) {
-      const name = pkg.slice(6); // "claude-client", "web"
+      const name = pkg.slice(6); // "llm-client", "web"
       const entry = dirToZone.get(`packages/${name}`);
       if (entry) { pkgToZone.set(pkg, entry.zoneId); continue; }
     }
@@ -124,6 +116,24 @@ export function buildExternalImportEdges(
     const entry = dirToZone.get(`packages/${pkg}`);
     if (entry) { pkgToZone.set(pkg, entry.zoneId); continue; }
   }
+
+  return pkgToZone;
+}
+
+/**
+ * Build cross-zone edges from external package imports.
+ *
+ * Static call analysis can't resolve cross-package function calls — they appear
+ * as external imports (e.g. `import { ... } from "rex"`). This function maps
+ * those external package names back to zones and creates weighted edges so the
+ * call graph diagram shows inter-package traffic.
+ */
+export function buildExternalImportEdges(
+  external: ExternalImport[],
+  fileToZoneMap: Map<string, FileZone>,
+  zones: Zones,
+): WeightedEdge[] {
+  const pkgToZone = mapPackagesToZones(external, zones);
 
   // Build cross-zone edges: for each external import, map importedBy files to their zones
   const pairCounts = new Map<string, number>();
