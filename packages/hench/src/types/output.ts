@@ -42,11 +42,6 @@ export {
 
 import { isQuiet, isVerbose, verbose, bold, dim, yellow, red, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";
 
-/**
- * Await a long-running operation, printing a periodic "still running" tick
- * under --verbose so a slow step can be told apart from a hung one. No-op
- * (besides awaiting) unless verbose mode is active.
- */
 /** A duration as `42s`, or `3m 7s` from a minute up; partial seconds are dropped. */
 export function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -56,6 +51,11 @@ export function formatDuration(ms: number): string {
   return `${minutes}m ${remaining}s`;
 }
 
+/**
+ * Await a long-running operation, printing a periodic "still running" tick
+ * under --verbose so a slow step can be told apart from a hung one. No-op
+ * (besides awaiting) unless verbose mode is active.
+ */
 export async function withHeartbeat<T>(label: string, promise: Promise<T>, intervalMs = 15_000): Promise<T> {
   if (!isVerbose()) return promise;
   const startMs = Date.now();

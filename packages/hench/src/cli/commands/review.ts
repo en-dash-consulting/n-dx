@@ -18,7 +18,6 @@
  * @module hench/cli/commands/review
  */
 
-
 import { loadRun } from "../../store/runs.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { CLIError } from "../errors.js";
