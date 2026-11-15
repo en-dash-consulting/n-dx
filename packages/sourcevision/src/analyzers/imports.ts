@@ -27,6 +27,7 @@ import { readManifest } from "./manifest.js";
 import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
 import { type FileFacts, type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
 import { isTerraformSource } from "./terraform-infrastructure.js";
+import { parseJsTsSource } from "./ts-source.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -47,15 +48,7 @@ export interface RawImport {
 }
 
 export function extractImports(sourceText: string, filePath: string): RawImport[] {
-  const ext = extname(filePath);
-  const scriptKind =
-    ext === ".tsx" || ext === ".jsx"
-      ? ts.ScriptKind.TSX
-      : ext === ".ts"
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS;
-
-  const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, false, scriptKind);
+  const sf = parseJsTsSource(filePath, sourceText, false);
   const imports: RawImport[] = [];
 
   function visit(node: ts.Node) {

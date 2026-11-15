@@ -32,6 +32,7 @@ import {
 } from "./route-detection.js";
 import { detectServerRoutes } from "./server-route-detection.js";
 import { withPackRouteGroups, type PackFrameworkFacts } from "./pack-framework-facts.js";
+import { parseJsTsSource } from "./ts-source.js";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js";
 
@@ -39,13 +40,6 @@ const JSX_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const ALL_PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function getScriptKind(filePath: string): ts.ScriptKind {
-  const ext = extname(filePath);
-  if (ext === ".tsx" || ext === ".jsx") return ts.ScriptKind.TSX;
-  if (ext === ".ts") return ts.ScriptKind.TS;
-  return ts.ScriptKind.JS;
-}
 
 function isPascalCase(name: string): boolean {
   return /^[A-Z][a-zA-Z0-9]*$/.test(name);
@@ -75,13 +69,7 @@ export function extractComponentDefinitions(
   sourceText: string,
   filePath: string
 ): ComponentDefinition[] {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    getScriptKind(filePath)
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const components: ComponentDefinition[] = [];
 
@@ -260,13 +248,7 @@ export function extractJsxUsages(
   sourceText: string,
   filePath: string
 ): Array<{ componentName: string; count: number }> {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    getScriptKind(filePath)
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const counts = new Map<string, number>();
 
@@ -305,13 +287,7 @@ export function extractConventionExports(
   sourceText: string,
   filePath: string
 ): RouteExportKind[] {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    getScriptKind(filePath)
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const exports: RouteExportKind[] = [];
 
