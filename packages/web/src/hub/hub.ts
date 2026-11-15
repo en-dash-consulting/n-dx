@@ -214,7 +214,6 @@ function postExecute(
   });
 }
 
-/** A response's JSON body when it is an object; null for anything else. */
 /** The registered projects, as the OAuth callback page reads them. */
 function callbackProjects(hub: Hub): CallbackProjects {
   return {
@@ -226,6 +225,7 @@ function callbackProjects(hub: Hub): CallbackProjects {
   };
 }
 
+/** A response's JSON body when it is an object; null for anything else. */
 async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await res.json();
@@ -235,10 +235,6 @@ async function readJsonObject(res: Response): Promise<Record<string, unknown> | 
   }
 }
 
-/**
- * Hub state and operations, independent of HTTP so the routes stay thin and
- * the lifecycle is testable without a socket.
- */
 /**
  * The binary every project server is spawned from.
  *
@@ -293,6 +289,10 @@ export function resolveNdxCli(explicit: string | null | undefined, webRoot: stri
   return "";
 }
 
+/**
+ * Hub state and operations, independent of HTTP so the routes stay thin and
+ * the lifecycle is testable without a socket.
+ */
 export class Hub {
   readonly hubHome: string;
   readonly registryPath: string;
