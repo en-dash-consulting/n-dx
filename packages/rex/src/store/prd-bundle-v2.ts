@@ -40,7 +40,9 @@ import { join } from "node:path";
 import {
   BUNDLE_KIND,
   BundleError,
+  exportProvenance,
   parseBundle,
+  readProvenance,
   sameContent,
   type BundleCollision,
   type BundleProvenance,
@@ -167,9 +169,7 @@ export interface BuildBundleV2Options {
 /** Snapshot a loaded v2 model into an envelope v2 bundle. The nodes are deep-cloned. */
 export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {}): PRDBundleV2 {
   const rows = options.stateRows ?? new Map<string, ItemState>();
-  const provenance: BundleProvenance = {};
-  if (options.branch) provenance.branch = options.branch;
-  if (options.commit) provenance.commit = options.commit;
+  const exportedFrom = exportProvenance(options);
   const header = carriedHeader(model.header);
   if (options.folderState) assertFolderStateOwners(model.tree, options.folderState, model.warnings);
   const folderState = options.folderState ? carriedFolderState(options.folderState) : undefined;
@@ -181,7 +181,7 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
     title: model.title,
     ...(header ? { header } : {}),
     exportedAt: options.exportedAt ?? new Date().toISOString(),
-    ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),
+    ...(exportedFrom ? { exportedFrom } : {}),
     product: toBundleNodes(model.tree.product, rows),
     changes: toBundleNodes(model.tree.changes, rows),
     ...(folderState ? { folderState } : {}),
@@ -342,13 +342,8 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
   };
   if (header) parsed.header = header;
   if (folderState) parsed.folderState = folderState;
-  if (isRecord(candidate.exportedFrom)) {
-    const { branch, commit } = candidate.exportedFrom;
-    const provenance: BundleProvenance = {};
-    if (typeof branch === "string") provenance.branch = branch;
-    if (typeof commit === "string") provenance.commit = commit;
-    if (Object.keys(provenance).length > 0) parsed.exportedFrom = provenance;
-  }
+  const exportedFrom = readProvenance(candidate.exportedFrom);
+  if (exportedFrom) parsed.exportedFrom = exportedFrom;
   return parsed;
 }
 
