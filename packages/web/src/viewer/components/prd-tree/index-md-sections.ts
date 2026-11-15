@@ -1,12 +1,13 @@
 /**
  * Preact components for rendering index.md schema sections in detail panel.
  *
- * Renders: Progress table (sortable), Commits, Changes, Info, Summary, Subtasks
+ * Renders: Progress table (sortable), Commits, Changes, Info, Subtasks
  *
  * @module web/viewer/components/prd-tree/index-md-sections
  */
 
 import { h, Fragment } from "preact";
+import type { ComponentChildren } from "preact";
 import { useState, useMemo } from "preact/hooks";
 import type {
   IndexMdSections,
@@ -265,30 +266,6 @@ export function InfoSection({ fields }: { fields: InfoField[] }) {
 }
 
 /**
- * Summary Section (rendered prose)
- */
-export function SummarySection({ markdown }: { markdown: string }) {
-  // Simple markdown to HTML conversion for summary
-  // In a real implementation, you'd use the existing renderMarkdownPreview pattern
-  const html = markdown
-    .split("\n")
-    .map((line) => {
-      if (line.startsWith("# ")) return `<h1>${escapeHtml(line.slice(2))}</h1>`;
-      if (line.startsWith("## ")) return `<h2>${escapeHtml(line.slice(3))}</h2>`;
-      if (line.startsWith("- ")) return `<li>${escapeHtml(line.slice(2))}</li>`;
-      if (line.startsWith("* ")) return `<li>${escapeHtml(line.slice(2))}</li>`;
-      if (line.trim()) return `<p>${escapeHtml(line)}</p>`;
-      return "";
-    })
-    .join("");
-
-  return h("div", {
-    class: "detail-summary-section",
-    dangerouslySetInnerHTML: { __html: html },
-  });
-}
-
-/**
  * Subtasks display
  */
 export function SubtasksList({ subtasks }: { subtasks: SubtaskEntry[] }) {
@@ -325,6 +302,16 @@ export function SubtasksList({ subtasks }: { subtasks: SubtaskEntry[] }) {
   );
 }
 
+/** One labelled detail-panel section around a parsed index.md block. */
+function LabeledSection({ label, children }: { label: string; children?: ComponentChildren }) {
+  return h(
+    "div",
+    { class: "task-section" },
+    h("div", { class: "task-section-label" }, label),
+    children,
+  );
+}
+
 /**
  * Main index.md sections container
  */
@@ -336,68 +323,25 @@ export function IndexMdSectionsPanel({ sections, gitRemoteUrl }: { sections: Ind
   return h(
     Fragment,
     null,
-    // Progress section
     sections.progress && sections.progress.length > 0
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Progress"),
-          h(ProgressTable, { rows: sections.progress }),
-        )
+      ? h(LabeledSection, { label: "Progress" }, h(ProgressTable, { rows: sections.progress }))
       : null,
-
-    // Commits section
     sections.commits && sections.commits.length > 0
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Commits"),
-          h(CommitsList, { commits: sections.commits, gitRemoteUrl }),
-        )
+      ? h(LabeledSection, { label: "Commits" }, h(CommitsList, { commits: sections.commits, gitRemoteUrl }))
       : null,
-
-    // Changes section
     sections.changes && sections.changes.length > 0
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Changes"),
-          h(ChangesList, { changes: sections.changes }),
-        )
+      ? h(LabeledSection, { label: "Changes" }, h(ChangesList, { changes: sections.changes }))
       : null,
-
-    // Info section
     sections.info && sections.info.length > 0
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Extended Info"),
-          h(InfoSection, { fields: sections.info }),
-        )
+      ? h(LabeledSection, { label: "Extended Info" }, h(InfoSection, { fields: sections.info }))
       : null,
-
-    // Subtasks section
     sections.subtasks && sections.subtasks.length > 0
       ? h(SubtasksList, { subtasks: sections.subtasks })
       : null,
-
     // Fallback: raw markdown if parsing failed
     sections.rawMarkdown && !sections.progress && !sections.commits
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Schema Content (Legacy)"),
-          h("pre", { class: "detail-raw-markdown" }, sections.rawMarkdown),
-        )
+      ? h(LabeledSection, { label: "Schema Content (Legacy)" },
+          h("pre", { class: "detail-raw-markdown" }, sections.rawMarkdown))
       : null,
   );
-}
-
-/**
- * Simple HTML escape utility
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
 }
