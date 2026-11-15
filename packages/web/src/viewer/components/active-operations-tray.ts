@@ -17,7 +17,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import type { ActiveOperation } from "../hooks/index.js";
 import { useTick } from "../hooks/index.js";
-import { fmtDuration } from "../utils/format.js";
+import { elapsedUntilNow } from "./elapsed-time.js";
 import type { NavigateTo } from "../types.js";
 
 export interface ActiveOperationsTrayProps {
@@ -33,14 +33,10 @@ const STATUS_ICON: Record<ActiveOperation["status"], string> = {
   failed: "✗", // ✗
 };
 
-function elapsedFormatter(startedAt: string): string {
-  return fmtDuration(startedAt, new Date().toISOString());
-}
-
 function OperationRow(
   { op, navigateTo, onStop }: { op: ActiveOperation; navigateTo?: NavigateTo; onStop?: (op: ActiveOperation) => void },
 ) {
-  const elapsed = useTick(op.startedAt, elapsedFormatter);
+  const elapsed = useTick(op.startedAt, elapsedUntilNow);
   // The full failure detail (untruncated) is only actually logged to the
   // Activity log for hench task executions (routes-hench.ts's
   // task_execution_failed entries) — don't offer the link for operation
