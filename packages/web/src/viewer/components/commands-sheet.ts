@@ -9,7 +9,7 @@
 import { h } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEscapeKey } from "./use-escape-key.js";
 
 export interface CommandsSheetProps {
   open: boolean;
@@ -22,12 +22,7 @@ export interface CommandsSheetProps {
 }
 
 export function CommandsSheet({ open, onClose, children }: CommandsSheetProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  useEscapeKey(open, onClose);
 
   return h("div", { class: `commands-sheet-layer${open ? " open" : ""}` },
     open ? h("div", { class: "commands-sheet-scrim", onClick: onClose, "aria-hidden": "true" }) : null,

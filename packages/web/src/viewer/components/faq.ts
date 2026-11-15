@@ -1,7 +1,8 @@
 import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import { BodyPortal } from "./body-portal.js";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useCallback } from "preact/hooks";
+import { useEscapeKey } from "./use-escape-key.js";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 interface FAQItem {
@@ -204,15 +205,8 @@ function FAQModal({ onClose }: { onClose: () => void }) {
 export function GlobalFAQ() {
   const [open, setOpen] = useState(false);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useEscapeKey(open, close);
 
   return h(Fragment, null,
     h("button", {
