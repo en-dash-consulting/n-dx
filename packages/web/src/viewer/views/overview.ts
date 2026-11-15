@@ -96,8 +96,7 @@ function priorityCounts(steps: NextStep[]): [string, number][] {
  * Collapsed by default to one summary line — the count by priority and the
  * top step's title — so the map above it stays the first thing on the page.
  * The open state is remembered per browser.
- */
-/**
+ *
  * `embedded`: inside a dashboard tile, which already names it — always open,
  * no caret or heading of its own, the counts and Copy all kept.
  */

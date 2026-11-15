@@ -1,4 +1,3 @@
-import { TOAST_DURATION_MS } from "../utils/notifications.js";
 /**
  * App data management hook for the viewer.
  *
@@ -30,6 +29,7 @@ import {
 } from "../loader/index.js";
 import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { TOAST_DURATION_MS } from "../utils/notifications.js";
 
 /**
  * Where the page is running. `unavailable` is a server that answered but
