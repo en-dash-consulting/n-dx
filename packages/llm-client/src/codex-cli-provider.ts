@@ -75,11 +75,6 @@ export interface CodexCliProviderOptions {
 // ── Policy flag compilation ──────────────────────────────────────────────
 
 /**
- * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
- *
- * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
- */
-/**
  * The `--sandbox` values `codex exec` accepts.
  *
  * From `codex exec --help`: `[possible values: read-only, workspace-write,
@@ -109,6 +104,11 @@ export type CodexApprovalPolicy =
   | "granular"
   | "never";
 
+/**
+ * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
+ *
+ * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
+ */
 export function mapSandboxToCodexFlag(mode: SandboxMode): CodexSandboxMode {
   switch (mode) {
     case "read-only":
