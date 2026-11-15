@@ -27,6 +27,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { openReconnectingSocket } from "../live-feed-socket.js";
 import { createWSPipeline } from "./use-gateway.js";
+import { getJson, sendJson } from "./json-requests.js";
 import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
@@ -413,36 +414,8 @@ export function orderCards(cards: readonly SidecarCard[]): SidecarCard[] {
   return [...cards].sort((a, b) => (a.raisedAt < b.raisedAt ? -1 : a.raisedAt > b.raisedAt ? 1 : 0));
 }
 
-async function getJson<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url);
-    return res.ok ? (await res.json()) as T : null;
-  } catch {
-    return null;
-  }
-}
-
 const postJson = <T>(url: string, body: unknown) => sendJson<T>("POST", url, body);
 const patchJson = <T>(url: string, body: unknown) => sendJson<T>("PATCH", url, body);
-
-/** Send a JSON body; the parsed answer, or the server's error text. */
-async function sendJson<T>(
-  method: "POST" | "PATCH",
-  url: string,
-  body: unknown,
-): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({})) as T & { error?: string };
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Request failed (${res.status})` };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
 
 /** The picker's catalog from GET /api/llm/catalog; null when the route does not answer. */
 async function loadCatalog(refresh = false): Promise<SidecarCatalog | null> {
