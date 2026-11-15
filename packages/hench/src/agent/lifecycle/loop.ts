@@ -1383,11 +1383,6 @@ async function summarizeLocalHistory(args: {
 // Verifier
 // ---------------------------------------------------------------------------
 
-/** The verifier server's address: llm.local.verifier.host/port, else localhost:1235. */
-function verifierAddress(cfg: { host?: unknown; port?: unknown }): { host: string; port: number } {
-  return localServerAddress(cfg, DEFAULT_VERIFIER_PORT);
-}
-
 /**
  * Call a second local model and ask it to review the primary model's solution.
  *
@@ -1406,7 +1401,7 @@ async function callVerifier(
    */
   timeoutMs: number = 60_000,
 ): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
-  const { host, port } = verifierAddress(cfg);
+  const { host, port } = localServerAddress(cfg, DEFAULT_VERIFIER_PORT);
   const model = typeof cfg.model === "string" ? cfg.model : "";
   const baseUrl = `http://${host}:${port}/v1`;
 
@@ -1774,7 +1769,7 @@ async function runLocalToolLoop(params: ApiToolLoopParams): Promise<AgentLoopRes
         }
 
         if (verifierCfg && verifierCycleCount < maxVerifierCycles) {
-          const verifier = verifierAddress(verifierCfg);
+          const verifier = localServerAddress(verifierCfg, DEFAULT_VERIFIER_PORT);
           section(`Verifier Review (cycle ${verifierCycleCount + 1}/${maxVerifierCycles})`);
           detail(`[Verifier] Querying ${verifier.host}:${verifier.port} …`);
           const { verdict, reasoning } = await callVerifier(
