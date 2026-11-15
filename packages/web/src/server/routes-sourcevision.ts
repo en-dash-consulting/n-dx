@@ -39,6 +39,18 @@ function loadZonePins(ctx: ServerContext): Record<string, string> | null {
   }
 }
 
+/**
+ * GET /api/sv/<path> routes that serve one analysis file as stored, each with
+ * the 404 it answers while that file is absent or unreadable.
+ */
+const PASS_THROUGH_FILES: ReadonlyMap<string, { file: string; missing: string }> = new Map([
+  ["classifications", { file: DATA_FILES.classifications, missing: "No classifications data. Run 'sourcevision analyze' first." }],
+  ["manifest", { file: DATA_FILES.manifest, missing: "No manifest data. Run 'sourcevision analyze' first." }],
+  ["imports", { file: DATA_FILES.imports, missing: "No imports data. Run 'sourcevision analyze' first." }],
+  ["components", { file: DATA_FILES.components, missing: "No components data. Run 'sourcevision analyze' first." }],
+  ["callgraph", { file: DATA_FILES.callGraph, missing: "No call graph data. Run 'sourcevision analyze' first." }],
+]);
+
 /** Safely read and parse a JSON data file. Returns null on failure. */
 function loadDataFile(ctx: ServerContext, filename: string): unknown | null {
   const filePath = join(ctx.svDir, filename);
@@ -163,22 +175,12 @@ export function handleSourcevisionRoute(
     return true;
   }
 
-  // GET /api/sv/classifications — file archetype classifications
-  if (path === "classifications") {
-    const data = loadDataFile(ctx, "classifications.json");
+  // GET /api/sv/manifest, /classifications, /imports, /components, /callgraph
+  const passThrough = PASS_THROUGH_FILES.get(path);
+  if (passThrough) {
+    const data = loadDataFile(ctx, passThrough.file);
     if (!data) {
-      errorResponse(res, 404, "No classifications data. Run 'sourcevision analyze' first.");
-      return true;
-    }
-    jsonResponse(res, 200, data);
-    return true;
-  }
-
-  // GET /api/sv/manifest
-  if (path === "manifest") {
-    const data = loadDataFile(ctx, DATA_FILES.manifest);
-    if (!data) {
-      errorResponse(res, 404, "No manifest data. Run 'sourcevision analyze' first.");
+      errorResponse(res, 404, passThrough.missing);
       return true;
     }
     jsonResponse(res, 200, data);
@@ -217,17 +219,6 @@ export function handleSourcevisionRoute(
     return true;
   }
 
-  // GET /api/sv/imports
-  if (path === "imports") {
-    const data = loadDataFile(ctx, DATA_FILES.imports);
-    if (!data) {
-      errorResponse(res, 404, "No imports data. Run 'sourcevision analyze' first.");
-      return true;
-    }
-    jsonResponse(res, 200, data);
-    return true;
-  }
-
   // GET /api/sv/zones
   if (path === "zones") {
     const data = loadDataFile(ctx, DATA_FILES.zones);
@@ -239,28 +230,6 @@ export function handleSourcevisionRoute(
     const pins = loadZonePins(ctx);
     if (pins && Object.keys(pins).length > 0) {
       (data as Record<string, unknown>).zonePins = pins;
-    }
-    jsonResponse(res, 200, data);
-    return true;
-  }
-
-  // GET /api/sv/components
-  if (path === "components") {
-    const data = loadDataFile(ctx, DATA_FILES.components);
-    if (!data) {
-      errorResponse(res, 404, "No components data. Run 'sourcevision analyze' first.");
-      return true;
-    }
-    jsonResponse(res, 200, data);
-    return true;
-  }
-
-  // GET /api/sv/callgraph
-  if (path === "callgraph") {
-    const data = loadDataFile(ctx, DATA_FILES.callGraph);
-    if (!data) {
-      errorResponse(res, 404, "No call graph data. Run 'sourcevision analyze' first.");
-      return true;
     }
     jsonResponse(res, 200, data);
     return true;
@@ -295,29 +264,25 @@ export function handleSourcevisionRoute(
     };
 
     if (manifest) {
-      summary.project = (manifest as Record<string, unknown>).project;
-      summary.analyzedAt = (manifest as Record<string, unknown>).timestamp;
+      summary.project = manifest.project;
+      summary.analyzedAt = manifest.timestamp;
     }
 
     if (inventory) {
-      const inv = inventory as Record<string, unknown>;
-      summary.fileCount = Array.isArray(inv.files) ? inv.files.length : 0;
-      summary.inventorySummary = inv.summary;
+      summary.fileCount = Array.isArray(inventory.files) ? inventory.files.length : 0;
+      summary.inventorySummary = inventory.summary;
     }
 
     if (zones) {
-      const z = zones as Record<string, unknown>;
-      summary.zoneCount = Array.isArray(z.zones) ? z.zones.length : 0;
+      summary.zoneCount = Array.isArray(zones.zones) ? zones.zones.length : 0;
     }
 
     if (components) {
-      const c = components as Record<string, unknown>;
-      summary.componentCount = Array.isArray(c.components) ? c.components.length : 0;
+      summary.componentCount = Array.isArray(components.components) ? components.components.length : 0;
     }
 
     if (callGraph) {
-      const cg = callGraph as Record<string, unknown>;
-      summary.callGraphSummary = cg.summary;
+      summary.callGraphSummary = callGraph.summary;
     }
 
     jsonResponse(res, 200, summary);
