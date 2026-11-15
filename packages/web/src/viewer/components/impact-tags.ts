@@ -21,7 +21,7 @@
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { acceptsFrame } from "../base-path.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 export type FileKind = "code" | "test" | "config" | "docs" | "other";
 
@@ -110,30 +110,19 @@ function openFeed(): void {
     feedCloseTimer = null;
   }
   if (feed) return;
-  let ws: WebSocket | null = null;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    ws = openWebSocket();
-    ws.onmessage = (event: MessageEvent) => {
-      let frame: Record<string, unknown>;
-      try {
-        frame = JSON.parse(String(event.data)) as Record<string, unknown>;
-      } catch {
-        return;
-      }
-      if (!REFRESH_FRAMES.has(String(frame.type)) || !acceptsFrame(frame)) return;
-      refreshTimer ??= setTimeout(() => {
-        refreshTimer = null;
-        invalidate();
-      }, REFRESH_WINDOW_MS);
-    };
-  } catch {
-    // No socket: rows still refresh a load older than STALE_MS when they mount.
-  }
+  // With no socket, rows still refresh a load older than STALE_MS when they mount.
+  const closeSocket = openFrameSocket((frame) => {
+    if (!REFRESH_FRAMES.has(String(frame.type)) || !acceptsFrame(frame)) return;
+    refreshTimer ??= setTimeout(() => {
+      refreshTimer = null;
+      invalidate();
+    }, REFRESH_WINDOW_MS);
+  });
   feed = {
     close: () => {
       if (refreshTimer) clearTimeout(refreshTimer);
-      try { ws?.close(); } catch { /* already closed */ }
+      closeSocket();
     },
   };
 }
