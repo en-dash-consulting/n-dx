@@ -86,7 +86,7 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, resolveCodexQuotaKey, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
-import { V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
+import { RUNS_DIRNAME, V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
 import {
   PRD_COMMIT_PATHS,
   deletedAmong,
@@ -1852,9 +1852,9 @@ export function quarantinePendingCommitMessage(
     return null;
   }
 
-  const rescued = join(henchDir, "runs", `${runId}.commit-msg.txt`);
+  const rescued = join(henchDir, RUNS_DIRNAME, `${runId}.commit-msg.txt`);
   try {
-    mkdirSync(join(henchDir, "runs"), { recursive: true });
+    mkdirSync(join(henchDir, RUNS_DIRNAME), { recursive: true });
     renameSync(msgPath, rescued);
     return rescued;
   } catch {
