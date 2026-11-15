@@ -41,12 +41,12 @@ import {
   BUNDLE_KIND,
   BundleError,
   parseBundle,
+  sameContent,
   type BundleCollision,
   type BundleProvenance,
   type ImportMode,
   type PRDBundle,
 } from "../core/prd-bundle.js";
-import { ITEM_BOOKKEEPING_FIELDS } from "../core/sync.js";
 import type { PRDItem } from "../schema/index.js";
 import {
   ItemStateSchema,
@@ -628,20 +628,6 @@ function idsOf(tree: V2Tree): Set<string> {
   };
   LAYERS.forEach((layer) => tree[layer].forEach(visit));
   return ids;
-}
-
-/** Same content, ignoring children and bookkeeping stamps (the v1 bundle's rule). */
-function sameContent(a: RuleNode, b: RuleNode): boolean {
-  return stableKey(a) === stableKey(b);
-}
-
-function stableKey(node: RuleNode): string {
-  const entries = Object.entries(node)
-    .filter(([key]) => key !== "children" && !ITEM_BOOKKEEPING_FIELDS.has(key))
-    .sort(([l], [r]) => l.localeCompare(r));
-  return JSON.stringify(entries, (_key, value) =>
-    isRecord(value) ? Object.fromEntries(Object.entries(value).sort(([l], [r]) => l.localeCompare(r))) : value,
-  );
 }
 
 // ── Import ───────────────────────────────────────────────────────

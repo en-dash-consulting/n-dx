@@ -511,12 +511,14 @@ export function countItems(items: PRDItem[]): number {
  * the operator was pointed at a destructive command over deltas that were not
  * content. Sharing the list with `sync.ts` is what keeps the two notions of
  * "same item" from drifting apart again.
+ *
+ * The v2 bundle compares its nodes by the same rule, so it takes any record.
  */
-function sameContent(a: PRDItem, b: PRDItem): boolean {
+export function sameContent(a: object, b: object): boolean {
   return stableKey(a) === stableKey(b);
 }
 
-function stableKey(item: PRDItem): string {
+function stableKey(item: object): string {
   const entries = Object.entries(item)
     .filter(([key]) => key !== "children" && !ITEM_BOOKKEEPING_FIELDS.has(key))
     .sort(([left], [right]) => left.localeCompare(right));
