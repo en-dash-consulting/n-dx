@@ -25,6 +25,7 @@ import type { LLMVendor } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { confirmPrompt } from "../prompt.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
 // ── LLM setup ────────────────────────────────────────────────────────
@@ -62,24 +63,6 @@ async function prepareLlmPass(
 }
 
 // ── TTY interaction ──────────────────────────────────────────────────
-
-/**
- * Ask a single yes/no question in a TTY. Returns true for "y"/"yes".
- */
-async function confirmPrompt(question: string): Promise<boolean> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const answer = await new Promise<string>((resolve) =>
-    rl.question(question, resolve),
-  );
-  rl.close();
-
-  return answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes";
-}
 
 /**
  * Format a pruning impact summary for interactive preview.
