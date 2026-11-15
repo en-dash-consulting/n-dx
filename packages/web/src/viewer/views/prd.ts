@@ -1,4 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
 /**
  * PRD view — displays Rex PRD hierarchy with interactive tree.
  *
@@ -26,7 +25,7 @@ import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
-import { BrandedHeader, WorkspaceWriteStrip, InfoTip } from "../components/index.js";
+import { BrandedHeader, WorkspaceWriteStrip, InfoTip, FloatingNotice } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
 import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";

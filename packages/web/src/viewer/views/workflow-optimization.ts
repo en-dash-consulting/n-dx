@@ -1,5 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
-import { useToast } from "../hooks/index.js";
 /**
  * Workflow Optimization view — displays analysis of run history with
  * actionable suggestions that users can preview, accept, reject, or defer.
@@ -12,8 +10,8 @@ import { useToast } from "../hooks/index.js";
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { BrandedHeader, FloatingNotice } from "../components/index.js";
+import { useCliName, useToast } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

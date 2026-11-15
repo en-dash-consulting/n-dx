@@ -1,5 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
-import { useToast } from "../hooks/index.js";
 /**
  * Task Audit view — detailed execution information and administrative controls.
  *
@@ -14,8 +12,8 @@ import { useToast } from "../hooks/index.js";
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { BrandedHeader, RexTaskLink, ElapsedTime } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { BrandedHeader, RexTaskLink, ElapsedTime, FloatingNotice } from "../components/index.js";
+import { useCliName, useToast } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { openWebSocket } from "../session.js";
 

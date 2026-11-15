@@ -1,5 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
-import { useToast } from "../hooks/index.js";
 /**
  * Templates — the template section of the Workflow page.
  *
@@ -22,6 +20,8 @@ import { useToast } from "../hooks/index.js";
 
 import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { FloatingNotice } from "../components/index.js";
+import { useToast } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
