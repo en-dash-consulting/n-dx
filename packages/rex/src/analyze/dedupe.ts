@@ -182,48 +182,62 @@ export function deduplicateScanResults(
   const output: ScanResult[] = [];
 
   for (const [, kindResults] of byKind) {
-    // Build clusters using union-find approach
-    const n = kindResults.length;
-    const parent = Array.from({ length: n }, (_, i) => i);
-
-    function find(i: number): number {
-      while (parent[i] !== i) {
-        parent[i] = parent[parent[i]]; // path compression
-        i = parent[i];
-      }
-      return i;
-    }
-
-    function union(i: number, j: number): void {
-      const ri = find(i);
-      const rj = find(j);
-      if (ri !== rj) parent[ri] = rj;
-    }
-
-    // Compare all pairs within this kind using combined similarity
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const score = resultSimilarity(kindResults[i], kindResults[j]);
-        if (score >= threshold) {
-          union(i, j);
-        }
-      }
-    }
-
-    // Collect clusters
-    const clusters = new Map<number, ScanResult[]>();
-    for (let i = 0; i < n; i++) {
-      const root = find(i);
-      const cluster = clusters.get(root) ?? [];
-      cluster.push(kindResults[i]);
-      clusters.set(root, cluster);
-    }
-
-    // Merge each cluster into a single representative
-    for (const [, cluster] of clusters) {
+    // Compare all pairs within this kind using combined similarity, then
+    // merge each cluster into a single representative
+    const clusters = clusterTransitively(
+      kindResults,
+      (a, b) => resultSimilarity(a, b) >= threshold,
+    );
+    for (const cluster of clusters) {
       output.push(mergeCluster(cluster));
     }
   }
 
   return output;
+}
+
+/**
+ * Group `items` into clusters of transitively similar members (union-find):
+ * `a` and `c` share a cluster when `a`~`b` and `b`~`c`, even if `a`≁`c`.
+ *
+ * Every pair is compared once, in index order. Clusters come back in order of
+ * their first member, and members keep their input order.
+ */
+export function clusterTransitively<T>(
+  items: T[],
+  similar: (a: T, b: T) => boolean,
+): T[][] {
+  const n = items.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+
+  function find(i: number): number {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]]; // path compression
+      i = parent[i];
+    }
+    return i;
+  }
+
+  function union(i: number, j: number): void {
+    const ri = find(i);
+    const rj = find(j);
+    if (ri !== rj) parent[ri] = rj;
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (similar(items[i], items[j])) {
+        union(i, j);
+      }
+    }
+  }
+
+  const clusters = new Map<number, T[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    const cluster = clusters.get(root) ?? [];
+    cluster.push(items[i]);
+    clusters.set(root, cluster);
+  }
+  return [...clusters.values()];
 }
