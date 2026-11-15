@@ -27,7 +27,7 @@ import {
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
-import { addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
+import { addCallTokens, addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import { markPass, markBatch } from "./analyze-progress.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -270,10 +270,7 @@ async function enrichSingleZone(
         ? await callClaude(prompt, undefined, { taskClass: "zone.enrich-scan" })
         : await callClaude(prompt, undefined, { taskClass: "zone.enrich-deep" });
       zoneTokenUsage.calls++;
-      if (callResult.tokenUsage) {
-        zoneTokenUsage.input += callResult.tokenUsage.input;
-        zoneTokenUsage.output += callResult.tokenUsage.output;
-      }
+      addCallTokens(zoneTokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {
       if (err instanceof ClaudeClientError) {

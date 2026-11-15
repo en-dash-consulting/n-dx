@@ -53,6 +53,7 @@ import { askJev, noul } from "@n-dx/llm-client";
 import type { JevQuestion, JsonValue } from "@n-dx/llm-client";
 import { collectFileHeaders, extractFileHeader } from "./file-headers.js";
 import { SV_CACHE_DIRNAME } from "../paths.js";
+import { addCallTokens } from "./token-usage.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -366,10 +367,7 @@ export async function judgeRerun(
       break;
     }
     outcome.calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
+    addCallTokens(usage, response.tokenUsage);
 
     for (const [qid, delta] of request.zoneIds) {
       const a = response.answers[qid];

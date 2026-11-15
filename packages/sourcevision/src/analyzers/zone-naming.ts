@@ -33,6 +33,7 @@ import { markBatch } from "./analyze-progress.js";
 import { collectZoneSymbols, dominantSymbolNoun } from "./zone-symbols.js";
 import type { RouteLayout } from "./route-convention.js";
 import { deriveZoneName } from "./zone-id-derivation.js";
+import { addCallTokens } from "./token-usage.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -513,12 +514,6 @@ export interface ZoneNamingResult {
   fallbackZoneIds: string[];
 }
 
-function addUsage(total: TokenUsage, more?: TokenUsage): void {
-  if (!more) return;
-  total.input += more.input;
-  total.output += more.output;
-}
-
 /**
  * Name (and where warranted merge) zones by selection. Inert without a
  * `zone.judge` route: returns the zones untouched.
@@ -552,7 +547,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
       throw err;
     }
     result.calls++;
-    addUsage(usage, response.tokenUsage);
+    addCallTokens(usage, response.tokenUsage);
 
     for (const [qid, { zone, candidates }] of req.naming) {
       const a = response.answers[qid];
@@ -636,7 +631,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
       throw err;
     }
     result.calls++;
-    addUsage(usage, response.tokenUsage);
+    addCallTokens(usage, response.tokenUsage);
     withNames.forEach((zone, i) => {
       const id = `z${i}`;
       const names = proposed.get(zone.id)!;

@@ -31,6 +31,19 @@ export function addCallUsage(
   aggregate.outputTokens += usage?.output ?? 0;
 }
 
+/**
+ * Add one call's input/output tokens to a step's running total; nothing when
+ * the call reported no usage. Cache token counts are not added.
+ */
+export function addCallTokens(
+  total: { input: number; output: number },
+  usage?: { input: number; output: number },
+): void {
+  if (!usage) return;
+  total.input += usage.input;
+  total.output += usage.output;
+}
+
 /** Merge one aggregate into another, cache token counts included. */
 export function mergeTokenUsage(target: AnalyzeTokenUsage, source: AnalyzeTokenUsage): void {
   target.calls += source.calls;
