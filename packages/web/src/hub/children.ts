@@ -35,6 +35,7 @@ import { killWithFallback, spawnManaged } from "./exec-gateway.js";
 import type { ManagedChild } from "./exec-gateway.js";
 import { isPidAlive } from "./registry.js";
 import type { ProjectRecord } from "./registry.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 export type ChildState =
   /** Spawned; waiting for the port file or the first health check. */
@@ -128,9 +129,9 @@ export async function checkProjectHealth(
   token: string | null = null,
 ): Promise<{ ok: boolean; projectDir: string | null; error: string | null }> {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/status`, {
+    const res = await fetch(loopbackUrl(port, "/api/status"), {
       signal: AbortSignal.timeout(timeoutMs),
-      headers: token ? { "X-Ndx-Token": token } : {},
+      headers: tokenHeaders(token),
     });
     if (!res.ok) return { ok: false, projectDir: null, error: `HTTP ${res.status}` };
     const body = (await res.json()) as { projectDir?: unknown };

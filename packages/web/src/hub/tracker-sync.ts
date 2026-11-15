@@ -23,6 +23,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ProjectView } from "./hub.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** How often a project with a rule on is ticked. */
 export const TRACKER_TICK_INTERVAL_MS = 5 * 60_000;
@@ -61,9 +62,9 @@ export type TrackerTickPost = (projectId: string) => Promise<TrackerTickOutcome>
 export function proxiedTickPost(port: () => number, token: string | null): TrackerTickPost {
   return async (projectId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:${port()}/p/${encodeURIComponent(projectId)}${TRACKER_TICK_PATH}`, {
+      const res = await fetch(loopbackUrl(port(), `/p/${encodeURIComponent(projectId)}${TRACKER_TICK_PATH}`), {
         method: "POST",
-        headers: token ? { "X-Ndx-Token": token } : {},
+        headers: tokenHeaders(token),
         signal: AbortSignal.timeout(TICK_TIMEOUT_MS),
       });
       await res.arrayBuffer();

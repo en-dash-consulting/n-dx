@@ -56,6 +56,7 @@ import { proxiedTickPost, TrackerSyncClock } from "./tracker-sync.js";
 import type { TrackerSyncClockOptions } from "./tracker-sync.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 import { sha256Hex, takeSessionHandover, writeSessionHandover } from "./session-handover.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -196,11 +197,11 @@ function postExecute(
   timeoutMs: number,
   token: string | null,
 ): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}${path}`, {
+  return fetch(loopbackUrl(port, path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { "X-Ndx-Token": token } : {}),
+      ...tokenHeaders(token),
       ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
     },
     body: JSON.stringify({

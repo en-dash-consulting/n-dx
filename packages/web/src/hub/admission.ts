@@ -32,6 +32,7 @@
 import { totalmem } from "node:os";
 import { derivePressure, getAvailableMemory, readAvailableMemory, type MemoryPressure } from "@n-dx/llm-client";
 import type { RunMode, RunOptions } from "../shared/index.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** Bounds the machine will not exceed, whatever any single project would allow. */
 export interface AdmissionLimits {
@@ -533,8 +534,8 @@ export class AdmissionGate {
  */
 export async function countProjectExecutions(port: number, token: string | null = null, timeoutMs = 2_000): Promise<number> {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`, {
-      headers: token ? { "X-Ndx-Token": token } : {},
+    const res = await fetch(loopbackUrl(port, "/api/hench/execute/status"), {
+      headers: tokenHeaders(token),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return 0;

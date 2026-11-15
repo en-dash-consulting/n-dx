@@ -18,6 +18,7 @@
  */
 
 import type { ProjectView } from "./hub.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** One project as the home page shows it. */
 export interface ProjectCard {
@@ -113,9 +114,9 @@ export interface ChildSnapshot {
 /** Everything a card needs from one child, or the reason it has none. */
 export async function fetchChildSnapshot(port: number, timeoutMs = 2_000, token: string | null = null): Promise<ChildSnapshot> {
   const get = async (path: string): Promise<unknown | null> => {
-    const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    const res = await fetch(loopbackUrl(port, path), {
       signal: AbortSignal.timeout(timeoutMs),
-      headers: token ? { "X-Ndx-Token": token } : {},
+      headers: tokenHeaders(token),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} from ${path}`);
     return res.json();
