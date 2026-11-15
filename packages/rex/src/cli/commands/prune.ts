@@ -21,10 +21,45 @@ import { enforceBudgetPreflight } from "./budget-preflight.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { headerModelSource } from "../model-resolution.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
+import type { LLMVendor } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
+
+// ── LLM setup ────────────────────────────────────────────────────────
+
+/**
+ * Configure the LLM client from the project's config, print the vendor and
+ * model header, and run the budget gate — everything a prune pass does
+ * before its first LLM call. `tier` "light" runs the pass on the light tier.
+ */
+async function prepareLlmPass(
+  rexDir: string,
+  dir: string,
+  flags: Record<string, string>,
+  tier?: "light",
+): Promise<{ resolvedModel: string; vendor: LLMVendor }> {
+  const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
+  const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
+  const llmConfig = await loadLLMConfig(rexDir);
+  setLLMConfig(llmConfig);
+  const claudeConfig = await loadClaudeConfig(rexDir);
+  setClaudeConfig(claudeConfig);
+  setProjectDir(dir);
+
+  const resolvedModel = resolveConfiguredModel(flags.model, tier);
+  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
+  printVendorModelHeader(vendor, llmConfig, {
+    format: flags.format,
+    resolvedModel,
+    modelSource: headerModelSource(flags.model, llmConfig, tier),
+    ...(tier ? { tier } : {}),
+  });
+
+  await enforceBudgetPreflight(rexDir, dir);
+  return { resolvedModel, vendor };
+}
 
 // ── TTY interaction ──────────────────────────────────────────────────
 
@@ -159,27 +194,10 @@ export async function cmdPrune(
     let consolidateSpinner: ReturnType<typeof startSpinner> | null = null;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
-        const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
-        const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-        const llmConfig = await loadLLMConfig(rexDir);
-        setLLMConfig(llmConfig);
-        const claudeConfig = await loadClaudeConfig(rexDir);
-        setClaudeConfig(claudeConfig);
-        setProjectDir(dir);
-
         // Resolve model: explicit flag > light-tier resolution (consolidation
         // is a mechanical single-shot pass, so it runs on the light tier;
         // only lightModel config or --model overrides it).
-        const resolvedModel = resolveConfiguredModel(flags.model, "light");
-        const dryRunVendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-        printVendorModelHeader(dryRunVendor, llmConfig, {
-          format: flags.format,
-          resolvedModel,
-          modelSource: headerModelSource(flags.model, llmConfig, "light"),
-          tier: "light",
-        });
-
-        await enforceBudgetPreflight(rexDir, dir);
+        const { resolvedModel } = await prepareLlmPass(rexDir, dir, flags, "light");
 
         const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -374,28 +392,10 @@ async function consolidateAfterPrune(
   const accept = flags.accept === "true";
 
   try {
-    // Load Claude config
-    const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
-    const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-    const llmConfig = await loadLLMConfig(rexDir);
-    setLLMConfig(llmConfig);
-    const claudeConfig = await loadClaudeConfig(rexDir);
-    setClaudeConfig(claudeConfig);
-    setProjectDir(dir);
-
     // Resolve model: explicit flag > light-tier resolution (post-prune
     // consolidation is a mechanical single-shot pass, so it runs on the
     // light tier; only lightModel config or --model overrides it).
-    const resolvedModel = resolveConfiguredModel(flags.model, "light");
-    const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-    printVendorModelHeader(vendor, llmConfig, {
-      format: flags.format,
-      resolvedModel,
-      modelSource: headerModelSource(flags.model, llmConfig, "light"),
-      tier: "light",
-    });
-
-    await enforceBudgetPreflight(rexDir, dir);
+    const { resolvedModel, vendor } = await prepareLlmPass(rexDir, dir, flags, "light");
 
     const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -523,25 +523,8 @@ async function smartPrune(
     );
   }
 
-  // Load Claude config
-  const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
-  const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-  const llmConfig = await loadLLMConfig(rexDir);
-  setLLMConfig(llmConfig);
-  const claudeConfig = await loadClaudeConfig(rexDir);
-  setClaudeConfig(claudeConfig);
-  setProjectDir(dir);
-
   // Resolve model: explicit flag > vendor config > default
-  const resolvedModel = resolveConfiguredModel(flags.model);
-  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-  printVendorModelHeader(vendor, llmConfig, {
-    format: flags.format,
-    resolvedModel,
-    modelSource: headerModelSource(flags.model, llmConfig),
-  });
-
-  await enforceBudgetPreflight(rexDir, dir);
+  const { resolvedModel, vendor } = await prepareLlmPass(rexDir, dir, flags);
 
   const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
