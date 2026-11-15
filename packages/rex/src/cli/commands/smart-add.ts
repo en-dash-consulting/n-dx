@@ -10,7 +10,8 @@ import {
   findPRDFileForBranch,
   resolveGitBranch,
   resolvePRDFilename,
- resolveRexPaths } from "../../store/index.js";
+  resolveRexPaths,
+} from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { getFolderTreePath } from "../folder-tree-path.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
@@ -31,8 +32,9 @@ import {
   applyConsolidationGuard,
 } from "../../analyze/index.js";
 import { pickLoEFields } from "../../analyze/index.js";
-import type { Proposal, QualityIssue } from "../../analyze/index.js";
-import {PRIORITY_ORDER, LOE_DEFAULTS} from "../../schema/index.js";import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
+import type { Proposal, ProposalFeature, QualityIssue } from "../../analyze/index.js";
+import { PRIORITY_ORDER, LOE_DEFAULTS } from "../../schema/index.js";
+import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { hashPRD } from "../../core/pending-cache.js";
 import {
@@ -160,32 +162,9 @@ export function formatProposalTree(
           }
         }
       }
-    } else if (parentLevel === "feature") {
-      // Parent is a feature — show tasks directly
-      for (const f of p.features) {
-        for (let ti = 0; ti < f.tasks.length; ti++) {
-          const t = f.tasks[ti];
-          const isLast = ti === f.tasks.length - 1;
-          const branch = isLast ? "└─" : "├─";
-          const pri = t.priority ? ` [${t.priority}]` : "";
-          const loe = formatTaskLoE(t, thresholdWeeks);
-          lines.push(`    ${branch} ○ ${t.title}${pri}${loe}`);
-          const rationale = formatTaskLoERationale(t, `    ${isLast ? "  " : "│ "}   `);
-          if (rationale) lines.push(rationale);
-          if (t.description) {
-            const cont = isLast ? "  " : "│ ";
-            lines.push(`    ${cont}   ${t.description}`);
-          }
-          if (t.acceptanceCriteria?.length) {
-            const cont = isLast ? "  " : "│ ";
-            for (const ac of t.acceptanceCriteria) {
-              lines.push(`    ${cont}   ✓ ${ac}`);
-            }
-          }
-        }
-      }
-    } else if (parentLevel === "task") {
-      // Parent is a task — show subtasks
+    } else if (parentLevel === "feature" || parentLevel === "task") {
+      // Parent is a feature — show tasks directly; parent is a task — show
+      // them as its subtasks. Both render the same flat list.
       for (const f of p.features) {
         for (let ti = 0; ti < f.tasks.length; ti++) {
           const t = f.tasks[ti];
@@ -779,6 +758,118 @@ async function acceptProposals(
   // Track every newly added item ID so we can resolve which PRD files received writes.
   const addedItemIds: string[] = [];
 
+  /**
+   * Reuse the existing container the LLM placed a proposal node under
+   * (`existingId`), retitling it when the LLM expanded its scope, and return
+   * its id. Returns undefined when there is no reference or the item is gone
+   * (the LLM hallucinated the id), so the caller creates a new container.
+   */
+  const reuseExistingContainer = async (
+    existingRef: string | undefined,
+    title: string,
+  ): Promise<string | undefined> => {
+    if (!existingRef) return undefined;
+    const doc = await store.loadDocument();
+    const existing = findItem(doc.items, existingRef);
+    if (!existing) return undefined;
+    reusedContainerIds.push(existingRef);
+    // Update title if the LLM expanded the scope
+    if (title && title !== existing.item.title) {
+      await store.updateItem(existingRef, { title }, attributionOptions);
+    }
+    return existingRef;
+  };
+
+  /**
+   * Resolve where proposal feature `fIdx` lands — the merge target the
+   * operator chose, an existing feature named by `existingId` (only when
+   * `honourExistingId`), or a new feature under `featureParentId` — and
+   * return its id.
+   */
+  const placeFeature = async (
+    pIdx: number,
+    fIdx: number,
+    f: ProposalFeature,
+    featureParentId: string,
+    honourExistingId: boolean,
+  ): Promise<string> => {
+    const featureKey = `p${pIdx}:feature:${fIdx}`;
+    const featureMergeTarget = await validateMergeTarget(
+      store, mergeTargetsByNodeKey?.[featureKey], "feature",
+    );
+    if (featureMergeTarget) return featureMergeTarget;
+    const featureMarker = overrideMarkersByNodeKey?.[featureKey];
+
+    // Check for existingId — LLM-directed placement under existing feature
+    if (honourExistingId) {
+      const reusedId = await reuseExistingContainer(f.existingId, f.title);
+      if (reusedId) return reusedId;
+    }
+
+    const featureId = randomUUID();
+    await store.addItem(
+      {
+        id: featureId,
+        title: f.title,
+        level: "feature",
+        status: "pending",
+        source: "smart-add",
+        ...(f.summary ? { summary: f.summary } : {}),
+        description: f.description,
+        ...(featureMarker ? { overrideMarker: featureMarker } : {}),
+      },
+      featureParentId,
+      attributionOptions,
+    );
+    addedCount++;
+    addedItemIds.push(featureId);
+    newContainerIds.push(featureId);
+    return featureId;
+  };
+
+  /**
+   * Add proposal feature `fIdx`'s tasks under `taskParentId` as `level`
+   * items, skipping each task the operator merged into an existing item.
+   */
+  const addProposalTasks = async (
+    pIdx: number,
+    fIdx: number,
+    f: ProposalFeature,
+    taskParentId: string,
+    level: "task" | "subtask",
+  ): Promise<void> => {
+    for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
+      const t = f.tasks[tIdx];
+      const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
+      const taskMergeTarget = await validateMergeTarget(
+        store, mergeTargetsByNodeKey?.[taskKey], level,
+      );
+      if (taskMergeTarget) continue;
+      const taskMarker = overrideMarkersByNodeKey?.[taskKey];
+      const taskId = randomUUID();
+      await store.addItem(
+        {
+          id: taskId,
+          title: t.title,
+          level,
+          status: "pending",
+          source: "smart-add",
+          ...(t.summary ? { summary: t.summary } : {}),
+          description: t.description,
+          acceptanceCriteria: t.acceptanceCriteria,
+          priority: t.priority as PRDItem["priority"],
+          tags: t.tags,
+          ...pickLoEFields(t),
+          ...(taskMarker ? { overrideMarker: taskMarker } : {}),
+        },
+        taskParentId,
+        attributionOptions,
+      );
+      addedCount++;
+      addedItemIds.push(taskId);
+    }
+  };
+
   for (let pIdx = 0; pIdx < proposals.length; pIdx++) {
     const p = proposals[pIdx];
     if (!parentId) {
@@ -786,28 +877,15 @@ async function acceptProposals(
       const epicMergeTarget = await validateMergeTarget(
         store, mergeTargetsByNodeKey?.[`p${pIdx}:epic`], "epic",
       );
-      let epicId = epicMergeTarget ?? randomUUID();
       const epicMarker = overrideMarkersByNodeKey?.[`p${pIdx}:epic`];
 
       // Check for existingId — LLM-directed placement under existing epic
-      const epicExistingRef = p.epic.existingId;
-      let epicReused = false;
-      if (epicExistingRef && !epicMergeTarget) {
-        const doc = await store.loadDocument();
-        const existing = findItem(doc.items, epicExistingRef);
-        if (existing) {
-          epicId = epicExistingRef;
-          epicReused = true;
-          reusedContainerIds.push(epicExistingRef);
-          // Update title if the LLM expanded the scope
-          if (p.epic.title && p.epic.title !== existing.item.title) {
-            await store.updateItem(epicExistingRef, { title: p.epic.title }, attributionOptions);
-          }
-        }
-        // If not found, fall through to create a new epic (LLM hallucinated the ID)
-      }
+      const reusedEpicId = epicMergeTarget
+        ? undefined
+        : await reuseExistingContainer(p.epic.existingId, p.epic.title);
+      const epicId = epicMergeTarget ?? reusedEpicId ?? randomUUID();
 
-      if (!epicMergeTarget && !epicReused) {
+      if (!epicMergeTarget && !reusedEpicId) {
         await store.addItem({
           id: epicId,
           title: p.epic.title,
@@ -823,211 +901,23 @@ async function acceptProposals(
 
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
         const f = p.features[fIdx];
-        const featureKey = `p${pIdx}:feature:${fIdx}`;
-        const featureMergeTarget = await validateMergeTarget(
-          store, mergeTargetsByNodeKey?.[featureKey], "feature",
-        );
-        let featureId = featureMergeTarget ?? randomUUID();
-        const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
-
-        // Check for existingId — LLM-directed placement under existing feature
-        const featureExistingRef = f.existingId;
-        let featureReused = false;
-        if (featureExistingRef && !featureMergeTarget) {
-          const doc = await store.loadDocument();
-          const existing = findItem(doc.items, featureExistingRef);
-          if (existing) {
-            featureId = featureExistingRef;
-            featureReused = true;
-            reusedContainerIds.push(featureExistingRef);
-            if (f.title && f.title !== existing.item.title) {
-              await store.updateItem(featureExistingRef, { title: f.title }, attributionOptions);
-            }
-          }
-        }
-
-        if (!featureMergeTarget && !featureReused) {
-          await store.addItem(
-            {
-              id: featureId,
-              title: f.title,
-              level: "feature",
-              status: "pending",
-              source: "smart-add",
-              ...(f.summary ? { summary: f.summary } : {}),
-              description: f.description,
-              ...(featureMarker ? { overrideMarker: featureMarker } : {}),
-            },
-            epicId,
-            attributionOptions,
-          );
-          addedCount++;
-          addedItemIds.push(featureId);
-          newContainerIds.push(featureId);
-        }
-
-        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
-          const t = f.tasks[tIdx];
-          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          const taskMergeTarget = await validateMergeTarget(
-            store, mergeTargetsByNodeKey?.[taskKey], "task",
-          );
-          if (taskMergeTarget) continue;
-          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
-          const taskId = randomUUID();
-          await store.addItem(
-            {
-              id: taskId,
-              title: t.title,
-              level: "task",
-              status: "pending",
-              source: "smart-add",
-              ...(t.summary ? { summary: t.summary } : {}),
-              description: t.description,
-              acceptanceCriteria: t.acceptanceCriteria,
-              priority: t.priority as PRDItem["priority"],
-              tags: t.tags,
-              ...pickLoEFields(t),
-              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
-            },
-            featureId,
-            attributionOptions,
-          );
-          addedCount++;
-          addedItemIds.push(taskId);
-        }
+        const featureId = await placeFeature(pIdx, fIdx, f, epicId, true);
+        await addProposalTasks(pIdx, fIdx, f, featureId, "task");
       }
     } else if (parentLevel === "epic") {
       // Parent is an epic — attach features (and their tasks) directly
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
         const f = p.features[fIdx];
-        const featureKey = `p${pIdx}:feature:${fIdx}`;
-        const featureMergeTarget = await validateMergeTarget(
-          store, mergeTargetsByNodeKey?.[featureKey], "feature",
-        );
-        const featureId = featureMergeTarget ?? randomUUID();
-        const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
-        if (!featureMergeTarget) {
-          await store.addItem(
-            {
-              id: featureId,
-              title: f.title,
-              level: "feature",
-              status: "pending",
-              source: "smart-add",
-              ...(f.summary ? { summary: f.summary } : {}),
-              description: f.description,
-              ...(featureMarker ? { overrideMarker: featureMarker } : {}),
-            },
-            parentId,
-            attributionOptions,
-          );
-          addedCount++;
-          addedItemIds.push(featureId);
-          newContainerIds.push(featureId);
-        }
-
-        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
-          const t = f.tasks[tIdx];
-          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          const taskMergeTarget = await validateMergeTarget(
-            store, mergeTargetsByNodeKey?.[taskKey], "task",
-          );
-          if (taskMergeTarget) continue;
-          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
-          const taskId = randomUUID();
-          await store.addItem(
-            {
-              id: taskId,
-              title: t.title,
-              level: "task",
-              status: "pending",
-              source: "smart-add",
-              ...(t.summary ? { summary: t.summary } : {}),
-              description: t.description,
-              acceptanceCriteria: t.acceptanceCriteria,
-              priority: t.priority as PRDItem["priority"],
-              tags: t.tags,
-              ...pickLoEFields(t),
-              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
-            },
-            featureId,
-            attributionOptions,
-          );
-          addedCount++;
-          addedItemIds.push(taskId);
-        }
+        const featureId = await placeFeature(pIdx, fIdx, f, parentId, false);
+        await addProposalTasks(pIdx, fIdx, f, featureId, "task");
       }
-    } else if (parentLevel === "feature") {
+    } else if (parentLevel === "feature" || parentLevel === "task") {
       // Parent is a feature — flatten proposal features' tasks as direct
-      // children of the feature (level: task)
+      // children of the feature (level: task). Parent is a task — flatten
+      // everything as subtasks.
+      const level = parentLevel === "feature" ? "task" : "subtask";
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
-        const f = p.features[fIdx];
-        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
-          const t = f.tasks[tIdx];
-          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          const taskMergeTarget = await validateMergeTarget(
-            store, mergeTargetsByNodeKey?.[taskKey], "task",
-          );
-          if (taskMergeTarget) continue;
-          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
-          const taskId = randomUUID();
-          await store.addItem(
-            {
-              id: taskId,
-              title: t.title,
-              level: "task",
-              status: "pending",
-              source: "smart-add",
-              ...(t.summary ? { summary: t.summary } : {}),
-              description: t.description,
-              acceptanceCriteria: t.acceptanceCriteria,
-              priority: t.priority as PRDItem["priority"],
-              tags: t.tags,
-              ...pickLoEFields(t),
-              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
-            },
-            parentId,
-            attributionOptions,
-          );
-          addedCount++;
-          addedItemIds.push(taskId);
-        }
-      }
-    } else if (parentLevel === "task") {
-      // Parent is a task — flatten everything as subtasks
-      for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
-        const f = p.features[fIdx];
-        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
-          const t = f.tasks[tIdx];
-          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          const taskMergeTarget = await validateMergeTarget(
-            store, mergeTargetsByNodeKey?.[taskKey], "subtask",
-          );
-          if (taskMergeTarget) continue;
-          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
-          const subtaskId = randomUUID();
-          await store.addItem(
-            {
-              id: subtaskId,
-              title: t.title,
-              level: "subtask",
-              status: "pending",
-              source: "smart-add",
-              ...(t.summary ? { summary: t.summary } : {}),
-              description: t.description,
-              acceptanceCriteria: t.acceptanceCriteria,
-              priority: t.priority as PRDItem["priority"],
-              tags: t.tags,
-              ...pickLoEFields(t),
-              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
-            },
-            parentId,
-            attributionOptions,
-          );
-          addedCount++;
-          addedItemIds.push(subtaskId);
-        }
+        await addProposalTasks(pIdx, fIdx, p.features[fIdx], parentId, level);
       }
     }
   }
