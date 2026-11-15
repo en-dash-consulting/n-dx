@@ -91,6 +91,7 @@ import {
 } from "../shared/index.js";
 import type { RunMode, RunOptions, CredentialStore } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
+import { replayedRunFields } from "./admission.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { HOME_EXTENSIONS_WAIT_MS, renderHomePage } from "./home.js";
 import { buildExtensionsAnswer } from "./extensions.js";
@@ -1168,10 +1169,7 @@ async function handleExecuteAdmission(
     projectId: decision.project.id,
     workspace,
     taskId,
-    ...(options ? { options } : {}),
-    ...(mode ? { mode } : {}),
-    ...(iterations !== undefined ? { iterations } : {}),
-    ...(saveRun ? { saveRun } : {}),
+    ...replayedRunFields({ options, mode, iterations, saveRun }),
   });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));

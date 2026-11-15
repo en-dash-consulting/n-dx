@@ -93,6 +93,19 @@ export interface QueueEntry {
   enqueuedAt: string;
 }
 
+/** What a queued request replays besides its task. */
+export type ReplayedRunFields = Pick<QueueEntry, "options" | "mode" | "iterations" | "saveRun">;
+
+/** The {@link ReplayedRunFields} a request carried, each only when it did, in the order the execute body lists them. */
+export function replayedRunFields(fields: ReplayedRunFields): ReplayedRunFields {
+  return {
+    ...(fields.options ? { options: fields.options } : {}),
+    ...(fields.mode ? { mode: fields.mode } : {}),
+    ...(fields.iterations !== undefined ? { iterations: fields.iterations } : {}),
+    ...(fields.saveRun ? { saveRun: fields.saveRun } : {}),
+  };
+}
+
 /** A refusal from the project server, as its execute route answered it. */
 export interface ExecuteRefusal {
   /** The HTTP status `POST /api/hench/execute` answered (or would have). */
@@ -260,10 +273,7 @@ export class AdmissionQueue {
         projectId: queued.projectId,
         workspace: queued.workspace,
         taskId: queued.taskId,
-        ...(entry.options ? { options: entry.options } : {}),
-        ...(entry.mode ? { mode: entry.mode } : {}),
-        ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
-        ...(entry.saveRun ? { saveRun: entry.saveRun } : {}),
+        ...replayedRunFields(entry),
         enqueuedAt: queued.enqueuedAt,
       };
       return { position: existing + 1, added: false };

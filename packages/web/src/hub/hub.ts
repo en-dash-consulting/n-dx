@@ -26,7 +26,7 @@ import { basename, isAbsolute, join } from "node:path";
 import { isPackageNamed, WEB_PACKAGE_ROOT } from "./build-identity.js";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
-import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
+import { AdmissionGate, countProjectExecutions, redactQueueEntry, replayedRunFields } from "./admission.js";
 import type { AdmissionLimits, ExecuteRefusal, PublicQueueSnapshot, QueueEntry, StartOutcome } from "./admission.js";
 import {
   HUB_CONFIG_DEFAULTS,
@@ -208,10 +208,7 @@ function postExecute(
     },
     body: JSON.stringify({
       taskId: entry.taskId,
-      ...(entry.options ? { options: entry.options } : {}),
-      ...(entry.mode ? { mode: entry.mode } : {}),
-      ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
-      ...(entry.saveRun ? { saveRun: entry.saveRun } : {}),
+      ...replayedRunFields(entry),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
