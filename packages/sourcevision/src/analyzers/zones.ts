@@ -73,14 +73,13 @@ import { checkDeclaredRules } from "./declared-rules.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
 import { applyFindingVerdict, findingKey } from "./rerun-judge.js";
 import type { RerunOutcome } from "./rerun-judge.js";
-import { dedupeZoneNames, deepestDistinguishingSegment, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf } from "./zone-identity.js";
+import { dedupeZoneNames, deepestDistinguishingSegment, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, titleFromId, zoneIdsOf } from "./zone-identity.js";
 import {
   GENERIC_SEGMENTS,
   SKIPPABLE_SEGMENTS,
   deriveZoneId,
   deriveZoneIdFromFileStems,
   deriveZoneIdFromFilenames,
-  deriveZoneName,
   disambiguateZoneId,
 } from "./zone-id-derivation.js";
 export { deriveZoneId, deriveZoneIdFromFilenames, deriveZoneName, disambiguateZoneId } from "./zone-id-derivation.js";
@@ -1422,7 +1421,7 @@ function buildZonesFromCommunities(
       id,
       // A sub-zone is named for itself, not its path ("Global Nav", not
       // "Components/global Nav"); the parent is already on screen around it.
-      name: deriveZoneName(id.slice(id.lastIndexOf("/") + 1)),
+      name: titleFromId(id),
       description: describeZone(members, inventory),
       files: members,
       entryPoints,
