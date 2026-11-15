@@ -145,11 +145,6 @@ export function createAttemptTracker(): AttemptTracker {
 // ---------------------------------------------------------------------------
 
 /**
- * Verify the loaded PRD document uses a schema version compatible with this
- * build of hench. Catches mismatches early (at startup) rather than letting
- * them surface as mysterious runtime failures deep in the agent loop.
- */
-/**
  * Snapshot the protected config for the run's backstop. A protected path that
  * cannot be read (a link loop, an unreadable `.claude/`) refuses the run with
  * a message naming it, rather than crashing the command.
@@ -165,6 +160,11 @@ export function captureConfigBackstop(dir: string): ConfigBackstop {
   }
 }
 
+/**
+ * Verify the loaded PRD document uses a schema version compatible with this
+ * build of hench. Catches mismatches early (at startup) rather than letting
+ * them surface as mysterious runtime failures deep in the agent loop.
+ */
 async function assertSchemaCompatibility(store: PRDStore): Promise<void> {
   const doc = await store.loadDocument();
   if (doc.schema !== SCHEMA_VERSION) {

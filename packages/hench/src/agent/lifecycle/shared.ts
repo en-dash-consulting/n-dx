@@ -1487,25 +1487,6 @@ export interface FinalizeRunOptions {
 /** Run statuses that indicate the run ended in failure. */
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
-/**
- * Run an interactive y/n readline prompt with the outer SIGINT handlers
- * temporarily suspended for the duration of the question.
- *
- * The run-loop in `run.ts` registers a SIGINT handler that calls
- * `process.exit(1)` on a second Ctrl-C. Without suspension that handler
- * would kill the process while the user is answering a rollback or
- * commit prompt. This helper snapshots the existing SIGINT listeners,
- * removes them while the readline is open, and restores them on exit.
- *
- * By default, a Ctrl-C received during the prompt is treated as "cancel
- * cleanly — decline": the readline closes and the promise resolves with
- * `false`. Rollback confirmation uses a stricter policy: the first
- * Ctrl-C is absorbed with a visible hint, and a second Ctrl-C exits.
- *
- * @param question  The question to display (with trailing space).
- * @returns         true on accept (empty input, 'y', 'yes');
- *                  false on explicit decline or Ctrl-C cancellation.
- */
 interface AskYesNoOptions {
   interruptMode?: "decline" | "hold-then-exit";
   /**
@@ -1594,6 +1575,25 @@ async function readLineWithSuspendedSigint(
   });
 }
 
+/**
+ * Run an interactive y/n readline prompt with the outer SIGINT handlers
+ * temporarily suspended for the duration of the question.
+ *
+ * The run-loop in `run.ts` registers a SIGINT handler that calls
+ * `process.exit(1)` on a second Ctrl-C. Without suspension that handler
+ * would kill the process while the user is answering a rollback or
+ * commit prompt. This helper snapshots the existing SIGINT listeners,
+ * removes them while the readline is open, and restores them on exit.
+ *
+ * By default, a Ctrl-C received during the prompt is treated as "cancel
+ * cleanly — decline": the readline closes and the promise resolves with
+ * `false`. Rollback confirmation uses a stricter policy: the first
+ * Ctrl-C is absorbed with a visible hint, and a second Ctrl-C exits.
+ *
+ * @param question  The question to display (with trailing space).
+ * @returns         true on accept (empty input, 'y', 'yes');
+ *                  false on explicit decline or Ctrl-C cancellation.
+ */
 async function askYesNoWithSuspendedSigint(
   question: string,
   options: AskYesNoOptions = {},
@@ -1657,33 +1657,6 @@ export async function promptRollbackConfirm(
 }
 
 /**
- * Revert uncommitted changes introduced during a failed run — but only
- * after an express, per-run confirmation. A revert NEVER occurs
- * non-interactively; on a TTY the operator can always decline it.
- *
- * Skips silently when the working tree is already clean.
- *
- * Only hench's own writes are ever in scope. The PRD paths are what hench
- * wrote; the agent's source edits and the operator's own dirty files are
- * reported and left alone. Before that split, the prompt offered the whole
- * dirty tree as "hench's status writes" and the revert ran `git checkout .`,
- * so accepting it — which a bare Enter does — reverted the agent's finished
- * work along with the bookkeeping.
- *
- * The revert is prompt-only:
- * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
- *   names the classified PRD paths and prompts `Roll back these PRD paths?
- *   [Y/n]`, defaulting to Yes — leaving hench's own
- *   uncommitted writes in place is the damage, so a bare Enter reverts them.
- *   Only an explicit 'n'/'no' keeps them. Even then the scope narrows twice
- *   more: tracked changes are restored to HEAD only at the listed paths, and
- *   untracked removal is limited to files absent from the pre-run baseline
- *   (agent-created) *and* inside those paths, never pre-existing work.
- * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
- *   channel for a per-run confirmation, so the working tree is left exactly
- *   as-is and the uncommitted files are reported. Nothing is discarded.
- */
-/**
  * What a rollback is allowed to touch.
  *
  * - `"prd"` — only hench's own PRD writes. The default, and what a *failed
@@ -1711,6 +1684,33 @@ interface PerformRollbackOptions {
   baselineDirectories?: DirectoryBaseline;
 }
 
+/**
+ * Revert uncommitted changes introduced during a failed run — but only
+ * after an express, per-run confirmation. A revert NEVER occurs
+ * non-interactively; on a TTY the operator can always decline it.
+ *
+ * Skips silently when the working tree is already clean.
+ *
+ * Only hench's own writes are ever in scope. The PRD paths are what hench
+ * wrote; the agent's source edits and the operator's own dirty files are
+ * reported and left alone. Before that split, the prompt offered the whole
+ * dirty tree as "hench's status writes" and the revert ran `git checkout .`,
+ * so accepting it — which a bare Enter does — reverted the agent's finished
+ * work along with the bookkeeping.
+ *
+ * The revert is prompt-only:
+ * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
+ *   names the classified PRD paths and prompts `Roll back these PRD paths?
+ *   [Y/n]`, defaulting to Yes — leaving hench's own
+ *   uncommitted writes in place is the damage, so a bare Enter reverts them.
+ *   Only an explicit 'n'/'no' keeps them. Even then the scope narrows twice
+ *   more: tracked changes are restored to HEAD only at the listed paths, and
+ *   untracked removal is limited to files absent from the pre-run baseline
+ *   (agent-created) *and* inside those paths, never pre-existing work.
+ * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
+ *   channel for a per-run confirmation, so the working tree is left exactly
+ *   as-is and the uncommitted files are reported. Nothing is discarded.
+ */
 async function performRollbackIfNeeded(
   projectDir: string,
   options: PerformRollbackOptions = {},
