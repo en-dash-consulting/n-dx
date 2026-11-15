@@ -20,13 +20,11 @@ import type {
   FuncInfo,
   ExpandedSubZones,
 } from "./zone-types.js";
+import { BOX_H_COLLAPSED, FILE_ROW_H, FILE_ROWS_MAX, boxEdgeAnchor } from "./zone-edge-geometry.js";
 
 // ── Constants ────────────────────────────────────────────────────────
 
 const BOX_W = 200;
-export const BOX_H_COLLAPSED = 80;
-export const FILE_ROW_H = 22;
-export const FILE_ROWS_MAX = 15;
 const GAP_X = 80;
 const GAP_Y = 60;
 const PADDING = 40;
@@ -475,24 +473,6 @@ function boxHeight(
   // No subzones → show files directly
   const rows = Math.min(zone.files.length, FILE_ROWS_MAX);
   return BOX_H_COLLAPSED + rows * FILE_ROW_H + 16 + (zone.files.length > FILE_ROWS_MAX ? 20 : 0);
-}
-
-function boxEdgeAnchor(box: BoxRect, tx: number, ty: number): { x: number; y: number } {
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h / 2;
-  const dx = tx - cx;
-  const dy = ty - cy;
-
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-
-  const hw = box.w / 2;
-  const hh = box.h / 2;
-
-  const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
-  const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
-  const s = Math.min(sx, sy);
-
-  return { x: cx + dx * s, y: cy + dy * s };
 }
 
 export function computeZoneLayout(

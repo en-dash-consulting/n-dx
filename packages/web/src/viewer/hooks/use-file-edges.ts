@@ -14,7 +14,7 @@ import {
   boxEdgeAnchor,
   clampToBox,
   edgeCurve,
-} from "./zone-edge-geometry.js";
+} from "../views/zone-edge-geometry.js";
 
 interface FileEdgeElement {
   key: string;

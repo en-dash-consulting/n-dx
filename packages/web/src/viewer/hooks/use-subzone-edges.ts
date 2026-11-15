@@ -15,7 +15,7 @@ import {
   boxEdgeAnchor,
   clampToBox,
   edgeCurve,
-} from "./zone-edge-geometry.js";
+} from "../views/zone-edge-geometry.js";
 
 const SUBZONE_ROW_H = 28;
 const SUBZONE_ROWS_MAX = 10;

@@ -1,13 +1,17 @@
 /**
- * Edge geometry the zone diagram's edge hooks share (`use-file-edges.ts`,
- * `use-subzone-edges.ts`): the row metrics of an expanded zone box, where an
- * edge leaves or meets a box, and the curve drawn between two points.
+ * Zone-box geometry the Zones diagram shares between the layout that sizes
+ * the boxes (`zones-model.ts`), the diagram that draws their rows (`zones.ts`)
+ * and its edge hooks (`hooks/use-file-edges.ts`, `hooks/use-subzone-edges.ts`):
+ * the row metrics of an expanded zone box, where an edge leaves or meets a
+ * box, and the curve drawn between two points. One copy of the row metrics
+ * keeps every edge on the row it belongs to.
  *
- * The row metrics must match the layout that sizes the boxes
- * (`views/zones-model.ts`), or edges land between rows.
+ * A leaf beside zone-types.ts rather than in hooks/: the layout reaches it
+ * without the hooks barrel, which would close an import cycle back through
+ * `visualization/` and `components/`.
  */
 
-import type { BoxRect } from "../views/zone-types.js";
+import type { BoxRect } from "./zone-types.js";
 
 /** Height of a zone box with nothing expanded; rows start just above its bottom. */
 export const BOX_H_COLLAPSED = 80;

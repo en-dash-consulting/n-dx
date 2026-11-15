@@ -32,10 +32,8 @@ import type {
   ZoneBreadcrumb,
   ExpandedSubZones,
 } from "./zone-types.js";
+import { BOX_H_COLLAPSED, FILE_ROW_H, FILE_ROWS_MAX } from "./zone-edge-geometry.js";
 import {
-  BOX_H_COLLAPSED,
-  FILE_ROW_H,
-  FILE_ROWS_MAX,
   SUBZONE_ROW_H,
   SUBZONE_ROWS_MAX,
   SUBZONE_FILE_INDENT,
