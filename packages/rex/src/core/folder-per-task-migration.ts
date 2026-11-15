@@ -281,11 +281,6 @@ async function renameTitleMdToIndexMd(
 }
 
 /**
- * Recursively scan and migrate a directory and its children.
- * currentLevel is the level of items we expect to find AT this directory.
- * depth is the actual nesting depth: 0 (root), 1 (epic), 2 (feature), 3 (task), 4+ (subtask).
- */
-/**
  * Run one file migration, counting it on success. A failure is recorded on
  * `result` against the file rather than aborting the walk.
  */
@@ -306,6 +301,11 @@ async function migrateRecorded(
   }
 }
 
+/**
+ * Recursively scan and migrate a directory and its children.
+ * currentLevel is the level of items we expect to find AT this directory.
+ * depth is the actual nesting depth: 0 (root), 1 (epic), 2 (feature), 3 (task), 4+ (subtask).
+ */
 async function migrateDirRecursive(
   dir: string,
   currentLevel: "epic" | "feature" | "task" | "subtask",
