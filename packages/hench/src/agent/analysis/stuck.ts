@@ -1,11 +1,5 @@
+import { HARD_FAILURE_RUN_STATUSES } from "../../schema/index.js";
 import type { RunRecord } from "../../schema/index.js";
-
-/**
- * Statuses that count as a hard failure for stuck-task detection.
- * Transient errors (API rate limits, network blips) do not count because
- * they are expected to self-resolve on retry.
- */
-const FAILURE_STATUSES: Set<string> = new Set(["failed", "timeout", "budget_exceeded"]);
 
 /**
  * True when a run failed only because the missing-review gate refused it.
@@ -57,7 +51,7 @@ export function countRecentFailures(
  */
 export function isCountedFailure(run: RunRecord): boolean | undefined {
   if (isReviewGateRefusal(run)) return undefined;
-  return FAILURE_STATUSES.has(run.status);
+  return HARD_FAILURE_RUN_STATUSES.has(run.status);
 }
 
 /**

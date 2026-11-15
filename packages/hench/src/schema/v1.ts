@@ -808,6 +808,17 @@ export const DEFAULT_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient" | "cancelled";
 
+/**
+ * Statuses that count as a hard failure for stuck-task detection and workflow
+ * analysis. Transient errors (API rate limits, network blips) do not count
+ * because they are expected to self-resolve on retry.
+ */
+export const HARD_FAILURE_RUN_STATUSES: ReadonlySet<string> = new Set<RunStatus>([
+  "failed",
+  "timeout",
+  "budget_exceeded",
+]);
+
 export interface ToolCallRecord {
   turn: number;
   tool: string;
