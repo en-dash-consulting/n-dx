@@ -8,7 +8,7 @@ import {
   buildConnectionsTooltip,
   buildXZoneBarSegments,
   buildFileConnectionMap,
-} from "../../../src/viewer/views/zones.js";
+} from "../../../src/viewer/views/zones-model.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
