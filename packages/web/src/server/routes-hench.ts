@@ -3249,28 +3249,8 @@ export function startConcurrencyMonitor(
       // locks dir doesn't exist yet
     }
 
-    // Dashboard active
-    const dashboardRunning = Array.from(activeExecutions.values()).filter(
-      (e) => e.state.status === "running" || e.state.status === "starting",
-    ).length;
-
-    // Disk running
-    const dashboardTaskIds = new Set(activeExecutions.keys());
-    let diskRunning = 0;
-    try {
-      const runFiles = readdirSync(runsDir);
-      for (const file of runFiles) {
-        if (!file.endsWith(".json")) continue;
-        const id = file.replace(/\.json$/, "");
-        const run = loadRunFile(runsDir, id);
-        if (run && run.status === "running" && !dashboardTaskIds.has(run.taskId as string)) {
-          diskRunning++;
-        }
-      }
-    } catch {
-      // runs dir may not exist
-    }
-
+    const dashboardRunning = countDashboardRunning(activeExecutions);
+    const diskRunning = countDiskOnlyRunning(runsDir, activeExecutions);
     const totalRunning = dashboardRunning + diskRunning;
     const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
     const level = concurrencyLevelOf(processCount, maxConcurrent);
@@ -3844,6 +3824,32 @@ export function concurrencyLevelOf(inUse: number, max: number): ConcurrencyLevel
   return "low";
 }
 
+/** Dashboard-spawned executions that are starting or running. */
+function countDashboardRunning(activeExecutions: ReadonlyMap<string, ActiveExecution>): number {
+  return Array.from(activeExecutions.values()).filter(
+    (e) => e.state.status === "running" || e.state.status === "starting",
+  ).length;
+}
+
+/**
+ * Run records on disk still marked running for a task this server is not
+ * executing: runs started from a terminal. None when the runs directory does
+ * not exist yet.
+ */
+function countDiskOnlyRunning(runsDir: string, activeExecutions: ReadonlyMap<string, ActiveExecution>): number {
+  let count = 0;
+  try {
+    for (const file of readdirSync(runsDir)) {
+      if (!file.endsWith(".json")) continue;
+      const run = loadRunFile(runsDir, file.replace(/\.json$/, ""));
+      if (run && run.status === "running" && !activeExecutions.has(run.taskId as string)) count++;
+    }
+  } catch {
+    // runs dir may not exist
+  }
+  return count;
+}
+
 /** The concurrency status of one workspace, as `GET /api/hench/concurrency` answers it. */
 export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus {
   const { activeExecutions } = stateForCtx(ctx);
@@ -3852,26 +3858,10 @@ export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus 
 
   // Count dashboard-triggered executions
   const dashboardActive = activeExecutions.size;
-  const dashboardRunning = Array.from(activeExecutions.values()).filter(
-    (e) => e.state.status === "running" || e.state.status === "starting",
-  ).length;
+  const dashboardRunning = countDashboardRunning(activeExecutions);
 
   // 4. Count disk-based running runs (excludes dashboard-tracked ones)
-  const dashboardTaskIds = new Set(activeExecutions.keys());
-  let diskRunningCount = 0;
-  try {
-    const runFiles = readdirSync(runsDir);
-    for (const file of runFiles) {
-      if (!file.endsWith(".json")) continue;
-      const id = file.replace(/\.json$/, "");
-      const run = loadRunFile(runsDir, id);
-      if (run && run.status === "running" && !dashboardTaskIds.has(run.taskId as string)) {
-        diskRunningCount++;
-      }
-    }
-  } catch {
-    // runs dir may not exist
-  }
+  const diskRunningCount = countDiskOnlyRunning(runsDir, activeExecutions);
 
   // 5. Count pending PRD tasks
   let pendingTaskCount = 0;
