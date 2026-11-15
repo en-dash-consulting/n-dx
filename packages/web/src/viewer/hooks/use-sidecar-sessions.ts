@@ -32,6 +32,15 @@ export interface SidecarSessionRow {
   waiting: number;
 }
 
+/**
+ * Cards still waiting on the operator. Here rather than beside `SidecarCard`
+ * in use-sidecar.ts, which imports this module: the sessions list counts them
+ * for every row, and the drawer for its badges.
+ */
+export function waitingCards(cards: readonly SidecarCard[]): number {
+  return cards.filter((c) => c.status === "pending").length;
+}
+
 interface Workspaces {
   anchor: string;
   workspaces: Array<{ key: string; branch: string | null }>;
@@ -93,7 +102,7 @@ export function useSidecarSessions(opts: {
         const cards = entry.session.endedAt
           ? null
           : await getJson<{ cards: SidecarCard[] }>(worktreeApiUrl(w.key, `${SESSIONS}/${encodeURIComponent(entry.session.id)}/cards`));
-        const waiting = cards?.cards.filter((c) => c.status === "pending").length ?? 0;
+        const waiting = cards ? waitingCards(cards.cards) : 0;
         return { entry, worktree: w.key, own: false, waiting };
       }));
     }));

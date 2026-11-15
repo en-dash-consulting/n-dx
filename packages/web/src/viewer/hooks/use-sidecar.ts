@@ -28,7 +28,7 @@ import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { openReconnectingSocket } from "../live-feed-socket.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { getJson, sendJson } from "./json-requests.js";
-import { useSidecarSessions } from "./use-sidecar-sessions.js";
+import { useSidecarSessions, waitingCards } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
 import type { SidecarAttachment, SidecarPageSelection } from "./use-sidecar-attachment.js";
@@ -402,11 +402,6 @@ export function pickOpenSession(entries: readonly SidecarSessionEntry[]): Sideca
     if (!best || entry.session.lastActivityAt > best.session.lastActivityAt) best = entry;
   }
   return best;
-}
-
-/** Cards still waiting on the operator. */
-export function waitingCards(cards: readonly SidecarCard[]): number {
-  return cards.filter((c) => c.status === "pending").length;
 }
 
 /** Cards oldest first, the order the agent waits on them. */
