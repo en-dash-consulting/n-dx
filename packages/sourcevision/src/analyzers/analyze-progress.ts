@@ -50,6 +50,7 @@ import { execFileSyncCli } from "../util/exec-cli.js";
 import { describePass } from "./enrich-config.js";
 import { ANALYSIS_HISTORY_FILE, setRunLedgerListener, snapshotRunLedger } from "./run-ledger.js";
 import { SV_CACHE_DIRNAME } from "../paths.js";
+import { pidAlive } from "../util/pid.js";
 
 /** File name under `<svDir>/.cache/`. */
 export const ANALYZE_PROGRESS_FILE = "analyze-progress.json";
@@ -507,15 +508,9 @@ export function readAnalyzeProgress(svDir: string, options: ReadAnalyzeProgressO
   };
 }
 
-/** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */
+/** {@link pidAlive}, for a pid the progress file may have recorded malformed. */
 function defaultIsPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === "EPERM";
-  }
+  return Number.isInteger(pid) && pid > 0 && pidAlive(pid);
 }
 
 /**
