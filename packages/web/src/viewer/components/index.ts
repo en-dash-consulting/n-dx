@@ -94,7 +94,6 @@ export { SearchOverlay, useSearchOverlay } from "./search-overlay.js";
 export {
   NeolithicOverlay,
   useNeolithicOverlay,
-  NEOLITHIC_EVENT,
   type NeolithicOverlayProps,
 } from "./neolithic-overlay.js";
 export {
@@ -119,11 +118,11 @@ export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
 export { TrackerLinkList, TrackerLinksEditor, resetTrackerLabel, useTrackerLabel } from "./tracker-links.js";
 export type { TrackerLinksEditorProps } from "./tracker-links.js";
-export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
+export { SidecarDock, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
 export { StrengthChip } from "./strength-chip.js";
 export type { GuessStrength } from "./strength-chip.js";
-export { HubSessionDrawer, HubCeilingMeter, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
+export { HubSessionDrawer, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
 export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
 export { PlaceWithSidecarContext, PlaceWithSidecarButton } from "./place-with-sidecar.js";
 export { SidecarPlacementContext, createCardDrafts, draftOnTarget, useCardDraft, useCardDrafts } from "./sidecar-placement.js";
@@ -134,10 +133,10 @@ export { CreateInTrackerButton, TrackerChip, asTrackerChipRead, useTrackerChips 
 export type { TrackerChipRead } from "./tracker-chip.js";
 export { ExternalCallBody, ProblemList } from "./sidecar-external-call.js";
 export type { ExternalCallEdit, ExternalCallBodyProps } from "./sidecar-external-call.js";
-export { ItemEditBody, itemEditDraftOf, itemEditEdits, listDiff } from "./sidecar-item-edit.js";
+export { ItemEditBody, itemEditDraftOf, itemEditEdits } from "./sidecar-item-edit.js";
 export type { ItemEditBodyProps, ItemEditDraft } from "./sidecar-item-edit.js";
 export { StatusBody, statusLabel } from "./sidecar-status.js";
-export { ChoiceBody, choiceAnswerOf, toggleChoice, toggleOther, EMPTY_CHOICE_DRAFT } from "./sidecar-choice.js";
+export { ChoiceBody, choiceAnswerOf, EMPTY_CHOICE_DRAFT } from "./sidecar-choice.js";
 export type { ChoiceBodyProps, ChoiceDraft } from "./sidecar-choice.js";
 export { PlanWithSidecarContext, PlanWithSidecarButton, PlanInAreaButton, planFirstTurn, planSurvivesAreaReport } from "./plan-with-sidecar.js";
 export type { PlanWithSidecar } from "./plan-with-sidecar.js";

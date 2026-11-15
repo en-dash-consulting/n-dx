@@ -41,7 +41,7 @@ export function snapshotChipLabel(snapshot: HubSessionInfo["snapshot"]): string 
 }
 
 /** The composer's meter: the context the next turn resumes with, against the hub ceiling. */
-export function HubCeilingMeter({ used, ceiling }: { used: number; ceiling: number | null }) {
+function HubCeilingMeter({ used, ceiling }: { used: number; ceiling: number | null }) {
   const max = ceiling ?? 0;
   const ratio = max > 0 ? Math.min(1, used / max) : 0;
   const level = ratio >= 0.9 ? "high" : ratio >= 0.7 ? "mid" : "low";
