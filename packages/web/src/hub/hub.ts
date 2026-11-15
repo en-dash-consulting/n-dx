@@ -582,15 +582,19 @@ export class Hub {
     this.persist();
   }
 
+  /** A supervisor's record joined with its live status, as every project-returning method answers it. */
+  private view(sup: ProjectSupervisor): ProjectView {
+    return { ...sup.record, ndxBin: this.selfBin, status: sup.status() };
+  }
+
   listProjects(): ProjectView[] {
-    return Array.from(this.supervisors.values())
-      .map((sup) => ({ ...sup.record, ndxBin: this.selfBin, status: sup.status() }))
+    return Array.from(this.supervisors.values(), (sup) => this.view(sup))
       .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   }
 
   getProject(id: string): ProjectView | null {
     const sup = this.supervisors.get(id);
-    return sup ? { ...sup.record, ndxBin: this.selfBin, status: sup.status() } : null;
+    return sup ? this.view(sup) : null;
   }
 
   /**
@@ -627,7 +631,7 @@ export class Hub {
       await sup.start();
       this.persist();
     }
-    return { created, project: { ...sup.record, ndxBin: this.selfBin, status: sup.status() } };
+    return { created, project: this.view(sup) };
   }
 
   /** How many projects are registered. */
@@ -666,7 +670,7 @@ export class Hub {
       worktreeKnown,
       projectRemoved: false,
       remaining,
-      project: { ...sup.record, ndxBin: this.selfBin, status: sup.status() },
+      project: this.view(sup),
       hubExiting: false,
     };
   }
@@ -712,6 +716,18 @@ export class Hub {
   }
 }
 
+/**
+ * Answer a request whose handler threw. A throw left to propagate is an
+ * unhandled rejection, which ends the hub and every project server it
+ * supervises, so it is logged and answered 500 instead — as far as the
+ * response is not already under way.
+ */
+function answerInternalError(res: ServerResponse, err: unknown): void {
+  console.error("[hub] request failed:", err);
+  if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
+}
+
 /** Start the hub: adopt registered servers, listen, health-check. */
 export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   const requestedPort = options.port ?? DEFAULT_HUB_PORT;
@@ -753,11 +769,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       // No credential: only what is public — the home page shell and proxied
       // requests the project server answers with its own public shell or a 401.
       if (isPublicOnlyHubRequest(req)) {
-        void handlePublicHubRequest(req, res, hub).catch((err: unknown) => {
-          console.error("[hub] request failed:", err);
-          if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-          if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
-        });
+        void handlePublicHubRequest(req, res, hub).catch((err: unknown) => answerInternalError(res, err));
         return;
       }
     }
@@ -767,15 +779,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
         // /p/<id>/… explicitly, or the root alias when one project is registered.
         if (!handled) void handleProxyRequest(req, res, hub);
       })
-      .catch((err: unknown) => {
-        // A throw here is an unhandled rejection, which ends the hub and every
-        // project server it supervises. Answer 500 instead.
-        console.error("[hub] request failed:", err);
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        }
-        if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
-      });
+      .catch((err: unknown) => answerInternalError(res, err));
   });
   server.on("upgrade", (req, socket, head) => {
     // Each refusal keeps its own status line, as on the HTTP path and on the
