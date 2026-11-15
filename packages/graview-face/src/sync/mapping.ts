@@ -26,11 +26,15 @@ export function isSyncedKind(kind: string): kind is SyncedKind {
   return (SYNCED_KINDS as readonly string[]).includes(kind);
 }
 
+/** The owner of every product-layer kind: area, capability and constraint. */
+const PRODUCT_LAYER_OWNER =
+  "rex's product layer: on a v1 tree it is what the migration plan proposes, real once the PRD migrates; on v2, edit it with ndx rex product edit <node>";
+
 /** Who owns each read-only kind, as the refusal says it. */
 export const OWNERS: Readonly<Record<string, string>> = {
-  area: "rex's product layer: on a v1 tree it is what the migration plan proposes, real once the PRD migrates; on v2, edit it with ndx rex product edit <node>",
-  capability: "rex's product layer: on a v1 tree it is what the migration plan proposes, real once the PRD migrates; on v2, edit it with ndx rex product edit <node>",
-  constraint: "rex's product layer: on a v1 tree it is what the migration plan proposes, real once the PRD migrates; on v2, edit it with ndx rex product edit <node>",
+  area: PRODUCT_LAYER_OWNER,
+  capability: PRODUCT_LAYER_OWNER,
+  constraint: PRODUCT_LAYER_OWNER,
   release: "a field on each change (plannedRelease, shippedIn); rex stamps shippedIn from CI",
   zone: "sourcevision: re-run ndx analyze . to change the zones",
   component: "sourcevision: re-run ndx analyze . to change the catalogue",
