@@ -157,6 +157,31 @@ function withCacheAccounting(
   return usage;
 }
 
+/**
+ * The parse result for an input and output count as found (a non-number is
+ * absent and counts as 0) and the record holding the cache fields. Shared by
+ * the API, CLI and stream parsers, which differ only in where they look.
+ */
+function toTokenParseResult(
+  rawInput: unknown,
+  rawOutput: unknown,
+  cacheSource: Record<string, unknown>,
+): TokenParseResult {
+  const hasInput = typeof rawInput === "number";
+  const hasOutput = typeof rawOutput === "number";
+  const cache = extractCacheAccounting(cacheSource);
+
+  return {
+    usage: withCacheAccounting(
+      hasInput ? (rawInput as number) : 0,
+      hasOutput ? (rawOutput as number) : 0,
+      cache,
+    ),
+    diagnosticStatus: classifyPresence(hasInput, hasOutput),
+    cacheProvenance: cache.provenance,
+  };
+}
+
 // ── API token parsing ─────────────────────────────────────────────────────
 
 /**
@@ -185,18 +210,7 @@ export function parseApiTokenUsage(
 export function parseApiTokenUsageWithDiagnostic(
   raw: Record<string, unknown>,
 ): TokenParseResult {
-  const hasInput = typeof raw.input_tokens === "number";
-  const hasOutput = typeof raw.output_tokens === "number";
-
-  const input = hasInput ? (raw.input_tokens as number) : 0;
-  const output = hasOutput ? (raw.output_tokens as number) : 0;
-  const cache = extractCacheAccounting(raw);
-
-  return {
-    usage: withCacheAccounting(input, output, cache),
-    diagnosticStatus: classifyPresence(hasInput, hasOutput),
-    cacheProvenance: cache.provenance,
-  };
+  return toTokenParseResult(raw.input_tokens, raw.output_tokens, raw);
 }
 
 // ── CLI token parsing ─────────────────────────────────────────────────────
@@ -226,22 +240,11 @@ export function parseCliTokenUsage(
 export function parseCliTokenUsageWithDiagnostic(
   envelope: Record<string, unknown>,
 ): TokenParseResult {
-  const rawInput = envelope.input_tokens ?? envelope.total_input_tokens;
-  const rawOutput = envelope.output_tokens ?? envelope.total_output_tokens;
-
-  const hasInput = typeof rawInput === "number";
-  const hasOutput = typeof rawOutput === "number";
-  const cache = extractCacheAccounting(envelope);
-
-  return {
-    usage: withCacheAccounting(
-      hasInput ? (rawInput as number) : 0,
-      hasOutput ? (rawOutput as number) : 0,
-      cache,
-    ),
-    diagnosticStatus: classifyPresence(hasInput, hasOutput),
-    cacheProvenance: cache.provenance,
-  };
+  return toTokenParseResult(
+    envelope.input_tokens ?? envelope.total_input_tokens,
+    envelope.output_tokens ?? envelope.total_output_tokens,
+    envelope,
+  );
 }
 
 // ── Stream token parsing ──────────────────────────────────────────────────
@@ -294,19 +297,7 @@ export function parseStreamTokenUsageWithDiagnostic(
     cacheSource = nested;
   }
 
-  const hasInput = typeof rawInput === "number";
-  const hasOutput = typeof rawOutput === "number";
-  const cache = extractCacheAccounting(cacheSource);
-
-  return {
-    usage: withCacheAccounting(
-      hasInput ? (rawInput as number) : 0,
-      hasOutput ? (rawOutput as number) : 0,
-      cache,
-    ),
-    diagnosticStatus: classifyPresence(hasInput, hasOutput),
-    cacheProvenance: cache.provenance,
-  };
+  return toTokenParseResult(rawInput, rawOutput, cacheSource);
 }
 
 // ── Codex token parsing ───────────────────────────────────────────────────
