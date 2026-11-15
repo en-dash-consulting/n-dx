@@ -16,7 +16,7 @@
  *   FORCE_COLOR > NO_COLOR > process.stdout.isTTY (false when piped)
  *
  * @see packages/llm-client/src/help-format.ts  — TS color implementation
- * @see packages/core/help.js                   — JS color implementation (ndx)
+ * @see packages/core/cli-brand.js              — JS color implementation (ndx)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
