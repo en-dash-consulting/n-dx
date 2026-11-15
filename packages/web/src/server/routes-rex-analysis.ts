@@ -187,6 +187,18 @@ function resolveParentId(ctx: ServerContext, requested: unknown): string | null 
   return null;
 }
 
+/**
+ * A request's optional `parentId` resolved by {@link resolveParentId}:
+ * undefined when the request sent none, or null once it has answered 400
+ * because the PRD holds no such item.
+ */
+function requestedParentIdOr400(ctx: ServerContext, res: ServerResponse, requested: unknown): string | undefined | null {
+  if (requested === undefined) return undefined;
+  const parentId = resolveParentId(ctx, requested);
+  if (parentId === null) errorResponse(res, 400, "parentId does not name an item in this PRD");
+  return parentId;
+}
+
 // ---------------------------------------------------------------------------
 // Edited proposal types
 // ---------------------------------------------------------------------------
@@ -1294,11 +1306,8 @@ async function handleSmartAddPreview(
     // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode).
     // Pass description via --description flag (not positional) to prevent any
     // stale UI text from being concatenated into the argument list.
-    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
-    if (parentId === null) {
-      errorResponse(res, 400, "parentId does not name an item in this PRD");
-      return true;
-    }
+    const parentId = requestedParentIdOr400(ctx, res, input.parentId);
+    if (parentId === null) return true;
 
     const area = input.area === undefined ? undefined : await resolvePreviewArea(ctx, input.area);
     if (typeof area === "string") {
@@ -1431,11 +1440,8 @@ async function handleSmartAddAccept(
       errorResponse(res, 400, "Text is required");
       return true;
     }
-    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
-    if (parentId === null) {
-      errorResponse(res, 400, "parentId does not name an item in this PRD");
-      return true;
-    }
+    const parentId = requestedParentIdOr400(ctx, res, input.parentId);
+    if (parentId === null) return true;
 
     // The description goes to rex through a file, the way batch import already
     // sends its items, rather than as a `--description` argv token: the text
@@ -1535,11 +1541,8 @@ async function handleBatchImport(
       }
     }
 
-    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
-    if (parentId === null) {
-      errorResponse(res, 400, "parentId does not name an item in this PRD");
-      return true;
-    }
+    const parentId = requestedParentIdOr400(ctx, res, input.parentId);
+    if (parentId === null) return true;
 
     // Write items to temp files and build --file args for rex CLI
     const tmpDir = mkdtempSync(join(tmpdir(), "rex-batch-"));
