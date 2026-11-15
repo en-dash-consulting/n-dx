@@ -23,6 +23,7 @@ import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, loadPrdModel, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunLoopPosition, RunMemoryStats, RunReviewPlan, RunEscalation, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import { FAILED_RUN_STATUSES } from "../../schema/index.js";
 import type { ReviewerVendor, RunReviewMode } from "../../schema/index.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
 import { execGitMutation } from "../../process/git-mutation.js";
@@ -1474,9 +1475,6 @@ export interface FinalizeRunOptions {
 // ---------------------------------------------------------------------------
 // Git rollback helpers
 // ---------------------------------------------------------------------------
-
-/** Run statuses that indicate the run ended in failure. */
-const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 interface AskYesNoOptions {
   interruptMode?: "decline" | "hold-then-exit";
@@ -3086,7 +3084,7 @@ async function resetInProgressTaskIfFailed(
   store: PRDStore,
   run: RunRecord,
 ): Promise<void> {
-  if (!FAILURE_STATUSES.has(run.status) || !run.taskId) {
+  if (!FAILED_RUN_STATUSES.has(run.status) || !run.taskId) {
     return;
   }
 
@@ -4458,7 +4456,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     !uncommittedWorkRefused &&
     !reviewGateRefused &&
     opts.rollbackOnFailure !== false &&
-    FAILURE_STATUSES.has(run.status) &&
+    FAILED_RUN_STATUSES.has(run.status) &&
     !(opts.store && run.taskId && (await appliedChangeOfCompletion(opts.store, run.taskId)))
   ) {
     await performRollbackIfNeeded(projectDir, {

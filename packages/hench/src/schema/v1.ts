@@ -809,6 +809,21 @@ export const DEFAULT_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient" | "cancelled";
 
 /**
+ * Statuses a run ends in when it failed. The rollback gate
+ * (`agent/lifecycle/shared.ts`) and the consecutive-failure counter
+ * (`cli/commands/consecutive-failures.ts`) both answer "did this run end in
+ * failure?" from this one set, so a status cannot be rolled back yet still
+ * reset the counter (or vice versa).
+ */
+export const FAILED_RUN_STATUSES: ReadonlySet<string> = new Set<RunStatus>([
+  "failed",
+  "timeout",
+  "budget_exceeded",
+  "error_transient",
+  "cancelled",
+]);
+
+/**
  * Statuses that count as a hard failure for stuck-task detection and workflow
  * analysis. Transient errors (API rate limits, network blips) do not count
  * because they are expected to self-resolve on retry.
