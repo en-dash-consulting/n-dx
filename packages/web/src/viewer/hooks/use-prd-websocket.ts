@@ -106,14 +106,12 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
           fetchTaskUsage();
         }
       },
-      defaultDelayMs: 250,
       delays: {
         "rex:prd-changed": 300,     // heavier — full tree reconciliation
         "rex:item-updated": 200,    // lighter — targeted node patch
         "rex:item-deleted": 200,    // lighter — targeted node removal
       },
       throttledTypes: ["rex:prd-changed", "rex:item-updated", "rex:item-deleted"],
-      maxPendingPerType: 20,
     });
 
     // Response buffer gate: drops messages while tab is hidden,

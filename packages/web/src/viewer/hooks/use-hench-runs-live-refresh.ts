@@ -78,12 +78,10 @@ export function useHenchRunsLiveRefresh(
           batch.types.has("hench:task-execution-progress");
         if (needsRefresh) refresh();
       },
-      defaultDelayMs: 250,
       delays: {
         "hench:task-execution-progress": 200,
       },
       throttledTypes: ["hench:task-execution-progress"],
-      maxPendingPerType: 20,
     });
 
     // WebSocket not available — polling still works as fallback

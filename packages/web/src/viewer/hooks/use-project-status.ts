@@ -210,13 +210,11 @@ export function useProjectStatus(): ProjectStatus | null {
           refresh();
         }
       },
-      defaultDelayMs: 250,
       delays: {
         "rex:prd-changed": 300,
         "hench:task-execution-progress": 200,
       },
       throttledTypes: ["rex:prd-changed", "hench:task-execution-progress"],
-      maxPendingPerType: 20,
     });
 
     // WebSocket not available — polling still works as fallback

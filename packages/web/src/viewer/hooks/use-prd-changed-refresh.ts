@@ -23,10 +23,8 @@ export function usePrdChangedRefresh(refresh: () => void): void {
       onFlush: (batch) => {
         if (live && batch.types.has("rex:prd-changed")) refresh();
       },
-      defaultDelayMs: 250,
       delays: { "rex:prd-changed": 300 },
       throttledTypes: ["rex:prd-changed"],
-      maxPendingPerType: 20,
     });
 
     // WebSocket not available — the view keeps what it last loaded

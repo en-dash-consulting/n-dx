@@ -384,7 +384,6 @@ function startFeed(): () => void {
       if (Date.now() - lastFetchAt < MIN_REFETCH_INTERVAL_MS) return;
       void fetchLive();
     },
-    defaultDelayMs: 250,
   });
 
   // With no socket at all, the poll carries the feed.
