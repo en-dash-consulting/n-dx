@@ -221,9 +221,11 @@ function readDocumentVisibility(): TabVisibilityState {
 
 // ─── Event handlers ─────────────────────────────────────────────────────────
 
-function handleVisibilityChange(): void {
-  const newState = readDocumentVisibility();
-
+/**
+ * Move to `newState`: record the transition, then tell the configured
+ * `onChange` and every subscriber. No-op when the state is unchanged.
+ */
+function transitionTo(newState: TabVisibilityState): void {
   if (newState === currentState) return;
 
   const previousState = currentState;
@@ -241,42 +243,18 @@ function handleVisibilityChange(): void {
   notifyListeners(snapshot);
 }
 
+function handleVisibilityChange(): void {
+  transitionTo(readDocumentVisibility());
+}
+
 /** Focus handler for the fallback detection path. */
 function handleWindowFocus(): void {
-  if (currentState === "visible") return;
-
-  const previousState = currentState;
-  currentState = "visible";
-  stateChangedAt = Date.now();
-
-  recordTransition(previousState, "visible");
-
-  const snapshot = buildSnapshot();
-
-  if (config.onChange) {
-    config.onChange(snapshot, previousState);
-  }
-
-  notifyListeners(snapshot);
+  transitionTo("visible");
 }
 
 /** Blur handler for the fallback detection path. */
 function handleWindowBlur(): void {
-  if (currentState === "hidden") return;
-
-  const previousState = currentState;
-  currentState = "hidden";
-  stateChangedAt = Date.now();
-
-  recordTransition(previousState, "hidden");
-
-  const snapshot = buildSnapshot();
-
-  if (config.onChange) {
-    config.onChange(snapshot, previousState);
-  }
-
-  notifyListeners(snapshot);
+  transitionTo("hidden");
 }
 
 // ─── Cleanup helpers ────────────────────────────────────────────────────────
