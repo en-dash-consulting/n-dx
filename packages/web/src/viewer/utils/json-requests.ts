@@ -1,9 +1,9 @@
 /**
  * JSON requests. `getJson` and `sendJson` serve callers that treat every
  * failure alike: the Sidecar hooks (`use-sidecar`, its sessions list and
- * attachment, and the hub session page), the tooling panel and the Delivery
- * view. In utils/ rather than hooks/ so a component or view can import it
- * directly, without the full hooks barrel.
+ * attachment, and the hub session page), the project metadata read, the
+ * tooling panel and the Delivery view. In utils/ rather than hooks/ so a
+ * component or view can import it directly, without the full hooks barrel.
  *
  * A read answers null for anything but a 2xx — and for a request that throws —
  * since every caller treats "no answer" the same way. A write answers the
