@@ -1,32 +1,19 @@
 /**
  * Token usage tracking utilities for sourcevision analyze.
- * Mirrors the pattern from rex's analyze token tracking.
+ *
+ * The empty aggregate and the per-call accumulator are llm-client's, shared
+ * with rex and hench: {@link AnalyzeTokenUsage} is its `AggregateTokenUsage`
+ * plus the vendor and model the manifest records.
  */
 
-import type { TokenUsage, AnalyzeTokenUsage } from "../schema/index.js";
+import { accumulateTokenUsage, emptyAggregateTokenUsage } from "@n-dx/llm-client";
+import type { AnalyzeTokenUsage } from "../schema/index.js";
+
+export { accumulateTokenUsage };
 
 /** Create an empty AnalyzeTokenUsage accumulator. */
 export function emptyAnalyzeTokenUsage(): AnalyzeTokenUsage {
-  return { calls: 0, inputTokens: 0, outputTokens: 0 };
-}
-
-/** Accumulate a single call's token usage into the aggregate. */
-export function accumulateTokenUsage(
-  aggregate: AnalyzeTokenUsage,
-  usage?: TokenUsage,
-): void {
-  aggregate.calls++;
-  if (!usage) return;
-  aggregate.inputTokens += usage.input;
-  aggregate.outputTokens += usage.output;
-  if (usage.cacheCreationInput) {
-    aggregate.cacheCreationInputTokens =
-      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
-  }
-  if (usage.cacheReadInput) {
-    aggregate.cacheReadInputTokens =
-      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
-  }
+  return emptyAggregateTokenUsage();
 }
 
 /**
