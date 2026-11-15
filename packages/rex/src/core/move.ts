@@ -12,7 +12,7 @@
 
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
-import {findItem, removeFromTree, insertChild} from "./tree.js";
+import { findItem, removeFromTree, insertChild } from "./tree.js";
 import { changeLayerType } from "./layer-projection.js";
 export interface MoveResult {
   item: PRDItem;

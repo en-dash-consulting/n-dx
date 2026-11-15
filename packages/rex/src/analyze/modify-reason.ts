@@ -12,7 +12,8 @@
  * @module analyze/modify-reason
  */
 
-import type {PRDItem} from "../schema/index.js";import type { Proposal } from "./propose.js";
+import type { PRDItem } from "../schema/index.js";
+import type { Proposal } from "./propose.js";
 import type { ReasonResult } from "./reason.js";
 import {
   spawnClaude,

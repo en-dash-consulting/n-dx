@@ -1,4 +1,5 @@
-import type {PRDItem, Priority} from "../schema/index.js";import { PRIORITY_ORDER } from "../schema/index.js";
+import type { PRDItem, Priority } from "../schema/index.js";
+import { PRIORITY_ORDER } from "../schema/index.js";
 import type { TreeEntry } from "./tree.js";
 import { walkTree, findItem } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";

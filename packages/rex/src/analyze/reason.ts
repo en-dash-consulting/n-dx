@@ -6,7 +6,8 @@ import { z } from "zod";
 import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import { isContainerLevel } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
-import type {Proposal} from "./propose.js";import { walkTree } from "../core/tree.js";
+import type { Proposal } from "./propose.js";
+import { walkTree } from "../core/tree.js";
 // Re-export shared utilities for backward compatibility — existing consumers
 // that import from "./reason.js" continue to work without changes.
 export {

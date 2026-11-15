@@ -12,7 +12,8 @@
 import type { LoEConfig, AnalyzeTokenUsage } from "../schema/index.js";
 import { LOE_DEFAULTS } from "../schema/index.js";
 import type { Proposal, ProposalTask, ProposalFeature } from "./propose.js";
-import type {ClaudeResult} from "./reason.js";import {
+import type { ClaudeResult } from "./reason.js";
+import {
   spawnClaude,
   resolveConfiguredModel,
   extractJson,

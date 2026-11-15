@@ -6,7 +6,9 @@ import { findPrunableItems, findKeptItems, pruneItems, countSubtree } from "../.
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
-import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPRD,
+import { ARCHIVE_FILE, loadArchive } from "../../core/archive.js";
+import {
+  hashPRD,
   savePendingSmartPrune,
   loadPendingSmartPrune,
   clearPendingSmartPrune,

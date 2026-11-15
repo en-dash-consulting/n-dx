@@ -41,7 +41,8 @@ import {
   pickLoEFields,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
-import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
+import type { PRDItem, AnalyzeTokenUsage, LoEConfig } from "../../schema/index.js";
+import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
