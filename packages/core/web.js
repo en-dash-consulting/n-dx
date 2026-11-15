@@ -1568,6 +1568,25 @@ export async function loadHubPort(home = hubHome()) {
   return HUB_DEFAULT_PORT;
 }
 
+/**
+ * The hub port a command addresses: `--port` when given, else the configured
+ * one ({@link loadHubPort}). Null, after printing why, for an invalid `--port`.
+ *
+ * @param {Record<string, string | true>} flags
+ * @param {string} home
+ * @returns {Promise<number | null>}
+ */
+async function resolveHubPort(flags, home) {
+  const configured = await loadHubPort(home);
+  if (!flags.port) return configured;
+  const parsed = parseInt(flags.port, 10);
+  if (isNaN(parsed) || parsed < 1 || parsed > MAX_PORT) {
+    console.error(`Invalid port: ${flags.port}`);
+    return null;
+  }
+  return parsed;
+}
+
 /** The hub's registry, read-only. Empty when absent or unreadable. */
 export async function readHubRegistry(home = hubHome()) {
   try {
@@ -2643,15 +2662,8 @@ export async function runHub(rest, { commandName = "hub" } = {}) {
   _quiet = !!flags.quiet;
 
   const home = hubHome();
-  let port = await loadHubPort(home);
-  if (flags.port) {
-    const parsed = parseInt(flags.port, 10);
-    if (isNaN(parsed) || parsed < 1 || parsed > MAX_PORT) {
-      console.error(`Invalid port: ${flags.port}`);
-      return 1;
-    }
-    port = parsed;
-  }
+  const port = await resolveHubPort(flags, home);
+  if (port === null) return 1;
 
   if (subcommand === "status" || subcommand === undefined || subcommand === null) {
     const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
@@ -2823,15 +2835,8 @@ function openBrowser(url) {
  */
 async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   const home = hubHome();
-  let hubPort = await loadHubPort(home);
-  if (flags.port) {
-    const parsed = parseInt(flags.port, 10);
-    if (isNaN(parsed) || parsed < 1 || parsed > MAX_PORT) {
-      console.error(`Invalid port: ${flags.port}`);
-      return 1;
-    }
-    hubPort = parsed;
-  }
+  const hubPort = await resolveHubPort(flags, home);
+  if (hubPort === null) return 1;
 
   const repo = resolveRepo(absDir);
   const name = await loadProjectName(repo.repoRoot);
