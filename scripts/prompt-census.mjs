@@ -63,8 +63,7 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 // Only `--write` shells out, and only to establish whether the tree is clean.
 // See treeState() for why reading .git/ was not enough. This script is listed
-// under "Development scripts" in the ALLOWED set of
-// tests/e2e/architecture-policy.test.js.
+// in packages/core/child-process-allowlist.json.
 import { execFileSync } from "node:child_process";
 
 // PROMPT_CENSUS_ROOT is a test seam: tests/e2e/prompt-census.test.js runs a
@@ -1641,9 +1640,8 @@ function renderMarkdown(report) {
  * index, inflating loose objects, and walking packfiles — reimplementing git.
  * The mtime shortcut (compare each measured file against `.git/index`) is
  * guesswork that reports clean after a `touch`. Since a false *clean* is the
- * exact failure being fixed, neither is acceptable, so this script joins the
- * "Development scripts" entries already in the ALLOWED set of
- * tests/e2e/architecture-policy.test.js.
+ * exact failure being fixed, neither is acceptable, so this script has its
+ * own entry, with that reason, in packages/core/child-process-allowlist.json.
  *
  * ## Scope, and why it is deliberately broad
  *
