@@ -575,17 +575,11 @@ async function processJsTsFiles(
         }
       } else if (!raw.specifier.startsWith(".")) {
         // External package
-        const pkg = extractPackageName(raw.specifier);
-        const existing = externalMap.get(pkg);
-        if (existing) {
-          externalMap.set(pkg, {
-            package: pkg,
-            importedBy: Array.from(new Set([...existing.importedBy, file.path])),
-            symbols: Array.from(new Set([...existing.symbols, ...raw.symbols])),
-          });
-        } else {
-          externalMap.set(pkg, { package: pkg, importedBy: [file.path], symbols: [...raw.symbols] });
-        }
+        mergeExternal(externalMap, {
+          package: extractPackageName(raw.specifier),
+          importedBy: [file.path],
+          symbols: [...raw.symbols],
+        });
       }
       // Unresolved relative imports are silently skipped
     }
@@ -632,17 +626,20 @@ function mergeGraph(
     }
   }
 
-  for (const ext of graph.external) {
-    const existing = externalMap.get(ext.package);
-    if (existing) {
-      externalMap.set(ext.package, {
-        package: ext.package,
-        importedBy: Array.from(new Set([...existing.importedBy, ...ext.importedBy])),
-        symbols: Array.from(new Set([...existing.symbols, ...ext.symbols])),
-      });
-    } else {
-      externalMap.set(ext.package, { ...ext });
-    }
+  for (const ext of graph.external) mergeExternal(externalMap, ext);
+}
+
+/** Add an external package to the map, unioning importers and symbols with an entry already there. */
+function mergeExternal(externalMap: Map<string, ExternalImport>, ext: ExternalImport): void {
+  const existing = externalMap.get(ext.package);
+  if (existing) {
+    externalMap.set(ext.package, {
+      package: ext.package,
+      importedBy: Array.from(new Set([...existing.importedBy, ...ext.importedBy])),
+      symbols: Array.from(new Set([...existing.symbols, ...ext.symbols])),
+    });
+  } else {
+    externalMap.set(ext.package, { ...ext });
   }
 }
 
