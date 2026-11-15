@@ -12,7 +12,7 @@ import { appUrl } from "../base-path.js";
 import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { viewPathname } from "../route-state.js";
 import type { NavigateTo } from "../types.js";
-import { ROBOT_WRANGLER_SECTIONS, type RobotWranglerSection } from "./robot-wrangler-sections.js";
+import type { RobotWranglerSection } from "./robot-wrangler-sections.js";
 import {
   summarizeSidecarTooling,
   summarizeTooling,

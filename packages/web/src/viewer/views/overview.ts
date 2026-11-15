@@ -340,7 +340,7 @@ function StatTile({ glyph, label, value, sub, tone, meter, info, onOpen }: StatT
 
 export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }: OverviewProps) {
   const lead = variant === "lead";
-  const { manifest, inventory, imports, zones, components } = data;
+  const { manifest, inventory, imports, zones } = data;
 
   if (!manifest && !inventory && !imports && !zones) {
     return h("div", { class: "loading" }, "No data loaded. Use 'sourcevision serve' or drop files.");
@@ -349,9 +349,6 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
   const hasZones = zones && zones.zones.length > 0;
   const hasImports = imports && imports.edges.length > 0;
   const showGettingStarted = manifest && (!hasImports || !hasZones);
-
-  // Calculate overall health metrics
-  const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
 
   // Top zones by size
   const topZones = useMemo(() => {

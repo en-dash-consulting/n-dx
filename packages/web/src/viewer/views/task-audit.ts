@@ -184,7 +184,6 @@ function AuditTaskCard({
   entry,
   navigateTo,
   onTerminate,
-  onViewLogs,
   terminating,
   expanded,
   onToggle,
@@ -192,7 +191,6 @@ function AuditTaskCard({
   entry: AuditEntry;
   navigateTo?: NavigateTo;
   onTerminate: (taskId: string) => void;
-  onViewLogs: (runId: string) => void;
   terminating: boolean;
   expanded: boolean;
   onToggle: () => void;
@@ -617,7 +615,6 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
                   entry,
                   navigateTo,
                   onTerminate: handleTerminate,
-                  onViewLogs: (runId) => toggleLogs(runId),
                   terminating: terminatingTasks.has(entry.taskId),
                   expanded: isExpanded,
                   onToggle: () => toggleLogs(entry.runId),

@@ -427,11 +427,6 @@ function getChangeClassification(changes: FileChangeEntry[]): { label: string; c
   if (changes.length === 0) return { label: "no changes", color: "var(--text-dim)" };
 
   const categories = new Set(changes.map((c) => c.category));
-  const hasCode = categories.has("code");
-  const hasDocs = categories.has("docs");
-  const hasConfig = categories.has("config");
-  const hasMetadata = categories.has("metadata");
-  const hasTest = categories.has("test");
 
   // If only one non-test category, use that
   const nonTestCategories = Array.from(categories).filter((c) => c !== "test");

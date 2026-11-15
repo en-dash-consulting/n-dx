@@ -20,10 +20,7 @@ function routeToTreeNode(node: RouteTreeNode): TreeNode {
 }
 
 /** Build a tree of component usage from usageEdges. Root nodes are components that are not used by others. */
-function buildComponentTree(
-  edges: ComponentUsageEdge[],
-  componentFiles: Set<string>,
-): TreeNode[] {
+function buildComponentTree(edges: ComponentUsageEdge[]): TreeNode[] {
   // Build adjacency: from -> children
   const childrenMap = new Map<string, Array<{ name: string; file: string; count: number }>>();
   const usedBy = new Set<string>();
@@ -94,7 +91,6 @@ export function RoutesView({ data }: RoutesViewProps) {
   }
 
   const { routeModules, routeTree, usageEdges, summary } = components;
-  const componentDefs = components.components;
 
   const treeNodes = useMemo(
     () => routeTree.map(routeToTreeNode),
@@ -112,9 +108,8 @@ export function RoutesView({ data }: RoutesViewProps) {
   // Component usage tree
   const componentTreeNodes = useMemo(() => {
     if (!usageEdges || usageEdges.length === 0) return [];
-    const compFiles = new Set(componentDefs.map((c) => c.file));
-    return buildComponentTree(usageEdges, compFiles);
-  }, [usageEdges, componentDefs]);
+    return buildComponentTree(usageEdges);
+  }, [usageEdges]);
 
   const filterMatch = useMemo(() => {
     if (!search) return null;

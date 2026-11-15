@@ -78,7 +78,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Data fetching & polling ────────────────────────────────────
   const {
-    data, setData, loading, error, setError,
+    data, setData, loading, error,
     taskUsageById, rollupById, weeklyBudget,
     fetchPRDData, fetchTaskUsage,
   } = usePRDData(prdData);
@@ -152,9 +152,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Facet filters (tags + status + branch + Inbox, URL-persisted) ────
   const {
-    activeTags, activeSearchStatuses, searchFacets,
+    activeTags, searchFacets,
     activeBranch, setActiveBranch,
-    setActiveTags, setActiveSearchStatuses,
+    setActiveTags,
     clearFacets, hasFacets,
     inboxOnly, setInboxOnly,
   } = useFacetState(inboxIds);

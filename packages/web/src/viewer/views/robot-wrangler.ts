@@ -755,7 +755,6 @@ function FailoverSection({
   onChange: (key: string, v: boolean) => void;
   dirty: boolean;
 }) {
-  const cliName = useCliName();
   const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
   // Without the server's block there is no chain and no reason: the toggle stands alone.
   const chain = failover?.chain ?? [];
@@ -974,8 +973,8 @@ function ReviewSection({
           })),
         }),
         on ? h(ReviewOptions, {
-          review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label,
-          executor, editValues, dirtyKeys, onChange,
+          review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog,
+          executor, dirtyKeys, onChange,
         }) : null,
         on ? h(FlowStrip, {
           steps: pair
@@ -1008,7 +1007,7 @@ function ReviewSection({
 
 /** The options panel: reviewer vendor and fix rounds (pair only) and the reviewer model. */
 function ReviewOptions({
-  review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label, executor, editValues, dirtyKeys, onChange,
+  review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, executor, dirtyKeys, onChange,
 }: {
   review: ReviewInfo;
   pair: boolean;
@@ -1018,9 +1017,7 @@ function ReviewOptions({
   modelValue: string;
   resolvedModel: string;
   catalog: LlmCatalog | null;
-  label: (v: string) => string;
   executor: ViewerLLMVendor;
-  editValues: Record<string, string>;
   dirtyKeys: Set<string>;
   onChange: (key: string, v: string) => void;
 }) {
