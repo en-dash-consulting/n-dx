@@ -1752,7 +1752,6 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
   // Hench agent — deferred node: builtins for lock file and cleanup operations
   ["packages/hench/src/agent/lifecycle/shared.ts", "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem"],
-  ["packages/hench/src/tools/cleanup-transformations.ts", "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path"],
   ["packages/hench/src/tools/test-command-resolver.ts", "Lazy-loads node:readline only when interactive prompts are needed for test command resolution — avoids import cost in automated/config-resolved paths"],
   // Graview face — the published bin answers --help before Vite is loaded, so the loadability policy can run it from a bare tarball
   ["packages/graview-face/bin/serve.js", "Lazy-loads vite only once the arguments say the face is being served — `--help` answers without it, which is what lets the published-package loadability check run the bin from an extracted tarball with no dependencies installed"],
