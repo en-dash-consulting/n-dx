@@ -61,11 +61,6 @@ export function getProjectMetadata(): Promise<ProjectMetadata | null> {
   return fetchPromise;
 }
 
-/** Return the cached value synchronously (may be null if not yet fetched). */
-export function getCachedProjectMetadata(): ProjectMetadata | null {
-  return cachedMeta;
-}
-
 /** Clear the metadata cache (exposed for testing). */
 export function clearProjectMetadataCache(): void {
   cachedMeta = null;
