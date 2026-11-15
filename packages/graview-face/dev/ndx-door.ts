@@ -42,6 +42,7 @@ import { createReadStream, existsSync, readdirSync, readFileSync, realpathSync, 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Plugin } from "vite";
+import { DOOR_KEY_HEADER, DOOR_KEY_META } from "../src/sync/door.js";
 
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { name: string; version: string };
 
@@ -57,10 +58,6 @@ export function rangeOf(header: string | undefined, size: number): { start: numb
   if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return undefined;
   return { start, end };
 }
-
-/** The header a page sends the door's key in, and the meta tag the key is written to. */
-export const DOOR_KEY_HEADER = "x-ndx-door";
-export const DOOR_KEY_META = "ndx-door";
 
 /** What the projection reads, under either layout, relative to the project. */
 const READS = [".rex", ".ndx/rex", ".hench/runs", ".ndx/hench/runs", ".sourcevision", ".ndx/sourcevision", ".n-dx.json", ".n-dx.local.json", ".ndx/config.json"];
@@ -87,10 +84,12 @@ export function projectStamp(root: string): string {
     for (const name of readdirSync(path)) if (name !== ".cache") walk(join(path, name));
   };
   for (const rel of READS) walk(join(root, rel));
+  const git = (args: string[]): string =>
+    execFileSync("git", args, { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
   let refs = "";
   try {
-    refs = execFileSync("git", ["for-each-ref", "--format=%(objectname) %(refname)"], { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
-    refs += execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
+    refs = git(["for-each-ref", "--format=%(objectname) %(refname)"]);
+    refs += git(["rev-parse", "HEAD"]);
   } catch {
     // Not a repository: the files alone decide.
   }

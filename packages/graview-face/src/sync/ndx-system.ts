@@ -15,6 +15,7 @@
 import { fetchSnapshot } from "@graview/core/snapshot";
 import { doorClient, mcpRemote, type RemoteChange, type RemoteSystem, type RemoteWrite, type ToolCall } from "@graview/core/sync";
 import { BASE } from "../base.js";
+import { DOOR_KEY_HEADER, DOOR_KEY_META } from "./door.js";
 import { isSyncedKind, SYNC_FIELDS, SYNCED_KINDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -32,7 +33,7 @@ export interface NdxRemoteOptions {
 /** The key the dev server wrote into this page, if it is one. */
 function pageKey(): string | undefined {
   if (typeof document === "undefined") return undefined;
-  return document.querySelector('meta[name="ndx-door"]')?.getAttribute("content") ?? undefined;
+  return document.querySelector(`meta[name="${DOOR_KEY_META}"]`)?.getAttribute("content") ?? undefined;
 }
 
 interface Item {
@@ -74,7 +75,7 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
   const doFetch: Fetch = (input, init) => {
     if (!key || !String(input).includes("/ndx/")) return send(input, init);
     const headers = new Headers(init?.headers);
-    headers.set("x-ndx-door", key);
+    headers.set(DOOR_KEY_HEADER, key);
     return send(input, { ...init, headers });
   };
   const base = options.base ?? BASE;
