@@ -3202,8 +3202,12 @@ export function getEffectiveMaxConcurrent(projectDir: string): number {
   if (throttleState.concurrencyOverride !== null) {
     return throttleState.concurrencyOverride;
   }
-  const config = loadHenchConfig(projectDir);
-  const guard = config?.guard as Record<string, unknown> | undefined;
+  return configuredMaxConcurrent(projectDir);
+}
+
+/** `guard.maxConcurrentProcesses` from the hench config, or the default when it is unset or not a number. */
+function configuredMaxConcurrent(projectDir: string): number {
+  const guard = loadHenchConfig(projectDir)?.guard as Record<string, unknown> | undefined;
   return typeof guard?.maxConcurrentProcesses === "number"
     ? guard.maxConcurrentProcesses
     : DEFAULT_MAX_CONCURRENT_PROCESSES;
@@ -3755,11 +3759,7 @@ export async function shutdownActiveExecutions(
  */
 function handleThrottleGet(res: ServerResponse, ctx: ServerContext): boolean {
   const { activeExecutions } = stateForCtx(ctx);
-  const config = loadHenchConfig(ctx.projectDir);
-  const guard = config?.guard as Record<string, unknown> | undefined;
-  const configMax = typeof guard?.maxConcurrentProcesses === "number"
-    ? guard.maxConcurrentProcesses
-    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+  const configMax = configuredMaxConcurrent(ctx.projectDir);
 
   const effective = throttleState.concurrencyOverride ?? configMax;
 
@@ -3969,11 +3969,7 @@ function broadcastThrottleState(
   ctx: ServerContext,
 ): void {
   const { activeExecutions } = stateForCtx(ctx);
-  const config = loadHenchConfig(ctx.projectDir);
-  const guard = config?.guard as Record<string, unknown> | undefined;
-  const configMax = typeof guard?.maxConcurrentProcesses === "number"
-    ? guard.maxConcurrentProcesses
-    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+  const configMax = configuredMaxConcurrent(ctx.projectDir);
 
   broadcast({
     type: "hench:throttle-state",
