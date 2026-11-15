@@ -286,6 +286,18 @@ function resetDeferredArgs(entry: PrdEntry | null): string[] {
   return resetsDeferred(entry?.item.status) ? ["--reset-deferred"] : [];
 }
 
+/** The request body as a JSON object, or null once it has answered 400 because it is not one. */
+async function readObjectBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed: unknown = JSON.parse(await readBody(req, res));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    return parsed as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return null;
+  }
+}
+
 /** PUT /api/hench/prep/:taskId — save or clear the task's own run settings. */
 async function handleSave(
   req: IncomingMessage,
@@ -294,15 +306,8 @@ async function handleSave(
   taskId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(await readBody(req, res));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    body = parsed as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readObjectBody(req, res);
+  if (!body) return true;
 
   const version = body["version"];
   if (typeof version !== "string" || version.length === 0) {
@@ -488,15 +493,8 @@ export async function diagnoseTaskRun(
 async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   const refusal = preparationRefusal(ctx, taskId);
   if (refusal) { errorResponse(res, 400, refusal); return true; }
-  let body: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(await readBody(req, res));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    body = parsed as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readObjectBody(req, res);
+  if (!body) return true;
   const checked = await validateRunOptions(ctx.projectDir, body["options"]);
   if (!checked.ok) {
     jsonResponse(res, 400, { error: checked.error, key: checked.key });
