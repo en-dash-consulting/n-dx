@@ -19,10 +19,10 @@
 
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { DEFAULT_CLI_NAME, latestContextTokens, lensLabel, sidecarSetupNeed } from "../hooks/sidecar.js";
 import type { HubSessionInfo, HubSnapshotWorktree, SidecarState } from "../hooks/sidecar.js";
-import { SidecarFrameRow, SidecarTurnNotices, pairToolResults } from "./sidecar-drawer.js";
+import { SidecarFrameRow, SidecarTurnNotices, pairToolResults, useFollowNewestFrame } from "./sidecar-drawer.js";
 import { SidecarCardList, cardTurnSender } from "./sidecar-cards.js";
 
 /** `40000` → `40k`, `12345` → `12k`, `1234` → `1.2k`, `950` → `950`: one decimal only below 10k. */
@@ -117,12 +117,7 @@ export interface HubSessionDrawerProps {
 
 export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessionDrawerProps) {
   const [draft, setDraft] = useState("");
-  const transcriptRef = useRef<HTMLOListElement>(null);
-
-  useEffect(() => {
-    const el = transcriptRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [sidecar.frames.length]);
+  const transcriptRef = useFollowNewestFrame(sidecar.frames.length);
 
   const setupNeed = sidecarSetupNeed(sidecar.agent, sidecar.catalog, sidecar.lastTurn);
   const busy = sidecar.running || sidecar.sending;

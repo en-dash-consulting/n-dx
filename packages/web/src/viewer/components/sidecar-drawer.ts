@@ -250,6 +250,19 @@ export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
 }
 
 /**
+ * The transcript list's ref, scrolled to the bottom whenever a frame arrives
+ * so both drawers follow the newest one.
+ */
+export function useFollowNewestFrame(frameCount: number) {
+  const transcriptRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [frameCount]);
+  return transcriptRef;
+}
+
+/**
  * What stands between the session and its next turn, under the cards: the CLI
  * setup the agent still needs, how the last turn ended, the session's error
  * and the paused bar. The hub drawer draws them alike; only the hint for a
@@ -366,7 +379,6 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [draft, setDraft] = useState("");
   const [listing, setListing] = useState(false);
   const [lensMenu, setLensMenu] = useState(false);
-  const transcriptRef = useRef<HTMLOListElement>(null);
   const hub = useHubProjects();
   const tabs = useExtensionTabs(hub);
   const [selected, setSelected] = useState(SIDECAR_TAB);
@@ -414,11 +426,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     return () => { root.style.removeProperty("--sidecar-w"); };
   }, [shownWidth]);
 
-  // Follow the newest frame.
-  useEffect(() => {
-    const el = transcriptRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [sidecar.frames.length]);
+  const transcriptRef = useFollowNewestFrame(sidecar.frames.length);
 
   const onResizeStart = (e: PointerEvent) => {
     e.preventDefault();
