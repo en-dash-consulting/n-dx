@@ -21,9 +21,9 @@
 
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync } from "node:fs";
+import { basename, isAbsolute, join } from "node:path";
+import { isPackageNamed, WEB_PACKAGE_ROOT } from "./build-identity.js";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
 import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
@@ -258,19 +258,6 @@ export function resolveSelfBin(explicit: string | undefined): string {
   return "";
 }
 
-/** `@n-dx/web`'s own root: this module sits at `<pkg>/src/hub/` or `<pkg>/dist/hub/`. */
-const WEB_PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-
-/** Whether `dir` is the `@n-dx/core` package, by its own package.json. */
-function isNdxCorePackage(dir: string): boolean {
-  try {
-    const pkg: unknown = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
-    return !!pkg && typeof pkg === "object" && (pkg as { name?: unknown }).name === "@n-dx/core";
-  } catch {
-    return false;
-  }
-}
-
 /**
  * The n-dx CLI the hub asks about extensions: the one it was given, or else
  * `@n-dx/core`'s `cli.js` found beside this `@n-dx/web` — its sibling in a
@@ -284,7 +271,7 @@ export function resolveNdxCli(explicit: string | null | undefined, webRoot: stri
   if (explicit) return explicit;
   for (const coreDir of [join(webRoot, "..", "core"), join(webRoot, "..", "..", "..")]) {
     const cli = join(coreDir, "cli.js");
-    if (existsSync(cli) && isNdxCorePackage(coreDir)) return cli;
+    if (existsSync(cli) && isPackageNamed(coreDir, "@n-dx/core")) return cli;
   }
   return "";
 }

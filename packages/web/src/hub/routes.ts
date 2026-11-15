@@ -61,9 +61,9 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 import { detectBasePath, projectIdFromBasePath, requestAccess, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
@@ -72,7 +72,7 @@ import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject,
 import type { NewProjectPlan } from "./new-project.js";
 import { EXTENSION_API_VERSION, buildExtensionsAnswer, resolveFrameUrl } from "./extensions.js";
 import { SidecarManager } from "./sidecars.js";
-import { hubBuildIdentity } from "./build-identity.js";
+import { hubBuildIdentity, isPackageNamed } from "./build-identity.js";
 import { DEFAULT_IDLE_STOP_MINUTES } from "./frame-keys.js";
 import { probeHubLens } from "./session-host.js";
 
@@ -144,22 +144,6 @@ function isDirectory(path: string): boolean {
   }
 }
 
-/**
- * Whether `pkgRoot` is the real `@n-dx/web` package, by its own package.json.
- *
- * Identity, not location: the hub spawns whatever it accepts here, so matching
- * on where a file sits means anyone who can create a directory can offer it a
- * process to run.
- */
-function isNdxWebPackage(pkgRoot: string): boolean {
-  try {
-    const pkg: unknown = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf-8"));
-    return !!pkg && typeof pkg === "object" && (pkg as { name?: unknown }).name === "@n-dx/web";
-  } catch {
-    // No package.json, unreadable, or not JSON — not the package.
-    return false;
-  }
-}
 
 /**
  * Whether `ndxBin` is something the hub should spawn.
@@ -175,8 +159,11 @@ export function isAcceptableNdxBin(path: string): boolean {
   // `…/dist/cli/index.js` is a *shape*, and any directory can be given it.
   // Ask the package that owns the file who it is instead: an impostor dropped
   // at /tmp/x/web/dist/cli/index.js passed the shape test and was spawned.
+  // Identity, not location: the hub spawns whatever it accepts here, so
+  // matching on where a file sits means anyone who can create a directory can
+  // offer it a process to run.
   if (/\/dist\/cli\/index\.(m|c)?js$/.test(normalized)) {
-    return isNdxWebPackage(dirname(dirname(dirname(path))));
+    return isPackageNamed(dirname(dirname(dirname(path))), "@n-dx/web");
   }
   const base = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
   // A launcher is a shim with nothing to interrogate, so its name is all
