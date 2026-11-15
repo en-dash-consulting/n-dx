@@ -298,6 +298,20 @@ const LANG_COLORS: Record<string, string> = {
   Go: "#00add8",
 };
 
+/** A zone the health views flag: cohesion under 0.4 or coupling over 0.5. */
+export function zoneNeedsAttention(zone: { cohesion: number; coupling: number }): boolean {
+  return zone.cohesion < 0.4 || zone.coupling > 0.5;
+}
+
+/** The facts the isometric map's caption lists: zones, imports and the branch, when known. */
+function isoMapFacts({ zones, imports, manifest }: LoadedData): string[] {
+  return [
+    `${zones?.zones.length ?? 0} zones`,
+    imports ? `${imports.edges.length.toLocaleString()} imports` : "",
+    manifest?.gitBranch ?? "",
+  ].filter(Boolean);
+}
+
 /** Green ≥ 0.7, orange ≥ 0.4, red below — higher is better. */
 function healthColor(score: number): string {
   return score >= 0.7 ? "var(--green)" : score >= 0.4 ? "var(--orange)" : "var(--red)";
@@ -364,7 +378,7 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
   // Zones needing attention count
   const attentionCount = useMemo(() => {
     if (!zones) return 0;
-    return zones.zones.filter(z => z.cohesion < 0.4 || z.coupling > 0.5).length;
+    return zones.zones.filter(zoneNeedsAttention).length;
   }, [zones]);
 
   const narration = manifest ? narrationNotice(manifest.narration) : null;
@@ -412,11 +426,7 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
     hasZones && !lead
       ? h(IsoMapHero, {
           analysisStamp: isoMapAnalysisStamp(data),
-          facts: [
-            `${zones!.zones.length} zones`,
-            imports ? `${imports.edges.length.toLocaleString()} imports` : "",
-            manifest?.gitBranch ?? "",
-          ].filter(Boolean),
+          facts: isoMapFacts(data),
           onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
         })
       : null,
@@ -543,17 +553,13 @@ export function MapPanel({ data, navigateTo, opened = false, onExpand }: {
   opened?: boolean;
   onExpand?: () => void;
 }): ComponentChild {
-  const { zones, imports, manifest } = data;
+  const { zones } = data;
   if (!zones || zones.zones.length === 0) {
     return h("p", { class: "stage-tile-empty" }, "No zones yet — run an analysis to draw the map.");
   }
   return h(IsoMapHero, {
     analysisStamp: isoMapAnalysisStamp(data),
-    facts: [
-      `${zones.zones.length} zones`,
-      imports ? `${imports.edges.length.toLocaleString()} imports` : "",
-      manifest?.gitBranch ?? "",
-    ].filter(Boolean),
+    facts: isoMapFacts(data),
     onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
     onExpand: opened ? undefined : onExpand,
     hosted: opened,
@@ -639,7 +645,7 @@ export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (st
   const { inventory, imports, zones } = data;
   const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
   const attentionCount = useMemo(
-    () => (zones ? zones.zones.filter((z) => z.cohesion < 0.4 || z.coupling > 0.5).length : 0),
+    () => (zones ? zones.zones.filter(zoneNeedsAttention).length : 0),
     [zones],
   );
   return h("div", { class: "overview-stats", role: "list", "aria-label": "Codebase summary" },
@@ -779,7 +785,7 @@ export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): 
   const files = useMemo(() => new Map((inventory?.files ?? []).map((f) => [f.path, f])), [inventory]);
   const attention = useMemo(
     () => (zones?.zones ?? [])
-      .filter((z) => z.cohesion < 0.4 || z.coupling > 0.5)
+      .filter(zoneNeedsAttention)
       .sort((a, b) => (a.cohesion - a.coupling) - (b.cohesion - b.coupling)),
     [zones],
   );
