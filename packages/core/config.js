@@ -581,17 +581,6 @@ async function loadEffectiveProjectConfig(dir) {
 }
 
 /**
- * Check if a key (in "section.path" format) should be written to .n-dx.local.json.
- */
-function isMachineLocalKey(keyArg) {
-  return MACHINE_LOCAL_KEYS.has(keyArg);
-}
-
-/**
- * Get a nested value from an object by dot-separated path.
- * Returns undefined if any segment is missing.
- */
-/**
  * Sections under `llm` that hold a flat map keyed by task class.
  *
  * Task classes contain dots (`agent.execute`, `prd.rename`), and so does the
@@ -646,6 +635,10 @@ function splitSettingPath(settingPath, pkg) {
   return parts;
 }
 
+/**
+ * Get a nested value from an object by dot-separated path.
+ * Returns undefined if any segment is missing.
+ */
 function getByPath(obj, path, pkg) {
   const parts = splitSettingPath(path, pkg);
   let current = obj;
@@ -1189,11 +1182,6 @@ const CLI_TIMEOUT_DEFAULTS = {
 };
 
 /**
- * Validate a CLI timeout value: must be a non-negative finite number.
- * Zero is valid and means "no timeout".
- * Exported for unit testing.
- */
-/**
  * Environment additions that carry BETA experimental settings into spawned CLIs.
  *
  * Returns `{}` unless a flag is explicitly enabled, so the common case leaves a
@@ -1219,6 +1207,11 @@ export function experimentalEnv(projectConfig) {
   return {};
 }
 
+/**
+ * Validate a CLI timeout value: must be a non-negative finite number.
+ * Zero is valid and means "no timeout".
+ * Exported for unit testing.
+ */
 export function validateTimeoutMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(

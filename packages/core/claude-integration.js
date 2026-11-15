@@ -120,6 +120,9 @@ function mergeSettings(dir) {
 
 // ── Skill writing ─────────────────────────────────────────────────────────────
 
+/** Old unprefixed skill names — removed on init to avoid duplicates. */
+const LEGACY_SKILL_NAMES = ["plan", "status", "capture", "zone", "work", "configure"];
+
 /**
  * Write all skill files via the canonical vendor-neutral writer, after
  * cleaning up legacy Claude-specific skill layouts.
@@ -127,9 +130,6 @@ function mergeSettings(dir) {
  * Legacy cleanup is a Claude-only migration concern — the shared
  * `writeVendorSkills()` handles the actual generation.
  */
-/** Old unprefixed skill names — removed on init to avoid duplicates. */
-const LEGACY_SKILL_NAMES = ["plan", "status", "capture", "zone", "work", "configure"];
-
 function writeSkills(dir) {
   const skillsDir = join(dir, ".claude", "skills");
 
