@@ -37,7 +37,7 @@ import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
-import { classifyAuthError } from "./llm-error-classifier.js";
+import { classifyAuthError, extractJsonErrorMessage } from "./llm-error-classifier.js";
 import { resolveClaudeCliEffort } from "./claude-effort.js";
 import { printRetryLine } from "./progress-reporter.js";
 import { formatRetryCountdown } from "./rate-limit.js";
@@ -261,25 +261,7 @@ function cleanResultMessage(text: string): string {
     } catch { /* not pure JSON — fall through */ }
   }
   // Slow-path: JSON blob embedded mid-string (e.g. "Error: {...}").
-  let depth = 0, start = -1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "{") {
-      if (!depth) start = i;
-      depth++;
-    } else if (text[i] === "}" && depth > 0) {
-      depth--;
-      if (!depth && start >= 0) {
-        try {
-          const parsed = JSON.parse(text.slice(start, i + 1)) as Record<string, unknown>;
-          const inner = parsed.error as Record<string, unknown> | undefined;
-          if (inner && typeof inner.message === "string") return inner.message;
-          if (typeof parsed.message === "string") return parsed.message;
-        } catch { /* not JSON here */ }
-        start = -1;
-      }
-    }
-  }
-  return "";
+  return extractJsonErrorMessage(text);
 }
 
 /**
