@@ -549,10 +549,6 @@ function renderResult(
     "data-result-index": index,
     tabIndex: -1,
     onClick: () => onSelect(result),
-    onMouseEnter: () => {
-      // Allow mouse to update active index for visual feedback
-      // (handled via CSS :hover, but aria-selected needs state)
-    },
   },
     // Top row: level icon + highlighted title + status badge
     h("div", { class: "search-result-header" },
