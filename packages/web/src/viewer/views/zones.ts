@@ -442,31 +442,31 @@ function ZoneBox({
   const showConnectingToggle = !!onToggleConnectingOnly &&
     (connectingOnly || hasConnecting(zone.files) || !!zone.subZones?.some((sz) => hasConnecting(sz.files)));
 
+  /** One file row: the flat list and an expanded subzone differ only in key, position and width. */
+  const fileRow = (file: FileInfo, key: string, y: number, boxX: number, boxW: number) =>
+    h(FileRow, {
+      key,
+      file,
+      y,
+      boxX,
+      boxW,
+      searchMatch: searchQ ? matchingFiles.has(file.path) : false,
+      hasCrossZone: fileConnections.has(file.path),
+      active: activeFilePath === file.path,
+      xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
+      tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
+      onClick: () => onSelectFile(file.path),
+      onDblClick: () => onDblClickFile(file.path),
+      onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
+    });
+
   // Build expanded content elements
   const renderFileContent = () => {
     const visibleFiles = zone.files.slice(0, FILE_ROWS_MAX);
     const overflow = zone.files.length - FILE_ROWS_MAX;
     return [
-      ...visibleFiles.map((file, i) => {
-        const fy = box.y + BOX_H_COLLAPSED - 4 + i * FILE_ROW_H;
-        const isMatch = !searchQ || matchingFiles.has(file.path);
-        const hasCrossZone = fileConnections.has(file.path);
-        return h(FileRow, {
-          key: file.path,
-          file,
-          y: fy,
-          boxX: box.x,
-          boxW: box.w,
-          searchMatch: searchQ ? isMatch : false,
-          hasCrossZone,
-          active: activeFilePath === file.path,
-          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
-          tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
-          onClick: () => onSelectFile(file.path),
-          onDblClick: () => onDblClickFile(file.path),
-          onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
-        });
-      }),
+      ...visibleFiles.map((file, i) =>
+        fileRow(file, file.path, box.y + BOX_H_COLLAPSED - 4 + i * FILE_ROW_H, box.x, box.w)),
       overflow > 0
         ? h("text", {
             key: "overflow",
@@ -505,27 +505,8 @@ function ZoneBox({
       if (szExpanded) {
         const szFiles = sz.files.slice(0, FILE_ROWS_MAX);
         const szOverflow = sz.files.length - FILE_ROWS_MAX;
-        for (let fi = 0; fi < szFiles.length; fi++) {
-          const file = szFiles[fi];
-          const fy = curY;
-          const hasCrossZone = fileConnections.has(file.path);
-          elements.push(
-            h(FileRow, {
-              key: `${sz.id}-${file.path}`,
-              file,
-              y: fy,
-              boxX: box.x + SUBZONE_FILE_INDENT,
-              boxW: box.w - SUBZONE_FILE_INDENT,
-              searchMatch: searchQ ? matchingFiles.has(file.path) : false,
-              hasCrossZone,
-              active: activeFilePath === file.path,
-              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
-              tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
-              onClick: () => onSelectFile(file.path),
-              onDblClick: () => onDblClickFile(file.path),
-              onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
-            }),
-          );
+        for (const file of szFiles) {
+          elements.push(fileRow(file, `${sz.id}-${file.path}`, curY, box.x + SUBZONE_FILE_INDENT, box.w - SUBZONE_FILE_INDENT));
           curY += FILE_ROW_H;
         }
         if (szOverflow > 0) {
