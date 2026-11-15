@@ -8,7 +8,6 @@
  * - Selective refresh: only reload files whose mtime changed
  */
 
-import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../external.js";
 import { DATA_FILES } from "../external.js";
 import {
   validate,

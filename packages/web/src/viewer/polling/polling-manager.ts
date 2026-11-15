@@ -14,10 +14,7 @@
  */
 
 import { onDebouncedVisibilityChange, isTabVisible } from "./tab-visibility.js";
-import {
-  registerPollingSource,
-  unregisterPollingSource,
-} from "./engine/index.js";
+import { registerPollingSource } from "./engine/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

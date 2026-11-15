@@ -8,11 +8,10 @@
  * @see ../performance/dom-performance-monitor.ts — standalone monitoring module
  */
 
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { useState, useEffect, useCallback } from "preact/hooks";
 import type { RefObject } from "preact";
 import type {
   DOMNodeSnapshot,
-  DOMPerformanceConfig,
   RenderTiming,
   UpdateComparison,
   PerformanceSummary,
@@ -29,9 +28,6 @@ import {
   recordUpdate,
   measureOperation,
   computeSummary,
-  resetDOMPerformanceMonitor,
-  countDOMNodes,
-  readHeapUsage,
 } from "../performance/dom-performance-monitor.js";
 
 export interface UseDOMPerformanceMonitorOptions {

@@ -19,7 +19,6 @@ import {
   getQueueState,
   enqueueRefresh,
   getRecommendedInterval,
-  resetRefreshThrottle,
   type RefreshQueueState,
   type RefreshPriority,
 } from "../performance/refresh-throttle.js";
