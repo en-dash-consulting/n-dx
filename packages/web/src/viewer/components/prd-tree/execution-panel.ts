@@ -131,9 +131,10 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
   // callers (e.g. a WebSocket-triggered reconciliation arriving while a
   // polling fetch is in-flight) share a single underlying request, and
   // rapid successive calls are rate-limited. This guarantees at most one
-  // /api/rex/execute/status request is active at any time.
+  // /api/rex/execute/status request is active at any time. The pipeline is
+  // built on the first render only.
 
-  const statusPipeline = useRef(
+  const [statusPipeline] = useState(() =>
     createFetchPipeline(async () => {
       const res = await fetch("/api/rex/execute/status");
       if (res.ok) {
@@ -146,7 +147,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
 
   const fetchStatus = useCallback(async () => {
     try {
-      await statusPipeline.current.execute();
+      await statusPipeline.execute();
     } catch {
       // Silently fail — will retry on next poll
     }
@@ -203,10 +204,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
   }, [fetchStatus, onPrdChanged]);
 
   // Dispose pipeline on unmount to clear rate-limiter timers and in-flight state.
-  useEffect(() => {
-    const pipeline = statusPipeline.current;
-    return () => pipeline.dispose();
-  }, []);
+  useEffect(() => () => statusPipeline.dispose(), []);
 
   // Poll as fallback (every 3s) — visibility-aware via polling manager.
   // Automatically paused when memory pressure disables autoRefresh.
