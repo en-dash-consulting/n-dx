@@ -936,6 +936,15 @@ function ZoneDiagram({
     return indices;
   }, [edges]);
 
+  // The zone-level edges this render draws, each with its path and its label:
+  // not replaced by file- or subzone-level edges, and with both boxes laid out.
+  const drawnEdges = edges.flatMap((edge) => {
+    const edgeKey = `${edge.from}->${edge.to}`;
+    const fromBox = boxes.get(edge.from);
+    const toBox = boxes.get(edge.to);
+    return hiddenZoneEdges.has(edgeKey) || !fromBox || !toBox ? [] : [{ edge, edgeKey, fromBox, toBox }];
+  });
+
   // Search/filter state
   const { dimmedZones, matchingFilesByZone } = useMemo(() => {
     if (!searchQ) return { dimmedZones: new Set<string>(), matchingFilesByZone: new Map<string, Set<string>>() };
@@ -1048,14 +1057,7 @@ function ZoneDiagram({
 
       // Zone-level edges (hidden when expanded zones have file-level edges)
       h("g", { class: "cg-edges" },
-        edges.map((edge) => {
-          const edgeKey = `${edge.from}->${edge.to}`;
-          if (hiddenZoneEdges.has(edgeKey)) return null;
-
-          const fromBox = boxes.get(edge.from);
-          const toBox = boxes.get(edge.to);
-          if (!fromBox || !toBox) return null;
-
+        drawnEdges.map(({ edge, edgeKey, fromBox, toBox }) => {
           const pairKey = [edge.from, edge.to].sort().join("|");
           const total = pairCounts.get(pairKey) ?? 1;
           const idx = pairIndices.get(edgeKey) ?? 0;
@@ -1108,22 +1110,14 @@ function ZoneDiagram({
 
       // Edge labels (only for visible zone-level edges)
       h("g", { class: "cg-edge-labels" },
-        edges.map((edge) => {
-          const edgeKey = `${edge.from}->${edge.to}`;
-          if (hiddenZoneEdges.has(edgeKey)) return null;
-
-          const fromBox = boxes.get(edge.from);
-          const toBox = boxes.get(edge.to);
-          if (!fromBox || !toBox) return null;
-
-          return h(EdgeLabel, {
+        drawnEdges.map(({ edge, edgeKey, fromBox, toBox }) =>
+          h(EdgeLabel, {
             key: `label-${edgeKey}`,
             edge,
             fromBox,
             toBox,
             hovered: hoveredEdge === edgeKey,
-          });
-        }),
+          })),
       ),
 
       // Zone boxes (rendered last so they're on top)
