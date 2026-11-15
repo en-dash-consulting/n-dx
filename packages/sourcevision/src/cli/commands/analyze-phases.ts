@@ -60,13 +60,13 @@ import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers
 import { mergeTokenUsage } from "../../analyzers/token-usage.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
+import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 /**
  * Machine-local record of the {@link inventoryFingerprint} the last inventory
  * was made under. Kept out of inventory.json so its bytes depend on content alone.
  */
 const INVENTORY_FINGERPRINT_FILE = "inventory-fingerprint.json";
-import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 // ── Shared context passed between phases ─────────────────────────────
 
@@ -134,6 +134,40 @@ function loadPreviousData(filePath: string): any {
   }
 }
 
+/**
+ * Paths of inventory.json and imports.json, which every phase after the
+ * second reads; throws a {@link PhasePrerequsiteError} when either is missing.
+ */
+function requireGraphFiles(
+  ctx: AnalyzeContext,
+  phase: number,
+  module: string,
+): { inventoryPath: string; importsPath: string } {
+  const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
+  const importsPath = join(ctx.svDir, DATA_FILES.imports);
+  if (!existsSync(inventoryPath) || !existsSync(importsPath)) {
+    throw new PhasePrerequsiteError(phase, module, "inventory.json and imports.json — run phases 1-2 first");
+  }
+  return { inventoryPath, importsPath };
+}
+
+/** Whether the inventory phase added or deleted files; true when it did not run. */
+function didFileSetChange(ctx: AnalyzeContext): boolean {
+  const stats = ctx.inventoryResult?.stats;
+  return stats ? (stats.added > 0 || stats.deleted > 0) : true;
+}
+
+/**
+ * Record a phase's failure in the manifest and rethrow it as a
+ * {@link PhaseError}. A prerequisite error passes through unchanged.
+ */
+function failPhase(ctx: AnalyzeContext, phase: number, module: string, err: unknown): never {
+  if (err instanceof PhasePrerequsiteError) throw err;
+  const msg = err instanceof Error ? err.message : String(err);
+  updateManifestError(ctx.absDir, module, msg);
+  throw new PhaseError(phase, module, msg);
+}
+
 // ── Phase 1: Inventory ───────────────────────────────────────────────
 
 export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
@@ -185,9 +219,7 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
       info(`  ${bold(String(ctx.inventoryResult.files.length))} files cataloged → ${dim(outPath)}`);
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    updateManifestError(ctx.absDir, "inventory", msg);
-    throw new PhaseError(1, "inventory", msg);
+    failPhase(ctx, 1, "inventory", err);
   }
 }
 
@@ -206,8 +238,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const inventory = JSON.parse(readFileSync(inventoryPath, "utf-8"));
     const previousImports = loadPreviousData(join(ctx.svDir, DATA_FILES.imports));
 
-    const stats = ctx.inventoryResult?.stats;
-    const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
+    const fileSetChanged = didFileSetChange(ctx);
 
     const packFacts: Array<PackFrameworkFacts[number]> = [];
     const analysedPacks: string[] = [];
@@ -237,21 +268,14 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     updateManifestModule(ctx.absDir, "imports", "complete");
     info(`  ${bold(String(imports.summary.totalEdges))} edges, ${bold(String(imports.summary.totalExternal))} external → ${dim(outPath)}`);
   } catch (err) {
-    if (err instanceof PhasePrerequsiteError) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    updateManifestError(ctx.absDir, "imports", msg);
-    throw new PhaseError(2, "imports", msg);
+    failPhase(ctx, 2, "imports", err);
   }
 }
 
 // ── Phase 3: Classifications ─────────────────────────────────────────
 
 export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void> {
-  const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
-  const importsPath = join(ctx.svDir, DATA_FILES.imports);
-  if (!existsSync(inventoryPath) || !existsSync(importsPath)) {
-    throw new PhasePrerequsiteError(3, "classifications", "inventory.json and imports.json — run phases 1-2 first");
-  }
+  const { inventoryPath, importsPath } = requireGraphFiles(ctx, 3, "classifications");
 
   info(`${bold(cyan("[phase 3]"))} Classifications...`);
   updateManifestModule(ctx.absDir, "classifications", "running");
@@ -297,10 +321,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     updateManifestModule(ctx.absDir, "classifications", "complete");
     info(`  ${bold(String(classifications.summary.totalClassified))} classified, ${bold(String(classifications.summary.totalUnclassified))} unclassified → ${dim(outPath)}`);
   } catch (err) {
-    if (err instanceof PhasePrerequsiteError) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    updateManifestError(ctx.absDir, "classifications", msg);
-    throw new PhaseError(3, "classifications", msg);
+    failPhase(ctx, 3, "classifications", err);
   }
 }
 
@@ -331,11 +352,7 @@ export function loadHints(svDir: string): string | undefined {
 // ── Phase 4: Zones ───────────────────────────────────────────────────
 
 export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): Promise<void> {
-  const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
-  const importsPath = join(ctx.svDir, DATA_FILES.imports);
-  if (!existsSync(inventoryPath) || !existsSync(importsPath)) {
-    throw new PhasePrerequsiteError(4, "zones", "inventory.json and imports.json — run phases 1-2 first");
-  }
+  const { inventoryPath, importsPath } = requireGraphFiles(ctx, 4, "zones");
 
   info(`${bold(cyan("[phase 4]"))} Zones...`);
   updateManifestModule(ctx.absDir, "zones", "running");
@@ -524,10 +541,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
     reportZoneInsights(zones);
   } catch (err) {
-    if (err instanceof PhasePrerequsiteError) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    updateManifestError(ctx.absDir, "zones", msg);
-    throw new PhaseError(4, "zones", msg);
+    failPhase(ctx, 4, "zones", err);
   }
 }
 
@@ -594,11 +608,7 @@ function reportZoneInsights(zones: any): void {
 // ── Phase 5: Components ──────────────────────────────────────────────
 
 export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
-  const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
-  const importsPath = join(ctx.svDir, DATA_FILES.imports);
-  if (!existsSync(inventoryPath) || !existsSync(importsPath)) {
-    throw new PhasePrerequsiteError(5, "components", "inventory.json and imports.json — run phases 1-2 first");
-  }
+  const { inventoryPath, importsPath } = requireGraphFiles(ctx, 5, "components");
 
   info(`${bold(cyan("[phase 5]"))} Components...`);
   updateManifestModule(ctx.absDir, "components", "running");
@@ -608,8 +618,7 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     const importsData = JSON.parse(readFileSync(importsPath, "utf-8"));
     const previousComponents = loadPreviousData(join(ctx.svDir, DATA_FILES.components));
 
-    const stats = ctx.inventoryResult?.stats;
-    const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
+    const fileSetChanged = didFileSetChange(ctx);
 
     const components = await analyzeComponents(ctx.absDir, inventory, importsData, {
       ...(!ctx.fullMode && previousComponents ? {
@@ -624,21 +633,14 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     updateManifestModule(ctx.absDir, "components", "complete");
     info(`  ${bold(String(components.summary.totalComponents))} components, ${bold(String(components.summary.totalRouteModules))} route modules, ${bold(String(components.summary.totalUsageEdges))} usage edges → ${dim(outPath)}`);
   } catch (err) {
-    if (err instanceof PhasePrerequsiteError) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    updateManifestError(ctx.absDir, "components", msg);
-    throw new PhaseError(5, "components", msg);
+    failPhase(ctx, 5, "components", err);
   }
 }
 
 // ── Phase 6: Call Graph ──────────────────────────────────────────────
 
 export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
-  const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
-  const importsPath = join(ctx.svDir, DATA_FILES.imports);
-  if (!existsSync(inventoryPath) || !existsSync(importsPath)) {
-    throw new PhasePrerequsiteError(6, "callgraph", "inventory.json and imports.json — run phases 1-2 first");
-  }
+  const { inventoryPath, importsPath } = requireGraphFiles(ctx, 6, "callgraph");
 
   info(`${bold(cyan("[phase 6]"))} Call graph...`);
   updateManifestModule(ctx.absDir, "callgraph", "running");
@@ -648,8 +650,7 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
     const importsData = JSON.parse(readFileSync(importsPath, "utf-8"));
     const previousCallGraph = loadPreviousData(join(ctx.svDir, DATA_FILES.callGraph));
 
-    const stats = ctx.inventoryResult?.stats;
-    const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
+    const fileSetChanged = didFileSetChange(ctx);
 
     const callGraph = await analyzeCallGraph(ctx.absDir, inventory, importsData, !ctx.fullMode && previousCallGraph ? {
       previousCallGraph,
@@ -669,10 +670,7 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
     // Enrich zones.json with call graph cross-zone statistics and findings
     enrichZonesWithCallGraph(ctx.svDir, callGraph, inventory, importsData.edges, classificationsData);
   } catch (err) {
-    if (err instanceof PhasePrerequsiteError) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    updateManifestError(ctx.absDir, "callgraph", msg);
-    throw new PhaseError(6, "callgraph", msg);
+    failPhase(ctx, 6, "callgraph", err);
   }
 }
 
