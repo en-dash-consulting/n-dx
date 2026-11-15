@@ -11,6 +11,10 @@
  * the Preact hook (`useMemoryMonitor`) is provided separately.
  */
 
+import {
+  registerPollingSource,
+} from "../polling/index.js";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Memory usage snapshot at a point in time. */
@@ -60,10 +64,6 @@ export interface MemoryMonitorConfig {
   onLevelChange: MemoryLevelChangeHandler | null;
 }
 
-import {
-  registerPollingSource,
-} from "../polling/index.js";
-
 // ─── Chrome-specific type augmentation ───────────────────────────────────────
 
 interface PerformanceMemory {
@@ -72,7 +72,8 @@ interface PerformanceMemory {
   jsHeapSizeLimit: number;
 }
 
-interface PerformanceWithMemory extends Performance {
+/** `performance` where Chrome/Edge expose `performance.memory`. */
+export interface PerformanceWithMemory extends Performance {
   memory?: PerformanceMemory;
 }
 
@@ -95,13 +96,18 @@ const FALLBACK_HEAP_LIMIT = 2 * 1024 * 1024 * 1024;
 /** Maximum number of snapshots kept in history for debugging. */
 const MAX_HISTORY_LENGTH = 60;
 
+/** The configuration in force before any start, and after a reset. */
+function defaultConfig(): MemoryMonitorConfig {
+  return {
+    intervalMs: DEFAULT_INTERVAL_MS,
+    thresholds: { ...DEFAULT_THRESHOLDS },
+    onLevelChange: null,
+  };
+}
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
-let config: MemoryMonitorConfig = {
-  intervalMs: DEFAULT_INTERVAL_MS,
-  thresholds: { ...DEFAULT_THRESHOLDS },
-  onLevelChange: null,
-};
+let config: MemoryMonitorConfig = defaultConfig();
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let stateUnsub: (() => void) | null = null;
@@ -319,9 +325,5 @@ export function resetMemoryMonitor(): void {
   snapshotHistory = [];
   changeListeners = [];
   stateUnsub = null;
-  config = {
-    intervalMs: DEFAULT_INTERVAL_MS,
-    thresholds: { ...DEFAULT_THRESHOLDS },
-    onLevelChange: null,
-  };
+  config = defaultConfig();
 }
