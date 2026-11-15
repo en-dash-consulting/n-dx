@@ -181,6 +181,3 @@ export function chunkByTopDir(
   }
   return chunks;
 }
-
-/** Threshold for chunking: number of files above which we chunk */
-export const CHUNK_THRESHOLD = 500;

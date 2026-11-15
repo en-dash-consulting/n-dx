@@ -507,11 +507,6 @@ export async function proposeZoneNamesFor(zones: Zone[]): Promise<Map<string, st
   return out;
 }
 
-/** Single-zone form, kept for callers that have one zone in hand. */
-export async function proposeZoneNames(zone: Zone): Promise<string[]> {
-  return (await proposeZoneNamesFor([zone])).get(zone.id) ?? [];
-}
-
 // ── Orchestration ────────────────────────────────────────────────────────────
 
 export interface ZoneNamingResult {
