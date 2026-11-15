@@ -35,11 +35,11 @@ const BOOT_BOM = "spring-boot-dependencies";
 const NO_VERSION = "no version in the script; a plugin or platform may manage it";
 /** Dependency-block statements that name no external coordinate. */
 const NON_COORDINATE = /^(?:project|projects|files|fileTree|gradleApi|localGroovy|gradleTestKit|kotlin|testFixtures)\b/;
-/** Statement heads that are declarations or control flow, not configurations. */
 /** A plugin declaration's trailing `apply false` / `.apply(false)`. */
 const APPLY_TAIL = /(?:\.\s*apply\s*\(\s*\w+\s*\)|\s+apply\s+\w+)\s*$/;
-const LEVEL_WRAPPER =/^(?:JavaLanguageVersion\.of|JavaVersion\.toVersion)\(([\s\S]*)\)$/;
-const NOT_A_CONFIGURATION =new Set(["val", "var", "def", "if", "else", "for", "while", "when", "try", "return"]);
+const LEVEL_WRAPPER = /^(?:JavaLanguageVersion\.of|JavaVersion\.toVersion)\(([\s\S]*)\)$/;
+/** Statement heads that are declarations or control flow, not configurations. */
+const NOT_A_CONFIGURATION = new Set(["val", "var", "def", "if", "else", "for", "while", "when", "try", "return"]);
 
 interface PluginUse {
   id: string;
