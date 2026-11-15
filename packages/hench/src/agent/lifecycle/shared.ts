@@ -767,11 +767,6 @@ async function beginRunEvents(henchDir: string, run: RunRecord): Promise<RunEven
 }
 
 /**
- * Create a new RunRecord in "running" status and persist it.
- * Also captures a system memory snapshot for later use in finalization.
- * Both loops create identical initial records.
- */
-/**
  * Repository trust at run start, for the record. Never throws: a run must not
  * fail because the trust store or a config file could not be read.
  */
@@ -783,6 +778,11 @@ function captureRunTrust(projectDir: string): RunRecord["trust"] {
   }
 }
 
+/**
+ * Create a new RunRecord in "running" status and persist it.
+ * Also captures a system memory snapshot for later use in finalization.
+ * Both loops create identical initial records.
+ */
 export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRecord; memoryCtx: MemoryContext }> {
   // Which checkout this run belongs to. Every automatic commit below re-checks
   // against these three values, so a run whose HEAD is moved mid-run (the
