@@ -47,6 +47,7 @@ import type { ProposalDuplicateMatch, ItemFileMap } from "./smart-add-duplicates
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
 import type { LLMVendor, LLMConfig, CLIErrorCode } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
+import { parseGranularityInput, parseNumericIndices } from "./proposal-selection.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
@@ -258,15 +259,7 @@ export function parseApprovalInput(
   if (["n", "no", "none", ""].includes(trimmed)) return "none";
 
   // Parse comma/space separated numbers (1-based → 0-based), dedup first
-  const unique = [
-    ...new Set(
-      trimmed
-        .split(/[\s,]+/)
-        .map((s) => parseInt(s, 10))
-        .filter((n) => !isNaN(n) && n >= 1 && n <= totalProposals)
-        .map((n) => n - 1), // convert to 0-based
-    ),
-  ].sort((a, b) => a - b);
+  const unique = parseNumericIndices(trimmed, totalProposals);
 
   if (unique.length === 0) return "none";
   if (unique.length === totalProposals) return "all";
@@ -560,55 +553,6 @@ export function remapDuplicateMatchesForSelectedProposals(
     });
   }
   return remapped;
-}
-
-/**
- * Parse granularity adjustment input from the approval prompt.
- * Accepts:
- *   "b1,3" or "b 1 3" or "break down 1,3"  → break down proposals 1 and 3
- *   "c1,3" or "c 1 3" or "consolidate 1,3"  → consolidate proposals 1 and 3
- *
- * Returns null if the input is not a granularity command.
- */
-export function parseGranularityInput(
-  input: string,
-  totalProposals: number,
-): { direction: "break_down" | "consolidate"; indices: number[] } | null {
-  const raw = input.trim();
-
-  // Break down: "b1,3" or "break down 1,3" or "b 1 3"
-  const breakMatch = raw.match(/^[bB](?:reak\s*down)?\s*(.+)$/i);
-  if (breakMatch) {
-    const indices = parseNumericList(breakMatch[1], totalProposals);
-    if (indices.length > 0) {
-      return { direction: "break_down", indices };
-    }
-  }
-
-  // Consolidate: "c1,3" or "consolidate 1,3" or "c 1 3"
-  const consolidateMatch = raw.match(/^[cC](?:onsolidate)?\s*(.+)$/i);
-  if (consolidateMatch) {
-    const indices = parseNumericList(consolidateMatch[1], totalProposals);
-    if (indices.length > 0) {
-      return { direction: "consolidate", indices };
-    }
-  }
-
-  return null;
-}
-
-/**
- * Parse comma/space-separated 1-based numbers into sorted, deduplicated 0-based indices.
- */
-function parseNumericList(input: string, total: number): number[] {
-  return [...new Set(
-    input
-      .trim()
-      .split(/[\s,]+/)
-      .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n) && n >= 1 && n <= total)
-      .map((n) => n - 1),
-  )].sort((a, b) => a - b);
 }
 
 /**
