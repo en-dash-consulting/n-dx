@@ -15,7 +15,7 @@
  * @see ../hooks/use-toast.ts — toast notification state
  */
 
-import {h} from "preact";
+import { h } from "preact";
 import type { VNode } from "preact";
 import { ActionIcon, GhostCardsContext } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo, useRef, useContext } from "preact/hooks";
