@@ -21,7 +21,7 @@
  * committed, so an edit to it is genuine operator work and must still count.
  *
  * @see packages/hench/src/store/artifacts.ts — HENCH_RUNTIME_GITIGNORE_ENTRIES
- * @see packages/hench/src/agent/lifecycle/shared.ts — the gate
+ * @see packages/hench/src/agent/lifecycle/pre-run-commit-gate.ts — the gate
  */
 
 import { describe, it, expect, afterEach } from "vitest";
@@ -29,7 +29,7 @@ import { execSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { performPreRunCommitGateIfNeeded } from "../../../src/agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded } from "../../../src/agent/lifecycle/pre-run-commit-gate.js";
 import {
   excludeHenchRuntimeArtifacts,
   HENCH_RUNTIME_GITIGNORE_ENTRIES,

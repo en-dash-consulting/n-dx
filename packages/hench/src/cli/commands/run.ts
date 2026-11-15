@@ -13,7 +13,8 @@ import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT } from "../../agent/lifecycle/local-endpoint-defaults.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
-import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import { commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/pre-run-commit-gate.js";
 import { commitFailForward } from "../../agent/lifecycle/fail-forward.js";
 import {
   PRD_COMMIT_PATHS,

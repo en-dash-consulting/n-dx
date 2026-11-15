@@ -4,7 +4,7 @@
  *
  * Two consumers must agree on this list:
  * - `hench init` gitignores these paths (`cli/commands/init.ts`)
- * - the pre-run git gate discounts them (`agent/lifecycle/shared.ts`)
+ * - the pre-run git gate discounts them (`agent/lifecycle/pre-run-commit-gate.ts`)
  *
  * Both are needed. Gitignoring keeps the paths out of `git status` on a
  * freshly initialized project; the discount is what makes the gate correct on

@@ -4,7 +4,7 @@ import {
   resolvePreRunCommitAnswer,
   type PreRunCommitChoice,
   type PreRunCommitGateOptions,
-} from "../../../../src/agent/lifecycle/shared.js";
+} from "../../../../src/agent/lifecycle/pre-run-commit-gate.js";
 import type { ReviewDiff } from "../../../../src/agent/analysis/review.js";
 import type { ChangeMagnitude } from "../../../../src/agent/analysis/change-magnitude.js";
 

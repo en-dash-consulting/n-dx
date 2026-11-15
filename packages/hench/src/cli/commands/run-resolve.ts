@@ -29,7 +29,7 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { missingPrdFolderError } from "./prd-folder.js";
 import { excludeHenchRuntimeArtifacts, formatPorcelainPath, splitPlanningPaths } from "../../store/artifacts.js";
-import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/shared.js";
+import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/pre-run-commit-gate.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
 import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";
