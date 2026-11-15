@@ -1195,11 +1195,7 @@ export function openAiPruneShape(hasSystemPrompt: boolean): PruneShape<OpenAiMes
 }
 
 /** Single tool call extracted from an OpenAI chat response. */
-interface OpenAiToolCall {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-}
+type OpenAiToolCall = NonNullable<OpenAiMessage["tool_calls"]>[number];
 
 /** Parse token usage from an OpenAI-format usage object. */
 function parseLocalUsage(usage: unknown): { input: number; output: number } {
@@ -1373,6 +1369,13 @@ async function summarizeLocalHistory(args: {
 // Verifier
 // ---------------------------------------------------------------------------
 
+/** The verifier server's address: llm.local.verifier.host/port, else localhost:1235. */
+function verifierAddress(cfg: { host?: unknown; port?: unknown }): { host: string; port: number } {
+  const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
+  const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
+  return { host, port };
+}
+
 /**
  * Call a second local model and ask it to review the primary model's solution.
  *
@@ -1391,8 +1394,7 @@ async function callVerifier(
    */
   timeoutMs: number = 60_000,
 ): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
-  const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
-  const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
+  const { host, port } = verifierAddress(cfg);
   const model = typeof cfg.model === "string" ? cfg.model : "";
   const baseUrl = `http://${host}:${port}/v1`;
 
@@ -1763,12 +1765,9 @@ async function runLocalToolLoop(params: ApiToolLoopParams): Promise<AgentLoopRes
         }
 
         if (verifierCfg && verifierCycleCount < maxVerifierCycles) {
-          const vHost = typeof verifierCfg["host"] === "string" && verifierCfg["host"]
-            ? verifierCfg["host"] : "localhost";
-          const vPort = typeof verifierCfg["port"] === "number" && (verifierCfg["port"] as number) > 0
-            ? verifierCfg["port"] as number : 1235;
+          const verifier = verifierAddress(verifierCfg);
           section(`Verifier Review (cycle ${verifierCycleCount + 1}/${maxVerifierCycles})`);
-          detail(`[Verifier] Querying ${vHost}:${vPort} …`);
+          detail(`[Verifier] Querying ${verifier.host}:${verifier.port} …`);
           const { verdict, reasoning } = await callVerifier(
             verifierCfg as { host?: string; port?: number; model?: string },
             briefText,
