@@ -120,7 +120,9 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
 
   // ── PRD data fetching (dedup + rate-limited) ─────────────────────
 
-  const prdPipeline = useRef(
+  // Each pipeline is built on the first render only, at the rate limiter's
+  // default spacing.
+  const [prdPipeline] = useState(() =>
     createFetchPipeline(async () => {
       try {
         const res = await fetch("/data/prd.json");
@@ -138,16 +140,16 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
       } catch (_err) {
         setError("Could not fetch PRD data. Is the server running?");
       }
-    }, { minIntervalMs: 500 }),
+    }),
   );
 
   const fetchPRDData = useCallback(async () => {
-    await prdPipeline.current.execute();
+    await prdPipeline.execute();
   }, []);
 
   // ── Task usage fetching (dedup + rate-limited) ─────────────────
 
-  const usagePipeline = useRef(
+  const [usagePipeline] = useState(() =>
     createFetchPipeline(async () => {
       const [taskUsageResult, utilizationResult] = await Promise.allSettled([
         fetch("/api/hench/task-usage"),
@@ -178,11 +180,11 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
           // Keep existing values on parse errors.
         }
       }
-    }, { minIntervalMs: 500 }),
+    }),
   );
 
   const fetchTaskUsage = useCallback(async () => {
-    await usagePipeline.current.execute();
+    await usagePipeline.execute();
   }, []);
 
   // ── Initial fetch ────────────────────────────────────────────────
@@ -206,11 +208,9 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
   // ── Cleanup ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    const prd = prdPipeline.current;
-    const usage = usagePipeline.current;
     return () => {
-      prd.dispose();
-      usage.dispose();
+      prdPipeline.dispose();
+      usagePipeline.dispose();
     };
   }, []);
 
