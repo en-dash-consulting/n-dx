@@ -109,6 +109,11 @@ export function ndxDoor(): Plugin {
 
   let workspaceKey: string | undefined;
   const token = () => (tokenFile && existsSync(tokenFile) ? readFileSync(tokenFile, "utf-8").trim() : undefined);
+  /** The per-user token as the hub wants it, read from its file once per call; none when there is no token. */
+  const tokenHeader = (): Record<string, string> => {
+    const value = token();
+    return value ? { "x-ndx-token": value } : {};
+  };
   const real = (p: string) => {
     try {
       return realpathSync(p);
@@ -121,7 +126,7 @@ export function ndxDoor(): Plugin {
   const resolveWorkspace = async (): Promise<void> => {
     if (!worktree || workspaceKey) return;
     if (!workspacesUrl) throw new Error("this is a worktree but no workspace listing was given; sync is off");
-    const response = await fetch(workspacesUrl, { headers: { accept: "application/json", ...(token() ? { "x-ndx-token": token()! } : {}) } });
+    const response = await fetch(workspacesUrl, { headers: { accept: "application/json", ...tokenHeader() } });
     if (!response.ok) throw new Error(`workspaces: ${response.status}`);
     const { workspaces } = (await response.json()) as { workspaces?: { key: string; path: string }[] };
     const mine = workspaces?.find((w) => real(w.path) === real(worktree));
@@ -132,7 +137,7 @@ export function ndxDoor(): Plugin {
   /** The token and the workspace, read when a call is made and never handed to the page. */
   const headers = async (): Promise<Record<string, string>> => {
     await resolveWorkspace();
-    return { ...(token() ? { "x-ndx-token": token()! } : {}), ...(workspaceKey ? { "x-ndx-workspace": workspaceKey } : {}) };
+    return { ...tokenHeader(), ...(workspaceKey ? { "x-ndx-workspace": workspaceKey } : {}) };
   };
 
   const rex: ToolCall = rexUrl
@@ -143,6 +148,8 @@ export function ndxDoor(): Plugin {
   const door = mcpDoor({ path: "/ndx/mcp", call: rex, allow: ALLOWED_TOOLS });
   const key = randomBytes(24).toString("hex");
   const keyed = (req: IncomingMessage) => req.headers[DOOR_KEY_HEADER] === key;
+  /** The 403 for a request that is not from this face's own pages. */
+  const notOurs = { ok: false, error: "refused: not from this face's own pages" } as const;
 
   // One re-emit at a time: the loop, "Sync now" and a second tab all ask, and every asker gets the run in flight.
   let emitting: Promise<{ ok: boolean; output: string }> | undefined;
@@ -172,7 +179,7 @@ export function ndxDoor(): Plugin {
   /** The re-emit takes JSON from our own pages and nothing else, as the door does; the answer says why when it refuses. */
   const admit = (req: IncomingMessage, res: ServerResponse): boolean => {
     if (!sameOrigin(req.headers) || !keyed(req)) {
-      json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
+      json(res, 403, notOurs);
       return false;
     }
     if ((req.headers["content-type"] ?? "").split(";")[0]!.trim() !== "application/json") {
@@ -247,7 +254,7 @@ export function ndxDoor(): Plugin {
             return json(res, 200, await emit());
           }
           if (url === "/ndx/mcp") {
-            if (!keyed(req)) return json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
+            if (!keyed(req)) return json(res, 403, notOurs);
             // The door matches its path exactly, so it is handed the path without the base.
             req.url = url + (req.url ?? "").slice(asked.length);
             return door(req, res, next);
