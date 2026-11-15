@@ -23,7 +23,7 @@
  */
 
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type { PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
+import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
@@ -603,17 +603,7 @@ export function rawJsonToTokenUsageEvent(
   metadata: SpawnTokenMetadata,
   seen?: UsageMessageFilter,
 ): RuntimeEvent | null {
-  let usage: Record<string, unknown> | undefined;
-
-  if (rawJson.usage && typeof rawJson.usage === "object") {
-    usage = rawJson.usage as Record<string, unknown>;
-  } else if (rawJson.message && typeof rawJson.message === "object") {
-    const msg = rawJson.message as Record<string, unknown>;
-    if (msg.usage && typeof msg.usage === "object") {
-      usage = msg.usage as Record<string, unknown>;
-    }
-  }
-
+  const usage = findUsagePayload(rawJson);
   if (!usage) return null;
 
   // A repeat of a message already counted. Dropping it here rather than at the
@@ -640,11 +630,60 @@ export function rawJsonToTokenUsageEvent(
 // ── Token usage extraction from raw JSON ──────────────────────────────────
 
 /**
+ * The usage payload of a raw vendor event, from the two places Claude and
+ * Codex put it: the event's own `usage` (both vendors), else the nested
+ * `message.usage` (Claude "assistant" events).
+ */
+function findUsagePayload(rawJson: Record<string, unknown>): Record<string, unknown> | undefined {
+  // Direct usage field (both vendors)
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    return rawJson.usage as Record<string, unknown>;
+  }
+  // Nested message.usage (Claude "assistant" events)
+  if (rawJson.message && typeof rawJson.message === "object") {
+    const msg = rawJson.message as Record<string, unknown>;
+    if (msg.usage && typeof msg.usage === "object") {
+      return msg.usage as Record<string, unknown>;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Push the token usage a Codex spawn reported in its whole stdout, for when no
+ * structured event carried any: the JSON mapping when stdout is one JSON
+ * document, else the text-format summary line (non-JSON stdout, e.g. codex
+ * --json JSONL). Pushes nothing when neither yields a reading.
+ */
+function pushCodexStdoutUsage(
+  accumulator: EventAccumulator,
+  stdout: string,
+  vendor: LLMVendor,
+): void {
+  let tokenUsage: TokenUsage | undefined;
+  try {
+    const codexMapping = mapCodexUsageToTokenUsage(JSON.parse(stdout));
+    if (codexMapping.diagnosticStatus !== "unavailable") tokenUsage = codexMapping.usage;
+  } catch {
+    const textTokens = parseCodexCliTokenUsage(stdout);
+    if (textTokens) tokenUsage = { input: textTokens.input, output: textTokens.output };
+  }
+  if (!tokenUsage) return;
+  accumulator.push({
+    type: "token_usage",
+    vendor,
+    turn: 1,
+    timestamp: new Date().toISOString(),
+    tokenUsage,
+  });
+}
+
+/**
  * Extract token usage from a raw JSON event object.
  *
  * Both Claude and Codex embed token usage in event payloads at predictable
- * locations (`event.usage`, `event.message.usage`). This function checks
- * those locations and accumulates usage into the SpawnResult.
+ * locations (see {@link findUsagePayload}). This function accumulates that
+ * usage into the SpawnResult.
  */
 function extractTokenUsage(
   rawJson: Record<string, unknown>,
@@ -653,20 +692,7 @@ function extractTokenUsage(
   tokenMetadata: SpawnTokenMetadata,
   seen: UsageMessageFilter,
 ): void {
-  let usage: Record<string, unknown> | undefined;
-
-  // Direct usage field (both vendors)
-  if (rawJson.usage && typeof rawJson.usage === "object") {
-    usage = rawJson.usage as Record<string, unknown>;
-  }
-  // Nested message.usage (Claude "assistant" events)
-  else if (rawJson.message && typeof rawJson.message === "object") {
-    const msg = rawJson.message as Record<string, unknown>;
-    if (msg.usage && typeof msg.usage === "object") {
-      usage = msg.usage as Record<string, unknown>;
-    }
-  }
-
+  const usage = findUsagePayload(rawJson);
   if (!usage) return;
 
   // See {@link rawJsonToTokenUsageEvent}: the same message arrives once per
@@ -1111,64 +1137,14 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
 
           // Codex-specific: extract token usage from raw stdout
           if (adapter.vendor === LLM_VENDOR.CODEX) {
-            try {
-              const raw = JSON.parse(fullStdout);
-              const codexMapping = mapCodexUsageToTokenUsage(raw);
-              if (codexMapping.diagnosticStatus !== "unavailable") {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: codexMapping.usage,
-                });
-              }
-            } catch {
-              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
-              // usage from the text-format summary line.
-              const textTokens = parseCodexCliTokenUsage(fullStdout);
-              if (textTokens) {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: { input: textTokens.input, output: textTokens.output },
-                });
-              }
-            }
+            pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
         // Codex token usage fallback: structured events parsed but no usage
         if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
           if (adapter.vendor === LLM_VENDOR.CODEX) {
-            try {
-              const raw = JSON.parse(fullStdout);
-              const codexMapping = mapCodexUsageToTokenUsage(raw);
-              if (codexMapping.diagnosticStatus !== "unavailable") {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: codexMapping.usage,
-                });
-              }
-            } catch {
-              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
-              // usage from the text-format summary line.
-              const textTokens = parseCodexCliTokenUsage(fullStdout);
-              if (textTokens) {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: { input: textTokens.input, output: textTokens.output },
-                });
-              }
-            }
+            pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
