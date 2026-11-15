@@ -758,12 +758,25 @@ function handleAnalyzeStatus(res: ServerResponse): boolean {
   return true;
 }
 
+/** Where `rex analyze` caches its proposals for a later accept. */
+function pendingProposalsPath(ctx: ServerContext): string {
+  return join(ctx.rexDir, "pending-proposals.json");
+}
+
+/** Empty the cached proposals once an accept has taken them, best-effort. */
+function clearPendingProposals(ctx: ServerContext): void {
+  const pendingPath = pendingProposalsPath(ctx);
+  if (existsSync(pendingPath)) {
+    try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
+  }
+}
+
 /** Handle GET /api/rex/proposals — get pending proposals */
 function handleGetProposals(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const pendingPath = join(ctx.rexDir, "pending-proposals.json");
+  const pendingPath = pendingProposalsPath(ctx);
   if (!existsSync(pendingPath)) {
     jsonResponse(res, 200, { proposals: [] });
     return true;
@@ -876,7 +889,7 @@ async function handleAcceptProposals(
       indices?: number[];
     };
 
-    const pendingPath = join(ctx.rexDir, "pending-proposals.json");
+    const pendingPath = pendingProposalsPath(ctx);
     if (!existsSync(pendingPath)) {
       errorResponse(res, 404, "No pending proposals");
       return true;
@@ -1176,11 +1189,7 @@ async function handleAcceptEditedProposals(
     // eventually, but we want immediate visibility for the dashboard).
     refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
-    // Clear pending proposals file
-    const pendingPath = join(ctx.rexDir, "pending-proposals.json");
-    if (existsSync(pendingPath)) {
-      try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
-    }
+    clearPendingProposals(ctx);
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -1238,10 +1247,7 @@ async function acceptEditedAsChanges(
     return true;
   }
 
-  const pendingPath = join(ctx.rexDir, "pending-proposals.json");
-  if (existsSync(pendingPath)) {
-    try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
-  }
+  clearPendingProposals(ctx);
   appendLog(ctx, {
     timestamp: new Date().toISOString(),
     event: "proposals_edited_accept",
