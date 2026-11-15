@@ -59,8 +59,8 @@ export function isPackageNamed(dir: string, name: string): boolean {
   return readJson(join(dir, "package.json"))?.name === name;
 }
 
-/** Read the identity of the package rooted at `packageRoot`. Exported for tests. */
-export function readBuildIdentity(packageRoot: string): HubBuildIdentity {
+/** Read the identity of the package rooted at `packageRoot`. */
+function readBuildIdentity(packageRoot: string): HubBuildIdentity {
   const version = readJson(join(packageRoot, "package.json"))?.version;
   const sourceHash = readJson(join(packageRoot, "dist", BUILD_STAMP_FILE))?.sourceHash;
   return {

@@ -153,7 +153,6 @@ async function readJsonBodyOr400(req: IncomingMessage, res: ServerResponse): Pro
   }
 }
 
-
 /**
  * Whether `ndxBin` is something the hub should spawn.
  *
