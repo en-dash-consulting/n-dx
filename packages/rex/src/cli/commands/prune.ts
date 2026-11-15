@@ -378,7 +378,7 @@ async function consolidateAfterPrune(
     // Resolve model: explicit flag > light-tier resolution (post-prune
     // consolidation is a mechanical single-shot pass, so it runs on the
     // light tier; only lightModel config or --model overrides it).
-    const { resolvedModel, vendor } = await prepareLlmPass(rexDir, dir, flags, "light");
+    const { resolvedModel } = await prepareLlmPass(rexDir, dir, flags, "light");
 
     const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
