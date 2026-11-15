@@ -14,7 +14,7 @@
 import { h, Fragment } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef } from "preact/hooks";
-import { ProposalEditor } from "./proposal-editor.js";
+import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -300,11 +300,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
   // ── Render: Results ──────────────────────────────────────────────
 
   if (state === "done" && proposals.length > 0) {
-    const taskCount = proposals.reduce(
-      (sum, p) => sum + p.features.reduce((fs, f) => fs + f.tasks.length, 0),
-      0,
-    );
-    const featureCount = proposals.reduce((sum, p) => sum + p.features.length, 0);
+    const { features: featureCount, tasks: taskCount } = proposalCounts(proposals);
 
     return h(
       "div",
@@ -319,22 +315,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       ),
 
       // Summary stats
-      h("div", { class: "smart-add-stats" },
-        h("span", { class: "smart-add-stat" },
-          h("span", { class: "smart-add-stat-count" }, String(proposals.length)),
-          ` epic${proposals.length !== 1 ? "s" : ""}`,
-        ),
-        h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-        h("span", { class: "smart-add-stat" },
-          h("span", { class: "smart-add-stat-count" }, String(featureCount)),
-          ` feature${featureCount !== 1 ? "s" : ""}`,
-        ),
-        h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-        h("span", { class: "smart-add-stat" },
-          h("span", { class: "smart-add-stat-count" }, String(taskCount)),
-          ` task${taskCount !== 1 ? "s" : ""}`,
-        ),
-      ),
+      h(ProposalStats, { epics: proposals.length, features: featureCount, tasks: taskCount }),
 
       // Confidence indicator
       confidence > 0
