@@ -638,11 +638,6 @@ async function readDirListing(dir: string): Promise<DirListing | null> {
   }
 }
 
-/** Return direct subdirectory names of `dir` in alphabetical order. */
-async function listSubdirs(dir: string): Promise<string[]> {
-  return (await readDirListing(dir))?.subdirs ?? [];
-}
-
 /**
  * Parse every subdirectory of `dir` as a child item, concurrently, and
  * return them in the order a one-at-a-time walk would have produced.

@@ -33,7 +33,7 @@
  * which the resulting tree records.
  */
 
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";

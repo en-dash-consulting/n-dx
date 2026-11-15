@@ -20,7 +20,6 @@ import { z } from "zod";
 import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import {
-  detectFileFormat,
   extractJson,
   repairTruncatedJson,
   emptyAnalyzeTokenUsage,

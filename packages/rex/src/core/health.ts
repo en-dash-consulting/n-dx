@@ -14,7 +14,6 @@ import {
   isWorkItem,
   isRootLevel,
   getLevelLabel,
-  getLevelPlural,
 } from "../schema/index.js";
 import { checkV2Rules, indexTree, type RuleFinding, type V2Tree } from "../schema/v2-rules.js";
 import { walkTree } from "./tree.js";

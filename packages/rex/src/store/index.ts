@@ -72,7 +72,6 @@ import { FileStore, PRD_FILENAME } from "./file-adapter.js";
 import { dirname } from "node:path";
 import { resolveGitBranch } from "./branch-naming.js";
 import { findPRDFileForBranch } from "./prd-discovery.js";
-import { PRD_MARKDOWN_FILENAME } from "./prd-md-migration.js";
 import type { PRDStore } from "./contracts.js";
 import { resolveLayerStore } from "./change-layer-store.js";
 

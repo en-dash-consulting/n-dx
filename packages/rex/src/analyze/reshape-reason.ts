@@ -486,8 +486,6 @@ export async function reasonForBodyMerge(
   group: PRDItem[],
   model?: string,
 ): Promise<BodyMergeResult> {
-  const tokenUsage = emptyAnalyzeTokenUsage();
-
   const envelope = buildBodyMergeEnvelope(group);
   logRexPromptSections("reasonForBodyMerge", envelope);
 

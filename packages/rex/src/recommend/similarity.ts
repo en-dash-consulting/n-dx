@@ -1,7 +1,5 @@
 import {
   normalize,
-  bigrams,
-  wordSet,
   splitActionContent,
   rawSimilarity,
 } from "./text-similarity-shared.js";

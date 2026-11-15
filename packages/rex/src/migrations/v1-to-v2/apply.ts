@@ -156,8 +156,6 @@ export interface BuiltV2Tree {
   stateKeys: Map<string, Set<string>>;
 }
 
-type WorkType = "change" | "task" | "subtask";
-
 interface Placed {
   item: PRDItem;
   entry?: V1ToV2Entry;

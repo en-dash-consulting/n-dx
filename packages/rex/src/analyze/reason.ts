@@ -52,7 +52,7 @@ import {
   extractJsonItems,
   extractYamlItems,
 } from "./analyze-shared.js";
-import type { ClaudeResult, FileFormat } from "./analyze-shared.js";
+import type { FileFormat } from "./analyze-shared.js";
 import { spawnClaude } from "./llm-bridge.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
 import {

@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { removeEpic } from "../../core/remove-epic.js";
 import { removeTask } from "../../core/remove-task.js";

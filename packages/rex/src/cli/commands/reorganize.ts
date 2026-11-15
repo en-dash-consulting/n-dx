@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { isChangeLayerStore, resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { loadProductLayerItems, resolveLayerStore } from "../../store/change-layer-store.js";

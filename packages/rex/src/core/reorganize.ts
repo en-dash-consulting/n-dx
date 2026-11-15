@@ -21,7 +21,6 @@ import type { PRDItem, ItemLevel } from "../schema/index.js";
 import {
   isRootLevel,
   isContainerLevel,
-  isWorkItem,
   getLevelLabel,
   getLevelPlural,
 } from "../schema/index.js";

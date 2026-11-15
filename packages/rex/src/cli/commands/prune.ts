@@ -26,32 +26,6 @@ import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/
 import { ensureSnapshot } from "../snapshot-guard.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
-// ── Parsed flag helpers ──────────────────────────────────────────────
-
-interface PruneFlags {
-  dryRun: boolean;
-  skipConsolidate: boolean;
-  accept: boolean;
-  autoConfirm: boolean;
-  isJson: boolean;
-  model?: string;
-  format?: string;
-  raw: Record<string, string>;
-}
-
-function parseFlags(flags: Record<string, string>): PruneFlags {
-  return {
-    dryRun: flags["dry-run"] === "true",
-    skipConsolidate: flags["no-consolidate"] === "true",
-    accept: flags.accept === "true",
-    autoConfirm: flags.yes === "true" || flags.y === "true",
-    isJson: flags.format === "json",
-    model: flags.model,
-    format: flags.format,
-    raw: flags,
-  };
-}
-
 // ── TTY interaction ──────────────────────────────────────────────────
 
 /**
