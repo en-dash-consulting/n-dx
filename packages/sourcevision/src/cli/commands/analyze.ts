@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { constants as osConstants } from "node:os";
-import {resolve, join} from "node:path";import {
+import { resolve, join } from "node:path";
+import {
   DATA_FILES,
   SUPPLEMENTARY_FILES,
   readManifest,
@@ -25,7 +26,7 @@ import {resolve, join} from "node:path";import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -56,7 +57,6 @@ import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../a
 import { callClaude } from "../../analyzers/claude-client.js";
 import { ANALYSIS_HISTORY_FILE, startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
 import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
-import { configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
 import { configureRerunLog } from "../../analyzers/rerun-judge.js";
 import { configureRuleCache } from "../../analyzers/declared-rules.js";
 import {
@@ -144,6 +144,16 @@ function shouldRunPhase(filter: PhaseFilter, phase: number, moduleName: string):
 }
 
 /**
+ * Exit after a phase failed, when the failure decides the run: a critical
+ * phase stops a full run, and a non-critical one fails a run that asked for
+ * it alone. Otherwise the run continues.
+ */
+function exitIfPhaseFailureIsFatal(filter: PhaseFilter, critical: boolean): void {
+  if (critical && filter.type === "all") process.exit(1);
+  if (!critical && filter.type !== "all") process.exit(1);
+}
+
+/**
  * Ensure the .sourcevision directory exists and load LLM configuration.
  *
  * Returns the loaded LLM config and the resolved svDir path.
@@ -162,9 +172,10 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
-  configureJudgmentCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
-  configureRerunLog({ svDir: resolveSourcevisionPaths(absDir).svDir });
-  configureRuleCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
+  const cacheOwner = { svDir: resolveSourcevisionPaths(absDir).svDir };
+  configureJudgmentCache(cacheOwner);
+  configureRerunLog(cacheOwner);
+  configureRuleCache(cacheOwner);
   // The Jev client is foundation-tier and cannot import the run ledger, so the
   // accounting is handed to it here — once, beside the cache it also owns.
   setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });
@@ -242,8 +253,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         } else {
           console.error(`  Phase ${err.phase} failed: ${err.reason}`);
         }
-        if (critical && filter.type === "all") process.exit(1);
-        if (!critical && filter.type !== "all") process.exit(1);
+        exitIfPhaseFailureIsFatal(filter, critical);
       } else {
         // Unrecognized error — try LLM classification before rethrowing
         const errObj = err instanceof Error ? err : new Error(String(err));
@@ -253,8 +263,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         if (classified.category !== "unknown") {
           console.error(`  Phase ${phase} failed: ${classified.message}`);
           warn(`  Hint: ${classified.suggestion}`);
-          if (critical && filter.type === "all") process.exit(1);
-          if (!critical && filter.type !== "all") process.exit(1);
+          exitIfPhaseFailureIsFatal(filter, critical);
         } else {
           throw err;
         }
@@ -308,6 +317,11 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
     writeManifest(absDir, manifest);
     warn(`  could not start background narration (${err instanceof Error ? err.message : String(err)}); run 'sv narrate .' or 'sv analyze --wait .'`);
   }
+}
+
+/** Whether any zone still waits to be narrated or named. */
+function hasPendingNarration(ctx: AnalyzeContext): boolean {
+  return (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
 }
 
 function currentZoneIds(svDir: string): Set<string> {
@@ -494,8 +508,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
     // --wait: narrate the escalated zones (and generate pending names) now,
     // before the outputs are written.
-    const anythingPending = (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
-    if (anythingPending && ctx.wait) {
+    if (hasPendingNarration(ctx) && ctx.wait) {
       await cmdNarrate(absDir, { inline: true, zoneIds: ctx.pendingNarration ?? [], nameZoneIds: ctx.pendingNames ?? [], deps: narrateDeps() });
       ctx.pendingNarration = undefined;
       ctx.pendingNames = undefined;
@@ -510,13 +523,13 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
     // Otherwise the results are on disk already; narration continues in a
     // detached child so this command can return.
-    if ((ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0) {
+    if (hasPendingNarration(ctx)) {
       await scheduleDetachedNarration(ctx.absDir, ctx.svDir, ctx.pendingNarration ?? [], ctx.pendingNames ?? []);
     }
 
     // Hint about zone pins when move-file or structural findings exist
     try {
-      const zonesPath = join(ctx.svDir, "zones.json");
+      const zonesPath = join(ctx.svDir, DATA_FILES.zones);
       const zonesRaw = readFileSync(zonesPath, "utf-8");
       const zonesData = JSON.parse(zonesRaw);
       const findings = zonesData.findings ?? [];
