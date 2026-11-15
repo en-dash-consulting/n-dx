@@ -38,11 +38,7 @@
  * The Preact integration lives in the consumer (views/prd.ts etc.).
  */
 
-import {
-  onVisibilityChange,
-  isTabVisible,
-  type TabVisibilitySnapshot,
-} from "../polling/index.js";
+import { onDebouncedVisibilityChange, isTabVisible } from "../polling/index.js";
 import type { UpdateBatcher } from "./update-batcher.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -132,10 +128,6 @@ export interface DomUpdateGate {
   dispose(): void;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const DEFAULT_RESUME_DEBOUNCE_MS = 100;
-
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -161,24 +153,15 @@ const DEFAULT_RESUME_DEBOUNCE_MS = 100;
 export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate {
   const batcher = config.batcher;
   const onResume = config.onResume;
-  const resumeDebounceMs = config.resumeDebounceMs ?? DEFAULT_RESUME_DEBOUNCE_MS;
 
   let open = true;
   let deferredQueue = new Map<AnySetter, QueuedEntry>();
   let queuedCount = 0;
   let totalDeferred = 0;
   let suspensionCount = 0;
-  let resumeTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
 
   // ─── Internal helpers ─────────────────────────────────────────────
-
-  function clearResumeTimer(): void {
-    if (resumeTimer !== null) {
-      clearTimeout(resumeTimer);
-      resumeTimer = null;
-    }
-  }
 
   /**
    * Compose all queued updaters for a single setter into one function call.
@@ -249,25 +232,12 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
     replayQueue();
   }
 
-  function handleVisibilityChange(snapshot: TabVisibilitySnapshot): void {
-    if (disposed) return;
-
-    if (snapshot.isVisible) {
-      // Tab became visible — resume with debounce to prevent thrash.
-      clearResumeTimer();
-      resumeTimer = setTimeout(() => {
-        resumeTimer = null;
-        resume();
-      }, resumeDebounceMs);
-    } else {
-      // Tab became hidden — suspend immediately.
-      clearResumeTimer();
-      suspend();
-    }
-  }
-
-  // Subscribe to tab visibility changes.
-  const unsubVisibility = onVisibilityChange(handleVisibilityChange);
+  // Subscribe to tab visibility changes: suspend immediately when hidden,
+  // resume after the debounce when visible again.
+  const stopVisibility = onDebouncedVisibilityChange(
+    { onHidden: suspend, onVisible: resume },
+    config.resumeDebounceMs,
+  );
 
   // If the tab is currently hidden, suspend immediately.
   if (!isTabVisible()) {
@@ -343,8 +313,7 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
 
   function dispose(): void {
     disposed = true;
-    clearResumeTimer();
-    unsubVisibility();
+    stopVisibility();
     deferredQueue = new Map();
     queuedCount = 0;
   }
