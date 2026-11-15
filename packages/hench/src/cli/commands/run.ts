@@ -10,7 +10,7 @@ import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
-import { agentLoop } from "../../agent/lifecycle/loop.js";
+import { agentLoop, DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
 import { commitFailForward } from "../../agent/lifecycle/fail-forward.js";
@@ -2142,8 +2142,8 @@ export async function cmdRun(
   // of a mid-run context-window or connection failure deep in the loop.
   if (llmVendor === LLM_VENDOR.LOCAL && !dryRun) {
     const localCfg = llmConfig?.local;
-    const host = localCfg?.host ?? "localhost";
-    const port = localCfg?.port ?? 1234;
+    const host = localCfg?.host ?? DEFAULT_LOCAL_HOST;
+    const port = localCfg?.port ?? DEFAULT_LOCAL_PORT;
     const baseUrl = `http://${host}:${port}/v1`;
     try {
       const res = await fetch(`${baseUrl}/models`, {

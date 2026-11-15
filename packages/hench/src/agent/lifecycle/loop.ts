@@ -1137,6 +1137,32 @@ async function runGeminiToolLoop(params: ApiToolLoopParams<GeminiToolProvider>):
 // Local (OpenAI-compatible) tool-use loop
 // ---------------------------------------------------------------------------
 
+/**
+ * Where llm.local points when its host or port is unset: LM Studio on this
+ * machine. llm-client exports the canonical DEFAULT_LOCAL_HOST and
+ * DEFAULT_LOCAL_PORT, but the llm-gateway is at its export ceiling, so hench
+ * keeps this one copy (the run preflight reads it too) and
+ * `tests/unit/agent/lifecycle/local-endpoint-defaults.test.ts` pins the two equal.
+ */
+export const DEFAULT_LOCAL_HOST = "localhost";
+export const DEFAULT_LOCAL_PORT = 1234;
+
+/** Port the second-model verifier is queried on when llm.local.verifier.port is unset. */
+const DEFAULT_VERIFIER_PORT = 1235;
+
+/**
+ * A local server's address from its `host`/`port` settings: a non-empty host
+ * string, else {@link DEFAULT_LOCAL_HOST}; a positive port, else `defaultPort`.
+ */
+function localServerAddress(
+  cfg: { host?: unknown; port?: unknown } | undefined,
+  defaultPort: number,
+): { host: string; port: number } {
+  const host = typeof cfg?.host === "string" && cfg.host ? cfg.host : DEFAULT_LOCAL_HOST;
+  const port = typeof cfg?.port === "number" && cfg.port > 0 ? cfg.port : defaultPort;
+  return { host, port };
+}
+
 /** OpenAI-format message in the conversation history. */
 export interface OpenAiMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -1371,9 +1397,7 @@ async function summarizeLocalHistory(args: {
 
 /** The verifier server's address: llm.local.verifier.host/port, else localhost:1235. */
 function verifierAddress(cfg: { host?: unknown; port?: unknown }): { host: string; port: number } {
-  const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
-  const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
-  return { host, port };
+  return localServerAddress(cfg, DEFAULT_VERIFIER_PORT);
 }
 
 /**
@@ -1537,10 +1561,7 @@ async function runLocalToolLoop(params: ApiToolLoopParams): Promise<AgentLoopRes
 
   // Resolve the base URL from config
   const localCfg = (llmConfig as Record<string, unknown>)["local"] as Record<string, unknown> | undefined;
-  const host = typeof localCfg?.["host"] === "string" && localCfg["host"]
-    ? localCfg["host"] : "localhost";
-  const port = typeof localCfg?.["port"] === "number" && localCfg["port"] > 0
-    ? localCfg["port"] : 1234;
+  const { host, port } = localServerAddress(localCfg, DEFAULT_LOCAL_PORT);
   const baseUrl = `http://${host}:${port}/v1`;
   // Read the optional maxContextTokens limit from config (set via ndx config llm.local.maxContextTokens=N).
   const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
