@@ -29,6 +29,7 @@ import type { ChildStatus, SupervisorOptions } from "./children.js";
 import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
 import type { AdmissionLimits, ExecuteRefusal, PublicQueueSnapshot, QueueEntry, StartOutcome } from "./admission.js";
 import {
+  HUB_CONFIG_DEFAULTS,
   hubConfigPath,
   hubPidPath,
   readHubConfig,
@@ -58,7 +59,8 @@ import { ensureAuthToken } from "@n-dx/llm-client";
 import { sha256Hex, takeSessionHandover, writeSessionHandover } from "./session-handover.js";
 import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
-export const DEFAULT_HUB_PORT = 3117;
+/** The port `hub.port` in the per-user config defaults to. */
+export const DEFAULT_HUB_PORT = HUB_CONFIG_DEFAULTS.port;
 const LOOPBACK_HOST = "127.0.0.1";
 
 export interface HubOptions {
