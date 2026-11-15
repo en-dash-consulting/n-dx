@@ -510,6 +510,26 @@ export function createGoogleApiProvider(
       let buffer = "";
       let totalUsage: TokenUsage | undefined;
 
+      // One `data:` payload: its text becomes a chunk, its usage is kept for
+      // the final chunk. A payload that is not JSON is skipped.
+      function* readData(raw: string): Generator<StreamChunk> {
+        try {
+          const data = JSON.parse(raw) as Record<string, unknown>;
+          const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
+          const chunkText = extractTextFromCandidates(candidates);
+          if (chunkText) {
+            yield { text: chunkText };
+          }
+          if (data.usageMetadata) {
+            totalUsage = parseGeminiTokenUsage(
+              data.usageMetadata as Record<string, unknown>,
+            );
+          }
+        } catch {
+          // Skip malformed JSON lines
+        }
+      }
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -530,21 +550,7 @@ export function createGoogleApiProvider(
                 yield { done: true, usage: totalUsage };
                 return;
               }
-              try {
-                const data = JSON.parse(raw) as Record<string, unknown>;
-                const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-                const chunkText = extractTextFromCandidates(candidates);
-                if (chunkText) {
-                  yield { text: chunkText };
-                }
-                if (data.usageMetadata) {
-                  totalUsage = parseGeminiTokenUsage(
-                    data.usageMetadata as Record<string, unknown>,
-                  );
-                }
-              } catch {
-                // Skip malformed JSON lines
-              }
+              yield* readData(raw);
             }
           }
         }
@@ -555,21 +561,7 @@ export function createGoogleApiProvider(
           if (trimmed.startsWith("data: ")) {
             const raw = trimmed.slice(6).trim();
             if (raw && raw !== "[DONE]") {
-              try {
-                const data = JSON.parse(raw) as Record<string, unknown>;
-                const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-                const chunkText = extractTextFromCandidates(candidates);
-                if (chunkText) {
-                  yield { text: chunkText };
-                }
-                if (data.usageMetadata) {
-                  totalUsage = parseGeminiTokenUsage(
-                    data.usageMetadata as Record<string, unknown>,
-                  );
-                }
-              } catch {
-                // Skip malformed JSON
-              }
+              yield* readData(raw);
             }
           }
         }
