@@ -13,6 +13,7 @@ import { migrateToFolderPerTask, type FolderPerTaskMigrationResult } from "../..
 import { loadProductLayerItems, resolveLayerStore } from "../../store/change-layer-store.js";
 import { reshapeProductLayer } from "./reshape-product.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
+import { reviewEach } from "../prompt.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
@@ -459,36 +460,5 @@ async function interactiveReview(
   proposals: ReshapeProposal[],
   items: PRDItem[],
 ): Promise<ReshapeProposal[]> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const ask = (q: string): Promise<string> =>
-    new Promise((resolve) => rl.question(q, resolve));
-
-  const accepted: ReshapeProposal[] = [];
-
-  try {
-    for (let i = 0; i < proposals.length; i++) {
-      const p = proposals[i];
-      info(`\n[${i + 1}/${proposals.length}] ${formatReshapeProposal(p, items)}`);
-      const answer = await ask("  Accept? (y/n/a=all/q=quit) ");
-      const choice = answer.trim().toLowerCase();
-
-      if (choice === "q") break;
-      if (choice === "a") {
-        accepted.push(...proposals.slice(i));
-        break;
-      }
-      if (choice === "y" || choice === "yes") {
-        accepted.push(p);
-      }
-    }
-  } finally {
-    rl.close();
-  }
-
-  return accepted;
+  return reviewEach(proposals, (p) => formatReshapeProposal(p, items), "Accept");
 }

@@ -25,7 +25,7 @@ import type { LLMVendor } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
-import { confirmPrompt } from "../prompt.js";
+import { confirmPrompt, reviewEach } from "../prompt.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
 // ── LLM setup ────────────────────────────────────────────────────────
@@ -408,7 +408,7 @@ async function consolidateAfterPrune(
     if (accept) {
       accepted = proposals;
     } else if (process.stdin.isTTY) {
-      accepted = await interactiveAcceptProposals(proposals, doc.items, "Consolidate");
+      accepted = await reviewEach(proposals, (p) => formatReshapeProposal(p, doc.items), "Consolidate");
     } else {
       info("Run with --accept to apply consolidation, or use interactively in a TTY.");
       return undefined;
@@ -583,7 +583,7 @@ async function smartPrune(
   if (accept) {
     accepted = proposals;
   } else if (process.stdin.isTTY) {
-    accepted = await interactiveAcceptProposals(proposals, doc.items, "Prune");
+    accepted = await reviewEach(proposals, (p) => formatReshapeProposal(p, doc.items), "Prune");
   } else {
     info("Run with --accept to apply, or use interactively in a TTY.");
     return;
@@ -652,44 +652,4 @@ async function smartPrune(
 
 function summarize(item: PRDItem): { id: string; title: string; level: string } {
   return { id: item.id, title: item.title, level: item.level };
-}
-
-async function interactiveAcceptProposals(
-  proposals: ReshapeProposal[],
-  items: PRDItem[],
-  promptLabel = "Accept",
-): Promise<ReshapeProposal[]> {
-  const { formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const ask = (q: string): Promise<string> =>
-    new Promise((resolve) => rl.question(q, resolve));
-
-  const accepted: ReshapeProposal[] = [];
-
-  try {
-    for (let i = 0; i < proposals.length; i++) {
-      const p = proposals[i];
-      info(`\n[${i + 1}/${proposals.length}] ${formatReshapeProposal(p, items)}`);
-      const answer = await ask(`  ${promptLabel}? (y/n/a=all/q=quit) `);
-      const choice = answer.trim().toLowerCase();
-
-      if (choice === "q") break;
-      if (choice === "a") {
-        accepted.push(...proposals.slice(i));
-        break;
-      }
-      if (choice === "y" || choice === "yes") {
-        accepted.push(p);
-      }
-    }
-  } finally {
-    rl.close();
-  }
-
-  return accepted;
 }
