@@ -39,20 +39,15 @@
  */
 
 import { onDebouncedVisibilityChange, isTabVisible } from "../polling/index.js";
-import type { UpdateBatcher } from "./update-batcher.js";
+import {
+  composeUpdaters,
+  enqueueUpdater,
+  type AnySetter,
+  type SetterEntry,
+  type UpdateBatcher,
+} from "./update-batcher.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyUpdater = (prev: any) => any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySetter = (updater: (prev: any) => any) => void;
-
-/** Per-setter queue entry: the setter function and its accumulated updaters. */
-interface QueuedEntry {
-  setter: AnySetter;
-  updaters: AnyUpdater[];
-}
 
 /** Configuration for the DOM update gate. */
 export interface DomUpdateGateConfig {
@@ -155,28 +150,13 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
   const onResume = config.onResume;
 
   let open = true;
-  let deferredQueue = new Map<AnySetter, QueuedEntry>();
+  let deferredQueue = new Map<AnySetter, SetterEntry>();
   let queuedCount = 0;
   let totalDeferred = 0;
   let suspensionCount = 0;
   let disposed = false;
 
   // ─── Internal helpers ─────────────────────────────────────────────
-
-  /**
-   * Compose all queued updaters for a single setter into one function call.
-   * Each updater receives the output of the previous — identical to
-   * sequential application, just like the update-batcher's composition.
-   */
-  function composeUpdaters(updaters: AnyUpdater[]): AnyUpdater {
-    return (prev) => {
-      let current = prev;
-      for (const updater of updaters) {
-        current = updater(current);
-      }
-      return current;
-    };
-  }
 
   /**
    * Replay all queued updates through the batcher, then flush.
@@ -259,13 +239,7 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
     }
 
     // Gate is closed — queue the updater for replay on resume.
-    const key = setter as AnySetter;
-    let entry = deferredQueue.get(key);
-    if (!entry) {
-      entry = { setter: key, updaters: [] };
-      deferredQueue.set(key, entry);
-    }
-    entry.updaters.push(updater as AnyUpdater);
+    enqueueUpdater(deferredQueue, setter, updater);
     queuedCount++;
     totalDeferred++;
   }

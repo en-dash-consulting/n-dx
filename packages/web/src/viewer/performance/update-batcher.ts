@@ -66,17 +66,50 @@ export interface UpdateBatcher {
   dispose(): void;
 }
 
-// ─── Internal types ──────────────────────────────────────────────────────────
+// ─── Per-setter queue (shared with dom-update-gate) ─────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyUpdater = (prev: any) => any;
+export type AnyUpdater = (prev: any) => any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySetter = (updater: (prev: any) => any) => void;
+export type AnySetter = (updater: (prev: any) => any) => void;
 
 /** Per-setter queue entry: the setter function and its accumulated updaters. */
-interface SetterEntry {
+export interface SetterEntry {
   setter: AnySetter;
   updaters: AnyUpdater[];
+}
+
+/**
+ * Append `updater` to `setter`'s entry in `queue`, creating the entry on the
+ * setter's first update. A Map keeps insertion order, so setters are applied
+ * in the order they were first scheduled.
+ */
+export function enqueueUpdater<T>(
+  queue: Map<AnySetter, SetterEntry>,
+  setter: (updater: (prev: T) => T) => void,
+  updater: (prev: T) => T,
+): void {
+  const key = setter as AnySetter;
+  let entry = queue.get(key);
+  if (!entry) {
+    entry = { setter: key, updaters: [] };
+    queue.set(key, entry);
+  }
+  entry.updaters.push(updater as AnyUpdater);
+}
+
+/**
+ * Compose queued updaters into one: each receives the output of the
+ * previous, identical to applying them in sequence.
+ */
+export function composeUpdaters(updaters: readonly AnyUpdater[]): AnyUpdater {
+  return (prev) => {
+    let current = prev;
+    for (const updater of updaters) {
+      current = updater(current);
+    }
+    return current;
+  };
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
@@ -118,16 +151,7 @@ export function createUpdateBatcher(config?: UpdateBatcherConfig): UpdateBatcher
 
     for (const entry of entries.values()) {
       // Compose all updaters into a single function call.
-      // Each updater receives the output of the previous one.
-      const composed: AnyUpdater = (prev) => {
-        let current = prev;
-        for (const updater of entry.updaters) {
-          current = updater(current);
-        }
-        return current;
-      };
-
-      entry.setter(composed);
+      entry.setter(composeUpdaters(entry.updaters));
     }
   }
 
@@ -155,14 +179,7 @@ export function createUpdateBatcher(config?: UpdateBatcherConfig): UpdateBatcher
       return;
     }
 
-    const key = setter as AnySetter;
-    let entry = queue.get(key);
-    if (!entry) {
-      entry = { setter: key, updaters: [] };
-      queue.set(key, entry);
-    }
-    entry.updaters.push(updater as AnyUpdater);
-
+    enqueueUpdater(queue, setter, updater);
     scheduleRAF();
   }
 
