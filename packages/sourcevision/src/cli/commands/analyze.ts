@@ -27,7 +27,7 @@ import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
-import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
+import type { RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
   runImportsPhase,
@@ -688,6 +688,36 @@ async function writePrimerIfPossible(
   }
 }
 
+/**
+ * Attach each zone's architectural risk metrics to it and replace the
+ * previous run's risk findings (pass 0: a zone's risk score, or the
+ * fragile-zones summary) with this run's. Mutates `zonesData`; when this run
+ * found no risk, the existing findings are left as they are.
+ */
+function applyZoneRisks(zonesData: Zones, options: RiskAssessmentOptions): void {
+  const riskResult = assessAllZoneRisks(zonesData, options);
+
+  for (const zone of zonesData.zones) {
+    const metrics = riskResult.metrics[zone.id];
+    if (metrics) {
+      zone.riskMetrics = metrics;
+    }
+  }
+
+  if (riskResult.findings.length > 0) {
+    const existingFindings = (zonesData.findings ?? []).filter(
+      (f: { pass: number; text: string }) =>
+        !(f.pass === 0 && (
+          f.text.includes("(risk score:") ||
+          f.text.includes("zones are fragile")
+        )),
+    );
+    zonesData.findings = enforceSeverityRules(
+      deduplicateFindings([...existingFindings, ...riskResult.findings]),
+    );
+  }
+}
+
 export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
   try {
     const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
@@ -720,34 +750,8 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
 
     // Compute architectural risk scoring and attach metrics to zones
     if (zonesData.zones.length > 0) {
-      const riskResult = assessAllZoneRisks(zonesData, {
-        justifications: riskJustifications,
-        zoneTypes,
-      });
-
-      // Attach risk metrics to each zone object
-      for (const zone of zonesData.zones) {
-        const metrics = riskResult.metrics[zone.id];
-        if (metrics) {
-          zone.riskMetrics = metrics;
-        }
-      }
-
-      // Merge risk findings with existing findings (replace previous risk findings)
-      if (riskResult.findings.length > 0) {
-        const existingFindings = (zonesData.findings ?? []).filter(
-          (f: { pass: number; text: string }) =>
-            !(f.pass === 0 && (
-              f.text.includes("(risk score:") ||
-              f.text.includes("zones are fragile")
-            )),
-        );
-        zonesData.findings = enforceSeverityRules(
-          deduplicateFindings([...existingFindings, ...riskResult.findings]),
-        );
-      }
-
-      writeFileSync(join(ctx.svDir, DATA_FILES.zones), toCanonicalJSON(zonesData));
+      applyZoneRisks(zonesData, { justifications: riskJustifications, zoneTypes });
+      writeFileSync(zonesPath, toCanonicalJSON(zonesData));
     }
 
     // Project profile — primary language, frameworks, release/build/CI surfaces
