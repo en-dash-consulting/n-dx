@@ -9,6 +9,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useCallback, useMemo } from "preact/hooks";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -393,8 +394,7 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       onAccepted();

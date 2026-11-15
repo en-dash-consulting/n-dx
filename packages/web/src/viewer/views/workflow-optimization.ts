@@ -12,7 +12,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { BrandedHeader, FloatingNotice } from "../components/index.js";
 import { useCliName, useToast } from "../hooks/index.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 import { StatCard } from "./stat-card.js";
 
 // ── Types ────────────────────────────────────────────────────────────

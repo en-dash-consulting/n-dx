@@ -11,6 +11,7 @@ import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import type { Proposal } from "@n-dx/rex";
 import { toggled } from "../set-toggle.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -142,8 +143,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
       });
 
       if (!res.ok && res.status !== 409) {
-        const errBody = await res.json().catch(() => ({ error: "Analysis failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Analysis failed"));
       }
 
       cancelPollRef.current = pollAnalyzeStatus(applyAnalyzeResult);
@@ -166,8 +166,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       const data = await res.json();

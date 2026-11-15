@@ -22,7 +22,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { FloatingNotice } from "../components/index.js";
 import { useToast } from "../hooks/index.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────

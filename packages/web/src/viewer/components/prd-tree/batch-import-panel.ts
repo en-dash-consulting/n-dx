@@ -17,6 +17,7 @@ import { useState, useCallback, useRef } from "preact/hooks";
 import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { formatByteSize } from "./format-usage.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -197,8 +198,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       setProcessingStage("analyzing");
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Import failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Import failed"));
       }
 
       setProcessingStage("generating");
@@ -249,8 +249,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       // Reset

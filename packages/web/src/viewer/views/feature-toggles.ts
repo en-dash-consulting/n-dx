@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { FeatureToggle, FeaturesResponse } from "../external.js";
 import { SettingRow, Switch, type SettingRowSpec, type SettingTag } from "./setting-row.js";
 import type { ProjectSectionId } from "./project-sections.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 
 // ── Form state ───────────────────────────────────────────────────────
 

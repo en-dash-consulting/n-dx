@@ -18,7 +18,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { GlossaryLine } from "../components/index.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────

@@ -37,7 +37,7 @@ import { TrackerLinkList, WorkspaceWriteStrip, useTrackerLabel } from "../compon
 import { CRITERIA_LABEL } from "../external.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
-import { errorOf } from "./response-error.js";
+import { errorOf } from "../utils/response-error.js";
 import { SideSection, copyPageLink, useFollowScroll } from "./live-shared.js";
 import { LogTab } from "./live-log.js";
 import { ReviewSection, ReviewTab, StageStrip } from "./live-review.js";

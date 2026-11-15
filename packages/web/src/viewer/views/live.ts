@@ -36,7 +36,7 @@ import { useFeatureToggle } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { READY_NEXT_FEATURE, ReadyNext } from "./live-ready-next.js";
 import { TrackerActivitySection } from "./live-tracker.js";
-import { errorOf } from "./response-error.js";
+import { errorOf } from "../utils/response-error.js";
 import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {

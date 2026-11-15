@@ -32,7 +32,7 @@ import type { NavigateTo } from "../types.js";
 import { useLiveAnalyze, useTick, useCliName, type LiveAnalyzeSnapshot } from "../hooks/index.js";
 import { fmtDuration, formatSince } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
-import { errorOf } from "./response-error.js";
+import { errorOf } from "../utils/response-error.js";
 import { SideSection, copyPageLink, useFollowScroll } from "./live-shared.js";
 import {
   analyzeTitle,

@@ -19,7 +19,7 @@ import { useCliName, findOperation } from "../hooks/index.js";
 import type { ActiveOperation, JobTray } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { CommandReferenceView } from "./command-reference.js";
-import { assertJobStarted } from "./response-error.js";
+import { assertJobStarted } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────

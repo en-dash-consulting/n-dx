@@ -10,7 +10,7 @@ import { findOperation } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { findingAskSeed } from "./finding-seed.js";
 import { StatCard } from "./stat-card.js";
-import { assertJobStarted } from "./response-error.js";
+import { assertJobStarted } from "../utils/response-error.js";
 
 interface SuggestionsProps {
   data: LoadedData;

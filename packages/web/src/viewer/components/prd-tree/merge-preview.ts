@@ -17,6 +17,7 @@ import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import type { PRDItemData } from "./types.js";
 import { itemTypeLabel, itemTypeOf } from "../../external.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -74,8 +75,7 @@ async function postMerge(body: Record<string, unknown>, unreadable: string) {
   });
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: unreadable }));
-    throw new Error(errBody.error || `HTTP ${res.status}`);
+    throw new Error(await errorOrHttpStatus(res, unreadable));
   }
 
   return res.json();

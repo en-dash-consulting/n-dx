@@ -13,7 +13,7 @@ import { BrandedHeader } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useCliName } from "../hooks/index.js";
 import { itemTypeLabel } from "../external.js";
-import { assertJobStarted } from "./response-error.js";
+import { errorOrHttpStatus, assertJobStarted } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -924,8 +924,7 @@ export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
     try {
       const res = await fetch("/api/rex/validate");
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Validation failed" }));
-        setError(err.error || `HTTP ${res.status}`);
+        setError(await errorOrHttpStatus(res, "Validation failed"));
         return;
       }
       const data = await res.json();

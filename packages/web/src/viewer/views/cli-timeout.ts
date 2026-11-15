@@ -13,7 +13,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 

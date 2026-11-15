@@ -23,6 +23,7 @@ import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
 import { statusOptions } from "./status-display.js";
 import { formatByteSize } from "./format-usage.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Helpers (inlined to avoid cross-zone import from ../../utils) ────
 
@@ -154,8 +155,7 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
 
       const res = await fetch(`/api/rex/prune/preview${qs ? `?${qs}` : ""}`);
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Preview failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Preview failed"));
       }
 
       const data = await res.json();
@@ -199,8 +199,7 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Prune failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Prune failed"));
       }
 
       const data = await res.json();

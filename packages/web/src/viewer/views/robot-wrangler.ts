@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { ROBOT_WRANGLER_SECTIONS, robotWranglerSectionId } from "./robot-wrangler-sections.js";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
 
 // ── Types ─────────────────────────────────────────────────────────────

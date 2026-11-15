@@ -29,6 +29,7 @@ import { findItemById } from "../components/prd-tree/tree-utils.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { prdDetailOf, useItemSelection } from "./use-item-selection.js";
 import { useDeleteActions } from "./use-delete-actions.js";
+import { errorOrHttpStatus } from "../utils/response-error.js";
 
 /**
  * Toast text for a `POST /api/rex/items` answer. A v1 project answers the
@@ -50,8 +51,7 @@ async function postNewItem(input: object): Promise<{ type?: string; level?: stri
   });
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: "Failed to add item" }));
-    throw new Error(errBody.error || `HTTP ${res.status}`);
+    throw new Error(await errorOrHttpStatus(res, "Failed to add item"));
   }
 
   return res.json();

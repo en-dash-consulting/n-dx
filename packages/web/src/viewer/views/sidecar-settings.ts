@@ -16,7 +16,7 @@
 import { h, type ComponentChildren } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { resolveCliLabel, useCliName } from "../hooks/index.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 
 interface SettingsResponse {
   mode: "ask";

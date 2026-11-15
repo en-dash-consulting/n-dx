@@ -22,7 +22,7 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { SettingRow, Switch, type SettingRowSpec } from "./setting-row.js";
 import type { ProjectSectionId } from "./project-sections.js";
 import { PROJECT_LANGUAGES } from "../external.js";
-import { responseError } from "./response-error.js";
+import { responseError } from "../utils/response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 

@@ -29,6 +29,7 @@ import { PlanWithSidecarButton } from "../plan-with-sidecar.js";
 import { useProductRead } from "../../hooks/index.js";
 import type { AreaDetail, PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
 import { errorMessage } from "../../utils/format.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -241,8 +242,7 @@ async function postJson<T>(url: string, body: unknown, fallback: string): Promis
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: fallback }));
-    throw new Error(errBody.error || `HTTP ${res.status}`);
+    throw new Error(await errorOrHttpStatus(res, fallback));
   }
   return await res.json() as T;
 }
@@ -380,8 +380,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       if (reqId !== requestIdRef.current) return;
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Preview failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Preview failed"));
       }
 
       const data = await res.json();
@@ -478,8 +477,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       // Reset state
