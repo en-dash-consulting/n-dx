@@ -13,7 +13,7 @@ import { itemLinkRefs, type LinkFields } from "../tracker/link-refs.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, updateInTree,
-  appendLog, API_SETTABLE_STATUSES,
+  appendLog, API_SETTABLE_STATUSES, loadPRDOr404,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
 import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode } from "../rex-gateway.js";
@@ -106,11 +106,8 @@ export function routeItems(
 
     // GET /api/rex/items/:id — single item
     if (method === "GET") {
-      const doc = loadPRDSync(ctx.rexDir);
-      if (!doc) {
-        errorResponse(res, 404, "No PRD data found");
-        return true;
-      }
+      const doc = loadPRDOr404(ctx, res);
+      if (!doc) return true;
       const item = findItemById(doc.items, itemId);
       if (!item) {
         errorResponse(res, 404, `Item "${itemId}" not found`);

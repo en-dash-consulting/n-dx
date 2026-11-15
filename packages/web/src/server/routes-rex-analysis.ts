@@ -14,7 +14,7 @@ import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { appendLog } from "./routes-rex/rex-route-helpers.js";
+import { appendLog, loadPRDOr404 } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { resolveOwnPackageCli } from "./own-cli.js";
@@ -876,11 +876,8 @@ async function handleAcceptProposals(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);
@@ -1059,11 +1056,8 @@ async function handleAcceptEditedProposals(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);
@@ -1527,11 +1521,8 @@ async function handleBatchImport(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);

@@ -7,8 +7,8 @@ import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog } from "./rex-route-helpers.js";
-import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { findItemById, appendLog, loadPRDOr404 } from "./rex-route-helpers.js";
+import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
 import { itemTypeOf } from "../../shared/index.js";
 
@@ -145,11 +145,8 @@ function handleGetRequirements(
   ctx: ServerContext,
   itemId: string,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   const item = findItemById(doc.items, itemId);
   if (!item) {
@@ -410,11 +407,8 @@ function handleRequirementsCoverage(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   const stats: RequirementsCoverageStats = {
     totalItems: 0,
@@ -483,11 +477,8 @@ function handleRequirementsTraceability(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   // Build traceability: each requirement → which items it applies to
   const matrix: Array<{
