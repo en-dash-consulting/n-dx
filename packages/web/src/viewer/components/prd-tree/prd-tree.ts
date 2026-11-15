@@ -76,6 +76,13 @@ function collectIdsToDepth(
   return ids;
 }
 
+/** A copy of the expanded set with every id in `ids` expanded too. */
+function withExpanded(expanded: Set<string>, ids: Iterable<string>): Set<string> {
+  const next = new Set(expanded);
+  for (const id of ids) next.add(id);
+  return next;
+}
+
 // ── Sub-components ──────────────────────────────────────────────────
 
 function StatusIndicator({ status }: { status: ItemStatus }) {
@@ -894,18 +901,8 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
   const impacts = useItemImpacts();
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
 
-  // Collect all IDs for expand-all
-  const allIds = useMemo(() => {
-    const ids = new Set<string>();
-    function walk(items: PRDItemData[]) {
-      for (const item of items) {
-        ids.add(item.id);
-        if (item.children) walk(item.children);
-      }
-    }
-    walk(doc.items);
-    return ids;
-  }, [doc.items]);
+  // All IDs for expand-all, in the item map's tree order
+  const allIds = useMemo(() => new Set(itemMap.keys()), [itemMap]);
 
   const [expanded, setExpanded] = useState<Set<string>>(() =>
     collectIdsToDepth(doc.items, defaultExpandDepth),
@@ -914,13 +911,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
   // Deep-link: force-expand ancestor nodes so the target item is visible
   useEffect(() => {
     if (!deepLinkExpandIds || deepLinkExpandIds.size === 0) return;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      for (const id of deepLinkExpandIds) {
-        next.add(id);
-      }
-      return next;
-    });
+    setExpanded((prev) => withExpanded(prev, deepLinkExpandIds));
   }, [deepLinkExpandIds]);
 
   // Status filter: controlled (from parent) or internal fallback
@@ -937,14 +928,8 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
   // Search: auto-expand ancestors of matches so they're visible
   useEffect(() => {
     if (!searchVisibleIds || searchVisibleIds.size === 0) return;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      // Expand all ancestors — searchVisibleIds includes ancestor IDs
-      for (const id of searchVisibleIds) {
-        next.add(id);
-      }
-      return next;
-    });
+    // Expand all ancestors — searchVisibleIds includes ancestor IDs
+    setExpanded((prev) => withExpanded(prev, searchVisibleIds));
   }, [searchVisibleIds]);
 
   // Branch filter: compute visible set for the active branch
@@ -956,13 +941,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
   // Branch filter: auto-expand ancestors of branch-matched items
   useEffect(() => {
     if (!branchVisibleIds || branchVisibleIds.size === 0) return;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      for (const id of branchVisibleIds) {
-        next.add(id);
-      }
-      return next;
-    });
+    setExpanded((prev) => withExpanded(prev, branchVisibleIds));
   }, [branchVisibleIds]);
 
   // Combined visibility: intersection of search and branch when both active,
@@ -1039,11 +1018,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
       // Toggle: if already open for this item, close it; otherwise open it
       setInlineAddParentId((prev) => (prev === item.id ? null : item.id));
       // Auto-expand the node so the form is visible in context
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        next.add(item.id);
-        return next;
-      });
+      setExpanded((prev) => withExpanded(prev, [item.id]));
     },
     [],
   );
