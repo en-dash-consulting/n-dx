@@ -107,6 +107,16 @@ let listeners: PollingStateChangeHandler[] = [];
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
+/** The read-only view of one source, with its status asked for now. */
+function toSourceInfo(entry: SourceEntry): PollingSourceInfo {
+  return {
+    key: entry.key,
+    status: entry.callbacks.getStatus(),
+    essential: entry.config.essential,
+    registeredAt: entry.registeredAt,
+  };
+}
+
 /** Build a snapshot from current module state. */
 function buildSnapshot(): PollingStateSnapshot {
   const infos: PollingSourceInfo[] = [];
@@ -114,15 +124,10 @@ function buildSnapshot(): PollingStateSnapshot {
   let suspendedCount = 0;
 
   for (const entry of sources.values()) {
-    const status = entry.callbacks.getStatus();
-    infos.push({
-      key: entry.key,
-      status,
-      essential: entry.config.essential,
-      registeredAt: entry.registeredAt,
-    });
-    if (status === "active") activeCount++;
-    if (status === "suspended") suspendedCount++;
+    const info = toSourceInfo(entry);
+    infos.push(info);
+    if (info.status === "active") activeCount++;
+    if (info.status === "suspended") suspendedCount++;
   }
 
   return {
@@ -323,14 +328,7 @@ export function isSourceRegistered(key: string): boolean {
  */
 export function getSourceInfo(key: string): PollingSourceInfo | null {
   const entry = sources.get(key);
-  if (!entry) return null;
-
-  return {
-    key: entry.key,
-    status: entry.callbacks.getStatus(),
-    essential: entry.config.essential,
-    registeredAt: entry.registeredAt,
-  };
+  return entry ? toSourceInfo(entry) : null;
 }
 
 /**
