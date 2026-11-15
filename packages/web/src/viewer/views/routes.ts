@@ -5,6 +5,7 @@ import type { RouteTreeNode, RouteExportKind, ComponentUsageEdge } from "../exte
 import { TreeView, type TreeNode, CollapsibleSection, BarChart } from "../visualization/index.js";
 import { SearchFilter } from "../components/index.js";
 import { BrandedHeader } from "../components/index.js";
+import { StatCard } from "./stat-card.js";
 
 interface RoutesViewProps {
   data: LoadedData;
@@ -192,22 +193,10 @@ export function RoutesView({ data }: RoutesViewProps) {
     ),
 
     h("div", { class: "stat-grid" },
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(summary.totalComponents)),
-        h("div", { class: "label" }, "Components")
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(summary.totalRouteModules)),
-        h("div", { class: "label" }, "Route Modules")
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(summary.totalUsageEdges)),
-        h("div", { class: "label" }, "Usage Edges")
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(summary.layoutDepth)),
-        h("div", { class: "label" }, "Layout Depth")
-      ),
+      h(StatCard, { value: String(summary.totalComponents), label: "Components" }),
+      h(StatCard, { value: String(summary.totalRouteModules), label: "Route Modules" }),
+      h(StatCard, { value: String(summary.totalUsageEdges), label: "Usage Edges" }),
+      h(StatCard, { value: String(summary.layoutDepth), label: "Layout Depth" }),
     ),
 
     routeTree.length > 0 || componentTreeNodes.length > 0

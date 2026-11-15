@@ -9,6 +9,7 @@ import { BrandedHeader, EnrichmentGate } from "../components/index.js";
 import { findOperation } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { findingAskSeed } from "./finding-seed.js";
+import { StatCard } from "./stat-card.js";
 
 interface SuggestionsProps {
   data: LoadedData;
@@ -138,18 +139,9 @@ export function SuggestionsView({ data, navigateTo, askEnabled = false, jobs }: 
 
     findings.length > 0
       ? h("div", { class: "stat-grid" },
-          h("div", { class: "stat-card" },
-            h("div", { class: "value" }, String(globalCount)),
-            h("div", { class: "label" }, "Global Suggestions")
-          ),
-          h("div", { class: "stat-card" },
-            h("div", { class: "value" }, String(zoneCount)),
-            h("div", { class: "label" }, "Zone-Specific")
-          ),
-          h("div", { class: "stat-card" },
-            h("div", { class: "value" }, String(zonesAffected)),
-            h("div", { class: "label" }, "Zones Affected")
-          ),
+          h(StatCard, { value: String(globalCount), label: "Global Suggestions" }),
+          h(StatCard, { value: String(zoneCount), label: "Zone-Specific" }),
+          h(StatCard, { value: String(zonesAffected), label: "Zones Affected" }),
         )
       : null,
 
