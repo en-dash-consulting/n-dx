@@ -53,14 +53,13 @@ import {
   type GoVendoredModule,
   type GoWorkFacts,
 } from "@n-dx/lang-kit";
-import type {
-  Capture,
-  ExternalModule,
-  FileReferences,
-  PackResolver,
-  PackSourceFile,
-  PreparedResolver,
-  SourcePosition,
+import {
+  contains,
+  type ExternalModule,
+  type FileReferences,
+  type PackResolver,
+  type PackSourceFile,
+  type PreparedResolver,
 } from "@n-dx/lang-runtime";
 
 // ── Project facts ───────────────────────────────────────────────────────────
@@ -99,21 +98,12 @@ interface GoImport {
   readonly alias?: string;
 }
 
-function before(a: SourcePosition, b: SourcePosition): boolean {
-  return a.line < b.line || (a.line === b.line && a.column < b.column);
-}
-
-/** `inner` lies within `outer` (bounds inclusive). */
-function within(inner: Capture, outer: Capture): boolean {
-  return !before(inner.start, outer.start) && !before(outer.end, inner.end);
-}
-
 function readImports(file: PackSourceFile): GoImport[] {
   const captures = file.captures["imports"] ?? [];
   return captures
     .filter((c) => c.name === "import.spec")
     .flatMap((spec): GoImport[] => {
-      const inside = captures.filter((c) => c !== spec && within(c, spec));
+      const inside = captures.filter((c) => c !== spec && contains(spec, c));
       const name = inside.find((c) => c.name === "import.name");
       if (!name) return [];
       const alias = inside.find((c) => c.name === "import.alias");
