@@ -22,6 +22,7 @@ import {
   sortZonesData,
   toCanonicalJSON,
 } from "../util/sort.js";
+import { computeInventorySummary } from "../util/merge.js";
 import {
   promoteZones,
   promoteCrossings,
@@ -45,7 +46,6 @@ import type {
   Manifest,
   Inventory,
   FileEntry,
-  InventorySummary,
   Imports,
   ImportEdge,
   ExternalImport,
@@ -203,22 +203,6 @@ export function aggregateInventory(members: SubAnalysis[]): Inventory {
 
   const summary = computeInventorySummary(allFiles);
   return sortInventory({ files: allFiles, summary });
-}
-
-function computeInventorySummary(files: FileEntry[]): InventorySummary {
-  const byLanguage: Record<string, number> = {};
-  const byRole: Partial<Record<string, number>> = {};
-  const byCategory: Record<string, number> = {};
-  let totalLines = 0;
-
-  for (const f of files) {
-    byLanguage[f.language] = (byLanguage[f.language] ?? 0) + 1;
-    byRole[f.role] = ((byRole[f.role] as number) ?? 0) + 1;
-    byCategory[f.category] = (byCategory[f.category] ?? 0) + 1;
-    totalLines += f.lineCount;
-  }
-
-  return { totalFiles: files.length, totalLines, byLanguage, byRole, byCategory };
 }
 
 /**
