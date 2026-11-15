@@ -771,8 +771,6 @@ function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
  *
  * Duplicate ids collapse in the returned map — {@link serializeFolderTree}
  * uses the positional form so it stays lossless on that malformed input.
- *
- * @public — used by folder-tree-mutations for rendering
  */
 export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
   const slugs = resolvePositionalSiblingSlugs(items);
@@ -837,7 +835,7 @@ function requireMapValue(map: Map<string, string>, key: string): string {
  * folder children link to `./<slug>/index.md`. For leaf items pass an empty
  * `children` array — no Children table will be emitted.
  *
- * @public — used by folder-tree-mutations for targeted rewrites
+ * @public — used by targeted-update for targeted rewrites
  */
 export function renderItemIndexMd(
   item: PRDItem,
