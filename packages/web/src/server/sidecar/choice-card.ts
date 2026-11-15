@@ -7,7 +7,7 @@
  */
 
 import type { SidecarChoice, SidecarChoiceAnswer } from "../../shared/index.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 const MAX_OPTIONS = 12;
 const MAX_ANSWER_CHARS = 2000;

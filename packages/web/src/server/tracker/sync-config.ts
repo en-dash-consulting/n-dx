@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { isLocalConfigTracked, resolveLayout } from "@n-dx/llm-client";
 import { TRACKER_EVENTS, type TrackerEvent } from "./server-profiles.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 export const TRACKER_RULE_MODES = ["off", "dry-run", "on"] as const;
 export type TrackerRuleMode = (typeof TRACKER_RULE_MODES)[number];

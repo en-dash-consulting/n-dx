@@ -28,7 +28,7 @@ import { join } from "node:path";
 import { resolveNdxHome } from "@n-dx/llm-client";
 import { parseFieldHints, type FieldHints } from "../connections/connection-config.js";
 import caos from "./profiles/caos.json" with { type: "json" };
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /** The ndx events tracker sync rules fire on, in workflow order. */
 export const TRACKER_EVENTS = [

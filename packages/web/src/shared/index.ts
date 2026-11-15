@@ -11,6 +11,7 @@ export type { ViewId } from "./view-id.js";
 export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export { PROJECT_LANGUAGES, isProjectLanguage } from "./project-languages.js";
 export type { ProjectLanguage } from "./project-languages.js";
+export { isRecord } from "./is-record.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
   HUB_PATH,

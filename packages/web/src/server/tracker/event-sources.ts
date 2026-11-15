@@ -39,7 +39,7 @@ import { itemLinkRefs, type LinkFields } from "./link-refs.js";
 import type { TrackerEventRecord } from "./rules.js";
 import { readSourceProblems, writeSourceProblems, type SourceProblem } from "./source-problems.js";
 import type { FactSource, TrackerEvent } from "./server-profiles.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /** Runs one command: the llm-client `exec` in production, a stub in tests. */
 export type TrackerEventExec = (cmd: string, args: string[], opts: ExecOptions) => Promise<ExecResult>;

@@ -14,7 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { isLocalConfigTracked, resolveLayout } from "@n-dx/llm-client";
-import { isRecord } from "./is-record.js";
+import { isRecord } from "../shared/index.js";
 
 type Json = Record<string, unknown>;
 

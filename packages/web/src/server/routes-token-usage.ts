@@ -39,7 +39,7 @@ import {
   type BillableTokens,
 } from "@n-dx/llm-client";
 import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
-import { isRecord } from "./is-record.js";
+import { isRecord } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)

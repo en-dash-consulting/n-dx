@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { ensureSidecarDir } from "../sidecar/sidecar-dir.js";
 import { worktreeSidecarDir } from "../sidecar/session-registry.js";
 import type { TrackerEvent } from "./server-profiles.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /** One source that could not be read at the last tick. */
 export interface SourceProblem {

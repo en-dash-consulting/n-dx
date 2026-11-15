@@ -38,7 +38,7 @@ import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
 import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { resolveDraftPath } from "./draft-file.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
 

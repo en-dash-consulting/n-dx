@@ -11,7 +11,7 @@
 import { updateLocalConfigBlock } from "../local-config-write.js";
 import { CONNECTION_ID_PATTERN, parseConnection, type ConnectionConfig } from "./connection-config.js";
 import { TOOL_CLASSES, TOOL_POLICIES } from "./tool-policy.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /** An edit that cannot be made; `status` is the HTTP status it deserves and `message` is safe to show. */
 export class ConnectionWriteError extends Error {

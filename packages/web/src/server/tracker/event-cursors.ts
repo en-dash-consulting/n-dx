@@ -14,7 +14,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ensureSidecarDir } from "../sidecar/sidecar-dir.js";
 import { worktreeSidecarDir } from "../sidecar/session-registry.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /**
  * A high-water mark: the newest time read (ms since the epoch) and the keys

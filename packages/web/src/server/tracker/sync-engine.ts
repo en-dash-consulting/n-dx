@@ -31,7 +31,7 @@ import { changeItemLink } from "./item-links.js";
 import { normalizeWorkRef } from "./link-refs.js";
 import { checkServerProfile, loadServerProfile, trackerItemUrl, type ProfileOptions, type ServerProfile, type TrackerMapping } from "./server-profiles.js";
 import { loadTrackerSync, type TrackerSyncConfig } from "./sync-config.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /** The connection service calls sync makes. */
 export type TrackerSyncService = Pick<ConnectionService, "callTool" | "listTools" | "callContext">;

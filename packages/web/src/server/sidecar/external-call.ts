@@ -25,7 +25,7 @@ import type { SidecarCallProblem, SidecarExternalCall, SidecarFieldOption } from
 import type { FieldHint, FieldHints } from "../connections/connection-config.js";
 import type { ConnectionService, ConnectionTool } from "../connections/connection-service.js";
 import { profileFieldHints, type ProfileOptions } from "../tracker/server-profiles.js";
-import { isRecord } from "../is-record.js";
+import { isRecord } from "../../shared/index.js";
 
 /** The longest a picker's list is drawn; a longer result is cut. */
 export const MAX_FIELD_OPTIONS = 200;
