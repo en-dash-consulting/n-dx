@@ -216,10 +216,6 @@ export function louvainPhase1(
 
 // ── Merge small communities ─────────────────────────────────────────────────
 
-/**
- * Communities with fewer than `minSize` files get absorbed into
- * their most-connected neighbor community.
- */
 /** Log entries from mergeSmallCommunities for debuggability */
 export interface MergeLogEntry {
   smallCommunity: string;
@@ -228,6 +224,10 @@ export interface MergeLogEntry {
   importWeight: number;
 }
 
+/**
+ * Communities with fewer than `minSize` files get absorbed into
+ * their most-connected neighbor community.
+ */
 export function mergeSmallCommunities(
   community: Map<string, string>,
   graph: UndirectedGraph,

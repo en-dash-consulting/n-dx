@@ -388,15 +388,6 @@ interface IncrementalState {
 }
 
 /**
- * Build starting edge/external maps from a previous run, carrying forward only
- * the entries for unchanged files. Files in changedFiles are excluded so they
- * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
- * file pruned from the inventory in an earlier run is absent from it without
- * showing up as deleted (#744). An edge target must still exist: an inventoried
- * file, or a directory holding one, since Go edges point at the imported
- * package's directory.
- */
-/**
  * Whether an edge target names something in the inventory: a file, or a
  * directory holding an inventoried Go file, since Go edges, and only Go
  * edges, point at the imported package's directory ("" is the project root:
@@ -414,6 +405,15 @@ function inventoriedTarget(fileSet: ReadonlySet<string>): (to: string) => boolea
   return (to) => fileSet.has(to) || goDirs.has(to);
 }
 
+/**
+ * Build starting edge/external maps from a previous run, carrying forward only
+ * the entries for unchanged files. Files in changedFiles are excluded so they
+ * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
+ * file pruned from the inventory in an earlier run is absent from it without
+ * showing up as deleted (#744). An edge target must still exist: an inventoried
+ * file, or a directory holding one, since Go edges point at the imported
+ * package's directory.
+ */
 function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
@@ -483,7 +483,6 @@ async function reExtractUnchangedExternals(
   }
 }
 
-/** Parse JS/TS files and append edges and external imports to the provided maps. */
 /**
  * Tokenize a JS/TS source file and count occurrences of each identifier-like
  * token. Used to weight import edges by *actual usage* rather than just the
@@ -529,6 +528,7 @@ function importWeight(symbols: readonly string[], counts: Map<string, number>): 
   return Math.max(1, total);
 }
 
+/** Parse JS/TS files and append edges and external imports to the provided maps. */
 async function processJsTsFiles(
   files: Inventory["files"],
   targetDir: string,

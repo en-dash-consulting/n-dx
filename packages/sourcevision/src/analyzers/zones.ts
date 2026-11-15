@@ -535,11 +535,6 @@ export function assignByProximity(
 // ── Zone pinning ─────────────────────────────────────────────────────────────
 
 /**
- * Apply manual zone pins by moving files from their detected zone to the
- * pinned target zone. Files whose target zone doesn't exist are skipped.
- * This runs after Louvain detection and proximity assignment.
- */
-/**
  * A configured zone pin that could not be applied this run.
  * `target-zone-absent` is the important one: the pin's target zone did not
  * form (Louvain non-determinism), so the file silently fell back elsewhere.
@@ -550,6 +545,11 @@ export interface ZonePinSkip {
   reason: "target-zone-absent" | "file-unzoned";
 }
 
+/**
+ * Apply manual zone pins by moving files from their detected zone to the
+ * pinned target zone. Files whose target zone doesn't exist are skipped.
+ * This runs after Louvain detection and proximity assignment.
+ */
 export function applyZonePins(
   zones: Zone[],
   pins: Record<string, string>,
@@ -1930,14 +1930,6 @@ function backPopulateInsights(
  */
 export const DEFAULT_MAX_ZONE_PERCENT = 15;
 
-/**
- * Run the full zone detection pipeline: graph construction, Louvain community
- * detection, community merging/splitting, zone construction with subdivision,
- * proximity assignment, and crossing computation.
- *
- * This is the shared pipeline used by both root-level analysis and (future)
- * recursive zone subdivision.
- */
 /** Fewest distinct importers that make a file a hub, whatever the project size. */
 export const HUB_MIN_FAN_IN = 20;
 /** Share of the scope's files that must import a file for it to count as a hub. */
@@ -1970,6 +1962,14 @@ export function computeHubDamping(edges: ImportEdge[], fileCount: number): Map<s
   return damping;
 }
 
+/**
+ * Run the full zone detection pipeline: graph construction, Louvain community
+ * detection, community merging/splitting, zone construction with subdivision,
+ * proximity assignment, and crossing computation.
+ *
+ * This is the shared pipeline used by both root-level analysis and (future)
+ * recursive zone subdivision.
+ */
 export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResult {
   const {
     edges,

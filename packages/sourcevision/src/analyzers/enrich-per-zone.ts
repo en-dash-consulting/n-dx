@@ -62,11 +62,6 @@ interface SingleZoneResult {
   success: boolean;
 }
 
-/**
- * Enrich a single zone with the active LLM vendor.
- * Sends only this zone's files + entry points + boundary crossings.
- * Includes 1-line summaries of other zones for context.
- */
 /** Everything the two per-zone prompts read, already rendered. */
 interface SingleZonePromptContext {
   zone: Zone;
@@ -181,6 +176,11 @@ export function buildSingleZoneLaterPassEnvelope(
   ]);
 }
 
+/**
+ * Enrich a single zone with the active LLM vendor.
+ * Sends only this zone's files + entry points + boundary crossings.
+ * Includes 1-line summaries of other zones for context.
+ */
 async function enrichSingleZone(
   zone: Zone,
   allZones: Zone[],
