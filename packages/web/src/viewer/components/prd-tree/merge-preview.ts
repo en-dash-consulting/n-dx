@@ -61,6 +61,26 @@ const STATUS_ICONS: Record<string, string> = {
   deleted: "\u2715",       // ✕
 };
 
+/**
+ * POST to the merge endpoint (a preview when `body.preview` is set) and
+ * return its reply. A refusal throws the server's error, or `unreadable`
+ * when its body is not JSON.
+ */
+async function postMerge(body: Record<string, unknown>, unreadable: string) {
+  const res = await fetch("/api/rex/items/merge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: unreadable }));
+    throw new Error(errBody.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function MergePreview({ selectedItems, onMergeComplete, onCancel }: MergePreviewProps) {
@@ -89,18 +109,7 @@ export function MergePreview({ selectedItems, onMergeComplete, onCancel }: Merge
       };
       if (customTitle.trim()) body.title = customTitle.trim();
 
-      const res = await fetch("/api/rex/items/merge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Preview failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await postMerge(body, "Preview failed");
       setPreview(data.preview);
     } catch (err) {
       setError(String(err));
@@ -125,18 +134,7 @@ export function MergePreview({ selectedItems, onMergeComplete, onCancel }: Merge
       };
       if (customTitle.trim()) body.title = customTitle.trim();
 
-      const res = await fetch("/api/rex/items/merge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Merge failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await postMerge(body, "Merge failed");
       const absorbedCount = data.absorbedIds?.length ?? 0;
       setResult(`Merged ${absorbedCount + 1} items successfully`);
 
