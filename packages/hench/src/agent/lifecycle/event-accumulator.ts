@@ -418,6 +418,87 @@ function worstDiagnosticStatus(
 
 // ── Claude stream-json parser (mutation-based) ────────────────────────────
 
+/** Print a tool call and record it on the result, its output still to come. */
+function recordToolUse(
+  result: CliRunResult,
+  turn: number,
+  toolName: string,
+  toolInput: Record<string, unknown>,
+): void {
+  stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
+  result.toolCalls.push({
+    turn,
+    tool: toolName,
+    input: toolInput,
+    output: "",
+    durationMs: 0,
+  });
+}
+
+/** Attach a tool's output to the last recorded call, if any, and print its preview. */
+function recordToolOutput(result: CliRunResult, output: string): void {
+  if (result.toolCalls.length > 0) {
+    result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+  }
+  const preview = output.slice(0, 200);
+  stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+}
+
+/**
+ * Add one turn's usage payload to the result's totals and append its per-turn
+ * row. The Claude and Codex parsers share it, so a Codex turn's cache halves
+ * land on the record exactly as a Claude turn's do.
+ */
+function accumulateTurnUsage(
+  result: CliRunResult,
+  rawUsage: Record<string, unknown>,
+  turn: number,
+  tokenMetadata: TokenEventMetadata | undefined,
+): void {
+  const { usage: parsed, diagnosticStatus, cacheProvenance } = parseTokenUsageWithDiagnostic(rawUsage);
+
+  result.tokenUsage.input += parsed.input;
+  result.tokenUsage.output += parsed.output;
+
+  const turnUsage: TurnTokenUsage = {
+    turn,
+    input: parsed.input,
+    output: parsed.output,
+    diagnosticStatus,
+    cacheProvenance,
+    ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
+  };
+
+  if (parsed.cacheCreationInput) {
+    result.tokenUsage.cacheCreationInput = (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
+    turnUsage.cacheCreationInput = parsed.cacheCreationInput;
+  }
+  if (parsed.cacheReadInput) {
+    result.tokenUsage.cacheReadInput = (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
+    turnUsage.cacheReadInput = parsed.cacheReadInput;
+  }
+
+  result.turnTokenUsage.push(turnUsage);
+}
+
+/**
+ * Apply one content block of an assistant event: text is printed and becomes
+ * the summary so far, a tool_use is recorded. Other block types are ignored.
+ */
+function applyAssistantBlock(
+  block: { type: string; text?: string },
+  result: CliRunResult,
+  turn: number,
+): void {
+  if (block.type === "text" && block.text) {
+    stream("Agent", block.text);
+    result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
+  } else if (block.type === "tool_use") {
+    const b = block as { name?: string; input?: Record<string, unknown> };
+    recordToolUse(result, turn, b.name || "unknown", b.input || {});
+  }
+}
+
 /**
  * Parse a single line of Claude `--output-format stream-json` output
  * and accumulate the result into a mutable `CliRunResult`.
@@ -457,77 +538,19 @@ export function processStreamLine(
         const msg = message as Record<string, unknown>;
         const blocks = msg.content as Array<{ type: string; text?: string }> | undefined;
         if (Array.isArray(blocks)) {
-          for (const block of blocks) {
-            if (block.type === "text" && block.text) {
-              stream("Agent", block.text);
-              result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
-            } else if (block.type === "tool_use") {
-              const b = block as { name?: string; input?: Record<string, unknown> };
-              const toolName = b.name || "unknown";
-              const toolInput = b.input || {};
-              stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-              result.toolCalls.push({
-                turn: turnCounter.value,
-                tool: toolName,
-                input: toolInput,
-                output: "",
-                durationMs: 0,
-              });
-            }
-          }
+          for (const block of blocks) applyAssistantBlock(block, result, turnCounter.value);
         }
 
         // Extract per-turn token usage from message.usage
         if (msg.usage && typeof msg.usage === "object") {
-          const { usage: parsed, diagnosticStatus, cacheProvenance } =
-            parseTokenUsageWithDiagnostic(msg.usage as Record<string, unknown>);
-
-          result.tokenUsage.input += parsed.input;
-          result.tokenUsage.output += parsed.output;
-
-          const turnUsage: TurnTokenUsage = {
-            turn: turnCounter.value,
-            input: parsed.input,
-            output: parsed.output,
-            diagnosticStatus,
-            cacheProvenance,
-            ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
-          };
-
-          if (parsed.cacheCreationInput) {
-            result.tokenUsage.cacheCreationInput = (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
-            turnUsage.cacheCreationInput = parsed.cacheCreationInput;
-          }
-          if (parsed.cacheReadInput) {
-            result.tokenUsage.cacheReadInput = (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
-            turnUsage.cacheReadInput = parsed.cacheReadInput;
-          }
-
-          result.turnTokenUsage.push(turnUsage);
+          accumulateTurnUsage(result, msg.usage as Record<string, unknown>, turnCounter.value, tokenMetadata);
         }
       }
 
       // Also check top-level content (some event shapes put it here)
       const content = event.content as Array<{ type: string; text?: string }> | undefined;
       if (Array.isArray(content) && !event.message) {
-        for (const block of content) {
-          if (block.type === "text" && block.text) {
-            stream("Agent", block.text);
-            result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
-          } else if (block.type === "tool_use") {
-            const b = block as { name?: string; input?: Record<string, unknown> };
-            const toolName = b.name || "unknown";
-            const toolInput = b.input || {};
-            stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-            result.toolCalls.push({
-              turn: turnCounter.value,
-              tool: toolName,
-              input: toolInput,
-              output: "",
-              durationMs: 0,
-            });
-          }
-        }
+        for (const block of content) applyAssistantBlock(block, result, turnCounter.value);
       }
       break;
     }
@@ -535,25 +558,13 @@ export function processStreamLine(
     case "tool_use": {
       const toolName = (event.tool as string) || (event.name as string) || "unknown";
       const toolInput = (event.input as Record<string, unknown>) || {};
-      stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-      result.toolCalls.push({
-        turn: turnCounter.value,
-        tool: toolName,
-        input: toolInput,
-        output: "",
-        durationMs: 0,
-      });
+      recordToolUse(result, turnCounter.value, toolName, toolInput);
       break;
     }
 
     case "tool_result": {
       const output = (event.output as string) || (event.content as string) || "";
-      // Attach output to the last tool call if available
-      if (result.toolCalls.length > 0) {
-        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
-      }
-      const preview = output.slice(0, 200);
-      stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+      recordToolOutput(result, output);
       break;
     }
 
@@ -623,14 +634,7 @@ export function processCodexJsonLine(
 
       const itemType = typeof item.type === "string" ? item.type : undefined;
       if (itemType === "command_execution" && typeof item.command === "string") {
-        stream("Tool", `shell(${JSON.stringify({ command: item.command }).slice(0, 100)})`);
-        result.toolCalls.push({
-          turn: turnCounter.value || 1,
-          tool: "shell",
-          input: { command: item.command },
-          output: "",
-          durationMs: 0,
-        });
+        recordToolUse(result, turnCounter.value || 1, "shell", { command: item.command });
         return true;
       }
 
@@ -685,14 +689,7 @@ export function processCodexJsonLine(
             const toolInput = rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
               ? rawInput as Record<string, unknown>
               : {};
-            stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-            result.toolCalls.push({
-              turn: turnCounter.value,
-              tool: toolName,
-              input: toolInput,
-              output: "",
-              durationMs: 0,
-            });
+            recordToolUse(result, turnCounter.value, toolName, toolInput);
           }
         }
       }
@@ -711,32 +708,7 @@ export function processCodexJsonLine(
       // on the record as a run that cached nothing. `cross-vendor-run-record-
       // smoke.test.ts` holds the two branches to the same shape.
       if (event.usage && typeof event.usage === "object") {
-        const { usage: parsed, diagnosticStatus, cacheProvenance } =
-          parseTokenUsageWithDiagnostic(event.usage as Record<string, unknown>);
-        result.tokenUsage.input += parsed.input;
-        result.tokenUsage.output += parsed.output;
-
-        const turnUsage: TurnTokenUsage = {
-          turn: turnCounter.value,
-          input: parsed.input,
-          output: parsed.output,
-          diagnosticStatus,
-          cacheProvenance,
-          ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
-        };
-
-        if (parsed.cacheCreationInput) {
-          result.tokenUsage.cacheCreationInput =
-            (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
-          turnUsage.cacheCreationInput = parsed.cacheCreationInput;
-        }
-        if (parsed.cacheReadInput) {
-          result.tokenUsage.cacheReadInput =
-            (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
-          turnUsage.cacheReadInput = parsed.cacheReadInput;
-        }
-
-        result.turnTokenUsage.push(turnUsage);
+        accumulateTurnUsage(result, event.usage as Record<string, unknown>, turnCounter.value, tokenMetadata);
       }
 
       return true;
@@ -748,25 +720,13 @@ export function processCodexJsonLine(
       const toolInput = rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs)
         ? rawArgs as Record<string, unknown>
         : {};
-      stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-      result.toolCalls.push({
-        turn: turnCounter.value || 1,
-        tool: toolName,
-        input: toolInput,
-        output: "",
-        durationMs: 0,
-      });
+      recordToolUse(result, turnCounter.value || 1, toolName, toolInput);
       return true;
     }
 
     case "function_call_output": {
       const output = (event.output as string) || (event.content as string) || "";
-      // Attach output to the last tool call if available
-      if (result.toolCalls.length > 0) {
-        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
-      }
-      const preview = output.slice(0, 200);
-      stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+      recordToolOutput(result, output);
       return true;
     }
 
