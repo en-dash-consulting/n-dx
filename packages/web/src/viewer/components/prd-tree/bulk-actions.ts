@@ -9,6 +9,7 @@ import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
+import { statusOptions } from "./status-display.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -25,14 +26,7 @@ export interface BulkActionsProps {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: Array<{ value: ItemStatus; label: string; icon: string }> = [
-  { value: "pending", label: "Pending", icon: "○" },
-  { value: "in_progress", label: "In Progress", icon: "◐" },
-  { value: "completed", label: "Completed", icon: "●" },
-  { value: "blocked", label: "Blocked", icon: "⊘" },
-  { value: "deferred", label: "Deferred", icon: "◌" },
-  { value: "deleted", label: "Deleted", icon: "✕" },
-];
+const STATUS_OPTIONS = statusOptions(["pending", "in_progress", "completed", "blocked", "deferred", "deleted"]);
 
 // ── Component ────────────────────────────────────────────────────────
 

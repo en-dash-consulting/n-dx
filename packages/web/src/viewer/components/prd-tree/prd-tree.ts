@@ -31,6 +31,7 @@ import { InlineAddForm } from "./inline-add-form.js";
 import { parentTypeIn } from "./tree-utils.js";
 import type { InlineAddInput } from "./inline-add-form.js";
 import { InlineStatusPicker } from "./inline-status-picker.js";
+import { STATUS_DISPLAY } from "./status-display.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
 import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex } from "./virtual-scroll.js";
@@ -43,20 +44,6 @@ import type { PRDGhostRow } from "./ghost-rows.js";
 import { ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../impact-tags.js";
 
 // ── Status rendering ────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<
-  ItemStatus,
-  { icon: string; cssClass: string; label: string }
-> = {
-  completed: { icon: "●", cssClass: "prd-status-completed", label: "Completed" },
-  in_progress: { icon: "◐", cssClass: "prd-status-in-progress", label: "In Progress" },
-  pending: { icon: "○", cssClass: "prd-status-pending", label: "Pending" },
-  failing: { icon: "⚠", cssClass: "prd-status-failing", label: "Failing" },
-  deferred: { icon: "◌", cssClass: "prd-status-deferred", label: "Deferred" },
-  blocked: { icon: "⊘", cssClass: "prd-status-blocked", label: "Blocked" },
-  cancelled: { icon: "⊗", cssClass: "prd-status-cancelled", label: "Cancelled" },
-  deleted: { icon: "✕", cssClass: "prd-status-deleted", label: "Deleted" },
-};
 
 const PRIORITY_CONFIG: Record<Priority, { cssClass: string }> = {
   critical: { cssClass: "prd-priority-critical" },
@@ -92,7 +79,7 @@ function collectIdsToDepth(
 // ── Sub-components ──────────────────────────────────────────────────
 
 function StatusIndicator({ status }: { status: ItemStatus }) {
-  const config = STATUS_CONFIG[status];
+  const config = STATUS_DISPLAY[status];
   return h(
     "span",
     {
@@ -691,7 +678,7 @@ function SummaryBar({ items }: { items: PRDItemData[] }) {
         h(
           "span",
           { key: seg.status, class: "prd-summary-stat" },
-          h("span", { class: `prd-status-dot ${STATUS_CONFIG[seg.status].cssClass}` }),
+          h("span", { class: `prd-status-dot ${STATUS_DISPLAY[seg.status].cssClass}` }),
           `${seg.count} ${seg.label}`,
         ),
       ),
@@ -1109,7 +1096,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
     (status: ItemStatus) => {
       if (!statusPicker || !onUpdateItem) return;
       const { item } = statusPicker;
-      const label = STATUS_CONFIG[status].label;
+      const label = STATUS_DISPLAY[status].label;
       onUpdateItem(item.id, { status });
       setStatusLiveMsg(`${item.title} status changed to ${label}`);
     },

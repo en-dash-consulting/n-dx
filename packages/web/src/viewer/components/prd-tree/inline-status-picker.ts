@@ -11,18 +11,13 @@
 import { h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
+import { statusOptions } from "./status-display.js";
 
 // ── Status options ──────────────────────────────────────────────────
 
-const STATUS_OPTIONS: ReadonlyArray<{ value: ItemStatus; label: string; icon: string }> = [
-  { value: "pending", label: "Pending", icon: "○" },
-  { value: "in_progress", label: "In Progress", icon: "◐" },
-  { value: "completed", label: "Completed", icon: "●" },
-  { value: "failing", label: "Failing", icon: "⚠" },
-  { value: "blocked", label: "Blocked", icon: "⊘" },
-  { value: "deferred", label: "Deferred", icon: "◌" },
-  { value: "deleted", label: "Deleted", icon: "✕" },
-];
+const STATUS_OPTIONS = statusOptions([
+  "pending", "in_progress", "completed", "failing", "blocked", "deferred", "deleted",
+]);
 
 // ── Component ───────────────────────────────────────────────────────
 
