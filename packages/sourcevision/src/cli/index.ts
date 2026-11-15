@@ -168,7 +168,6 @@ try {
         work: "ndx work",
         "self-heal": "ndx self-heal",
         start: "ndx start",
-        init: "ndx init",
         ci: "ndx ci",
         dev: "ndx dev",
         refresh: "ndx refresh",
