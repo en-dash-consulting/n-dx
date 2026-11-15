@@ -37,7 +37,7 @@ import type { EnrichResult } from "./enrich-parsing.js";
 import { isStructuralZone, applyStructuralTemplate } from "./enrich.js";
 import { narrateZones } from "./enrich-multiplex.js";
 import { assessZoneFragility, fragilityFindings } from "./enrich-judge.js";
-import { nameZonesBySelection, describeZoneFromFacts, algorithmicZoneName } from "./zone-naming.js";
+import { nameZonesBySelection, describeZoneFromFacts } from "./zone-naming.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import type { AnalyzeTokenUsage } from "../schema/index.js";
 import { routeLayoutFor } from "./route-convention.js";

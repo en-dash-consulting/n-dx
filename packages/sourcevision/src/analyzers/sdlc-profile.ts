@@ -844,13 +844,6 @@ const FEATURE_FLAG_PY_DISTS: Array<[string, string]> = [
 /** `FEATURE_NEW_CHECKOUT=true` in a dotenv file: an in-house flag convention. */
 const ENV_FLAG_LINE = /^\s*(?:export\s+)?((?:FEATURE|FF)_[A-Z0-9_]+)\s*=/;
 
-interface MigrationSignal {
-  tool: string;
-  /** Where the migration files live, when the signal is a directory. */
-  directory?: string;
-  evidence: SdlcEvidence;
-}
-
 /**
  * Migration tooling, from the files that prove it.
  *

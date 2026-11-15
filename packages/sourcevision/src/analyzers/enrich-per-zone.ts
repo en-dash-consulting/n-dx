@@ -21,7 +21,6 @@ import type {
 import {
   MAX_CONCURRENT_ZONES,
   PER_ZONE_MAX_FILES,
-  PER_ZONE_MAX_CROSSINGS,
   getPassConfig,
   computePerZoneAttemptConfigs,
 } from "./enrich-config.js";
@@ -186,7 +185,6 @@ async function enrichSingleZone(
   zone: Zone,
   allZones: Zone[],
   crossings: ZoneCrossing[],
-  inventory: Inventory,
   passNumber: number,
   passConfig: PassConfig,
   previousZone?: Zone,
@@ -357,7 +355,6 @@ export async function enrichZonesPerZone(
 ): Promise<PerZoneEnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
-  const isFirstPass = passNumber === 1;
   const passConfig = getPassConfig(passNumber, (previousZones?.findings ?? []).length);
 
   const empty: PerZoneEnrichResult = {
@@ -431,7 +428,7 @@ export async function enrichZonesPerZone(
       batchResults = await Promise.all(
         batch.map((zone) => {
           const prevZone = findPrevZone(previousZones?.zones, zone);
-          return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes, hints);
+          return enrichSingleZone(zone, zones, crossings, passNumber, passConfig, prevZone, fileArchetypes, hints);
         })
       );
     } finally {

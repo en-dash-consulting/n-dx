@@ -30,7 +30,6 @@ import type {
   ZoneStability,
   Finding,
   AnalyzeTokenUsage,
-  SubAnalysisRef,
   ProjectProfile,
   PartitionReview,
   ZoneArea,
@@ -1921,7 +1920,7 @@ function computeEntryPoints(
  * Computes entry points, cohesion/coupling, and recursive subdivision.
  *
  * Cohesion/coupling are computed from `metricsGraph` (import edges only),
- * not from the clustering `graph` which includes proximity edges. This
+ * not from the clustering graph, which includes proximity edges. This
  * prevents isolated files grouped by directory proximity from receiving
  * artificially perfect cohesion scores.
  *
@@ -1931,7 +1930,6 @@ function computeEntryPoints(
  */
 function buildZonesFromCommunities(
   community: Map<string, string>,
-  graph: Map<string, Map<string, number>>,
   metricsGraph: Map<string, Map<string, number>>,
   imports: Imports,
   inventory: Inventory,
@@ -2781,7 +2779,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
 
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
-    community, graph, importOnlyGraph, imports, inventory, testFiles, parentId, depth,
+    community, importOnlyGraph, imports, inventory, testFiles, parentId, depth,
     maxPct < 100 ? maxZoneSize : undefined, routeLayout,
   );
 

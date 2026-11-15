@@ -51,7 +51,7 @@ function isPascalCase(name: string): boolean {
   return /^[A-Z][a-zA-Z0-9]*$/.test(name);
 }
 
-function returnsJsx(node: ts.Node, sf: ts.SourceFile): boolean {
+function returnsJsx(node: ts.Node): boolean {
   let found = false;
   function walk(n: ts.Node) {
     if (found) return;
@@ -87,29 +87,16 @@ export function extractComponentDefinitions(
 
   // Track which declarations are default-exported
   let defaultExportedName: string | null = null;
-  let hasDefaultExportDeclaration = false;
 
   // First pass: find default export identifier
   for (const stmt of sf.statements) {
-    // export default function Foo() {}
+    // export default function Foo() {} / export default class Foo {}
     if (
-      ts.isFunctionDeclaration(stmt) &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
+      (ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) &&
+      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) &&
+      stmt.name
     ) {
-      hasDefaultExportDeclaration = true;
-      if (stmt.name) {
-        defaultExportedName = stmt.name.text;
-      }
-    }
-    // export default class Foo {}
-    if (
-      ts.isClassDeclaration(stmt) &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
-    ) {
-      hasDefaultExportDeclaration = true;
-      if (stmt.name) {
-        defaultExportedName = stmt.name.text;
-      }
+      defaultExportedName = stmt.name.text;
     }
     // export default Foo;
     if (ts.isExportAssignment(stmt) && !stmt.isExportEquals) {
@@ -168,7 +155,7 @@ export function extractComponentDefinitions(
     // function Foo() { return <div/> }
     if (ts.isFunctionDeclaration(stmt) && stmt.name && stmt.body) {
       const name = stmt.name.text;
-      if (isPascalCase(name) && returnsJsx(stmt.body, sf)) {
+      if (isPascalCase(name) && returnsJsx(stmt.body)) {
         const line = sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
         addComponent(name, "function", line, stmt);
       }
@@ -209,7 +196,7 @@ export function extractComponentDefinitions(
             }
           }
 
-          if (kind && bodyNode && returnsJsx(bodyNode, sf)) {
+          if (kind && bodyNode && returnsJsx(bodyNode)) {
             const line =
               sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
             addComponent(name, kind, line, stmt);
@@ -246,7 +233,7 @@ export function extractComponentDefinitions(
                     ts.isIdentifier(member.name) &&
                     member.name.text === "render" &&
                     member.body &&
-                    returnsJsx(member.body, sf)
+                    returnsJsx(member.body)
                   ) {
                     const line =
                       sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;

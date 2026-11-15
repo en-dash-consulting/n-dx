@@ -260,7 +260,7 @@ export function mergeSmallCommunities(
       .filter(([, m]) => m.length < minSize)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
-    for (const [smallComm, smallMembers] of sortedCommunities) {
+    for (const [smallComm] of sortedCommunities) {
       // Re-check size (may have grown from previous merge in this iteration)
       const currentMembers = getCommunityMembers().get(smallComm);
       if (!currentMembers || currentMembers.length >= minSize) continue;

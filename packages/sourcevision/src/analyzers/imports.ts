@@ -6,7 +6,8 @@
  */
 
 import { readFile } from "node:fs/promises";
-import {join, dirname, extname, resolve} from "node:path";import ts from "typescript";
+import { join, dirname, extname } from "node:path";
+import ts from "typescript";
 import type {
   ImportEdge,
   ImportType,
@@ -230,7 +231,6 @@ interface Resolver {
 
 function createResolver(
   fileSet: Set<string>,
-  targetDir: string,
   tsconfigPaths: Record<string, string[]> | null
 ): Resolver {
   return {
@@ -284,19 +284,8 @@ function probeFile(candidate: string, fileSet: Set<string>): string | null {
     if (fileSet.has(stripped + "/index" + ext)) return stripped + "/index" + ext;
   }
 
-  // Also try extensions on the original (for extensionless specifiers)
-  if (stripped !== candidate) {
-    // Already tried above with stripped
-  } else {
-    // No extension was stripped — try appending extensions directly
-    for (const ext of PROBE_EXTENSIONS) {
-      if (fileSet.has(candidate + ext)) return candidate + ext;
-    }
-    for (const ext of PROBE_EXTENSIONS) {
-      if (fileSet.has(candidate + "/index" + ext)) return candidate + "/index" + ext;
-    }
-  }
-
+  // An extensionless specifier needs no probe of its own: with no `.js`/`.jsx`
+  // stripped, `stripped` is `candidate`, so the loops above already tried it.
   return null;
 }
 
@@ -741,7 +730,7 @@ export async function analyzeImports(
   const fileSet = new Set(inventory.files.map((f) => f.path));
   const targetExists = inventoriedTarget(fileSet);
   const tsconfigPaths = await readTsconfigPaths(targetDir);
-  const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
+  const resolver = createResolver(fileSet, tsconfigPaths);
 
   const parseableExts = await parseableExtensionsFor(targetDir, options);
 

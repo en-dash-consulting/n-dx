@@ -79,7 +79,6 @@ export async function enrichZonesWithAI(
 ): Promise<EnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
-  const isFirstPass = passNumber === 1;
   const isMetaPass = passNumber >= 5;
 
   const existingFindings = previousZones?.findings ?? [];

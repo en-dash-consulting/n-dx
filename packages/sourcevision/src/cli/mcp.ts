@@ -3,7 +3,7 @@
  * Exposes codebase analysis data via MCP protocol (stdio or HTTP).
  */
 
-import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { McpServer, type ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
