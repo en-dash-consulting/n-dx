@@ -1050,6 +1050,20 @@ interface NextTaskInfo {
   priority?: string;
 }
 
+/** The dismissible banner for a run link that could not be opened; null when there is no error. */
+function deepLinkErrorBanner(message: string | null, onDismiss: () => void) {
+  return message
+    ? h("div", { class: "hench-deep-link-error", role: "alert" },
+        h("span", null, message),
+        h("button", {
+          class: "hench-deep-link-error-dismiss",
+          onClick: onDismiss,
+          "aria-label": "Dismiss",
+        }, h(ActionIcon, { name: "close" })),
+      )
+    : null;
+}
+
 export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps = {}) {
   const cliName = useCliName();
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -1381,16 +1395,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
         h("h2", null, "Execution History"),
         h(ValidateTokensTrigger, null),
       ),
-      deepLinkError
-        ? h("div", { class: "hench-deep-link-error", role: "alert" },
-            h("span", null, deepLinkError),
-            h("button", {
-              class: "hench-deep-link-error-dismiss",
-              onClick: () => setDeepLinkError(null),
-              "aria-label": "Dismiss",
-            }, h(ActionIcon, { name: "close" })),
-          )
-        : null,
+      deepLinkErrorBanner(deepLinkError, () => setDeepLinkError(null)),
       h("div", { class: "hench-empty" },
         h("div", { class: "hench-empty-icon" }, "▶"),
         h("p", null, "No runs yet."),
@@ -1465,16 +1470,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     ),
 
     // Deep-link error banner
-    deepLinkError
-      ? h("div", { class: "hench-deep-link-error", role: "alert" },
-          h("span", null, deepLinkError),
-          h("button", {
-            class: "hench-deep-link-error-dismiss",
-            onClick: () => setDeepLinkError(null),
-            "aria-label": "Dismiss",
-          }, h(ActionIcon, { name: "close" })),
-        )
-      : null,
+    deepLinkErrorBanner(deepLinkError, () => setDeepLinkError(null)),
 
     // Active tasks panel — shown at top when there are running tasks
     h(ActiveTasksPanel, { runs: activeRuns, navigateTo }),

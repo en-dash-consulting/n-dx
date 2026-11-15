@@ -672,19 +672,25 @@ function computeZoneLayout(
   return { boxes, totalW, totalH };
 }
 
+/** Where an edge leaves `fromBox` and enters `toBox`: each border, on the line between the two centres. */
+function edgeEndpoints(fromBox: BoxRect, toBox: BoxRect): { from: { x: number; y: number }; to: { x: number; y: number } } {
+  const fromCx = fromBox.x + fromBox.w / 2;
+  const fromCy = fromBox.y + fromBox.h / 2;
+  const toCx = toBox.x + toBox.w / 2;
+  const toCy = toBox.y + toBox.h / 2;
+  return {
+    from: boxEdgeAnchor(fromBox, toCx, toCy),
+    to: boxEdgeAnchor(toBox, fromCx, fromCy),
+  };
+}
+
 function computeEdgePath(
   fromBox: BoxRect,
   toBox: BoxRect,
   edgeIndex: number,
   totalEdgesBetweenPair: number,
 ): string {
-  const fromCx = fromBox.x + fromBox.w / 2;
-  const fromCy = fromBox.y + fromBox.h / 2;
-  const toCx = toBox.x + toBox.w / 2;
-  const toCy = toBox.y + toBox.h / 2;
-
-  const from = boxEdgeAnchor(fromBox, toCx, toCy);
-  const to = boxEdgeAnchor(toBox, fromCx, fromCy);
+  const { from, to } = edgeEndpoints(fromBox, toBox);
 
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2;
@@ -1033,13 +1039,7 @@ function EdgeLabel({
   toBox: BoxRect;
   hovered: boolean;
 }) {
-  const fromCx = fromBox.x + fromBox.w / 2;
-  const fromCy = fromBox.y + fromBox.h / 2;
-  const toCx = toBox.x + toBox.w / 2;
-  const toCy = toBox.y + toBox.h / 2;
-
-  const from = boxEdgeAnchor(fromBox, toCx, toCy);
-  const to = boxEdgeAnchor(toBox, fromCx, fromCy);
+  const { from, to } = edgeEndpoints(fromBox, toBox);
 
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2;
