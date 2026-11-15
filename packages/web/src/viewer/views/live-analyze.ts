@@ -33,6 +33,7 @@ import type { NavigateTo } from "../types.js";
 import { useLiveAnalyze, useTick, useCliName, type LiveAnalyzeSnapshot } from "../hooks/index.js";
 import { fmtDuration, formatSince } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
+import { errorOf } from "./response-error.js";
 import {
   analyzeTitle,
   barSegments,
@@ -61,11 +62,6 @@ import {
 
 export interface LiveAnalyzeViewProps {
   navigateTo: NavigateTo;
-}
-
-async function errorOf(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: string } | null;
-  return body?.error ?? `${fallback} (HTTP ${res.status})`;
 }
 
 function Elapsed({ startedAt }: { startedAt: string }) {

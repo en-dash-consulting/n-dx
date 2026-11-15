@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { ROBOT_WRANGLER_SECTIONS, robotWranglerSectionId } from "./robot-wrangler-sections.js";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
+import { responseError } from "./response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -1912,8 +1913,7 @@ export function RobotWranglerView() {
     try {
       const res = await fetch("/api/llm/config");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load");
+        setError(await responseError(res, "Failed to load"));
         return;
       }
       setData(await res.json() as LlmConfigResponse);
@@ -2124,10 +2124,9 @@ export function RobotWranglerView() {
           body: JSON.stringify({ changes }),
         });
         if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: "Save failed" }));
           // Edits stay in place and `dirty` stays true, so the frame keeps Save
           // enabled and the leave prompt armed.
-          setError((body as { error?: string }).error ?? "Failed to save");
+          setError(await responseError(res, "Save failed", "Failed to save"));
           return;
         }
         const json = await res.json() as { config: LlmConfigResponse };
@@ -2150,8 +2149,7 @@ export function RobotWranglerView() {
           body: JSON.stringify({ changes: { provider: provider.value } }),
         });
         if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: "Save failed" }));
-          setError((body as { error?: string }).error ?? "Failed to save the provider");
+          setError(await responseError(res, "Save failed", "Failed to save the provider"));
           return;
         }
         setHenchProvider(provider.value);

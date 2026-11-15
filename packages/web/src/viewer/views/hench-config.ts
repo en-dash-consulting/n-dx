@@ -18,6 +18,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { GlossaryLine } from "../components/index.js";
+import { responseError } from "./response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -485,8 +486,7 @@ export function useHenchConfigForm(): HenchConfigForm {
     try {
       const res = await fetch("/api/hench/config");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setLoadError((body as { error?: string }).error ?? "Failed to load configuration");
+        setLoadError(await responseError(res, "Failed to load", "Failed to load configuration"));
         return;
       }
       setData(await res.json() as ConfigResponse);
@@ -538,8 +538,7 @@ export function useHenchConfigForm(): HenchConfigForm {
         body: JSON.stringify({ changes }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        setSaveError((body as { error?: string }).error ?? "Save failed");
+        setSaveError(await responseError(res, "Save failed"));
         return false;
       }
     } catch (err) {

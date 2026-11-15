@@ -22,6 +22,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { FloatingNotice } from "../components/index.js";
 import { useToast } from "../hooks/index.js";
+import { responseError } from "./response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -278,8 +279,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
     try {
       const res = await fetch("/api/hench/templates");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load templates");
+        setError(await responseError(res, "Failed to load", "Failed to load templates"));
         return;
       }
       const json = await res.json() as TemplatesResponse;
@@ -301,8 +301,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
     try {
       const res = await fetch(`/api/hench/templates/${id}/apply`, { method: "POST" });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Apply failed" }));
-        throw new Error((body as { error?: string }).error ?? "Apply failed");
+        throw new Error(await responseError(res, "Apply failed"));
       }
       const result = await res.json() as { templateName: string };
       showToast(`Applied template "${result.templateName}"`);
@@ -318,8 +317,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
     try {
       const res = await fetch(`/api/hench/templates/${id}`, { method: "DELETE" });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Delete failed" }));
-        throw new Error((body as { error?: string }).error ?? "Delete failed");
+        throw new Error(await responseError(res, "Delete failed"));
       }
       showToast(`Deleted template "${id}"`);
       await fetchTemplates();
@@ -352,8 +350,7 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        throw new Error((body as { error?: string }).error ?? "Save failed");
+        throw new Error(await responseError(res, "Save failed"));
       }
 
       showToast(`Saved template "${data.name || data.id}"`);

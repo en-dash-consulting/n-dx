@@ -12,6 +12,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { BrandedHeader, FloatingNotice } from "../components/index.js";
 import { useCliName, useToast } from "../hooks/index.js";
+import { responseError } from "./response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -344,8 +345,7 @@ export function WorkflowOptimizationView() {
     try {
       const res = await fetch("/api/hench/workflow/analysis");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load analysis");
+        setError(await responseError(res, "Failed to load", "Failed to load analysis"));
         return;
       }
       const json = await res.json() as AnalysisResponse;

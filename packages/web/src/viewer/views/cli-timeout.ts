@@ -13,6 +13,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { responseError } from "./response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -330,8 +331,7 @@ export function useCliTimeoutsForm(): CliTimeoutsForm {
     try {
       const res = await fetch("/api/cli/timeouts");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setLoadError((body as { error?: string }).error ?? "Failed to load timeout configuration");
+        setLoadError(await responseError(res, "Failed to load", "Failed to load timeout configuration"));
         return;
       }
       setData(await res.json() as CliTimeoutsResponse);
@@ -414,8 +414,7 @@ export function useCliTimeoutsForm(): CliTimeoutsForm {
         body: JSON.stringify(pendingBody),
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Save failed" }));
-        setSaveError((errBody as { error?: string }).error ?? "Save failed");
+        setSaveError(await responseError(res, "Save failed"));
         return false;
       }
     } catch (err) {

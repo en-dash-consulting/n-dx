@@ -38,6 +38,7 @@ import { TrackerLinkList, WorkspaceWriteStrip, useTrackerLabel } from "../compon
 import { CRITERIA_LABEL } from "../external.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
+import { errorOf } from "./response-error.js";
 import { LogTab } from "./live-log.js";
 import { ReviewSection, ReviewTab, StageStrip } from "./live-review.js";
 import { reviewStages, reviewTabMarker } from "./live-review-model.js";
@@ -75,11 +76,6 @@ type TabId = "summary" | "work" | "log" | "review";
  */
 const RERUN_POLL_MS = 1_000;
 const RERUN_POLL_TRIES = 20;
-
-async function errorOf(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: string } | null;
-  return body?.error ?? `${fallback} (HTTP ${res.status})`;
-}
 
 function elapsed(startedAt: string): string {
   return fmtDuration(startedAt, new Date().toISOString());
