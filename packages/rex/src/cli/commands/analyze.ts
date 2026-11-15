@@ -12,13 +12,10 @@ import { addChanges, report } from "./add-change.js";
 import { changeInputsFromProposals, type ProposedWork } from "../../recommend/changes-from-proposals.js";
 import { stampModified } from "../../core/sync.js";
 
-import { CLIError, BudgetExceededError } from "../errors.js";
+import { CLIError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
 import { info, warn, result, startSpinner, withCommandProgressReporter } from "../output.js";
-import {
-  preflightBudgetCheck,
-  formatBudgetWarnings,
-} from "./token-format.js";
+import { enforceBudgetPreflight } from "./budget-preflight.js";
 import {
   scanTests,
   scanDocs,
@@ -681,22 +678,7 @@ async function resolveModel(dir: string, flagModel?: string): Promise<string | u
 async function runBudgetPreflight(dir: string): Promise<void> {
   if (!(await hasRexDir(dir))) return;
 
-  const rexDir = resolveRexPaths(dir).rexDir;
-  const budgetResult = await preflightBudgetCheck(rexDir, dir);
-  if (!budgetResult) return;
-
-  const budgetLines = formatBudgetWarnings(budgetResult);
-  if (budgetLines.length > 0) {
-    for (const line of budgetLines) warn(line);
-    warn("");
-  }
-  if (budgetResult.severity === "exceeded") {
-    const store = await resolveStore(rexDir);
-    const config = await store.loadConfig();
-    if (config.budget?.abort) {
-      throw new BudgetExceededError(budgetResult.warnings);
-    }
-  }
+  await enforceBudgetPreflight(resolveRexPaths(dir).rexDir, dir);
 }
 
 /** Replay cached proposals if available. Returns true if accepted and done. */

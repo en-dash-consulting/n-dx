@@ -15,8 +15,9 @@ import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPR
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
-import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
+import { enforceBudgetPreflight } from "./budget-preflight.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
+import { headerModelSource } from "../model-resolution.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
@@ -195,34 +196,14 @@ export async function cmdPrune(
         // only lightModel config or --model overrides it).
         const resolvedModel = resolveConfiguredModel(flags.model, "light");
         const dryRunVendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-        const dryRunModelSource = flags.model
-          ? "cli-override" as const
-          : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
-            ? "configured" as const
-            : "default" as const;
         printVendorModelHeader(dryRunVendor, llmConfig, {
           format: flags.format,
           resolvedModel,
-          modelSource: dryRunModelSource,
+          modelSource: headerModelSource(flags.model, llmConfig, "light"),
           tier: "light",
         });
 
-        // Pre-flight budget check
-        const budgetResult = await preflightBudgetCheck(rexDir, dir);
-        if (budgetResult) {
-          const budgetLines = formatBudgetWarnings(budgetResult);
-          if (budgetLines.length > 0) {
-            for (const line of budgetLines) warn(line);
-            warn("");
-          }
-          if (budgetResult.severity === "exceeded") {
-            const store2 = await resolveStore(rexDir);
-            const config = await store2.loadConfig();
-            if (config.budget?.abort) {
-              throw new BudgetExceededError(budgetResult.warnings);
-            }
-          }
-        }
+        await enforceBudgetPreflight(rexDir, dir);
 
         const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -431,34 +412,14 @@ async function consolidateAfterPrune(
     // light tier; only lightModel config or --model overrides it).
     const resolvedModel = resolveConfiguredModel(flags.model, "light");
     const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-    const modelSource = flags.model
-      ? "cli-override" as const
-      : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
-        ? "configured" as const
-        : "default" as const;
     printVendorModelHeader(vendor, llmConfig, {
       format: flags.format,
       resolvedModel,
-      modelSource,
+      modelSource: headerModelSource(flags.model, llmConfig, "light"),
       tier: "light",
     });
 
-    // Pre-flight budget check
-    const budgetResult = await preflightBudgetCheck(rexDir, dir);
-    if (budgetResult) {
-      const budgetLines = formatBudgetWarnings(budgetResult);
-      if (budgetLines.length > 0) {
-        for (const line of budgetLines) warn(line);
-        warn("");
-      }
-      if (budgetResult.severity === "exceeded") {
-        const store2 = await resolveStore(rexDir);
-        const config = await store2.loadConfig();
-        if (config.budget?.abort) {
-          throw new BudgetExceededError(budgetResult.warnings);
-        }
-      }
-    }
+    await enforceBudgetPreflight(rexDir, dir);
 
     const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -598,32 +559,13 @@ async function smartPrune(
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);
   const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-  const modelSource = flags.model
-    ? "cli-override" as const
-    : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
-      ? "configured" as const
-      : "default" as const;
   printVendorModelHeader(vendor, llmConfig, {
     format: flags.format,
     resolvedModel,
-    modelSource,
+    modelSource: headerModelSource(flags.model, llmConfig),
   });
 
-  // Pre-flight budget check
-  const budgetResult = await preflightBudgetCheck(rexDir, dir);
-  if (budgetResult) {
-    const budgetLines = formatBudgetWarnings(budgetResult);
-    if (budgetLines.length > 0) {
-      for (const line of budgetLines) warn(line);
-      warn("");
-    }
-    if (budgetResult.severity === "exceeded") {
-      const config = await store.loadConfig();
-      if (config.budget?.abort) {
-        throw new BudgetExceededError(budgetResult.warnings);
-      }
-    }
-  }
+  await enforceBudgetPreflight(rexDir, dir);
 
   const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 

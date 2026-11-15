@@ -16,11 +16,12 @@ import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
-import { CLIError, BudgetExceededError } from "../errors.js";
+import { CLIError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
-import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
+import { enforceBudgetPreflight } from "./budget-preflight.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
+import { headerModelSource } from "../model-resolution.js";
 import { getLLMVendor } from "../../analyze/reason.js";
 import { detectCrossPRDDuplicates } from "./reshape-detect-duplicates.js";
 import { acquireReshapeLock, detectHashSuffixDuplicatesInTree } from "./add-reshape.js";
@@ -132,33 +133,13 @@ async function _cmdReshapeCore(
   // vendor's light tier. An explicit --model flag still overrides everything.
   const lightModel = resolveConfiguredModel(flags.model, "light");
   const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-  const modelSource = flags.model
-    ? "cli-override" as const
-    : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
-      ? "configured" as const
-      : "default" as const;
   printVendorModelHeader(vendor, llmConfig, {
     format: flags.format,
     resolvedModel,
-    modelSource,
+    modelSource: headerModelSource(flags.model, llmConfig),
   });
 
-  // Pre-flight budget check
-  const budgetResult = await preflightBudgetCheck(rexDir, dir);
-  if (budgetResult) {
-    const budgetLines = formatBudgetWarnings(budgetResult);
-    if (budgetLines.length > 0) {
-      for (const line of budgetLines) warn(line);
-      warn("");
-    }
-    if (budgetResult.severity === "exceeded") {
-      const store2 = await resolveStore(rexDir);
-      const config = await store2.loadConfig();
-      if (config.budget?.abort) {
-        throw new BudgetExceededError(budgetResult.warnings);
-      }
-    }
-  }
+  await enforceBudgetPreflight(rexDir, dir);
 
   const product = productItems.length > 0
     ? await reshapeProductLayer({ dir, rexDir, store, items: productItems, model: resolvedModel, vendor, dryRun, accept, review: interactiveReview })
