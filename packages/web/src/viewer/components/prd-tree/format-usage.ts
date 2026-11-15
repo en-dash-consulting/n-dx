@@ -1,6 +1,5 @@
 /**
- * Presentation helpers for the PRD tree's usage and duration columns, and
- * the byte sizes its import and prune panels show.
+ * Presentation helpers for the PRD tree's usage and duration columns.
  *
  * Pure, dependency-free formatters used by `prd-tree.ts` and its tests.
  * Keeping the formatting logic here (rather than inlined in the render
@@ -116,14 +115,4 @@ export function formatDuration(ms: number | null | undefined): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   return `${hours}h ${minutes}m`;
-}
-
-/**
- * Format a size on disk as `512 B`, `1.5 KB` or `2.0 MB` (one decimal, MB at
- * most): a file the batch import reads, the space a prune frees.
- */
-export function formatByteSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

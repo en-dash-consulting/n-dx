@@ -16,7 +16,7 @@ import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef } from "preact/hooks";
 import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
-import { formatByteSize } from "./format-usage.js";
+import { formatByteSize } from "../../utils/format.js";
 import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────

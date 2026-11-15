@@ -22,7 +22,7 @@ import { itemTypeLabel, itemTypePlural } from "../../external.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
 import { statusOptions } from "./status-display.js";
-import { formatByteSize } from "./format-usage.js";
+import { formatByteSize } from "../../utils/format.js";
 import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Helpers (inlined to avoid cross-zone import from ../../utils) ────

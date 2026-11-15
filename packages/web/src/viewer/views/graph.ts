@@ -31,6 +31,7 @@ import {
   type NodeKind,
 } from "./import-graph/layout.js";
 import { useColumnSort } from "./column-sort.js";
+import { formatByteSize } from "../utils/format.js";
 
 interface GraphProps {
   data: LoadedData;
@@ -90,12 +91,6 @@ function fitToBox(
 ): { textLength?: number; lengthAdjust?: "spacingAndGlyphs" } {
   if (!text || estTextWidth(text, fontPx, mono) <= maxWidth) return {};
   return { textLength: Math.max(8, Math.round(maxWidth)), lengthAdjust: "spacingAndGlyphs" };
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function parentContext(path: string): string {
@@ -2231,7 +2226,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               h("strong", { title: focusFile }, focusFile),
               h("span", null, `${inDegree.get(focusFile) ?? 0} importing · ${outDegree.get(focusFile) ?? 0} outgoing`),
               focusInv
-                ? h("span", null, `${focusInv.language} · ${formatSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
+                ? h("span", null, `${focusInv.language} · ${formatByteSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
                 : null,
             )
           : null,
@@ -2254,7 +2249,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   ? h("span", null, "File")
                   : null,
                 focusInv
-                  ? h("strong", null, `${focusInv.language} · ${formatSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
+                  ? h("strong", null, `${focusInv.language} · ${formatByteSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
                   : null,
               )
             : h("div", { class: "ig-focus-detail-grid" },

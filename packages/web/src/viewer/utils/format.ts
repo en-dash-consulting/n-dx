@@ -34,6 +34,17 @@ export function formatSince(iso: string | null | undefined): string | null {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/**
+ * Format a size on disk as `512 B`, `1.5 KB` or `2.0 MB` (one decimal, MB at
+ * most): a file the batch import reads or the inventory lists, the space a
+ * prune frees.
+ */
+export function formatByteSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /** The text of a caught value: an Error's message, anything else as a string. */
 export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
