@@ -25,7 +25,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { openWebSocket } from "../session.js";
+import { openReconnectingSocket } from "../reconnecting-socket.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
@@ -593,10 +593,6 @@ interface Tail {
   again: boolean;
 }
 
-/** The socket's reconnect delay doubles from the first to the cap, and resets once it opens (as use-live.ts). */
-const RECONNECT_FIRST_MS = 1_000;
-const RECONNECT_MAX_MS = 30_000;
-
 const newTail = (sessionId: string | null): Tail => ({ sessionId, cursor: 0, inFlight: false, again: false });
 
 export function useSidecar(
@@ -716,7 +712,6 @@ export function useSidecar(
     if (!enabled) return () => { mountedRef.current = false; };
     void fetchWaiting();
 
-    let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onFlush: (batch) => {
@@ -743,60 +738,23 @@ export function useSidecar(
       throttledTypes: [],
       coalescerWindowMs: 100,
     });
-    let stopped = false;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let reconnectDelay = RECONNECT_FIRST_MS;
-
-    const connect = (isReconnect: boolean): void => {
-      if (typeof WebSocket === "undefined") return; // no socket: the drawer still reads when it opens
-      try {
-        ws = openWebSocket(endpointRef.current.socketUrl());
-      } catch {
-        scheduleReconnect();
-        return;
-      }
-      ws.onopen = () => {
-        reconnectDelay = RECONNECT_FIRST_MS;
+    // With no socket at all, the drawer still reads when it opens. A
+    // malformed frame is dropped: the next announcement carries the cursor again.
+    const stopSocket = openReconnectingSocket({
+      url: () => endpointRef.current.socketUrl(),
+      onFrame: (frame) => pipeline.push(frame),
+      onOpen: (isReconnect) => {
         // Announcements sent while the socket was down are gone: catch up now.
         if (isReconnect && mountedRef.current) {
           void fetchWaiting();
           void fetchFrames();
         }
-      };
-      ws.onclose = () => {
-        ws = null;
-        if (!stopped) scheduleReconnect();
-      };
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // A malformed frame: the next announcement carries the cursor again.
-        }
-      };
-    };
-
-    const scheduleReconnect = (): void => {
-      if (stopped || reconnectTimer !== null) return;
-      const delay = reconnectDelay;
-      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        connect(true);
-      }, delay);
-    };
-
-    connect(false);
+      },
+    });
     return () => {
-      stopped = true;
       mountedRef.current = false;
       pipeline.dispose();
-      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
-      if (ws) {
-        ws.onclose = null;
-        ws.close();
-        ws = null;
-      }
+      stopSocket();
     };
   }, [enabled, fetchWaiting, fetchFrames]);
 
