@@ -41,7 +41,7 @@ import {
 } from "./registry.js";
 import type { HealedRecord, HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
-import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
+import { bareResponse, handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
 import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
 import { answerOAuthCallback, type CallbackProjects } from "./oauth-callback.js";
 import { CredentialStore } from "../shared/index.js";
@@ -790,7 +790,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       ? frameKeyUpgradeRefusal(req, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))
       : upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url));
     if (refusal !== null) {
-      socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+      socket.write(bareResponse(refusal));
       socket.destroy();
       return;
     }

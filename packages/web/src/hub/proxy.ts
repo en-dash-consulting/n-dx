@@ -133,6 +133,15 @@ export const FRAME_CSP = "sandbox allow-scripts allow-forms allow-popups allow-d
 /** Headers a frame-keyed response carries; the key in the URL must not leave in a Referer. */
 const FRAME_RESPONSE_HEADERS = { "Content-Security-Policy": FRAME_CSP, "Referrer-Policy": "no-referrer" } as const;
 
+/**
+ * A whole HTTP response with no body, written straight to a socket — how an
+ * upgrade is refused, since there is no `ServerResponse` to answer it with.
+ * `statusLine` is the code and reason, `"403 Forbidden"`.
+ */
+export function bareResponse(statusLine: string): string {
+  return `HTTP/1.1 ${statusLine}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`;
+}
+
 /** Put {@link FRAME_RESPONSE_HEADERS} on a keyed response before anything answers it, refusals included. */
 export function setFrameResponseHeaders(res: ServerResponse): void {
   for (const [name, value] of Object.entries(FRAME_RESPONSE_HEADERS)) res.setHeader(name, value);
@@ -602,7 +611,7 @@ export function proxyUpgrade(
   const fail = (): void => {
     onUpstreamError?.();
     if (socket.writable) {
-      socket.write("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+      socket.write(bareResponse("502 Bad Gateway"));
     }
     socket.destroy();
     upstream.destroy();
@@ -919,9 +928,9 @@ async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buf
     host = hub.sessionHosts.pick(hub.listProjects());
   }
   if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
-    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    socket.end(bareResponse("403 Forbidden"));
   } else {
-    socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    socket.end(bareResponse("503 Service Unavailable"));
   }
 }
 
@@ -1244,11 +1253,11 @@ async function upgradeSidecar(
   if (!started.ok) {
     revokeOnRefusal(hub, decision.name, started);
     const reason = started.status === 404 ? "Not Found" : "Service Unavailable";
-    socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    socket.end(bareResponse(`${started.status} ${reason}`));
     return;
   }
   if (decision.frameKey !== undefined && !hub.frameKeys.isLive(decision.name, decision.frameKey)) {
-    socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    socket.end(bareResponse("401 Unauthorized"));
     return;
   }
   socket.once("close", hub.sidecars.openSocket(decision.name));
@@ -1274,5 +1283,5 @@ export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: B
   }
   const status = decision.kind === "json" ? decision.status : 404;
   const reason = status === 409 ? "Conflict" : status === 503 ? "Service Unavailable" : "Not Found";
-  socket.end(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  socket.end(bareResponse(`${status} ${reason}`));
 }
