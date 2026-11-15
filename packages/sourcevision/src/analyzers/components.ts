@@ -750,9 +750,6 @@ export async function analyzeComponents(
         });
       }
     }
-
-    // Also check .ts files for components (rare but possible with createElement)
-    // and .tsx convention exports
   }
 
   if (verboseScan) {
