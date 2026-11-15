@@ -771,8 +771,11 @@ async function parseItemFileFromFrontmatter(
   return item;
 }
 
-/** Mark the warnings pushed since index `from` as the reason an item was dropped. */
-function markSkipped(warnings: ParseWarning[], from: number): void {
+/**
+ * Mark the warnings pushed since index `from` as the reason an item was
+ * dropped. The v2 model reader marks a dropped node the same way.
+ */
+export function markSkipped(warnings: ParseWarning[], from: number): void {
   for (let i = from; i < warnings.length; i++) warnings[i] = { ...warnings[i], skipped: true };
 }
 

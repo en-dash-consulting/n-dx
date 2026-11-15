@@ -676,7 +676,7 @@ function removedIds(product: readonly RuleNode[], amends: readonly Amendment[]):
 }
 
 /** Every live node below `node`; a retired child's subtree is already hidden. */
-function liveDescendants(node: RuleNode): RuleNode[] {
+export function liveDescendants(node: RuleNode): RuleNode[] {
   return (node.children ?? []).flatMap((child) => (child.status === "deleted" ? [] : [child, ...liveDescendants(child)]));
 }
 

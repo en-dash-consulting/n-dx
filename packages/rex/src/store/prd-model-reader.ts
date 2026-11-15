@@ -47,7 +47,7 @@ import type { ItemLevel, PRDItem } from "../schema/index.js";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../schema/index.js";
 import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type ItemState, type Layer, type NodeType, type StateFile } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
-import { parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
+import { markSkipped, parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "./paths.js";
 import { STATE_FILE_NAME, extraTopLevelKeys, loadStateFile } from "./state-writer.js";
 import { parseTreeMeta } from "./tree-meta.js";
@@ -389,11 +389,6 @@ async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode |
   if (extra) ctx.folderState?.nodes.set(node.id, extra);
   if (folder.named.length) node.children = childrenOf(folder);
   return node;
-}
-
-/** Mark the warnings pushed since index `from` as the reason a node was dropped. */
-function markSkipped(warnings: ParseWarning[], from: number): void {
-  for (let i = from; i < warnings.length; i++) warnings[i] = { ...warnings[i], skipped: true };
 }
 
 function warnOrphanRows(dir: string, folder: FolderRead, warnings: ParseWarning[]): void {
