@@ -42,7 +42,7 @@ import { createReadStream, existsSync, readdirSync, readFileSync, realpathSync, 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Plugin } from "vite";
-import { DOOR_KEY_HEADER, DOOR_KEY_META } from "../src/sync/door.js";
+import { DOOR_EMIT_PATH, DOOR_KEY_HEADER, DOOR_KEY_META, DOOR_MCP_PATH, DOOR_SYNC_INFO_PATH } from "../src/sync/door.js";
 
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { name: string; version: string };
 
@@ -144,7 +144,7 @@ export function ndxDoor(): Plugin {
     : async () => {
         throw new Error("sync is off: no rex endpoint (run ndx start . and ndx graview serve .)");
       };
-  const door = mcpDoor({ path: "/ndx/mcp", call: rex, allow: ALLOWED_TOOLS });
+  const door = mcpDoor({ path: DOOR_MCP_PATH, call: rex, allow: ALLOWED_TOOLS });
   const key = randomBytes(24).toString("hex");
   const keyed = (req: IncomingMessage) => req.headers[DOOR_KEY_HEADER] === key;
   /** The 403 for a request that is not from this face's own pages. */
@@ -245,14 +245,14 @@ export function ndxDoor(): Plugin {
             if (!existsSync(file)) return next();
             return serveData(req, res, file);
           }
-          if (url === "/ndx/sync-info") {
+          if (url === DOOR_SYNC_INFO_PATH) {
             return json(res, 200, { rex: Boolean(rexUrl), emit: Boolean(graviewCli && projectRoot), project: projectRoot ?? null, live: Boolean(graviewDir), worktree: Boolean(worktree) });
           }
-          if (url === "/ndx/emit" && req.method === "POST") {
+          if (url === DOOR_EMIT_PATH && req.method === "POST") {
             if (!admit(req, res)) return;
             return json(res, 200, await emit());
           }
-          if (url === "/ndx/mcp") {
+          if (url === DOOR_MCP_PATH) {
             if (!keyed(req)) return json(res, 403, notOurs);
             // The door matches its path exactly, so it is handed the path without the base.
             req.url = url + (req.url ?? "").slice(asked.length);
