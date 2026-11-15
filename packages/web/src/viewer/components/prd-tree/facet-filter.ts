@@ -24,6 +24,7 @@ import { ActionIcon } from "../action-icon.js";
 import { useCallback, useState, useRef, useEffect, useMemo } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
 import { STATUS_DISPLAY } from "./status-display.js";
+import { toggled } from "../set-toggle.js";
 
 // ── Status facets, in chip order ──────────────────────────────────────────
 
@@ -97,10 +98,7 @@ export function FacetFilter({
   );
 
   const toggleStatus = (status: ItemStatus) => {
-    const next = new Set(activeStatuses);
-    if (next.has(status)) next.delete(status);
-    else next.add(status);
-    onStatusesChange(next);
+    onStatusesChange(toggled(activeStatuses, status));
   };
 
   // Trigger-button summary label.

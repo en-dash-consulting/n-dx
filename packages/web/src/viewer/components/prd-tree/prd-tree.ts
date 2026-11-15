@@ -42,6 +42,7 @@ import { formatTokensExact, formatDuration, formatUsd, newTokens, EMPTY_DASH } f
 import { useLiveTick } from "./use-live-tick.js";
 import type { PRDGhostRow } from "./ghost-rows.js";
 import { ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../impact-tags.js";
+import { toggled } from "../set-toggle.js";
 
 // ── Status rendering ────────────────────────────────────────────────
 
@@ -1036,17 +1037,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
     [onInlineAddSubmit],
   );
 
-  const toggle = useCallback(
-    (id: string) => {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-    },
-    [],
-  );
+  const toggle = useCallback((id: string) => setExpanded((prev) => toggled(prev, id)), []);
 
   const expandAll = useCallback(() => setExpanded(new Set(allIds)), [allIds]);
   const collapseAll = useCallback(() => setExpanded(new Set<string>()), []);

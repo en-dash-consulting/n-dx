@@ -9,7 +9,10 @@ import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
-import type {Proposal} from "@n-dx/rex";// ── Types ────────────────────────────────────────────────────────────
+import type { Proposal } from "@n-dx/rex";
+import { toggled } from "../set-toggle.js";
+
+// ── Types ────────────────────────────────────────────────────────────
 
 export interface AnalyzePanelProps {
   /** Called when proposals are accepted and PRD should be refreshed. */
@@ -188,15 +191,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
   }, [selectedIndices, proposals, acceptedIndices, onPrdChanged]);
 
   const toggleProposal = useCallback((index: number) => {
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
+    setSelectedIndices((prev) => toggled(prev, index));
   }, []);
 
   const selectAll = useCallback(() => {

@@ -9,6 +9,7 @@
 import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { toggled } from "../set-toggle.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -67,17 +68,6 @@ async function applyFailure(res: Response): Promise<string> {
   return typeof body?.error === "string" && body.error
     ? body.error
     : `Apply failed (${res.status})`;
-}
-
-/** A copy of `set` with `id` added, or removed when it was there. */
-function toggled<T>(set: Set<T>, id: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(id)) {
-    next.delete(id);
-  } else {
-    next.add(id);
-  }
-  return next;
 }
 
 /** What `POST /api/rex/reorganize/apply` reports. */
