@@ -83,6 +83,26 @@ const TITLE_ID = "prepare-task-title";
 
 type Reply = { ok: boolean; status: number; data: Record<string, unknown> };
 
+/**
+ * One request to the prep and execute routes: GET with no body, POST with
+ * one, and `method` when the caller names it (PUT, saving run settings).
+ * `workspace`, when given, travels as `X-Ndx-Workspace` on every request: a
+ * modal or button for another worktree must read AND write that worktree. A
+ * body that is not JSON reads as `{ error: "HTTP <status>" }`.
+ */
+export async function workspaceRequest(workspace: string | undefined, path: string, body?: unknown, method?: "PUT"): Promise<Reply> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (workspace) headers["X-Ndx-Workspace"] = workspace;
+  const res = await fetch(path, {
+    method: method ?? (body === undefined ? "GET" : "POST"),
+    headers,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+  return { ok: res.ok, status: res.status, data: data as Record<string, unknown> };
+}
+
 /** A `run` block as a PUT carries it; `null` clears the task's settings. */
 type RunBlock = Record<string, unknown> | null;
 
@@ -156,21 +176,10 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     return () => document.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  // GET with no body, POST with one, and PUT when the caller says so (saving
-  // run settings). The workspace header travels on all three: a modal opened
-  // for another worktree must read AND write that worktree.
-  const request = useCallback(async (path: string, body?: unknown, method?: "PUT"): Promise<Reply> => {
-    const headers: Record<string, string> = {};
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-    if (workspace) headers["X-Ndx-Workspace"] = workspace;
-    const res = await fetch(path, {
-      method: method ?? (body === undefined ? "GET" : "POST"),
-      headers,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    return { ok: res.ok, status: res.status, data: data as Record<string, unknown> };
-  }, [workspace]);
+  const request = useCallback(
+    (path: string, body?: unknown, method?: "PUT") => workspaceRequest(workspace, path, body, method),
+    [workspace],
+  );
 
   const load = useCallback(async () => {
     setLoadError(null);
