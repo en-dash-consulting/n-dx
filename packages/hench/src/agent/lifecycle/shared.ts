@@ -84,7 +84,7 @@ import {
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
 import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
-import { section, subsection, stream, detail, info, warn, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
+import { section, subsection, stream, detail, info, warn, formatDuration, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { recordRunDiagnosis } from "./run-diagnosis.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
@@ -1353,18 +1353,6 @@ async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): 
 // ---------------------------------------------------------------------------
 // Run finalization (identical in both loops)
 // ---------------------------------------------------------------------------
-
-/**
- * Format a duration in milliseconds as a human-readable string.
- * e.g., 5000 → "5s", 65000 → "1m 5s"
- */
-function formatDurationMs(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}m ${remaining}s`;
-}
 
 export interface FinalizeRunOptions {
   run: RunRecord;
@@ -4518,7 +4506,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       detail(
         testGateTimeoutMs === 0
           ? "Test gate timeout: none (hench.fullTestTimeoutMs = 0)"
-          : `Test gate timeout: ${formatDurationMs(testGateTimeoutMs)} (hench.fullTestTimeoutMs)`,
+          : `Test gate timeout: ${formatDuration(testGateTimeoutMs)} (hench.fullTestTimeoutMs)`,
       );
     }
 
@@ -4599,7 +4587,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         if (testGate.passed) {
           stream("Test Gate", `✓ All ${packageCount} package(s) passed`);
           if (testGate.totalDurationMs != null) {
-            detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
+            detail(`Elapsed: ${formatDuration(testGate.totalDurationMs)}`);
           }
           emitRunEvent("gate", `Test gate passed — ${packageCount} package(s)`, {
             ok: true,
