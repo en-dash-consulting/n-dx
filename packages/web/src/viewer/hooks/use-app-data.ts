@@ -134,7 +134,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
       initialLoad.current = false;
       // In deployed mode, data is static — polling would be wasteful.
       if (!isDeployedMode()) {
-        startPolling(5000);
+        startPolling();
       }
 
       // Load remaining modules in the background (non-blocking).
@@ -205,7 +205,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
       stopPolling();
     } else if (!initialLoad.current) {
       // Only resume if we've already completed the initial load.
-      startPolling(5000);
+      startPolling();
     }
   }, [shouldPause, mode]);
 

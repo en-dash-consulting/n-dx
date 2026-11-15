@@ -296,12 +296,15 @@ async function pollForChanges(): Promise<void> {
   }
 }
 
+/** How often the data files' mtimes are checked, unless the caller says otherwise. */
+const DATA_POLL_INTERVAL_MS = 5000;
+
 /**
  * Start polling for data changes (selective refresh — only changed files).
  * Registers with the centralized polling manager for automatic
  * suspend/resume based on tab visibility.
  */
-export function startPolling(intervalMs: number = 5000): void {
+export function startPolling(intervalMs: number = DATA_POLL_INTERVAL_MS): void {
   if (pollingActive) return;
   pollingActive = true;
   registerPoller("loader:data-status", pollForChanges, intervalMs);
