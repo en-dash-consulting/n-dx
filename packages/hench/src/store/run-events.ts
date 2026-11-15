@@ -46,9 +46,9 @@
  */
 
 import { join, resolve } from "node:path";
-import { mkdir, open } from "node:fs/promises";
-import type { WriteStream } from "node:fs";
+import { mkdir } from "node:fs/promises";
 
+import { openAppendStream } from "./append-stream.js";
 import { RUNS_DIRNAME } from "./paths.js";
 import { redactSecrets } from "../prd/llm-gateway.js";
 
@@ -170,26 +170,10 @@ export async function openRunEvents(henchDir: string, runId: string): Promise<Ru
   await mkdir(join(henchDir, RUNS_DIRNAME), { recursive: true, mode: 0o700 });
 
   const path = runEventsPath(henchDir, runId);
-  // open() first, so an unwritable path rejects here — where the caller can
-  // still decide what to do — rather than as an async 'error' event later.
-  // Closing the stream closes the handle.
-  const handle = await open(path, "w", 0o600);
-  const stream: WriteStream = handle.createWriteStream({ encoding: "utf-8" });
-
-  let failure: Error | null = null;
-  let closed = false;
-  /** Set while close() is waiting, so an error can settle it too. */
-  let settleClose: ((error: Error | null) => void) | null = null;
-
-  stream.on("error", (error: Error) => {
-    failure ??= error;
-    const settle = settleClose;
-    settleClose = null;
-    settle?.(failure);
-  });
+  const file = await openAppendStream(path);
 
   const append = (event: RunEvent): void => {
-    if (closed || failure) return;
+    if (file.done) return;
     let line: string;
     try {
       // Scrubbed before flattening: the redactor's assignment rule runs to
@@ -205,33 +189,10 @@ export async function openRunEvents(henchDir: string, runId: string): Promise<Ru
       // it would be worse than losing the line.
       return;
     }
-    // Deliberately no backpressure handling: the agent loop must never wait on
-    // disk. Node buffers what the fd cannot take yet and drains it in order, so
-    // the file stays correct — only its tail lags.
-    stream.write(line + "\n");
+    file.write(line + "\n");
   };
 
-  const close = (): Promise<Error | null> =>
-    new Promise((resolvePromise) => {
-      if (closed) {
-        resolvePromise(failure);
-        return;
-      }
-      closed = true;
-      if (failure) {
-        stream.destroy();
-        resolvePromise(failure);
-        return;
-      }
-      settleClose = resolvePromise;
-      stream.end(() => {
-        const settle = settleClose;
-        settleClose = null;
-        settle?.(failure);
-      });
-    });
-
-  return { path, append, close };
+  return { path, append, close: () => file.close() };
 }
 
 // ---------------------------------------------------------------------------
