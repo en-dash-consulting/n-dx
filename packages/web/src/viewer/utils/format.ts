@@ -56,6 +56,23 @@ export function errorMessage(err: unknown): string {
 }
 
 /**
+ * "5m 30s" — time from `startedAt` until now, for a live-ticking run. A start
+ * in the future (clock skew) reads `0s`.
+ */
+export function formatElapsedSince(startedAt: string): string {
+  const ms = Date.now() - new Date(startedAt).getTime();
+  if (ms < 0) return "0s";
+  const totalSecs = Math.floor(ms / 1000);
+  if (totalSecs < 60) return `${totalSecs}s`;
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  if (mins < 60) return `${mins}m ${secs}s`;
+  const hours = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return `${hours}h ${remainMins}m`;
+}
+
+/**
  * Format a run duration from ISO start/end timestamps.
  * Returns "running…" when end is absent, "—" for negative durations.
  */

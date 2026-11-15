@@ -16,7 +16,7 @@ import { BrandedHeader, RexTaskLink, ElapsedTime, FloatingNotice } from "../comp
 import { useCliName, useToast } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { openWebSocket } from "../session.js";
-import { formatTokenCount as fmtTokens } from "../utils/format.js";
+import { formatElapsedSince, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -83,18 +83,6 @@ function fmtBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
-function fmtElapsed(ms: number): string {
-  if (ms < 0) return "0s";
-  const totalSecs = Math.floor(ms / 1000);
-  if (totalSecs < 60) return `${totalSecs}s`;
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  if (mins < 60) return `${mins}m ${secs}s`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h ${remainMins}m`;
-}
-
 function fmtUptime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const mins = Math.floor(seconds / 60);
@@ -117,11 +105,6 @@ function fmtTimeSince(isoString: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   return `${hours}h ago`;
-}
-
-/** Formatter for useTick: computes elapsed time from an ISO start timestamp. */
-function formatElapsedFromStart(startedAt: string): string {
-  return fmtElapsed(Date.now() - new Date(startedAt).getTime());
 }
 
 function heartbeatLabel(status?: HeartbeatStatus): string {
@@ -244,7 +227,7 @@ function AuditTaskCard({
               ),
           h("span", { class: "audit-chip", title: "Elapsed time" },
             h("span", { class: "audit-chip-icon" }, "⏱"),
-            h(ElapsedTime, { startedAt: entry.startedAt, formatter: formatElapsedFromStart }),
+            h(ElapsedTime, { startedAt: entry.startedAt, formatter: formatElapsedSince }),
           ),
           h("span", { class: "audit-chip", title: "Run ID" },
             h("span", { class: "audit-chip-icon" }, "▶"),
