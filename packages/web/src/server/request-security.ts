@@ -10,7 +10,8 @@ import {
   authRequiredPage,
   wantsHtml,
   stripWorkspaceSlot,
-  AUTH_HINT,
+  authRequiredBody,
+  BEARER_CHALLENGE,
 } from "../shared/index.js";
 import type { CredentialStore, RequestAccess } from "../shared/index.js";
 
@@ -110,9 +111,9 @@ function rejectUnauthenticated(res: ServerResponse): true {
   res.writeHead(401, {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
-    "WWW-Authenticate": 'Bearer realm="n-dx"',
+    "WWW-Authenticate": BEARER_CHALLENGE,
   });
-  res.end(JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
+  res.end(JSON.stringify(authRequiredBody()));
   return true;
 }
 
@@ -126,7 +127,7 @@ export function refusePublicOnly(req: IncomingMessage, res: ServerResponse): tru
     res.writeHead(401, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
-      "WWW-Authenticate": 'Bearer realm="n-dx"',
+      "WWW-Authenticate": BEARER_CHALLENGE,
     });
     res.end(authRequiredPage());
     return true;
@@ -247,7 +248,7 @@ export function handleRequestSecurity(
   if (route !== null) {
     const answer = answerAuthRoute(route, method, req.headers, options.token, options.credentials, access);
     const headers: Record<string, string> = { "Content-Type": "application/json", "Cache-Control": "no-store" };
-    if (answer.status === 401) headers["WWW-Authenticate"] = 'Bearer realm="n-dx"';
+    if (answer.status === 401) headers["WWW-Authenticate"] = BEARER_CHALLENGE;
     res.writeHead(answer.status, headers);
     res.end(JSON.stringify(answer.body));
     return true;
