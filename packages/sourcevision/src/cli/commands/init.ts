@@ -4,7 +4,7 @@ import { getCurrentHead, getCurrentBranch, relativeToRoot, resolveLayout } from 
 import { SCHEMA_VERSION } from "../sourcevision-core.js";
 import { TOOL_VERSION } from "./constants.js";
 import { info } from "../output.js";
-import { resolveSourcevisionPaths } from "../../paths.js";
+import { resolveSourcevisionPaths, SV_CACHE_DIRNAME } from "../../paths.js";
 
 export const HINTS_TEMPLATE = `<!-- Sourcevision Hints -->
 <!-- Uncomment and edit the lines below to provide project context -->
@@ -29,7 +29,7 @@ export function cmdInit(dir: string): void {
   // Ignore it before the already-initialized return so a re-init fixes a
   // project initialized without the entry: `ndx init` commits what init
   // wrote, and would otherwise commit the cache with it.
-  ensureGitignoreEntry(absDir, `${svDirName}/.cache/`);
+  ensureGitignoreEntry(absDir, `${svDirName}/${SV_CACHE_DIRNAME}/`);
 
   if (existsSync(join(svDir, "manifest.json"))) {
     info(`${svDirName}/ already initialized in ${absDir}`);

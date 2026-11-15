@@ -54,7 +54,7 @@ import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
-import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
+import { ANALYSIS_HISTORY_FILE, startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
 import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
 import { configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
 import { configureRerunLog } from "../../analyzers/rerun-judge.js";
@@ -72,7 +72,7 @@ import {
 import { carryNarration, cmdNarrate, narrationLogPath, takeOverNarration } from "./narrate.js";
 import type { NarrateDeps } from "./narrate.js";
 import type { Manifest } from "../sourcevision-core.js";
-import { resolveSourcevisionPaths } from "../../paths.js";
+import { resolveSourcevisionPaths, SV_CACHE_DIRNAME } from "../../paths.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -285,7 +285,7 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
   const logPath = join(absDir, narrationLog);
   const startedAt = new Date().toISOString();
   try {
-    mkdirSync(join(svDir, ".cache"), { recursive: true });
+    mkdirSync(join(svDir, SV_CACHE_DIRNAME), { recursive: true });
     const cli = fileURLToPath(new URL("../index.js", import.meta.url));
     const child = await spawnTool(process.execPath, [cli, "narrate", absDir], {
       detached: true,
@@ -368,9 +368,9 @@ export function finalizeTokenUsage(
 /** Append one run to the history file, trimming it to {@link ANALYSIS_HISTORY_MAX} lines. */
 export function appendAnalysisHistory(svDir: string, line: string): void {
   try {
-    const dir = join(svDir, ".cache");
+    const dir = join(svDir, SV_CACHE_DIRNAME);
     mkdirSync(dir, { recursive: true });
-    const path = join(dir, "analyses.jsonl");
+    const path = join(dir, ANALYSIS_HISTORY_FILE);
     appendFileSync(path, line + "\n");
     const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
     if (lines.length > ANALYSIS_HISTORY_MAX) {
