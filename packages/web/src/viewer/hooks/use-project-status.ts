@@ -17,7 +17,7 @@
 
 import { getWorkspaceKey } from "../base-path.js";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import {
   createWSPipeline,
   isFeatureDisabled,

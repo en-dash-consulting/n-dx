@@ -33,7 +33,7 @@
 
 import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback, useMemo } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
 import type { ViewId } from "../types.js";

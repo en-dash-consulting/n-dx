@@ -14,7 +14,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import { useHenchRunsLiveRefresh } from "./use-hench-runs-live-refresh.js";
 
 /** Mirrors ClaimWire in server/routes-rex/reads.ts. */

@@ -95,7 +95,7 @@
         "packages/web/src/server/routes-commands.ts": "web-server",
         "packages/web/src/server/routes-llm.ts": "web-server",
         "packages/web/src/server/routes-project-settings.ts": "web-server",
-        "packages/web/src/viewer/views/use-polling.ts": "web-viewer",
+        "packages/web/src/viewer/hooks/use-polling.ts": "web-viewer",
         "packages/web/src/viewer/polling/batched-tick-dispatcher.ts": "web-viewer",
         "packages/web/src/viewer/polling/tick-timer.ts": "web-viewer",
         "packages/web/src/viewer/polling/tick-visibility-gate.ts": "web-viewer",
