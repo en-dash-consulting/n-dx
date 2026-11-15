@@ -45,6 +45,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { resolveNdxHome } from "./layout.js";
+import { isPidAlive } from "./child-lifecycle.js";
 import { validateExtensionManifest } from "./extension-manifest.js";
 
 /** Sources in precedence order, highest first. */
@@ -694,17 +695,6 @@ function sweepStaleTempFiles(fs, path, isAlive) {
     if (match && Number(match[1]) !== process.pid && !isAlive(Number(match[1]))) {
       fs.rmSync(join(dirname(path), entry), { force: true });
     }
-  }
-}
-
-/** @param {number} pid */
-function isPidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    // EPERM: the process exists but belongs to someone else.
-    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
   }
 }
 

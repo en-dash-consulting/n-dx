@@ -22,6 +22,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isPidAlive } from "./child-lifecycle.js";
 
 /** The one flag that replaces a hub now, even with live work on it. */
 export const REPLACE_HUB_FLAG = "--replace-hub";
@@ -71,16 +72,6 @@ export function liveWorkAnswer(res) {
   return "unknown";
 }
 
-/** @param {number} pid */
-function pidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
-  }
-}
-
 /**
  * The hench runs holding a lock in `henchDir` whose process is alive. Read
  * only: nothing is created or cleaned up, that is hench's business.
@@ -93,7 +84,7 @@ function pidAlive(pid) {
  * @param {{ isAlive?: (pid: number) => boolean }} [deps]
  * @returns {number}
  */
-export function countLiveHenchLocks(henchDir, { isAlive = pidAlive } = {}) {
+export function countLiveHenchLocks(henchDir, { isAlive = isPidAlive } = {}) {
   let entries;
   try {
     entries = readdirSync(join(henchDir, "locks"));

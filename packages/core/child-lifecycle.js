@@ -77,6 +77,24 @@ export function isLifecycleDebugEnabled(env = process.env) {
   return v === "1" || v === "true" || v === "yes";
 }
 
+/**
+ * Whether `pid` names a live process. EPERM counts as alive: the process
+ * exists but belongs to someone else. Like any `kill(pid, 0)` probe it cannot
+ * tell a live process from a zombie or a recycled PID (see `pidTarget`), so a
+ * caller that owns a pid or lock file keeps its own staleness rules.
+ *
+ * @param {number} pid
+ * @returns {boolean}
+ */
+export function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
+  }
+}
+
 function isChildRunning(child) {
   return child.exitCode === null && child.signalCode === null;
 }
