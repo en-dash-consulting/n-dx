@@ -688,6 +688,24 @@ export function getCurrentHead(cwd: string): string | undefined {
 /** Environment variables that change how git reads every pathspec. */
 const PATHSPEC_MODE_VARS = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const;
 
+/**
+ * `relPath` as a literal pathspec (`icase` with `ignoreCase`), and the
+ * environment to run git in without {@link PATHSPEC_MODE_VARS}, which would
+ * change how git reads it.
+ */
+function literalPathspec(relPath: string, ignoreCase: boolean | undefined): { pathspec: string; env: NodeJS.ProcessEnv } {
+  const pathspec = `:(literal${ignoreCase ? ",icase" : ""})${relPath}`;
+  const env = { ...process.env };
+  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  return { pathspec, env };
+}
+
+/** Why a git probe gave no answer: git's first stderr line, else the error's message. */
+function gitFailureReason(err: { stderr?: string | Buffer; message?: string }): string {
+  const stderrLine = String(err.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+  return stderrLine ?? err.message ?? "git failed";
+}
+
 /** git's answer to "is this path in the index?", or why it gave none. */
 export type GitTrackAnswer =
   /** `paths`: the index entries git matched, as git spells them (its case; a symlink itself, not a path through it). */
@@ -712,9 +730,7 @@ export type GitTrackAnswer =
  * turns the magic off, so a committed file would read as untracked.
  */
 export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitTrackAnswer {
-  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
-  const env = { ...process.env };
-  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  const { pathspec, env } = literalPathspec(relPath, options.ignoreCase);
   try {
     // -z: raw names, not git's octal quoting of non-ASCII paths.
     const out = execFileSync("git", ["ls-files", "-z", "--error-unmatch", "--", pathspec], {
@@ -731,8 +747,7 @@ export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCas
   } catch (err) {
     const e = err as { status?: number | null; stderr?: string | Buffer; message?: string };
     if (e.status === 1) return { state: "untracked" };
-    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
-    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+    return { state: "unanswered", reason: gitFailureReason(e) };
   }
 }
 
@@ -747,9 +762,7 @@ export type GitlinkAnswer = { state: "answered"; gitlink: boolean } | { state: "
  * Any git failure is unanswered, with git's first stderr line as the reason.
  */
 export function gitlinkAt(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitlinkAnswer {
-  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
-  const env = { ...process.env };
-  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  const { pathspec, env } = literalPathspec(relPath, options.ignoreCase);
   const same = (a: string) => (options.ignoreCase ? a.toLowerCase() === relPath.toLowerCase() : a === relPath);
   try {
     // -s: `<mode> <object> <stage>\t<path>`; -z: raw names, NUL-terminated.
@@ -767,9 +780,7 @@ export function gitlinkAt(cwd: string, relPath: string, options: { ignoreCase?: 
     });
     return { state: "answered", gitlink };
   } catch (err) {
-    const e = err as { stderr?: string | Buffer; message?: string };
-    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
-    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+    return { state: "unanswered", reason: gitFailureReason(err as { stderr?: string | Buffer; message?: string }) };
   }
 }
 
