@@ -2,7 +2,8 @@
  * How a PRD item status is drawn: its glyph, its label and its badge class.
  *
  * The tree rows, the detail panel's status selector, the inline status
- * picker, the bulk-actions bar and the facet filter all read this one table,
+ * picker, the bulk-actions bar, the facet filter, the status filter's chips,
+ * the prune criteria and the search overlay's filter all read this one table,
  * so a status looks the same wherever it appears. Each picker chooses which
  * statuses it offers, and in what order, with `statusOptions`.
  *
