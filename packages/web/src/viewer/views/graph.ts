@@ -30,6 +30,7 @@ import {
   nodeHalfWidth,
   type NodeKind,
 } from "./import-graph/layout.js";
+import { useColumnSort } from "./column-sort.js";
 
 interface GraphProps {
   data: LoadedData;
@@ -347,17 +348,8 @@ function ImportEdgeTableView({
   focusPackage: string | null;
   packageFiles: string[];
 }) {
-  const [sortCol, setSortCol] = useState<"source" | "imported" | "type">("source");
-  const [sortAsc, setSortAsc] = useState(true);
-
-  const toggleSort = (col: typeof sortCol) => {
-    if (sortCol === col) setSortAsc((v) => !v);
-    else { setSortCol(col); setSortAsc(true); }
-  };
-
-  const thKeyDown = (col: typeof sortCol) => (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(col); }
-  };
+  const { sortCol, sortAsc, toggleSort, thKeyDown, ariaSort, sortArrow } =
+    useColumnSort<"source" | "imported" | "type">("source");
 
   // In package mode, synthesise rows from the importer list
   const rows = useMemo(() => {
@@ -374,12 +366,6 @@ function ImportEdgeTableView({
       return sortAsc ? cmp : -cmp;
     });
   }, [edges, mode, focusPackage, packageFiles, sortCol, sortAsc]);
-
-  const ariaSort = (col: typeof sortCol): "ascending" | "descending" | "none" =>
-    sortCol !== col ? "none" : sortAsc ? "ascending" : "descending";
-
-  const sortArrow = (col: typeof sortCol) =>
-    sortCol !== col ? "" : (sortAsc ? " ▲" : " ▼");
 
   const captionId = "ig-table-caption";
   const scopeLabel = mode === "package" && focusPackage

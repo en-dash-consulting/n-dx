@@ -40,6 +40,7 @@ import type { NavigateTo } from "../types.js";
 import type { PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 import { isRootType } from "../external.js";
+import { useColumnSort } from "./column-sort.js";
 
 // ── API types (mirrors packages/web/src/server/merge-history.ts) ─────────────
 
@@ -961,8 +962,8 @@ function ContextTableView({
   onSelectPrd: (node: PrdNode) => void;
   selected: SelectedNode | null;
 }) {
-  const [sortCol, setSortCol] = useState<"title" | "type" | "parent" | "status">("type");
-  const [sortAsc, setSortAsc] = useState(true);
+  const { sortCol, sortAsc, toggleSort, thKeyDown, ariaSort, sortArrow } =
+    useColumnSort<"title" | "type" | "parent" | "status">("type");
 
   const parentTitleById = useMemo(() => {
     const m = new Map<string, string>();
@@ -971,15 +972,6 @@ function ContextTableView({
     }
     return m;
   }, [graph]);
-
-  const toggleSort = (col: typeof sortCol) => {
-    if (sortCol === col) setSortAsc((v) => !v);
-    else { setSortCol(col); setSortAsc(true); }
-  };
-
-  const thKeyDown = (col: typeof sortCol) => (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(col); }
-  };
 
   const rows = useMemo(() => {
     const TYPE_ORDER = ["epic", "change", "feature", "capability", "task", "subtask"];
@@ -1000,12 +992,6 @@ function ContextTableView({
       return sortAsc ? cmp : -cmp;
     });
   }, [graph, visiblePrdIds, sortCol, sortAsc, parentTitleById]);
-
-  const ariaSort = (col: typeof sortCol): "ascending" | "descending" | "none" =>
-    sortCol !== col ? "none" : sortAsc ? "ascending" : "descending";
-
-  const sortArrow = (col: typeof sortCol) =>
-    sortCol !== col ? "" : (sortAsc ? " ▲" : " ▼");
 
   const captionId = "mg-table-caption";
   return h("div", { class: "data-table-wrapper mg-table-wrapper" },
