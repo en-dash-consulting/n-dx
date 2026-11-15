@@ -120,7 +120,12 @@ import {
   createLineSplitter,
   throttleDebugLines,
   INIT_PHASES,
+  bold,
+  cyan,
   dim,
+  green,
+  red,
+  yellow,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
 import { ensureGitignoreEntry, ensureWebRuntimeIgnores } from "./gitignore.js";
@@ -228,50 +233,6 @@ function suppressKnownDeprecations() {
   };
 
   process[FILTER_INSTALLED] = true;
-}
-
-let colorEnabled = null;
-
-function supportsColor() {
-  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
-    return true;
-  }
-  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
-    return false;
-  }
-  return Boolean(process.stdout && process.stdout.isTTY);
-}
-
-function isColorEnabled() {
-  if (colorEnabled === null) {
-    colorEnabled = supportsColor();
-  }
-  return colorEnabled;
-}
-
-function ansi(code, text, reset) {
-  if (!isColorEnabled()) return text;
-  return `\x1b[${code}m${text}\x1b[${reset}m`;
-}
-
-function bold(text) {
-  return ansi("1", text, "22");
-}
-
-function cyan(text) {
-  return ansi("36", text, "39");
-}
-
-function yellow(text) {
-  return ansi("33", text, "39");
-}
-
-function green(text) {
-  return ansi("32", text, "39");
-}
-
-function red(text) {
-  return ansi("31", text, "39");
 }
 
 suppressKnownDeprecations();
