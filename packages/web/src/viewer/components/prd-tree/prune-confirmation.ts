@@ -21,6 +21,7 @@ import { useState, useCallback } from "preact/hooks";
 import { itemTypeLabel, itemTypePlural } from "../../external.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
+import { statusOptions } from "./status-display.js";
 // ── Helpers (inlined to avoid cross-zone import from ../../utils) ────
 
 /** Extract the filename from a path (last segment after '/'). */
@@ -97,11 +98,7 @@ const AGE_OPTIONS = [
   { value: 90, label: "90+ days old" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "completed", label: "Completed" },
-  { value: "deferred", label: "Deferred" },
-  { value: "deleted", label: "Deleted" },
-];
+const STATUS_OPTIONS = statusOptions(["completed", "deferred", "deleted"]);
 
 /** Confirmation flow step. */
 type PruneStep = "criteria" | "preview" | "confirm" | "result";
