@@ -17,10 +17,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { isProjectRestricted, refuseWhileRestricted, TRUST_HINT } from "./trust-gate.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
@@ -441,31 +441,6 @@ const BOOLEAN_PATHS = new Set(["llm.autoFailover", "llm.escalation.enabled"]);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function readJsonFile(path: string): Record<string, unknown> {
-  if (!existsSync(path)) return {};
-  try {
-    return JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-/** Read the shared, git-tracked project config only. Writes always target this file. */
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  return readJsonFile(resolveLayout(projectDir).configFile);
-}
-
-// `readEffectiveNdxConfig` (shared config deep-merged with the gitignored
-// `.n-dx.local.json` overlay, local wins) lives in effective-agent-config.ts
-// beside the snapshot it feeds. Use it for anything the user should *see*; use
-// `readNdxConfig` for anything about to be *written back*, so a write never
-// flattens the local overlay's values into the shared file.
-
-function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = resolveLayout(projectDir).configFile;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-}
 
 /** Read a string leaf from a nested object. Returns null if absent or not a string. */
 function getString(obj: Record<string, unknown>, key: string): string | null {

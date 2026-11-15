@@ -14,10 +14,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import { planSidecarSettings, readSidecarSettings, saveSidecarSettings } from "./sidecar/settings.js";
 import { PROJECT_LANGUAGES, isProjectLanguage } from "../shared/index.js";
@@ -71,21 +71,6 @@ const MAX_PORT = 65535;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = resolveLayout(projectDir).configFile;
-  if (!existsSync(configPath)) return {};
-  try {
-    return JSON.parse(readFileSync(configPath, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = resolveLayout(projectDir).configFile;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-}
 
 function extractProjectSettings(projectDir: string): ProjectSettingsResponse {
   const config = readNdxConfig(projectDir);
