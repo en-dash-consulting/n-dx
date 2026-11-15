@@ -41,7 +41,7 @@ import {
  * - pending → no color
  * - failing → red
  * - blocked → yellow
- * - deferred/deleted → dim
+ * - deferred/deleted → no color
  */
 function renderTreeWithColorScheme(
   items: PRDItem[],
