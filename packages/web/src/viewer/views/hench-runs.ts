@@ -220,6 +220,11 @@ export interface RunDetail extends RunSummary {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/** Every token a run spent: input, output and both cache figures. */
+function totalTokensOf(usage: RunSummary["tokenUsage"]): number {
+  return (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheCreationInput ?? 0) + (usage.cacheReadInput ?? 0);
+}
+
 function fmtTimestamp(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -468,10 +473,7 @@ function RunMetrics({ runs }: { runs: RunSummary[] }) {
   const completed = runs.filter((r) => r.status === "completed").length;
   const failed = runs.filter((r) => r.status === "failed" || r.status === "error").length;
 
-  const totalTokens = runs.reduce((sum, r) => {
-    const t = r.tokenUsage;
-    return sum + (t.input ?? 0) + (t.output ?? 0) + (t.cacheCreationInput ?? 0) + (t.cacheReadInput ?? 0);
-  }, 0);
+  const totalTokens = runs.reduce((sum, r) => sum + totalTokensOf(r.tokenUsage), 0);
 
   const totalTurns = runs.reduce((sum, r) => sum + (r.turns ?? 0), 0);
 
@@ -517,10 +519,7 @@ function RunCard({ run, isSelected, isHighlighted, isNewestOfTask, showWorktree,
 }) {
   const status = getStatusConfig(run.status);
   const stale = isStaleRun(run);
-  const totalTokens = (run.tokenUsage.input ?? 0)
-    + (run.tokenUsage.output ?? 0)
-    + (run.tokenUsage.cacheCreationInput ?? 0)
-    + (run.tokenUsage.cacheReadInput ?? 0);
+  const totalTokens = totalTokensOf(run.tokenUsage);
 
   const counts = run.structuredSummary?.counts;
 
@@ -645,10 +644,7 @@ export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onB
   const status = getStatusConfig(run.status);
   const cliName = useCliName();
   const errorDisplay = runErrorDisplay(run, cliName);
-  const totalTokens = (run.tokenUsage.input ?? 0)
-    + (run.tokenUsage.output ?? 0)
-    + (run.tokenUsage.cacheCreationInput ?? 0)
-    + (run.tokenUsage.cacheReadInput ?? 0);
+  const totalTokens = totalTokensOf(run.tokenUsage);
   const counts = run.structuredSummary?.counts;
 
   return h("div", { class: "hench-run-detail" },

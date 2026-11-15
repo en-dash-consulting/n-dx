@@ -655,6 +655,40 @@ function PrdFrontMatterSummary({ item, fallback, itemType, origin, onClose }: {
   );
 }
 
+/** How long a copy button shows its check mark after a successful copy. */
+const COPIED_FEEDBACK_MS = 1500;
+
+/**
+ * Copy a commit's full SHA and flag `copied` for a moment. Failure (no
+ * clipboard API, permission denied) is logged and ignored, so the panel that
+ * offers the button stays usable.
+ */
+function useCopySha(): { copied: boolean; copySha: (sha: string) => Promise<void> } {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  const copySha = useCallback(async (sha: string) => {
+    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+    if (!clip || typeof clip.writeText !== "function") {
+      console.warn("Clipboard API unavailable; cannot copy commit hash.");
+      return;
+    }
+    try {
+      await clip.writeText(sha);
+      setCopied(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    } catch (err) {
+      console.warn("Failed to copy commit hash:", err);
+    }
+  }, []);
+
+  return { copied, copySha };
+}
+
 /**
  * Origin (introducing-commit) section of the PRD detail panel.
  *
@@ -665,11 +699,7 @@ function PrdFrontMatterSummary({ item, fallback, itemType, origin, onClose }: {
  *   - error               : inline error message; never blocks the rest of the card
  */
 function PrdOriginSection({ origin }: { origin: OriginEntry | undefined }) {
-  const [copied, setCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  }, []);
+  const { copied, copySha } = useCopySha();
 
   if (!origin || origin.kind === "loading") {
     return h("div", { class: "mg-origin mg-origin-loading" },
@@ -692,21 +722,6 @@ function PrdOriginSection({ origin }: { origin: OriginEntry | undefined }) {
   }
 
   const o = origin.origin;
-  const handleCopy = async () => {
-    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
-    if (!clip || typeof clip.writeText !== "function") {
-      console.warn("Clipboard API unavailable; cannot copy commit hash.");
-      return;
-    }
-    try {
-      await clip.writeText(o.sha);
-      setCopied(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.warn("Failed to copy commit hash:", err);
-    }
-  };
 
   const coNames = o.coAuthors.map((c) => c.name).filter(Boolean).join(", ");
   return h("div", { class: "mg-origin" },
@@ -722,7 +737,7 @@ function PrdOriginSection({ origin }: { origin: OriginEntry | undefined }) {
         title: copied ? "Copied!" : "Copy full commit hash",
         "aria-label": "Copy full commit hash",
         "data-full-sha": o.sha,
-        onClick: handleCopy,
+        onClick: () => copySha(o.sha),
       }, copied ? "✓" : "⧉"),
       h("time", {
         class: "mg-origin-time",
@@ -852,30 +867,7 @@ export function resolveMergeMetaForSelection(
  * logged and ignored — the panel itself stays usable.
  */
 function MergeMetaRow({ merge }: { merge: MergeNode }) {
-  const [copied, setCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  const handleCopy = useCallback(async () => {
-    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
-    if (!clip || typeof clip.writeText !== "function") {
-      console.warn("Clipboard API unavailable; cannot copy commit hash.");
-      return;
-    }
-    try {
-      await clip.writeText(merge.sha);
-      setCopied(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.warn("Failed to copy commit hash:", err);
-    }
-  }, [merge.sha]);
+  const { copied, copySha } = useCopySha();
 
   return h("div", { class: "mg-meta-row" },
     h("time", {
@@ -891,7 +883,7 @@ function MergeMetaRow({ merge }: { merge: MergeNode }) {
         title: copied ? "Copied!" : "Copy full commit hash",
         "aria-label": "Copy full commit hash",
         "data-full-sha": merge.sha,
-        onClick: handleCopy,
+        onClick: () => copySha(merge.sha),
       }, copied ? "✓" : "⧉"),
     ),
     h("span", { class: "mg-meta-author", title: merge.author || EMPTY_FIELD },
