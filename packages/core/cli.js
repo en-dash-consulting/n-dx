@@ -2826,6 +2826,41 @@ function readZoneMetrics(dir) {
   }
 }
 
+/**
+ * Self-heal's regression guard: print how code health moved since the previous
+ * iteration. Returns true, after printing why, when it got worse and self-heal
+ * must stop. Zone metrics are printed for information only.
+ */
+function reportSelfHealRegression(dir, shTag, iteration, baselineHealth, currentHealth) {
+  const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
+  const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
+  const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
+
+  if (circularDelta > 0) {
+    console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${iteration}:`)}`);
+    console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
+    console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+    console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
+    return true;
+  }
+
+  if (totalAfter > totalBefore) {
+    console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${iteration}:`)}`);
+    console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
+    console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
+    console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+    console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
+    console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
+    return true;
+  }
+
+  // Log zone metrics for information (not used as termination signals)
+  const zoneInfo = readZoneMetrics(dir);
+  const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
+  console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+  return false;
+}
+
 async function handleSelfHeal(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["rex", "hench", "sourcevision"]);
@@ -2903,33 +2938,8 @@ async function handleSelfHeal(rest) {
     if (!captureOnly) {
       // Regression guard: compare file-level code health metrics to baseline
       const currentHealth = readCodeHealthMetrics(dir);
-      if (baselineHealth && currentHealth && i > 1) {
-        const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
-        const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
-        const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
-
-        if (circularDelta > 0) {
-          console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
-          console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
-          console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-          console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
-          break;
-        }
-
-        if (totalAfter > totalBefore) {
-          console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
-          console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
-          console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
-          console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-          console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
-          console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
-          break;
-        }
-
-        // Log zone metrics for information (not used as termination signals)
-        const zoneInfo = readZoneMetrics(dir);
-        const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
-        console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+      if (baselineHealth && currentHealth && i > 1 && reportSelfHealRegression(dir, shTag, i, baselineHealth, currentHealth)) {
+        break;
       }
       // Update baseline for next iteration
       if (currentHealth) baselineHealth = currentHealth;
