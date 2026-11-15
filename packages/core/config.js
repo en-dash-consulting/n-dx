@@ -761,6 +761,18 @@ function executableBitIsMeaningful(platform = process.platform) {
   return platform !== "win32";
 }
 
+/** Throw, with the chmod hint, when `value` lacks the executable bit (POSIX only). */
+async function assertExecutable(value) {
+  if (!executableBitIsMeaningful()) return;
+  try {
+    await access(value, constants.X_OK);
+  } catch {
+    throw new Error(
+      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
+    );
+  }
+}
+
 /**
  * Validate claude.cli_path: check the file exists and — on POSIX — is executable.
  * Throws with a helpful message on failure.
@@ -774,15 +786,7 @@ async function validateCliPath(value) {
         "  Provide an absolute path to the Claude Code CLI binary.",
     );
   }
-  if (executableBitIsMeaningful()) {
-    try {
-      await access(value, constants.X_OK);
-    } catch {
-      throw new Error(
-        `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
-      );
-    }
-  }
+  await assertExecutable(value);
 }
 
 /**
@@ -815,15 +819,7 @@ async function validateCodexCliPath(value, dir) {
     );
   }
 
-  if (executableBitIsMeaningful()) {
-    try {
-      await access(value, constants.X_OK);
-    } catch {
-      throw new Error(
-        `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
-      );
-    }
-  }
+  await assertExecutable(value);
 }
 
 /**
@@ -1931,17 +1927,6 @@ function isBareCommand(binary) {
   );
 }
 
-function hasClaudeAuthenticatedEvidence(detailLower) {
-  return [
-    "already authenticated",
-    "already logged in",
-    "logged in as",
-    "authenticated as",
-    "personal account authenticated",
-    "enterprise account authenticated",
-  ].some((phrase) => detailLower.includes(phrase));
-}
-
 /**
  * Detect whether a CLI preflight failure detail indicates rejected/expired
  * credentials (as opposed to a missing binary or a launch/PATH problem).
@@ -1955,7 +1940,6 @@ function isAuthFailureDetail(detail) {
 
 function formatClaudePreflightFailure(preflight) {
   const detail = preflight.detail || "unknown error";
-  const detailLower = detail.toLowerCase();
   const binary = preflight.binary;
   const retryCommand = "ndx config llm.vendor claude";
 
@@ -1979,19 +1963,6 @@ function formatClaudePreflightFailure(preflight) {
         `Check PATH resolution: command -v ${binary}`,
         `If the binary exists elsewhere, either update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.`,
         `Retry after fixing PATH: ${retryCommand}`,
-      ],
-    };
-  }
-
-  if (hasClaudeAuthenticatedEvidence(detailLower)) {
-    return {
-      code: "NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED",
-      lines: [
-        "Claude appears to be installed, but ndx could not launch a usable executable from this environment.",
-        `Verify the executable ndx can launch: '${binary} --version'`,
-        `If that succeeds, run the same binary directly with the preflight arguments and confirm it works outside ndx.`,
-        "If ndx is resolving the wrong executable, update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.",
-        `Retry after fixing the executable resolution: ${retryCommand}`,
       ],
     };
   }
