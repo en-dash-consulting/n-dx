@@ -72,7 +72,7 @@ import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, CredentialStore, stripWorkspaceSlot, urlWithNonce } from "../shared/index.js";
-import { findAvailablePort } from "./port.js";
+import { DEFAULT_PORT, findAvailablePort } from "./port.js";
 import { resolveWebPaths } from "./paths.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "./request-security.js";
 
@@ -1195,7 +1195,7 @@ export function silenceChildLegacyNotice(env: NodeJS.ProcessEnv = process.env): 
 
 export async function startServer(
   targetDir: string,
-  port: number = 3117,
+  port: number = DEFAULT_PORT,
   opts: ServerOptions = {},
 ): Promise<StartResult> {
   silenceChildLegacyNotice();
