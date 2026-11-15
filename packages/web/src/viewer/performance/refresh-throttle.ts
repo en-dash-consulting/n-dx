@@ -98,15 +98,20 @@ const PRIORITY_ORDER: Record<RefreshPriority, number> = {
   high: 2,
 };
 
+/** The configuration in force before any start, and after a reset. */
+function defaultConfig(): RefreshThrottleConfig {
+  return {
+    baseIntervalMs: DEFAULT_BASE_INTERVAL_MS,
+    avgRefreshMs: DEFAULT_AVG_REFRESH_MS,
+    onChange: null,
+    getInitialMemoryLevel: null,
+    subscribeToMemoryLevel: null,
+  };
+}
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
-let config: RefreshThrottleConfig = {
-  baseIntervalMs: DEFAULT_BASE_INTERVAL_MS,
-  avgRefreshMs: DEFAULT_AVG_REFRESH_MS,
-  onChange: null,
-  getInitialMemoryLevel: null,
-  subscribeToMemoryLevel: null,
-};
+let config: RefreshThrottleConfig = defaultConfig();
 
 let queue: QueuedRefresh[] = [];
 let activeCount = 0;
@@ -117,13 +122,6 @@ let drainTimer: ReturnType<typeof setTimeout> | null = null;
 let listeners: Array<(state: RefreshQueueState) => void> = [];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Get the recommended interval for the current memory level. */
-function computeRecommendedInterval(): number {
-  const multiplier = INTERVAL_MULTIPLIERS[currentMemoryLevel];
-  if (!isFinite(multiplier)) return Infinity;
-  return config.baseIntervalMs * multiplier;
-}
 
 /** Get max concurrency for the current memory level. */
 function computeMaxConcurrency(): number {
@@ -150,7 +148,7 @@ function buildState(): RefreshQueueState {
     activeCount,
     paused: currentMemoryLevel === "critical",
     memoryLevel: currentMemoryLevel,
-    recommendedIntervalMs: computeRecommendedInterval(),
+    recommendedIntervalMs: getRecommendedInterval(),
     maxConcurrency: computeMaxConcurrency(),
     estimatedCompletionMs: computeEstimatedCompletion(),
     completedCount,
@@ -223,15 +221,7 @@ function handleMemoryLevelChange(newLevel: MemoryLevel): void {
 
   notifyListeners();
 
-  // If memory pressure eased, try to drain the queue.
-  if (
-    PRIORITY_ORDER[newLevel as unknown as RefreshPriority] === undefined &&
-    computeMaxConcurrency() > 0
-  ) {
-    scheduleDrain();
-  }
-
-  // More reliably: if new concurrency > 0 and we have queued items, drain.
+  // If memory pressure eased enough to run anything, drain what is queued.
   if (computeMaxConcurrency() > 0 && queue.length > 0) {
     scheduleDrain();
   }
@@ -358,11 +348,5 @@ export function resetRefreshThrottle(): void {
   completedCount = 0;
   currentMemoryLevel = "normal";
   listeners = [];
-  config = {
-    baseIntervalMs: DEFAULT_BASE_INTERVAL_MS,
-    avgRefreshMs: DEFAULT_AVG_REFRESH_MS,
-    onChange: null,
-    getInitialMemoryLevel: null,
-    subscribeToMemoryLevel: null,
-  };
+  config = defaultConfig();
 }
