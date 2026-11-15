@@ -34,6 +34,11 @@ export function formatSince(iso: string | null | undefined): string | null {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/** The text of a caught value: an Error's message, anything else as a string. */
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 /**
  * Format a run duration from ISO start/end timestamps.
  * Returns "running…" when end is absent, "—" for negative durations.

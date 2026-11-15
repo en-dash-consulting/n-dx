@@ -17,6 +17,7 @@ import { useEffect, useState } from "preact/hooks";
 import { webSocketUrl } from "../external.js";
 import type { SidecarEndpoint } from "./use-sidecar.js";
 import { getJson } from "../utils/json-requests.js";
+import { errorMessage } from "../utils/format.js";
 
 /** Mirrors `HubSessionPageConfig` in server/routes-sidecar.ts. */
 export interface HubSessionPageConfig {
@@ -99,7 +100,7 @@ export async function requestHubHandoff(
     if (res.ok && typeof body?.url === "string") return { url: body.url };
     return { error: typeof body?.error === "string" ? body.error : `The host answered ${res.status}` };
   } catch (err) {
-    return { error: `The host did not answer: ${err instanceof Error ? err.message : String(err)}` };
+    return { error: `The host did not answer: ${errorMessage(err)}` };
   }
 }
 

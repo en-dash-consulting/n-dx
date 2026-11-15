@@ -9,6 +9,8 @@
  * parsed body, or the server's `error` text for the operator to read.
  */
 
+import { errorMessage } from "./format.js";
+
 /** GET `url` as JSON; null when it fails or answers non-2xx. */
 export async function getJson<T>(url: string): Promise<T | null> {
   try {
@@ -34,6 +36,6 @@ export async function sendJson<T>(
     const data = await res.json().catch(() => ({})) as T & { error?: string };
     return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Request failed (${res.status})` };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return { ok: false, error: errorMessage(err) };
   }
 }
