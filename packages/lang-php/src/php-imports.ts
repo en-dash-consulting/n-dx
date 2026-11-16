@@ -32,7 +32,7 @@ const before = (a: WrittenImport, b: WrittenImport): number =>
 export function readWrittenImports(file: PackSourceFile): WrittenImport[] {
   const captures = file.captures.imports ?? [];
   const named = (name: string): Capture[] => captures.filter((c) => c.name === name);
-  const guards = (file.captures.guards ?? []).filter((c) => c.name === "guard.conditional");
+  const guards = (file.captures.guards ?? []).filter((c) => c.name === "guard.conditional" || c.name === "guard.function");
   const guarded = (statement: Capture): boolean => guards.some((g) => contains(g, statement));
 
   const written: WrittenImport[] = [];

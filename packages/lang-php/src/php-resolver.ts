@@ -80,7 +80,7 @@ import { contains, type Capture, type PackResolver, type PackSourceFile, type Pr
 import { isPhpBuiltinClass } from "./php-builtins.js";
 import { readWrittenImports } from "./php-imports.js";
 import { PhpAutoloaders } from "./php-autoloaders.js";
-import { dynamicIncludeNotices, type DynamicInclude } from "./php-include-notices.js";
+import { dynamicIncludeNotices, hostReader, type DynamicInclude } from "./php-include-notices.js";
 import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
 
 // ── Names and paths ─────────────────────────────────────────────────────────
@@ -622,6 +622,8 @@ export interface PreparedPhpResolver extends PreparedResolver {
 export interface ResolvedPhpInclude {
   readonly include: WrittenImport;
   readonly outcome: PhpIncludeOutcome;
+  /** A dynamic include whose path reads the request's host name, in the path or through a variable (`hostReader`). */
+  readonly host?: true;
 }
 
 /** Include-path settings read from configuration files, and the files that could not be read. */
@@ -647,17 +649,22 @@ export function preparePhpImports(
   for (const file of files) {
     const out = new Collector(file.path);
     const resolvedIncludes: ResolvedPhpInclude[] = [];
+    let readsHost: ReturnType<typeof hostReader> | undefined;
     // A dynamic include's candidates go on its written import only: they are never edges.
     const written = readWrittenImports(file).map((w) => {
       if (!isInclude(w)) return w;
       const outcome = includes.resolve(file.path, w);
       if (outcome.kind === "internal") out.file(outcome.target, "*");
-      const candidates = outcome.kind === "unresolved" && outcome.reason === "dynamic" ? outcome.candidates : undefined;
-      const include = candidates === undefined ? w : { ...w, candidates: candidates.files };
-      if (outcome.kind === "unresolved" && outcome.reason === "dynamic") {
-        dynamic.push({ path: file.path, position: w.position, specifier: w.specifier, ...(candidates && { candidates }) });
+      if (outcome.kind !== "unresolved" || outcome.reason !== "dynamic") {
+        resolvedIncludes.push({ include: w, outcome });
+        return w;
       }
-      resolvedIncludes.push({ include, outcome });
+      const candidates = outcome.candidates;
+      const include = candidates === undefined ? w : { ...w, candidates: candidates.files };
+      readsHost ??= hostReader(file);
+      const host = readsHost(w.specifier, w.position);
+      dynamic.push({ path: file.path, position: w.position, specifier: w.specifier, host, ...(candidates && { candidates }) });
+      resolvedIncludes.push({ include, outcome, ...(host && { host }) });
       return include;
     });
     const resolved = readPhpReferences(file, written).map((reference) => ({ reference, outcome: resolveReference(index, reference, file.path, legacy, out) }));

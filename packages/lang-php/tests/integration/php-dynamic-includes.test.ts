@@ -1,16 +1,16 @@
 /**
  * Dynamic includes over `tests/fixtures/php-dynamic-includes`: paths built
  * from variables, `$_SERVER['HTTP_HOST']` and interpolated strings give no
- * edge, are counted in notices with their lines (host-based ones under their
- * own code), and carry the files their literal prefix and suffix match as
+ * edge, are counted in notices with their lines (host-based ones, inline or
+ * through a variable in the include's scope, under their own code), and carry the files their literal prefix and suffix match as
  * `candidates`. Runs the pack entry; skips when the grammar is not built.
  */
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FileFacts } from "@n-dx/lang-kit";
-import { listFixtureFiles, skipUnlessGrammar } from "@n-dx/lang-runtime";
-import { MAX_INCLUDE_CANDIDATES, pack, PhpIncludes, phpGrammarPath, phpPack } from "../../src/index.js";
+import { createTreeSitterRunner, listFixtureFiles, skipUnlessGrammar, type PackSourceFile } from "@n-dx/lang-runtime";
+import { MAX_INCLUDE_CANDIDATES, pack, PhpIncludes, phpGrammarPath, phpPack, preparePhpImports, readPhpProjectFacts } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-dynamic-includes");
 
@@ -46,8 +46,35 @@ describe("php dynamic includes", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const { notices } = await analyze();
     expect(notices).toEqual([
-      "PHP: [php-dynamic-include] 5 includes build their path at run time and give no edge: htdocs/index.php:4, htdocs/index.php:5, htdocs/index.php:6, htdocs/index.php:7, htdocs/index.php:8; 3 with candidate files, never edges.",
-      "PHP: [php-host-include] 2 includes choose their file by the request's host name and give no edge: htdocs/index.php:3, htdocs/index.php:9; 1 with candidate files, never edges.",
+      "PHP: [php-dynamic-include] 8 includes build their path at run time and give no edge: htdocs/index.php:4, htdocs/index.php:5, htdocs/index.php:6, htdocs/index.php:7, htdocs/index.php:8, and 3 more; 5 with candidate files, never edges.",
+      "PHP: [php-host-include] 5 includes choose their file by the request's host name and give no edge: htdocs/index.php:3, htdocs/index.php:9, htdocs/tenant.php:3, htdocs/tenant.php:6, htdocs/tenant.php:15; 3 with candidate files, never edges.",
+    ]);
+  });
+
+  it("counts an include as host-based through a variable last assigned the host name in its scope", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const paths = listFixtureFiles(dir, [...phpPack.config.extensions]);
+    const runner = createTreeSitterRunner();
+    const parsed: PackSourceFile[] = [];
+    try {
+      for (const path of paths) {
+        const result = await runner.parseFile({ pack: phpPack, grammarPath: phpGrammarPath() }, join(dir, path));
+        if (result.status === "parsed") parsed.push({ path, captures: result.captures });
+      }
+    } finally {
+      runner.dispose();
+    }
+    const facts = await readPhpProjectFacts(dir, paths);
+    const flagged = preparePhpImports(facts.projects, parsed, [], facts)
+      .includes("htdocs/tenant.php")
+      .map(({ include, host }) => [include.position.line, host ?? false]);
+    expect(flagged).toEqual([
+      [3, true], // $host = $_SERVER['HTTP_HOST']
+      [6, true], // $dir = $tenant = strtolower($_SERVER['SERVER_NAME'])
+      [8, false], // $host reassigned from getenv()
+      [10, false], // another function's $host
+      [15, true], // assigned the host in the function, then `.=`
+      [18, false], // $_GET, not the host
     ]);
   });
 

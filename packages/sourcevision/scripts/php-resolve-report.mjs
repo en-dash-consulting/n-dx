@@ -23,7 +23,8 @@
  *   written, for checking by hand;
  * - includes (with php.ini, `.user.ini` and `.htaccess` read as analyze
  *   does): resolved / total and how, computable but unresolved, dynamic with
- *   candidate files (and lists cut at the cap), dynamic without, host-based,
+ *   candidate files (and lists cut at the cap), dynamic without, host-based
+ *   (the path reads the host name, inline or through a variable),
  *   and a sample of N resolved and N unresolved includes drawn after the
  *   reference samples, so those stay as they were.
  * Exits 2 when the corpus, a build or the grammar is missing. Never touches
@@ -74,7 +75,7 @@ if (!existsSync(walkDist)) {
 const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { loadIgnoreFilter, projectSkip, walkProjectFiles } = await import(walkDist.href);
 const { phpConfig } = await importWorkspacePack("@n-dx/lang-kit");
-const { isHostInclude, phpGrammarPath, phpPack, preparePhpImports, readPhpProjectFacts } = await importWorkspacePack("@n-dx/lang-php");
+const { phpGrammarPath, phpPack, preparePhpImports, readPhpProjectFacts } = await importWorkspacePack("@n-dx/lang-php");
 const wasm = phpGrammarPath();
 if (!existsSync(wasm)) {
   console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-php build:grammars\``);
@@ -179,7 +180,7 @@ try {
     const includeResolved = [];
     const includeUnresolved = [];
     for (const file of parsed) {
-      for (const { include, outcome } of prepared.includes(file.path)) {
+      for (const { include, outcome, host } of prepared.includes(file.path)) {
         includes.total++;
         const at = { file: file.path, line: include.position.line, form: include.form, specifier: include.specifier };
         if (outcome.kind === "internal") {
@@ -190,7 +191,7 @@ try {
         }
         if (outcome.reason !== "dynamic") includes.computableUnresolved++;
         else {
-          if (isHostInclude(include.specifier)) includes.host++;
+          if (host) includes.host++;
           if (outcome.candidates === undefined) includes.dynamicWithout++;
           else {
             includes.dynamicWithCandidates++;

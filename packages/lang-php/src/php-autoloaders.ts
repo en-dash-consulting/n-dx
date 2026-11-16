@@ -31,32 +31,17 @@
 
 import type { SourcePosition, WrittenImport } from "@n-dx/lang-kit";
 import { contains, innermost, type Capture, type PackSourceFile } from "@n-dx/lang-runtime";
+import { before, inside, readAssignments, variableName, type Assignment } from "./php-assignments.js";
 import { readWrittenImports } from "./php-imports.js";
-import { isInclude, owned, type PhpIncludes } from "./php-includes.js";
+import { isInclude, type PhpIncludes } from "./php-includes.js";
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
-const before = (a: SourcePosition, b: SourcePosition): boolean => a.line < b.line || (a.line === b.line && a.column < b.column);
-
-const inside = (span: Capture, at: SourcePosition): boolean => !before(at, span.start) && before(at, span.end);
-
-/** A variable's name without its `$`. */
-const variableName = (text: string): string => text.replace(/^\$/, "");
 
 /** The last segment of a function or class name, lowercase: callbacks are matched by it. */
 const shortName = (name: string): string => name.slice(name.lastIndexOf("\\") + 1).toLowerCase();
 
 /** Two class names whose computed paths differ when a path depends on the class. */
 const PROBES = ["NdxProbe_One", "NdxProbe\\Two"] as const;
-
-interface Assignment {
-  readonly name: string;
-  /** A compound operator (`.=`); undefined for `=`. */
-  readonly operator?: string;
-  /** The right-hand side as written; undefined when it cannot build a path (an array, a closure, `new`). */
-  readonly value?: string;
-  readonly start: SourcePosition;
-}
 
 /** A function, method or closure that could be an autoloader. */
 interface Body {
@@ -130,25 +115,7 @@ function readFacts(file: PackSourceFile): FileFacts {
     return { call, ...(callback !== undefined && { callback }), ...(enclosingClass !== undefined && { enclosingClass }) };
   });
 
-  const names = owned(imports, "include.assign", "include.assigned");
-  const values = owned(imports, "include.assign", "include.assign_value");
-  const operators = owned(imports, "include.assign", "include.assign_operator");
-  const assignments: Assignment[] = [];
-  const valued = new Set<string>();
-  for (const [assign, name] of names) {
-    const value = values.get(assign);
-    if (value === undefined) continue;
-    const operator = operators.get(assign)?.text;
-    valued.add(`${assign.start.line}:${assign.start.column}`);
-    assignments.push({ name: variableName(name.text), value: value.text, start: assign.start, ...(operator !== undefined && { operator }) });
-  }
-  // Any other assignment (its variable alone, which starts where the assignment does) leaves the value unknown.
-  for (const target of named(imports, "include.reassigned")) {
-    if (!valued.has(`${target.start.line}:${target.start.column}`)) assignments.push({ name: variableName(target.text), start: target.start });
-  }
-  assignments.sort((a, b) => (before(a.start, b.start) ? -1 : before(b.start, a.start) ? 1 : 0));
-
-  return { path: file.path, includes: readWrittenImports(file).filter(isInclude), assignments, functions, methods, registrations, parameters };
+  return { path: file.path, includes: readWrittenImports(file).filter(isInclude), assignments: readAssignments(file), functions, methods, registrations, parameters };
 }
 
 // ── Callbacks ───────────────────────────────────────────────────────────────
