@@ -112,6 +112,18 @@ function locate(value: string): Located | undefined {
   return { kind: "relative", path: value };
 }
 
+/**
+ * The repository path a computed path (from {@link evaluatePath}) written in
+ * `file` names, a relative one taken against `file`'s directory; undefined
+ * when it is not computable or lies outside the repository.
+ */
+export function repositoryPath(file: string, value: string): string | undefined {
+  const located = locate(value);
+  if (located === undefined || located.kind === "outside") return undefined;
+  const path = located.kind === "repo" ? located.path : normalize(dirOf(file), located.path);
+  return path === "" ? undefined : path;
+}
+
 // ── Path expressions ────────────────────────────────────────────────────────
 
 /** Looks a constant up; undefined when it is not computable. */

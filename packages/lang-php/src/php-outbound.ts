@@ -362,8 +362,8 @@ class TargetReader {
     if (value !== undefined) return value !== "" && isPlainValue(value) ? { target: value, targetSource: "literal" } : UNKNOWN;
     const key = envKey(t);
     if (key !== undefined) return key === "" ? UNKNOWN : { target: key, targetSource: "env" };
-    const config = CONFIG.exec(t);
-    if (config && CONFIG_NAMES.has(configName(t))) return { target: keysOf(config[1]!), targetSource: "config" };
+    const config = configSubscript(t);
+    if (config && CONFIG_NAMES.has(config.array)) return { target: config.key, targetSource: "config" };
     const variable = VARIABLE.exec(t);
     if (variable) {
       const assigned = this.lastAssignment(variable[1]!, at);
@@ -489,6 +489,18 @@ class TargetReader {
 function configName(text: string): string {
   const base = text.slice(0, text.indexOf("["));
   return /(\w+)\s*$/.exec(base)![1]!.toLowerCase();
+}
+
+/**
+ * A subscript read with literal keys: its array's last name in lowercase
+ * (`config` in `$this->config['a']`) and its keys joined with `.` (`a.b` for
+ * `['a']['b']`); undefined for any other text. Whether the array holds
+ * configuration is the caller's call ({@link CONFIG_NAMES}).
+ */
+export function configSubscript(text: string): { readonly array: string; readonly key: string } | undefined {
+  const t = text.trim();
+  const m = CONFIG.exec(t);
+  return m ? { array: configName(t), key: keysOf(m[1]!) } : undefined;
 }
 
 // ── Calls ───────────────────────────────────────────────────────────────────

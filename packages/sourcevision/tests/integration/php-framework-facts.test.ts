@@ -3,8 +3,9 @@
  * (its php-outbound rules) through the analyze pipeline: the imports phase's
  * single pack call collects them, the components phase adds one serverRoutes
  * group per handler file, each route carrying its `source`, and outbound.json
- * gains one dependency per call. Without the PHP pack, components.json and
- * outbound.json are what the detectors alone produce.
+ * gains one dependency per call; its php-config rules' config reads and flag
+ * checks give config.json's data. Without the PHP pack, components.json and
+ * outbound.json are what the detectors alone produce, and there is no config.json.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -17,6 +18,7 @@ import { analyzeComponents } from "../../src/analyzers/components.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { detectOutbound } from "../../src/analyzers/outbound-detection.js";
+import { packConfigData } from "../../src/analyzers/pack-config-facts.js";
 import { withPackOutbound } from "../../src/analyzers/pack-framework-facts.js";
 import { KNOWN_PACKS, loadPack, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Inventory } from "../../src/schema/v1.js";
@@ -89,7 +91,7 @@ describe("PHP docroot routes in serverRoutes", () => {
     const { components, imports } = await pipeline(countingPhp(requests));
 
     expect(requests).toHaveLength(1);
-    expect(requests[0].kinds).toEqual(["imports", "routes", "outboundCalls", "entryPoints"]);
+    expect(requests[0].kinds).toEqual(["imports", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks"]);
     const route = (file: string, method: "GET" | "POST", path: string, source: string) => ({ file, method, path, source });
     expect(components.serverRoutes).toEqual([
       { file: "cart.php", prefix: "/", routes: [route("cart.php", "GET", "/cart.php", "docroot ."), route("cart.php", "POST", "/cart.php", "docroot .")] },
@@ -140,5 +142,47 @@ describe("PHP docroot routes in serverRoutes", () => {
     expect(toCanonicalJSON(components)).toBe(toCanonicalJSON(await analyzeComponents(dir, inventory, imports)));
     expect(toCanonicalJSON(outbound)).toBe(toCanonicalJSON(await detectOutbound(dir, inventory)));
     expect(components.serverRoutes).toEqual([]);
+  });
+});
+
+describe("PHP config reads and flag checks in config.json", () => {
+  const SITE: Record<string, string> = {
+    "includes/configure.php": "<?php\ndefine('FEATURE_NEW_CHECKOUT', true);\ndefine('DB_SERVER', 'db.internal');\n",
+    "checkout.php": "<?php\nrequire 'includes/configure.php';\nif (FEATURE_NEW_CHECKOUT) {\n  new_checkout();\n}\nmysql_connect(DB_SERVER);\n",
+  };
+  let dir: string;
+  let inventory: Inventory;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "sv-php-config-"));
+    for (const [path, text] of Object.entries(SITE)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    }
+    inventory = await analyzeInventory(dir, { languageConfig: phpConfig });
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  async function config(php: KnownPack) {
+    const facts: FileFacts[] = [];
+    await analyzeImports(dir, inventory, { language: "php", packs: { packs: [php], warn: () => {}, framework: (f) => facts.push(...f) } });
+    return packConfigData(facts, inventory);
+  }
+
+  it("indexes the pack's flags and config keys, with no value", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const data = await config(countingPhp([]));
+    expect(data?.flags).toEqual([
+      { normalized: "new_checkout", names: ["FEATURE_NEW_CHECKOUT"], mechanisms: ["constant"], files: ["checkout.php"], checks: 1, gatedLines: 3 },
+    ]);
+    expect(data?.keys).toEqual([
+      { key: "DB_SERVER", sources: ["define"], sourceFiles: ["includes/configure.php"], files: ["checkout.php", "includes/configure.php"] },
+      { key: "FEATURE_NEW_CHECKOUT", sources: ["define"], sourceFiles: ["includes/configure.php"], files: ["checkout.php", "includes/configure.php"] },
+    ]);
+    expect(JSON.stringify(data)).not.toContain("db.internal");
+  });
+
+  it("has nothing for config.json without the PHP pack", async () => {
+    expect(await config(NOT_INSTALLED_PHP)).toBeUndefined();
   });
 });
