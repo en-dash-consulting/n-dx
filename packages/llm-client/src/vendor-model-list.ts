@@ -1,8 +1,8 @@
 /**
  * Live model listing from the vendor APIs.
  *
- * Neither the `claude` nor the `codex` CLI can list models, so the only live
- * source is the vendor's own HTTP API, which needs a key. This module asks for
+ * This is the vendor HTTP API catalog, not Codex CLI account availability.
+ * CLI consumers use listCodexModels instead. This module asks for
  * that list and reports either the models or why it could not — it never
  * throws, because the caller's fallback (the built-in catalog) is always
  * available and a settings page must not fail on a vendor outage.

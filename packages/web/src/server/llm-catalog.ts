@@ -1,15 +1,9 @@
 /**
  * Per-vendor live model list and installed-CLI probe behind GET /api/llm/catalog.
  *
- * Neither the `claude` nor the `codex` CLI can list models, so the live list
- * comes from the vendor API (`listVendorModels` in `@n-dx/llm-client`) and needs
- * a key. Without one, or when the call fails, the caller keeps the built-in
- * list — this module only reports what it learned and never throws.
- *
- * Both the list and the `<binary> --version` probe cost a network round trip or
- * a process spawn, so the pair is cached per project and vendor for
- * {@link CATALOG_CACHE_TTL_MS}. `?refresh=true` refills it and a config save
- * clears it, because either can change which key or binary applies.
+ * Codex uses the selected CLI's model/list client catalog, which is not proof
+ * of inference access. Claude uses its vendor API. Codex probes are not cached:
+ * account, CLI config and PATH changes must apply on the next request.
  */
 
 import {
@@ -17,6 +11,7 @@ import {
   LLM_VENDOR,
   exec,
   listVendorModels,
+  listCodexModels,
   loadLLMConfig,
   repoEnvPolicy,
   resolveGoogleApiKey,
@@ -127,6 +122,24 @@ async function probeVendor(
   projectDir: string,
   config: LLMConfig,
 ): Promise<LiveVendorProbe> {
+  if (vendor === LLM_VENDOR.CODEX) {
+    const cli = await probeCli(vendor, projectDir, config);
+    let listing: LiveVendorProbe["listing"];
+    if (isProjectRestricted(projectDir)) {
+      listing = { ok: false, reason: "Codex catalog not probed: accept this checkout with n-dx trust accept . before refreshing." };
+    } else if (!cli.found) {
+      listing = { ok: false, reason: "Codex CLI unavailable; check llm.codex.cli_path, install or update Codex, then refresh." };
+    } else {
+      try {
+        const env = resolveVendorCliEnv({ ...config, vendor }, repoEnvPolicy(projectDir));
+        listing = await listCodexModels({ binary: resolveBinary(vendor, config), cwd: projectDir, env });
+      } catch (err) {
+        if (!(err instanceof ClaudeClientError) || err.reason !== "auth") throw err;
+        listing = { ok: false, reason: "Codex API authentication is configured without a key; configure the key or select CLI login, then refresh." };
+      }
+    }
+    return { listing, checkedAt: new Date().toISOString(), cli };
+  }
   const [listing, cli] = await Promise.all([
     listVendorModels(vendor, config),
     probeCli(vendor, projectDir, config),
@@ -145,13 +158,13 @@ export async function getLiveVendorProbe(
 ): Promise<LiveVendorProbe> {
   const key = cacheKey(projectDir, vendor);
   const hit = cache.get(key);
-  if (!options.refresh && hit && hit.expiresAt > Date.now()) return hit.probe;
+  if (vendor !== LLM_VENDOR.CODEX && !options.refresh && hit && hit.expiresAt > Date.now()) return hit.probe;
 
   const restricted = isProjectRestricted(projectDir);
   const probe = await probeVendor(vendor, projectDir, await loadLLMConfig(projectDir));
   // A restricted answer is not cached: accepting the config must show the
   // probed result on the next request, not ten minutes later.
-  if (!restricted) cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
+  if (!restricted && vendor !== LLM_VENDOR.CODEX) cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
   return probe;
 }
 

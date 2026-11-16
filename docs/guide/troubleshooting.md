@@ -179,6 +179,26 @@ For the full multi-pass analysis, `--deep` is the default. The first run is slow
 
 See the [Skills Reference](./skills) for the workflow slash commands available in your assistant session, including `/ndx-feedback` for filing issues.
 
+## Codex model discovery falls back to the built-in list
+
+The dashboard probes the effective `llm.codex.cli_path` using Codex app-server's
+[`model/list`](https://learn.chatgpt.com/docs/app-server#list-models-modellist).
+ChatGPT-login discovery does not require an OpenAI API key. The selected CLI
+receives the same filtered vendor environment used for execution.
+
+A **Codex client catalog** is observed from that CLI and its configured account
+and provider. It may contain bundled entries; it does not verify inference
+access. Public documentation and the **built-in model list** are fallback
+information, not account observations. OpenAI API catalog membership is not
+used as evidence of Codex access.
+
+The dashboard shows the CLI version, probe time and fallback reason. Check the
+configured binary, update an unsupported CLI, check its login and connectivity,
+then select **Refresh models**. A restricted checkout must first be reviewed
+and accepted with `n-dx trust accept .`. Codex probes are not cached, so the next
+lookup observes account, binary and configuration changes. No inference request
+is sent during discovery, and explicit saved model pins are preserved.
+
 ## Codex output and usage diagnostics
 
 ### Malformed Codex output (parse fallback)

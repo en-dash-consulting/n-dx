@@ -1015,9 +1015,11 @@ export interface VendorCatalogEntry {
    * vendor default.
    */
   defaultModel: string;
-  /** `"live"` when `models` came from the vendor's Models API, else the built-in list. */
+  /** Live CLI client catalog or vendor API; see provenance. */
   source: "live" | "built-in";
-  /** ISO time of the live fetch; null when `source` is `"built-in"`. */
+  /** Catalog provenance is not inference entitlement. */
+  provenance?: "codex-client-catalog" | "vendor-api" | "built-in";
+  /** ISO time of the probe, including failed probes; null when not probed. */
   checkedAt: string | null;
   /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
   reason?: string;
@@ -1126,7 +1128,8 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       providers: [...VENDOR_PROVIDERS[vendor]],
       defaultModel: defaultModel(vendor),
       source: live ? "live" : "built-in",
-      checkedAt: live ? probe.checkedAt : null,
+      provenance: live ? (vendor === LLM_VENDOR.CODEX ? "codex-client-catalog" : "vendor-api") : "built-in",
+      checkedAt: probe.checkedAt,
       ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
       readiness,
       cli: probe.cli,
