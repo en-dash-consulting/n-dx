@@ -17,6 +17,11 @@ export interface ModuleInfo {
 
 /** Calls, tokens and wall-clock for one LLM task class in one analyze run. */
 export interface LLMClassUsage {
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  /** Calls whose accounting is absent or incomplete. */
+  unmeasuredCalls?: number;
+  measuredCalls?: number;
   calls: number;
   inputTokens: number;
   outputTokens: number;

@@ -463,7 +463,7 @@ describe("extractSvTokenUsage", () => {
     writeManifest({
       schemaVersion: "1.0.0",
       analyzedAt: "2026-01-15T10:00:00.000Z",
-      tokenUsage: { calls: 3, inputTokens: 2000, outputTokens: 600 },
+      tokenUsage: { calls: 3, inputTokens: 2000, outputTokens: 600, cacheReadInputTokens: 8000 },
     });
 
     const usage = await extractSvTokenUsage(tmp);
@@ -471,6 +471,8 @@ describe("extractSvTokenUsage", () => {
     expect(usage.calls).toBe(3);
     expect(usage.inputTokens).toBe(2000);
     expect(usage.outputTokens).toBe(600);
+    expect(usage.cacheReadTokens).toBe(8000);
+    expect((await extractSvTokenEvents(tmp))[0].cacheReadTokens).toBe(8000);
   });
 
   it("returns zero when .sourcevision does not exist", async () => {

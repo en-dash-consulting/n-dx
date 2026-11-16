@@ -430,8 +430,11 @@ interface SvManifest {
   analyzedAt?: string;
   tokenUsage?: {
     calls?: number;
+    model?: string;
     inputTokens?: number;
     outputTokens?: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
   };
 }
 
@@ -458,6 +461,9 @@ export async function extractSvTokenUsage(
     usage.calls += manifest.tokenUsage.calls ?? 0;
     usage.inputTokens += manifest.tokenUsage.inputTokens ?? 0;
     usage.outputTokens += manifest.tokenUsage.outputTokens ?? 0;
+    usage.cacheCreationTokens += manifest.tokenUsage.cacheCreationInputTokens ?? 0;
+    usage.cacheReadTokens += manifest.tokenUsage.cacheReadInputTokens ?? 0;
+    attributeToModel(modelBuckets(usage), normalizeEventMetadata(manifest.tokenUsage.model), usage);
   } catch {
     // Missing or invalid manifest — skip
   }
@@ -610,9 +616,8 @@ export async function extractSvTokenEvents(
       package: "sv",
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
-      // The sourcevision manifest records no cache split.
-      cacheCreationTokens: 0,
-      cacheReadTokens: 0,
+      cacheCreationTokens: manifest.tokenUsage.cacheCreationInputTokens ?? 0,
+      cacheReadTokens: manifest.tokenUsage.cacheReadInputTokens ?? 0,
       calls: manifest.tokenUsage.calls ?? 0,
     });
   } catch {

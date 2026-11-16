@@ -1,3 +1,4 @@
+import { ManifestSchema } from "../../../src/schema/validate.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   startRunLedger,
@@ -62,7 +63,7 @@ describe("run ledger", () => {
 
     const { byTaskClass } = snapshotRunLedger().llm;
     expect(byTaskClass["code.classify"]).toEqual({
-      calls: 2, inputTokens: 150, outputTokens: 10, durationMs: 700, vendor: "typesafe", model: "jev-1.13.0",
+      calls: 2, measuredCalls: 2, inputTokens: 150, outputTokens: 10, durationMs: 700, vendor: "typesafe", model: "jev-1.13.0",
     });
     // A CLI vendor that returns no usage still counts the call and its time.
     expect(byTaskClass["zone.enrich-scan"]).toMatchObject({ calls: 1, inputTokens: 0, outputTokens: 0, durationMs: 9000, vendor: "claude" });
@@ -170,3 +171,19 @@ describe("priceRunLedger", () => {
     expect(priceRunLedger(snapshotRunLedger())).toBeGreaterThan(0);
   });
 });
+
+ it("prices cache reads separately and distinguishes missing usage from measured zero", () => {
+   recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
+     tokenUsage: { input: 0, output: 0, cacheReadInput: 1000000 }, usageStatus: "measured" });
+   const cached = snapshotRunLedger();
+   expect(cached.llm.byTaskClass.test.cacheReadInputTokens).toBe(1000000);
+   expect(ManifestSchema.shape.lastAnalysis.parse(cached)).toEqual(cached);
+   expect(cached.llm.costUsd).toBeGreaterThan(0);
+   startRunLedger();
+   recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
+     tokenUsage: { input: 0, output: 0 }, usageStatus: "measured" });
+   expect(snapshotRunLedger().llm.costUsd).toBe(0);
+   recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
+     usageStatus: "unavailable" });
+   expect(snapshotRunLedger().llm.costUsd).toBeUndefined();
+ });

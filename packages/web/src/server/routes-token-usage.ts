@@ -526,6 +526,8 @@ interface SvManifest {
     calls?: number;
     inputTokens?: number;
     outputTokens?: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
     vendor?: string;
     model?: string;
   };
@@ -545,8 +547,8 @@ function extractSvEvents(projectDir: string, since?: string, until?: string): To
       package: "sv",
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
-      cacheCreationTokens: 0,
-      cacheReadTokens: 0,
+      cacheCreationTokens: manifest.tokenUsage.cacheCreationInputTokens ?? 0,
+      cacheReadTokens: manifest.tokenUsage.cacheReadInputTokens ?? 0,
       calls: manifest.tokenUsage.calls ?? 0,
       vendor: normalizeEventMetadata(manifest.tokenUsage.vendor) ?? "unknown",
       model: normalizeEventMetadata(manifest.tokenUsage.model) ?? "unknown",

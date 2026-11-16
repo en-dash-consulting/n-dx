@@ -122,6 +122,8 @@ export interface CompletionResult {
   text: string;
   /** Token usage from the call, if available. */
   tokenUsage?: TokenUsage;
+  /** Coverage of CLI accounting; absent on providers without provenance. */
+  usageStatus?: "measured" | "unavailable" | "malformed" | "partial";
 }
 
 /**
@@ -132,6 +134,9 @@ export type ErrorReason = "auth" | "timeout" | "rate-limit" | "not-found" | "net
 
 /** A classified error from a Claude call or CLI operation. */
 export class ClaudeClientError extends Error {
+  /** Spend retained even when completion fails. */
+  tokenUsage?: TokenUsage;
+  usageStatus?: CompletionResult["usageStatus"];
   readonly reason: ErrorReason;
   /** Whether this error is transient and the call could be retried. */
   readonly retryable: boolean;

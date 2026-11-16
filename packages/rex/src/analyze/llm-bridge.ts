@@ -15,6 +15,7 @@
 import type {
   ClaudeConfig,
   ClaudeClient,
+  CompletionResult,
   AuthMode,
   LLMConfig,
   LLMVendor,
@@ -27,6 +28,8 @@ import {
   resolveVendorModel,
   resolveTaskModel,
 } from "@n-dx/llm-client";
+import { resolveStore, resolveRexPaths } from "../store/index.js";
+import type { LogEntry } from "../schema/index.js";
 import type { ClaudeResult } from "./analyze-shared.js";
 
 // ── Module-level LLM state ──
@@ -169,6 +172,16 @@ function getClient(): ClaudeClient {
   return _llmClient;
 }
 
+/** Logging must not replace a completion or the error carrying its spend. */
+async function recordUsageEntry(projectDir: string, entry: LogEntry): Promise<void> {
+  try {
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
+    await store.appendLog(entry);
+  } catch (error) {
+    console.warn(`Failed to persist LLM usage: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 // ── LLM interaction ──
 
 /**
@@ -209,9 +222,36 @@ export async function spawnClaude(
     })
     : getClient();
 
-  const result = await client.complete({ prompt, ...resolveRoute(model, route) });
-  return {
-    text: result.text,
-    tokenUsage: result.tokenUsage,
-  };
+  const resolution = resolveRoute(model, route);
+  try {
+    const result = await client.complete({ prompt, ...resolution });
+    if (_projectDir && result.usageStatus && (result.usageStatus !== "measured"
+      || (result.tokenUsage?.input === 0 && result.tokenUsage.output === 0 && !result.tokenUsage.cacheReadInput))) {
+      // Diagnostic only: the command still owns successful token totals.
+      await recordUsageEntry(_projectDir, {
+        timestamp: new Date().toISOString(), event: "llm_usage_diagnostic",
+        detail: JSON.stringify({ usageStatus: result.usageStatus, vendor: resolveVendor(), model: resolution.model }),
+      });
+    }
+    return result;
+  } catch (error) {
+    // Successful calls are logged by their command. Failed calls never reach
+    // that aggregation; record their measured spend here exactly once.
+    const failure: (Error & Pick<CompletionResult, "tokenUsage" | "usageStatus">) | undefined =
+      error instanceof Error ? error : undefined;
+    if (_projectDir && failure?.usageStatus) {
+      await recordUsageEntry(_projectDir, {
+        timestamp: new Date().toISOString(), event: "analyze_token_usage",
+        detail: JSON.stringify({
+          calls: 1, outcome: "failed", usageStatus: failure.usageStatus,
+          vendor: resolveVendor(), model: resolution.model,
+          inputTokens: failure.tokenUsage?.input ?? 0,
+          outputTokens: failure.tokenUsage?.output ?? 0,
+          cacheReadInputTokens: failure.tokenUsage?.cacheReadInput ?? 0,
+          cacheCreationInputTokens: failure.tokenUsage?.cacheCreationInput ?? 0,
+        }),
+      });
+    }
+    throw error;
+  }
 }
