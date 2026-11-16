@@ -6,8 +6,9 @@
  * A framework pack (lang-runtime's `FrameworkPack`): its query
  * (`queries/php-compat/compat.scm`) runs in the PHP parse only when the
  * version floor is wanted. Each rule in {@link SYNTAX_RULES} dates one
- * construct by the php.net migration guide page that introduces it (its
- * `source`); no version comes from anywhere else. A file's floor is the
+ * construct by the php.net page that introduces it (its `source`): the
+ * migration guide from 5.6 on, the PHP 5 changelog for 5.3 to 5.5
+ * (`php-version-sources.ts`); no version comes from anywhere else. A file's floor is the
  * highest version of any rule it matches, with the first use of the construct
  * that set it (the earliest rule hit at that version). A file matching no rule
  * gets no floor: it uses nothing a rule dates.
@@ -37,6 +38,7 @@ import { join } from "node:path";
 import { compareLanguageVersions, type FactKind, type FileFacts, type SourcePosition, type VersionFloorFact } from "@n-dx/lang-kit";
 import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
+import { phpVersionSource, phpVersionSourceName } from "./php-version-sources.js";
 
 /** One construct and the PHP version that introduced it. */
 export interface PhpSyntaxRule {
@@ -44,13 +46,11 @@ export interface PhpSyntaxRule {
   readonly version: string;
   /** The construct in words. */
   readonly construct: string;
-  /** The php.net migration guide page listing it among that version's new features. */
+  /** The php.net page listing it among that version's new features: the migration guide, or the PHP 5 changelog for 5.3 to 5.5. */
   readonly source: string;
 }
 
-const guide = (version: string): string => `https://www.php.net/manual/en/migration${version.replace(".", "")}.new-features.php`;
-
-const rule = (version: string, construct: string): PhpSyntaxRule => ({ version, construct, source: guide(version) });
+const rule = (version: string, construct: string): PhpSyntaxRule => ({ version, construct, source: phpVersionSource(version, "new-features") });
 
 /** Every rule, by id, oldest version first. */
 export const SYNTAX_RULES = {
@@ -192,7 +192,7 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
     source: "https://github.com/tree-sitter/tree-sitter-php/blob/v0.25.1/php/src/node-types.json",
   },
   ...Object.fromEntries(
-    Object.entries(SYNTAX_RULES).map(([id, r]) => [id, { verifiedAgainst: [GRAMMAR, `PHP ${r.version} migration guide`], verifiedOn: "2026-11-16", source: r.source }]),
+    Object.entries(SYNTAX_RULES).map(([id, r]) => [id, { verifiedAgainst: [GRAMMAR, phpVersionSourceName(r.version)], verifiedOn: "2026-11-16", source: r.source }]),
   ),
 };
 

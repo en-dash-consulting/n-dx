@@ -89,7 +89,7 @@ describe("PHP version floors and legacy constructs in the SDLC profile and readi
               status: "removed",
               uses: 2,
               files: 1,
-              deprecated: { version: "5.5", source: `${MIGRATION}55.deprecated.php` },
+              deprecated: { version: "5.5", source: "https://www.php.net/ChangeLog-5.php#5.5.0" },
               removed: { version: "7.0", source: `${MIGRATION}70.removed-exts-sapis.php` },
               source: `${MIGRATION}70.removed-exts-sapis.php`,
             },

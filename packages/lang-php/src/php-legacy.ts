@@ -6,8 +6,9 @@
  * A framework pack (lang-runtime's `FrameworkPack`): its query
  * (`queries/php-legacy/legacy.scm`) runs in the PHP parse only when legacy
  * constructs are wanted. Each rule in {@link LEGACY_RULES} names the php.net
- * migration guide page of every version it gives (deprecated, removed,
- * changed); no version comes from anywhere else. A fact's `status` is
+ * page of every version it gives (deprecated, removed, changed): the
+ * migration guide from 5.6 on, the PHP 5 changelog for 5.3 to 5.5
+ * (`php-version-sources.ts`); no version comes from anywhere else. A fact's `status` is
  * `removed` when the rule has a removal, else `deprecated`, and `notice` for
  * the two rules that only ask for a review:
  *
@@ -45,6 +46,7 @@ import { join } from "node:path";
 import type { FactKind, FileFacts, LanguageBoundary, LegacyConstructFact, LegacyStatus, SourcePosition } from "@n-dx/lang-kit";
 import { atOrBefore, contains, innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
+import { phpVersionSource } from "./php-version-sources.js";
 
 /** One removed, deprecated or changed construct, with the php.net page of every version it names. */
 export interface PhpLegacyRule {
@@ -61,53 +63,50 @@ export interface PhpLegacyRule {
 
 const MANUAL = "https://www.php.net/manual/en/";
 
-/** A version and its migration guide page (`migration70.incompatible`). */
-const at = (version: string, page: string): LanguageBoundary => ({ version, source: `${MANUAL}${page}.php` });
-
-/** The guide page a boundary must cite: `migrationXY.<section>.php` for version X.Y. */
-export const MIGRATION_PAGE = /^https:\/\/www\.php\.net\/manual\/en\/migration(\d)(\d)\.[a-z-]+\.php$/;
+/** A version and its page: the migration guide's `section` page, or the PHP 5 changelog anchor for 5.3 to 5.5 (`php-version-sources.ts`). */
+const at = (version: string, section: string): LanguageBoundary => ({ version, source: phpVersionSource(version, section) });
 
 /** Every rule, by id. */
 export const LEGACY_RULES = {
-  "call-time-pass-by-reference": { construct: "call-time pass-by-reference f(&$x)", removed: at("5.4", "migration54.incompatible") },
+  "call-time-pass-by-reference": { construct: "call-time pass-by-reference f(&$x)", removed: at("5.4", "incompatible") },
   "session-register": {
     construct: "session_register(), session_unregister() or session_is_registered()",
-    deprecated: at("5.3", "migration53.deprecated"),
-    removed: at("5.4", "migration54.incompatible"),
+    deprecated: at("5.3", "deprecated"),
+    removed: at("5.4", "incompatible"),
   },
-  "import-request-variables": { construct: "import_request_variables()", removed: at("5.4", "migration54.incompatible") },
+  "import-request-variables": { construct: "import_request_variables()", removed: at("5.4", "incompatible") },
   "magic-quotes-runtime": {
     construct: "set_magic_quotes_runtime() or magic_quotes_runtime()",
-    deprecated: at("5.3", "migration53.deprecated"),
-    removed: at("7.0", "migration70.incompatible"),
+    deprecated: at("5.3", "deprecated"),
+    removed: at("7.0", "incompatible"),
   },
-  "mysql-functions": { construct: "mysql_* function", deprecated: at("5.5", "migration55.deprecated"), removed: at("7.0", "migration70.removed-exts-sapis") },
+  "mysql-functions": { construct: "mysql_* function", deprecated: at("5.5", "deprecated"), removed: at("7.0", "removed-exts-sapis") },
   "ereg-functions": {
     construct: "ereg*, split, spliti or sql_regcase function",
-    deprecated: at("5.3", "migration53.deprecated"),
-    removed: at("7.0", "migration70.removed-exts-sapis"),
+    deprecated: at("5.3", "deprecated"),
+    removed: at("7.0", "removed-exts-sapis"),
   },
-  "asp-tags": { construct: "<% or <%= tag", removed: at("7.0", "migration70.incompatible") },
-  "script-tags": { construct: "<script language=\"php\"> tag", removed: at("7.0", "migration70.incompatible") },
-  "mcrypt-functions": { construct: "mcrypt_* function", deprecated: at("7.1", "migration71.deprecated"), removed: at("7.2", "migration72.other-changes") },
-  "php4-constructor": { construct: "PHP 4 constructor (method named as its class)", deprecated: at("7.0", "migration70.deprecated"), removed: at("8.0", "migration80.incompatible") },
-  "create-function": { construct: "create_function()", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
-  each: { construct: "each()", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
-  "unset-cast": { construct: "(unset) cast", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
-  "autoload-function": { construct: "__autoload()", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
-  "curly-offset": { construct: "curly-brace offset $s{0}", deprecated: at("7.4", "migration74.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  "asp-tags": { construct: "<% or <%= tag", removed: at("7.0", "incompatible") },
+  "script-tags": { construct: "<script language=\"php\"> tag", removed: at("7.0", "incompatible") },
+  "mcrypt-functions": { construct: "mcrypt_* function", deprecated: at("7.1", "deprecated"), removed: at("7.2", "other-changes") },
+  "php4-constructor": { construct: "PHP 4 constructor (method named as its class)", deprecated: at("7.0", "deprecated"), removed: at("8.0", "incompatible") },
+  "create-function": { construct: "create_function()", deprecated: at("7.2", "deprecated"), removed: at("8.0", "incompatible") },
+  each: { construct: "each()", deprecated: at("7.2", "deprecated"), removed: at("8.0", "incompatible") },
+  "unset-cast": { construct: "(unset) cast", deprecated: at("7.2", "deprecated"), removed: at("8.0", "incompatible") },
+  "autoload-function": { construct: "__autoload()", deprecated: at("7.2", "deprecated"), removed: at("8.0", "incompatible") },
+  "curly-offset": { construct: "curly-brace offset $s{0}", deprecated: at("7.4", "deprecated"), removed: at("8.0", "incompatible") },
   "get-magic-quotes": {
     construct: "get_magic_quotes_gpc() or get_magic_quotes_runtime()",
-    deprecated: at("7.4", "migration74.deprecated"),
-    removed: at("8.0", "migration80.incompatible"),
+    deprecated: at("7.4", "deprecated"),
+    removed: at("8.0", "incompatible"),
   },
-  "string-dollar-brace": { construct: "${} string interpolation", deprecated: at("8.2", "migration82.deprecated") },
-  "dynamic-property": { construct: "dynamic property creation", deprecated: at("8.2", "migration82.deprecated"), likely: true },
-  "utf8-encode-decode": { construct: "utf8_encode() or utf8_decode()", deprecated: at("8.2", "migration82.deprecated") },
+  "string-dollar-brace": { construct: "${} string interpolation", deprecated: at("8.2", "deprecated") },
+  "dynamic-property": { construct: "dynamic property creation", deprecated: at("8.2", "deprecated"), likely: true },
+  "utf8-encode-decode": { construct: "utf8_encode() or utf8_decode()", deprecated: at("8.2", "deprecated") },
   "short-open-tag": { construct: "<? short open tag (needs short_open_tag)", notice: { source: `${MANUAL}ini.core.php#ini.short-open-tag` } },
   "string-number-comparison": {
     construct: "== between a non-numeric string and a number",
-    changed: at("8.0", "migration80.incompatible"),
+    changed: at("8.0", "incompatible"),
     notice: { source: `${MANUAL}migration80.incompatible.php` },
   },
 } as const satisfies Record<string, PhpLegacyRule>;
@@ -367,7 +366,7 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   ...Object.fromEntries(
     Object.entries(LEGACY_RULES).map(([id, r]: [string, PhpLegacyRule]) => [
       id,
-      { verifiedAgainst: [GRAMMAR, "PHP migration guides"], verifiedOn: "2026-11-16", source: legacySource(r) },
+      { verifiedAgainst: [GRAMMAR, "PHP migration guides", "PHP 5 changelog"], verifiedOn: "2026-11-16", source: legacySource(r) },
     ]),
   ),
 };

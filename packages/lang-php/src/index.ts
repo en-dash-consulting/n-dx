@@ -12,6 +12,7 @@ export * from "./php-pack.js";
 export * from "./php-builtins.js";
 export * from "./php-compat.js";
 export * from "./php-legacy.js";
+export * from "./php-version-sources.js";
 export * from "./php-docroot.js";
 export * from "./php-docroots.js";
 export * from "./php-cron.js";

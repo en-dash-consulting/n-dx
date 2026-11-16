@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { compareLanguageVersions } from "@n-dx/lang-kit";
-import { SYNTAX_RULES, phpCompat } from "../../src/index.js";
+import { SYNTAX_RULES, citedPhpVersion, phpCompat } from "../../src/index.js";
 
 describe("php version-floor rules", () => {
-  it("cite the php.net migration guide page of the version they set", () => {
+  it("cite the php.net page of the version they set", () => {
     for (const [id, rule] of Object.entries(SYNTAX_RULES)) {
-      const [major, minor] = rule.version.split(".");
-      expect(rule.source, id).toBe(`https://www.php.net/manual/en/migration${major}${minor}.new-features.php`);
+      expect(citedPhpVersion(rule.source), id).toBe(rule.version);
+      if (rule.source.includes("/manual/")) expect(rule.source, id).toMatch(/\.new-features\.php$/);
     }
   });
 

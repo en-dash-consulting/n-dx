@@ -25,7 +25,7 @@ const MYSQL: Omit<LegacyConstructFact, "position"> = {
   rule: "mysql-functions",
   construct: "mysql_query()",
   status: "removed",
-  deprecated: page("5.5", "deprecated"),
+  deprecated: { version: "5.5", source: "https://www.php.net/ChangeLog-5.php#5.5.0" },
   removed: page("7.0", "removed-exts-sapis"),
   source: page("7.0", "removed-exts-sapis").source,
 };

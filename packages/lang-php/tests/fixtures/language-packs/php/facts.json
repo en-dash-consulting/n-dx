@@ -410,7 +410,7 @@
         "version": "5.4",
         "rule": "short-echo-tag",
         "construct": "<?= tag",
-        "source": "https://www.php.net/manual/en/migration54.new-features.php",
+        "source": "https://www.php.net/ChangeLog-5.php#5.4.0",
         "position": {
           "line": 50,
           "column": 12
@@ -423,7 +423,7 @@
           "status": "removed",
           "deprecated": {
             "version": "5.5",
-            "source": "https://www.php.net/manual/en/migration55.deprecated.php"
+            "source": "https://www.php.net/ChangeLog-5.php#5.5.0"
           },
           "removed": {
             "version": "7.0",
@@ -1524,7 +1524,7 @@
         "version": "5.3",
         "rule": "namespaces",
         "construct": "namespace",
-        "source": "https://www.php.net/manual/en/migration53.new-features.php",
+        "source": "https://www.php.net/ChangeLog-5.php#5.3.0",
         "position": {
           "line": 2,
           "column": 0

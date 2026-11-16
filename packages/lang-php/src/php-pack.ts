@@ -17,7 +17,7 @@
  * (`php-outbound.ts`); config reads and flag checks are settings files, settings
  * loaders, config constants and flag checks with the lines they gate
  * (`php-config.ts`); the version floor is the newest syntax a file uses, dated
- * by the php.net migration guides (`php-compat.ts`); legacy constructs are the
+ * by php.net's migration guides and PHP 5 changelog (`php-compat.ts`); legacy constructs are the
  * uses of what later versions removed or deprecated (`php-legacy.ts`);
  * embedded SQL gives table names in memory (`php-sql.ts`).
  *

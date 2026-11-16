@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { compareLanguageVersions } from "@n-dx/lang-kit";
-import { LEGACY_RULES, MIGRATION_PAGE, blankStringsAndComments, legacySource, legacyStatus, phpLegacy, type PhpLegacyRule } from "../../src/index.js";
+import { LEGACY_RULES, blankStringsAndComments, citedPhpVersion, legacySource, legacyStatus, phpLegacy, type PhpLegacyRule } from "../../src/index.js";
 
 const rules = Object.entries(LEGACY_RULES) as [string, PhpLegacyRule][];
 
 describe("php legacy rules", () => {
-  it("cite, for every version they give, that version's php.net migration guide page", () => {
+  it("cite, for every version they give, that version's php.net page", () => {
     for (const [id, rule] of rules) {
       for (const boundary of [rule.deprecated, rule.removed, rule.changed]) {
         if (boundary === undefined) continue;
-        const [, major, minor] = MIGRATION_PAGE.exec(boundary.source) ?? [];
-        expect(`${major}.${minor}`, `${id}: ${boundary.source}`).toBe(boundary.version);
+        expect(citedPhpVersion(boundary.source), `${id}: ${boundary.source}`).toBe(boundary.version);
       }
     }
   });
