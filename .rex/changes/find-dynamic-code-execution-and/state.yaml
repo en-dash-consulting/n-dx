@@ -11,12 +11,23 @@ items:
     lastModified: "2026-11-16T21:32:08.708Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a5be0950-1068-442a-b018-ec76d52b5348":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T21:33:04.056Z"
-    activeIntervals: [{"start":"2026-11-16T21:33:04.056Z"}]
-    lastModified: "2026-11-16T21:33:05.515Z"
+    completedAt: "2026-11-16T21:57:29.856Z"
+    endedAt: "2026-11-16T21:57:29.856Z"
+    activeIntervals: [{"end":"2026-11-16T21:57:29.856Z","start":"2026-11-16T21:33:04.056Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-database-flow.ts marks exec/dispatch sites fed by query results (DynamicCodeFact.database: tables, literal SELECT columns, source calls), [php-db-exec]/[php-db-dispatch] notices, ecosystem.php.dynamicCode.database counts. Corpus check left for the operator (~/.cache off-limits)."
+    lastModified: "2026-11-16T21:57:29.856Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ec248078-5c99-4dd6-b4a8-b7d4311313f6":
+    status: "completed"
+    startedAt: "2026-11-16T21:57:29.856Z"
+    completedAt: "2026-11-16T21:57:29.856Z"
+    endedAt: "2026-11-16T21:57:29.856Z"
+    activeIntervals: [{"end":"2026-11-16T21:57:29.856Z","start":"2026-11-16T21:57:29.856Z"}]
+    appliedAt: "2026-11-16T21:57:29.856Z"
+    appliedAmendsHash: "20601ee796d745da5d4c95a8812dd7f9d7de8c2c7a1e8c221384baea9119f7d6"
     createdAt: "2026-11-16T21:11:25.246Z"
-    lastModified: "2026-11-16T21:12:25.370Z"
+    lastModified: "2026-11-16T21:57:29.856Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

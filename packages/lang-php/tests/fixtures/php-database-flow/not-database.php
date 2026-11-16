@@ -21,3 +21,13 @@ function from_parameter($rows) {
         call_user_func($row['handler']);
     }
 }
+
+function replaced_by_closures() {
+    $row = mysql_fetch_assoc(mysql_query('SELECT handler FROM pages'));
+    $f = $row['handler'];
+    $f = function () { return 1; };
+    $f();
+    $g = $row['handler'];
+    $g = fn () => 1;
+    $g();
+}

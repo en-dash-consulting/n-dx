@@ -55,6 +55,9 @@ import { PHP_SQL_FUNCTIONS, readSqlStatements } from "./php-sql.js";
 /** How many times repository return summaries are recomputed before they are taken as they stand. */
 export const MAX_SUMMARY_ROUNDS = 10;
 
+/** How deeply one expression's reads are followed (`.` chains, subscripts, calls) before the value is missed. */
+export const MAX_EXPRESSION_DEPTH = 200;
+
 /** Fetch functions: they return a row, a field or every row of a result. Field metadata (`*_fetch_field*`, `*_fetch_lengths`) is not data. */
 export const FETCH_FUNCTION = /^(?:(?:mysql|mysqli|pg|oci|sqlsrv|odbc)_fetch_(?!field|lengths)\w+|(?:mysql|pg|oci|odbc)_result)$/;
 
@@ -108,7 +111,7 @@ export interface FlowSite {
 }
 
 type Event =
-  | { readonly kind: "assign"; readonly at: SourcePosition; readonly left: Capture; readonly right: Capture; readonly append: boolean }
+  | { readonly kind: "assign"; readonly at: SourcePosition; readonly start: SourcePosition; readonly left: Capture; readonly right: Capture; readonly append: boolean }
   | { readonly kind: "foreach"; readonly at: SourcePosition; readonly variable: string; readonly subject: Capture }
   | { readonly kind: "global"; readonly at: SourcePosition; readonly variable: string }
   | { readonly kind: "return"; readonly at: SourcePosition; readonly value: Capture }
@@ -220,14 +223,14 @@ class FileFlow {
     for (const a of c.get("assign")) {
       const left = lefts.get(nodeKey(a))?.[0];
       const right = rights.get(nodeKey(a))?.[0];
-      if (left !== undefined && right !== undefined) all.push({ kind: "assign", at: a.end, left, right, append: false });
+      if (left !== undefined && right !== undefined) all.push({ kind: "assign", at: a.end, start: a.start, left, right, append: false });
     }
     const appendLefts = c.partsOf("append", "append-left");
     const appendRights = c.partsOf("append", "append-right");
     for (const a of c.get("append")) {
       const left = appendLefts.get(nodeKey(a))?.[0];
       const right = appendRights.get(nodeKey(a))?.[0];
-      if (left !== undefined && right !== undefined) all.push({ kind: "assign", at: a.end, left, right, append: true });
+      if (left !== undefined && right !== undefined) all.push({ kind: "assign", at: a.end, start: a.start, left, right, append: true });
     }
     const subjects = c.partsOf("foreach", "foreach-subject");
     const values = c.partsOf("foreach", "foreach-value");
@@ -248,7 +251,9 @@ class FileFlow {
     }
     for (const site of sites) all.push({ kind: "site", at: site.position, site });
     all.sort((a, b) => order(a.at, b.at));
-    const owners = innermostEach(this.scopes, all.map((e) => point(e.at)));
+    // The scope is where an event starts: an assignment takes effect at its end, which for
+    // `$f = function () { … }` is the closure's own end, inside the closure.
+    const owners = innermostEach(this.scopes, all.map((e) => point(e.kind === "assign" ? e.start : e.at)));
     all.forEach((event, i) => {
       const scope = owners[i];
       const list = this.events.get(scope);
@@ -346,8 +351,26 @@ class RepositoryFlow {
     if (root !== undefined && root !== "this" && value.size > 0) set(state, root, union(state.vars.get(root) ?? NONE, value));
   }
 
-  /** The sources of what `node` evaluates to. */
+  /** How deep {@link evaluate} is nested now. */
+  private depth = 0;
+
+  /**
+   * The sources of what `node` evaluates to. Past {@link MAX_EXPRESSION_DEPTH}
+   * nested reads (a generated `$a . $b . …` chain thousands of operands long)
+   * a value is missed rather than overflowing the stack and losing every
+   * dynamic-code fact in the repository.
+   */
   private evaluate(file: FileFlow, node: Capture, state: State): Sources {
+    if (this.depth >= MAX_EXPRESSION_DEPTH) return NONE;
+    this.depth++;
+    try {
+      return this.evaluateNode(file, node, state);
+    } finally {
+      this.depth--;
+    }
+  }
+
+  private evaluateNode(file: FileFlow, node: Capture, state: State): Sources {
     const c = file.captures;
     const part = (owner: string, name: string): Capture | undefined => c.partsOf(owner, name).get(nodeKey(node))?.[0];
     const each = (owner: string, name: string): Sources => {
