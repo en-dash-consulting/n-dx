@@ -18,6 +18,9 @@ items:
     resolutionDetail: "Rule 5a: holder.json/reclaim.lock naming this pid with a token this process does not hold is stale (per-process live lease and reclaim token sets; replaces orphanedTokens). Wait line names holder.json path; TESTING.md + docs/packages/hench.md explain clearing a wedged slot; deadline wording removed; hench patch changeset."
     lastModified: "2026-11-14T05:20:57.400Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1d5360b5-e284-4327-ae21-554c2e134e97":
+    lastModified: "2026-11-16T17:31:41.456Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ec3f9f1-5362-4345-8cce-0b7910813b27":
     status: "completed"
     startedAt: "2026-11-14T05:29:57.800Z"
@@ -248,7 +251,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     createdAt: "2026-11-12T17:26:37.734Z"
-    lastModified: "2026-11-14T06:38:12.036Z"
+    lastModified: "2026-11-16T17:31:41.456Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1e742ad-552e-47c7-8587-b0d5212cde09":
     status: "completed"
