@@ -28,7 +28,7 @@ LLM Client sits at the foundation tier — the lowest level of the dependency hi
 | Vendor | API Mode | CLI Mode | Token Accounting | Default model |
 |--------|----------|----------|-----------------|---------------|
 | Claude | Yes (recommended) | Yes | Full | `claude-sonnet-5-5` |
-| Codex | No | Yes | Limited (CLI doesn't return usage) | `gpt-5.6-terra` |
+| Codex | No | Yes | Limited (CLI doesn't return usage) | `gpt-6.1-sol` |
 | Google | Yes | No | Full | `gemini-2.5-pro` |
 | Local | Yes (OpenAI-compatible) | No | Depends on server | _(whatever is loaded)_ |
 

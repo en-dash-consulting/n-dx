@@ -334,8 +334,8 @@ describe("TIER_MODELS", () => {
     expect(TIER_MODELS.claude.light).toBe("claude-haiku-4-5");
   });
 
-  it("codex.light maps to gpt-5.6-luna", () => {
-    expect(TIER_MODELS.codex.light).toBe("gpt-5.6-luna");
+  it("codex.light maps to gpt-6-luna", () => {
+    expect(TIER_MODELS.codex.light).toBe("gpt-6-luna");
   });
 
   it("defines all three tiers for all vendors", () => {

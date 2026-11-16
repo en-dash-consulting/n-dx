@@ -14,7 +14,7 @@
  *
  * Chain lengths:
  * - Claude-origin: sonnet (attempt 0) → haiku (1) → codex-standard (2) → codex-light (3) → exhausted (4+)
- * - Codex-origin: gpt-5.6-terra (attempt 0) → gpt-5.6-luna (1) → sonnet (2) → haiku (3) → exhausted (4+)
+ * - Codex-origin: gpt-6.1-sol (attempt 0) → gpt-6-luna (1) → sonnet (2) → haiku (3) → exhausted (4+)
  * - Google-origin: flash (attempt 0) → google-light/flash (1) → claude-standard (2) → claude-light (3) → exhausted (4+)
  *
  * The chain terminates after 3 failover attempts (attempts 1-3), with attempt 4+ reporting exhaustion.
@@ -38,12 +38,12 @@ export interface FailoverAttemptResult {
  *
  * Failover chain for Claude-origin:
  * - Attempt 1: claude (light/haiku)
- * - Attempt 2: codex (standard/gpt-5.5)
- * - Attempt 3: codex (light/gpt-5.6-luna)
+ * - Attempt 2: codex (standard/gpt-6.1-sol)
+ * - Attempt 3: codex (light/gpt-6-luna)
  * - Attempt 4+: exhausted
  *
  * Failover chain for Codex-origin:
- * - Attempt 1: codex (light/gpt-5.6-luna)
+ * - Attempt 1: codex (light/gpt-6-luna)
  * - Attempt 2: claude (standard/sonnet)
  * - Attempt 3: claude (light/haiku)
  * - Attempt 4+: exhausted
@@ -105,7 +105,7 @@ function getClaudeFailoverAttempt(
       };
 
     case 2:
-      // Cross to Codex standard (gpt-5.5)
+      // Cross to Codex standard (gpt-6.1-sol)
       return {
         isExhausted: false,
         vendor: LLM_VENDOR.CODEX,
@@ -113,7 +113,7 @@ function getClaudeFailoverAttempt(
       };
 
     case 3:
-      // Try Codex light (gpt-5.6-luna)
+      // Try Codex light (gpt-6-luna)
       return {
         isExhausted: false,
         vendor: LLM_VENDOR.CODEX,
@@ -137,7 +137,7 @@ function getCodexFailoverAttempt(
 ): FailoverAttemptResult {
   switch (attemptNumber) {
     case 1:
-      // Try Codex light (gpt-5.6-luna)
+      // Try Codex light (gpt-6-luna)
       return {
         isExhausted: false,
         vendor: LLM_VENDOR.CODEX,

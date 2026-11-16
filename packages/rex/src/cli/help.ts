@@ -273,7 +273,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     examples: [
       { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"review\":true}'", description: "Save a portable model tier and review on a task" },
-      { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"models\":{\"claude\":\"claude-opus-5-5\",\"codex\":\"gpt-5.6-sol\"}}'", description: "Also pin an exact model per vendor" },
+      { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"models\":{\"claude\":\"claude-opus-5-5\",\"codex\":\"gpt-6-astra\"}}'", description: "Also pin an exact model per vendor" },
       { command: "rex update abc123 --criterion=\"Rejects an empty password\" --criterion=\"Locks after 5 failures\"", description: "Replace a task's acceptance criteria" },
       { command: "rex update abc123 --run=null", description: "Remove a task's saved run settings" },
       { command: "rex update abc123 --status=completed", description: "Mark a task as done" },

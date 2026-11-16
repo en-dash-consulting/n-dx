@@ -194,7 +194,7 @@ run:                  # object  optional — saved run settings, inline JSON (se
 **`run` holds the settings saved for running a task.** It is inline JSON in front matter, like every object-valued field, and every key is optional:
 
 ```yaml
-run: {"tier":"heavy","models":{"claude":"claude-opus-5-5","codex":"gpt-5.6-sol"},"review":true,"reviewTier":"standard"}
+run: {"tier":"heavy","models":{"claude":"claude-opus-5-5","codex":"gpt-6-astra"},"review":true,"reviewTier":"standard"}
 ```
 
 | Key | Type |
