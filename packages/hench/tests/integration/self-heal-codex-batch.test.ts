@@ -21,7 +21,7 @@ import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { initConfig } from "../../src/store/config.js";
+import { initConfig, saveConfig } from "../../src/store/config.js";
 import { cliSpawnsOnly, RM_RETRY } from "../helpers/index.js";
 
 // The temp project dirs created below have no git repo, so the real
@@ -126,7 +126,9 @@ async function setupProjectDir(): Promise<{
   const henchDir = join(projectDir, ".hench");
   const rexDir = join(projectDir, ".rex");
 
-  await initConfig(henchDir);
+  // These fixtures measure task spawns; orientation has dedicated fork tests.
+  const initial = await initConfig(henchDir);
+  await saveConfig(henchDir, { ...initial, sessionStrategy: "cold" });
   await mkdir(rexDir, { recursive: true });
 
   // Set Codex as the active vendor and provide a stub fullTestCommand so

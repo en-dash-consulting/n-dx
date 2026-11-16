@@ -25,7 +25,7 @@ import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { initConfig } from "../../src/store/config.js";
+import { initConfig, saveConfig } from "../../src/store/config.js";
 import { SELF_HEAL_TAG } from "@n-dx/rex/dist/store/index.js";
 import { cliSpawnsOnly, RM_RETRY } from "../helpers/index.js";
 
@@ -128,7 +128,9 @@ async function setupProjectDir(): Promise<{
   const henchDir = join(projectDir, ".hench");
   const rexDir = join(projectDir, ".rex");
 
-  await initConfig(henchDir);
+  // These fixtures measure task spawns; orientation has dedicated fork tests.
+  const initial = await initConfig(henchDir);
+  await saveConfig(henchDir, { ...initial, sessionStrategy: "cold" });
   await mkdir(rexDir, { recursive: true });
 
   await writeFile(

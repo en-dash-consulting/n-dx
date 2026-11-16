@@ -62,19 +62,16 @@ export const codexCliAdapter: VendorAdapter = {
     // per-command allowlist surface (its safety model is the sandbox/approval
     // flags), so git-subcommand scoping is a Claude-CLI-only control.
     //
-    // opts.permissionMode and opts.forkSession are ignored: neither has a Codex
-    // equivalent. The batch strategy's resume is a plain `exec resume`, which
-    // appends to the thread. A resumed thread does not keep its starting
-    // policy and `exec resume` rejects `--sandbox`, so the resume form
-    // re-applies the same policy as `-c` overrides; both forms end with the
-    // shell-environment overrides that hide the Codex key from the agent's
-    // commands.
+    // Fork/resume reapply the execution policy; neither inherits permission.
     const { binary, args, stdin } = codexSessionDriver.turnSpawn({
       systemPrompt,
       prompt: taskPrompt,
       model: opts.model,
-      resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId } : undefined,
+      resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId, fork: opts.forkSession } : undefined,
       codex: {
+        forkSupported: opts.codexForkSupported,
+        // Orientation must not reach write-capable MCP tools outside the sandbox.
+        configFlags: opts.codexOrientationFlags,
         policyFlags: compileCodexPolicyFlags(policy),
         resumePolicyFlags: compileCodexPolicyFlags(policy, { resume: true }),
       },

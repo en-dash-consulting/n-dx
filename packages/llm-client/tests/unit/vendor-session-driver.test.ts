@@ -70,7 +70,7 @@ describe("codex turn spawn", () => {
   // `exec resume` rejects --sandbox, but config is read per process: the
   // policy overrides and the ones that blank the Codex key in the agent's
   // commands must ride on every resumed turn.
-  it("ignores fork and sends the resume policy, not the fresh flags, on resume", () => {
+  it("forks only with capability evidence and reapplies policy", () => {
     const resumePolicyFlags = compileCodexPolicyFlags(
       { ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only" },
       { resume: true },
@@ -80,10 +80,10 @@ describe("codex turn spawn", () => {
       prompt: "hi",
       model: "m",
       resume: { sessionId: "t", fork: true },
-      codex: { policyFlags: ["-s", "read-only"], resumePolicyFlags },
+      codex: { forkSupported: true, policyFlags: ["-s", "read-only"], resumePolicyFlags },
     });
     expect(args).toEqual([
-      "exec", "resume", "t", "--json", "--skip-git-repo-check",
+      "exec", "fork", "t", "--json", "--skip-git-repo-check",
       ...resumePolicyFlags,
       "-m", "m", "-",
     ]);
@@ -388,3 +388,10 @@ describe("codex mcp tool calls", () => {
     });
   });
 });
+
+ it("refuses an unprobed fork instead of mutating its parent with resume", () => {
+   expect(() => codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "task",
+     resume: { sessionId: "parent", fork: true } })).toThrow(/capability probe/);
+   expect(() => codexSessionDriver.turnSpawn({ systemPrompt: "", prompt: "task",
+     resume: { sessionId: "parent", fork: true }, codex: { forkSupported: true } })).toThrow(/explicit sandbox/);
+ });

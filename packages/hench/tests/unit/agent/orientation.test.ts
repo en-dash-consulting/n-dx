@@ -139,6 +139,20 @@ describe("ensureWarmParent", () => {
     } as never;
   }
 
+  it("binds the parent to execution identity and confines Codex orientation", async () => {
+    const adapter = makeAdapter();
+    const spawn = vi.fn().mockResolvedValue({ sessionId: "parent" });
+    const opts = { adapter, vendor: "codex", cliBinary: "selected-codex", policy: POLICY, henchDir, projectDir, model: "pinned-model", identityHash: "policy-A", spawn };
+    // baseArgs deliberately uses a minimal fixture type.
+    await ensureWarmParent(opts);
+    expect((adapter as unknown as { buildSpawnConfig: unknown }).buildSpawnConfig).toHaveBeenCalledWith(expect.anything(),
+      expect.objectContaining({ sandbox: "read-only", approvals: "never", writableRoots: [] }), expect.anything());
+    expect((await ensureWarmParent(opts)).outcome).toBe("hit");
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect((await ensureWarmParent({ ...opts, identityHash: "policy-B" })).reason).toBe("identity-changed");
+    expect(spawn).toHaveBeenCalledTimes(2);
+  });
+
   it("reuses a cached parent without spawning", async () => {
     const spawn = vi.fn();
     // Seed a cache entry whose fingerprint matches this project (no

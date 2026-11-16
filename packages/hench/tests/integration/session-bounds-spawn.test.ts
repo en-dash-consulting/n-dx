@@ -31,6 +31,7 @@ const mode = process.argv[2];
 if (process.env.HENCH_TEST_CHILD_PID) writeFileSync(process.env.HENCH_TEST_CHILD_PID, String(process.pid));
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
 process.on("SIGTERM", () => process.exit(143));
+if (mode === "parent") out({ type: "thread.started", thread_id: "shared-parent" });
 if (mode === "tools") {
   out({ type: "assistant", session_id: "s", message: { content: [{ type: "tool_use", id: "tu-a", name: "Read", input: { file_path: "a.ts" } }] } });
   out({ type: "assistant", session_id: "s", message: { content: [{ type: "tool_use", id: "tu-b", name: "Bash", input: { command: "ls" } }] } });
@@ -46,7 +47,7 @@ if (mode === "max-turns") {
 }
 let n = 0;
 setInterval(() => {
-  if (mode === "slow") return;
+  if (mode === "slow" || mode === "parent") return;
   n++;
   out({ type: "assistant", session_id: "s", message: { content: [{ type: "text", text: "step " + n }] } });
   out({ type: "assistant", session_id: "s", message: { content: [{ type: "tool_use", id: "tu" + n, name: "Read", input: { file_path: "f" + n } }] } });
@@ -70,7 +71,7 @@ describe("spawnWithAdapter session bounds", () => {
   });
 
   function spawn(
-    mode: "forever" | "max-turns" | "slow" | "tools",
+    mode: "forever" | "max-turns" | "slow" | "tools" | "parent",
     extra: Partial<Parameters<typeof spawnWithAdapter>[0]> = {},
     adapter: VendorAdapter = claudeCliAdapter,
   ) {
@@ -103,6 +104,14 @@ describe("spawnWithAdapter session bounds", () => {
     }
     throw new Error("child never started");
   }
+
+  it("stops a Codex fork immediately if it announces the shared parent", async () => {
+    const result = await spawn("parent", { forkParentId: "shared-parent", timeoutMs: 5_000 }, codexCliAdapter);
+    expect(result.error).toMatch(/distinct child session id/);
+    expect(result.sessionId).toBeUndefined();
+    expect(result.timedOut).toBeUndefined();
+    await expectChildGone();
+  });
 
   it("an abort terminates the running CLI and reports the reason", async () => {
     const controller = new AbortController();
