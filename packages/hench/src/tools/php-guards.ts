@@ -4,8 +4,14 @@
  *
  * - `php -l` on each changed `.php` / `.phtml` / `.inc` file, when `php` is
  *   on PATH;
- * - `composer validate --no-check-publish`, when `composer.json` exists and
- *   `composer` is on PATH.
+ * - `composer validate --no-check-publish`, when `composer.json` exists, the
+ *   change touched `composer.json` or `composer.lock`, and `composer` is on
+ *   PATH. Gated on the change because the command also checks the lock file:
+ *   a lock that was stale before the run would otherwise fail every run, and
+ *   the agent cannot refresh it without the network.
+ *
+ * `filesChanged` is relative to the project directory: callers holding
+ * repo-relative paths map them with {@link projectRelativePaths} first.
  *
  * PHPUnit is the test gate's job: {@link detectPhpunitCommand} is what the
  * test-command resolver auto-detects for a PHP project.
@@ -31,6 +37,19 @@ export const PHPUNIT_CONFIG_FILES: readonly string[] = ["phpunit.xml", "phpunit.
 export const PHPUNIT_BINARY = "vendor/bin/phpunit";
 
 export const COMPOSER_VALIDATE_COMMAND = "composer validate --no-check-publish";
+
+/** Root files whose change triggers `composer validate`. */
+const COMPOSER_FILES: readonly string[] = ["composer.json", "composer.lock"];
+
+/**
+ * Repo-relative changed paths (what git reports) as paths relative to the
+ * project directory, given the project's `sub/`-style prefix in the repo
+ * (`""` at the root). Paths outside the project are dropped.
+ */
+export function projectRelativePaths(repoRelative: readonly string[], prefix: string): string[] {
+  if (!prefix) return [...repoRelative];
+  return repoRelative.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
+}
 
 async function isRegularFile(path: string): Promise<boolean> {
   try { return (await stat(path)).isFile(); } catch { return false; }
@@ -117,7 +136,8 @@ export async function planPhpGuards(
     }
   }
 
-  if (await isRegularFile(join(projectDir, "composer.json"))) {
+  const composerTouched = filesChanged.some((f) => COMPOSER_FILES.includes(f.split(sep).join("/")));
+  if (composerTouched && (await isRegularFile(join(projectDir, "composer.json")))) {
     if (onPath("composer")) checks.push({ kind: "composer-validate", command: COMPOSER_VALIDATE_COMMAND });
     else skipped.push("composer validate: composer is not on PATH");
   }

@@ -74,7 +74,7 @@ import {
   type ValidationSlotRunOptions,
 } from "../../process/validation-run.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
-import { runPhpGuards, type RunPhpGuardsOptions } from "../../tools/php-guards.js";
+import { projectRelativePaths, runPhpGuards, type RunPhpGuardsOptions } from "../../tools/php-guards.js";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
 import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
 import { section, subsection, stream, detail, info, warn, formatDuration, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
@@ -1226,9 +1226,11 @@ export async function runPhpGuardsIfNeeded(
 ): Promise<void> {
   if (config?.language !== "php" || run.status !== "completed" || !run.structuredSummary) return;
 
+  // Git reports paths from the repository root; the checks resolve them from
+  // the project, which may be a subdirectory of it.
   const result = await runPhpGuards({
     projectDir,
-    filesChanged: run.structuredSummary.filesChanged,
+    filesChanged: projectRelativePaths(run.structuredSummary.filesChanged, await repoRelativePrefix(projectDir)),
     timeout: config.guard.commandTimeout,
     ...deps,
   });

@@ -6,6 +6,7 @@ import {
   COMPOSER_VALIDATE_COMMAND,
   detectPhpunitCommand,
   planPhpGuards,
+  projectRelativePaths,
   quotePathForShell,
   runPhpGuards,
 } from "../../../src/tools/php-guards.js";
@@ -61,7 +62,7 @@ describe("detectPhpunitCommand", () => {
 });
 
 describe("planPhpGuards", () => {
-  it("lints each changed PHP file that still exists, and validates composer.json", async () => {
+  it("lints each changed PHP file that still exists, and validates a changed composer.json", async () => {
     await put("composer.json", "{}");
     await put("src/A.php");
     await put("views/page.phtml");
@@ -69,7 +70,7 @@ describe("planPhpGuards", () => {
     await put("README.md");
     const plan = await planPhpGuards(
       projectDir,
-      ["src/A.php", "views/page.phtml", "lib/legacy.INC", "README.md", "src/Deleted.php"],
+      ["src/A.php", "views/page.phtml", "lib/legacy.INC", "README.md", "src/Deleted.php", "composer.json"],
       posix,
     );
     expect(plan.checks.map((c) => c.command)).toEqual([
@@ -88,16 +89,25 @@ describe("planPhpGuards", () => {
     expect(plan.checks.map((c) => c.kind)).toEqual(["php-lint"]);
   });
 
-  it("validates composer.json when no PHP file changed", async () => {
+  it.each(["composer.json", "composer.lock"])("validates composer.json when %s changed and no PHP file did", async (changed) => {
     await put("composer.json", "{}");
-    const plan = await planPhpGuards(projectDir, ["composer.json"], posix);
+    const plan = await planPhpGuards(projectDir, [changed], posix);
     expect(plan.checks.map((c) => c.command)).toEqual([COMPOSER_VALIDATE_COMMAND]);
+  });
+
+  // `composer validate` checks the lock too: a lock stale before the run would
+  // fail every run, and the agent cannot refresh it offline.
+  it("does not validate composer.json when the change touched neither Composer file", async () => {
+    await put("composer.json", "{}");
+    await put("index.php");
+    const plan = await planPhpGuards(projectDir, ["index.php", "lib/composer.json"], posix);
+    expect(plan.checks.map((c) => c.kind)).toEqual(["php-lint"]);
   });
 
   it("skips a check whose tool is not on PATH instead of failing", async () => {
     await put("composer.json", "{}");
     await put("index.php");
-    const plan = await planPhpGuards(projectDir, ["index.php"], { onPath: () => false, shellKind: "posix" });
+    const plan = await planPhpGuards(projectDir, ["index.php", "composer.json"], { onPath: () => false, shellKind: "posix" });
     expect(plan.checks).toEqual([]);
     expect(plan.skipped).toHaveLength(2);
     expect(plan.skipped[0]).toContain("php is not on PATH");
@@ -107,6 +117,17 @@ describe("planPhpGuards", () => {
   it("plans nothing for a change with no PHP file and no composer.json", async () => {
     await put("README.md");
     expect(await planPhpGuards(projectDir, ["README.md"], posix)).toEqual({ checks: [], skipped: [], errors: [] });
+  });
+});
+
+describe("projectRelativePaths", () => {
+  it("strips the project's prefix and drops paths outside it", () => {
+    expect(projectRelativePaths(["app/src/A.php", "other/B.php", "app/composer.json"], "app/"))
+      .toEqual(["src/A.php", "composer.json"]);
+  });
+
+  it("returns repo-root paths unchanged at the root", () => {
+    expect(projectRelativePaths(["src/A.php"], "")).toEqual(["src/A.php"]);
   });
 });
 
@@ -137,7 +158,7 @@ describe("runPhpGuards", () => {
     const calls: Array<[string, ExecOptions]> = [];
     const r = await runPhpGuards({
       projectDir,
-      filesChanged: ["index.php"],
+      filesChanged: ["index.php", "composer.json"],
       timeout: 1234,
       ...posix,
       execCommand: async (command, opts) => { calls.push([command, opts]); return result(0); },

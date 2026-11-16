@@ -7,6 +7,7 @@ import { detectProjectLanguage } from "../../../src/cli/commands/init.js";
 import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 import type { RunRecord } from "../../../src/schema/index.js";
 import type { ExecResult } from "../../../src/process/exec.js";
+import { initGitFixtureRepo } from "../../helpers/index.js";
 
 let projectDir: string;
 
@@ -48,10 +49,26 @@ describe("runPhpGuardsIfNeeded", () => {
     await writeFile(join(projectDir, "ok.php"), "<?php echo 1;");
     await writeFile(join(projectDir, "composer.json"), "{}");
     const calls: string[] = [];
-    const run = completedRun(["ok.php"]);
+    const run = completedRun(["ok.php", "composer.json"]);
     await runPhpGuardsIfNeeded(run, projectDir, php, deps(0, calls));
     expect(run.status).toBe("completed");
     expect(calls).toEqual(["php -l ok.php", "composer validate --no-check-publish"]);
+  });
+
+  // Git reports changed paths from the repository root. A project in a
+  // subdirectory resolved them against itself, found nothing, and linted no
+  // file at all — a broken PHP change passed.
+  it("lints a changed file of a project that is a subdirectory of its repository", async () => {
+    await initGitFixtureRepo(projectDir);
+    const app = join(projectDir, "app");
+    await mkdir(app);
+    await writeFile(join(app, "bad.php"), "<?php if (");
+    await writeFile(join(projectDir, "outside.php"), "<?php");
+    const calls: string[] = [];
+    const run = completedRun(["app/bad.php", "outside.php"]);
+    await runPhpGuardsIfNeeded(run, app, php, deps(255, calls));
+    expect(calls).toEqual(["php -l bad.php"]);
+    expect(run.status).toBe("failed");
   });
 
   it.each([

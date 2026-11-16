@@ -1,12 +1,23 @@
 schema: "rex/v2"
 items:
   "605dd17e-9810-4c71-a1ca-638b98c1f4e8":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T20:30:33.156Z"
-    activeIntervals: [{"start":"2026-11-16T20:30:33.156Z"}]
-    lastModified: "2026-11-16T20:30:33.861Z"
+    completedAt: "2026-11-16T20:43:07.633Z"
+    endedAt: "2026-11-16T20:43:07.633Z"
+    activeIntervals: [{"end":"2026-11-16T20:43:07.633Z","start":"2026-11-16T20:30:33.156Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PHP language in hench + llm-client baseline/detection; php -l and composer validate guards before the test gate; vendor/bin/phpunit test-gate auto-detect; php-project template; tests and docs."
+    lastModified: "2026-11-16T20:43:07.633Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6122f413-b6ff-43d6-9aee-07ea9b4504e4":
+    status: "completed"
+    startedAt: "2026-11-16T20:43:07.633Z"
+    completedAt: "2026-11-16T20:43:07.633Z"
+    endedAt: "2026-11-16T20:43:07.633Z"
+    activeIntervals: [{"end":"2026-11-16T20:43:07.633Z","start":"2026-11-16T20:43:07.633Z"}]
+    appliedAt: "2026-11-16T20:43:07.633Z"
+    appliedAmendsHash: "effa32501ba05c9882eeb700b2ed7ad7dbb8272e8c222d103d4caea15cb1efbe"
     createdAt: "2026-11-14T05:18:03.280Z"
-    lastModified: "2026-11-14T05:24:02.662Z"
+    lastModified: "2026-11-16T20:43:07.633Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
