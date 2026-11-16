@@ -1,0 +1,402 @@
+schema: "rex/v2"
+items:
+  "115f26b3-76f5-4714-b171-160e12c2bcab":
+    status: "completed"
+    startedAt: "2026-11-12T18:52:24.775Z"
+    completedAt: "2026-11-12T18:54:11.451Z"
+    endedAt: "2026-11-12T18:54:11.451Z"
+    activeIntervals: [{"end":"2026-11-12T18:54:11.451Z","start":"2026-11-12T18:52:24.775Z"}]
+    lastModified: "2026-11-12T18:54:11.451Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1bb5db41-3b76-446f-92b9-dda76a5f0b54":
+    status: "completed"
+    startedAt: "2026-11-14T05:14:33.048Z"
+    completedAt: "2026-11-14T05:20:57.400Z"
+    endedAt: "2026-11-14T05:20:57.400Z"
+    activeIntervals: [{"end":"2026-11-14T05:20:57.400Z","start":"2026-11-14T05:14:33.048Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rule 5a: holder.json/reclaim.lock naming this pid with a token this process does not hold is stale (per-process live lease and reclaim token sets; replaces orphanedTokens). Wait line names holder.json path; TESTING.md + docs/packages/hench.md explain clearing a wedged slot; deadline wording removed; hench patch changeset."
+    lastModified: "2026-11-14T05:20:57.400Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1d5360b5-e284-4327-ae21-554c2e134e97":
+    status: "completed"
+    startedAt: "2026-11-16T17:32:04.986Z"
+    completedAt: "2026-11-16T17:38:07.496Z"
+    endedAt: "2026-11-16T17:38:07.496Z"
+    activeIntervals: [{"end":"2026-11-16T17:38:07.496Z","start":"2026-11-16T17:32:04.986Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Test now drives a Codex session with confinement on and a never-resolving hostIdentity cache, so spawnVendorProcess always awaits withSessionValidationSlotDir (no sandbox backend needed) and the abort lands during that wait. Test-only; production unchanged."
+    lastModified: "2026-11-16T17:38:07.496Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1ec3f9f1-5362-4345-8cce-0b7910813b27":
+    status: "completed"
+    startedAt: "2026-11-14T05:29:57.800Z"
+    completedAt: "2026-11-14T05:33:10.316Z"
+    endedAt: "2026-11-14T05:33:10.316Z"
+    activeIntervals: [{"end":"2026-11-14T05:33:10.316Z","start":"2026-11-14T05:29:57.800Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot tests use 2**30 dead pid with bounded acquires; crash test Windows branch asserts the new lease instead of a freed pid; admission-timeout test 3 s hold / 2.5 s timeout; hench.md Ctrl-C sentence corrected."
+    lastModified: "2026-11-14T05:33:10.316Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "24e3c609-310d-41d1-b65f-26d8c55656cd":
+    status: "completed"
+    startedAt: "2026-11-14T05:25:20.858Z"
+    completedAt: "2026-11-14T05:29:45.868Z"
+    endedAt: "2026-11-14T05:29:45.868Z"
+    activeIntervals: [{"end":"2026-11-14T05:29:45.868Z","start":"2026-11-14T05:25:20.858Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot dir is <ndx home>/validation-slot/<sanitized host>/; reclaim.lock finally removes only its own lock; tests, docs, patch changeset."
+    lastModified: "2026-11-14T05:29:45.868Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "31f28b1c-8b8b-4c05-9379-9366fac04223":
+    status: "completed"
+    startedAt: "2026-11-12T18:38:44.457Z"
+    completedAt: "2026-11-12T18:41:18.200Z"
+    endedAt: "2026-11-12T18:41:18.200Z"
+    activeIntervals: [{"end":"2026-11-12T18:41:18.200Z","start":"2026-11-12T18:38:44.457Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: validation-slot.ts remembers tokens whose release failed; this process's next acquire reclaims such a record instead of waiting on itself."
+    lastModified: "2026-11-12T18:41:18.200Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "391a5838-082d-4b5d-928e-7759329ad87a":
+    lastModified: "2026-11-12T17:57:26.059Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3928f6b4-d0f8-4943-8185-f0c6cba12ddb":
+    status: "completed"
+    startedAt: "2026-11-12T17:51:47.410Z"
+    completedAt: "2026-11-12T17:53:30.628Z"
+    endedAt: "2026-11-12T17:53:30.628Z"
+    activeIntervals: [{"end":"2026-11-12T17:53:30.628Z","start":"2026-11-12T17:51:47.410Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Documented NDX_TEST_MAX_WORKERS (TESTING.md) and hench.testGate.maxWorkers (configuration.md, packages/hench.md); added patch changeset for @n-dx/hench."
+    lastModified: "2026-11-12T17:53:30.628Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3ab4bb09-5f4b-4127-bb01-8aca612cd9b4":
+    status: "completed"
+    startedAt: "2026-11-14T06:07:20.192Z"
+    completedAt: "2026-11-14T06:18:22.855Z"
+    endedAt: "2026-11-14T06:18:22.855Z"
+    activeIntervals: [{"end":"2026-11-14T06:18:22.855Z","start":"2026-11-14T06:07:20.192Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "reclaimIfStale + prepareSpawn hook at every confined spawn and hench validation step; rule 4a documents namespace reuse"
+    lastModified: "2026-11-14T06:18:22.855Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3f564624-cbee-4520-b9f6-247ccfc8e92a":
+    status: "completed"
+    startedAt: "2026-11-12T22:19:06.222Z"
+    completedAt: "2026-11-12T22:31:03.630Z"
+    endedAt: "2026-11-12T22:31:03.630Z"
+    activeIntervals: [{"end":"2026-11-12T22:31:03.630Z","start":"2026-11-12T22:19:06.222Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot protocol rule 4a: records carry the writer's PID namespace and enclosing chain; the bwrap sandbox sets NDX_OUTER_PID_NAMESPACES; both implementations judge foreign-namespace pids by namespace, so nesting and waiting work under bubblewrap."
+    lastModified: "2026-11-12T22:31:03.630Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "40b7cd84-8bcc-4175-8bd0-92b8ea8ea290":
+    status: "completed"
+    startedAt: "2026-11-12T17:55:08.873Z"
+    completedAt: "2026-11-12T17:57:54.099Z"
+    endedAt: "2026-11-12T17:57:54.099Z"
+    activeIntervals: [{"end":"2026-11-12T17:57:54.099Z","start":"2026-11-12T17:55:08.873Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "createCommandExecutor(projectDir, testMaxWorkers) wraps env in withTestMaxWorkers; rex_update_status passes options.testMaxWorkers. Probe cases added. Commit 9f67254e0."
+    lastModified: "2026-11-12T17:57:54.099Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4b090e30-2142-4219-b274-fd8ba3a56b7e":
+    status: "completed"
+    startedAt: "2026-11-12T21:17:43.038Z"
+    completedAt: "2026-11-12T21:25:16.093Z"
+    endedAt: "2026-11-12T21:25:16.093Z"
+    activeIntervals: [{"end":"2026-11-12T21:25:16.093Z","start":"2026-11-12T21:17:43.038Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "exec gains optional onSpawn; runInValidationSlot hands callers withSlot(options), which sets the slot env and records the spawned child (group on POSIX) via lease.recordChild before release; gate, re-run, post-task and completion paths use it. Cross-process crash test + per-path holder.json tests."
+    lastModified: "2026-11-12T21:25:16.093Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4cabcef6-50cd-46b6-b78a-334e047774cb":
+    status: "completed"
+    startedAt: "2026-11-14T05:03:40.404Z"
+    completedAt: "2026-11-14T05:08:30.435Z"
+    endedAt: "2026-11-14T05:08:30.435Z"
+    activeIntervals: [{"end":"2026-11-14T05:08:30.435Z","start":"2026-11-14T05:03:40.404Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "finalizeRun-level maxWorkers cases in test-gate-flaky-rerun.test.ts (mutation-checked against both shared.ts sites); resolveSessionCliEnv extracted to store/project-config.ts with unit tests; test-worker-cap.test.ts header now points at them."
+    lastModified: "2026-11-14T05:08:30.435Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "51f1f218-d1e0-4a74-8a98-e3b5a1a9d8d7":
+    lastModified: "2026-11-12T18:09:39.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "53be00af-2a22-4259-a5ce-ef69d8171b17":
+    status: "completed"
+    startedAt: "2026-11-13T18:36:26.387Z"
+    completedAt: "2026-11-13T18:36:26.387Z"
+    endedAt: "2026-11-13T18:36:26.387Z"
+    activeIntervals: [{"end":"2026-11-13T18:36:26.387Z","start":"2026-11-13T18:36:26.387Z"}]
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Default matrix run 2026-11-13 on a quiet M2/16 GiB at 7a0f45ef0. Note: ~/ndx-core/local-design-workshop/docs/analysis/task-prep/04-validation-bench-2026-11-13.md (raw data in validation-bench-2026-11-13/). D vs C: 0/9 vs 4/9 failures, test RSS -75-78%, swap -0.3-0.7 GiB, ~2x batch time. B vs A: +43-94% per run. Keep the slot; measure slot-only (case E) before keeping the cap of 2."
+    lastModified: "2026-11-13T18:36:26.387Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "58c29a6c-14b2-474e-acfb-237613391f80":
+    status: "completed"
+    startedAt: "2026-11-14T06:38:34.411Z"
+    completedAt: "2026-11-14T06:50:55.347Z"
+    endedAt: "2026-11-14T06:50:55.347Z"
+    activeIntervals: [{"end":"2026-11-14T06:50:55.347Z","start":"2026-11-14T06:38:34.411Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "9d828a7fd: the vendor CLI session spawn waits for the host lookup (withSessionValidationSlotDir, bounded by LOOKUP_TIMEOUT_MS, abortable) and passes NDX_VALIDATION_SLOT_DIR; Codex sessions get it unless the sandbox setting is off; failure spawns without it with one warning; per-command spawns still peek."
+    lastModified: "2026-11-14T06:50:55.347Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5bd00ff5-6790-498b-be8c-123681df0b4b":
+    status: "completed"
+    startedAt: "2026-11-14T06:02:27.114Z"
+    completedAt: "2026-11-14T06:07:10.035Z"
+    endedAt: "2026-11-14T06:07:10.035Z"
+    activeIntervals: [{"end":"2026-11-14T06:07:10.035Z","start":"2026-11-14T06:02:27.114Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Runner fails open, awaits child records before release, skips the slot for empty selections; parity pid case skipped on win32; TESTING.md updated"
+    lastModified: "2026-11-14T06:07:10.035Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5e14adef-7996-48b2-a2bd-4681c6e1f85b":
+    status: "completed"
+    startedAt: "2026-11-14T06:20:13.784Z"
+    completedAt: "2026-11-14T06:37:16.038Z"
+    endedAt: "2026-11-14T06:37:16.038Z"
+    activeIntervals: [{"end":"2026-11-14T06:37:16.038Z","start":"2026-11-14T06:20:13.784Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "e1ccf4e2b: host-resolved NDX_VALIDATION_SLOT_DIR handed to every confined command and honoured without lookup in both copies; 60 s failure memory; non-waiting pre-spawn reclaim; seam tests and parity. Closed 0ccd7aa6, 2387d5ba, 3455bc3c."
+    lastModified: "2026-11-14T06:37:16.038Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5fac5b23-077d-40dd-a1d7-c9d1d9b7c20c":
+    status: "completed"
+    startedAt: "2026-11-14T05:08:40.369Z"
+    completedAt: "2026-11-14T05:10:35.873Z"
+    endedAt: "2026-11-14T05:10:35.873Z"
+    activeIntervals: [{"end":"2026-11-14T05:10:35.873Z","start":"2026-11-14T05:08:40.369Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml test matrix and release.yml validate matrix: hench+web split into hench and web groups; leg-count and Windows timeout comments updated (timeout stays 20)."
+    lastModified: "2026-11-14T05:10:35.873Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "61977eb2-9bdc-4f1d-9bf0-5be0fc593e0b":
+    status: "completed"
+    startedAt: "2026-11-14T04:59:12.140Z"
+    completedAt: "2026-11-14T05:03:31.649Z"
+    endedAt: "2026-11-14T05:03:31.649Z"
+    activeIntervals: [{"end":"2026-11-14T05:03:31.649Z","start":"2026-11-14T04:59:12.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "HENCH_VALIDATORS gains testGate.maxWorkers (requirePositiveInteger, now isSafeInteger); withTestMaxWorkers keeps the lower of config and a valid inherited cap; docs, TESTING.md, changesets updated."
+    lastModified: "2026-11-14T05:03:31.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6b308b56-b70f-4490-ae86-bd1e421dc074":
+    status: "completed"
+    startedAt: "2026-11-13T22:06:38.320Z"
+    completedAt: "2026-11-13T22:08:34.822Z"
+    endedAt: "2026-11-13T22:08:34.822Z"
+    activeIntervals: [{"end":"2026-11-13T22:08:34.822Z","start":"2026-11-13T22:06:38.320Z"}]
+    lastModified: "2026-11-13T22:08:34.822Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6d28d3dc-e91b-4b6c-98f7-ea4a9ed8c63b":
+    status: "completed"
+    startedAt: "2026-11-13T19:06:08.949Z"
+    completedAt: "2026-11-13T19:10:20.706Z"
+    endedAt: "2026-11-13T19:10:20.706Z"
+    activeIntervals: [{"end":"2026-11-13T19:10:20.706Z","start":"2026-11-13T19:06:08.949Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added cases E–H to the benchmark; default stays A–D; slot handling keys on the slot flag; tests and TESTING.md updated."
+    lastModified: "2026-11-13T19:10:20.706Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "74838585-5fc7-436e-ba6c-f378be47807f":
+    status: "completed"
+    startedAt: "2026-11-13T22:12:41.225Z"
+    completedAt: "2026-11-13T22:14:20.312Z"
+    endedAt: "2026-11-13T22:14:20.312Z"
+    activeIntervals: [{"end":"2026-11-13T22:14:20.312Z","start":"2026-11-13T22:12:41.225Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Slot test builds the namespace variant from an object; sandbox live probe takes paths via argv. Commit 141608352."
+    lastModified: "2026-11-13T22:14:20.312Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "823880dc-c2ca-4221-8fae-5a413a0eed80":
+    status: "completed"
+    startedAt: "2026-11-12T18:29:50.033Z"
+    completedAt: "2026-11-12T18:34:10.491Z"
+    endedAt: "2026-11-12T18:34:10.491Z"
+    activeIntervals: [{"end":"2026-11-12T18:34:10.491Z","start":"2026-11-12T18:29:50.033Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runInValidationSlot turns acquire failures into ok:false and release failures into a warning; commit 5186679f7"
+    lastModified: "2026-11-12T18:34:10.491Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "85839d4a-3b74-4e79-bb93-838726de17cf":
+    status: "completed"
+    startedAt: "2026-11-12T18:27:16.544Z"
+    completedAt: "2026-11-12T18:29:10.211Z"
+    endedAt: "2026-11-12T18:29:10.211Z"
+    activeIntervals: [{"end":"2026-11-12T18:29:10.211Z","start":"2026-11-12T18:27:16.544Z"}]
+    lastModified: "2026-11-12T18:29:10.211Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "92b189a1-8d77-463f-b524-a29b015eb6f9":
+    status: "completed"
+    startedAt: "2026-11-12T18:54:53.413Z"
+    completedAt: "2026-11-12T19:08:41.728Z"
+    endedAt: "2026-11-12T19:08:41.728Z"
+    activeIntervals: [{"end":"2026-11-12T19:08:41.728Z","start":"2026-11-12T18:54:53.413Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added scripts/bench/validation-bench.mjs with pure helpers in scripts/bench/lib/ (plan, samples, gate-output, summary). It covers cases A–D and five fixtures, with A–C passing --no-slot and D holding the slot through hench's dist module so the runner nests. The dry run prints the matrix, the fixture files and an estimate, and creates nothing. Other parts: a preflight refusal, 2 s samples, JSONL plus summary.md output, and worktree cleanup on exit, signal and error. scripts/lib/workspace-manifests.mjs is now shared with run-all-tests.mjs. There are 24 unit tests and a TESTING.md section."
+    lastModified: "2026-11-12T19:08:41.728Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "96357e8a-d040-477a-9f0d-d75fea4656ef":
+    status: "completed"
+    startedAt: "2026-11-14T05:34:55.095Z"
+    completedAt: "2026-11-14T05:43:20.476Z"
+    endedAt: "2026-11-14T05:43:20.476Z"
+    activeIntervals: [{"end":"2026-11-14T05:43:20.476Z","start":"2026-11-14T05:34:55.095Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "a75d03b6f: slot dir m-/h- + sha256[:16] of machine id or hostname, cached per process; NDX_VALIDATION_SLOT_DIR beside the token, nested acquire uses it; docs, protocol header, patch changeset; change a3e16b11 closed."
+    lastModified: "2026-11-14T05:43:20.476Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9861a7ad-5ff9-47b7-863e-b38ac6cd5da1":
+    status: "completed"
+    startedAt: "2026-11-12T17:37:34.236Z"
+    completedAt: "2026-11-12T17:51:36.753Z"
+    endedAt: "2026-11-12T17:51:36.753Z"
+    activeIntervals: [{"end":"2026-11-12T17:41:46.505Z","start":"2026-11-12T17:37:34.236Z"},{"end":"2026-11-12T17:51:36.753Z","start":"2026-11-12T17:43:23.296Z"}]
+    lastModified: "2026-11-12T17:51:39.396Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a4ee4cda-49d7-4ea3-8df5-f3953da19093":
+    status: "completed"
+    startedAt: "2026-11-12T18:34:19.612Z"
+    completedAt: "2026-11-12T18:38:24.093Z"
+    endedAt: "2026-11-12T18:38:24.093Z"
+    activeIntervals: [{"end":"2026-11-12T18:38:24.093Z","start":"2026-11-12T18:34:19.612Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: run.ts passes its abortSignal to agentLoop; loop.ts passes it to finalizeRun, the completion check's slot options and the tool context's slot options in the Claude API, Gemini and local loops. Test in local-tool-loop.test.ts: a gate queued behind another holder ends when the signal aborts."
+    lastModified: "2026-11-12T18:38:24.093Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a683873b-dd71-4e72-a959-b09d287aa00d":
+    status: "completed"
+    startedAt: "2026-11-13T23:14:17.661Z"
+    completedAt: "2026-11-13T23:17:30.248Z"
+    endedAt: "2026-11-13T23:17:30.248Z"
+    activeIntervals: [{"end":"2026-11-13T23:17:30.248Z","start":"2026-11-13T23:14:17.661Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Both slot implementations read /proc/<n>/status first and skip single-NSpid entries before readlinking ns/pid; nested unreadable own-user entries still count as alive. Rule 4a header updated, tests and hench patch changeset added."
+    lastModified: "2026-11-13T23:17:30.248Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a746220b-6a9a-4f2c-97cc-54c1790cd9bb":
+    status: "completed"
+    startedAt: "2026-11-14T06:52:25.910Z"
+    completedAt: "2026-11-14T06:55:31.230Z"
+    endedAt: "2026-11-14T06:55:31.230Z"
+    activeIntervals: [{"end":"2026-11-14T06:55:31.230Z","start":"2026-11-14T06:52:25.910Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "4a36e28e5: new scripts/bench/lib/stop.mjs (sleep, createSignalHandler, throwIfStopped); runBatch rejects on abort; interrupted line in summary.md; uncaughtException SIGKILL; Windows-safe test path; TESTING.md wording."
+    lastModified: "2026-11-14T06:55:31.230Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "adb92a12-af68-4f9a-b28b-310fb0ea9980":
+    status: "completed"
+    startedAt: "2026-11-12T18:10:17.703Z"
+    completedAt: "2026-11-12T18:27:05.493Z"
+    endedAt: "2026-11-12T18:27:05.493Z"
+    activeIntervals: [{"end":"2026-11-12T18:14:06.702Z","start":"2026-11-12T18:10:17.703Z"},{"end":"2026-11-12T18:27:05.493Z","start":"2026-11-12T18:15:09.764Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench.testGate.hostSlot wires the host validation slot around each gate attempt/re-run, post-task tests and the completion test run (commit 0f03d9652); queueMs/executionMs on run records and in hench show."
+    lastModified: "2026-11-12T18:27:08.200Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b772b0c5-c910-4e92-83bf-776a266c413a":
+    createdAt: "2026-11-12T17:26:37.734Z"
+    lastModified: "2026-11-16T17:31:41.456Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c1e742ad-552e-47c7-8587-b0d5212cde09":
+    status: "completed"
+    startedAt: "2026-11-14T05:54:26.229Z"
+    completedAt: "2026-11-14T06:02:17.667Z"
+    endedAt: "2026-11-14T06:02:17.667Z"
+    activeIntervals: [{"end":"2026-11-14T06:02:17.667Z","start":"2026-11-14T05:54:26.229Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench: rule 5a live lease/reclaim token sets (namespace-aware, live child respected), reclaim-lock ownership check in finally, machine-id per-host dir (same sources/order/hash/10 s timeout/cache rule), NDX_VALIDATION_SLOT_DIR nesting + export, holderPath in wait report. Parity test extended both directions; runner exports both variables."
+    lastModified: "2026-11-14T06:02:17.667Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d34d2902-408a-4b05-9de9-7b2932aae778":
+    status: "completed"
+    startedAt: "2026-11-12T17:32:11.607Z"
+    completedAt: "2026-11-12T17:37:23.271Z"
+    endedAt: "2026-11-12T17:37:23.271Z"
+    activeIntervals: [{"end":"2026-11-12T17:37:23.271Z","start":"2026-11-12T17:32:11.607Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "tests/test-max-workers.mjs reads NDX_TEST_MAX_WORKERS; root and every package vitest config (rex bench excepted) sets test.maxWorkers from it; unit + config policy tests added."
+    lastModified: "2026-11-12T17:37:23.271Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d8a7343d-275f-4a4d-a782-c06c1a08f585":
+    status: "completed"
+    startedAt: "2026-11-12T21:30:37.432Z"
+    completedAt: "2026-11-12T22:18:22.009Z"
+    endedAt: "2026-11-12T22:18:22.009Z"
+    activeIntervals: [{"end":"2026-11-12T22:18:22.009Z","start":"2026-11-12T21:30:37.432Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sandbox grants exactly <ndx home>/validation-slot/ (Seatbelt allow after the ndx-home deny; bwrap bind over the mask) for tool and vendor-cli kinds, creates it before spawn; nested acquire reads before any write in both slot implementations; runner names sandbox and slot dir on EPERM/EACCES. Live Seatbelt tests cover gate nesting and no-token take/release. Linux PID-namespace liveness split into its own task."
+    lastModified: "2026-11-12T22:18:22.009Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "de29498f-6556-4355-b68b-d5c4b3c11129":
+    status: "completed"
+    startedAt: "2026-11-13T23:08:13.923Z"
+    completedAt: "2026-11-13T23:12:34.432Z"
+    endedAt: "2026-11-13T23:12:34.432Z"
+    activeIntervals: [{"end":"2026-11-13T23:12:34.432Z","start":"2026-11-13T23:08:13.923Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Crash test asserts win32 reclaim (child dies with holder); ENOTDIR test now uses holder.json-as-directory (fails release on all OSes); read-only-dir test skipped on win32 with reason; slot header rule 4 notes Windows children end with holder."
+    lastModified: "2026-11-13T23:12:34.432Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dec010f7-03e8-41d5-85c8-d40526f58c0e":
+    status: "completed"
+    startedAt: "2026-11-14T05:44:44.491Z"
+    completedAt: "2026-11-14T05:50:27.953Z"
+    endedAt: "2026-11-14T05:50:27.953Z"
+    activeIntervals: [{"end":"2026-11-14T05:50:27.953Z","start":"2026-11-14T05:44:44.491Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "d1e4224a0: lookups classified found / no source / transient; only the first two cached (createHostIdentityCache); transient throws HostIdentityLookupError, which runInValidationSlot's fail-open path turns into an unslotted run with slotWarning; timeout 10 s; module header, TESTING.md, docs/packages/hench.md updated. Change 10a4e198 closed."
+    lastModified: "2026-11-14T05:50:27.953Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ed2f3d51-97a5-4f5b-8b98-2ff2e2667a10":
+    status: "completed"
+    startedAt: "2026-11-12T17:58:48.316Z"
+    completedAt: "2026-11-12T18:10:08.166Z"
+    endedAt: "2026-11-12T18:10:08.166Z"
+    activeIntervals: [{"end":"2026-11-12T18:10:08.166Z","start":"2026-11-12T17:58:48.316Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New packages/hench/src/process/validation-slot.ts (protocol documented in header) + validation-slot-dir.ts; 18 tests incl. two real processes contending."
+    lastModified: "2026-11-12T18:10:08.166Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ee944d3b-6829-4cac-901a-427b91170c79":
+    status: "completed"
+    startedAt: "2026-11-12T18:43:21.415Z"
+    completedAt: "2026-11-12T18:52:16.095Z"
+    endedAt: "2026-11-12T18:52:16.095Z"
+    activeIntervals: [{"end":"2026-11-12T18:52:16.095Z","start":"2026-11-12T18:43:21.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "scripts/lib/validation-slot.mjs mirrors hench's protocol v1; run-all-tests.mjs takes the slot before rebuild, releases after summary or on SIGINT/SIGTERM after the suite exits, nests on a live holder's token, --list/--no-slot skip it; parity drift test in ROOT_DRIFT_TEST_FILES."
+    lastModified: "2026-11-12T18:52:16.095Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f24532f0-6032-46dd-b167-e684c54e0a5d":
+    status: "completed"
+    startedAt: "2026-11-12T22:32:04.595Z"
+    completedAt: "2026-11-12T22:36:24.813Z"
+    endedAt: "2026-11-12T22:36:24.813Z"
+    activeIntervals: [{"end":"2026-11-12T22:36:24.813Z","start":"2026-11-12T22:32:04.595Z"}]
+    lastModified: "2026-11-12T22:36:24.813Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f2aa9f8c-556b-453f-bc9d-7fa9af4fa7a2":
+    status: "completed"
+    startedAt: "2026-11-14T05:21:06.668Z"
+    completedAt: "2026-11-14T05:25:10.913Z"
+    endedAt: "2026-11-14T05:25:10.913Z"
+    activeIntervals: [{"end":"2026-11-14T05:25:10.913Z","start":"2026-11-14T05:21:06.668Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runInValidationSlot runs the command without the slot on a non-abort acquire error and returns a slotWarning naming the slot dir (also via onWarning); all four call sites go through it. Commit 098541acc."
+    lastModified: "2026-11-14T05:25:10.913Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "feb4f772-7b1a-4273-8365-a618fb1bdf8e":
+    status: "completed"
+    startedAt: "2026-11-12T21:25:38.434Z"
+    completedAt: "2026-11-12T21:29:20.445Z"
+    endedAt: "2026-11-12T21:29:20.445Z"
+    activeIntervals: [{"end":"2026-11-12T21:29:20.445Z","start":"2026-11-12T21:25:38.434Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Claude API completion check passes opts.abortSignal to its validation-slot wait; new integration test covers it."
+    lastModified: "2026-11-12T21:29:20.445Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

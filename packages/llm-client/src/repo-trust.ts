@@ -1000,7 +1000,14 @@ const HENCH_FIELD_CHECKS = {
   language: optional(oneOf("typescript", "javascript", "go", "swift")),
   provider: optional(oneOf("cli", "api")),
   fullTestCommand: optional(isString),
-  testGate: optional(shape({ command: optional(isString), rerunCommand: optional(isString) })),
+  testGate: optional(shape({
+    command: optional(isString),
+    rerunCommand: optional(isString),
+    maxWorkers: optional((v) => positive(v) && Number.isSafeInteger(v)),
+    // Only queues hench's own test commands behind one another: it runs
+    // nothing new, so it needs no review of its own.
+    hostSlot: optional((v) => typeof v === "boolean"),
+  })),
 } satisfies Record<string, FieldCheck>;
 
 /**

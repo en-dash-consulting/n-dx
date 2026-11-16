@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
+import { testMaxWorkers } from "../../tests/test-max-workers.mjs";
 
 const packagesRoot = resolve(import.meta.dirname, "..");
 
@@ -17,6 +18,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // NDX_TEST_MAX_WORKERS caps workers for every project; unset keeps vitest's default.
+    maxWorkers: testMaxWorkers(),
     silent: "passed-only",
     // Pin color and session env so ambient shell state cannot change verdicts.
     setupFiles: [

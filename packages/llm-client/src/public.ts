@@ -407,6 +407,8 @@ export {
   readOnlyProjectPathsFor,
   gitControlPathsFor,
   removeSandboxPlaceholders,
+  validationSlotDirFor,
+  VALIDATION_SLOT_DIRNAME,
   SANDBOX_MACH_SERVICES,
   SANDBOX_MACH_SERVICES_DNS,
   SANDBOX_MACH_SERVICES_VENDOR,

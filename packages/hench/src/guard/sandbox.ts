@@ -38,6 +38,8 @@ import type {
 // Through hench's exec module, so a test that stubs it stubs these spawns too.
 import { exec, execShellCmd } from "../process/exec.js";
 import type { ExecOptions, ExecResult } from "../process/exec.js";
+import { reclaimHostValidationSlot, withHostValidationSlotDir } from "../process/validation-run.js";
+import { hostIdentity, type HostIdentityCache } from "../process/validation-slot-dir.js";
 import { GuardError } from "./paths.js";
 
 /** What a tool spawn site needs: wrap one argv, and say what it is running under. */
@@ -45,6 +47,15 @@ export interface ToolSandbox {
   wrap(file: string, args: readonly string[]): SandboxedInvocation;
   /** Wrap a shell command string in the shell `execShellCmd` would use. */
   wrapShell(command: string): SandboxedInvocation;
+  /**
+   * Await before each confined spawn, and spawn with the environment it
+   * returns: clears a stale validation-slot holder that the confined command
+   * could not judge (`reclaimHostValidationSlot`), and returns `base` with
+   * the host-resolved slot directory in `NDX_VALIDATION_SLOT_DIR`
+   * (`withHostValidationSlotDir`). Never throws, and never waits on the host
+   * lookup.
+   */
+  prepareSpawn(base: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv>;
   readonly backend: SandboxBackend;
   readonly setting: SandboxSetting;
   readonly tmpDir: string;
@@ -68,6 +79,27 @@ export interface CreateToolSandboxOptions {
   backend?: SandboxBackend;
   /** Injected for tests; defaults to `resolveSandboxSetting`. */
   setting?: SandboxSetting;
+  /** Injected for tests; defaults to `reclaimHostValidationSlot`. Must never throw. */
+  reclaimSlot?: (env: NodeJS.ProcessEnv) => Promise<void>;
+  /** Injected for tests; defaults to this process's host identity cache. */
+  hostIdentity?: Pick<HostIdentityCache, "peek">;
+}
+
+/** Clear a stale holder from the host view, as `prepareSpawn` does. */
+function reclaimSlot(options: CreateToolSandboxOptions): Promise<void> {
+  const env = options.env ?? process.env;
+  return options.reclaimSlot ? options.reclaimSlot(env) : reclaimHostValidationSlot(env, options.hostIdentity);
+}
+
+/** The `prepareSpawn` of a sandbox built with `options`. */
+function spawnPreparer(options: CreateToolSandboxOptions): (base: NodeJS.ProcessEnv) => Promise<NodeJS.ProcessEnv> {
+  const hostEnv = options.env ?? process.env;
+  // Started now, so the identity is usually known by the first spawn.
+  (options.hostIdentity ?? hostIdentity).peek();
+  return async (base) => {
+    await reclaimSlot(options);
+    return withHostValidationSlotDir(base, hostEnv, options.hostIdentity);
+  };
 }
 
 function realOr(path: string): string {
@@ -132,6 +164,7 @@ export function createToolSandbox(
     tmpDir,
     wrap: (file, args) => wrapInSandbox(file, args, policy, backend),
     wrapShell: (command) => wrapShellInSandbox(command, policy, backend),
+    prepareSpawn: spawnPreparer(options),
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -161,6 +194,11 @@ export function createToolSandbox(
  * The sandbox is built per call and removed afterwards. npm's cache moves
  * into its scratch directory, because the home directory is not writable.
  * Never throws for a command failure; the result is `execShellCmd`'s.
+ *
+ * Every call first clears a stale validation-slot holder from the host view,
+ * confined or not: these are hench's own validation steps, so during a
+ * vendor-CLI session (one sandbox for the whole session) they are where a
+ * holder that died on the host is cleared for the session's confined runners.
  */
 export async function execRepoShellCmd(
   command: string,
@@ -168,11 +206,15 @@ export async function execRepoShellCmd(
   sandboxOptions: CreateToolSandboxOptions = {},
 ): Promise<ExecResult> {
   const sandbox = createToolSandbox(opts.cwd, sandboxOptions);
-  if (!sandbox) return execShellCmd(command, opts);
+  if (!sandbox) {
+    await reclaimSlot(sandboxOptions);
+    return execShellCmd(command, opts);
+  }
   try {
+    const base = await sandbox.prepareSpawn(opts.env ?? process.env);
     const inv = sandbox.wrapShell(command);
     const env = {
-      ...(opts.env ?? process.env),
+      ...base,
       ...inv.env,
       npm_config_cache: join(sandbox.tmpDir, "npm-cache"),
     };
@@ -216,6 +258,23 @@ function installRoot(path: string, home: string): string {
 export interface CreateVendorCliSandboxOptions extends CreateToolSandboxOptions {
   /** Path the vendor CLI was resolved to; its install directory is made readable. */
   cliBinary: string;
+}
+
+/**
+ * Whether `vendor` runs its session inside its own sandbox under the
+ * operator's confinement setting: Codex, unless that setting is off. Such a
+ * session gets the host-resolved validation slot directory like one we
+ * confine, because a lookup inside its sandbox may be refused. No backend is
+ * needed: Codex brings its own.
+ */
+export function isSelfConfinedVendorSession(
+  projectDir: string,
+  vendor: string,
+  options: Pick<CreateToolSandboxOptions, "env" | "ndxHome" | "setting"> = {},
+): boolean {
+  if (vendor !== LLM_VENDOR.CODEX) return false;
+  const setting = options.setting ?? resolveSandboxSetting(projectDir, { env: options.env, ndxHome: options.ndxHome });
+  return setting.mode !== "off";
 }
 
 /**
@@ -301,6 +360,7 @@ export function createVendorCliSandbox(
     tmpDir,
     wrap: (file, args) => withClaudeTmp(wrapInSandbox(file, args, policy, backend)),
     wrapShell: (command) => withClaudeTmp(wrapShellInSandbox(command, policy, backend)),
+    prepareSpawn: spawnPreparer(options),
     dispose: () => {
       if (disposed) return;
       disposed = true;

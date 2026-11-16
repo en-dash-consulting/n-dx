@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "3455bc3c-2fa0-4c72-9cb9-faaa06c6697d":
+    status: "completed"
+    startedAt: "2026-11-14T06:35:00.774Z"
+    completedAt: "2026-11-14T06:35:00.774Z"
+    endedAt: "2026-11-14T06:35:00.774Z"
+    activeIntervals: [{"end":"2026-11-14T06:35:00.774Z","start":"2026-11-14T06:35:00.774Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed in e1ccf4e2b (task 5e14adef): sandbox-pre-spawn.test.ts asserts the reclaim completes before the vendor CLI spawn (new vendorSandbox seam) and before confined execRepoShellCmd spawns; validation-run-host-slot-dir.test.ts runs the production reclaim on a temp ndx home (stale removed, live kept)."
+    appliedAt: "2026-11-14T06:35:00.774Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-14T06:17:58.305Z"
+    lastModified: "2026-11-14T06:35:00.774Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

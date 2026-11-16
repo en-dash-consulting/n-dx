@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "10fb002b-534b-4596-b28e-1f80d8cfbcec":
+    status: "completed"
+    startedAt: "2026-11-14T06:49:34.060Z"
+    completedAt: "2026-11-14T06:49:34.060Z"
+    endedAt: "2026-11-14T06:49:34.060Z"
+    activeIntervals: [{"end":"2026-11-14T06:49:34.060Z","start":"2026-11-14T06:49:34.060Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed in 9d828a7fd by task 58c29a6c (Give every vendor CLI session the host slot directory): the session spawn waits, bounded and abortable, for the host lookup."
+    appliedAt: "2026-11-14T06:49:34.060Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-14T06:36:49.155Z"
+    lastModified: "2026-11-14T06:49:34.060Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

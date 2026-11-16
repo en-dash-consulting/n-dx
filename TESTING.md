@@ -126,6 +126,7 @@ node scripts/run-all-tests.mjs root-docs             # docs-page tests only (~2 
 node scripts/run-all-tests.mjs root-extensions       # the fixture extension through the CLI and hub (~10 s)
 node scripts/run-all-tests.mjs affected <baseRef>    # only suites the change since <baseRef> touches
 node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection and why; run nothing
+node scripts/run-all-tests.mjs root-policy --no-slot # skip the host validation slot (deliberate parallel run)
 ```
 
 `affected` compares the working tree to `<baseRef>` (committed, staged, unstaged and untracked files). Rules live in `scripts/lib/select-suites.mjs`:
@@ -142,13 +143,23 @@ node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection
 - Machine-written state (`.rex/prd_tree/`, `.hench/`, `.sourcevision/`) selects nothing.
 - **Stale builds fail the gate.** Several root tests read a package through `dist/` (`catalog-runtime-contract`, `layout-resolver-contract`, …), so against an old build they pass on a source change they should fail. Freshness is judged by content, not mtimes. A package's full build (`build` script) ends with `scripts/write-build-stamp.mjs`, which writes `dist/.build-stamp.json` holding a hash of the `src/` it compiled. When a changed file is under `packages/<dir>/src/` and that stamp is missing or differs from the current source hash, `affected` runs nothing: it exits 1 naming the package and `pnpm --filter <name> build`, and prints `test-gate: stale-dist=<dirs>`. Build the packages you changed and re-run. Consequences: a partial build (web `build:landing`) never writes the stamp, so it cannot mask stale compiled code; a source rewritten with identical content needs no rebuild (the hash is unchanged, even though incremental `tsc` emits nothing). Any new package build that produces `dist/` must end with the stamp step. `--list` runs nothing and skips the check. (The e2e `verify-build.js` still only warns locally outside CI; it shares the same check, `scripts/lib/stale-dist.mjs`.)
 
+**Host validation slot.** The runner takes the same per-user slot hench's gates take (see [Running Several Worktrees at Once](#running-several-worktrees-at-once)), always, whatever `hench.testGate.hostSlot` says: it is repository tooling, not hench config. A selected run waits for the slot before the stale-package rebuild, prints `Waiting for the validation slot held by pid <n> …` while it queues, and gives the slot back after the summary (or on SIGINT/SIGTERM, once the running suite has exited; a signal during the wait just aborts it). The summary ends with a `Validation slot:` line: `queued <n>s`, `ran inside the slot of the process that started this runner`, `not taken (--no-slot)`, `not taken (nothing to run)`, or `skipped (could not take it in <dir>: <error>)`.
+
+- **Nesting.** A runner started by a live slot holder (the holder exports its token as `NDX_VALIDATION_SLOT` and its slot directory as `NDX_VALIDATION_SLOT_DIR`; a hench gate does so when `hench.testGate.hostSlot` is on, and the runner does so to the suites it runs) runs inside that holder's slot and does not wait, so a hench gate that calls `run-all-tests.mjs` cannot deadlock on itself. With `hostSlot` off the gate holds nothing and the runner takes the slot itself. A token naming a dead holder is ignored, and the runner queues normally.
+- **Inside the sandbox.** Hench's OS sandbox grants `<ndx home>/validation-slot/` read and write, and nothing else in the ndx home, to the gate's command and to an agent's shell, so the runner works confined. Under bubblewrap the child has its own PID namespace; each slot record names the namespace it was written in and the sandbox sets `NDX_OUTER_PID_NAMESPACES`, so a confined runner still nests on its gate's token and never judges a holder outside its namespace dead (rule 4a in `packages/hench/src/process/validation-slot.ts`). It cannot judge a holder in a sibling sandbox either, so a runner killed with its sandbox (a `run_command` timeout) would leave a record every later confined runner waits on; hench, which runs on the host, clears such a stale record before each confined spawn and each of its own validation commands. Hench also hands every confined command the slot directory it resolved on the host, as `NDX_VALIDATION_SLOT_DIR` without a token, so a confined runner takes the slot there and runs no machine-id lookup (which the sandbox may refuse). A nested runner only reads `holder.json`. When it still may not use the directory (a sandbox that does not grant it), it warns naming the directory and the sandbox, and runs without the slot.
+- **Fails open.** A slot it cannot take (the ndx home unwritable or full, a sandbox that does not grant it, a failed host lookup) prints a `WARNING:` naming the slot directory and the error, and the suites run without it, as hench's gate does. A signal during the wait still stops the run.
+- **`--list` never waits.** It prints the selection and exits without taking the slot or rebuilding.
+- **Nothing to run, no wait.** An `affected` run that selects no suite and has no stale package to rebuild does not take the slot.
+- **Opt-out.** `--no-slot` runs without the slot, for a deliberate parallel run (for example two worktrees on a machine with the cores to spare). Apart from the cases above, nothing skips it.
+- **Two copies of the protocol.** The runner's `scripts/lib/validation-slot.mjs` is plain JS because the runner cannot import hench; `tests/e2e/validation-slot-parity.test.js` (in `root-drift`) fails if it and `packages/hench/src/process/validation-slot.ts` (with `validation-slot-dir.ts`) disagree on the per-host slot directory, exclusion, release, token and directory nesting, stale-holder reclaim, own-pid leftovers or reclaim-lock ownership. Change both together.
+
 The runner prints `test-gate: selected-suites=…` and, on failure, `test-gate: failed-suites=…`. Hench reads these for `hench.testGate.command` / `rerunCommand` (see [`docs/packages/hench.md`](docs/packages/hench.md)). This repo opts in through `.n-dx.json`. CI still runs everything.
 
 ### Root-drift membership
 
 **Admission rule.** A root test belongs in `root-drift` when it reads a package source — or two packages' definitions of one thing — and fails on a *mismatch*. A root test that drives a package through its public API and asserts *behaviour* does not: those regressions are the package suite's job, and running them all here would be running `root`.
 
-Measured together: **~14 s** for the nineteen files below (`prompt-census` alone is ~12 s of it; the other eighteen fill the remaining workers beside it). `root-policy` is ~2 s for seven.
+Measured together: **~14 s** for the twenty-one files in `ROOT_DRIFT_TEST_FILES` (`prompt-census` alone is ~12 s of it; the other twenty fill the remaining workers beside it). `root-policy` is ~2 s for seven.
 
 A checked-in artifact generated from a package source:
 
@@ -169,6 +180,7 @@ One definition, duplicated across a tier boundary where neither side may import 
 | `tests/e2e/run-options-contract.test.js` | `web/src/shared/run-options.ts` vs hench's run-option table (and rex's `RUN_SETTING_KEYS`) |
 | `tests/e2e/catalog-runtime-contract.test.js` | `core/llm-model-catalog.js` vs llm-client's `DEFAULT_CLAUDE_MODEL` / `DEFAULT_CODEX_MODEL` |
 | `tests/e2e/run-liveness-parity.test.js` | `hench/src/process/run-liveness.ts` vs `web/src/server/run-liveness.ts` |
+| `tests/e2e/validation-slot-parity.test.js` | `hench/src/process/validation-slot.ts` vs `scripts/lib/validation-slot.mjs` |
 | `tests/integration/layout-resolver-contract.test.js` | `core/layout.js`, `llm-client/src/layout.ts`, sourcevision's iso bundle, web's `state-paths.ts` |
 | `tests/integration/task-class-sync.test.js` | `core/config.js`'s task-class list vs llm-client's `DEFAULT_ROUTES` |
 | `tests/integration/task-class-registry.test.js` | every package's `src/` task-class literals vs `DEFAULT_ROUTES` |
@@ -314,6 +326,166 @@ Required test files must contain the annotation `REQUIRED TEST` (case-insensitiv
 a comment near the top of the file. This annotation is machine-verified by
 `tests/e2e/architecture-policy.test.js` to prevent silent removal of required test
 coverage.
+
+## Capping Test Workers
+
+`NDX_TEST_MAX_WORKERS` caps the workers every vitest suite in the repository
+starts (root and each package). The root and package `vitest.config` files read
+it through one helper, `tests/test-max-workers.mjs` (`testMaxWorkers()`).
+
+- **Unset or empty:** vitest keeps its default (one worker per core), so a solo
+  run behaves as it always did.
+- **A positive integer:** the cap for that run, e.g. `NDX_TEST_MAX_WORKERS=2`.
+- **Anything else** (`0`, negative, `50%`, text): ignored with a one-line
+  warning; the run uses vitest's default.
+
+For several worktrees, the host slot ([below](#running-several-worktrees-at-once))
+is the better bound. The cap is for runs outside it: an agent's own shell
+commands, `run-all-tests.mjs --no-slot`, machines that leave the slot off, and
+CI. Export it in the shell profile (`export NDX_TEST_MAX_WORKERS=2`) to cap
+those. Hench sets it for the commands it runs from
+`hench.testGate.maxWorkers` (see
+[Configuration](docs/guide/configuration.md#hench-configuration)). The lower
+value wins: an exported cap below the configured one is kept, so repository
+config can never raise it. A new vitest
+config must read it with `testMaxWorkers()` at the top level of `test`.
+
+## Running Several Worktrees at Once
+
+Turn on the host-wide validation slot so the gates of several worktrees queue
+instead of competing:
+
+```sh
+ndx config hench.testGate.hostSlot true .
+```
+
+This repository sets the slot and no cap. In one [benchmark](#validation-benchmark)
+run (2026-11-13, one repeat, one machine), the slot alone had no failed runs and
+took 19–48% less batch time than the slot with a worker cap; that is one
+measurement, not a rule, so re-run the benchmark on your machine before relying
+on it. The trade-off of no cap: a suite an agent starts directly (for example
+`pnpm --filter <pkg> exec vitest`) is neither capped nor queued here, while
+`scripts/run-all-tests.mjs`, inside hench's sandbox too, does take the slot.
+To cap an agent's shell runs, export `NDX_TEST_MAX_WORKERS`
+([above](#capping-test-workers)).
+
+With `hench.testGate.hostSlot` on (default off), the test gate (each attempt and
+the re-run), the post-task tests and the completion test run each take one slot
+per OS user, shared by every hench process on the host. An agent's own shell
+commands are not serialized; only the worker cap bounds those.
+`scripts/run-all-tests.mjs` takes the same slot unconditionally (see
+[Running a subset of suites](#running-a-subset-of-suites)).
+
+- **Is a run waiting?** It prints `Waiting for the validation slot held by pid
+  <n> in <project> since <time> (<path to holder.json>)`, repeated about every
+  30 s. A holder marked `(exited; its tests still run)` has died but its test
+  child is still alive. Only an interrupt (Ctrl-C, SIGTERM) stops a wait; there
+  is no maximum wait, and the gate's timeout starts after admission.
+- **How long did it wait?** `hench show <run-id> .` prints
+  `Validation slot: queued <n>s, ran <n>s`; the run record stores `queueMs` and
+  `executionMs`.
+- **Where is it?** `<ndx home>/validation-slot/<host>/`
+  (`~/.ndx/validation-slot/<host>/` by default). `<host>` is keyed on the
+  machine id, not the hostname, which macOS changes with the network: `m-`
+  and the first 16 hex characters of the SHA-256 of the id (Linux
+  `/etc/machine-id`, else `/var/lib/dbus/machine-id`; macOS `IOPlatformUUID`;
+  Windows `MachineGuid`), or `h-` and a hash of the hostname when the host has
+  no id source (the files or command are absent, or the command answers
+  without an id). A lookup that times out (10 s) or fails another way never
+  falls back to the hostname, since every other process on the host uses the
+  `m-` directory: that one validation runs without the slot and warns
+  `skipped the validation slot and ran without it: … could not read this
+  host's machine id (…)`, and the next validation retries the lookup. Hosts
+  sharing one ndx home (a network home) each get their own slot.
+  The command hench runs inside the slot gets the slot's token as
+  `NDX_VALIDATION_SLOT` and its directory as `NDX_VALIDATION_SLOT_DIR`; a
+  slot acquire under them nests in that directory instead of waiting.
+  `holder.json` exists exactly while the slot is held and names the
+  pid, project and start time. If the directory cannot be used (permissions,
+  a read-only or full disk, no hard links), hench runs the command without the
+  slot and warns `skipped the validation slot and ran without it`, naming the
+  directory and the error.
+- **Stale holders.** A record whose process and test child are dead, that does
+  not parse, or that predates a reboot is reclaimed automatically by the next
+  waiter. So is one naming the waiter's own pid with a token it does not hold,
+  unless its test child is still alive.
+  Do not delete the directory by hand while a run is active.
+- **A wedged slot.** If a holder died without releasing and the OS gave its
+  pid to an unrelated process (Windows reuses pids within moments), every run
+  on the host waits behind that process. Confirm no ndx test run is active
+  (`hench`, `ndx work`, `run-all-tests.mjs`), then delete the `holder.json`
+  named in the wait message.
+
+### Validation benchmark
+
+`scripts/bench/validation-bench.mjs` measures what the worker cap and the slot
+change on your machine. It replays the affected gate on one commit under up to
+eight cases, every pairing of solo or parallel, cap unset or 2, and slot or
+none, so only these settings differ:
+
+| Case | Worktrees | `NDX_TEST_MAX_WORKERS` | Slot | Isolates |
+|------|-----------|------------------------|------|----------|
+| A | 1 | unset | none (`--no-slot`) | the behaviour before wave 1 |
+| B | 1 | 2 | none | B vs A: what the cap costs one run |
+| C | 3, started together | unset | none | parallel work before wave 1 |
+| D | 3, started together | 2 | host slot, held by the bench around each run (the runner nests in it) | D vs C: the cap and the slot together |
+| E | 3, started together | unset | host slot | E vs C: the slot alone; E vs D: what the cap adds once the slot serializes |
+| F | 3, started together | 2 | none | F vs C: whether the cap alone stops the failures |
+| G | 1 | unset | host slot | G vs A: the slot's own overhead, uncapped |
+| H | 1 | 2 | host slot | H vs B: the slot's own overhead, capped |
+
+The default is A–D, the baseline's cases, so a re-run stays comparable to it;
+select others with `--cases` (any of A–H). The cases with a slot (D, E, G, H)
+take it around each run; the others never touch it and pass `--no-slot`, so
+C's and F's runs share the machine. `--dry-run` says per case whether the slot
+is taken.
+
+```sh
+node scripts/bench/validation-bench.mjs --dry-run --out /tmp/bench   # the plan, the fixture files, an estimate; creates nothing
+node scripts/bench/validation-bench.mjs --out ~/bench-$(date +%F)     # the default matrix
+```
+
+- **Fixtures** (`--fixtures`, default `hench,llm-client,web`; also `core-cli`
+  and `docs`) append a comment to one file and commit it in each bench
+  worktree. Selection depends only on changed paths, so this produces the
+  workload a real edit would. They are listed in `scripts/bench/lib/plan.mjs`.
+- **Other flags.** `--cases A,B,C,D` (any of A–H), `--repeat N`, `--concurrency N` (the
+  worktrees in C, D, E and F), `--timeout-min N` per run (default 60), and `--keep`,
+  which leaves the worktrees in place for inspection.
+- **Before the clock.** The bench adds detached worktrees of `HEAD` under
+  `~/.cache/ndx-bench/<run id>/`, then installs and builds each one. Each
+  fixture rebuilds the packages it touches, so no measured run pays a
+  stale-dist rebuild. The worktrees are removed on exit, on Ctrl-C and on error.
+- **Ctrl-C** sends SIGTERM to the running suites and SIGKILL 10 s later; a
+  second Ctrl-C kills them at once. The batch running at the time is not
+  recorded, and `summary.md` opens with `Interrupted by <signal>: partial results`.
+- **It refuses to start** while a `hench … run`, `run-all-tests`, `vitest` or
+  `ndx work` process is running, or while the 1-minute load average exceeds
+  the core count. Run it on a quiet machine from a plain terminal, not from an
+  agent session: the default matrix runs for one to two hours.
+- **Keep the machine idle for the whole run.** That check runs once, at
+  start. The benchmark does not stop if a hench run, `ndx work` or a test
+  suite starts later; that run's load lands in the numbers. It prints this
+  warning when it starts.
+- **Output** (`--out`, which must be outside the repository):
+  - `runs.jsonl`: one line per run, with wall-clock, exit code, timeout,
+    per-suite pass/fail and duration, the case's `slot` setting, and
+    `slotTaken`, whether this run actually held the slot. Queue and execution
+    time are recorded only when it did (cases D, E, G and H).
+  - `samples.jsonl`: every 2 s, the load, free memory, swap in use, the
+    page-out counter, and the summed RSS of every process under the runs. It
+    reads `vm_stat` and `sysctl vm.swapusage` on macOS, `/proc` on Linux, and
+    `ps` on both.
+  - `batches.jsonl` and `meta.json`, which records the commit and machine.
+  - `logs/`: each run's output, plus `.test-logs/` copies for failed runs.
+  - `summary.md`.
+- **Reading `summary.md`.** There is one row per fixture and case; pair the
+  rows as the table's last column says. Against C, a parallel case should
+  lower peak RSS, peak swap, page-outs and failures and raise minimum free
+  memory, while total batch time shows what the queueing costs. Median wall
+  time for a slot case includes its queue wait. The median queue and exec
+  columns count only runs with `slotTaken`, so A, B, C and F show `–`; G and H
+  show a queue near zero, and E and D show the queueing.
 
 ## Timeout Guardrails
 

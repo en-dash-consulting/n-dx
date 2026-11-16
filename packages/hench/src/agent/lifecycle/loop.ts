@@ -11,6 +11,7 @@ import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { startHostIdentityLookup, validationSlotFromConfig, type ValidationSlotRunOptions } from "../../process/validation-run.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
@@ -124,6 +125,8 @@ async function rejectUnvalidatedCompletion(args: {
   baselineUntracked?: string[];
   testCommand?: string;
   selfHeal?: boolean;
+  testMaxWorkers?: number;
+  validationSlot?: ValidationSlotRunOptions;
 }): Promise<void> {
   const { run, store, taskId, projectDir } = args;
   if (run.status !== "completed") return;
@@ -132,6 +135,8 @@ async function rejectUnvalidatedCompletion(args: {
     testCommand: args.testCommand,
     startingHead: args.startingHead,
     selfHeal: args.selfHeal,
+    testMaxWorkers: args.testMaxWorkers,
+    validationSlot: args.validationSlot,
     baselineUntracked: args.baselineUntracked,
     finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
   });
@@ -253,7 +258,7 @@ async function callWithFailover(
         // Only the client is taken; the loop's own tool context keeps its backstop.
         const apiResources = await initApiResources(
           provider, config, henchDir, projectDir, store, taskId,
-          testCommand, startingHead, undefined,
+          testCommand, startingHead, undefined, undefined,
         );
         client = apiResources.client;
         currentVendor = apiResources.vendor;
@@ -304,6 +309,7 @@ async function initApiResources(
   testCommand: string | undefined,
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
+  abortSignal: AbortSignal | undefined,
 ): Promise<ApiResources> {
   const vendor = provider.info.vendor;
 
@@ -332,7 +338,10 @@ async function initApiResources(
   }
   const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
 
-  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
+  const guard = new GuardRails(projectDir, config.guard, {
+    sandbox: createToolSandbox(projectDir),
+    testMaxWorkers: config.testGate?.maxWorkers,
+  });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   const toolCtx: ToolContext = {
@@ -344,6 +353,8 @@ async function initApiResources(
     startingHead,
     memoryMonitor,
     selfHeal: config.selfHeal,
+    testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
   };
 
@@ -563,8 +574,12 @@ function initGoogleApiResources(
   testCommand: string | undefined,
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
+  abortSignal: AbortSignal | undefined,
 ): ToolContext {
-  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
+  const guard = new GuardRails(projectDir, config.guard, {
+    sandbox: createToolSandbox(projectDir),
+    testMaxWorkers: config.testGate?.maxWorkers,
+  });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   return {
@@ -576,6 +591,8 @@ function initGoogleApiResources(
     startingHead,
     memoryMonitor,
     selfHeal: config.selfHeal,
+    testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
   };
 }
@@ -867,7 +884,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       stream(formatModelLabel(model), completionResult.text ?? "");
     } else {
       const toolCtx = initGoogleApiResources(
-        config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
+        config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop, opts.abortSignal,
       );
       auditedGuard = toolCtx.guard;
       const tools = [{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }];
@@ -992,7 +1009,8 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   // Same completion standard as the CLI loop: a claim with no changes fails.
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand, selfHeal: config.selfHeal,
+    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -1012,6 +1030,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
     run,
     henchDir,
     projectDir,
@@ -1537,7 +1556,7 @@ async function runLocalToolLoop(params: {
   process.on("SIGINT", handleSignal);
 
   const toolCtx = initGoogleApiResources(
-    config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
+    config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop, opts.abortSignal,
   );
 
   const messages: OpenAiMessage[] = [];
@@ -1837,7 +1856,8 @@ async function runLocalToolLoop(params: {
   // Same completion standard as the CLI loop: a claim with no changes fails.
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand, selfHeal: config.selfHeal,
+    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
   });
 
   if (opts.approveDiff && run.status === "completed") {
@@ -1856,6 +1876,7 @@ async function runLocalToolLoop(params: {
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
     run,
     henchDir,
     projectDir,
@@ -1920,6 +1941,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const sandboxPosture = resolveSandboxPosture(projectDir).posture;
   assertSandboxReady(sandboxPosture, opts.autonomous === true || config.autonomous === true);
   stream("Guard", formatSandboxPosture(sandboxPosture));
+  // Read on the host now, so confined commands are handed the slot directory.
+  if (sandboxPosture.state === "confined") startHostIdentityLookup();
 
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
@@ -2057,7 +2080,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   const { client, vendor, toolCtx } = await initApiResources(
     provider, config, henchDir, projectDir, store, taskId,
-    brief.project.testCommand, startingHead, opts.configBackstop,
+    brief.project.testCommand, startingHead, opts.configBackstop, opts.abortSignal,
   );
 
   // Shared: initialize run record + capture start memory snapshot
@@ -2320,6 +2343,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   await rejectUnvalidatedCompletion({
     run, store, taskId, projectDir, startingHead, baselineUntracked,
     testCommand: brief.project.testCommand, selfHeal: config.selfHeal,
+    testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
   });
 
   // Shared: review gate
@@ -2340,6 +2365,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
     run,
     henchDir,
     projectDir,

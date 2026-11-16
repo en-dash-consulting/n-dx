@@ -423,6 +423,24 @@ describe("n-dx config", () => {
       expect(config.review).toBeUndefined();
     });
 
+    it("accepts a whole-number hench.testGate.maxWorkers", async () => {
+      run(["hench.testGate.maxWorkers", "2", tmpDir]);
+
+      const config = JSON.parse(
+        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+      );
+      expect(config.testGate).toEqual({ maxWorkers: 2 });
+    });
+
+    it.each(["0", "-1", "2.5", "abc"])("rejects hench.testGate.maxWorkers %s", async (value) => {
+      expect(runFail(["hench.testGate.maxWorkers", value, tmpDir])).toMatch(/Invalid testGate\.maxWorkers/);
+
+      const config = JSON.parse(
+        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+      );
+      expect(config.testGate).toBeUndefined();
+    });
+
     it("sets a nested value", async () => {
       run(["hench.guard.commandTimeout", "60000", tmpDir]);
 

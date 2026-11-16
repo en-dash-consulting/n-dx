@@ -1,6 +1,7 @@
 /**
  * `hench.testGate.rerunCommand` through finalizeRun: an unattended gate that
  * fails re-runs only the suites on its `test-gate: failed-suites=` line, once.
+ * Also `hench.testGate.maxWorkers` through finalizeRun (last describe).
  *
  * The gate is a real shell script outside the repository that keeps its call
  * log in a temp file, so it can fail on the first call and pass (or fail) on
@@ -17,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import { DEFAULT_HENCH_CONFIG } from "../../src/schema/v1.js";
 import type { HenchConfig, RunRecord } from "../../src/schema/index.js";
 import { finalizeRun } from "../../src/agent/lifecycle/shared.js";
+import { TEST_MAX_WORKERS_ENV } from "../../src/process/test-workers.js";
 import { initGitFixtureRepo, cleanupProjectDir } from "../helpers/index.js";
 import { itNeedsPosixShell } from "../helpers/posix-shell.js";
 
@@ -249,5 +251,55 @@ describe("hench.testGate.rerunCommand", () => {
     expect(run.status).toBe("failed");
     expect(run.testGate?.rerunSkipped).toMatch(/"a;b" is not safe/);
     expect(await calls()).toHaveLength(1);
+  });
+});
+
+/**
+ * `hench.testGate.maxWorkers` through finalizeRun's own wiring: the gate and
+ * the post-task tests each get a probe that exits 0 only when it sees the
+ * expected `NDX_TEST_MAX_WORKERS`. The leaf functions are covered in
+ * test-worker-cap.test.ts; these fail when finalizeRun stops passing the cap.
+ *
+ * The cap is 1 because the lower of the cap and a valid inherited value wins,
+ * so 1 is the result whatever the parent exports. The unset case expects the
+ * parent's value, read and never written.
+ */
+describe("hench.testGate.maxWorkers through finalizeRun", () => {
+  const CAP = 1;
+  const INHERITED = process.env[TEST_MAX_WORKERS_ENV];
+
+  function probe(expected: string | undefined): string {
+    const want = expected === undefined ? "undefined" : `'${expected}'`;
+    return `node -e "process.exit(process.env.${TEST_MAX_WORKERS_ENV} === ${want} ? 0 : 4)"`;
+  }
+
+  async function finalizeWithProbe(expected: string | undefined, maxWorkers?: number): Promise<RunRecord> {
+    const command = probe(expected);
+    const config: HenchConfig = {
+      ...DEFAULT_HENCH_CONFIG(),
+      testGate: { command, ...(maxWorkers !== undefined ? { maxWorkers } : {}) },
+    };
+    const run = buildRun();
+    await finalizeRun({
+      run, henchDir, projectDir, config, testCommand: command,
+      autonomous: true, rollbackOnFailure: false, startingHead: baseline,
+    });
+    return run;
+  }
+
+  itNeedsPosixShell("passes the configured cap to the gate and the post-task tests", async () => {
+    const run = await finalizeWithProbe(String(CAP), CAP);
+
+    expect(run.testGate?.passed).toBe(true);
+    expect(run.structuredSummary?.postRunTests).toMatchObject({ ran: true, passed: true });
+    expect(run.status).toBe("completed");
+  });
+
+  itNeedsPosixShell("leaves the variable as inherited when no cap is set", async () => {
+    const run = await finalizeWithProbe(INHERITED);
+
+    expect(run.testGate?.passed).toBe(true);
+    expect(run.structuredSummary?.postRunTests).toMatchObject({ ran: true, passed: true });
+    expect(run.status).toBe("completed");
   });
 });

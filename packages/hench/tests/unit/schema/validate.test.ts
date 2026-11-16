@@ -644,6 +644,44 @@ describe("validateRunRecord", () => {
     }
   });
 
+  describe("validation slot timing (queueMs / executionMs)", () => {
+    const summary = (postRunTests: Record<string, unknown>) => ({
+      filesChanged: [], filesRead: [], commandsExecuted: [], testsRun: [], postRunTests,
+      counts: { filesRead: 0, filesChanged: 0, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+    });
+    const postRun = { ran: true, passed: true, command: "npm test", durationMs: 40, targetedFiles: [] };
+
+    it("round-trips the gate's and post-task tests' timing", () => {
+      const run = {
+        ...validRun,
+        testGate: { ran: true, passed: true, packages: [], queueMs: 1200, executionMs: 3400 },
+        structuredSummary: summary({ ...postRun, queueMs: 5, executionMs: 40 }),
+      };
+      const result = validateRunRecord(JSON.parse(JSON.stringify(run)));
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.testGate).toMatchObject({ queueMs: 1200, executionMs: 3400 });
+        expect(result.data.structuredSummary!.postRunTests).toMatchObject({ queueMs: 5, executionMs: 40 });
+      }
+    });
+
+    it("loads a record written before the fields existed", () => {
+      const run = {
+        ...validRun,
+        testGate: { ran: true, passed: true, packages: [] },
+        structuredSummary: summary(postRun),
+      };
+      const result = validateRunRecord(run);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.structuredSummary!.postRunTests).not.toHaveProperty("queueMs");
+    });
+
+    it("rejects a negative post-task queue time", () => {
+      const run = { ...validRun, structuredSummary: summary({ ...postRun, queueMs: -1, executionMs: 1 }) };
+      expect(validateRunRecord(run).ok).toBe(false);
+    });
+  });
+
   it("accepts run with structuredSummary", () => {
     const run = {
       ...validRun,
