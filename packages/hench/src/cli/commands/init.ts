@@ -60,7 +60,8 @@ async function ensureGitignoreEntries(dir: string, entries: readonly string[]): 
  * 1. Explicit project-config `language` override
  * 2. `go.mod` present → "go"
  * 3. `Package.swift` OR `*.xcodeproj` / `*.xcworkspace` directory → "swift"
- * 4. `composer.json` → "php"
+ * 4. `composer.json` → "php", unless a root `package.json` sits beside it and
+ *    {@link phpOutnumbersJsTs} says the source is not mostly PHP
  * 5. Otherwise → undefined (JS/TS defaults)
  *
  * Steps 2–4 match `detectRepoLanguage` in `@n-dx/llm-client`, which picks the
@@ -88,10 +89,69 @@ export async function detectProjectLanguage(dir: string): Promise<ProjectLanguag
   if (await fileExists(join(dir, "Package.swift"))) return "swift";
   if (await hasXcodeProjectMarker(dir)) return "swift";
 
-  // Step 4: Composer manifest. A file, as detectRepoLanguage requires.
-  if (await isRegularFile(join(dir, "composer.json"))) return "php";
+  // Step 4: Composer manifest. A file, as detectRepoLanguage requires. Beside a
+  // package.json the source count breaks the tie.
+  if (await isRegularFile(join(dir, "composer.json"))) {
+    if (!(await isRegularFile(join(dir, "package.json")))) return "php";
+    if (await phpOutnumbersJsTs(dir)) return "php";
+  }
 
   return undefined;
+}
+
+const PHP_SOURCE = /\.(php|phtml|inc)$/;
+const JS_TS_SOURCE = /\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$/;
+
+/** Dependency and build directories the count skips, as lang-kit's `COUNT_SKIP_DIRS`. */
+const COUNT_SKIP_DIRS: ReadonlySet<string> = new Set([
+  "node_modules", "vendor", "venv", "site-packages", "bin", "obj", "dist", "build",
+]);
+
+/** Depth and directory bounds of lang-kit's count, plus a cap on entries read. */
+const COUNT_MAX_DEPTH = 3;
+const COUNT_MAX_DIRS = 2000;
+const COUNT_MAX_ENTRIES = 20000;
+
+/**
+ * Does PHP source outnumber JS/TS source? The tiebreak for a root holding both
+ * `composer.json` and `package.json`; a tie is JS/TS. Mirrors lang-kit's
+ * `detectLanguage` rule 3 (packages/lang-kit/src/detect.ts): a breadth-first
+ * walk to three levels below the root, skipping dot-directories and
+ * dependency/build directories, stopping after {@link COUNT_MAX_DIRS}
+ * directories or {@link COUNT_MAX_ENTRIES} entries and deciding on what it
+ * counted. Must give the same answer as `phpOutnumbersJsTs` in
+ * `@n-dx/llm-client`'s repo-trust.ts, or repository trust flags the guard
+ * init wrote.
+ */
+async function phpOutnumbersJsTs(rootDir: string): Promise<boolean> {
+  let php = 0;
+  let jsTs = 0;
+  let dirs = 0;
+  let seen = 0;
+  let queue = [rootDir];
+  for (let depth = 0; depth <= COUNT_MAX_DEPTH && queue.length > 0; depth++) {
+    const next: string[] = [];
+    for (const dir of queue) {
+      if (dirs++ >= COUNT_MAX_DIRS) return php > jsTs;
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        continue; // Unreadable directory: count what the rest holds.
+      }
+      for (const entry of entries) {
+        if (seen++ >= COUNT_MAX_ENTRIES) return php > jsTs;
+        if (entry.isDirectory()) {
+          if (!entry.name.startsWith(".") && !COUNT_SKIP_DIRS.has(entry.name)) next.push(join(dir, entry.name));
+        } else if (entry.isFile()) {
+          if (PHP_SOURCE.test(entry.name)) php++;
+          else if (JS_TS_SOURCE.test(entry.name)) jsTs++;
+        }
+      }
+    }
+    queue = next;
+  }
+  return php > jsTs;
 }
 
 export async function cmdInit(

@@ -441,6 +441,64 @@ describe("assessRepoExecutionConfig", () => {
     expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");
   });
 
+  describe("composer.json beside package.json: source count decides", () => {
+    function touch(...rels: string[]): void {
+      for (const rel of rels) {
+        mkdirSync(join(repo, rel, ".."), { recursive: true });
+        writeFileSync(join(repo, rel), "");
+      }
+    }
+    const detected = () => collectRepoExecutionConfig(repo).detectedLanguage;
+
+    it("is php with composer.json and no package.json", () => {
+      touch("composer.json", "src/a.js", "src/b.ts");
+      expect(detected()).toBe("php");
+    });
+
+    it("is typescript when JS/TS source outnumbers PHP", () => {
+      touch("composer.json", "package.json", "src/a.js", "src/b.tsx", "src/c.mjs", "api/index.php");
+      expect(detected()).toBe("typescript");
+    });
+
+    it("is typescript on a tie", () => {
+      touch("composer.json", "package.json", "src/a.ts", "api/index.php");
+      expect(detected()).toBe("typescript");
+    });
+
+    it("is php for a Laravel-shaped checkout", () => {
+      touch(
+        "composer.json", "package.json", "artisan",
+        "app/Models/User.php", "app/Http/Controllers/Controller.php", "routes/web.php",
+        "resources/views/home.phtml", "resources/js/app.js",
+      );
+      expect(detected()).toBe("php");
+    });
+
+    it("counts nothing under vendor/, node_modules/ or dot-directories", () => {
+      touch(
+        "composer.json", "package.json", "src/a.ts", "src/b.ts", "app/x.php",
+        "vendor/pkg/a.php", "vendor/pkg/b.php", "vendor/pkg/c.php",
+        "node_modules/x/a.js", "build/a.js", ".cache/a.js",
+      );
+      expect(detected()).toBe("typescript");
+      touch(
+        "app/y.php", "app/z.php",
+        "node_modules/x/b.js", "node_modules/x/c.js", "node_modules/x/d.js", "dist/a.js", ".git/a.js",
+      );
+      expect(detected()).toBe("php");
+    });
+
+    it("stops at a bounded depth", () => {
+      touch("composer.json", "package.json", "app/a.php", "a/b/c/d/e/x.js", "a/b/c/d/e/y.js");
+      expect(detected()).toBe("php");
+    });
+
+    it("still gives go.mod precedence", () => {
+      touch("go.mod", "composer.json", "package.json", "app/a.php", "app/b.php");
+      expect(detected()).toBe("go");
+    });
+  });
+
   it("does not count a file named like an Xcode project as a swift marker", () => {
     writeFileSync(join(repo, "App.xcodeproj"), "");
     expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");

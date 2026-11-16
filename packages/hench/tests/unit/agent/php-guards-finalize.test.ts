@@ -109,4 +109,63 @@ describe("detectProjectLanguage", () => {
     await writeFile(join(projectDir, "go.mod"), "module x\n");
     expect(await detectProjectLanguage(projectDir)).toBe("go");
   });
+
+  // Same cases as detectRepoLanguage's in llm-client's repo-trust.test.ts:
+  // the two must agree, or trust flags the guard init wrote.
+  describe("composer.json beside package.json: source count decides", () => {
+    async function touch(...rels: string[]): Promise<void> {
+      for (const rel of rels) {
+        await mkdir(join(projectDir, rel, ".."), { recursive: true });
+        await writeFile(join(projectDir, rel), "");
+      }
+    }
+
+    it("is php with composer.json and no package.json", async () => {
+      await touch("composer.json", "src/a.js", "src/b.ts");
+      expect(await detectProjectLanguage(projectDir)).toBe("php");
+    });
+
+    it("is the JS/TS default when JS/TS source outnumbers PHP", async () => {
+      await touch("composer.json", "package.json", "src/a.js", "src/b.tsx", "src/c.mjs", "api/index.php");
+      expect(await detectProjectLanguage(projectDir)).toBeUndefined();
+    });
+
+    it("is the JS/TS default on a tie", async () => {
+      await touch("composer.json", "package.json", "src/a.ts", "api/index.php");
+      expect(await detectProjectLanguage(projectDir)).toBeUndefined();
+    });
+
+    it("is php for a Laravel-shaped checkout", async () => {
+      await touch(
+        "composer.json", "package.json", "artisan",
+        "app/Models/User.php", "app/Http/Controllers/Controller.php", "routes/web.php",
+        "resources/views/home.phtml", "resources/js/app.js",
+      );
+      expect(await detectProjectLanguage(projectDir)).toBe("php");
+    });
+
+    it("counts nothing under vendor/, node_modules/ or dot-directories", async () => {
+      await touch(
+        "composer.json", "package.json", "src/a.ts", "src/b.ts", "app/x.php",
+        "vendor/pkg/a.php", "vendor/pkg/b.php", "vendor/pkg/c.php",
+        "node_modules/x/a.js", "build/a.js", ".cache/a.js",
+      );
+      expect(await detectProjectLanguage(projectDir)).toBeUndefined();
+      await touch(
+        "app/y.php", "app/z.php",
+        "node_modules/x/b.js", "node_modules/x/c.js", "node_modules/x/d.js", "dist/a.js", ".git/a.js",
+      );
+      expect(await detectProjectLanguage(projectDir)).toBe("php");
+    });
+
+    it("stops at a bounded depth", async () => {
+      await touch("composer.json", "package.json", "app/a.php", "a/b/c/d/e/x.js", "a/b/c/d/e/y.js");
+      expect(await detectProjectLanguage(projectDir)).toBe("php");
+    });
+
+    it("still gives go.mod precedence", async () => {
+      await touch("go.mod", "composer.json", "package.json", "app/a.php", "app/b.php");
+      expect(await detectProjectLanguage(projectDir)).toBe("go");
+    });
+  });
 });
