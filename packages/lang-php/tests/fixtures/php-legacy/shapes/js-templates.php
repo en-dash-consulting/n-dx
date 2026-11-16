@@ -12,3 +12,6 @@
 <script>var t = _.template('<%= name %>');</script>
 <%= $title %>
 <?php $tpl = '<% _.each(items) %>'; ?>
+<script type="text/template" id="late">
+<?php echo $label; ?>
+<% if (x) { %>ok<% } %></script>
