@@ -17,7 +17,7 @@ items:
     startedAt: "2026-11-16T23:02:30.574Z"
     activeIntervals: [{"end":"2026-11-16T23:11:15.932Z","start":"2026-11-16T23:02:30.574Z"}]
     failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-tests.mjs affected 02a61b204bb2de9e9f6ecfc5aaf603a5285db51e]: work…\nFailing tests (2):\n- the checked-in baseline exists and is well formed\n- tests/e2e/prompt-census.test.js > prompt census: baseline > the checked-in baseline exists and is well formed\n  AssertionError: expected '02a61b204bb2-dirty' to match /^[0-9a-f]{7,40}$/"
-    lastModified: "2026-11-16T23:31:48.196Z"
+    lastModified: "2026-11-16T23:33:14.652Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bc6b57ed-338a-4d0d-b776-e2019a5de6fd":
     lastModified: "2026-11-11T21:05:50.921Z"
