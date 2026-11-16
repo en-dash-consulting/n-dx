@@ -13,6 +13,31 @@ import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import type { Readable } from "node:stream";
 
+// Read the model from Codex's argv, or its quoted command behind cmd.exe.
+function codexModelPin(args: string[]): string | undefined {
+  if (args[0] === "/d" && args.includes("/c")) {
+    return args.at(-1)?.match(/(?:^| )"-m" "([^"]*)"(?= |"$)/)?.[1];
+  }
+  const at = args.indexOf("-m");
+  return at === -1 ? undefined : args[at + 1];
+}
+
+describe("Codex model-pin assertion argv fixtures (simulated Windows)", () => {
+  it.each([
+    ["POSIX literal pin", ["exec", "-m", "gpt-5.4"], "gpt-5.4"],
+    ["Windows literal pin", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m" "gpt-5.4""'], "gpt-5.4"],
+    ["POSIX wrong pin", ["exec", "-m", "gpt-5.5"], "gpt-5.5"],
+    ["Windows wrong pin", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m" "gpt-5.5""'], "gpt-5.5"],
+    ["POSIX missing flag", ["gpt-5.4", "exec"], undefined],
+    ["Windows missing flag", ["/d", "/v:off", "/s", "/c", '"codex "exec" "gpt-5.4""'], undefined],
+    ["POSIX missing value", ["exec", "-m"], undefined],
+    ["Windows missing value", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m""'], undefined],
+  ] as const)("reads the exact model: %s", (_label, args, expected) => {
+    expect(codexModelPin([...args])).toBe(expected);
+    expect(codexModelPin([...args]) === "gpt-5.4").toBe(expected === "gpt-5.4");
+  });
+});
+
 // ── Mock declarations (hoisted above imports by vitest) ──────────────────────
 
 const { mockReadFile, mockMkdtemp, mockRm, mockSpawn } = vi.hoisted(() => {
@@ -154,7 +179,7 @@ describe("Codex literal model execution", () => {
     const client = createCodexCliClient({ codexConfig: { model: "gpt-5.4" } });
     await client.complete({ prompt: "test" });
     const args = mockSpawn.mock.calls[0][1] as string[];
-    expect(args[args.indexOf("-m") + 1]).toBe("gpt-5.4");
+    expect(codexModelPin(args)).toBe("gpt-5.4");
   });
   it("does not retry or substitute a rejected ChatGPT model", async () => {
     mockSpawn.mockClear();
