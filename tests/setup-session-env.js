@@ -30,6 +30,9 @@
  * so leaving it set would point a fixture-driven lookup at a real one.
  */
 
+// Codex-assisted tests must never discover the ambient production rollout.
+delete process.env.CODEX_THREAD_ID;
+delete process.env.CODEX_HOME;
 delete process.env.CLAUDE_CODE_SESSION_ID;
 delete process.env.CLAUDE_CONFIG_DIR;
 

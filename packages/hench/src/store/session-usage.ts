@@ -1,5 +1,10 @@
 /**
- * Read a Claude Code session's own token usage from its transcript.
+ * Read an assisted session's own token usage from its transcript.
+ *
+ * Claude message usage retains its UUID/count addressing. Codex rollout
+ * cumulative counters are normalized into increments, with counter snapshots
+ * persisted for resume and prefix truncation. Unsupported/reset counters are
+ * reported to the command layer; they must not be presented as measured zero.
  *
  * Assisted runs — task work driven through the `/ndx-work` skill rather than a
  * spawned hench agent — used to record zero tokens, on the stated grounds that
@@ -72,6 +77,7 @@
 import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { parseCodexUsage } from "./codex-session-usage.js";
 import type { TokenUsage } from "../schema/index.js";
 
 /** Where Claude Code keeps per-project transcripts, relative to the config dir. */
@@ -82,6 +88,10 @@ const CURSOR_SUBDIR = "usage-cursors";
 
 /** How far through a session's transcript a previous record already accounted. */
 export interface SessionUsageCursor {
+  /** The previous record ended on an incomplete Codex rollout snapshot. */
+  usagePartial?: boolean;
+  /** Cumulative Codex counters survive a resumed/truncated rollout. */
+  totals?: Required<TokenUsage>;
   /**
    * uuid of the last transcript message attributed. Exact when the transcript
    * still contains it.
@@ -103,6 +113,8 @@ export interface SessionUsageCursor {
  * at record time.
  */
 export interface UsageMark {
+  /** The start snapshot contained incomplete Codex records. */
+  usagePartial?: boolean;
   /** The task (or `skill:<name>`) this mark was taken for. */
   task: string;
   /** When the mark was taken (ISO-8601). Metadata — never used to filter usage. */
@@ -122,6 +134,8 @@ export interface UsageMark {
   excluded?: Required<TokenUsage>;
   /** Messages those records claimed, subtracted from this mark's turn count. */
   excludedMessages?: number;
+  /** Disjoint cumulative-counter spans already claimed by nested Codex records. */
+  codexClaims?: Array<{ from: Required<TokenUsage>; to: Required<TokenUsage> }>;
 }
 
 /** A session that has had nothing attributed yet. */
@@ -209,6 +223,8 @@ function numeric(value: unknown): number {
  * rather than dropped.
  */
 function parseUsageEntries(transcript: string): TranscriptEntry[] {
+  const codex = parseCodexUsage(transcript);
+  if (codex.supported) return codex.entries;
   const entries: TranscriptEntry[] = [];
   const seen = new Set<string>();
   for (const line of transcript.split(/\r?\n/)) {
@@ -273,7 +289,17 @@ export function snapshotTranscriptUsage(transcript: string): TranscriptUsageSnap
 /** Build a mark for `task` from the transcript as it stands now. */
 export function takeUsageMark(transcript: string, task: string, at = new Date().toISOString()): UsageMark {
   const snapshot = snapshotTranscriptUsage(transcript);
-  return { task, at, lastUuid: snapshot.lastUuid, consumed: snapshot.messages, totals: snapshot.totals };
+  const codex = parseCodexUsage(transcript);
+  return { task, at, lastUuid: snapshot.lastUuid, consumed: snapshot.messages, totals: snapshot.totals,
+    ...(codex.supported && codex.status === "partial" ? { usagePartial: true } : {}),
+  };
+}
+
+/** A stale rollout must not rewind any boundary already observed in this session. */
+export function usageCountersRegressed(totals: Required<TokenUsage>, cursor: SessionUsageCursor): boolean {
+  const boundaries = [cursor.totals, ...Object.values(cursor.marks ?? {}).map((mark) => mark.totals)];
+  return boundaries.some((boundary) => boundary &&
+    (["input", "output", "cacheReadInput", "cacheCreationInput"] as const).some((key) => totals[key] < boundary[key]));
 }
 
 /**
@@ -334,6 +360,39 @@ export function withClaimExcluded(
   const taskIds = Object.keys(marks);
   if (taskIds.length === 0) return marks;
 
+  const codex = parseCodexUsage(transcript);
+  if (codex.supported) {
+    const positionTotals = (pos: { lastUuid?: string }) => {
+      const parts = pos.lastUuid?.split(":");
+      return parts?.[0] === "codex" && parts.length === 5
+        ? { input: Number(parts[1]), output: Number(parts[2]), cacheReadInput: Number(parts[3]), cacheCreationInput: Number(parts[4]) }
+        : zeroUsage();
+    };
+    const start = positionTotals(claim.from), end = positionTotals(claim.to);
+    return Object.fromEntries(Object.entries(marks).map(([id, mark]) => {
+      const from = {
+        input: Math.max(start.input, mark.totals.input), output: Math.max(start.output, mark.totals.output),
+        cacheReadInput: Math.max(start.cacheReadInput, mark.totals.cacheReadInput),
+        cacheCreationInput: Math.max(start.cacheCreationInput, mark.totals.cacheCreationInput),
+      };
+      const total = (u: Required<TokenUsage>) => u.input + u.output + u.cacheReadInput + u.cacheCreationInput;
+      if (total(from) >= total(end)) return [id, mark];
+      const spans = [...(mark.codexClaims ?? []), { from, to: end }].sort((a, b) => total(a.from) - total(b.from));
+      const merged: NonNullable<UsageMark["codexClaims"]> = [];
+      for (const span of spans) {
+        const last = merged[merged.length - 1];
+        if (last && total(span.from) <= total(last.to)) {
+          if (total(span.to) > total(last.to)) last.to = span.to;
+        } else merged.push({ ...span });
+      }
+      return [id, { ...mark, codexClaims: merged,
+        excluded: merged.reduce((sum, span) => addUsage(sum, subtractUsage(span.to, span.from)), zeroUsage()),
+        excludedMessages: codex.entries.filter((entry) => {
+          const at = entry.uuid.split(":").slice(1).reduce((sum, n) => sum + Number(n), 0);
+          return merged.some((span) => at > total(span.from) && at <= total(span.to));
+        }).length }];
+    }));
+  }
   const entries = parseUsageEntries(transcript);
   const claimStart = resolvePosition(entries, claim.from).index;
   const claimEnd = resolvePosition(entries, claim.to).index;
@@ -405,7 +464,8 @@ export function readUsageSinceMark(transcript: string, mark: UsageMark): MarkedU
     tokenUsage: subtractUsage(tokenUsage, excluded),
     messages: messages - excludedMessages,
     model,
-    cursor: { lastUuid: now.lastUuid, consumed: now.messages },
+    cursor: { lastUuid: now.lastUuid, consumed: now.messages,
+      ...(parseCodexUsage(transcript).supported ? { totals: now.totals } : {}) },
     resynced,
     from: { lastUuid: mark.lastUuid, consumed: mark.consumed },
     to: { lastUuid: now.lastUuid, consumed: now.messages },
@@ -440,6 +500,20 @@ export function readUsageDelta(
   since?: string,
 ): SessionUsageDelta {
   const entries = parseUsageEntries(transcript);
+
+  const codex = parseCodexUsage(transcript);
+  if (codex.supported && cursor.totals && !since) {
+    const now = snapshotTranscriptUsage(transcript);
+    const found = entries.findIndex((e) => e.uuid === cursor.lastUuid);
+    return {
+      tokenUsage: subtractUsage(now.totals, cursor.totals),
+      messages: found >= 0 ? entries.length - found - 1 : Math.max(0, entries.length - cursor.consumed),
+      model: now.model,
+      from: { lastUuid: cursor.lastUuid, consumed: cursor.consumed },
+      cursor: { lastUuid: now.lastUuid, consumed: now.messages, totals: now.totals, marks: cursor.marks },
+      resynced: found < 0,
+    };
+  }
 
   // Sidechain (subagent) messages are included deliberately — a subagent's tokens
   // are spend, and the task that launched it is what caused them.
@@ -495,6 +569,7 @@ export function readUsageDelta(
       // after it would be re-claimed.) With no uuid, `consumed` governs.
       lastUuid: lastScanned ? lastScanned.uuid : cursor.lastUuid,
       consumed: startAt + scanned.length,
+      ...(codex.supported ? { totals: snapshotTranscriptUsage(transcript).totals } : {}),
       // Marks are the caller's to keep or consume; the delta does not touch them.
       marks: cursor.marks,
     },
@@ -517,9 +592,11 @@ export function readUsageDelta(
  */
 export async function resolveTranscriptPath(
   sessionId: string,
-  opts: { home?: string; configDir?: string } = {},
+  opts: { home?: string; configDir?: string; codexHome?: string; vendor?: "claude" | "codex" } = {},
 ): Promise<string | null> {
   if (!sessionId || !isSafeSessionId(sessionId)) return null;
+
+  if (opts.vendor === "codex") return findCodexTranscript(sessionId, opts.codexHome ?? process.env.CODEX_HOME ?? join(opts.home ?? homedir(), ".codex"));
 
   // CLAUDE_CONFIG_DIR relocates Claude Code's whole config tree, transcripts
   // included. A user who has set it and does not get it honoured here would
@@ -537,7 +614,7 @@ export async function resolveTranscriptPath(
       .filter((e) => e.isDirectory())
       .map((e) => e.name);
   } catch {
-    return null;
+    projectDirs = [];
   }
 
   const filename = `${sessionId}.jsonl`;
@@ -552,7 +629,44 @@ export async function resolveTranscriptPath(
     }
   }
 
+  return opts.vendor === "claude" || (opts.configDir && !opts.codexHome) ? null : findCodexTranscript(sessionId,
+    opts.codexHome ?? process.env.CODEX_HOME ?? join(opts.home ?? homedir(), ".codex"));
+}
+
+/** Search only the documented rollout tree; never choose the latest other session. */
+async function findCodexTranscript(sessionId: string, home: string): Promise<string | null> {
+  async function search(dir: string, depth: number): Promise<string[]> {
+    let children;
+    try { children = await readdir(dir, { withFileTypes: true }); } catch { return []; }
+    const matches: string[] = [];
+    for (const child of children) {
+      if (child.isDirectory() && depth > 0) matches.push(...await search(join(dir, child.name), depth - 1));
+      else if (child.isFile() && child.name.startsWith("rollout-") && child.name.endsWith(`-${sessionId}.jsonl`)) matches.push(join(dir, child.name));
+    }
+    return matches;
+  }
+  for (const tree of ["sessions", "archived_sessions"]) {
+    const matches = await search(join(home, tree), 3);
+    if (matches.length > 1) return null; // ambiguous resumed files: require --transcript
+    if (matches.length === 1) return matches[0];
+  }
   return null;
+}
+
+/** Environment identity, with explicit overrides for wrappers and exports. */
+export function assistedSession(flags: Record<string, string>): { id: string; vendor?: "claude" | "codex" } {
+  const vendor = flags.vendor === "codex" || flags.vendor === "claude" ? flags.vendor : undefined;
+  if (flags.session) return { id: flags.session, vendor };
+  if (vendor === "codex" || (!vendor && process.env.CODEX_THREAD_ID)) return { id: process.env.CODEX_THREAD_ID || "", vendor: "codex" };
+  return { id: process.env.CLAUDE_CODE_SESSION_ID || "", vendor: vendor ?? "claude" };
+}
+
+/** Inspect measurement availability without retaining transcript content. */
+export function transcriptUsageStatus(transcript: string) {
+  const codex = parseCodexUsage(transcript);
+  return codex.supported
+    ? { vendor: "codex" as const, status: codex.status, sessionId: codex.sessionId }
+    : { vendor: "claude" as const, status: parseUsageEntries(transcript).length ? "complete" as const : "unavailable" as const };
 }
 
 /**
@@ -587,6 +701,8 @@ export async function loadUsageCursor(
     return {
       lastUuid: typeof parsed.lastUuid === "string" ? parsed.lastUuid : undefined,
       consumed: numeric(parsed.consumed),
+      ...(parsed.usagePartial === true ? { usagePartial: true } : {}),
+      ...(parsed.totals ? { totals: readUsageFields(parsed.totals) } : {}),
       ...(marks ? { marks } : {}),
     };
   } catch {
@@ -616,11 +732,13 @@ function readMarks(raw: unknown): Record<string, UsageMark> | undefined {
     const m = value as Partial<UsageMark>;
     marks[task] = {
       task,
+      ...(m.usagePartial === true ? { usagePartial: true } : {}),
       at: typeof m.at === "string" ? m.at : "",
       lastUuid: typeof m.lastUuid === "string" ? m.lastUuid : undefined,
       consumed: numeric(m.consumed),
       totals: readUsageFields(m.totals),
       // Absent in cursor files written before nested marks were accounted for.
+      ...(Array.isArray(m.codexClaims) ? { codexClaims: m.codexClaims.filter((s) => s && s.from && s.to).map((s) => ({ from: readUsageFields(s.from), to: readUsageFields(s.to) })) } : {}),
       ...(m.excluded ? { excluded: readUsageFields(m.excluded) } : {}),
       ...(m.excludedMessages ? { excludedMessages: numeric(m.excludedMessages) } : {}),
     };

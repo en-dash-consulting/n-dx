@@ -5,6 +5,8 @@ description: Restructure the PRD — regroup, reparent, merge overlaps and place
 
 Restructure the PRD hierarchy to keep it organized as a coherent product spec.
 
+Usage measurement supports Claude Code message usage and Codex rollout `event_msg/token_count` cumulative `total_token_usage`. Discovery uses `CLAUDE_CODE_SESSION_ID` or `CODEX_THREAD_ID`, with `CLAUDE_CONFIG_DIR` or `CODEX_HOME` respected. Wrappers can pass `--vendor=codex --session=<id> --transcript=<path>` to both `n-dx hench usage mark` and `n-dx hench record`. Codex `exec --json` output is not a rollout transcript. Missing/unsupported usage and counter resets are reported as unavailable; incomplete reads are partial. Keep the same session for mark and record; do not substitute another session or estimate counters.
+
 Use this when the PRD has grown organically and needs cleanup: too many top-level epics, features that should be tasks, overlapping areas that should be merged, or items that belong under different parents — or, on a v2 tree, changes left in the Inbox, placed on the wrong capability, or duplicated.
 
 **Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-reshape .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
@@ -74,7 +76,7 @@ ndx hench record --task=skill:ndx-reshape --status=completed   --title="ndx-resh
 
 Token usage is computed by the CLI as the difference between the `skill:ndx-reshape` mark taken at the start and the session transcript now — several skill runs in one session each get exactly their own slice. Use `--task=skill:ndx-reshape`. Restructuring spans many items, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket rather than charging a single item.
 
-Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with unavailable usage diagnostics; the command reports which happened.
 
 ## Done when
 

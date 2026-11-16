@@ -231,12 +231,14 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "hench record --task=<id> [options] [dir]",
     description:
       "Writes a lightweight run record for work performed through a skill\n" +
-      "(Claude Code) rather than a spawned hench agent, so it appears in run\n" +
+      "(Claude Code or Codex) rather than a spawned hench agent, so it appears in run\n" +
       "history and is auditable. The record is marked assisted.\n" +
       "\n" +
-      "Token usage is read from the current Claude Code session's transcript,\n" +
-      "which is where Claude Code records the API's own usage numbers; the\n" +
-      "session is located via CLAUDE_CODE_SESSION_ID. When 'hench usage mark\n" +
+      "Claude message usage and Codex rollout event_msg/token_count cumulative\n" +
+      "total_token_usage are supported. Discovery uses CLAUDE_CODE_SESSION_ID\n" +
+      "or CODEX_THREAD_ID; CODEX_HOME relocates sessions/YYYY/MM/DD and\n" +
+      "archived_sessions. exec JSON output is not a rollout transcript.\n" +
+      "When 'n-dx hench usage mark\n" +
       "--task=<id>' was run at the start of the task, the record claims exactly\n" +
       "what accumulated after that mark — the difference between two positions\n" +
       "in the transcript, computed here, per token class. Without a mark it\n" +
@@ -245,8 +247,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "usage-cursors directory inside hench's own state directory.\n" +
       "\n" +
       "Precedence: explicit --*-tokens flags, then the mark, then the session\n" +
-      "watermark, then zeros. A missing transcript never fails the record — an\n" +
-      "unrecorded run is worse than one missing its tokens.\n" +
+      "watermark, then unavailable usage. Missing/unsupported usage is stored\n" +
+      "with unavailable diagnostics, not as measured zero. Counter resets or\n" +
+      "mismatched sessions preserve the boundary for recovery; incomplete\n" +
+      "reads are partial. Codex reasoning output is already in output tokens.\n" +
       "\n" +
       "A mark outranks the watermark, so marks nest: a review marked and\n" +
       "recorded inside a task's still-open window is recorded first. Each\n" +
@@ -259,7 +263,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "\n" +
       "--startedAt is the run's start time and nothing more: it never selects\n" +
       "usage. Omit it when a mark exists — the mark knows when the task began.\n" +
-      "--since is an explicit time window for the rare case that needs one.\n" +
+      "--since is a Claude-only explicit time window; Codex requires marks.\n" +
       "An unparseable --startedAt/--since value is an error, not a silent no-op.",
     options: [
       { flag: "--task=<id>", description: "Rex task ID the work addressed (required)" },
@@ -271,7 +275,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--mark=<id>", description: "Consume this usage mark instead of the one named by --task" },
       { flag: "--startedAt=<iso>", description: "Run start time (metadata only; defaults to the mark's time)" },
       { flag: "--since=<iso>", description: "Claim spend from this time only (explicit window; skips the mark)" },
-      { flag: "--session=<id>", description: "Session to read (default: $CLAUDE_CODE_SESSION_ID)" },
+      { flag: "--session=<id>", description: "Session to read (default: $CODEX_THREAD_ID or $CLAUDE_CODE_SESSION_ID)" },
+      { flag: "--vendor=<vendor>", description: "Select transcript discovery: claude | codex" },
       { flag: "--transcript=<path>", description: "Read this transcript instead of searching by session" },
       { flag: "--input-tokens=<n>", description: "Set input tokens by hand (overrides the transcript)" },
       { flag: "--output-tokens=<n>", description: "Set output tokens by hand" },
@@ -294,7 +299,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "mark where a task's token usage starts",
     usage: "hench usage mark --task=<id> [dir] | hench usage marks [dir]",
     description:
-      "mark: snapshot the current Claude Code session's cumulative token usage\n" +
+      "mark: snapshot the current Claude Code or Codex session's cumulative usage\n" +
       "and transcript position under the task id, in .hench/usage-cursors/. Run\n" +
       "it the moment a task begins; 'hench record --task=<id>' then reports the\n" +
       "difference between that snapshot and the transcript at record time —\n" +
@@ -305,7 +310,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "marks: list the marks the session still holds.",
     options: [
       { flag: "--task=<id>", description: "Task (or skill:<name>) the mark is for (required for mark)" },
-      { flag: "--session=<id>", description: "Session to read (default: $CLAUDE_CODE_SESSION_ID)" },
+      { flag: "--session=<id>", description: "Session to read (default: $CODEX_THREAD_ID or $CLAUDE_CODE_SESSION_ID)" },
+      { flag: "--vendor=<vendor>", description: "Select transcript discovery: claude | codex" },
       { flag: "--transcript=<path>", description: "Read this transcript instead of searching by session" },
       { flag: "--format=json", description: "Output the mark as JSON" },
     ],

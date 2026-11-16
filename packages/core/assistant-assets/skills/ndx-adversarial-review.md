@@ -1,5 +1,7 @@
 Attack a change — or the claim that a task is done — and find what actually breaks. Then triage each finding for validity and necessity, propose solutions, and hand the result to the user.
 
+Usage measurement supports Claude Code message usage and Codex rollout `event_msg/token_count` cumulative `total_token_usage`. Discovery uses `CLAUDE_CODE_SESSION_ID` or `CODEX_THREAD_ID`, with `CLAUDE_CONFIG_DIR` or `CODEX_HOME` respected. Wrappers can pass `--vendor=codex --session=<id> --transcript=<path>` to both `n-dx hench usage mark` and `n-dx hench record`. Codex `exec --json` output is not a rollout transcript. Missing/unsupported usage and counter resets are reported as unavailable; incomplete reads are partial. Keep the same session for mark and record; do not substitute another session or estimate counters.
+
 **By itself, this skill changes nothing.** It reads, attacks, and triages. It never edits source code, never fixes a defect, and never writes a PRD item on its own initiative. The only writes it can make are PRD items the user has explicitly approved — a new item, or an addition to an item that already tracks the finding — and fixing any of them is a separate run.
 
 Two passes, in this order:
