@@ -16,5 +16,5 @@ items:
     startedAt: "2026-11-16T18:03:28.442Z"
     activeIntervals: [{"end":"2026-11-16T18:32:07.542Z","start":"2026-11-16T18:03:28.442Z"}]
     failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-tests.mjs affected 904cbd1299fbaa9b3a925b9de81e120bb2ebadc2]: web;…\nFailing tests (4):\n- enabled=false by default; applies=true with chain for Claude API\n- applies=false with reason and full chain for Codex\n- tests/unit/server/routes-llm-failover.test.ts > GET /api/llm/config — failover block > enabled=false by default; applies=true with chain for Claude API\n  AssertionError: expected 'gpt-6.1-sol' to contain 'gpt-5'\n- tests/unit/server/routes-llm-failover.test.ts > GET /api/llm/config — failover block > applies=false with reason and full chain for Codex\n  AssertionError: expected 'gpt-6-luna' to contain 'gpt-5'"
-    lastModified: "2026-11-16T18:32:08.181Z"
+    lastModified: "2026-11-16T18:35:30.524Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
