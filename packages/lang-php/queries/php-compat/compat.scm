@@ -73,6 +73,10 @@
 ; Type keywords, read by name in code: scalar types (7.0), `void` and
 ; `iterable` (7.1), `object` (7.2), `mixed` (8.0).
 (primitive_type) @compat.primitive-type
+; The grammar reads `int`, `float`, `string`, `bool` and `object` as keywords
+; only in lower case; `INT` or `String` is a named_type, which PHP still
+; reads as the keyword.
+(named_type (name) @compat.primitive-type)
 (function_definition return_type: (_) @compat.return-types)
 (method_declaration return_type: (_) @compat.return-types)
 (anonymous_function return_type: (_) @compat.return-types)

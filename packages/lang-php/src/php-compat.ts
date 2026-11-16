@@ -14,10 +14,12 @@
  *
  * Most rules are one capture named `@compat.<rule>`. Read here:
  *
- * - type keywords (`@compat.primitive-type`) by name, in any case: `int`,
- *   `float`, `string`, `bool` are scalar type declarations (7.0), `void` and
- *   `iterable` 7.1, `object` 7.2, `mixed` 8.0; `array`, `callable`, `null`
- *   and `false` date nothing here.
+ * - type keywords (`@compat.primitive-type`, a keyword type or a named
+ *   type's name, since the grammar takes `INT` or `String` for a class name)
+ *   by name, in any case, as PHP reads them: `int`, `float`, `string`, `bool`
+ *   are scalar type declarations (7.0), `void` and `iterable` 7.1, `object`
+ *   7.2, `mixed` 8.0; any other name (`array`, `callable`, `null`, a class)
+ *   dates nothing here.
  * - `$this` in a closure: a `$this` whose innermost enclosing body is a
  *   closure's, not a function's or a method's.
  * - flexible heredoc: a heredoc or nowdoc closing marker that is indented.

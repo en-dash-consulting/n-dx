@@ -1,10 +1,14 @@
 schema: "rex/v2"
 items:
   "4d498f89-3213-4ad4-a8ff-ca343af7a626":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T19:05:47.452Z"
-    activeIntervals: [{"start":"2026-11-16T19:05:47.452Z"}]
-    lastModified: "2026-11-16T19:05:48.165Z"
+    completedAt: "2026-11-16T19:23:42.045Z"
+    endedAt: "2026-11-16T19:23:42.045Z"
+    activeIntervals: [{"end":"2026-11-16T19:23:42.045Z","start":"2026-11-16T19:05:47.452Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PHP version floor per file (php-compat framework, 57 php.net-cited rules, fixture per rule) and per-repository histogram in sdlc-profile/readiness ecosystem."
+    lastModified: "2026-11-16T19:23:42.045Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9edf040a-d8df-47aa-9234-9fe19f4c5751":
     lastModified: "2026-11-14T05:22:50.484Z"

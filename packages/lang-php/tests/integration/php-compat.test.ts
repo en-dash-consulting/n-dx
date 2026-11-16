@@ -59,6 +59,15 @@ describe("php version floor", () => {
     });
   });
 
+  it("reads type keywords in any case, as PHP does, and a class type hint as nothing", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const byPath = new Map((await analyze()).facts.map((f) => [f.path, f.versionFloor]));
+    expect(byPath.get("case/upper-scalar.php")).toMatchObject({ version: "7.0", rule: "scalar-type-declarations", position: { line: 2, column: 17 } });
+    expect(byPath.get("case/upper-object.php")).toMatchObject({ version: "7.2", rule: "object-type" });
+    // A class name dates nothing; the qualified one is a namespace (5.3).
+    expect(byPath.get("case/class-hint.php")).toMatchObject({ version: "5.3", rule: "namespaces" });
+  });
+
   it("reads nothing when the version floor is not wanted", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const result = await analyze(["imports"]);
