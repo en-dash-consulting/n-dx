@@ -24,10 +24,10 @@ pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
 routes, outbound calls, entry points, config reads, flag checks, version floor, legacy constructs) and `DECLARED_FACT_KINDS` (components, typed but not
 yet produced). `VersionFloorFact` is one per file: the oldest language
 version its syntax needs, the rule and construct that set it and the
-language's own guide page; versions compare with `compareLanguageVersions`.
+language's own page (migration guide or changelog); versions compare with `compareLanguageVersions`.
 `LegacyConstructFact` is one use of a construct a later version removed or
 deprecated (`LEGACY_STATUSES`; `notice` is never a removal), each version a
-`LanguageBoundary` with its guide page. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+`LanguageBoundary` with its page. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
 never carry a value; a flag's `normalized` name comes from
 `normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`

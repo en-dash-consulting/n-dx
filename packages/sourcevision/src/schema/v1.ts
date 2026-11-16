@@ -1527,7 +1527,7 @@ export interface SdlcVersionFloors {
   highest?: string;
 }
 
-/** A language version and the language's own migration guide page naming it (lang-kit's `LanguageBoundary`). */
+/** A language version and the language's own page naming it, a migration guide or release changelog (lang-kit's `LanguageBoundary`). */
 export interface SdlcLanguageBoundary {
   version: string;
   source: string;

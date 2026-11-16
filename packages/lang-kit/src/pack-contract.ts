@@ -415,7 +415,7 @@ export interface VersionFloorFact {
   readonly rule: string;
   /** The construct in words (`arrow function`). */
   readonly construct: string;
-  /** URL of the language's own migration guide page that dates the construct. */
+  /** URL of the language's own page that dates the construct (a migration guide or release changelog). */
   readonly source: string;
   /** The construct's first use in the file. */
   readonly position: SourcePosition;
@@ -437,11 +437,11 @@ export function compareLanguageVersions(a: string, b: string): number {
 
 // ── Legacy constructs (produced) ────────────────────────────────────────────
 
-/** A language version and the language's own migration guide page that names it. */
+/** A language version and the language's own page that names it (a migration guide or release changelog). */
 export interface LanguageBoundary {
   /** `major.minor`, e.g. `7.0`. */
   readonly version: string;
-  /** URL of the guide page. */
+  /** URL of the page. */
   readonly source: string;
 }
 

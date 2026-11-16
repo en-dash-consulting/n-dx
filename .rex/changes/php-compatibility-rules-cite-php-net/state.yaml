@@ -1,12 +1,23 @@
 schema: "rex/v2"
 items:
   "242512fa-8799-499d-8ce9-07cbd6918a3e":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T19:49:48.488Z"
-    activeIntervals: [{"start":"2026-11-16T19:49:48.488Z"}]
-    lastModified: "2026-11-16T19:49:49.654Z"
+    completedAt: "2026-11-16T19:55:09.985Z"
+    endedAt: "2026-11-16T19:55:09.985Z"
+    activeIntervals: [{"end":"2026-11-16T19:55:09.985Z","start":"2026-11-16T19:49:48.488Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "5.3-5.5 boundaries cite https://www.php.net/ChangeLog-5.php#5.X.0 via shared src/php-version-sources.ts; provenance check accepts only the two forms; docs and changesets updated."
+    lastModified: "2026-11-16T19:55:09.985Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c2532cdb-90eb-4d98-b626-f42f2900578d":
+    status: "completed"
+    startedAt: "2026-11-16T19:55:09.985Z"
+    completedAt: "2026-11-16T19:55:09.985Z"
+    endedAt: "2026-11-16T19:55:09.985Z"
+    activeIntervals: [{"end":"2026-11-16T19:55:09.985Z","start":"2026-11-16T19:55:09.985Z"}]
+    appliedAt: "2026-11-16T19:55:09.985Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-16T19:48:34.474Z"
-    lastModified: "2026-11-16T19:49:31.345Z"
+    lastModified: "2026-11-16T19:55:09.985Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -46,7 +46,7 @@ import { join } from "node:path";
 import type { FactKind, FileFacts, LanguageBoundary, LegacyConstructFact, LegacyStatus, SourcePosition } from "@n-dx/lang-kit";
 import { atOrBefore, contains, innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
-import { phpVersionSource } from "./php-version-sources.js";
+import { phpVersionSource, phpVersionSourceName } from "./php-version-sources.js";
 
 /** One removed, deprecated or changed construct, with the php.net page of every version it names. */
 export interface PhpLegacyRule {
@@ -356,6 +356,12 @@ function declaredFunctions(files: readonly PackSourceFile[]): Set<string> {
 
 const GRAMMAR = "tree-sitter-php@0.25.1";
 
+/** The documents a rule's versions cite, each once (`PHP 7.2 migration guide`, `PHP 5 changelog`); the PHP manual for a notice with no version. */
+export function legacyDocuments(rule: PhpLegacyRule): string[] {
+  const names = [rule.deprecated, rule.removed, rule.changed].flatMap((b) => (b === undefined ? [] : [phpVersionSourceName(b.version)]));
+  return names.length === 0 ? ["PHP manual"] : [...new Set(names)];
+}
+
 /** Each rule's provenance is the page behind its status; the query was checked against the grammar's node types. */
 const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   [QUERY]: {
@@ -366,7 +372,7 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   ...Object.fromEntries(
     Object.entries(LEGACY_RULES).map(([id, r]: [string, PhpLegacyRule]) => [
       id,
-      { verifiedAgainst: [GRAMMAR, "PHP migration guides", "PHP 5 changelog"], verifiedOn: "2026-11-16", source: legacySource(r) },
+      { verifiedAgainst: [GRAMMAR, ...legacyDocuments(r)], verifiedOn: "2026-11-16", source: legacySource(r) },
     ]),
   ),
 };

@@ -34,6 +34,13 @@ describe("php legacy rules", () => {
   it("carry each rule's page as its provenance", () => {
     for (const [id, rule] of rules) expect(phpLegacy.provenance[id]?.source, id).toBe(legacySource(rule));
   });
+
+  it("name in their provenance only the documents their versions cite", () => {
+    expect(phpLegacy.provenance.each?.verifiedAgainst).toEqual(["tree-sitter-php@0.25.1", "PHP 7.2 migration guide", "PHP 8.0 migration guide"]);
+    expect(phpLegacy.provenance["session-register"]?.verifiedAgainst).toEqual(["tree-sitter-php@0.25.1", "PHP 5 changelog"]);
+    expect(phpLegacy.provenance["mysql-functions"]?.verifiedAgainst).toEqual(["tree-sitter-php@0.25.1", "PHP 5 changelog", "PHP 7.0 migration guide"]);
+    expect(phpLegacy.provenance["short-open-tag"]?.verifiedAgainst).toEqual(["tree-sitter-php@0.25.1", "PHP manual"]);
+  });
 });
 
 describe("blankStringsAndComments", () => {
