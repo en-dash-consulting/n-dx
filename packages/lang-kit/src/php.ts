@@ -42,9 +42,11 @@ export const PHP_DOCROOT_DIRECTORIES: readonly string[] = ["public", "web", "htd
  * - `*Test.php`, `*_test.php` and `tests/` / `test/` identify test files.
  * - `composer.json` is the module manifest.
  *
- * - `.php`, `.phtml`, `.php3`–`.php5` and `.inc` are parseable, but only by the
- *   opt-in `@n-dx/lang-php` pack: SourceVision has no other PHP parser, so
- *   without the pack PHP files are inventoried and classified only.
+ * - Every extension is parseable (`.module` and `.install` hold Drupal's
+ *   modules and their install hooks), but only by the opt-in `@n-dx/lang-php`
+ *   pack: SourceVision has no other PHP parser, so without the pack PHP files
+ *   are inventoried and classified only. Drupal's `.theme`, `.profile`,
+ *   `.engine` and `.test` are not PHP here.
  */
 export const phpConfig: LanguageConfig = {
   id: "php",
@@ -52,7 +54,7 @@ export const phpConfig: LanguageConfig = {
 
   extensions: new Set([".php", ".phtml", ".php3", ".php4", ".php5", ...PHP_REPOSITORY_ONLY_EXTENSIONS]),
 
-  parseableExtensions: new Set([".php", ".phtml", ".php3", ".php4", ".php5", ".inc"]),
+  parseableExtensions: new Set([".php", ".phtml", ".php3", ".php4", ".php5", ...PHP_REPOSITORY_ONLY_EXTENSIONS]),
 
   testFilePatterns: [
     /(?:^|\/)tests?\//,

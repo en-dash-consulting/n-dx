@@ -230,11 +230,15 @@ describe("markerMatches", () => {
 });
 
 describe("phpConfig", () => {
-  it("lists the ambiguous extensions as PHP extensions, and .module and .install as not parseable", () => {
-    for (const ext of PHP_REPOSITORY_ONLY_EXTENSIONS) expect(phpConfig.extensions.has(ext)).toBe(true);
-    expect(phpConfig.parseableExtensions.has(".inc")).toBe(true);
-    expect(phpConfig.parseableExtensions.has(".module")).toBe(false);
-    expect(phpConfig.parseableExtensions.has(".install")).toBe(false);
+  it("lists the ambiguous extensions as parseable PHP extensions, and no other Drupal one", () => {
+    for (const ext of PHP_REPOSITORY_ONLY_EXTENSIONS) {
+      expect(phpConfig.extensions.has(ext)).toBe(true);
+      expect(phpConfig.parseableExtensions.has(ext)).toBe(true);
+    }
+    for (const ext of [".theme", ".profile", ".engine", ".test"]) {
+      expect(phpConfig.extensions.has(ext)).toBe(false);
+      expect(phpConfig.parseableExtensions.has(ext)).toBe(false);
+    }
   });
 
   it("no other config claims an extension only PHP repositories own", () => {

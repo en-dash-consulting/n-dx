@@ -192,3 +192,62 @@ describe("PHP files with the PHP pack registered", () => {
     expect(loaded.analysed).toEqual(["php"]);
   });
 });
+
+describe("Drupal .module and .install files", () => {
+  const MODULE = "<?php\nclass FieldException extends Exception {}\nfunction field_eval($code) {\n  return eval($code);\n}\n";
+  const PHP_SITE: Record<string, string> = {
+    "index.php": "<?php\nthrow new FieldException('x');\n",
+    "modules/field/field.module": MODULE,
+    "modules/field/field.install": "<?php\nfunction field_schema() {\n  return array();\n}\n",
+  };
+  const TS_SITE: Record<string, string> = {
+    "package.json": '{"name": "web"}\n',
+    "src/app.ts": 'import { api } from "./api";\nexport const app = api;\n',
+    "src/api.ts": "export const api = 1;\n",
+    "lib/field.module": MODULE,
+  };
+  const dirs: string[] = [];
+  let emptyPackDir: string;
+
+  async function project(files: Record<string, string>, language: "php" | "typescript") {
+    const dir = mkdtempSync(join(tmpdir(), "sv-php-drupal-"));
+    dirs.push(dir);
+    for (const [path, source] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), source);
+    }
+    const inventory = await analyzeInventory(dir, language === "php" ? { languageConfig: phpConfig } : {});
+    const run = (packs: KnownPack[]): Promise<Imports> =>
+      analyzeImports(dir, inventory, { language, packs: { packs, loader: { packDir: emptyPackDir }, warn: () => {} } });
+    return { inventory, run };
+  }
+
+  beforeAll(() => {
+    emptyPackDir = mkdtempSync(join(tmpdir(), "sv-php-no-packs-"));
+  });
+  afterAll(() => {
+    for (const dir of [...dirs, emptyPackDir]) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("in a PHP repository, are PHP and parsed: a class a .module file declares resolves to it", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const { inventory, run } = await project(PHP_SITE, "php");
+    expect(inventory.files.filter((f) => !f.path.endsWith(".php")).map((f) => `${f.path} ${f.language}`)).toEqual([
+      "modules/field/field.install PHP",
+      "modules/field/field.module PHP",
+    ]);
+    const imports = await run(KNOWN_PACKS.slice());
+    expect(imports.edges.map((e) => `${e.from} -> ${e.to}`)).toEqual(["index.php -> modules/field/field.module"]);
+    expect(imports.external.filter((e) => e.package.startsWith("php:"))).toEqual([]);
+  });
+
+  it("in a repository that is not PHP, are neither PHP nor parsed, and imports.json is unchanged", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const { inventory, run } = await project(TS_SITE, "typescript");
+    expect(inventory.files.map((f) => f.path)).not.toContain("lib/field.module");
+    expect(inventory.summary.skippedExtensions?.[".module"]).toBe(1);
+    const withPack = await run(KNOWN_PACKS.slice());
+    expect(toCanonicalJSON(withPack)).toBe(toCanonicalJSON(await run(WITHOUT_PHP)));
+    expect(withPack.edges.map((e) => `${e.from} -> ${e.to}`)).toEqual(["src/app.ts -> src/api.ts"]);
+  });
+});

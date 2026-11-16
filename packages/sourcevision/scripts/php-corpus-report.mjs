@@ -14,8 +14,8 @@
  * counts as clean and as `legacy`, so it is not counted twice), the ten most
  * frequent parents of error nodes
  * with one example location each, and the parse time; then, kept out of the
- * D4 numbers, the same count and share for `.module`, `.install` and `.ctp`
- * files (Drupal's and CakePHP 2's PHP outside `parseableExtensions`). It ends
+ * D4 numbers, the same count and share for `.ctp` files (CakePHP 2's PHP
+ * outside `parseableExtensions`). It ends
  * with an overall line and a line for the `php5: true` repositories, which
  * decision D4 holds to 99.5% clean.
  *
@@ -43,7 +43,7 @@ const STOP_LINE = 0.95;
 /** Large enough that no corpus file is skipped: the bar measures the grammar, not the size limit. */
 const MAX_FILE_BYTES = 64 * 1024 * 1024;
 /** PHP that analyze does not parse, reported apart from the D4 numbers. */
-const OTHER_EXTENSIONS = new Set([".module", ".install", ".ctp"]);
+const OTHER_EXTENSIONS = new Set([".ctp"]);
 const TOP_PARENTS = 10;
 const ERROR_QUERY = fileURLToPath(new URL("./php-corpus-errors.scm", import.meta.url));
 
@@ -223,7 +223,7 @@ if (json) {
     console.log(`  clean parse:    ${percent(r)}${r.legacy > 0 ? `  (${r.legacy} with only $s{0} offsets, reported as legacy constructs)` : ""}`);
     console.log(`  parse time:     ${r.seconds.toFixed(1)} s`);
     for (const p of r.topParents) console.log(`  error parent:   ${p.parent} ×${p.count}  e.g. ${p.example}`);
-    console.log(`  .module/.install/.ctp (not in D4): ${percent(r.other)}`);
+    console.log(`  .ctp (not in D4): ${percent(r.other)}`);
   }
   console.log(`\noverall:        ${percent(overall)}`);
   console.log(`PHP 5 repos:    ${percent(php5)}  — D4 (>= ${D4_BAR * 100}%): ${d4}`);

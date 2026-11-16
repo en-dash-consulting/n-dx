@@ -94,7 +94,8 @@ beside `composer.json`); sourcevision's always-skipped vendored set yields to
 it. A `*.ext` marker means any file with that extension (`markerMatches`;
 PHP's `cache`, `tmp`, `.phpunit.cache` without a `.php` file).
 `.inc`, `.module` and `.install` (`PHP_REPOSITORY_ONLY_EXTENSIONS`) are PHP
-only in a repository detected as PHP; detection never counts them.
+only in a repository detected as PHP, where the PHP pack parses them;
+detection never counts them.
 `skipsDirectory` applies these rules
 and `skipDirectories`, the caller doing the I/O and passing the directory's
 place; a name both conditional rules list is kept if either keeps it.
