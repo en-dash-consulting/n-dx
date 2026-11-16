@@ -50,8 +50,11 @@
 
 ; ── Syntax the grammar no longer parses ──
 ; ASP tags and `<script language="php">` are inline HTML to this grammar.
+; Every segment holding a `<script` or `</script` is captured too, so code
+; can tell a JavaScript template's `<%` inside a script element from an ASP
+; tag, across segments a PHP block splits.
 ((text) @legacy.inline-html
-  (#match? @legacy.inline-html "<%|<[Ss][Cc][Rr][Ii][Pp][Tt][^>]*[Ll][Aa][Nn][Gg][Uu][Aa][Gg][Ee][^>]*[Pp][Hh][Pp]"))
+  (#match? @legacy.inline-html "<%|</?[Ss][Cc][Rr][Ii][Pp][Tt]"))
 ; A curly-brace offset `$s{0}` breaks the statement before its `{`: the
 ; statement or expression ends in a MISSING token, and the brace follows
 ; with no gap. Read in code.

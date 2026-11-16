@@ -33,7 +33,8 @@
  *   `#[AllowDynamicProperties]`, when the class declares no such property.
  *   `likely`: a property can still be declared where no rule sees it.
  * - Constructs the grammar cannot parse are read from what parsing left:
- *   ASP tags and `<script language="php">` from inline HTML, and a
+ *   ASP tags (outside script elements: a `<%` in one is a JavaScript
+ *   template) and `<script language="php">` from inline HTML, and a
  *   curly-brace offset (`$s{0}`) from a statement ending in a MISSING token
  *   right before a `{`, or from an ERROR node's text (strings and comments
  *   skipped). php-corpus-report.mjs counts a file whose every parse error sits
@@ -150,7 +151,9 @@ const NUMERIC_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
 const OFFSET_BASE_END = /(\$[A-Za-z_\x80-￿][\w\x80-￿]*|\]|->\s*[A-Za-z_\x80-￿][\w\x80-￿]*)$/;
 const OFFSET_BASE = /(\$[A-Za-z_\x80-￿][\w\x80-￿]*|\]|->\s*[A-Za-z_\x80-￿][\w\x80-￿]*)\{/g;
 
-const ASP_TAG = /<%=?/g;
+/** An ASP tag, a script element's start tag up to its `>` (which may sit in a later segment), or a script end tag. */
+const ASP_OR_SCRIPT = /<%=?|<script\b[^>]*|<\/script\b/gi;
+const PHP_LANGUAGE = /\blanguage\s*=\s*["']?php\b/i;
 const SCRIPT_TAG = /<script\b[^>]*\blanguage\s*=\s*["']?php["']?[^>]*>/gi;
 
 const QUERY = "legacy";
@@ -281,6 +284,29 @@ function curlyOffsetHits(by: ReadonlyMap<string, Capture[]>): LegacyHit[] {
   return seen.map((position) => ({ rule: "curly-offset" as const, position }));
 }
 
+/**
+ * ASP tags and `<script language="php">` in a file's inline-HTML segments.
+ * A `<%` inside a script element that is not `language="php"` is a
+ * JavaScript template (Underscore, EJS), never PHP, so it is skipped; the
+ * element is tracked across segments in document order, since PHP blocks can
+ * split one.
+ */
+function inlineHtmlHits(segments: readonly Capture[]): LegacyHit[] {
+  const hits: LegacyHit[] = [];
+  let inScript = false;
+  const ordered = [...segments].sort((a, b) => a.start.line - b.start.line || a.start.column - b.start.column);
+  for (const html of ordered) {
+    for (const m of html.text.matchAll(ASP_OR_SCRIPT)) {
+      const token = m[0].toLowerCase();
+      if (token.startsWith("</")) inScript = false;
+      else if (token.startsWith("<s")) inScript ||= !PHP_LANGUAGE.test(m[0]);
+      else if (!inScript) hits.push({ rule: "asp-tags", position: positionIn(html, m.index), construct: `${m[0]} tag` });
+    }
+    for (const m of html.text.matchAll(SCRIPT_TAG)) hits.push({ rule: "script-tags", position: positionIn(html, m.index) });
+  }
+  return hits;
+}
+
 /** Every rule a file's captures match. `declared` holds the lower-cased functions the repository declares. */
 export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> = new Set()): LegacyHit[] {
   const by = new Map<string, Capture[]>();
@@ -312,10 +338,7 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
     if (c.nodeType === "encapsed_string" && c.text.includes("$")) continue;
     if (!NUMERIC_STRING.test(c.text.slice(1, -1))) hits.push({ rule: "string-number-comparison", position: c.start });
   }
-  for (const html of by.get("inline-html") ?? []) {
-    for (const m of html.text.matchAll(ASP_TAG)) hits.push({ rule: "asp-tags", position: positionIn(html, m.index), construct: `${m[0]} tag` });
-    for (const m of html.text.matchAll(SCRIPT_TAG)) hits.push({ rule: "script-tags", position: positionIn(html, m.index) });
-  }
+  hits.push(...inlineHtmlHits(by.get("inline-html") ?? []));
   hits.push(...classHits(by), ...curlyOffsetHits(by));
   return hits.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
 }

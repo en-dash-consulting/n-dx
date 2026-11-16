@@ -3,7 +3,8 @@
  * entry, over `php-legacy`: one file per rule (`rules/<rule>.php`), near
  * misses that report nothing (`clean/`), and the
  * shapes a curly-brace offset leaves in the parse plus a PHP 4-era app
- * (`shapes/`); and `php-legacy-polyfill`, a project that declares its own
+ * (`shapes/`), and JavaScript templates in script elements
+ * (`shapes/js-templates.php`); and `php-legacy-polyfill`, a project that declares its own
  * `each()`. Skips when the grammar is not built.
  */
 
@@ -113,6 +114,13 @@ describe("php legacy constructs", () => {
       "asp-tags@14:0",
     ]);
     expect(facts.get("shapes/legacy-app.php")?.[0]?.construct).toBe("MySQL_Connect()");
+  });
+
+  it("skips JavaScript template tags inside script elements, also split by a PHP block, and PHP strings", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const facts = await byPath();
+    // Only the `<%=` outside every script element (line 13) is an ASP tag.
+    expect(at(facts.get("shapes/js-templates.php"))).toEqual(["asp-tags@13:0"]);
   });
 
   it("reads nothing when legacy constructs are not wanted", async (ctx) => {
