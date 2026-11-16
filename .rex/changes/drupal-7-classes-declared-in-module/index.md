@@ -7,6 +7,8 @@ summary: "Drupal 7 keeps some classes in .module and .install files, which n-dx 
 intent: "Seen in PR 3's php-resolve-report on drupal7 (2026-11-14): FieldException is declared in modules/field/field.module, but phpConfig.parseableExtensions (.php .phtml .php3 .php4 .php5 .inc) leaves .module out, so 22 references become the external php:FieldException (and 1 php:FieldUpdateForbiddenException). PR 2's corpus report showed .module/.install parse 186/186 clean. Options: add Drupal's .module, .install, .theme, .profile, .engine and .test to parseableExtensions (check the byte-identical rule for non-PHP repositories and the TypeScript fallback), or leave Drupal-specific extensions to the frameworks pack (PHP-8). Decision for the operator."
 acceptanceCriteria:
   - "References to a class declared in a Drupal 7 .module file resolve to that file, or the decision to leave them out is recorded"
+touches:
+  - "3c3ffe2f-8bc9-4b80-aa1d-ddab68f0fe11"
 priority: "low"
 discoveredFrom: {"item":"78cf4f7d-2b28-4263-bde2-bbc7995f7632"}
 tags:
