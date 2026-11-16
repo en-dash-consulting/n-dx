@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "2331ee7c-5a4b-488e-8cab-82d4fe1506dc":
+    status: "completed"
+    startedAt: "2026-11-16T18:54:53.187Z"
+    completedAt: "2026-11-16T18:54:53.187Z"
+    endedAt: "2026-11-16T18:54:53.187Z"
+    activeIntervals: [{"end":"2026-11-16T18:54:53.187Z","start":"2026-11-16T18:54:53.187Z"}]
+    appliedAt: "2026-11-16T18:54:53.187Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-11T21:04:42.716Z"
-    lastModified: "2026-11-11T21:04:49.873Z"
+    lastModified: "2026-11-16T18:54:53.187Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d0f52798-2869-423b-af3f-788175f450fc":
     status: "completed"
@@ -13,8 +20,10 @@ items:
     lastModified: "2026-11-16T17:59:51.024Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d1edb11c-4673-4613-8345-3ee0f2462f79":
+    status: "completed"
     startedAt: "2026-11-16T18:03:28.442Z"
-    activeIntervals: [{"end":"2026-11-16T18:32:07.542Z","start":"2026-11-16T18:03:28.442Z"}]
-    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-tests.mjs affected 904cbd1299fbaa9b3a925b9de81e120bb2ebadc2]: web;…\nFailing tests (4):\n- enabled=false by default; applies=true with chain for Claude API\n- applies=false with reason and full chain for Codex\n- tests/unit/server/routes-llm-failover.test.ts > GET /api/llm/config — failover block > enabled=false by default; applies=true with chain for Claude API\n  AssertionError: expected 'gpt-6.1-sol' to contain 'gpt-5'\n- tests/unit/server/routes-llm-failover.test.ts > GET /api/llm/config — failover block > applies=false with reason and full chain for Codex\n  AssertionError: expected 'gpt-6-luna' to contain 'gpt-5'"
-    lastModified: "2026-11-16T18:35:30.524Z"
+    completedAt: "2026-11-16T18:54:53.187Z"
+    endedAt: "2026-11-16T18:54:53.187Z"
+    activeIntervals: [{"end":"2026-11-16T18:32:07.542Z","start":"2026-11-16T18:03:28.442Z"},{"end":"2026-11-16T18:54:53.187Z","start":"2026-11-16T18:37:01.525Z"}]
+    lastModified: "2026-11-16T18:54:55.837Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

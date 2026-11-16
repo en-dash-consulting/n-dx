@@ -87,9 +87,9 @@ describe("GET /api/llm/config — failover block", () => {
     // Second entry should be the light model (haiku) from attempt 1
     expect(info.chain[1]).toContain("haiku");
     // Third entry should be codex standard from attempt 2
-    expect(info.chain[2]).toContain("gpt-5");
+    expect(info.chain[2]).toBe("gpt-6.1-sol");
     // Fourth entry should be codex light from attempt 3
-    expect(info.chain[3]).toContain("gpt-5");
+    expect(info.chain[3]).toBe("gpt-6-luna");
   });
 
   it("enabled=true when autoFailover is set; applies=true for Claude API", async () => {
@@ -150,7 +150,7 @@ describe("GET /api/llm/config — failover block", () => {
     expect(info.chain).toHaveLength(4);
     expect(info.chain[0]).toBe("gpt-5.5");
     // Attempt 1: codex light
-    expect(info.chain[1]).toContain("gpt-5");
+    expect(info.chain[1]).toBe("gpt-6-luna");
     // Attempt 2: claude standard
     expect(info.chain[2]).toContain("claude");
   });
