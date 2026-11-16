@@ -23,6 +23,8 @@
  *   (`\App\each()`) and a call of a name the repository itself declares as a
  *   function (a polyfill) are not PHP's function.
  * - `__autoload`: a function declared with that name.
+ * - `string-dollar-brace`: `"${…}"` in a string or heredoc, never
+ *   `"{${…}}"` (a variable variable in the complex syntax).
  * - `php4-constructor`: a method named as its class (no `__construct`, class
  *   outside any namespace), as `php-symbols.ts` reads PHP 4 constructors.
  * - `dynamic-property`: the first `$this->name = …` per name in a class that
@@ -302,7 +304,10 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
   }
   for (const c of by.get("call-time-reference") ?? []) hits.push({ rule: "call-time-pass-by-reference", position: c.start });
   for (const c of by.get("cast") ?? []) if (c.text.toLowerCase() === "unset") hits.push({ rule: "unset-cast", position: c.start });
-  for (const c of by.get("string-dollar-brace") ?? []) hits.push({ rule: "string-dollar-brace", position: c.start });
+  const braced = by.get("string-braced-variable") ?? [];
+  for (const c of by.get("string-dollar-brace") ?? []) {
+    if (!braced.some((b) => samePosition(b.start, c.start))) hits.push({ rule: "string-dollar-brace", position: c.start });
+  }
   for (const c of by.get("php-tag") ?? []) if (c.text === "<?") hits.push({ rule: "short-open-tag", position: c.start });
   for (const c of by.get("compare-string") ?? []) {
     if (c.nodeType === "encapsed_string" && c.text.includes("$")) continue;

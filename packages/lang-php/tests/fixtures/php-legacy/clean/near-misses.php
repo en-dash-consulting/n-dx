@@ -4,6 +4,7 @@
 $query->each($callback);
 $rows = mysqli_query($link, 'SELECT 1');
 echo "Hello {$name}";
+echo "Hello {${'name'}} <<{${$key}}>>";
 $value = ${'dynamic'};
 if ('1' == 1 || ' 2.5 ' == 2.5) {}
 $first = $name[0];

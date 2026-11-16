@@ -11,12 +11,23 @@ items:
     lastModified: "2026-11-16T19:23:42.045Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9edf040a-d8df-47aa-9234-9fe19f4c5751":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T19:24:16.521Z"
-    activeIntervals: [{"start":"2026-11-16T19:24:16.521Z"}]
-    lastModified: "2026-11-16T19:24:17.262Z"
+    completedAt: "2026-11-16T19:45:31.146Z"
+    endedAt: "2026-11-16T19:45:31.146Z"
+    activeIntervals: [{"end":"2026-11-16T19:45:31.146Z","start":"2026-11-16T19:24:16.521Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit legacyConstructs fact kind; lang-php php-legacy framework (21 rules, php.net page per version); sourcevision ecosystem.php.legacyConstructs counts in sdlc-profile/readiness; corpus report counts $s{0}-only error files as clean+legacy."
+    lastModified: "2026-11-16T19:45:31.146Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a6e82740-8767-4eba-86f9-e53327fdfc9a":
+    status: "completed"
+    startedAt: "2026-11-16T19:45:31.146Z"
+    completedAt: "2026-11-16T19:45:31.146Z"
+    endedAt: "2026-11-16T19:45:31.146Z"
+    activeIntervals: [{"end":"2026-11-16T19:45:31.146Z","start":"2026-11-16T19:45:31.146Z"}]
+    appliedAt: "2026-11-16T19:45:31.146Z"
+    appliedAmendsHash: "6295a679a29758eb3783f1ad9bd799985e219a7275e797920f27214f47412f42"
     createdAt: "2026-11-14T05:18:01.818Z"
-    lastModified: "2026-11-14T05:24:01.002Z"
+    lastModified: "2026-11-16T19:45:31.146Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

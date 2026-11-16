@@ -13,9 +13,12 @@
 (argument (reference_modifier) @legacy.call-time-reference)
 (cast_expression (cast_type) @legacy.cast)
 ; `"${var}"` and `"${expr}"` in a string or heredoc; `${…}` outside one is a
-; variable variable, never deprecated.
+; variable variable, never deprecated, and so is `{${…}}` inside one (the
+; complex syntax around a variable variable), captured to be left out.
 (encapsed_string (dynamic_variable_name) @legacy.string-dollar-brace)
 (heredoc_body (dynamic_variable_name) @legacy.string-dollar-brace)
+(encapsed_string "{" . (dynamic_variable_name) @legacy.string-braced-variable)
+(heredoc_body "{" . (dynamic_variable_name) @legacy.string-braced-variable)
 (php_tag) @legacy.php-tag
 ; `==`, `!=`, `<>` with a string literal on one side and a number on the other.
 (binary_expression
