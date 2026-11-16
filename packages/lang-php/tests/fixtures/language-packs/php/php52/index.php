@@ -58,3 +58,6 @@ $rows = $db->query ($sql);
 </ul>
 </body>
 </html>
+<?php
+// An array cannot build a path: only its variable is captured.
+$options = array('debug' => false);

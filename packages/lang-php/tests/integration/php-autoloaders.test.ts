@@ -105,6 +105,23 @@ describe("php legacy class resolution", () => {
     }
   });
 
+  it("treats a path variable last assigned an array, closure or object as unknown", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const root = await mkdtemp(join(tmpdir(), "php-autoload-overwritten-"));
+    try {
+      const loader = (value: string): string =>
+        `spl_autoload_register(function ($class) {\n    $path = __DIR__ . '/lib/';\n    $path = ${value};\n    require $path . $class . '.php';\n});\n`;
+      const values = ["array('lib/')", "function () { return 'lib/'; }", "new ArrayObject()"];
+      await writeFile(join(root, "boot.php"), `<?php\n${values.map(loader).join("")}`);
+      const result = await pack.analyzeProject({ projectDir: root, files: ["boot.php"], kinds: ["imports"] });
+      expect(result.notices.filter((n) => n.includes("autoloader"))).toEqual(
+        [2, 7, 12].map((line) => `PHP: boot.php:${line}: autoloader closure does not build its path from literals and the class name; not followed.`),
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("takes a pattern's file that failed to parse only when no file declares the class", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const prepared = await prepare(["lib/Pear/Mail.php", "plugins/widget.php"]);

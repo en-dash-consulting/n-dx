@@ -53,7 +53,8 @@ interface Assignment {
   readonly name: string;
   /** A compound operator (`.=`); undefined for `=`. */
   readonly operator?: string;
-  readonly value: string;
+  /** The right-hand side as written; undefined when it cannot build a path (an array, a closure, `new`). */
+  readonly value?: string;
   readonly start: SourcePosition;
 }
 
@@ -133,11 +134,17 @@ function readFacts(file: PackSourceFile): FileFacts {
   const values = owned(imports, "include.assign", "include.assign_value");
   const operators = owned(imports, "include.assign", "include.assign_operator");
   const assignments: Assignment[] = [];
+  const valued = new Set<string>();
   for (const [assign, name] of names) {
     const value = values.get(assign);
     if (value === undefined) continue;
     const operator = operators.get(assign)?.text;
+    valued.add(`${assign.start.line}:${assign.start.column}`);
     assignments.push({ name: variableName(name.text), value: value.text, start: assign.start, ...(operator !== undefined && { operator }) });
+  }
+  // Any other assignment (its variable alone, which starts where the assignment does) leaves the value unknown.
+  for (const target of named(imports, "include.reassigned")) {
+    if (!valued.has(`${target.start.line}:${target.start.column}`)) assignments.push({ name: variableName(target.text), start: target.start });
   }
   assignments.sort((a, b) => (before(a.start, b.start) ? -1 : before(b.start, a.start) ? 1 : 0));
 
@@ -277,7 +284,7 @@ export class PhpAutoloaders {
     for (const a of loader.assignments) {
       if (!before(a.start, at)) break;
       if (a.name !== name) continue;
-      const assigned = this.includes.evaluate(a.value, loader.body.file, (n) => this.valueAt(loader, n, a.start, className, memo));
+      const assigned = a.value === undefined ? undefined : this.includes.evaluate(a.value, loader.body.file, (n) => this.valueAt(loader, n, a.start, className, memo));
       if (a.operator === undefined) value = assigned;
       else value = a.operator === ".=" && value !== undefined && assigned !== undefined ? value + assigned : undefined;
     }

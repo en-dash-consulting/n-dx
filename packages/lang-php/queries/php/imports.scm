@@ -57,17 +57,32 @@
   (#match? @_ini "^[iI][nN][iI]_[sS][eE][tT]$"))
 
 ; A path kept in a variable (`$file = 'lib/' . $class . '.php'; require $file;`):
-; each assignment to a plain variable, with its operator when compound.
+; each assignment to a plain variable whose right-hand side a path can be
+; built from, with its operator when compound. Arrays, closures, `new` and
+; other values are not captured, so their text (a 5000-line array) is never
+; copied; @include.reassigned, the variable alone, marks every assignment so
+; one of those still makes the variable's value unknown.
 ;
 ;   $file = 'a/' . $c;                       @include.assign, @include.assigned "$file", @include.assign_value
 ;   $file .= '.php';                         ... and @include.assign_operator ".="
+;   $file = array('a');                      @include.reassigned "$file" only
 (assignment_expression
   left: (variable_name) @include.assigned
-  right: (_) @include.assign_value) @include.assign
+  right: [
+    (binary_expression) (string) (encapsed_string) (function_call_expression)
+    (variable_name) (name) (parenthesized_expression)
+    (class_constant_access_expression) (subscript_expression)
+  ] @include.assign_value) @include.assign
 (augmented_assignment_expression
   left: (variable_name) @include.assigned
   operator: _ @include.assign_operator
-  right: (_) @include.assign_value) @include.assign
+  right: [
+    (binary_expression) (string) (encapsed_string) (function_call_expression)
+    (variable_name) (name) (parenthesized_expression)
+    (class_constant_access_expression) (subscript_expression)
+  ] @include.assign_value) @include.assign
+(assignment_expression left: (variable_name) @include.reassigned)
+(augmented_assignment_expression left: (variable_name) @include.reassigned)
 
 ; Autoloaders (php-autoloaders.ts): `spl_autoload_register()` and the
 ; callback it is given first, and the first parameter of every function,
