@@ -14,8 +14,19 @@ const INCLUDES = new URL("../../src/php-includes.ts", import.meta.url);
 const ENTRY_POINTS = new URL("../../src/php-entry-points.ts", import.meta.url);
 const OUTBOUND = new URL("../../src/php-outbound.ts", import.meta.url);
 
-/** Long enough to stall a quadratic pattern, short enough to stay under the line cap. */
+/**
+ * Sizes at which each replaced regex overruns the call budget (5 s by default)
+ * many times over, so restoring one fails its test. One configuration line
+ * stays under the 64 KiB cap, where a regex took 2.6–4.4 s, inside the budget,
+ * so the line tests repeat it {@link LINES} times; other input is {@link HUGE}
+ * long (the regexes took ~40 s at that size).
+ */
 const LONG = 60_000;
+const LINES = 10;
+const HUGE = 300_000;
+
+/** `line` as {@link LINES} lines of one file. */
+const repeated = (line: string): string => Array.from({ length: LINES }, () => line).join("\n");
 
 describe("htaccessWords", () => {
   it("splits on white space, keeps a quoted word whole and unescapes only \\\"", () => {
@@ -59,8 +70,9 @@ describe("parsePhpIncludeConfig", () => {
     "runs in linear time on a long .htaccess value",
     async () => {
       const value = `x${" ".repeat(LONG)}y`;
-      const out = await callWithinBudget<typeof parsePhpIncludeConfig>(INCLUDES, "parsePhpIncludeConfig", ".htaccess", ".htaccess", `php_value include_path ${value}`);
-      expect(out.settings.map((s) => s.value)).toEqual([value]);
+      const text = repeated(`php_value include_path ${value}`);
+      const out = await callWithinBudget<typeof parsePhpIncludeConfig>(INCLUDES, "parsePhpIncludeConfig", ".htaccess", ".htaccess", text);
+      expect(out.settings.map((s) => s.value)).toEqual(Array(LINES).fill(value));
     },
     BOUNDED_TEST_TIMEOUT_MS,
   );
@@ -69,7 +81,7 @@ describe("parsePhpIncludeConfig", () => {
   it(
     "runs in linear time on a long ini line that is not a setting",
     async () => {
-      const text = `include_path =${" ".repeat(LONG)}x\r!`;
+      const text = repeated(`include_path =${" ".repeat(LONG)}x\r!`);
       const out = await callWithinBudget<typeof parsePhpIncludeConfig>(INCLUDES, "parsePhpIncludeConfig", "php.ini", "php.ini", text);
       expect(out.settings).toEqual([]);
     },
@@ -81,8 +93,9 @@ describe("parsePhpIncludeConfig", () => {
     "runs in linear time on a long unquoted ini value",
     async () => {
       const value = `a${" ".repeat(LONG)}b`;
-      const out = await callWithinBudget<typeof parsePhpIncludeConfig>(INCLUDES, "parsePhpIncludeConfig", "php.ini", "php.ini", `include_path = ${value}`);
-      expect(out.settings.map((s) => s.value)).toEqual([value]);
+      const text = repeated(`include_path = ${value}`);
+      const out = await callWithinBudget<typeof parsePhpIncludeConfig>(INCLUDES, "parsePhpIncludeConfig", "php.ini", "php.ini", text);
+      expect(out.settings.map((s) => s.value)).toEqual(Array(LINES).fill(value));
     },
     BOUNDED_TEST_TIMEOUT_MS,
   );
@@ -115,7 +128,7 @@ describe("splitComparison", () => {
   it(
     "runs in linear time on a long run of white space",
     async () => {
-      const text = `PHP_SAPI${" ".repeat(LONG)}x=`;
+      const text = `PHP_SAPI${" ".repeat(HUGE)}x=`;
       expect(await callWithinBudget<typeof isCliCheck>(ENTRY_POINTS, "isCliCheck", text)).toBe(false);
     },
     BOUNDED_TEST_TIMEOUT_MS,
@@ -136,7 +149,7 @@ describe("connectionKeyValues", () => {
   it(
     "runs in linear time on a long run of key characters",
     async () => {
-      const text = `${"a ".repeat(LONG / 2)};host=db`;
+      const text = `${"a ".repeat(HUGE / 2)};host=db`;
       const out = await callWithinBudget<typeof connectionKeyValues>(OUTBOUND, "connectionKeyValues", text);
       expect([...out]).toEqual([["host", "db"]]);
     },

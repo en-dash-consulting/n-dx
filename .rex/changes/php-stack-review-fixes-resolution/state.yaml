@@ -19,8 +19,15 @@ items:
     lastModified: "2026-11-16T23:24:04.689Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e2fb42b1-e547-4682-a2ef-176d0e7d7857":
+    status: "completed"
+    startedAt: "2026-11-16T23:55:02.188Z"
+    completedAt: "2026-11-16T23:55:02.188Z"
+    endedAt: "2026-11-16T23:55:02.188Z"
+    activeIntervals: [{"end":"2026-11-16T23:55:02.188Z","start":"2026-11-16T23:55:02.188Z"}]
+    appliedAt: "2026-11-16T23:55:02.188Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-16T22:45:23.943Z"
-    lastModified: "2026-11-16T23:08:28.020Z"
+    lastModified: "2026-11-16T23:55:02.188Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eb319918-d699-4f6f-99ce-1fc453155d70":
     status: "completed"
@@ -33,10 +40,14 @@ items:
     lastModified: "2026-11-16T23:35:40.736Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f0979b38-b04d-418e-9509-ddf5f7400203":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T23:39:02.140Z"
-    activeIntervals: [{"start":"2026-11-16T23:39:02.140Z"}]
-    lastModified: "2026-11-16T23:39:03.048Z"
+    completedAt: "2026-11-16T23:55:02.188Z"
+    endedAt: "2026-11-16T23:55:02.188Z"
+    activeIntervals: [{"end":"2026-11-16T23:55:02.188Z","start":"2026-11-16T23:39:02.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Eleven flagged regexes replaced with linear scans/trims, 64 KiB config line cap with notices, pathological-input tests via worker budget"
+    lastModified: "2026-11-16T23:55:02.188Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f0d1bbab-2a17-4645-af58-aa002a7efb5b":
     status: "completed"
