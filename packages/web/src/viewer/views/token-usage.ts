@@ -1018,6 +1018,9 @@ export function TokenUsageView() {
     cost && usage
       ? h("div", { class: "token-section" },
           h("h3", null, "Cost Breakdown"),
+          h("p", { class: "token-description" },
+            "API list-price estimates, not subscription charges. Aggregates use standard short-context rates and default cache duration; request modes and long-context premiums may differ.",
+          ),
           h("div", { class: "cost-breakdown" },
             h("div", { class: "cost-item" },
               h("span", { class: "cost-label" }, "Input tokens"),

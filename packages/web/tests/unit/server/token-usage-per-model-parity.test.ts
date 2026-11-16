@@ -28,6 +28,7 @@ import {
   type CostEstimate,
   type ModelCostLine,
 } from "@n-dx/rex";
+import { budgetPreflight } from "@n-dx/llm-client";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const FIXTURE_PATH = join(
@@ -153,6 +154,20 @@ describe("dashboard per-model cost parity with ndx usage", () => {
     expect(residual!.known).toBe(false);
     expect(residual!.pricedAs).toBe("claude-sonnet-5-5");
     expect(webSide.cost.fullyAttributed).toBe(false);
+  });
+
+  it("prices a supported 150K OpenAI prompt identically to preflight", async () => {
+    await writeFile(join(tmpDir, ".hench", "runs", "run-sol.json"), JSON.stringify({
+      id: "run-sol", startedAt: "2026-02-06T12:00:00.000Z", status: "completed",
+      model: "gpt-6.1-sol", tokenUsage: { input: 150_000, output: 0 },
+    }));
+    resetAggregationCache();
+    const preflight = budgetPreflight("gpt-6.1-sol", 600_000);
+    const summary = await fetchSummary();
+    const line = summary.cost.byModel.find((entry) => entry.model === "gpt-6.1-sol");
+    expect(preflight.fits).toBe(true);
+    expect(line).toMatchObject({ known: true, pricedAs: "gpt-6.1-sol", totalRaw: preflight.estimatedCostUsd });
+    expect(line?.totalRaw).toBe(0.3);
   });
 
   it("labels an unknown model id as priced-as fallback rather than dropping or defaulting it", async () => {
