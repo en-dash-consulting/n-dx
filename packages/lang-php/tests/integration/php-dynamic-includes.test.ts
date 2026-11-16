@@ -47,7 +47,7 @@ describe("php dynamic includes", () => {
     const { notices } = await analyze();
     expect(notices).toEqual([
       "PHP: [php-dynamic-include] 8 includes build their path at run time and give no edge: htdocs/index.php:4, htdocs/index.php:5, htdocs/index.php:6, htdocs/index.php:7, htdocs/index.php:8, and 3 more; 5 with candidate files, never edges.",
-      "PHP: [php-host-include] 5 includes choose their file by the request's host name and give no edge: htdocs/index.php:3, htdocs/index.php:9, htdocs/tenant.php:3, htdocs/tenant.php:6, htdocs/tenant.php:15; 3 with candidate files, never edges.",
+      "PHP: [php-host-include] 5 includes choose their file by the request's host name and give no edge: htdocs/index.php:3, htdocs/index.php:9, htdocs/tenant.php:3, htdocs/tenant.php:9, htdocs/tenant.php:15; 3 with candidate files, never edges.",
     ]);
   });
 
@@ -70,9 +70,10 @@ describe("php dynamic includes", () => {
       .map(({ include, host }) => [include.position.line, host ?? false]);
     expect(flagged).toEqual([
       [3, true], // $host = $_SERVER['HTTP_HOST']
-      [6, true], // $dir = $tenant = strtolower($_SERVER['SERVER_NAME'])
-      [8, false], // $host reassigned from getenv()
-      [10, false], // another function's $host
+      // Inside a function: the file's $host, which holds the host here, is another variable.
+      [5, false],
+      [9, true], // $dir = $tenant = strtolower($_SERVER['SERVER_NAME'])
+      [11, false], // $host reassigned from getenv()
       [15, true], // assigned the host in the function, then `.=`
       [18, false], // $_GET, not the host
     ]);
