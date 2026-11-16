@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "647ad9da-c922-487c-8c90-8c590b9752c0":
-    lastModified: "2026-11-14T05:22:46.127Z"
+    status: "completed"
+    startedAt: "2026-11-16T18:56:23.682Z"
+    completedAt: "2026-11-16T18:59:27.194Z"
+    endedAt: "2026-11-16T18:59:27.194Z"
+    activeIntervals: [{"end":"2026-11-16T18:59:27.194Z","start":"2026-11-16T18:56:23.682Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "FEATURE_FLAG_COMPOSER_PACKAGES table (operator-note names only) + composerFlagDeps reading composer.json via lang-kit composerProjectsFrom; evidence cites composer.json line."
+    lastModified: "2026-11-16T18:59:27.194Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "91476ef4-b036-4e03-87c3-d8d46f734727":
     status: "completed"
@@ -14,8 +21,15 @@ items:
     lastModified: "2026-11-16T18:23:24.512Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b74c12c2-673c-488b-9559-9f999d9440b4":
+    status: "completed"
+    startedAt: "2026-11-16T18:59:27.194Z"
+    completedAt: "2026-11-16T18:59:27.194Z"
+    endedAt: "2026-11-16T18:59:27.194Z"
+    activeIntervals: [{"end":"2026-11-16T18:59:27.194Z","start":"2026-11-16T18:59:27.194Z"}]
+    appliedAt: "2026-11-16T18:59:27.194Z"
+    appliedAmendsHash: "6db7c7e5ecf0eb9d3fe5f692faabde7a13659200cf958bb81c7c8efe66fef9b8"
     createdAt: "2026-11-14T05:18:00.326Z"
-    lastModified: "2026-11-16T18:14:59.912Z"
+    lastModified: "2026-11-16T18:59:27.194Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d1f293e3-9051-443f-b0f5-3a0839302edf":
     status: "completed"

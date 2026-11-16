@@ -40,6 +40,7 @@ import { discoverFromIaC } from "../export/iso-declared.js";
 import { FIXTURE_DIRS } from "./infrastructure.js";
 import { cmp } from "../util/sort.js";
 import {
+  composerProjectsFrom,
   isMap,
   listAt,
   parseYamlSubset,
@@ -841,6 +842,33 @@ const FEATURE_FLAG_PY_DISTS: Array<[string, string]> = [
   ["splitio-client", "split"],
 ];
 
+/**
+ * Composer package name (lowercase) → flag provider. Names verified on
+ * packagist.org on 2026-11-14; the last four are in-process flag libraries.
+ */
+const FEATURE_FLAG_COMPOSER_PACKAGES: Array<[string, string]> = [
+  ["launchdarkly/server-sdk", "launchdarkly"],
+  ["launchdarkly/launchdarkly-php", "launchdarkly"],
+  ["unleash/client", "unleash"],
+  ["flagsmith/flagsmith-php-client", "flagsmith"],
+  ["configcat/configcat-client", "configcat"],
+  ["configcat/configcat-client-php7", "configcat"],
+  ["splitsoftware/split-sdk-php", "split"],
+  ["splitsoftware/thin-sdk", "split"],
+  ["growthbook/growthbook", "growthbook"],
+  ["open-feature/sdk", "openfeature"],
+  ["posthog/posthog-php", "posthog"],
+  ["statsig/statsigsdk", "statsig"],
+  ["statsig/statsig-php-core", "statsig"],
+  ["devcycle/php-server-sdk", "devcycle"],
+  ["optimizely/optimizely-sdk", "optimizely"],
+  ["flipt-io/flipt", "flipt"],
+  ["laravel/pennant", "pennant"],
+  ["flagception/flagception", "flagception"],
+  ["qandidate/toggle", "qandidate-toggle"],
+  ["opensoft/rollout", "rollout"],
+];
+
 /** `FEATURE_NEW_CHECKOUT=true` in a dotenv file: an in-house flag convention. */
 const ENV_FLAG_LINE = /^\s*(?:export\s+)?((?:FEATURE|FF)_[A-Z0-9_]+)\s*=/;
 
@@ -910,6 +938,7 @@ interface Classified {
   pyprojects: WalkedFile[];
   requirements: WalkedFile[];
   goMods: WalkedFile[];
+  composerJsons: WalkedFile[];
   cargoTomls: WalkedFile[];
   githubWorkflows: WalkedFile[];
   gitlabCi: WalkedFile[];
@@ -928,7 +957,7 @@ interface Classified {
 
 function classify(files: WalkedFile[]): Classified {
   const out: Classified = {
-    packageJsons: [], makefiles: [], pyprojects: [], requirements: [], goMods: [], cargoTomls: [],
+    packageJsons: [], makefiles: [], pyprojects: [], requirements: [], goMods: [], composerJsons: [], cargoTomls: [],
     githubWorkflows: [], gitlabCi: [], circleCi: [], bitbucket: [],
     jenkinsfiles: [], dockerfiles: [], compose: [], k8s: [], appspecs: [],
     codeowners: [], preCommit: [], dotenvs: [], all: files,
@@ -943,6 +972,7 @@ function classify(files: WalkedFile[]): Classified {
     else if (name === "pyproject.toml") out.pyprojects.push(file);
     else if (/^requirements[\w.-]*\.txt$/.test(lower)) out.requirements.push(file);
     else if (name === "go.mod") out.goMods.push(file);
+    else if (name === "composer.json") out.composerJsons.push(file);
     else if (name === "Cargo.toml") out.cargoTomls.push(file);
     else if (/^\.github\/workflows\/.+\.ya?ml$/.test(file.path)) out.githubWorkflows.push(file);
     else if (name === ".gitlab-ci.yml" || name === ".gitlab-ci.yaml") out.gitlabCi.push(file);
@@ -1091,6 +1121,8 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
       }
     }
   }
+
+  featureFlags.push(...await composerFlagDeps(files.composerJsons, reader));
 
   // ── In-house flags: FEATURE_* / FF_* in dotenv files ──
   for (const file of files.dotenvs) {
@@ -1314,6 +1346,35 @@ function pythonFlagDeps(file: WalkedFile, text: string): SdlcFeatureFlag[] {
       if (new RegExp(`(^|["'\\s])${dist.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9-])`).test(line)) {
         found.push({ evidence: evidence("dependency", file.path, "certain", { line: i + 1, excerpt: lines[i] }), provider });
       }
+    }
+  }
+  return found;
+}
+
+/**
+ * Flag SDKs a `composer.json` requires (`require` or `require-dev`), read
+ * through lang-kit's Composer reader; names match case-insensitively. A
+ * reader notice (malformed JSON) is a parse failure. The evidence line is
+ * the first that names the package as written.
+ */
+async function composerFlagDeps(manifests: WalkedFile[], reader: Reader): Promise<SdlcFeatureFlag[]> {
+  const texts = new Map<string, string>();
+  for (const file of manifests) {
+    const text = reader.text(file, "composer.json");
+    if (text !== null) texts.set(file.path, text);
+  }
+  const found: SdlcFeatureFlag[] = [];
+  for (const project of await composerProjectsFrom([...texts.keys()], async (path) => texts.get(path))) {
+    const path = project.dir === "" ? "composer.json" : `${project.dir}/composer.json`;
+    for (const notice of project.notices) reader.fail(path, "composer.json", notice);
+    const lines = (texts.get(path) ?? "").split(/\r?\n/);
+    for (const { name } of project.requirements) {
+      const provider = FEATURE_FLAG_COMPOSER_PACKAGES.find(([pkg]) => pkg === name.toLowerCase())?.[1];
+      if (provider === undefined) continue;
+      const quoted = JSON.stringify(name);
+      const index = lines.findIndex((line) => line.includes(quoted));
+      const location = index < 0 ? { excerpt: name } : { line: index + 1, excerpt: lines[index] };
+      found.push({ evidence: evidence("dependency", path, "certain", location), provider });
     }
   }
   return found;
