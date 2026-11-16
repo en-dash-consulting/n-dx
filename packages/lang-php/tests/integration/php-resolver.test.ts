@@ -4,7 +4,9 @@
  * underscore-era prefix, a classmap with an excluded directory, a lock file
  * naming the package behind an external, and a file with two braced
  * namespaces; and `tests/fixtures/php-shared-root`, a project that shares its
- * root namespace with a library. Runs the pack entry; skips when the grammar
+ * root namespace with a library; and `tests/fixtures/php-composer-apps`, two
+ * Composer apps mapping the same namespace beside a path repository. Runs the
+ * pack entry; skips when the grammar
  * is not built.
  */
 
@@ -16,6 +18,7 @@ import { pack, phpGrammarPath, phpPack, preparePhpImports, readPhpResolveProject
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-composer");
 const sharedRoot = join(import.meta.dirname, "..", "fixtures", "php-shared-root");
+const apps = join(import.meta.dirname, "..", "fixtures", "php-composer-apps");
 const files = (): string[] => listFixtureFiles(dir, [...phpPack.config.extensions]);
 
 async function facts(): Promise<Map<string, FileFacts>> {
@@ -149,5 +152,41 @@ describe("php namespace resolver", () => {
     });
     const invoice = result.facts.find((f) => f.path === "src/Billing/Invoice.php");
     expect(invoice?.imports?.external).toEqual([{ package: "php:Acme", symbols: ["Acme\\Shared\\Money"] }]);
+  });
+
+  it("resolves through the mappings of the project that owns the referring file and the path repositories it requires", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    // Apps a and b both map App\ to src/ and classmap classes/; b requires acme/shared from
+    // the path repository ../packages/*; only a's lock names vendor/lib.
+    const outcomes = await outcomesIn(apps);
+    expect(outcomes("a/main.php")).toEqual([
+      "new App\\Foo psr-4",
+      "new Mapped classmap",
+      "new Shared\\Util internal-not-found",
+      "new Lib\\Thing external",
+    ]);
+    expect(outcomes("b/main.php")).toEqual([
+      "new App\\Foo psr-4",
+      "new App\\OnlyA internal-not-found",
+      "new Mapped classmap",
+      "new Shared\\Util psr-4",
+      "new Lib\\Thing external",
+    ]);
+    // A file outside every project keeps every project's mappings, longest prefix first.
+    expect(outcomes("loose/script.php")).toEqual(["new App\\Foo psr-4", "new Shared\\Util psr-4", "new Lib\\Thing external"]);
+
+    const result = await pack.analyzeProject({ projectDir: apps, files: listFixtureFiles(apps, [...phpPack.config.extensions]), kinds: ["imports"] });
+    const byPath = new Map(result.facts.map((f) => [f.path, f]));
+    expect(edges(byPath.get("a/main.php"))).toEqual(["a/classes/Mapped.php Mapped", "a/src/Foo.php App\\Foo"]);
+    expect(edges(byPath.get("b/main.php"))).toEqual([
+      "b/classes/Mapped.php Mapped",
+      "b/src/Foo.php App\\Foo",
+      "packages/shared/src/Util.php Shared\\Util",
+    ]);
+    expect(edges(byPath.get("loose/script.php"))).toEqual(["a/src/Foo.php App\\Foo", "packages/shared/src/Util.php Shared\\Util"]);
+    const lib = { package: "php:Lib", symbols: ["Lib\\Thing"], module: { path: "vendor/lib", version: "0.0.0-fixture" } };
+    expect(byPath.get("a/main.php")?.imports?.external).toEqual([lib]);
+    expect(byPath.get("b/main.php")?.imports?.external).toEqual([{ package: "php:Lib", symbols: ["Lib\\Thing"] }]);
+    expect(byPath.get("loose/script.php")?.imports?.external).toEqual([lib]);
   });
 });

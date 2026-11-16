@@ -18,9 +18,15 @@
  * `implements`, trait `use`, `new`, `X::` (calls, constants, `::class`,
  * properties), parameter, return, property and `catch` types, `instanceof`.
  *
- * **Resolution order**, every project's `autoload` and `autoload-dev` (the
- * file's own manifest has no priority: Composer merges path repositories'
- * autoload into one loader):
+ * **Scope.** A file resolves through the `autoload` and `autoload-dev` of
+ * the project owning it (the nearest enclosing `composer.json`) and of each
+ * project a `path` repository of that project points at and it requires,
+ * merged as Composer's one loader merges them; the same scope holds for the
+ * classmap, `composer.lock` prefixes and the declared-class fallback, so two
+ * apps mapping one namespace never link to each other. A file outside every
+ * project resolves through every project's.
+ *
+ * **Resolution order**:
  * 1. PSR-4, longest prefix first: the prefix is cut and the rest, `\` to
  *    `/`, is `<path>/<rest>.php`.
  * 2. PSR-0, longest prefix first: the whole name, namespace `\` to `/` and
@@ -65,7 +71,7 @@
  */
 
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import {
   readComposerProjects,
   trimTrailing,
@@ -324,10 +330,72 @@ interface LockPrefix {
   readonly module: ExternalModule;
 }
 
+/** The autoload a referring file sees: one project's and its required path repositories', or every project's. */
+interface Scope {
+  readonly psr4: readonly Mapping[];
+  readonly psr0: readonly Mapping[];
+  /** Class name, lowercase, to the first file by path declaring it under a `classmap` entry. */
+  readonly classmap: ReadonlyMap<string, string>;
+  readonly lock: readonly LockPrefix[];
+  /** Directories of the projects in scope; undefined when every project is. */
+  readonly projects?: ReadonlySet<string>;
+}
+
 const longestFirst = <T extends { readonly prefix: string }>(items: T[]): T[] =>
   items.sort((a, b) => b.prefix.length - a.prefix.length || compare(a.prefix, b.prefix));
 
 const autoloadsOf = (project: ComposerProject): ComposerAutoload[] => [project.autoload, project.autoloadDev];
+
+/** `text` matches `pattern`, where `*` is any run of characters; linear backtracking on the last `*`. */
+function globMatch(pattern: string, text: string): boolean {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let resume = 0;
+  while (t < text.length) {
+    if (p < pattern.length && pattern[p] === "*") {
+      star = p++;
+      resume = t;
+    } else if (p < pattern.length && pattern[p] === text[t]) {
+      p++;
+      t++;
+    } else if (star >= 0) {
+      p = star + 1;
+      t = ++resume;
+    } else {
+      return false;
+    }
+  }
+  while (p < pattern.length && pattern[p] === "*") p++;
+  return p === pattern.length;
+}
+
+/** A path repository's `url`, resolved against its project's directory, matches the project directory `dir` (`*` within a segment). */
+function pathRepositoryMatches(base: string, url: string, dir: string): boolean {
+  const resolved = posix.normalize(posix.join(base, url.replace(/\\/g, "/")));
+  const segments = resolved.split("/").filter((s) => s !== "" && s !== ".");
+  const dirSegments = dir === "" ? [] : dir.split("/");
+  return segments.length === dirSegments.length && segments.every((s, i) => globMatch(s, dirSegments[i]!));
+}
+
+/**
+ * The projects whose autoload `owner` loads: itself, and each project a
+ * `path` repository of `owner` points at that `owner` requires, directly or
+ * through another such project (Composer reads repositories from the root
+ * manifest only).
+ */
+function projectsInScope(owner: ComposerProject, projects: readonly ComposerProject[]): ComposerProject[] {
+  const paths = owner.repositories.filter((r) => r.type === "path");
+  const available = projects.filter((p) => p !== owner && p.name !== undefined && paths.some((r) => pathRepositoryMatches(owner.dir, r.url, p.dir)));
+  const inScope = [owner];
+  for (let i = 0; i < inScope.length; i++) {
+    for (const req of inScope[i]!.requirements) {
+      const required = available.find((p) => p.name === req.name && !inScope.includes(p));
+      if (required !== undefined) inScope.push(required);
+    }
+  }
+  return inScope;
+}
 
 /** `exclude-from-classmap` patterns: `**` any path, `*` any name part; matched from the start of a path. */
 function excludePattern(pattern: string): RegExp {
@@ -348,13 +416,16 @@ class Index {
   readonly files: ReadonlySet<string>;
   /** Files with captures; a file outside it failed to parse, so what it declares is unknown. */
   private readonly parsed: ReadonlySet<string>;
-  private readonly psr4: readonly Mapping[];
-  private readonly psr0: readonly Mapping[];
-  private readonly classmap = new Map<string, string>();
+  private readonly projects: readonly ComposerProject[];
+  /** Every project's autoload: for a file outside every project. */
+  private readonly everyProject: Scope;
+  /** Each project's scope by its directory, built on first use. */
+  private readonly scopes = new Map<string, Scope>();
+  /** Each file's owning project directory (undefined: none), by path. */
+  private readonly owners = new Map<string, string | undefined>();
   private readonly classes = new Map<string, string[]>();
   private readonly functions = new Map<string, string[]>();
   private readonly constants = new Map<string, string[]>();
-  private readonly lock: readonly LockPrefix[];
   /** Namespaces, lowercase, that the project declares (a `namespace` statement or a declared class's). */
   private readonly ownNamespaces = new Set<string>();
   /** Every leading run of segments of {@link ownNamespaces}: a `use` of one names a namespace, not a missing class. */
@@ -367,9 +438,7 @@ class Index {
   constructor(projects: readonly ComposerProject[], declared: readonly Declared[], parsed: readonly string[], unparsed: readonly string[]) {
     this.parsed = new Set(parsed);
     this.files = new Set([...parsed, ...unparsed]);
-    const autoloads = projects.flatMap(autoloadsOf);
-    this.psr4 = longestFirst(autoloads.flatMap((a) => a.psr4.map((m) => ({ prefix: m.prefix, paths: m.paths }))));
-    this.psr0 = longestFirst(autoloads.flatMap((a) => a.psr0.map((m) => ({ prefix: m.prefix, paths: m.paths }))));
+    this.projects = projects;
 
     const add = (map: Map<string, string[]>, name: string, file: string): void => {
       const key = name.toLowerCase();
@@ -391,60 +460,104 @@ class Index {
         this.ownNamespacePrefixes.add(lower);
       }
     }
-    this.ownPrefixes = [...this.psr4, ...this.psr0].map((m) => m.prefix.toLowerCase()).filter((p) => p !== "");
-    for (const m of [...this.psr4, ...this.psr0]) {
+    for (const files of [this.classes, this.functions, this.constants].flatMap((m) => [...m.values()])) files.sort(compare);
+
+    this.everyProject = this.scopeOver(projects);
+    this.ownPrefixes = [...this.everyProject.psr4, ...this.everyProject.psr0].map((m) => m.prefix.toLowerCase()).filter((p) => p !== "");
+    for (const m of [...this.everyProject.psr4, ...this.everyProject.psr0]) {
       const head = headOf(m.prefix.replace(/[\\_]+$/, ""));
       if (head !== "") this.ownHeads.add(head.toLowerCase());
     }
-    for (const files of [this.classes, this.functions, this.constants].flatMap((m) => [...m.values()])) files.sort(compare);
+  }
 
-    const classmap = autoloads.flatMap((a) => a.classmap);
+  /** The autoload of `projects` merged: PSR-4 and PSR-0 longest prefix first, the classmap, lock prefixes. */
+  private scopeOver(projects: readonly ComposerProject[], dirs?: ReadonlySet<string>): Scope {
+    const autoloads = projects.flatMap(autoloadsOf);
+    const classmap = new Map<string, string>();
+    const entries = autoloads.flatMap((a) => a.classmap);
     const excluded = autoloads.flatMap((a) => a.excludeFromClassmap).map(excludePattern);
-    if (classmap.length > 0) {
-      const inMap = (file: string): boolean => classmap.some((e) => underEntry(file, e)) && !excluded.some((x) => x.test(file));
+    if (entries.length > 0) {
+      const inMap = (file: string): boolean => entries.some((e) => underEntry(file, e)) && !excluded.some((x) => x.test(file));
       for (const [name, files] of this.classes) {
         const first = files.find(inMap);
-        if (first !== undefined) this.classmap.set(name, first);
+        if (first !== undefined) classmap.set(name, first);
       }
     }
-
-    this.lock = longestFirst(
-      projects.flatMap((p) =>
-        (p.lockPackages ?? []).flatMap((pkg) => {
-          const module: ExternalModule = { path: pkg.name, ...(pkg.version !== undefined && { version: pkg.version }) };
-          return [...pkg.autoload.psr4, ...pkg.autoload.psr0].filter((m) => m.prefix !== "").map((m) => ({ prefix: m.prefix, module }));
-        }),
+    return {
+      psr4: longestFirst(autoloads.flatMap((a) => a.psr4.map((m) => ({ prefix: m.prefix, paths: m.paths })))),
+      psr0: longestFirst(autoloads.flatMap((a) => a.psr0.map((m) => ({ prefix: m.prefix, paths: m.paths })))),
+      classmap,
+      lock: longestFirst(
+        projects.flatMap((p) =>
+          (p.lockPackages ?? []).flatMap((pkg) => {
+            const module: ExternalModule = { path: pkg.name, ...(pkg.version !== undefined && { version: pkg.version }) };
+            return [...pkg.autoload.psr4, ...pkg.autoload.psr0].filter((m) => m.prefix !== "").map((m) => ({ prefix: m.prefix, module }));
+          }),
+        ),
       ),
-    );
+      ...(dirs && { projects: dirs }),
+    };
+  }
+
+  /** The directory of the project owning `file`: the nearest enclosing `composer.json`; undefined outside every project. */
+  private ownerOf(file: string): string | undefined {
+    if (this.owners.has(file)) return this.owners.get(file);
+    let owner: string | undefined;
+    for (const p of this.projects) {
+      if (underEntry(file, p.dir) && (owner === undefined || p.dir.length > owner.length)) owner = p.dir;
+    }
+    this.owners.set(file, owner);
+    return owner;
+  }
+
+  /** What `fromFile` autoloads: its project's and that project's required path repositories', or every project's outside them all. */
+  private scopeOf(fromFile: string): Scope {
+    const owner = this.ownerOf(fromFile);
+    if (owner === undefined) return this.everyProject;
+    let scope = this.scopes.get(owner);
+    if (scope === undefined) {
+      const inScope = projectsInScope(this.projects.find((p) => p.dir === owner)!, this.projects);
+      scope = this.scopeOver(inScope, new Set(inScope.map((p) => p.dir)));
+      this.scopes.set(owner, scope);
+    }
+    return scope;
   }
 
   /**
    * The file a class is in, or why not; undefined when the project has no
    * trace of it. After Composer's rules, a `legacy` candidate is taken when
    * it declares the class (or failed to parse and no file declares it), so a
-   * pattern can pick one of several declarations.
+   * pattern can pick one of several declarations. A declaration in another
+   * project than those `fromFile`'s scope holds does not count.
    */
   findClass(qualified: string, fromFile: string, legacy?: LegacyCandidates): PhpOutcome | undefined {
-    for (const m of this.psr4) {
+    const scope = this.scopeOf(fromFile);
+    for (const m of scope.psr4) {
       if (!qualified.startsWith(m.prefix)) continue;
       const rest = `${qualified.slice(m.prefix.length).replace(/\\/g, "/")}.php`;
       const target = m.paths.map((p) => joinPath(p, rest)).find((f) => this.files.has(f));
       if (target !== undefined) return { kind: "internal", target, via: "psr-4" };
     }
     const logical = psr0Path(qualified);
-    for (const m of this.psr0) {
+    for (const m of scope.psr0) {
       if (!qualified.startsWith(m.prefix)) continue;
       const target = m.paths.map((p) => joinPath(p, logical)).find((f) => this.files.has(f));
       if (target !== undefined) return { kind: "internal", target, via: "psr-0" };
     }
     const key = qualified.toLowerCase();
-    const mapped = this.classmap.get(key);
+    const mapped = scope.classmap.get(key);
     if (mapped !== undefined) return { kind: "internal", target: mapped, via: "classmap" };
     const declaring = this.classes.get(key);
     for (const { target, via } of legacy?.(qualified, fromFile) ?? []) {
       if (declaring === undefined ? !this.parsed.has(target) : declaring.includes(target)) return { kind: "internal", target, via };
     }
-    return this.declared(this.classes, key);
+    const { projects } = scope;
+    if (projects === undefined || declaring === undefined) return this.declared(this.classes, key);
+    const visible = declaring.filter((file) => {
+      const owner = this.ownerOf(file);
+      return owner === undefined || projects.has(owner);
+    });
+    return this.oneOf(visible);
   }
 
   findFunction(qualified: string): PhpOutcome | undefined {
@@ -457,13 +570,18 @@ class Index {
   }
 
   private declared(map: ReadonlyMap<string, readonly string[]>, key: string): PhpOutcome | undefined {
-    const files = map.get(key);
-    if (files === undefined) return undefined;
+    return this.oneOf(map.get(key));
+  }
+
+  /** The one declaring file; ambiguous for two or more; undefined for none. */
+  private oneOf(files: readonly string[] | undefined): PhpOutcome | undefined {
+    if (files === undefined || files.length === 0) return undefined;
     return files.length === 1 ? { kind: "internal", target: files[0]!, via: "declared" } : { kind: "unresolved", reason: "ambiguous" };
   }
 
-  lockModule(qualified: string): ExternalModule | undefined {
-    return this.lock.find((l) => qualified.startsWith(l.prefix))?.module;
+  /** The composer.lock package, of a project in `fromFile`'s scope, whose autoload prefix covers the name. */
+  lockModule(qualified: string, fromFile: string): ExternalModule | undefined {
+    return this.scopeOf(fromFile).lock.find((l) => qualified.startsWith(l.prefix))?.module;
   }
 
   /**
@@ -553,7 +671,7 @@ function resolveReference(index: Index, ref: PhpReference, fromFile: string, leg
   if (ref.kind === "class" ? isPhpBuiltinClass(qualified) : !qualified.includes("\\")) {
     return ref.kind === "class" ? { kind: "builtin" } : { kind: "global" };
   }
-  const module = index.lockModule(qualified);
+  const module = index.lockModule(qualified, fromFile);
   if (module === undefined && index.isOwn(qualified)) return { kind: "unresolved", reason: "internal-not-found" };
   const pkg = `${PHP_EXTERNAL_PREFIX}${headOf(qualified)}`;
   out.externalPackage(pkg, qualified, module);
