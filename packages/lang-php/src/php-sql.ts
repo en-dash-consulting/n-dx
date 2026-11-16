@@ -48,8 +48,32 @@ export const PHP_SQL_METHODS: readonly string[] = [
 /** Stands for a value that is not known; never part of a table name. */
 const PLACEHOLDER = "\u0000";
 
-/** A placeholder and any name it touches (`users_$year`, `{$db}.orders`). */
-const TOUCHED = /[\w$.`{}]*\u0000[\w$.`{}]*/g;
+/** True for a character that joins a placeholder to a name: `[\w$.`{}]`. */
+function isNameChar(code: number): boolean {
+  return (code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)
+    || code === 0x5f || code === 0x24 || code === 0x2e || code === 0x60 || code === 0x7b || code === 0x7d;
+}
+
+/**
+ * Replaces each placeholder and any name it touches (`users_$year`,
+ * `{$db}.orders`) with ` ? `. Linear in `text`; name characters between two
+ * placeholders go to the first, as a leftmost regex match would take them.
+ */
+export function scrubPlaceholders(text: string): string {
+  const parts = text.split(PLACEHOLDER);
+  const last = parts.length - 1;
+  let out = "";
+  for (let i = 0; i <= last; i++) {
+    const part = parts[i]!;
+    let start = 0;
+    let end = part.length;
+    if (i > 0) while (start < end && isNameChar(part.charCodeAt(start))) start++;
+    if (i < last) while (end > start && isNameChar(part.charCodeAt(end - 1))) end--;
+    out += part.slice(start, end);
+    if (i < last) out += " ? ";
+  }
+  return out;
+}
 
 /** Drupal's table prefix braces: `{users}`. */
 const DRUPAL_TABLE = /\{([A-Za-z_]\w*)\}/g;
@@ -222,7 +246,7 @@ class SqlText {
 
   /** The tables the text names, on their source lines. */
   tables(): { name: string; schema?: string; line: number }[] {
-    const sql = this.text.replace(TOUCHED, " ? ").replace(DRUPAL_TABLE, "$1");
+    const sql = scrubPlaceholders(this.text).replace(DRUPAL_TABLE, "$1");
     if (this.first === undefined || !looksLikeSql(sql)) return [];
     return extractSqlTableReferences(sql, this.first);
   }

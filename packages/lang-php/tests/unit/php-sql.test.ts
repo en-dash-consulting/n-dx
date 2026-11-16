@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractPhpEmbeddedSql, PHP_SQL_FUNCTIONS, PHP_SQL_METHODS, sqlOperands } from "../../src/index.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../lang-kit/tests/helpers/call-within-budget.js";
+import { extractPhpEmbeddedSql, PHP_SQL_FUNCTIONS, PHP_SQL_METHODS, scrubPlaceholders, sqlOperands } from "../../src/index.js";
+
+const SQL = new URL("../../src/php-sql.ts", import.meta.url);
+const MIB = 1024 * 1024;
 
 const query = readFileSync(join(import.meta.dirname, "..", "..", "queries", "php", "sql.scm"), "utf8");
 
@@ -54,4 +58,34 @@ describe("extractPhpEmbeddedSql", () => {
   it("reads nothing from a file without query calls", () => {
     expect(extractPhpEmbeddedSql([{ path: "a.php", captures: {} }])).toEqual([]);
   });
+});
+
+describe("scrubPlaceholders", () => {
+  const P = "\u0000";
+  // The regex it replaced, which was quadratic in a run of name characters.
+  const byRegex = (text: string): string => text.replace(/[\w$.`{}]*\u0000[\w$.`{}]*/g, " ? ");
+
+  it.each([
+    "SELECT * FROM users",
+    `SELECT * FROM users_${P}`,
+    `SELECT * FROM {${P}}.orders WHERE id = 1`,
+    `INSERT INTO archive_${P}_x (a) VALUES (1)`,
+    `SELECT ${P}`,
+    P,
+    `${P}${P}`,
+    `a${P}b${P}c`,
+    `a${P}b c${P}d e`,
+    `x.\`y\`$${P}-z`,
+    `SELECT a FROM t WHERE b = 'é${P}é'`,
+  ])("replaces each placeholder and the name it touches as the regex did: %j", (text) => {
+    expect(scrubPlaceholders(text)).toBe(byRegex(text));
+  });
+
+  it.each([
+    ["without a placeholder", `INSERT INTO blobs (b) VALUES (0x${"a".repeat(MIB)})`],
+    ["with a placeholder", `INSERT INTO blobs (b) VALUES (0x${"a".repeat(MIB)}${P}${"b".repeat(MIB)})`],
+  ])("stays linear on a 1 MiB run of word characters %s", async (_, text) => {
+    const out = await callWithinBudget<typeof scrubPlaceholders>(SQL, "scrubPlaceholders", text);
+    expect(out.startsWith("INSERT INTO blobs (b) VALUES (")).toBe(true);
+  }, BOUNDED_TEST_TIMEOUT_MS);
 });
