@@ -7,6 +7,7 @@ import {
   FLAG_MECHANISMS,
   IMPORT_FORMS,
   IMPORT_GUARDS,
+  LEGACY_STATUSES,
   PRODUCED_FACT_KINDS,
   SYMBOL_KINDS,
   compareLanguageVersions,
@@ -17,10 +18,15 @@ import {
 } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks and the version floor as produced", () => {
+  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks, the version floor and legacy constructs as produced", () => {
     expect([...PRODUCED_FACT_KINDS]).toEqual([
       "imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor",
+      "legacyConstructs",
     ]);
+  });
+
+  it("names legacy construct statuses, a removal first", () => {
+    expect([...LEGACY_STATUSES]).toEqual(["removed", "deprecated", "notice"]);
   });
 
   it("compares language versions numerically, major then minor", () => {

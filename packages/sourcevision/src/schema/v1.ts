@@ -1527,9 +1527,52 @@ export interface SdlcVersionFloors {
   highest?: string;
 }
 
+/** A language version and the language's own migration guide page naming it (lang-kit's `LanguageBoundary`). */
+export interface SdlcLanguageBoundary {
+  version: string;
+  source: string;
+}
+
+/** One legacy-construct rule's uses across a repository. */
+export interface SdlcLegacyRuleCount {
+  status: "removed" | "deprecated" | "notice";
+  uses: number;
+  /** Files with at least one use. */
+  files: number;
+  deprecated?: SdlcLanguageBoundary;
+  removed?: SdlcLanguageBoundary;
+  changed?: SdlcLanguageBoundary;
+  /** The page behind `status`. */
+  source: string;
+  /** The rule sees only likely cases. */
+  likely?: true;
+}
+
+/**
+ * A language's uses of constructs later versions removed or deprecated
+ * (lang-kit's `LegacyConstructFact`), counted per repository. Notices
+ * (configuration-dependent or changed meaning) are counted apart and never in
+ * `uses`, `removedIn` or `deprecatedIn`.
+ */
+export interface SdlcLegacyConstructs {
+  /** Files with at least one use or notice. */
+  files: number;
+  /** Uses of removed or deprecated constructs. */
+  uses: number;
+  /** Review notices. */
+  notices: number;
+  /** By rule id, sorted. */
+  rules: Record<string, SdlcLegacyRuleCount>;
+  /** `major.minor` → uses of constructs that version removed, oldest first. */
+  removedIn: Record<string, number>;
+  /** `major.minor` → uses of constructs deprecated there and not yet removed, oldest first. */
+  deprecatedIn: Record<string, number>;
+}
+
 /** What a language pack reports about a repository's code, beyond the SDLC sections. */
 export interface SdlcLanguageEcosystem {
   versionFloors?: SdlcVersionFloors;
+  legacyConstructs?: SdlcLegacyConstructs;
 }
 
 /**

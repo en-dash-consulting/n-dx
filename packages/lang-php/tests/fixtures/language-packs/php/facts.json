@@ -415,7 +415,27 @@
           "line": 50,
           "column": 12
         }
-      }
+      },
+      "legacyConstructs": [
+        {
+          "rule": "mysql-functions",
+          "construct": "mysql_query()",
+          "status": "removed",
+          "deprecated": {
+            "version": "5.5",
+            "source": "https://www.php.net/manual/en/migration55.deprecated.php"
+          },
+          "removed": {
+            "version": "7.0",
+            "source": "https://www.php.net/manual/en/migration70.removed-exts-sapis.php"
+          },
+          "source": "https://www.php.net/manual/en/migration70.removed-exts-sapis.php",
+          "position": {
+            "line": 42,
+            "column": 10
+          }
+        }
+      ]
     },
     {
       "path": "php52/lib/Shop/Cart.php",
@@ -705,6 +725,41 @@
         {
           "callee": "number_format",
           "strings": []
+        }
+      ],
+      "legacyConstructs": [
+        {
+          "rule": "php4-constructor",
+          "construct": "PHP 4 constructor Shop_Cart::Shop_Cart()",
+          "status": "removed",
+          "deprecated": {
+            "version": "7.0",
+            "source": "https://www.php.net/manual/en/migration70.deprecated.php"
+          },
+          "removed": {
+            "version": "8.0",
+            "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+          },
+          "source": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "position": {
+            "line": 8,
+            "column": 13
+          }
+        },
+        {
+          "rule": "dynamic-property",
+          "construct": "dynamic property Shop_Order::$cart",
+          "status": "deprecated",
+          "deprecated": {
+            "version": "8.2",
+            "source": "https://www.php.net/manual/en/migration82.deprecated.php"
+          },
+          "source": "https://www.php.net/manual/en/migration82.deprecated.php",
+          "likely": true,
+          "position": {
+            "line": 37,
+            "column": 15
+          }
         }
       ]
     },
@@ -1474,7 +1529,42 @@
           "line": 2,
           "column": 0
         }
-      }
+      },
+      "legacyConstructs": [
+        {
+          "rule": "dynamic-property",
+          "construct": "dynamic property Cart::$order",
+          "status": "deprecated",
+          "deprecated": {
+            "version": "8.2",
+            "source": "https://www.php.net/manual/en/migration82.deprecated.php"
+          },
+          "source": "https://www.php.net/manual/en/migration82.deprecated.php",
+          "likely": true,
+          "position": {
+            "line": 9,
+            "column": 19
+          }
+        },
+        {
+          "rule": "php4-constructor",
+          "construct": "PHP 4 constructor GlobalCart::GlobalCart()",
+          "status": "removed",
+          "deprecated": {
+            "version": "7.0",
+            "source": "https://www.php.net/manual/en/migration70.deprecated.php"
+          },
+          "removed": {
+            "version": "8.0",
+            "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+          },
+          "source": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "position": {
+            "line": 22,
+            "column": 17
+          }
+        }
+      ]
     },
     {
       "path": "php8/src/Orders/OrderService.php",

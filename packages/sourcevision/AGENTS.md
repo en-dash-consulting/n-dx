@@ -75,12 +75,9 @@ includes reach imports.json through `buildPackImportGraph` as edges
 artifact is unchanged (`tests/integration/php-pack-imports.test.ts`). Over
 the pinned corpus (`php-corpus.json`, `php5` marking the PHP 5 era
 repositories), `scripts/php-corpus-report.mjs` measures the clean-parse rate
-of the files analyze would parse, per repository and for the PHP 5
-repositories against decision D4's 99.5% bar, and
-`scripts/php-resolve-report.mjs` the resolver: internal resolution rate per
-repository (`no composer` without a manifest), unresolved names, include
-resolution (resolved, computable-unresolved, dynamic with or without
-candidates, host-based) and seeded hand-check samples.
+(the PHP 5 repositories against decision D4's 99.5% bar) and
+`scripts/php-resolve-report.mjs` the resolver; each script's header says
+what it prints.
 
 ### The Terraform model in infrastructure.json
 
@@ -124,8 +121,9 @@ that `analyzeClassifications` scores (weight 1), recorded as evidence with
 (crontab:4)`; the schedule lives only in that detail. A file with pack signals, or pack evidence last run, is always
 reclassified. Without facts classifications.json is unchanged.
 
-`configReads` and `flagChecks` become config.json, `versionFloor`
-sdlc-profile.json's `ecosystem`, each only when present.
+`configReads` and `flagChecks` become config.json, `versionFloor` and
+`legacyConstructs` sdlc-profile.json's `ecosystem` (`pack-ecosystem.ts`),
+each only when present.
 
 ### Terraform as a database-engine source
 

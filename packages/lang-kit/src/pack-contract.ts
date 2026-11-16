@@ -435,6 +435,48 @@ export function compareLanguageVersions(a: string, b: string): number {
   return 0;
 }
 
+// ── Legacy constructs (produced) ────────────────────────────────────────────
+
+/** A language version and the language's own migration guide page that names it. */
+export interface LanguageBoundary {
+  /** `major.minor`, e.g. `7.0`. */
+  readonly version: string;
+  /** URL of the guide page. */
+  readonly source: string;
+}
+
+/**
+ * What a later language version did to a construct: `removed` (some version
+ * removed it, or stopped reading it as before), `deprecated` (deprecated, not
+ * yet removed), `notice` (worth a review — it depends on configuration, or
+ * its meaning changed — never a removal).
+ */
+export const LEGACY_STATUSES = ["removed", "deprecated", "notice"] as const;
+export type LegacyStatus = (typeof LEGACY_STATUSES)[number];
+
+/**
+ * One use of a construct a later language version removed or deprecated, or
+ * changed the meaning of. Every version it names comes with its guide page.
+ */
+export interface LegacyConstructFact {
+  /** The rule that matched, a stable id (`mysql-functions`). */
+  readonly rule: string;
+  /** The construct in words, the use's own name where it has one (`mysql_query()`). */
+  readonly construct: string;
+  readonly status: LegacyStatus;
+  /** Where it was deprecated. */
+  readonly deprecated?: LanguageBoundary;
+  /** Where it was removed, or stopped being read as before. */
+  readonly removed?: LanguageBoundary;
+  /** Where a `notice`'s meaning changed. */
+  readonly changed?: LanguageBoundary;
+  /** The page behind `status`: `removed`'s, else `deprecated`'s, else `changed`'s, else the page describing the notice. */
+  readonly source: string;
+  /** Set when the rule sees only a likely case (it cannot see the whole program). */
+  readonly likely?: true;
+  readonly position: SourcePosition;
+}
+
 // ── Resources (produced) ────────────────────────────────────────────────────
 
 /** The provider a resource belongs to. */
@@ -555,6 +597,8 @@ export interface FileFacts {
   readonly flagChecks?: readonly FlagCheckFact[];
   /** Absent when no syntax rule matched: the file uses nothing a rule dates. */
   readonly versionFloor?: VersionFloorFact;
+  /** In document order. */
+  readonly legacyConstructs?: readonly LegacyConstructFact[];
 }
 
 /** Fact kinds a pack produces today. */
@@ -569,6 +613,7 @@ export const PRODUCED_FACT_KINDS = [
   "configReads",
   "flagChecks",
   "versionFloor",
+  "legacyConstructs",
 ] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */

@@ -661,8 +661,37 @@ const SdlcVersionFloorsSchema = z.object({
   highest: z.string().regex(/^\d+\.\d+$/).optional(),
 });
 
+const LANGUAGE_VERSION = /^\d+\.\d+$/;
+const GUIDE_PAGE = z.string().regex(/^https:\/\/\S+$/);
+
+const SdlcLanguageBoundarySchema = z.object({
+  version: z.string().regex(LANGUAGE_VERSION),
+  source: GUIDE_PAGE,
+});
+
+const SdlcLegacyRuleCountSchema = z.object({
+  status: z.enum(["removed", "deprecated", "notice"]),
+  uses: z.number().int().positive(),
+  files: z.number().int().positive(),
+  deprecated: SdlcLanguageBoundarySchema.optional(),
+  removed: SdlcLanguageBoundarySchema.optional(),
+  changed: SdlcLanguageBoundarySchema.optional(),
+  source: GUIDE_PAGE,
+  likely: z.literal(true).optional(),
+});
+
+const SdlcLegacyConstructsSchema = z.object({
+  files: z.number().int().nonnegative(),
+  uses: z.number().int().nonnegative(),
+  notices: z.number().int().nonnegative(),
+  rules: z.record(z.string().min(1), SdlcLegacyRuleCountSchema),
+  removedIn: z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive()),
+  deprecatedIn: z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive()),
+});
+
 const SdlcLanguageEcosystemSchema = z.object({
   versionFloors: SdlcVersionFloorsSchema.optional(),
+  legacyConstructs: SdlcLegacyConstructsSchema.optional(),
 });
 
 export const SdlcProfileSchema = z.object({

@@ -1,0 +1,388 @@
+/**
+ * Removed and deprecated PHP constructs over the PHP pack: per file, each use
+ * of a construct a later PHP version removed or deprecated, and two review
+ * notices, as lang-kit's `LegacyConstructFact`.
+ *
+ * A framework pack (lang-runtime's `FrameworkPack`): its query
+ * (`queries/php-legacy/legacy.scm`) runs in the PHP parse only when legacy
+ * constructs are wanted. Each rule in {@link LEGACY_RULES} names the php.net
+ * migration guide page of every version it gives (deprecated, removed,
+ * changed); no version comes from anywhere else. A fact's `status` is
+ * `removed` when the rule has a removal, else `deprecated`, and `notice` for
+ * the two rules that only ask for a review:
+ *
+ * - `short-open-tag`: `<?` is PHP only while `short_open_tag` is on; never a
+ *   removal.
+ * - `string-number-comparison`: `==`, `!=` or `<>` between a non-numeric
+ *   string literal and a number, whose result PHP 8.0 changed.
+ *
+ * How each rule reads the captures:
+ *
+ * - Function rules: a call of the global function by name, in any letter case
+ *   (`mysql_*`, `ereg*`, `mcrypt_*`, `each`, …). A namespaced call
+ *   (`\App\each()`) and a call of a name the repository itself declares as a
+ *   function (a polyfill) are not PHP's function.
+ * - `__autoload`: a function declared with that name.
+ * - `php4-constructor`: a method named as its class (no `__construct`, class
+ *   outside any namespace), as `php-symbols.ts` reads PHP 4 constructors.
+ * - `dynamic-property`: the first `$this->name = …` per name in a class that
+ *   extends nothing, uses no trait, declares no `__set` and carries no
+ *   `#[AllowDynamicProperties]`, when the class declares no such property.
+ *   `likely`: a property can still be declared where no rule sees it.
+ * - Constructs the grammar cannot parse are read from what parsing left:
+ *   ASP tags and `<script language="php">` from inline HTML, and a
+ *   curly-brace offset (`$s{0}`) from a statement ending in a MISSING token
+ *   right before a `{`, or from an ERROR node's text (strings and comments
+ *   skipped). php-corpus-report.mjs counts a file whose every parse error sits
+ *   on a curly-offset line as legacy, not as a grammar failure.
+ *
+ * @module lang-php/php-legacy
+ */
+
+import { join } from "node:path";
+import type { FactKind, FileFacts, LanguageBoundary, LegacyConstructFact, LegacyStatus, SourcePosition } from "@n-dx/lang-kit";
+import { atOrBefore, contains, innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
+import { PHP_PACKAGE } from "./package-paths.js";
+
+/** One removed, deprecated or changed construct, with the php.net page of every version it names. */
+export interface PhpLegacyRule {
+  /** The construct in words. */
+  readonly construct: string;
+  readonly deprecated?: LanguageBoundary;
+  readonly removed?: LanguageBoundary;
+  readonly changed?: LanguageBoundary;
+  /** A review notice, never a removal; `source` is the page describing it. */
+  readonly notice?: { readonly source: string };
+  /** The rule sees only likely cases. */
+  readonly likely?: true;
+}
+
+const MANUAL = "https://www.php.net/manual/en/";
+
+/** A version and its migration guide page (`migration70.incompatible`). */
+const at = (version: string, page: string): LanguageBoundary => ({ version, source: `${MANUAL}${page}.php` });
+
+/** The guide page a boundary must cite: `migrationXY.<section>.php` for version X.Y. */
+export const MIGRATION_PAGE = /^https:\/\/www\.php\.net\/manual\/en\/migration(\d)(\d)\.[a-z-]+\.php$/;
+
+/** Every rule, by id. */
+export const LEGACY_RULES = {
+  "call-time-pass-by-reference": { construct: "call-time pass-by-reference f(&$x)", removed: at("5.4", "migration54.incompatible") },
+  "session-register": {
+    construct: "session_register(), session_unregister() or session_is_registered()",
+    deprecated: at("5.3", "migration53.deprecated"),
+    removed: at("5.4", "migration54.incompatible"),
+  },
+  "import-request-variables": { construct: "import_request_variables()", removed: at("5.4", "migration54.incompatible") },
+  "magic-quotes-runtime": {
+    construct: "set_magic_quotes_runtime() or magic_quotes_runtime()",
+    deprecated: at("5.3", "migration53.deprecated"),
+    removed: at("7.0", "migration70.incompatible"),
+  },
+  "mysql-functions": { construct: "mysql_* function", deprecated: at("5.5", "migration55.deprecated"), removed: at("7.0", "migration70.removed-exts-sapis") },
+  "ereg-functions": {
+    construct: "ereg*, split, spliti or sql_regcase function",
+    deprecated: at("5.3", "migration53.deprecated"),
+    removed: at("7.0", "migration70.removed-exts-sapis"),
+  },
+  "asp-tags": { construct: "<% or <%= tag", removed: at("7.0", "migration70.incompatible") },
+  "script-tags": { construct: "<script language=\"php\"> tag", removed: at("7.0", "migration70.incompatible") },
+  "mcrypt-functions": { construct: "mcrypt_* function", deprecated: at("7.1", "migration71.deprecated"), removed: at("7.2", "migration72.other-changes") },
+  "php4-constructor": { construct: "PHP 4 constructor (method named as its class)", deprecated: at("7.0", "migration70.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  "create-function": { construct: "create_function()", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  each: { construct: "each()", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  "unset-cast": { construct: "(unset) cast", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  "autoload-function": { construct: "__autoload()", deprecated: at("7.2", "migration72.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  "curly-offset": { construct: "curly-brace offset $s{0}", deprecated: at("7.4", "migration74.deprecated"), removed: at("8.0", "migration80.incompatible") },
+  "get-magic-quotes": {
+    construct: "get_magic_quotes_gpc() or get_magic_quotes_runtime()",
+    deprecated: at("7.4", "migration74.deprecated"),
+    removed: at("8.0", "migration80.incompatible"),
+  },
+  "string-dollar-brace": { construct: "${} string interpolation", deprecated: at("8.2", "migration82.deprecated") },
+  "dynamic-property": { construct: "dynamic property creation", deprecated: at("8.2", "migration82.deprecated"), likely: true },
+  "utf8-encode-decode": { construct: "utf8_encode() or utf8_decode()", deprecated: at("8.2", "migration82.deprecated") },
+  "short-open-tag": { construct: "<? short open tag (needs short_open_tag)", notice: { source: `${MANUAL}ini.core.php#ini.short-open-tag` } },
+  "string-number-comparison": {
+    construct: "== between a non-numeric string and a number",
+    changed: at("8.0", "migration80.incompatible"),
+    notice: { source: `${MANUAL}migration80.incompatible.php` },
+  },
+} as const satisfies Record<string, PhpLegacyRule>;
+
+export type PhpLegacyRuleId = keyof typeof LEGACY_RULES;
+
+/** A rule's status: a notice, else removed when it has a removal, else deprecated. */
+export function legacyStatus(rule: PhpLegacyRule): LegacyStatus {
+  if (rule.notice !== undefined) return "notice";
+  return rule.removed !== undefined ? "removed" : "deprecated";
+}
+
+/** Global functions by lower-cased name; prefixes after. */
+const FUNCTIONS: ReadonlyMap<string, PhpLegacyRuleId> = new Map([
+  ...["ereg", "eregi", "ereg_replace", "eregi_replace", "split", "spliti", "sql_regcase"].map((n) => [n, "ereg-functions"] as const),
+  ...["session_register", "session_unregister", "session_is_registered"].map((n) => [n, "session-register"] as const),
+  ["import_request_variables", "import-request-variables"],
+  ["set_magic_quotes_runtime", "magic-quotes-runtime"],
+  ["magic_quotes_runtime", "magic-quotes-runtime"],
+  ["get_magic_quotes_gpc", "get-magic-quotes"],
+  ["get_magic_quotes_runtime", "get-magic-quotes"],
+  ["create_function", "create-function"],
+  ["each", "each"],
+  ["utf8_encode", "utf8-encode-decode"],
+  ["utf8_decode", "utf8-encode-decode"],
+]);
+const FUNCTION_PREFIXES: readonly (readonly [string, PhpLegacyRuleId])[] = [
+  ["mysql_", "mysql-functions"],
+  ["mcrypt_", "mcrypt-functions"],
+];
+
+/** The rule a call of `name` (lower-cased, global) matches. */
+function functionRule(name: string): PhpLegacyRuleId | undefined {
+  return FUNCTIONS.get(name) ?? FUNCTION_PREFIXES.find(([prefix]) => name.startsWith(prefix) && name.length > prefix.length)?.[1];
+}
+
+/** A numeric string as PHP 8 reads one: whitespace, sign, digits, fraction, exponent, whitespace. */
+const NUMERIC_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
+
+/** A deref an offset can follow (`$s`, `$a['k']`, `$o->p`), ending the text before a `{`. */
+const OFFSET_BASE_END = /(\$[A-Za-z_\x80-￿][\w\x80-￿]*|\]|->\s*[A-Za-z_\x80-￿][\w\x80-￿]*)$/;
+const OFFSET_BASE = /(\$[A-Za-z_\x80-￿][\w\x80-￿]*|\]|->\s*[A-Za-z_\x80-￿][\w\x80-￿]*)\{/g;
+
+const ASP_TAG = /<%=?/g;
+const SCRIPT_TAG = /<script\b[^>]*\blanguage\s*=\s*["']?php["']?[^>]*>/gi;
+
+const QUERY = "legacy";
+const PREFIX = "legacy.";
+
+const samePosition = (a: SourcePosition, b: SourcePosition): boolean => a.line === b.line && a.column === b.column;
+
+/** The position `offset` characters into a capture's text. */
+function positionIn(capture: Capture, offset: number): SourcePosition {
+  let { line, column } = capture.start;
+  const text = capture.text;
+  for (let i = 0; i < offset; i++) {
+    if (text[i] === "\n") {
+      line++;
+      column = 0;
+    } else column++;
+  }
+  return { line, column };
+}
+
+/**
+ * `text` with quoted strings and comments blanked to spaces (newlines kept),
+ * so offsets still line up. One linear pass.
+ */
+export function blankStringsAndComments(text: string): string {
+  const out = [...text];
+  let i = 0;
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
+  };
+  while (i < text.length) {
+    const c = text[i]!;
+    if (c === "'" || c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== c) j += text[j] === "\\" ? 2 : 1;
+      blank(i, Math.min(j + 1, text.length));
+      i = j + 1;
+    } else if (c === "#" || (c === "/" && text[i + 1] === "/")) {
+      let j = text.indexOf("\n", i);
+      if (j === -1) j = text.length;
+      blank(i, j);
+      i = j;
+    } else if (c === "/" && text[i + 1] === "*") {
+      let j = text.indexOf("*/", i + 2);
+      j = j === -1 ? text.length : j + 2;
+      blank(i, j);
+      i = j;
+    } else i++;
+  }
+  return out.join("");
+}
+
+/** One use a rule matched; `construct` names the use when it has a name of its own. */
+export interface LegacyHit {
+  readonly rule: PhpLegacyRuleId;
+  readonly position: SourcePosition;
+  readonly construct?: string;
+}
+
+/** True when the class spanning `cls` is in a namespace: inside a braced `namespace A { … }`, or after `namespace A;`. */
+function namespaced(cls: Capture, namespaces: readonly Capture[], bodies: readonly Capture[]): boolean {
+  return namespaces.some((ns) => (bodies.some((b) => contains(ns, b)) ? contains(ns, cls) : atOrBefore(ns.end, cls.start)));
+}
+
+/** PHP 4 constructors and likely dynamic properties, from a file's class captures. */
+function classHits(by: ReadonlyMap<string, Capture[]>): LegacyHit[] {
+  const get = (name: string) => by.get(name) ?? [];
+  const classes = get("class");
+  if (classes.length === 0) return [];
+  // Anonymous classes own what they hold, so it never reaches an outer class.
+  const owners = [...classes, ...get("anonymous-class")];
+  const ownerOf = (captured: readonly Capture[]) => {
+    const owned = innermostEach(owners, captured);
+    return (cls: Capture) => captured.filter((_, i) => owned[i] === cls);
+  };
+  const names = ownerOf(get("class-name"));
+  const methods = ownerOf(get("method"));
+  const properties = ownerOf(get("property"));
+  const assigns = ownerOf(get("this-assign"));
+  const extend = ownerOf(get("class-extends"));
+  const traits = ownerOf(get("class-trait"));
+  const attributes = ownerOf(get("class-attributes"));
+  const namespaces = get("namespace");
+  const bodies = get("namespace-body");
+
+  const hits: LegacyHit[] = [];
+  for (const cls of classes) {
+    const name = names(cls)[0]?.text;
+    if (name === undefined) continue;
+    const declared = methods(cls);
+    const lower = new Set(declared.map((m) => m.text.toLowerCase()));
+    if (!lower.has("__construct") && !namespaced(cls, namespaces, bodies)) {
+      const ctor = declared.find((m) => m.text.toLowerCase() === name.toLowerCase());
+      if (ctor !== undefined) hits.push({ rule: "php4-constructor", position: ctor.start, construct: `PHP 4 constructor ${name}::${ctor.text}()` });
+    }
+    const open =
+      extend(cls).length === 0 &&
+      traits(cls).length === 0 &&
+      !lower.has("__set") &&
+      !attributes(cls).some((a) => /\bAllowDynamicProperties\b/i.test(a.text));
+    if (!open) continue;
+    const known = new Set(properties(cls).map((p) => p.text));
+    for (const assign of assigns(cls)) {
+      if (known.has(assign.text)) continue;
+      known.add(assign.text);
+      hits.push({ rule: "dynamic-property", position: assign.start, construct: `dynamic property ${name}::$${assign.text}` });
+    }
+  }
+  return hits;
+}
+
+/** Curly-brace offsets: a MISSING-ended statement right before a `{`, and offsets inside ERROR text. */
+function curlyOffsetHits(by: ReadonlyMap<string, Capture[]>): LegacyHit[] {
+  const seen: SourcePosition[] = [];
+  const hit = (position: SourcePosition) => {
+    if (!seen.some((p) => samePosition(p, position))) seen.push(position);
+  };
+  const bases = by.get("brace-base") ?? [];
+  const opens = by.get("brace-open") ?? [];
+  for (const base of bases) {
+    const open = opens.find((o) => samePosition(o.start, base.end));
+    if (open !== undefined && OFFSET_BASE_END.test(base.text)) hit(open.start);
+  }
+  for (const error of by.get("error") ?? []) {
+    const text = blankStringsAndComments(error.text);
+    for (const match of text.matchAll(OFFSET_BASE)) hit(positionIn(error, match.index + match[0].length - 1));
+  }
+  return seen.map((position) => ({ rule: "curly-offset" as const, position }));
+}
+
+/** Every rule a file's captures match. `declared` holds the lower-cased functions the repository declares. */
+export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> = new Set()): LegacyHit[] {
+  const by = new Map<string, Capture[]>();
+  for (const capture of file.captures[QUERY] ?? []) {
+    const name = capture.name.slice(PREFIX.length);
+    let list = by.get(name);
+    if (list === undefined) by.set(name, (list = []));
+    list.push(capture);
+  }
+  const hits: LegacyHit[] = [];
+  for (const call of by.get("call") ?? []) {
+    const written = call.text.replace(/^\\/, "");
+    if (written.includes("\\")) continue;
+    const lower = written.toLowerCase();
+    const rule = functionRule(lower);
+    if (rule !== undefined && !declared.has(lower)) hits.push({ rule, position: call.start, construct: `${written}()` });
+  }
+  for (const fn of by.get("function") ?? []) {
+    if (fn.text.toLowerCase() === "__autoload") hits.push({ rule: "autoload-function", position: fn.start });
+  }
+  for (const c of by.get("call-time-reference") ?? []) hits.push({ rule: "call-time-pass-by-reference", position: c.start });
+  for (const c of by.get("cast") ?? []) if (c.text.toLowerCase() === "unset") hits.push({ rule: "unset-cast", position: c.start });
+  for (const c of by.get("string-dollar-brace") ?? []) hits.push({ rule: "string-dollar-brace", position: c.start });
+  for (const c of by.get("php-tag") ?? []) if (c.text === "<?") hits.push({ rule: "short-open-tag", position: c.start });
+  for (const c of by.get("compare-string") ?? []) {
+    if (c.nodeType === "encapsed_string" && c.text.includes("$")) continue;
+    if (!NUMERIC_STRING.test(c.text.slice(1, -1))) hits.push({ rule: "string-number-comparison", position: c.start });
+  }
+  for (const html of by.get("inline-html") ?? []) {
+    for (const m of html.text.matchAll(ASP_TAG)) hits.push({ rule: "asp-tags", position: positionIn(html, m.index), construct: `${m[0]} tag` });
+    for (const m of html.text.matchAll(SCRIPT_TAG)) hits.push({ rule: "script-tags", position: positionIn(html, m.index) });
+  }
+  hits.push(...classHits(by), ...curlyOffsetHits(by));
+  return hits.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
+}
+
+/** The page behind a rule's status: the notice's page, else the removal's, else the deprecation's. */
+export function legacySource(rule: PhpLegacyRule): string {
+  const page = rule.notice?.source ?? (rule.removed ?? rule.deprecated)?.source;
+  if (page === undefined) throw new Error(`PHP legacy rule "${rule.construct}" cites no page`);
+  return page;
+}
+
+/** A hit as lang-kit's fact. */
+export function legacyFact(hit: LegacyHit): LegacyConstructFact {
+  const rule: PhpLegacyRule = LEGACY_RULES[hit.rule];
+  const status = legacyStatus(rule);
+  const source = legacySource(rule);
+  return {
+    rule: hit.rule,
+    construct: hit.construct ?? rule.construct,
+    status,
+    ...(rule.deprecated === undefined ? {} : { deprecated: rule.deprecated }),
+    ...(rule.removed === undefined ? {} : { removed: rule.removed }),
+    ...(rule.changed === undefined ? {} : { changed: rule.changed }),
+    source,
+    ...(rule.likely === undefined ? {} : { likely: true as const }),
+    position: hit.position,
+  };
+}
+
+/** Lower-cased names of the functions any of `files` declares. */
+function declaredFunctions(files: readonly PackSourceFile[]): Set<string> {
+  const names = new Set<string>();
+  for (const file of files) {
+    for (const c of file.captures[QUERY] ?? []) if (c.name === `${PREFIX}function`) names.add(c.text.toLowerCase());
+  }
+  return names;
+}
+
+const GRAMMAR = "tree-sitter-php@0.25.1";
+
+/** Each rule's provenance is the page behind its status; the query was checked against the grammar's node types. */
+const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
+  [QUERY]: {
+    verifiedAgainst: [GRAMMAR],
+    verifiedOn: "2026-11-16",
+    source: "https://github.com/tree-sitter/tree-sitter-php/blob/v0.25.1/php/src/node-types.json",
+  },
+  ...Object.fromEntries(
+    Object.entries(LEGACY_RULES).map(([id, r]: [string, PhpLegacyRule]) => [
+      id,
+      { verifiedAgainst: [GRAMMAR, "PHP migration guides"], verifiedOn: "2026-11-16", source: legacySource(r) },
+    ]),
+  ),
+};
+
+export const phpLegacy: FrameworkPack = {
+  id: "php-legacy",
+  produces: ["legacyConstructs"],
+  // A getter, so the path is computed on first use rather than at import.
+  get queries() {
+    return [{ name: QUERY, path: join(PHP_PACKAGE.queryDir("php-legacy"), `${QUERY}.scm`) }];
+  },
+  provenance: PROVENANCE,
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts {
+    const facts = new Map<string, Omit<FileFacts, "path">>();
+    if (!kinds.includes("legacyConstructs")) return { facts, notices: [] };
+    const declared = declaredFunctions(files);
+    for (const file of files) {
+      const hits = legacyHits(file, declared);
+      if (hits.length > 0) facts.set(file.path, { legacyConstructs: hits.map(legacyFact) });
+    }
+    return { facts, notices: [] };
+  },
+};

@@ -4,13 +4,13 @@ import { factGaps } from "@n-dx/lang-runtime";
 import { PHP_SYMBOL_RULES, pack, phpPack } from "../../src/index.js";
 
 describe("@n-dx/lang-php barrel", () => {
-  it("exports the PHP pack entry, producing imports, symbols, calls, routes, entry points, outbound calls, config reads, flag checks and the version floor", () => {
+  it("exports the PHP pack entry, producing imports, symbols, calls, routes, entry points, outbound calls, config reads, flag checks, the version floor and legacy constructs", () => {
     expect(isLanguagePackEntry(pack)).toBe(true);
     expect(pack).toMatchObject({
       packageName: "@n-dx/lang-php",
       id: "php",
       config: phpConfig,
-      produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls", "configReads", "flagChecks", "versionFloor"],
+      produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls", "configReads", "flagChecks", "versionFloor", "legacyConstructs"],
     });
   });
 

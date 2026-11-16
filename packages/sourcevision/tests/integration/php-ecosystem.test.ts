@@ -1,8 +1,9 @@
 /**
- * PHP version floors (the PHP pack's php-compat rules) through the analyze
- * pipeline: the imports phase's single pack call collects them, and they
- * become the SDLC profile's `ecosystem.php.versionFloors`, which readiness
- * carries through. Without the PHP pack the profile has no `ecosystem`.
+ * PHP version floors and legacy constructs (the PHP pack's php-compat and
+ * php-legacy rules) through the analyze pipeline: the imports phase's single
+ * pack call collects them, and they become the SDLC profile's
+ * `ecosystem.php`, which readiness carries through. Without the PHP pack the
+ * profile has no `ecosystem`.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -13,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { phpConfig, type FileFacts } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
-import { packVersionFloors, withEcosystem } from "../../src/analyzers/pack-version-floors.js";
+import { packEcosystem, withEcosystem } from "../../src/analyzers/pack-ecosystem.js";
 import { computeReadinessScore } from "../../src/analyzers/readiness-score.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../src/analyzers/sdlc-profile.js";
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
@@ -25,11 +26,12 @@ import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 const PHP = KNOWN_PACKS.find((p) => p.id === phpConfig.id)!;
 
 const FILES: Record<string, string> = {
-  // PHP 4 style: nothing a rule dates.
+  // PHP 4 style: nothing a rule dates, and a PHP 4 constructor.
   "legacy.php": "<?php\nclass Old { var $a = array(); function Old() { $this->a = array(1); } }\n",
   "closure.php": "<?php\n$f = function ($x) { return $x; };\n",
   "short.php": "<?php\n$ids = [1, 2];\n",
   "modern.php": "<?php\nenum Suit { case Hearts; }\n",
+  "db.php": "<?php\n$r = mysql_query('SELECT 1');\nwhile ($row = mysql_fetch_row($r)) { each($row); }\n",
 };
 
 const NOT_INSTALLED_PHP: KnownPack = {
@@ -38,12 +40,14 @@ const NOT_INSTALLED_PHP: KnownPack = {
     Promise.reject(Object.assign(new Error("Cannot find package '@n-dx/lang-php' imported from /x.js"), { code: "ERR_MODULE_NOT_FOUND" })),
 };
 
-describe("PHP version floors in the SDLC profile and readiness", () => {
+const MIGRATION = "https://www.php.net/manual/en/migration";
+
+describe("PHP version floors and legacy constructs in the SDLC profile and readiness", () => {
   let dir: string;
   let inventory: Inventory;
 
   beforeAll(async () => {
-    dir = mkdtempSync(join(tmpdir(), "sv-php-floors-"));
+    dir = mkdtempSync(join(tmpdir(), "sv-php-ecosystem-"));
     for (const [path, text] of Object.entries(FILES)) {
       mkdirSync(dirname(join(dir, path)), { recursive: true });
       writeFileSync(join(dir, path), text);
@@ -59,13 +63,50 @@ describe("PHP version floors in the SDLC profile and readiness", () => {
       // An empty pack directory: the workspace pack, never one installed for the user.
       packs: { packs: [php ?? NOT_INSTALLED_PHP], loader: { packDir: join(dir, "no-packs") }, warn: () => {}, framework: (f) => facts.push(...f) },
     });
-    return withEcosystem(await buildSdlcProfile(dir), packVersionFloors(facts, inventory));
+    return withEcosystem(await buildSdlcProfile(dir), packEcosystem(facts, inventory));
   }
 
-  it("counts each PHP file by its floor, and readiness carries the histogram", async (ctx) => {
+  it("counts each PHP file by its floor and the repository's legacy constructs, and readiness carries both", async (ctx) => {
     await skipUnlessPackRuns(ctx, "php");
     const profile = await profileWith(PHP);
-    const expected = { php: { versionFloors: { files: 4, floors: { "5.3": 1, "5.4": 1, "8.1": 1 }, none: 1, highest: "8.1" } } };
+    const expected = {
+      php: {
+        versionFloors: { files: 5, floors: { "5.3": 1, "5.4": 1, "8.1": 1 }, none: 2, highest: "8.1" },
+        legacyConstructs: {
+          files: 2,
+          uses: 4,
+          notices: 0,
+          rules: {
+            each: {
+              status: "removed",
+              uses: 1,
+              files: 1,
+              deprecated: { version: "7.2", source: `${MIGRATION}72.deprecated.php` },
+              removed: { version: "8.0", source: `${MIGRATION}80.incompatible.php` },
+              source: `${MIGRATION}80.incompatible.php`,
+            },
+            "mysql-functions": {
+              status: "removed",
+              uses: 2,
+              files: 1,
+              deprecated: { version: "5.5", source: `${MIGRATION}55.deprecated.php` },
+              removed: { version: "7.0", source: `${MIGRATION}70.removed-exts-sapis.php` },
+              source: `${MIGRATION}70.removed-exts-sapis.php`,
+            },
+            "php4-constructor": {
+              status: "removed",
+              uses: 1,
+              files: 1,
+              deprecated: { version: "7.0", source: `${MIGRATION}70.deprecated.php` },
+              removed: { version: "8.0", source: `${MIGRATION}80.incompatible.php` },
+              source: `${MIGRATION}80.incompatible.php`,
+            },
+          },
+          removedIn: { "7.0": 2, "8.0": 2 },
+          deprecatedIn: {},
+        },
+      },
+    };
     expect(profile.ecosystem).toEqual(expected);
 
     const onDisk = JSON.parse(toCanonicalJSON(stripSdlcProfileForDisk(profile)));

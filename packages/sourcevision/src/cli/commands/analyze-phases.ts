@@ -249,8 +249,8 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
         fileSetChanged,
       } : {}),
       packs: {
-        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor }) =>
-          ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor }))),
+        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs }) =>
+          ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs }))),
         analysed: (id) => analysedPacks.push(id),
         suggest: (id) => suggestPack(ctx, id),
       },

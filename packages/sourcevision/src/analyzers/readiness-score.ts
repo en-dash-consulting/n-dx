@@ -124,7 +124,8 @@ export interface ReadinessScore {
   suggestions: string[];
   /**
    * The profile's `ecosystem` (language packs' facts, such as PHP's version
-   * floors), carried through unscored. Absent when the profile has none.
+   * floors and legacy constructs), carried through unscored. Absent when the
+   * profile has none.
    */
   ecosystem?: SdlcProfile["ecosystem"];
 }

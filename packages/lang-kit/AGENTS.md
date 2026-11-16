@@ -21,10 +21,13 @@ the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
 pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
-routes, outbound calls, entry points, config reads, flag checks, version floor) and `DECLARED_FACT_KINDS` (components, typed but not
+routes, outbound calls, entry points, config reads, flag checks, version floor, legacy constructs) and `DECLARED_FACT_KINDS` (components, typed but not
 yet produced). `VersionFloorFact` is one per file: the oldest language
 version its syntax needs, the rule and construct that set it and the
-language's own guide page; versions compare with `compareLanguageVersions`. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+language's own guide page; versions compare with `compareLanguageVersions`.
+`LegacyConstructFact` is one use of a construct a later version removed or
+deprecated (`LEGACY_STATUSES`; `notice` is never a removal), each version a
+`LanguageBoundary` with its guide page. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
 never carry a value; a flag's `normalized` name comes from
 `normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`

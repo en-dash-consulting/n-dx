@@ -1,0 +1,187 @@
+import { describe, expect, it } from "vitest";
+import type { LegacyConstructFact, VersionFloorFact } from "@n-dx/lang-kit";
+import { packEcosystem, withEcosystem } from "../../../src/analyzers/pack-ecosystem.js";
+import { computeReadinessScore } from "../../../src/analyzers/readiness-score.js";
+import type { Inventory, SdlcProfile } from "../../../src/schema/index.js";
+import { SdlcProfileSchema, validate } from "../../../src/schema/validate.js";
+
+function inventory(files: Record<string, string>): Inventory {
+  return {
+    files: Object.entries(files).map(([path, language]) => ({ path, language, size: 1, lineCount: 1, hash: "h", role: "source", category: "" })),
+  } as unknown as Inventory;
+}
+
+const floor = (version: string): VersionFloorFact => ({
+  version,
+  rule: "r",
+  construct: "c",
+  source: `https://www.php.net/manual/en/migration${version.replace(".", "")}.new-features.php`,
+  position: { line: 1, column: 0 },
+});
+
+const page = (version: string, section: string) => ({ version, source: `https://www.php.net/manual/en/migration${version.replace(".", "")}.${section}.php` });
+
+const MYSQL: Omit<LegacyConstructFact, "position"> = {
+  rule: "mysql-functions",
+  construct: "mysql_query()",
+  status: "removed",
+  deprecated: page("5.5", "deprecated"),
+  removed: page("7.0", "removed-exts-sapis"),
+  source: page("7.0", "removed-exts-sapis").source,
+};
+const EACH: Omit<LegacyConstructFact, "position"> = {
+  rule: "each",
+  construct: "each()",
+  status: "removed",
+  deprecated: page("7.2", "deprecated"),
+  removed: page("8.0", "incompatible"),
+  source: page("8.0", "incompatible").source,
+};
+const DYNAMIC: Omit<LegacyConstructFact, "position"> = {
+  rule: "dynamic-property",
+  construct: "dynamic property A::$b",
+  status: "deprecated",
+  deprecated: page("8.2", "deprecated"),
+  source: page("8.2", "deprecated").source,
+  likely: true,
+};
+const SHORT_TAG: Omit<LegacyConstructFact, "position"> = {
+  rule: "short-open-tag",
+  construct: "<? short open tag",
+  status: "notice",
+  source: "https://www.php.net/manual/en/ini.core.php#ini.short-open-tag",
+};
+
+const use = (fact: Omit<LegacyConstructFact, "position">, line = 1): LegacyConstructFact => ({ ...fact, position: { line, column: 0 } });
+
+const EMPTY_PROFILE: SdlcProfile = {
+  schemaVersion: "1",
+  commands: [],
+  tests: { frameworks: [], suites: [] },
+  ci: [],
+  cd: [],
+  rollback: [],
+  migrations: [],
+  featureFlags: [],
+  qualityGates: [],
+  observability: [],
+  containers: [],
+  iac: [],
+  parseFailures: [],
+};
+
+describe("packEcosystem: version floors", () => {
+  it("counts a language's files by floor, oldest first, with files no rule dated and the highest floor", () => {
+    const inv = inventory({ "a.php": "PHP", "b.php": "PHP", "c.php": "PHP", "d.php": "PHP", "e.php": "PHP" });
+    const ecosystem = packEcosystem(
+      [
+        { path: "a.php", versionFloor: floor("7.4") },
+        { path: "b.php", versionFloor: floor("5.3") },
+        { path: "c.php", versionFloor: floor("7.4") },
+        { path: "d.php" },
+        { path: "e.php", versionFloor: floor("7.10") },
+      ],
+      inv,
+    );
+    expect(ecosystem).toEqual({ php: { versionFloors: { files: 5, floors: { "5.3": 1, "7.4": 2, "7.10": 1 }, none: 1, highest: "7.10" } } });
+    expect(Object.keys(ecosystem!.php!.versionFloors!.floors)).toEqual(["5.3", "7.4", "7.10"]);
+  });
+
+  it("is undefined without facts, without floors or uses, or for files the inventory does not list", () => {
+    const inv = inventory({ "a.php": "PHP" });
+    expect(packEcosystem(undefined, inv)).toBeUndefined();
+    expect(packEcosystem([{ path: "a.php" }, { path: "a.php", routes: [], legacyConstructs: [] }], inv)).toBeUndefined();
+    expect(packEcosystem([{ path: "gone.php", versionFloor: floor("8.0"), legacyConstructs: [use(EACH)] }], inv)).toBeUndefined();
+  });
+
+  it("leaves out a language whose files have neither", () => {
+    const inv = inventory({ "a.php": "PHP", "App.java": "Java" });
+    expect(packEcosystem([{ path: "a.php", versionFloor: floor("8.1") }, { path: "App.java" }], inv)).toEqual({
+      php: { versionFloors: { files: 1, floors: { "8.1": 1 }, none: 0, highest: "8.1" } },
+    });
+  });
+});
+
+describe("packEcosystem: legacy constructs", () => {
+  const inv = inventory({ "a.php": "PHP", "b.php": "PHP", "c.php": "PHP" });
+
+  it("counts uses and files by rule, by removal version and by deprecation version, notices apart", () => {
+    const ecosystem = packEcosystem(
+      [
+        { path: "a.php", legacyConstructs: [use(MYSQL, 1), use(MYSQL, 2), use(EACH, 3), use(SHORT_TAG, 4)] },
+        { path: "b.php", legacyConstructs: [use(MYSQL), use(DYNAMIC)] },
+        { path: "c.php" },
+      ],
+      inv,
+    );
+    expect(ecosystem).toEqual({
+      php: {
+        legacyConstructs: {
+          files: 2,
+          uses: 5,
+          notices: 1,
+          rules: {
+            "dynamic-property": { status: "deprecated", uses: 1, files: 1, deprecated: DYNAMIC.deprecated, source: DYNAMIC.source, likely: true },
+            each: { status: "removed", uses: 1, files: 1, deprecated: EACH.deprecated, removed: EACH.removed, source: EACH.source },
+            "mysql-functions": { status: "removed", uses: 3, files: 2, deprecated: MYSQL.deprecated, removed: MYSQL.removed, source: MYSQL.source },
+            "short-open-tag": { status: "notice", uses: 1, files: 1, source: SHORT_TAG.source },
+          },
+          removedIn: { "7.0": 3, "8.0": 1 },
+          deprecatedIn: { "8.2": 1 },
+        },
+      },
+    });
+    expect(Object.keys(ecosystem!.php!.legacyConstructs!.rules)).toEqual(["dynamic-property", "each", "mysql-functions", "short-open-tag"]);
+  });
+
+  it("sits beside the version floors of the same language", () => {
+    const ecosystem = packEcosystem([{ path: "a.php", versionFloor: floor("5.3"), legacyConstructs: [use(EACH)] }], inv);
+    expect(Object.keys(ecosystem!.php!)).toEqual(["versionFloors", "legacyConstructs"]);
+  });
+
+  it("counts a file with notices only, but no uses", () => {
+    expect(packEcosystem([{ path: "a.php", legacyConstructs: [use(SHORT_TAG)] }], inv)?.php?.legacyConstructs).toMatchObject({
+      files: 1,
+      uses: 0,
+      notices: 1,
+      removedIn: {},
+      deprecatedIn: {},
+    });
+  });
+});
+
+describe("the profile's ecosystem", () => {
+  const ecosystem = {
+    php: {
+      versionFloors: { files: 2, floors: { "5.3": 1, "8.0": 1 }, none: 0, highest: "8.0" },
+      legacyConstructs: packEcosystem([{ path: "a.php", legacyConstructs: [use(MYSQL), use(DYNAMIC), use(SHORT_TAG)] }], inventory({ "a.php": "PHP" }))!.php!
+        .legacyConstructs!,
+    },
+  };
+
+  it("is added only when there is one", () => {
+    expect(withEcosystem(EMPTY_PROFILE, undefined)).toBe(EMPTY_PROFILE);
+    expect(withEcosystem(EMPTY_PROFILE, ecosystem).ecosystem).toEqual(ecosystem);
+  });
+
+  it("is carried through readiness unscored, and absent when the profile has none", () => {
+    const agentSafety = { sources: [], findings: [] };
+    const without = computeReadinessScore(EMPTY_PROFILE, { agentSafety });
+    const withIt = computeReadinessScore(withEcosystem(EMPTY_PROFILE, ecosystem), { agentSafety });
+    expect("ecosystem" in without).toBe(false);
+    expect(withIt.ecosystem).toEqual(ecosystem);
+    expect(withIt.overall).toBe(without.overall);
+  });
+
+  it("survives the profile's schema, which rejects a malformed histogram or count", () => {
+    const checked = validate(SdlcProfileSchema, withEcosystem(EMPTY_PROFILE, ecosystem));
+    expect(checked.ok && checked.data.ecosystem).toEqual(ecosystem);
+    const bad = { ...EMPTY_PROFILE, ecosystem: { php: { versionFloors: { files: 1, floors: { "eight": 1 }, none: 0 } } } };
+    expect(validate(SdlcProfileSchema, bad).ok).toBe(false);
+    const legacy = ecosystem.php.legacyConstructs;
+    const badStatus = { ...EMPTY_PROFILE, ecosystem: { php: { legacyConstructs: { ...legacy, rules: { x: { ...legacy.rules["mysql-functions"]!, status: "gone" } } } } } };
+    expect(validate(SdlcProfileSchema, badStatus).ok).toBe(false);
+    const badVersion = { ...EMPTY_PROFILE, ecosystem: { php: { legacyConstructs: { ...legacy, removedIn: { seven: 1 } } } } };
+    expect(validate(SdlcProfileSchema, badVersion).ok).toBe(false);
+  });
+});

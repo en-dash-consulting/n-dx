@@ -23,12 +23,16 @@ import { SKIP_ROLES } from "./outbound-detection.js";
 import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
 
 /**
- * The routes, outbound-call, entry-point, config-read, flag-check and
- * version-floor facts packs returned for one analysis. Config reads and flag
- * checks become config.json (`pack-config-facts.ts`); version floors become
- * the SDLC profile's `ecosystem` (`pack-version-floors.ts`).
+ * The routes, outbound-call, entry-point, config-read, flag-check,
+ * version-floor and legacy-construct facts packs returned for one analysis.
+ * Config reads and flag checks become config.json (`pack-config-facts.ts`);
+ * version floors and legacy constructs become the SDLC profile's `ecosystem`
+ * (`pack-ecosystem.ts`).
  */
-export type PackFrameworkFacts = readonly Pick<FileFacts, "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor">[];
+export type PackFrameworkFacts = readonly Pick<
+  FileFacts,
+  "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs"
+>[];
 
 const HTTP_METHODS: ReadonlySet<string> = new Set<HttpMethod>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 

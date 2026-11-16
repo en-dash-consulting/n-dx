@@ -9,7 +9,10 @@
  * walk under `phpConfig`'s skip rules (so a Composer-less `vendor/` is
  * measured) and `.gitignore`, keeping `phpConfig.parseableExtensions`. Per
  * repository it prints that file count, the files parsed with no ERROR or
- * MISSING node and their share, the ten most frequent parents of error nodes
+ * MISSING node and their share (a file whose only error nodes are curly-brace
+ * offsets, removed in PHP 8 and reported by the pack's php-legacy rules,
+ * counts as clean and as `legacy`, so it is not counted twice), the ten most
+ * frequent parents of error nodes
  * with one example location each, and the parse time; then, kept out of the
  * D4 numbers, the same count and share for `.module`, `.install` and `.ctp`
  * files (Drupal's and CakePHP 2's PHP outside `parseableExtensions`). It ends
@@ -68,7 +71,7 @@ if (!existsSync(walkDist)) {
 const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { loadIgnoreFilter, projectSkip, walkProjectFiles } = await import(walkDist.href);
 const { phpConfig } = await importWorkspacePack("@n-dx/lang-kit");
-const { phpGrammarPath } = await importWorkspacePack("@n-dx/lang-php");
+const { pack, phpGrammarPath } = await importWorkspacePack("@n-dx/lang-php");
 const wasm = phpGrammarPath();
 if (!existsSync(wasm)) {
   console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-php build:grammars\``);
@@ -119,6 +122,23 @@ function errorNodes(captures) {
   });
 }
 
+/**
+ * True when every error node in a file lies on a line where the pack's
+ * php-legacy rules found a curly-brace offset (`$s{0}`), or spans one: syntax
+ * PHP 8 removed and no current grammar parses, which the pack already reports
+ * as a legacy construct. Such a file is counted clean (and `legacy`), not as a
+ * grammar failure, so the same construct is not counted twice.
+ */
+async function onlyRemovedSyntax(dir, path, captures) {
+  const result = await pack.analyzeProject({ projectDir: dir, files: [path], kinds: ["legacyConstructs"] });
+  const offsets = (result.facts[0]?.legacyConstructs ?? []).filter((f) => f.rule === "curly-offset").map((f) => f.position);
+  if (offsets.length === 0) return false;
+  const lines = new Set(offsets.map((p) => p.line));
+  const explained = (node) =>
+    lines.has(node.start.line) || offsets.some((p) => before(node.start, p) && before(p, node.end));
+  return captures.filter((c) => c.name === "error" || c.name === "missing").every(explained);
+}
+
 const share = (s) => (s.files === 0 ? 0 : s.clean / s.files);
 const percent = (s) => (s.files === 0 ? "no files" : `${s.clean}/${s.files} = ${(share(s) * 100).toFixed(2)}%`);
 
@@ -126,8 +146,8 @@ const results = [];
 try {
   for (const repo of corpus) {
     const dir = join(root, repo.name);
-    const parseable = { files: 0, clean: 0 };
-    const other = { files: 0, clean: 0 };
+    const parseable = { files: 0, clean: 0, legacy: 0 };
+    const other = { files: 0, clean: 0, legacy: 0 };
     const parents = new Map();
     const failing = [];
     let skipped = 0;
@@ -151,6 +171,11 @@ try {
         continue;
       }
       if (!measured) continue;
+      if (await onlyRemovedSyntax(dir, path, result.captures.errors)) {
+        stats.clean++;
+        stats.legacy++;
+        continue;
+      }
       failing.push(path);
       for (const node of errorNodes(result.captures.errors)) {
         const entry = parents.get(node.parent) ?? { parent: node.parent, count: 0, example: `${path}:${node.line}:${node.column} (${node.kind})` };
@@ -195,7 +220,7 @@ if (json) {
     const drift = r.sha === r.pinnedSha ? "" : `  (checked out ${r.sha}, pinned ${r.pinnedSha})`;
     console.log(`\n${r.name} @ ${r.pinnedSha.slice(0, 12)}${r.php5 ? "  [PHP 5]" : ""}${drift}`);
     console.log(`  PHP files:      ${r.files}  (skipped oversized: ${r.skipped})`);
-    console.log(`  clean parse:    ${percent(r)}`);
+    console.log(`  clean parse:    ${percent(r)}${r.legacy > 0 ? `  (${r.legacy} with only $s{0} offsets, reported as legacy constructs)` : ""}`);
     console.log(`  parse time:     ${r.seconds.toFixed(1)} s`);
     for (const p of r.topParents) console.log(`  error parent:   ${p.parent} ×${p.count}  e.g. ${p.example}`);
     console.log(`  .module/.install/.ctp (not in D4): ${percent(r.other)}`);

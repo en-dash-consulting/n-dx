@@ -54,7 +54,7 @@ import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { packConfigData, writeConfigData } from "../../analyzers/pack-config-facts.js";
-import { packVersionFloors, withEcosystem } from "../../analyzers/pack-version-floors.js";
+import { packEcosystem, withEcosystem } from "../../analyzers/pack-ecosystem.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { ANALYSIS_HISTORY_FILE, startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -788,11 +788,11 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // each claim carrying the file that proves it. Its own bounded walk,
     // because the inventory's codeOnly filter drops the YAML, TOML and
     // Dockerfiles this reads. Deterministic: no LLM call and no network.
-    // Language packs' version floors join it as `ecosystem`, only when a pack
-    // produced one.
+    // Language packs' version floors and legacy constructs join it as
+    // `ecosystem`, only when a pack produced one.
     const sdlcProfile = withEcosystem(
       await buildSdlcProfile(ctx.absDir),
-      packVersionFloors(await packFrameworkFacts(ctx, inventory), inventory),
+      packEcosystem(await packFrameworkFacts(ctx, inventory), inventory),
     );
     writeFileSync(
       join(ctx.svDir, DATA_FILES.sdlcProfile),
