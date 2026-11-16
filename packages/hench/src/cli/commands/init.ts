@@ -119,7 +119,9 @@ const COUNT_MAX_ENTRIES = 20000;
  * walk to three levels below the root, skipping dot-directories and
  * dependency/build directories, stopping after {@link COUNT_MAX_DIRS}
  * directories or {@link COUNT_MAX_ENTRIES} entries and deciding on what it
- * counted. Must give the same answer as `phpOutnumbersJsTs` in
+ * counted. Minified `.min.js` is library code and is not counted, as in
+ * lang-kit; unlike lang-kit, `.inc` counts as PHP, because this choice only
+ * exists once a root `composer.json` says the repository is PHP. Must give the same answer as `phpOutnumbersJsTs` in
  * `@n-dx/llm-client`'s repo-trust.ts, or repository trust flags the guard
  * init wrote.
  */
@@ -145,7 +147,7 @@ async function phpOutnumbersJsTs(rootDir: string): Promise<boolean> {
           if (!entry.name.startsWith(".") && !COUNT_SKIP_DIRS.has(entry.name)) next.push(join(dir, entry.name));
         } else if (entry.isFile()) {
           if (PHP_SOURCE.test(entry.name)) php++;
-          else if (JS_TS_SOURCE.test(entry.name)) jsTs++;
+          else if (JS_TS_SOURCE.test(entry.name) && !entry.name.endsWith(".min.js")) jsTs++;
         }
       }
     }

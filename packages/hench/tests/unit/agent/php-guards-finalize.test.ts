@@ -158,6 +158,11 @@ describe("detectProjectLanguage", () => {
       expect(await detectProjectLanguage(projectDir)).toBe("php");
     });
 
+    it("does not count minified JavaScript", async () => {
+      await touch("composer.json", "package.json", "plugin.php", "assets/jquery.min.js", "assets/select2.min.js");
+      expect(await detectProjectLanguage(projectDir)).toBe("php");
+    });
+
     it("stops at a bounded depth", async () => {
       await touch("composer.json", "package.json", "app/a.php", "a/b/c/d/e/x.js", "a/b/c/d/e/y.js");
       expect(await detectProjectLanguage(projectDir)).toBe("php");

@@ -312,8 +312,10 @@ const COUNT_MAX_ENTRIES = 20000;
  * it: a breadth-first walk to three levels below the root, skipping
  * dot-directories and dependency/build directories, stopping after
  * {@link COUNT_MAX_DIRS} directories or {@link COUNT_MAX_ENTRIES} entries and
- * deciding on what it counted. hench init's `phpOutnumbersJsTs` is the same
- * rule; keep them in step.
+ * deciding on what it counted. Minified `.min.js` is library code and is not
+ * counted, as in lang-kit; unlike lang-kit, `.inc` counts as PHP, because
+ * this choice only exists once a root `composer.json` says the repository is
+ * PHP. hench init's `phpOutnumbersJsTs` is the same rule; keep them in step.
  *
  * The count is repository content, but it only chooses between two baselines
  * that block the same paths.
@@ -340,7 +342,7 @@ function phpOutnumbersJsTs(rootDir: string): boolean {
           if (!entry.name.startsWith(".") && !COUNT_SKIP_DIRS.has(entry.name)) next.push(join(dir, entry.name));
         } else if (entry.isFile()) {
           if (PHP_SOURCE.test(entry.name)) php++;
-          else if (JS_TS_SOURCE.test(entry.name)) jsTs++;
+          else if (JS_TS_SOURCE.test(entry.name) && !entry.name.endsWith(".min.js")) jsTs++;
         }
       }
     }
