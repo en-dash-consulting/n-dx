@@ -66,6 +66,9 @@ const CURRENT_INCLUDE_PATH = "\u0002";
 /** `PATH_SEPARATOR`. */
 const PATH_SEPARATOR = "\u0003";
 
+/** Whether a computed value is plain text, holding none of the markers above (no `__FILE__`, `__DIR__` or include path). */
+export const isPlainValue = (value: string): boolean => !/[\u0000-\u0003]/.test(value);
+
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** PHP's `dirname()` on a computed path. */
@@ -112,7 +115,7 @@ function locate(value: string): Located | undefined {
 // ── Path expressions ────────────────────────────────────────────────────────
 
 /** Looks a constant up; undefined when it is not computable. */
-type ConstantLookup = (name: string) => string | undefined;
+export type ConstantLookup = (name: string) => string | undefined;
 
 /** Looks a variable up by name, without its `$`; undefined when it is not computable. */
 export type VariableLookup = (name: string) => string | undefined;
@@ -154,7 +157,7 @@ const DOUBLE_ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: 
  * `ltrim()`, `rtrim()` and `trim()` with a character list, which an autoloader
  * applies to its class name.
  */
-function evaluatePath(text: string, file: string, constant: ConstantLookup, variable: VariableLookup = NO_VARIABLES): string | undefined {
+export function evaluatePath(text: string, file: string, constant: ConstantLookup, variable: VariableLookup = NO_VARIABLES): string | undefined {
   let at = 0;
 
   const skip = (): void => {
@@ -358,7 +361,7 @@ function stringEnd(text: string, start: number): number {
 }
 
 /** The operands of a path expression's top-level `.` concatenation, as written; undefined when it does not scan. */
-function concatenationOperands(text: string): string[] | undefined {
+export function concatenationOperands(text: string): string[] | undefined {
   const out: string[] = [];
   let depth = 0;
   let start = 0;
@@ -422,7 +425,7 @@ function interpolationEnd(inner: string, at: number): number {
  * double-quoted string operand (`"lang/$code.php"` gives `lang/` and `.php`);
  * undefined for any other operand.
  */
-function interpolatedEnds(operand: string): { head: string; tail: string } | undefined {
+export function interpolatedEnds(operand: string): { head: string; tail: string } | undefined {
   if (!operand.startsWith('"') || stringEnd(operand, 0) !== operand.length - 1) return undefined;
   const inner = operand.slice(1, -1);
   let first = -1;
@@ -526,6 +529,35 @@ function constantsOf(file: PackSourceFile): Array<{ readonly name: string; reado
     if (value !== undefined && !inNamespace(element)) out.push({ name: name.text, definition: { value: value.text, file: file.path } });
   }
   return out;
+}
+
+/**
+ * The repository's global constants: a name's value when every definition
+ * computes to the same one, undefined when none does or two differ.
+ */
+export function repositoryConstants(sources: readonly PackSourceFile[]): ConstantLookup {
+  const definitions = new Map<string, ConstantDefinition[]>();
+  for (const file of [...sources].sort((a, b) => compare(a.path, b.path))) {
+    for (const { name, definition } of constantsOf(file)) {
+      const list = definitions.get(name);
+      if (list) list.push(definition);
+      else definitions.set(name, [definition]);
+    }
+  }
+  const values = new Map<string, string | undefined>();
+  const evaluating = new Set<string>();
+  const constant: ConstantLookup = (name) => {
+    if (values.has(name)) return values.get(name);
+    const defined = definitions.get(name);
+    if (defined === undefined || evaluating.has(name)) return undefined;
+    evaluating.add(name);
+    const computed = new Set(defined.map((d) => evaluatePath(d.value, d.file, constant)));
+    evaluating.delete(name);
+    const value = computed.size === 1 ? [...computed][0] : undefined;
+    values.set(name, value);
+    return value;
+  };
+  return constant;
 }
 
 // ── Include-path configuration ──────────────────────────────────────────────
@@ -722,9 +754,8 @@ export class PhpIncludes {
   /** Directories holding an `index.php`: entry-script directories, candidates for the working directory. */
   private readonly entryDirectories: ReadonlySet<string>;
   private readonly workingDirectoryCache = new Map<string, readonly string[]>();
-  private readonly constants = new Map<string, ConstantDefinition[]>();
-  private readonly constantValues = new Map<string, string | undefined>();
-  private readonly evaluating = new Set<string>();
+  /** A constant's value when every definition in the repository computes to the same one. */
+  private readonly constant: ConstantLookup;
   private readonly setterRoots: Root[] = [];
   private readonly configs: readonly PhpIncludeConfig[];
   private readonly configRoots = new Map<PhpIncludeConfig, Root[]>();
@@ -735,15 +766,8 @@ export class PhpIncludes {
     this.sortedFiles = [...files].sort(compare);
     this.docroot = primaryDocroot(files);
     this.entryDirectories = entryDirectories(files);
-    const ordered = [...sources].sort((a, b) => compare(a.path, b.path));
-    for (const file of ordered) {
-      for (const { name, definition } of constantsOf(file)) {
-        const list = this.constants.get(name);
-        if (list) list.push(definition);
-        else this.constants.set(name, [definition]);
-      }
-    }
-    for (const file of ordered) {
+    this.constant = repositoryConstants(sources);
+    for (const file of [...sources].sort((a, b) => compare(a.path, b.path))) {
       for (const value of this.includePathSettings(file)) {
         const computed = evaluatePath(value, file.path, this.constant);
         if (computed === undefined) continue;
@@ -774,19 +798,6 @@ export class PhpIncludes {
   private addRoot(roots: Root[], root: Root): void {
     if (!roots.some((r) => sameRoot(r, root))) roots.push(root);
   }
-
-  /** A constant's value when every definition in the repository computes to the same one. */
-  private readonly constant: ConstantLookup = (name) => {
-    if (this.constantValues.has(name)) return this.constantValues.get(name);
-    const definitions = this.constants.get(name);
-    if (definitions === undefined || this.evaluating.has(name)) return undefined;
-    this.evaluating.add(name);
-    const values = new Set(definitions.map((d) => evaluatePath(d.value, d.file, this.constant)));
-    this.evaluating.delete(name);
-    const value = values.size === 1 ? [...values][0] : undefined;
-    this.constantValues.set(name, value);
-    return value;
-  };
 
   /** Include-path roots for a file, in search order; PHP's default `.` when nothing sets one. */
   private rootsFor(file: string): Root[] {

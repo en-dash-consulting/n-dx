@@ -12,7 +12,8 @@
  * `php-autoloaders.ts`); includes with a computable path resolve through
  * PHP's include search order (`php-includes.ts`). Routes are the files under
  * each document root and the `.htaccess` front controllers (`php-docroot.ts`);
- * entry points are CLI scripts and the scripts crontabs run (`php-entry-points.ts`).
+ * entry points are CLI scripts and the scripts crontabs run (`php-entry-points.ts`);
+ * outbound calls are HTTP, SOAP and environment reads (`php-outbound.ts`).
  *
  * @module lang-php/php-pack
  */
@@ -24,6 +25,7 @@ import { PHP_PACKAGE } from "./package-paths.js";
 import { PHP_BUILTINS_PROVENANCE } from "./php-builtins.js";
 import { phpDocroot } from "./php-docroot.js";
 import { phpEntryPoints } from "./php-entry-points.js";
+import { phpOutbound } from "./php-outbound.js";
 import { phpResolver } from "./php-resolver.js";
 
 const QUERY_NAMES = ["imports", "guards", "definitions", "calls", "references"] as const;
@@ -53,9 +55,9 @@ export const phpPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: phpResolver,
-  // Routes and entry points come from the docroot and entry rules, whose queries run only when those kinds are wanted.
-  produces: ["imports", "symbols", "calls", "routes", "entryPoints"],
-  frameworks: [phpDocroot, phpEntryPoints],
+  // Routes, entry points and outbound calls come from the docroot, entry and outbound rules, whose queries run only when those kinds are wanted.
+  produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls"],
+  frameworks: [phpDocroot, phpEntryPoints, phpOutbound],
   provenance: {
     ...Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
     // Constructors: `__construct`, and a method named as its class (the old style) in a class outside a namespace without `__construct`.

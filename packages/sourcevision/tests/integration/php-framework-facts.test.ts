@@ -1,9 +1,10 @@
 /**
- * PHP docroot routes (the PHP pack's php-docroot rules) through the analyze
- * pipeline: the imports phase's single pack call collects them and the
- * components phase adds one serverRoutes group per handler file, each route
- * carrying its `source`. Without the PHP pack, components.json is what the
- * detectors alone produce.
+ * PHP docroot routes (the PHP pack's php-docroot rules) and outbound calls
+ * (its php-outbound rules) through the analyze pipeline: the imports phase's
+ * single pack call collects them, the components phase adds one serverRoutes
+ * group per handler file, each route carrying its `source`, and outbound.json
+ * gains one dependency per call. Without the PHP pack, components.json and
+ * outbound.json are what the detectors alone produce.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -15,6 +16,8 @@ import { phpConfig, type FileFacts, type PackProjectRequest } from "@n-dx/lang-k
 import { analyzeComponents } from "../../src/analyzers/components.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
+import { detectOutbound } from "../../src/analyzers/outbound-detection.js";
+import { withPackOutbound } from "../../src/analyzers/pack-framework-facts.js";
 import { KNOWN_PACKS, loadPack, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Inventory } from "../../src/schema/v1.js";
 import { toCanonicalJSON } from "../../src/util/sort.js";
@@ -26,6 +29,8 @@ const FILES: Record<string, string> = {
   "index.php": "<?php include 'inc/functions.php'; ?>\n<h1>Shop</h1>\n",
   "cart.php": "<?php\nrequire 'inc/functions.php';\necho cart_total();\n",
   "inc/functions.php": "<?php\nfunction cart_total() { return 0; }\n",
+  // `.inc.php`: a fragment, not a route.
+  "inc/rates.inc.php": "<?php\n$ch = curl_init('https://rates.example.com/latest');\n$host = getenv('DB_HOST');\n$self = $_SERVER['PHP_SELF'];\n",
   "admin/.htaccess": "Deny from all\n",
   "admin/index.php": "<?php\necho 'admin';\n",
   ".htaccess": "RewriteEngine On\nRewriteRule ^shop/(.*)$ index.php?path=$1 [L,QSA]\n",
@@ -64,14 +69,16 @@ describe("PHP docroot routes in serverRoutes", () => {
   });
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-  /** imports → components, as the analyze command chains them. */
+  /** imports → components → outbound, as the analyze command chains them. */
   async function pipeline(php: KnownPack) {
     const facts: FileFacts[] = [];
     const imports = await analyzeImports(dir, inventory, {
       language: "php",
       packs: { packs: [php], warn: () => {}, framework: (f) => facts.push(...f) },
     });
-    return { components: await analyzeComponents(dir, inventory, imports, { packFacts: facts }), imports };
+    const components = await analyzeComponents(dir, inventory, imports, { packFacts: facts });
+    const outbound = withPackOutbound(await detectOutbound(dir, inventory), inventory, facts);
+    return { components, outbound, imports };
   }
 
   it("asks the pack for routes in its one call and adds a group per handler file", async (ctx) => {
@@ -80,7 +87,7 @@ describe("PHP docroot routes in serverRoutes", () => {
     const { components, imports } = await pipeline(countingPhp(requests));
 
     expect(requests).toHaveLength(1);
-    expect(requests[0].kinds).toEqual(["imports", "routes", "entryPoints"]);
+    expect(requests[0].kinds).toEqual(["imports", "routes", "outboundCalls", "entryPoints"]);
     const route = (file: string, method: "GET" | "POST", path: string, source: string) => ({ file, method, path, source });
     expect(components.serverRoutes).toEqual([
       { file: "cart.php", prefix: "/", routes: [route("cart.php", "GET", "/cart.php", "docroot ."), route("cart.php", "POST", "/cart.php", "docroot .")] },
@@ -104,9 +111,30 @@ describe("PHP docroot routes in serverRoutes", () => {
     );
   });
 
-  it("leaves components.json byte-identical without the PHP pack", async () => {
-    const { components, imports } = await pipeline(NOT_INSTALLED_PHP);
+  it("adds one outbound dependency per PHP call, request keys of $_SERVER left out", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const { outbound } = await pipeline(countingPhp([]));
+    const detected = await detectOutbound(dir, inventory);
+    expect(detected.dependencies).toEqual([]);
+    expect(outbound.contracts).toEqual(detected.contracts);
+    expect(outbound.dependencies).toEqual([
+      {
+        file: "inc/rates.inc.php",
+        line: 2,
+        kind: "http",
+        target: "https://rates.example.com/latest",
+        targetSource: "literal",
+        client: "curl",
+        confidence: "certain",
+      },
+      { file: "inc/rates.inc.php", line: 3, kind: "env", target: "DB_HOST", targetSource: "env", client: "getenv", confidence: "certain" },
+    ]);
+  });
+
+  it("leaves components.json and outbound.json byte-identical without the PHP pack", async () => {
+    const { components, outbound, imports } = await pipeline(NOT_INSTALLED_PHP);
     expect(toCanonicalJSON(components)).toBe(toCanonicalJSON(await analyzeComponents(dir, inventory, imports)));
+    expect(toCanonicalJSON(outbound)).toBe(toCanonicalJSON(await detectOutbound(dir, inventory)));
     expect(components.serverRoutes).toEqual([]);
   });
 });

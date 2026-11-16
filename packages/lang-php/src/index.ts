@@ -18,5 +18,6 @@ export * from "./php-htaccess.js";
 export * from "./php-imports.js";
 export * from "./php-include-notices.js";
 export * from "./php-includes.js";
+export * from "./php-outbound.js";
 export * from "./php-resolver.js";
 export * from "./php-symbols.js";
