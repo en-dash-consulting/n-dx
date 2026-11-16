@@ -144,6 +144,46 @@ describe("PHP version floors and legacy constructs in the SDLC profile and readi
   });
 });
 
+// Routes and code chosen at run time: a stored block, a handler looked up by name, a module include.
+const DYNAMIC_FILES: Record<string, string> = {
+  "index.php": "<?php\ninclude $module . '.php';\n$handler = $routes[$path];\ncall_user_func($handler);\n",
+  "lib/blocks.php": "<?php\nfunction render($body) { return eval($body); }\n$c = new $class();\n",
+};
+
+describe("a PHP repository that runs code chosen at run time", () => {
+  let dir: string;
+  let inventory: Inventory;
+
+  beforeAll(async () => {
+    dir = writeRepository("sv-php-dynamic-", DYNAMIC_FILES);
+    inventory = await analyzeInventory(dir, { languageConfig: phpConfig });
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("counts its dynamic-code sites in the profile's ecosystem, which readiness carries", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const profile = await profileOf(dir, inventory, PHP);
+    const expected = {
+      files: 2,
+      sites: 4,
+      kinds: { exec: 1, dispatch: 2, include: 1 },
+      literal: 0,
+      constructs: { call_user_func: 1, "dynamic-include": 1, eval: 1, "variable-new": 1 },
+    };
+    expect(profile.ecosystem?.php?.dynamicCode).toEqual(expected);
+
+    const onDisk = JSON.parse(toCanonicalJSON(stripSdlcProfileForDisk(profile)));
+    const reread = validate(SdlcProfileSchema, onDisk);
+    expect(reread.ok && reread.data.ecosystem?.php?.dynamicCode).toEqual(expected);
+    expect(computeReadinessScore(profile, { agentSafety: { sources: [], findings: [] } }).ecosystem?.php?.dynamicCode).toEqual(expected);
+  });
+
+  it("has no ecosystem without the PHP pack", async () => {
+    const profile = await profileOf(dir, inventory, undefined);
+    expect(toCanonicalJSON(stripSdlcProfileForDisk(profile))).toBe(toCanonicalJSON(stripSdlcProfileForDisk(await buildSdlcProfile(dir))));
+  });
+});
+
 describe("a PHP 5.2-style repository no syntax rule dates", () => {
   let dir: string;
   let inventory: Inventory;

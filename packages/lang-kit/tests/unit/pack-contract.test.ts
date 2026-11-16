@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONFIG_SOURCES,
   DECLARED_FACT_KINDS,
+  DYNAMIC_CODE_KINDS,
   FACT_KINDS,
   FLAG_MECHANISMS,
   IMPORT_FORMS,
@@ -18,11 +19,15 @@ import {
 } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks, the version floor and legacy constructs as produced", () => {
+  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks, the version floor, legacy constructs and dynamic code as produced", () => {
     expect([...PRODUCED_FACT_KINDS]).toEqual([
       "imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor",
-      "legacyConstructs",
+      "legacyConstructs", "dynamicCode",
     ]);
+  });
+
+  it("names dynamic code kinds", () => {
+    expect([...DYNAMIC_CODE_KINDS]).toEqual(["exec", "dispatch", "include"]);
   });
 
   it("names legacy construct statuses, a removal first", () => {

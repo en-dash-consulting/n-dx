@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LegacyConstructFact, VersionFloorFact } from "@n-dx/lang-kit";
+import type { DynamicCodeFact, LegacyConstructFact, VersionFloorFact } from "@n-dx/lang-kit";
 import { packEcosystem, withEcosystem } from "../../../src/analyzers/pack-ecosystem.js";
 import { computeReadinessScore } from "../../../src/analyzers/readiness-score.js";
 import type { Inventory, SdlcProfile } from "../../../src/schema/index.js";
@@ -162,12 +162,49 @@ describe("packEcosystem: legacy constructs", () => {
   });
 });
 
+const site = (kind: DynamicCodeFact["kind"], construct: string, literal = false): DynamicCodeFact => ({
+  kind,
+  construct,
+  expression: `${construct}(...)`,
+  position: { line: 1, column: 0 },
+  ...(literal ? { literal: true as const } : {}),
+});
+
+describe("packEcosystem: dynamic code", () => {
+  const inv = inventory({ "a.php": "PHP", "b.php": "PHP", "c.php": "PHP" });
+
+  it("counts sites and files by kind and by construct, literal exec sites apart", () => {
+    const ecosystem = packEcosystem(
+      [
+        { path: "a.php", dynamicCode: [site("exec", "eval"), site("exec", "eval", true), site("dispatch", "variable-function")] },
+        { path: "b.php", dynamicCode: [site("include", "dynamic-include"), site("dispatch", "call_user_func")] },
+        { path: "c.php", dynamicCode: [] },
+      ],
+      inv,
+    );
+    expect(ecosystem?.php?.dynamicCode).toEqual({
+      files: 2,
+      sites: 5,
+      kinds: { exec: 2, dispatch: 2, include: 1 },
+      literal: 1,
+      constructs: { call_user_func: 1, "dynamic-include": 1, eval: 2, "variable-function": 1 },
+    });
+  });
+
+  it("is absent when no file has a site, and sits beside the other sections when one does", () => {
+    expect(packEcosystem([{ path: "a.php", dynamicCode: [] }], inv)).toBeUndefined();
+    const ecosystem = packEcosystem([{ path: "a.php", versionFloor: floor("5.3"), legacyConstructs: [use(EACH)], dynamicCode: [site("exec", "eval")] }], inv);
+    expect(Object.keys(ecosystem!.php!)).toEqual(["versionFloors", "legacyConstructs", "dynamicCode"]);
+  });
+});
+
 describe("the profile's ecosystem", () => {
   const ecosystem = {
     php: {
       versionFloors: { files: 2, floors: { "5.3": 1, "8.0": 1 }, none: 0, highest: "8.0" },
       legacyConstructs: packEcosystem([{ path: "a.php", legacyConstructs: [use(MYSQL), use(DYNAMIC), use(SHORT_TAG)] }], inventory({ "a.php": "PHP" }))!.php!
         .legacyConstructs!,
+      dynamicCode: { files: 1, sites: 2, kinds: { exec: 1, dispatch: 1, include: 0 }, literal: 0, constructs: { eval: 1, "variable-new": 1 } },
     },
   };
 
@@ -195,5 +232,7 @@ describe("the profile's ecosystem", () => {
     expect(validate(SdlcProfileSchema, badStatus).ok).toBe(false);
     const badVersion = { ...EMPTY_PROFILE, ecosystem: { php: { legacyConstructs: { ...legacy, removedIn: { seven: 1 } } } } };
     expect(validate(SdlcProfileSchema, badVersion).ok).toBe(false);
+    const badKinds = { ...EMPTY_PROFILE, ecosystem: { php: { dynamicCode: { ...ecosystem.php.dynamicCode, kinds: { exec: 1, dispatch: 1 } } } } };
+    expect(validate(SdlcProfileSchema, badKinds).ok).toBe(false);
   });
 });

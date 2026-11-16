@@ -74,17 +74,22 @@ export function hostReader(file: PackSourceFile): (specifier: string, at: Source
 /** How many locations a notice names before the rest are counted. */
 const NOTICE_LOCATIONS = 5;
 
+/** The first locations of `found` as `file:line`, the rest counted: `a.php:3, b.php:9, and 4 more`. */
+export function noticeLocations(found: readonly { readonly path: string; readonly position: SourcePosition }[]): string {
+  const where = found.slice(0, NOTICE_LOCATIONS).map((d) => `${d.path}:${d.position.line}`);
+  const more = found.length > NOTICE_LOCATIONS ? `, and ${found.length - NOTICE_LOCATIONS} more` : "";
+  return `${where.join(", ")}${more}`;
+}
+
 /** `subject` says what one include, or several, do: "include builds its path", "includes build their path". */
 function notice(code: string, found: readonly DynamicInclude[], subject: (one: boolean) => string): string | undefined {
   if (found.length === 0) return undefined;
   const one = found.length === 1;
-  const where = found.slice(0, NOTICE_LOCATIONS).map((d) => `${d.path}:${d.position.line}`);
-  const more = found.length > NOTICE_LOCATIONS ? `, and ${found.length - NOTICE_LOCATIONS} more` : "";
   const listed = found.filter((d) => d.candidates !== undefined);
   const cut = listed.filter((d) => d.candidates!.total > d.candidates!.files.length).length;
   const cutNote = cut === 0 ? "" : ` (${cut} cut at ${MAX_INCLUDE_CANDIDATES} files)`;
   const candidates = listed.length === 0 ? "" : `; ${listed.length} with candidate files, never edges${cutNote}`;
-  return `[${code}] ${found.length} ${subject(one)} and give${one ? "s" : ""} no edge: ${where.join(", ")}${more}${candidates}.`;
+  return `[${code}] ${found.length} ${subject(one)} and give${one ? "s" : ""} no edge: ${noticeLocations(found)}${candidates}.`;
 }
 
 /** The notices for a project's dynamic includes, host-based ones apart; empty when there are none. */

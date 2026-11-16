@@ -1569,10 +1569,30 @@ export interface SdlcLegacyConstructs {
   deprecatedIn: Record<string, number>;
 }
 
+/**
+ * A language's dynamic-code sites (lang-kit's `DynamicCodeFact`), counted per
+ * repository: where code runs a string as code (`exec`), chooses what to run
+ * from a value (`dispatch`) or includes a file whose path is built at run
+ * time (`include`). Counts only; each site's location is in the pack's notices.
+ */
+export interface SdlcDynamicCode {
+  /** Files with at least one site. */
+  files: number;
+  /** Every site. */
+  sites: number;
+  /** Sites by kind; a kind with none is 0. */
+  kinds: { exec: number; dispatch: number; include: number };
+  /** `exec` sites whose code is written as literals alone. */
+  literal: number;
+  /** Sites by construct (`eval`, `variable-function`, `dynamic-include`, …), sorted. */
+  constructs: Record<string, number>;
+}
+
 /** What a language pack reports about a repository's code, beyond the SDLC sections. */
 export interface SdlcLanguageEcosystem {
   versionFloors?: SdlcVersionFloors;
   legacyConstructs?: SdlcLegacyConstructs;
+  dynamicCode?: SdlcDynamicCode;
 }
 
 /**

@@ -24,9 +24,10 @@ import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
 
 /**
  * The routes, outbound-call, entry-point, config-read, flag-check,
- * version-floor and legacy-construct facts packs returned for one analysis.
- * Config reads and flag checks become config.json (`pack-config-facts.ts`);
- * version floors and legacy constructs become the SDLC profile's `ecosystem`
+ * version-floor, legacy-construct and dynamic-code facts packs returned for
+ * one analysis. Config reads and flag checks become config.json
+ * (`pack-config-facts.ts`); version floors, legacy constructs and dynamic
+ * code become the SDLC profile's `ecosystem`
  * (`pack-ecosystem.ts`).
  */
 export type PackFrameworkFacts = readonly PackFrameworkFact[];
@@ -34,7 +35,7 @@ export type PackFrameworkFacts = readonly PackFrameworkFact[];
 /** One file's framework facts, as its pack returned them (`packFrameworkFactsOf` in `pack-imports.ts`). */
 export type PackFrameworkFact = Pick<
   FileFacts,
-  "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs"
+  "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs" | "dynamicCode"
 > & {
   /**
    * The framework fact kinds the file's pack was asked for, which tells a

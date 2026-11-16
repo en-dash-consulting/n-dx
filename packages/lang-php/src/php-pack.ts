@@ -18,7 +18,8 @@
  * loaders, config constants and flag checks with the lines they gate
  * (`php-config.ts`); the version floor is the newest syntax a file uses, dated
  * by php.net's migration guides and PHP 5 changelog (`php-compat.ts`); legacy constructs are the
- * uses of what later versions removed or deprecated (`php-legacy.ts`);
+ * uses of what later versions removed or deprecated (`php-legacy.ts`); dynamic
+ * code is where a string runs as code or a value picks what runs (`php-dynamic-code.ts`);
  * embedded SQL gives table names in memory (`php-sql.ts`).
  *
  * @module lang-php/php-pack
@@ -32,6 +33,7 @@ import { PHP_BUILTINS_PROVENANCE } from "./php-builtins.js";
 import { phpCompat } from "./php-compat.js";
 import { phpConfigFlags } from "./php-config.js";
 import { phpDocroot } from "./php-docroot.js";
+import { phpDynamicCode } from "./php-dynamic-code.js";
 import { phpEntryPoints } from "./php-entry-points.js";
 import { phpLegacy } from "./php-legacy.js";
 import { phpOutbound } from "./php-outbound.js";
@@ -65,9 +67,9 @@ export const phpPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: phpResolver,
-  // Routes, entry points, outbound calls, config reads, flag checks, the version floor and legacy constructs come from the docroot, entry, outbound, config, compat and legacy rules, whose queries run only when those kinds are wanted.
-  produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls", "configReads", "flagChecks", "versionFloor", "legacyConstructs"],
-  frameworks: [phpDocroot, phpEntryPoints, phpOutbound, phpConfigFlags, phpCompat, phpLegacy],
+  // Routes, entry points, outbound calls, config reads, flag checks, the version floor, legacy constructs and dynamic code come from the docroot, entry, outbound, config, compat, legacy and dynamic rules, whose queries run only when those kinds are wanted.
+  produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls", "configReads", "flagChecks", "versionFloor", "legacyConstructs", "dynamicCode"],
+  frameworks: [phpDocroot, phpEntryPoints, phpOutbound, phpConfigFlags, phpCompat, phpLegacy, phpDynamicCode],
   provenance: {
     ...Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
     // Constructors: `__construct`, and a method named as its class (the old style) in a class outside a namespace without `__construct`.

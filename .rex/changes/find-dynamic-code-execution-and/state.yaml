@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "3ce7b963-e6e2-4593-a830-8cf46fcce425":
-    lastModified: "2026-11-16T21:12:05.479Z"
+    status: "completed"
+    startedAt: "2026-11-16T21:15:50.499Z"
+    completedAt: "2026-11-16T21:32:08.708Z"
+    endedAt: "2026-11-16T21:32:08.708Z"
+    activeIntervals: [{"end":"2026-11-16T21:32:08.708Z","start":"2026-11-16T21:15:50.499Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New php-dynamic framework (src/php-dynamic-code.ts, queries/php-dynamic/dynamic.scm) produces lang-kit dynamicCode facts (exec/dispatch/include) with [php-dynamic-exec]/[php-dynamic-dispatch] notices; sourcevision counts them as optional ecosystem.php.dynamicCode carried through readiness."
+    lastModified: "2026-11-16T21:32:08.708Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a5be0950-1068-442a-b018-ec76d52b5348":
     lastModified: "2026-11-16T21:12:22.543Z"

@@ -1,15 +1,19 @@
 /**
- * Language packs' `versionFloor` and `legacyConstructs` facts as the SDLC
- * profile's `ecosystem`, per language (the inventory's, lower-cased):
+ * Language packs' `versionFloor`, `legacyConstructs` and `dynamicCode` facts
+ * as the SDLC profile's `ecosystem`, per language (the inventory's,
+ * lower-cased):
  *
  * - `versionFloors`: files by the oldest version whose syntax covers them.
  * - `legacyConstructs`: uses of constructs later versions removed or
  *   deprecated, by rule and by the version that removed (or deprecated) them,
  *   with review notices counted apart.
+ * - `dynamicCode`: sites that run a string as code, choose what to run from a
+ *   value or include a path built at run time, by kind and by construct.
  *
  * Readiness carries it through (`readiness-score.ts`). `versionFloors`
  * appears when a pack was asked for floors over the language's files, even if
- * none has one; `legacyConstructs` only when a file has a use. A language
+ * none has one; `legacyConstructs` only when a file has a use, `dynamicCode`
+ * only when a file has a site. A language
  * appears only with a section, and the profile gains `ecosystem` only then, so
  * a repository without such a pack, or without files of its language, writes
  * the profile it always did.
@@ -20,6 +24,7 @@
 import { compareLanguageVersions, type LegacyConstructFact } from "@n-dx/lang-kit";
 import type {
   Inventory,
+  SdlcDynamicCode,
   SdlcLanguageEcosystem,
   SdlcLegacyConstructs,
   SdlcLegacyRuleCount,
@@ -124,6 +129,27 @@ export function legacyConstructs(facts: readonly PackFrameworkFacts[number][]): 
   };
 }
 
+/** A language's dynamic-code sites, counted. Undefined when no file has one. */
+export function dynamicCode(facts: readonly PackFrameworkFacts[number][]): SdlcDynamicCode | undefined {
+  const kinds = { exec: 0, dispatch: 0, include: 0 };
+  const constructs = new Map<string, number>();
+  let files = 0;
+  let sites = 0;
+  let literal = 0;
+  for (const { dynamicCode: list } of facts) {
+    if (list === undefined || list.length === 0) continue;
+    files++;
+    for (const fact of list) {
+      sites++;
+      kinds[fact.kind]++;
+      if (fact.literal === true) literal++;
+      add(constructs, fact.construct);
+    }
+  }
+  if (files === 0) return undefined;
+  return { files, sites, kinds, literal, constructs: Object.fromEntries([...constructs].sort(([a], [b]) => a.localeCompare(b))) };
+}
+
 /**
  * Each language's sections, keyed by the inventory's language lower-cased;
  * undefined when no language has one. Facts for files the inventory does not
@@ -134,10 +160,12 @@ export function packEcosystem(facts: PackFrameworkFacts | undefined, inventory: 
   for (const [language, list] of [...byLanguage(facts, inventory)].sort(([a], [b]) => a.localeCompare(b))) {
     const floors = versionFloors(list);
     const legacy = legacyConstructs(list);
-    if (floors === undefined && legacy === undefined) continue;
+    const dynamic = dynamicCode(list);
+    if (floors === undefined && legacy === undefined && dynamic === undefined) continue;
     ecosystem[language] = {
       ...(floors === undefined ? {} : { versionFloors: floors }),
       ...(legacy === undefined ? {} : { legacyConstructs: legacy }),
+      ...(dynamic === undefined ? {} : { dynamicCode: dynamic }),
     };
   }
   return Object.keys(ecosystem).length === 0 ? undefined : ecosystem;

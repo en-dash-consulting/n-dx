@@ -689,9 +689,20 @@ const SdlcLegacyConstructsSchema = z.object({
   deprecatedIn: z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive()),
 });
 
+const COUNT = z.number().int().nonnegative();
+
+const SdlcDynamicCodeSchema = z.object({
+  files: z.number().int().positive(),
+  sites: z.number().int().positive(),
+  kinds: z.object({ exec: COUNT, dispatch: COUNT, include: COUNT }),
+  literal: COUNT,
+  constructs: z.record(z.string().min(1), z.number().int().positive()),
+});
+
 const SdlcLanguageEcosystemSchema = z.object({
   versionFloors: SdlcVersionFloorsSchema.optional(),
   legacyConstructs: SdlcLegacyConstructsSchema.optional(),
+  dynamicCode: SdlcDynamicCodeSchema.optional(),
 });
 
 export const SdlcProfileSchema = z.object({

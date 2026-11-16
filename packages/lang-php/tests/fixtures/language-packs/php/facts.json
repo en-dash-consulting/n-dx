@@ -435,6 +435,35 @@
             "column": 10
           }
         }
+      ],
+      "dynamicCode": [
+        {
+          "kind": "include",
+          "construct": "dynamic-include",
+          "expression": "'boot.php' or die('boot failed')",
+          "position": {
+            "line": 26,
+            "column": 8
+          }
+        },
+        {
+          "kind": "include",
+          "construct": "dynamic-include",
+          "expression": "'pages/' . $page . '.php'",
+          "position": {
+            "line": 30,
+            "column": 16
+          }
+        },
+        {
+          "kind": "include",
+          "construct": "dynamic-include",
+          "expression": "$plugin",
+          "position": {
+            "line": 35,
+            "column": 17
+          }
+        }
       ]
     },
     {
@@ -1325,7 +1354,39 @@
           "line": 9,
           "column": 18
         }
-      }
+      },
+      "dynamicCode": [
+        {
+          "kind": "include",
+          "construct": "dynamic-include",
+          "expression": "$file",
+          "position": {
+            "line": 75,
+            "column": 20
+          },
+          "scope": "{closure:Order::load}"
+        },
+        {
+          "kind": "dispatch",
+          "construct": "variable-function",
+          "expression": "$loader(__DIR__ . \"/orders/{$id}.php\")",
+          "position": {
+            "line": 77,
+            "column": 8
+          },
+          "scope": "Order::load"
+        },
+        {
+          "kind": "dispatch",
+          "construct": "call_user_func",
+          "expression": "call_user_func(array($order, 'id'))",
+          "position": {
+            "line": 84,
+            "column": 11
+          },
+          "scope": "order_total"
+        }
+      ]
     },
     {
       "path": "php53/src/Shop/braced.php",
@@ -1970,11 +2031,24 @@
           "line": 38,
           "column": 4
         }
-      }
+      },
+      "dynamicCode": [
+        {
+          "kind": "dispatch",
+          "construct": "variable-function",
+          "expression": "$make('a')",
+          "position": {
+            "line": 69,
+            "column": 16
+          },
+          "scope": "OrderService::events"
+        }
+      ]
     }
   ],
   "unparsed": [],
   "notices": [
+    "PHP: [php-dynamic-dispatch] 3 sites choose what to run from a value: php53/src/Shop/Order.php:77, php53/src/Shop/Order.php:84, php8/src/Orders/OrderService.php:69.",
     "PHP: [php-dynamic-include] 4 includes build their path at run time and give no edge: php52/index.php:26, php52/index.php:30, php52/index.php:35, php53/src/Shop/Order.php:75."
   ]
 }

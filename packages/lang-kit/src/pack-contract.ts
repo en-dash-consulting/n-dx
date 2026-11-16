@@ -477,6 +477,35 @@ export interface LegacyConstructFact {
   readonly position: SourcePosition;
 }
 
+// ── Dynamic code (produced) ─────────────────────────────────────────────────
+
+/**
+ * What a dynamic-code site does: `exec` runs a string as code (`eval`),
+ * `dispatch` picks the function, method or class to run from a value
+ * (`$f()`, `new $class`), `include` loads a file whose path is built at run
+ * time.
+ */
+export const DYNAMIC_CODE_KINDS = ["exec", "dispatch", "include"] as const;
+export type DynamicCodeKind = (typeof DYNAMIC_CODE_KINDS)[number];
+
+/**
+ * One place code runs a string as code or chooses what to run from a value:
+ * what reading the files alone cannot explain. Locations and the expression
+ * as written only, never a value.
+ */
+export interface DynamicCodeFact {
+  readonly kind: DynamicCodeKind;
+  /** What matched, a stable id: the function's name (`eval`, `call_user_func`) or the syntax (`variable-function`). */
+  readonly construct: string;
+  /** The expression as written: the call, `new` or include path. */
+  readonly expression: string;
+  /** The enclosing function, `Class::method` or closure; absent at a file's top level. */
+  readonly scope?: string;
+  /** Set when the code an `exec` site runs is written as literals alone (`eval('return 1;')`). */
+  readonly literal?: true;
+  readonly position: SourcePosition;
+}
+
 // ── Resources (produced) ────────────────────────────────────────────────────
 
 /** The provider a resource belongs to. */
@@ -599,6 +628,8 @@ export interface FileFacts {
   readonly versionFloor?: VersionFloorFact;
   /** In document order. */
   readonly legacyConstructs?: readonly LegacyConstructFact[];
+  /** In document order. */
+  readonly dynamicCode?: readonly DynamicCodeFact[];
 }
 
 /** Fact kinds a pack produces today. */
@@ -614,6 +645,7 @@ export const PRODUCED_FACT_KINDS = [
   "flagChecks",
   "versionFloor",
   "legacyConstructs",
+  "dynamicCode",
 ] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */

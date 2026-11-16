@@ -121,9 +121,9 @@ that `analyzeClassifications` scores (weight 1), recorded as evidence with
 (crontab:4)`; the schedule lives only in that detail. A file with pack signals, or pack evidence last run, is always
 reclassified. Without facts classifications.json is unchanged.
 
-`configReads` and `flagChecks` become config.json, `versionFloor` and
-`legacyConstructs` sdlc-profile.json's `ecosystem` (`pack-ecosystem.ts`):
-config facts and legacy constructs only when present, the version-floor
+`configReads` and `flagChecks` become config.json, `versionFloor`,
+`legacyConstructs` and `dynamicCode` sdlc-profile.json's `ecosystem` (`pack-ecosystem.ts`):
+config facts, legacy constructs and dynamic code only when present, the version-floor
 histogram whenever the pack was asked for floors (`PackFrameworkFact.asked`),
 even with none found.
 

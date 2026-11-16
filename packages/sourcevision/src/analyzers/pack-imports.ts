@@ -70,12 +70,14 @@ export interface PackImportsOptions {
 }
 
 /** The fact kinds a pack's framework rules produce for later phases. */
-export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor", "legacyConstructs"] as const satisfies readonly FactKind[];
+export const FRAMEWORK_FACT_KINDS = [
+  "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor", "legacyConstructs", "dynamicCode",
+] as const satisfies readonly FactKind[];
 
 /** `facts`, the entries one pack call returned, as framework facts, each with the framework kinds that call `asked` for. */
 export function packFrameworkFactsOf(facts: readonly FileFacts[], asked: readonly FactKind[]): PackFrameworkFact[] {
-  return facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs }) =>
-    ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs, asked }));
+  return facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs, dynamicCode }) =>
+    ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs, dynamicCode, asked }));
 }
 
 /** The {@link FRAMEWORK_FACT_KINDS} `entry` produces. */

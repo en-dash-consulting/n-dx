@@ -113,6 +113,15 @@ function locate(value: string): Located | undefined {
 }
 
 /**
+ * Whether an include path expression written in `file` is not computable:
+ * the include gives no edge and {@link PhpIncludes.resolve} calls it `dynamic`.
+ */
+export function isDynamicIncludePath(text: string, file: string, constant: ConstantLookup): boolean {
+  const value = evaluatePath(text, file, constant);
+  return value === undefined || locate(value) === undefined;
+}
+
+/**
  * The repository path a computed path (from {@link evaluatePath}) written in
  * `file` names, a relative one taken against `file`'s directory; undefined
  * when it is not computable or lies outside the repository.

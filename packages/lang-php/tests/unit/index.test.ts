@@ -10,7 +10,7 @@ describe("@n-dx/lang-php barrel", () => {
       packageName: "@n-dx/lang-php",
       id: "php",
       config: phpConfig,
-      produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls", "configReads", "flagChecks", "versionFloor", "legacyConstructs"],
+      produces: ["imports", "symbols", "calls", "routes", "entryPoints", "outboundCalls", "configReads", "flagChecks", "versionFloor", "legacyConstructs", "dynamicCode"],
     });
   });
 
