@@ -28,8 +28,12 @@ items:
     lastModified: "2026-11-16T18:34:44.045Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "efa70788-9d7a-49e7-9250-1890d7455315":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T18:35:26.853Z"
-    activeIntervals: [{"start":"2026-11-16T18:35:26.853Z"}]
-    lastModified: "2026-11-16T18:35:27.504Z"
+    completedAt: "2026-11-16T18:53:59.346Z"
+    endedAt: "2026-11-16T18:53:59.346Z"
+    activeIntervals: [{"end":"2026-11-16T18:53:59.346Z","start":"2026-11-16T18:35:26.853Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php php-config framework (src/php-config.ts, queries/php-config/config.scm) produces configReads and flagChecks; fixture tests/fixtures/php-config/ with integration + unit tests."
+    lastModified: "2026-11-16T18:53:59.346Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -75,7 +75,7 @@ describe("php config reads and flag checks", () => {
       "application/config/config.php:4 enable_hooks file application/config/config.php",
       "application/config/config.php:6 features.wishlist file application/config/config.php",
       "application/config/config.php:7 features.reviews.moderated file application/config/config.php",
-      // A registry key held by one settings file.
+      // A registry key held by one settings file; the `$config` local in page() makes Shop.php no settings file.
       "application/controllers/Shop.php:6 enable_hooks file application/config/config.php",
       "application/controllers/Shop.php:9 base_url file application/config/config.php",
       // A consumer that includes the settings file; a key no included file holds is unknown.

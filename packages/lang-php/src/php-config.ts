@@ -43,8 +43,9 @@
  *
  * - `config-files` (source `file`): a settings file is one whose top level
  *   is `return [ … ];` (keys of the returned array) or that assigns
- *   `$config[…]`, `$conf[…]`, `$cfg[…]` or `$settings[…]` (the subscript's
- *   keys, and those of an array assigned to it). Each leaf key, dotted, is a
+ *   `$config[…]`, `$conf[…]`, `$cfg[…]` or `$settings[…]` outside any
+ *   function body (the subscript's keys, and those of an array assigned to
+ *   it; inside a function the array is a local). Each leaf key, dotted, is a
  *   read in the file itself with `sourceFile` the file. A file reading a
  *   configuration array ({@link CONFIG_ARRAYS}, or a variable assigned an
  *   include) reads from the settings files it includes (resolved include
@@ -79,7 +80,7 @@ import { join } from "node:path";
 import { normalizeFlagName, type ConfigReadFact, type ConfigSource, type FactKind, type FileFacts, type FlagCheckFact, type LineRange, type SourcePosition } from "@n-dx/lang-kit";
 import { innermostEach, type Capture, type FrameworkContext, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
-import { before } from "./php-assignments.js";
+import { before, scopeAt } from "./php-assignments.js";
 import { hostReader, PHP_HOST_INCLUDE } from "./php-include-notices.js";
 import { evaluatePath, isInclude, owned, repositoryConstants, repositoryPath, type ConstantLookup } from "./php-includes.js";
 import { CONFIG_NAMES, configSubscript, envKey } from "./php-outbound.js";
@@ -316,6 +317,8 @@ class FileScan {
       const value = firstNamed(own, "cfg.written_value");
       const subscript = target && configSubscript(target.text);
       if (!target || !value || !subscript || !DEFINING_ARRAYS.has(subscript.array) || subscript.key === "") continue;
+      // In a function body `$config` is a local (CodeIgniter's `$config['per_page'] = 20; $this->pagination->initialize($config);`).
+      if (scopeAt(this.file, write.start) !== undefined) continue;
       if (value.nodeType === "array_creation_expression") roots.push({ root: value, prefix: subscript.key });
       else out.push({ key: subscript.key, position: target.start });
     }
