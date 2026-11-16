@@ -20,10 +20,10 @@
  *
  * **Scope.** A file resolves through the `autoload` and `autoload-dev` of
  * the project owning it (the nearest enclosing `composer.json`) and of each
- * project a `path` repository of that project points at and it requires,
- * merged as Composer's one loader merges them, plus the loader of any
- * project that requires the owner through its own path repositories or
- * encloses the owner's directory; the same scope holds for the
+ * in-repository project it requires by name, transitively (a `path`
+ * repository's first), merged as Composer's one loader merges them, plus the
+ * loader of any project that requires the owner or encloses the owner's
+ * directory; the same scope holds for the
  * classmap, `composer.lock` prefixes and the declared-class fallback, so two
  * apps mapping one namespace never link to each other. A file outside every
  * project resolves through every project's.
@@ -332,7 +332,7 @@ interface LockPrefix {
   readonly module: ExternalModule;
 }
 
-/** The autoload a referring file sees: one project's and its required path repositories', or every project's. */
+/** The autoload a referring file sees: one project's and its required in-repository packages', or every project's. */
 interface Scope {
   readonly psr4: readonly Mapping[];
   readonly psr0: readonly Mapping[];
@@ -381,19 +381,28 @@ function pathRepositoryMatches(base: string, url: string, dir: string): boolean 
 }
 
 /**
- * The projects whose autoload `owner` loads: itself, and each project a
- * `path` repository of `owner` points at that `owner` requires, directly or
- * through another such project (Composer reads repositories from the root
- * manifest only).
+ * The projects whose autoload `owner` loads: itself, and each in-repository
+ * project `owner` requires by name (`require` or `require-dev`, names compared
+ * case-insensitively as Composer does), directly or through another such
+ * project, as Composer installs transitive dependencies. A project a `path`
+ * repository of `owner` points at wins over another of the same name
+ * (Composer reads repositories from the root manifest only); otherwise the
+ * first by directory.
  */
 function loadedBy(owner: ComposerProject, projects: readonly ComposerProject[]): ComposerProject[] {
   const paths = owner.repositories.filter((r) => r.type === "path");
-  const available = projects.filter((p) => p !== owner && p.name !== undefined && paths.some((r) => pathRepositoryMatches(owner.dir, r.url, p.dir)));
+  const fromPath = (p: ComposerProject): boolean => paths.some((r) => pathRepositoryMatches(owner.dir, r.url, p.dir));
+  const named = projects.filter((p) => p !== owner && p.name !== undefined);
+  const available = [...named.filter(fromPath), ...named.filter((p) => !fromPath(p))];
   const inScope = [owner];
+  const seen = new Set<string>();
   for (let i = 0; i < inScope.length; i++) {
     for (const req of inScope[i]!.requirements) {
-      const required = available.find((p) => p.name === req.name && !inScope.includes(p));
-      if (required !== undefined) inScope.push(required);
+      const name = req.name.toLowerCase();
+      if (req.platform === true || seen.has(name)) continue;
+      seen.add(name);
+      const required = available.find((p) => p.name!.toLowerCase() === name);
+      if (required !== undefined && !inScope.includes(required)) inScope.push(required);
     }
   }
   return inScope;
@@ -537,7 +546,7 @@ class Index {
     return owner;
   }
 
-  /** What `fromFile` autoloads: its project's and that project's required path repositories', or every project's outside them all. */
+  /** What `fromFile` autoloads: its project's and that project's required in-repository packages', or every project's outside them all. */
   private scopeOf(fromFile: string): Scope {
     const owner = this.ownerOf(fromFile);
     if (owner === undefined) return this.everyProject;

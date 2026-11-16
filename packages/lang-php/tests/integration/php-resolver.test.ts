@@ -5,7 +5,8 @@
  * naming the package behind an external, and a file with two braced
  * namespaces; and `tests/fixtures/php-shared-root`, a project that shares its
  * root namespace with a library; and `tests/fixtures/php-composer-apps`, two
- * Composer apps mapping the same namespace beside a path repository. Runs the
+ * Composer apps mapping the same namespace beside a path repository; and
+ * `tests/fixtures/php-composer-required`, packages required by name only. Runs the
  * pack entry; skips when the grammar
  * is not built.
  */
@@ -20,6 +21,7 @@ const dir = join(import.meta.dirname, "..", "fixtures", "php-composer");
 const sharedRoot = join(import.meta.dirname, "..", "fixtures", "php-shared-root");
 const apps = join(import.meta.dirname, "..", "fixtures", "php-composer-apps");
 const monorepo = join(import.meta.dirname, "..", "fixtures", "php-composer-monorepo");
+const required = join(import.meta.dirname, "..", "fixtures", "php-composer-required");
 const files = (): string[] => listFixtureFiles(dir, [...phpPack.config.extensions]);
 
 async function facts(): Promise<Map<string, FileFacts>> {
@@ -201,5 +203,28 @@ describe("php namespace resolver", () => {
     const result = await pack.analyzeProject({ projectDir: monorepo, files: listFixtureFiles(monorepo, [...phpPack.config.extensions]), kinds: ["imports"] });
     const a = result.facts.find((f) => f.path === "packages/x/src/A.php");
     expect(a?.imports?.external).toEqual([{ package: "php:Lib", symbols: ["Lib\\Thing"], module: { path: "vendor/lib", version: "0.0.0-fixture" } }]);
+  });
+
+  it("keeps in-repository packages a project requires by name in its scope, transitively", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    // Drupal 7's shape: typo3/phar-stream-wrapper requires brumann/polyfill-unserialize by name
+    // (in another letter case) with no repositories entry, and that requires acme/c; other/app
+    // maps Brumann\Polyfill\ too but requires nothing.
+    const outcomes = await outcomesIn(required);
+    expect(outcomes("misc/typo3/phar-stream-wrapper/src/Manifest.php")).toEqual([
+      "use Brumann\\Polyfill\\Unserialize psr-4",
+      "use Acme\\C\\Thing psr-4",
+      "new Acme\\C\\Thing psr-4",
+      "static Brumann\\Polyfill\\Unserialize psr-4",
+    ]);
+    expect(outcomes("other/main.php")).toEqual(["new Brumann\\Polyfill\\Unserialize psr-4", "new Acme\\C\\Thing internal-not-found"]);
+
+    const result = await pack.analyzeProject({ projectDir: required, files: listFixtureFiles(required, [...phpPack.config.extensions]), kinds: ["imports"] });
+    const byPath = new Map(result.facts.map((f) => [f.path, f]));
+    expect(edges(byPath.get("misc/typo3/phar-stream-wrapper/src/Manifest.php"))).toEqual([
+      "misc/acme/c/src/Thing.php Acme\\C\\Thing",
+      "misc/brumann/polyfill-unserialize/src/Unserialize.php Brumann\\Polyfill\\Unserialize",
+    ]);
+    expect(edges(byPath.get("other/main.php"))).toEqual(["other/src/Unserialize.php Brumann\\Polyfill\\Unserialize"]);
   });
 });
