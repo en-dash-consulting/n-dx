@@ -107,6 +107,12 @@ export interface PackResolver {
    */
   forProject?(projectDir: string, files: readonly string[]): Promise<PackResolver>;
   /**
+   * Text of the configuration files {@link forProject} read beside the
+   * sources (PHP's `.htaccess`), by project-relative path, for frameworks
+   * that read configuration rather than code. Absent when it reads none.
+   */
+  configFiles?(): ReadonlyMap<string, string>;
+  /**
    * Index every file of the project; call once per analysis. `unparsed` lists
    * the pack's files that produced no captures (over the size limit, unreadable):
    * they exist, so a resolver that maps references to directories must still
@@ -131,9 +137,10 @@ export interface PreparedResolver {
 
 /**
  * What a framework may follow across files: the pack's resolver, prepared
- * over the whole project. Given only when the pack has a resolver.
+ * over the whole project, and the configuration files it read. Given only
+ * when the pack has a resolver.
  */
-export type FrameworkContext = Pick<PreparedResolver, "resolve" | "module">;
+export type FrameworkContext = Pick<PreparedResolver, "resolve" | "module"> & Pick<PackResolver, "configFiles">;
 
 /** What a framework reads from a project: facts per file path, and what it skipped. */
 export interface FrameworkFacts {

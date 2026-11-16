@@ -1,0 +1,9 @@
+Options -Indexes
+php_value include_path ".:inc"
+
+<Files "config.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+RedirectMatch 403 ^/private/.*$

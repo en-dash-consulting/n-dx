@@ -10,7 +10,8 @@
  * `use` imports and class references resolve to files through Composer's
  * autoload rules, legacy autoloaders and the PSR-0 path (`php-resolver.ts`,
  * `php-autoloaders.ts`); includes with a computable path resolve through
- * PHP's include search order (`php-includes.ts`).
+ * PHP's include search order (`php-includes.ts`). Routes are the files under
+ * each document root and the `.htaccess` front controllers (`php-docroot.ts`).
  *
  * @module lang-php/php-pack
  */
@@ -20,6 +21,7 @@ import { phpConfig } from "@n-dx/lang-kit";
 import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
 import { PHP_BUILTINS_PROVENANCE } from "./php-builtins.js";
+import { phpDocroot } from "./php-docroot.js";
 import { phpResolver } from "./php-resolver.js";
 
 const QUERY_NAMES = ["imports", "guards", "definitions", "calls", "references"] as const;
@@ -49,7 +51,9 @@ export const phpPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: phpResolver,
-  produces: ["imports", "symbols", "calls"],
+  // Routes come from the docroot rules, whose query runs only when routes are wanted.
+  produces: ["imports", "symbols", "calls", "routes"],
+  frameworks: [phpDocroot],
   provenance: {
     ...Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
     // Constructors: `__construct`, and a method named as its class (the old style) in a class outside a namespace without `__construct`.

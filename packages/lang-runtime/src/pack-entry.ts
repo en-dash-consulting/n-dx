@@ -149,6 +149,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     const context: FrameworkContext | undefined = resolver && {
       resolve: (fromFile) => prepare(resolver).resolve(fromFile),
       module: (fromFile, specifier) => prepare(resolver).module?.(fromFile, specifier),
+      configFiles: () => resolver.configFiles?.() ?? new Map(),
     };
     const structural = parsed.filter((file) => !importsOnly.has(file.path));
     const project = options.projectFacts && readProjectFacts(options.projectFacts, pack, structural, kinds);

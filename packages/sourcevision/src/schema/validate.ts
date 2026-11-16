@@ -374,6 +374,7 @@ const ServerRouteSchema = z.object({
   method: HttpMethodSchema,
   path: z.string(),
   handler: z.string().optional(),
+  source: z.string().optional(),
 });
 
 const ServerRouteGroupSchema = z.object({

@@ -51,7 +51,13 @@ export function packRouteGroups(facts: PackFrameworkFacts, inventory: Inventory)
       const key = `${method} ${fact.path}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      routes.push({ file, method: method as HttpMethod, path: fact.path, ...(fact.handler === undefined ? {} : { handler: fact.handler }) });
+      routes.push({
+        file,
+        method: method as HttpMethod,
+        path: fact.path,
+        ...(fact.handler === undefined ? {} : { handler: fact.handler }),
+        ...(typeof fact.source === "string" ? { source: fact.source } : {}),
+      });
     }
     if (routes.length === 0) continue;
     routes.sort((a, b) => a.method.localeCompare(b.method) || a.path.localeCompare(b.path));

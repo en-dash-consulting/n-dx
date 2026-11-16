@@ -767,6 +767,11 @@ export interface ServerRoute {
   path: string;
   /** Handler function name, if identifiable */
   handler?: string;
+  /**
+   * Where a language pack found the route when not in the handler file's
+   * code: a convention (`docroot public`) or a config line (`public/.htaccess:3`)
+   */
+  source?: string;
 }
 
 export interface ServerRouteGroup {

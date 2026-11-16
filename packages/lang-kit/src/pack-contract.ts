@@ -253,6 +253,11 @@ export interface RouteFact {
   readonly path: string;
   /** Name of the function or method that handles it, when known. */
   readonly handler?: string;
+  /**
+   * Where the route is declared when not in the handler file's own code: a
+   * convention (`docroot public`) or a configuration line (`public/.htaccess:3`).
+   */
+  readonly source?: string;
   readonly position: SourcePosition;
 }
 

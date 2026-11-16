@@ -104,7 +104,9 @@ byte-identical. The field names await Sterling H's review (decision 3).
 
 A pack producing `routes` or `outboundCalls` (Java, through its Spring Boot
 rules; Python, `routes` through its FastAPI, Flask and Django rules and
-`outboundCalls` through its python-clients rules) is asked for them in the imports phase's one `analyzeProject` call
+`outboundCalls` through its python-clients rules; PHP, `routes` through its
+docroot and `.htaccess` rules, each with a `source` that `ServerRoute.source`
+keeps) is asked for them in the imports phase's one `analyzeProject` call
 (`PackImportsOptions.framework`), so no file is parsed twice; the facts ride
 on `AnalyzeContext.packFacts`. A run without the imports phase (`--phase`,
 `sv narrate`) reads them once with `readImportsPackFrameworkFacts`, which asks

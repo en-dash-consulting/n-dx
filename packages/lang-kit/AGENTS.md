@@ -35,8 +35,9 @@ it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
 `namespace` and `constant` symbol kinds (a trait contains its members, a
 namespace does not), the `conditional` `ImportGuard`, `WrittenImport.form`
 (`IMPORT_FORMS`) and `alias`, `WrittenImport.candidates` (a dynamic
-include's possible files, held in memory, never import edges), and
-`CallFact.construct` (`new`). The contract names no parser type; `@n-dx/lang-runtime`'s
+include's possible files, held in memory, never import edges),
+`CallFact.construct` (`new`) and `RouteFact.source` (a docroot or
+`.htaccess` line, for a route not declared in its handler's code). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

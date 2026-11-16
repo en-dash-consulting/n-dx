@@ -80,17 +80,13 @@ import { contains, type Capture, type PackResolver, type PackSourceFile, type Pr
 import { isPhpBuiltinClass } from "./php-builtins.js";
 import { readWrittenImports } from "./php-imports.js";
 import { PhpAutoloaders } from "./php-autoloaders.js";
+import { dirOf } from "./php-docroots.js";
 import { dynamicIncludeNotices, hostReader, type DynamicInclude } from "./php-include-notices.js";
 import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
 
 // ── Names and paths ─────────────────────────────────────────────────────────
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
-const dirOf = (path: string): string => {
-  const slash = path.lastIndexOf("/");
-  return slash < 0 ? "" : path.slice(0, slash);
-};
 
 const joinPath = (...parts: string[]): string => parts.filter((p) => p !== "").join("/");
 
@@ -578,6 +574,8 @@ export async function readPhpResolveProjects(projectDir: string, files: readonly
 export interface PhpProjectFacts {
   readonly projects: readonly ComposerProject[];
   readonly includeConfigs: readonly PhpIncludeConfig[];
+  /** Each `.htaccess`'s text by path: the resolver's `configFiles`, for the docroot routes. */
+  readonly htaccess: ReadonlyMap<string, string>;
   /** Configuration files that could not be read. */
   readonly notices: readonly string[];
 }
@@ -585,8 +583,8 @@ export interface PhpProjectFacts {
 /** What resolution reads from outside the PHP files: Composer manifests, php.ini, `.user.ini` and `.htaccess`. */
 export async function readPhpProjectFacts(projectDir: string, files: readonly string[]): Promise<PhpProjectFacts> {
   const listed = await listBeside(projectDir, files);
-  const { configs, notices } = await readPhpIncludeConfigs(projectDir, listed);
-  return { projects: await readComposerProjects(projectDir, listed), includeConfigs: configs, notices };
+  const { configs, htaccess, notices } = await readPhpIncludeConfigs(projectDir, listed);
+  return { projects: await readComposerProjects(projectDir, listed), includeConfigs: configs, htaccess, notices };
 }
 
 /** `files` and every file in a directory holding one of them or above one, sorted. */
@@ -690,6 +688,7 @@ export function preparePhpImports(
 function createPhpResolver(facts: PhpProjectFacts): PackResolver {
   return {
     forProject: async (projectDir, files) => createPhpResolver(await readPhpProjectFacts(projectDir, files)),
+    configFiles: () => facts.htaccess,
     prepare: (files, unparsed) => preparePhpImports(facts.projects, files, unparsed, facts),
   };
 }
@@ -699,4 +698,4 @@ function createPhpResolver(facts: PhpProjectFacts): PackResolver {
  * Composer project and no configuration file, so only classes declared in
  * the repository and includes set up in PHP code resolve.
  */
-export const phpResolver: PackResolver = createPhpResolver({ projects: [], ...NO_INCLUDE_SETTINGS });
+export const phpResolver: PackResolver = createPhpResolver({ projects: [], htaccess: new Map(), ...NO_INCLUDE_SETTINGS });

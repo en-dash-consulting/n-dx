@@ -29,8 +29,8 @@
  * (an entry script, as osCommerce's `catalog/` and `catalog/admin/`),
  * nearest first, then the docroot. The first that has the file wins.
  *
- * **Docroot**: the first of lang-kit's {@link PHP_DOCROOT_DIRECTORIES} holding
- * an `index.php`, else the repository root.
+ * **Docroot**: `php-docroots.ts`'s `primaryDocroot`, the first of lang-kit's
+ * `PHP_DOCROOT_DIRECTORIES` holding an `index.php`, else the repository root.
  *
  * **Include-path roots**, in this order, without duplicates:
  * 1. literal `set_include_path(…)` and `ini_set('include_path', …)` anywhere
@@ -50,8 +50,9 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PHP_DOCROOT_DIRECTORIES, trimTrailing, type WrittenImport } from "@n-dx/lang-kit";
+import { trimTrailing, type WrittenImport } from "@n-dx/lang-kit";
 import { contains, innermost, type Capture, type PackSourceFile } from "@n-dx/lang-runtime";
+import { dirOf, entryDirectories, primaryDocroot } from "./php-docroots.js";
 import { isOverlongLine, overlongLinesNotice } from "./php-line-cap.js";
 
 // ── Values ──────────────────────────────────────────────────────────────────
@@ -64,11 +65,6 @@ const OUTSIDE = "\u0001";
 const CURRENT_INCLUDE_PATH = "\u0002";
 /** `PATH_SEPARATOR`. */
 const PATH_SEPARATOR = "\u0003";
-
-const dirOf = (path: string): string => {
-  const slash = path.lastIndexOf("/");
-  return slash < 0 ? "" : path.slice(0, slash);
-};
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -645,9 +641,17 @@ export function parsePhpIncludeConfig(
   return { settings, notices: overlong > 0 ? [overlongLinesNotice(file, overlong, "include_path settings")] : [] };
 }
 
-/** The `include_path` settings of every php.ini, `.user.ini` and `.htaccess` among `listed` (project-relative), by path. */
-export async function readPhpIncludeConfigs(projectDir: string, listed: readonly string[]): Promise<{ configs: PhpIncludeConfig[]; notices: string[] }> {
+/**
+ * The `include_path` settings of every php.ini, `.user.ini` and `.htaccess`
+ * among `listed` (project-relative), by path, and each `.htaccess`'s text
+ * (for the docroot routes, `php-docroot.ts`).
+ */
+export async function readPhpIncludeConfigs(
+  projectDir: string,
+  listed: readonly string[],
+): Promise<{ configs: PhpIncludeConfig[]; htaccess: Map<string, string>; notices: string[] }> {
   const configs: PhpIncludeConfig[] = [];
+  const htaccess = new Map<string, string>();
   const notices: string[] = [];
   for (const file of [...listed].sort(compare)) {
     const kind = CONFIG_KINDS.get(file.slice(file.lastIndexOf("/") + 1));
@@ -662,8 +666,9 @@ export async function readPhpIncludeConfigs(projectDir: string, listed: readonly
     const parsed = parsePhpIncludeConfig(file, kind, text);
     configs.push(...parsed.settings);
     notices.push(...parsed.notices);
+    if (kind === ".htaccess") htaccess.set(file, text);
   }
-  return { configs, notices };
+  return { configs, htaccess, notices };
 }
 
 // ── Roots ───────────────────────────────────────────────────────────────────
@@ -715,7 +720,7 @@ export class PhpIncludes {
   private readonly sortedFiles: readonly string[];
   private readonly docroot: string;
   /** Directories holding an `index.php`: entry-script directories, candidates for the working directory. */
-  private readonly entryDirectories = new Set<string>();
+  private readonly entryDirectories: ReadonlySet<string>;
   private readonly workingDirectoryCache = new Map<string, readonly string[]>();
   private readonly constants = new Map<string, ConstantDefinition[]>();
   private readonly constantValues = new Map<string, string | undefined>();
@@ -728,8 +733,8 @@ export class PhpIncludes {
   constructor(sources: readonly PackSourceFile[], files: ReadonlySet<string>, configs: readonly PhpIncludeConfig[]) {
     this.files = files;
     this.sortedFiles = [...files].sort(compare);
-    this.docroot = PHP_DOCROOT_DIRECTORIES.find((d) => files.has(`${d}/index.php`)) ?? "";
-    for (const f of files) if (f === "index.php" || f.endsWith("/index.php")) this.entryDirectories.add(dirOf(f));
+    this.docroot = primaryDocroot(files);
+    this.entryDirectories = entryDirectories(files);
     const ordered = [...sources].sort((a, b) => compare(a.path, b.path));
     for (const file of ordered) {
       for (const { name, definition } of constantsOf(file)) {
