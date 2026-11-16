@@ -19,7 +19,14 @@ items:
     lastModified: "2026-11-14T05:20:57.400Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1d5360b5-e284-4327-ae21-554c2e134e97":
-    lastModified: "2026-11-16T17:31:41.456Z"
+    status: "completed"
+    startedAt: "2026-11-16T17:32:04.986Z"
+    completedAt: "2026-11-16T17:38:07.496Z"
+    endedAt: "2026-11-16T17:38:07.496Z"
+    activeIntervals: [{"end":"2026-11-16T17:38:07.496Z","start":"2026-11-16T17:32:04.986Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Test now drives a Codex session with confinement on and a never-resolving hostIdentity cache, so spawnVendorProcess always awaits withSessionValidationSlotDir (no sandbox backend needed) and the abort lands during that wait. Test-only; production unchanged."
+    lastModified: "2026-11-16T17:38:07.496Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ec3f9f1-5362-4345-8cce-0b7910813b27":
     status: "completed"

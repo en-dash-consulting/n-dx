@@ -15,8 +15,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnWithAdapter } from "../../src/agent/lifecycle/cli-loop.js";
 import { claudeCliAdapter } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import { codexCliAdapter } from "../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import type { VendorAdapter } from "../../src/agent/lifecycle/vendor-adapter.js";
 import { liveVendorProcessCount } from "../../src/process/run-interrupt.js";
+import type { HostIdentity } from "../../src/process/validation-slot-dir.js";
 
 /**
  * `forever` emits a text turn then a tool call every 10ms until signalled.
@@ -126,9 +128,20 @@ describe("spawnWithAdapter session bounds", () => {
   });
 
   it("an abort while the spawn is being prepared starts no process", async () => {
+    // The pre-spawn step must exist on every platform, so it is not left to a
+    // sandbox backend (Windows has none): a Codex session with confinement on
+    // always waits for the host lookup that names its slot directory, and this
+    // lookup never finishes. (A slot directory already in the environment
+    // skips the lookup, but the spawn still awaits the step.)
+    const neverResolves = Object.assign(() => new Promise<HostIdentity>(() => {}), { peek: () => undefined });
     const controller = new AbortController();
-    const pending = spawn("forever", { abortSignal: controller.signal, timeoutMs: 10_000 });
-    // Before any listener is attached: the spawn awaits its pre-spawn step first.
+    const pending = spawn("forever", {
+      abortSignal: controller.signal,
+      timeoutMs: 10_000,
+      vendorSandbox: { setting: { mode: "on", toolNetwork: "none", source: "default" }, hostIdentity: neverResolves },
+    }, codexCliAdapter);
+    // spawnWithAdapter runs synchronously into that wait, so this abort lands
+    // while the spawn is suspended on it, before any process listener exists.
     controller.abort(new Error("Interrupted by SIGINT"));
     const result = await pending;
 
