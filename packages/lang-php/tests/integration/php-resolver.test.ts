@@ -209,7 +209,7 @@ describe("php namespace resolver", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     // Drupal 7's shape: typo3/phar-stream-wrapper requires brumann/polyfill-unserialize by name
     // (in another letter case) with no repositories entry, and that requires acme/c; other/app
-    // maps Brumann\Polyfill\ too but requires nothing.
+    // maps Brumann\Polyfill\ too but requires nothing; site2 holds a second copy of both packages.
     const outcomes = await outcomesIn(required);
     expect(outcomes("misc/typo3/phar-stream-wrapper/src/Manifest.php")).toEqual([
       "use Brumann\\Polyfill\\Unserialize psr-4",
@@ -226,5 +226,9 @@ describe("php namespace resolver", () => {
       "misc/brumann/polyfill-unserialize/src/Unserialize.php Brumann\\Polyfill\\Unserialize",
     ]);
     expect(edges(byPath.get("other/main.php"))).toEqual(["other/src/Unserialize.php Brumann\\Polyfill\\Unserialize"]);
+    // site2 holds a second copy of both packages: its requirement takes the nearest copy.
+    expect(edges(byPath.get("site2/misc/typo3/phar-stream-wrapper/src/Manifest.php"))).toEqual([
+      "site2/misc/brumann/polyfill-unserialize/src/Unserialize.php Brumann\\Polyfill\\Unserialize",
+    ]);
   });
 });

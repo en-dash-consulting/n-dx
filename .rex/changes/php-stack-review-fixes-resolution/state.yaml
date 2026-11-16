@@ -24,8 +24,12 @@ items:
     lastModified: "2026-11-16T22:46:34.275Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f0d1bbab-2a17-4645-af58-aa002a7efb5b":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T23:08:53.515Z"
-    activeIntervals: [{"start":"2026-11-16T23:08:53.515Z"}]
-    lastModified: "2026-11-16T23:08:54.232Z"
+    completedAt: "2026-11-16T23:13:27.649Z"
+    endedAt: "2026-11-16T23:13:27.649Z"
+    activeIntervals: [{"end":"2026-11-16T23:13:27.649Z","start":"2026-11-16T23:08:53.515Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "loadedBy now adds every in-repository Composer project required by name (case-insensitive, transitive, path-repository match preferred); new fixture php-composer-required."
+    lastModified: "2026-11-16T23:13:27.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

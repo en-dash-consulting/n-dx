@@ -384,16 +384,28 @@ function pathRepositoryMatches(base: string, url: string, dir: string): boolean 
  * The projects whose autoload `owner` loads: itself, and each in-repository
  * project `owner` requires by name (`require` or `require-dev`, names compared
  * case-insensitively as Composer does), directly or through another such
- * project, as Composer installs transitive dependencies. A project a `path`
- * repository of `owner` points at wins over another of the same name
- * (Composer reads repositories from the root manifest only); otherwise the
- * first by directory.
+ * project, as Composer installs transitive dependencies. Of several projects
+ * with one name (two copies of an app in one repository), one a `path`
+ * repository of `owner` points at wins (Composer reads repositories from the
+ * root manifest only), then the one sharing the most leading directories with
+ * `owner`, then the first by directory.
  */
 function loadedBy(owner: ComposerProject, projects: readonly ComposerProject[]): ComposerProject[] {
   const paths = owner.repositories.filter((r) => r.type === "path");
-  const fromPath = (p: ComposerProject): boolean => paths.some((r) => pathRepositoryMatches(owner.dir, r.url, p.dir));
-  const named = projects.filter((p) => p !== owner && p.name !== undefined);
-  const available = [...named.filter(fromPath), ...named.filter((p) => !fromPath(p))];
+  const ownerSegments = owner.dir === "" ? [] : owner.dir.split("/");
+  const shared = (dir: string): number => {
+    const segments = dir === "" ? [] : dir.split("/");
+    let n = 0;
+    while (n < segments.length && n < ownerSegments.length && segments[n] === ownerSegments[n]) n++;
+    return n;
+  };
+  const rank = (p: ComposerProject) => ({ p, fromPath: paths.some((r) => pathRepositoryMatches(owner.dir, r.url, p.dir)), shared: shared(p.dir) });
+  // Array sort is stable, so equal ranks keep `projects`' directory order.
+  const available = projects
+    .filter((p) => p !== owner && p.name !== undefined)
+    .map(rank)
+    .sort((a, b) => Number(b.fromPath) - Number(a.fromPath) || b.shared - a.shared)
+    .map((r) => r.p);
   const inScope = [owner];
   const seen = new Set<string>();
   for (let i = 0; i < inScope.length; i++) {
