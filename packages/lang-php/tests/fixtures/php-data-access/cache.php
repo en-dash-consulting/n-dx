@@ -11,3 +11,9 @@ $predis = new Predis\Client('tcp://:secret@redis-cache.internal:6380');
 $sessions = new Predis\Client(['host' => 'redis-sessions.internal', 'port' => 6381]);
 // Not a cache client: not reported.
 $other->connect('elsewhere.internal', 1);
+// Classes named as JavaScript object members are not cache clients either.
+$builder = new Constructor();
+$builder->connect('builder.internal', 1);
+$proto = new __proto__();
+$proto->connect('proto.internal', 1);
+$pool = new PDO('constructor:host=pool.internal');

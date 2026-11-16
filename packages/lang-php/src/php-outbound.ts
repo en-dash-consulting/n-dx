@@ -249,12 +249,17 @@ export function connectionTarget(value: string, form: ConnectionForm): Connectio
   return withDriver(literal(pairs.get("unix_socket") ?? pairs.get("dbname") ?? ""));
 }
 
-/** The PDO extension for a DSN's driver prefix (https://www.php.net/manual/en/pdo.drivers.php); `mssql:` and `sybase:` are PDO_DBLIB. */
-const PDO_DRIVERS: Readonly<Record<string, string>> = {
-  cubrid: "pdo_cubrid", dblib: "pdo_dblib", mssql: "pdo_dblib", sybase: "pdo_dblib", firebird: "pdo_firebird", ibm: "pdo_ibm",
-  informix: "pdo_informix", mysql: "pdo_mysql", oci: "pdo_oci", odbc: "pdo_odbc", pgsql: "pdo_pgsql", sqlite: "pdo_sqlite",
-  sqlite2: "pdo_sqlite", sqlsrv: "pdo_sqlsrv",
-};
+/**
+ * The PDO extension for a DSN's driver prefix (https://www.php.net/manual/en/pdo.drivers.php); `mssql:` and `sybase:` are PDO_DBLIB.
+ * A Map, since a key is text from the repository (`constructor:`).
+ */
+const PDO_DRIVERS: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    cubrid: "pdo_cubrid", dblib: "pdo_dblib", mssql: "pdo_dblib", sybase: "pdo_dblib", firebird: "pdo_firebird", ibm: "pdo_ibm",
+    informix: "pdo_informix", mysql: "pdo_mysql", oci: "pdo_oci", odbc: "pdo_odbc", pgsql: "pdo_pgsql", sqlite: "pdo_sqlite",
+    sqlite2: "pdo_sqlite", sqlsrv: "pdo_sqlsrv",
+  }),
+);
 
 /** Reads targets in one file. */
 class TargetReader {
@@ -520,12 +525,16 @@ const DATABASE_FUNCTIONS: Readonly<Record<string, DatabaseFunction>> = {
   odbc_pconnect: odbc,
 };
 
-/** Cache classes, by qualified name in lowercase: client and the methods that name a server (host first, port second). */
-const CACHE_CLASSES: Readonly<Record<string, { readonly client: string; readonly methods: ReadonlySet<string> }>> = {
-  memcache: { client: "memcache", methods: new Set(["connect", "pconnect", "addserver"]) },
-  memcached: { client: "memcached", methods: new Set(["addserver"]) },
-  redis: { client: "redis", methods: new Set(["connect", "pconnect", "open", "popen"]) },
-};
+/**
+ * Cache classes, by qualified name in lowercase: client and the methods that
+ * name a server (host first, port second). A Map, since a key is a class name
+ * from the repository (`Constructor`, `__proto__`).
+ */
+const CACHE_CLASSES: ReadonlyMap<string, { readonly client: string; readonly methods: ReadonlySet<string> }> = new Map([
+  ["memcache", { client: "memcache", methods: new Set(["connect", "pconnect", "addserver"]) }],
+  ["memcached", { client: "memcached", methods: new Set(["addserver"]) }],
+  ["redis", { client: "redis", methods: new Set(["connect", "pconnect", "open", "popen"]) }],
+]);
 
 const MYSQLI_CLASS = "mysqli";
 const PDO_CLASS = "pdo";
@@ -537,7 +546,7 @@ export const PHP_OUTBOUND_FUNCTIONS: readonly string[] = ["curl_init", "curl_set
 /** The Guzzle and cache method names the query's method pattern must match. */
 export const PHP_OUTBOUND_METHODS: readonly string[] = [
   ...[...GUZZLE_VERBS, "request"].flatMap((m) => [m, `${m}async`]),
-  ...new Set(Object.values(CACHE_CLASSES).flatMap((c) => [...c.methods])),
+  ...new Set([...CACHE_CLASSES.values()].flatMap((c) => [...c.methods])),
 ];
 
 // ── One file ────────────────────────────────────────────────────────────────
@@ -673,7 +682,7 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
         add("database", "mysqli", port(connection(argumentAt(call, 0, "hostname"), "plain").target, argumentAt(call, ...MYSQLI_PORT), at), at);
       } else if (qualified === PDO_CLASS) {
         const { target: dsn, driver } = connection(argumentAt(call, 0, "dsn"), "dsn");
-        add("database", (driver && PDO_DRIVERS[driver]) ?? "pdo", dsn, at);
+        add("database", (driver && PDO_DRIVERS.get(driver)) || "pdo", dsn, at);
       } else if (qualified === PREDIS_CLIENT) {
         const given = argumentAt(call, 0, "parameters");
         const options = optionsOf(given, elements);
@@ -694,7 +703,7 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
       if (GUZZLE_VERBS.has(method)) add("http", "guzzle", target(argumentAt(call, 0, "uri")), at);
       else if (method === "request") add("http", "guzzle", target(argumentAt(call, 1, "uri")), at);
     } else if (receiver !== undefined) {
-      const cache = CACHE_CLASSES[receiver];
+      const cache = CACHE_CLASSES.get(receiver);
       if (cache?.methods.has(call.method)) add("cache", cache.client, server(call, at), at);
     }
   }

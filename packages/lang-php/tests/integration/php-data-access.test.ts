@@ -58,6 +58,8 @@ describe("php database and cache outbound calls", () => {
       // The password is dropped.
       'cache.php:10 cache predis "tcp://redis-cache.internal:6380" (literal, certain)',
       'cache.php:11 cache predis "redis-sessions.internal:6381" (literal, certain)',
+      // A driver named as a JavaScript object member is no known driver.
+      'cache.php:19 database pdo "pool.internal" (literal, certain)',
       'connections.php:4 database mysqli "mysqli.internal:3306" (literal, certain)',
       'connections.php:5 database mysqli "crm-db.internal" (literal, certain)',
       'connections.php:6 database pgsql "pg.internal:5432" (literal, certain)',
@@ -78,7 +80,8 @@ describe("php database and cache outbound calls", () => {
       // The driver is not known.
       'pdo/app.php:9 database pdo "dsn" (config, certain)',
     ]);
-    // Not reported: connect() on a receiver that is not a cache client (cache.php).
+    // Not reported: connect() on a receiver that is not a cache client, including classes named
+    // `Constructor` and `__proto__`, which once threw and lost every outbound call (cache.php).
   });
 
 });
