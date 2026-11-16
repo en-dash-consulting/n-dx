@@ -29,9 +29,11 @@
  *   `[php-host-include]` notices already name them, so they are counted here,
  *   never noticed again.
  *
- * A named rule is PHP's function only when called by its global name (`eval`,
- * `\eval`; never `\App\eval`) and the repository declares no function of that
- * name (a polyfill). The scope is the innermost function (`name`), method
+ * A named rule is PHP's function only when the call reaches the global
+ * function, resolved as PHP does (`php-namespaces.ts`: `eval`, `\eval`, a
+ * `use function` alias of it; never `\App\eval`), and not a function the
+ * repository declares (a namespaced helper the call resolves to, a global
+ * polyfill). The scope is the innermost function (`name`), method
  * (`Class::name`, `class@anonymous::name`) or closure (`{closure:<outer>}`,
  * `{closure}` at the top level) holding the site; absent at a file's top level.
  *
@@ -53,6 +55,7 @@ import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, t
 import { PHP_PACKAGE } from "./package-paths.js";
 import { databaseFeeds, nodeKey, type FlowSite } from "./php-database-flow.js";
 import { readWrittenImports } from "./php-imports.js";
+import { builtinCallResolver, declaredFunctions } from "./php-namespaces.js";
 import { hostReader, noticeLocations } from "./php-include-notices.js";
 import { isDynamicIncludePath, isInclude, repositoryConstants, type ConstantLookup } from "./php-includes.js";
 
@@ -256,17 +259,15 @@ function namedCallSite(name: string, call: Capture, captures: FileCaptures): Sit
   return captures.isStaticCallable(args[index]) ? undefined : { kind: "dispatch", ...at, operands: [args[index]] };
 }
 
-/** Every exec and dispatch site in a file. `declared` holds the lower-cased functions the repository declares. */
-function codeSites(captures: FileCaptures, declared: ReadonlySet<string>): Site[] {
+/** Every exec and dispatch site in a file. `builtin` names the built-in a callee reaches (`php-namespaces.ts`). */
+function codeSites(captures: FileCaptures, builtin: (callee: Capture) => string | undefined): Site[] {
   const sites: Site[] = [];
   for (const call of captures.get("call")) {
     const callee = captures.callee(call);
     if (callee === undefined) continue;
     if (NAME_TYPES.has(callee.nodeType)) {
-      const written = callee.text.replace(/^\\/, "");
-      if (written.includes("\\")) continue;
-      const name = written.toLowerCase();
-      if (declared.has(name) || (!EXEC_FUNCTIONS.has(name) && !CALLERS.has(name) && !CALLBACK_ARGUMENT.has(name))) continue;
+      const name = builtin(callee)?.toLowerCase();
+      if (name === undefined || (!EXEC_FUNCTIONS.has(name) && !CALLERS.has(name) && !CALLBACK_ARGUMENT.has(name))) continue;
       const site = namedCallSite(name, call, captures);
       if (site !== undefined) sites.push(site);
     } else if (!captures.isStaticCallable(callee)) {
@@ -345,15 +346,6 @@ function includeSites(file: PackSourceFile, constant: ConstantLookup): Site[] {
   }));
 }
 
-/** Lower-cased names of the functions any of `files` declares. */
-function declaredFunctions(files: readonly PackSourceFile[]): Set<string> {
-  const names = new Set<string>();
-  for (const file of files) {
-    for (const c of file.captures[QUERY] ?? []) if (c.name === `${PREFIX}declared`) names.add(c.text.toLowerCase());
-  }
-  return names;
-}
-
 const before = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
 
 /** Every dynamic-code site of each file, in document order, database-driven ones marked; files without one are left out. */
@@ -362,7 +354,7 @@ export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, D
   const constant = repositoryConstants(files);
   const read = files.map((file) => {
     const captures = new FileCaptures(file);
-    return { file, captures, sites: codeSites(captures, declared) };
+    return { file, captures, sites: codeSites(captures, builtinCallResolver(file, declared)) };
   });
   const feeds = databaseFeeds(read, constant);
   const out = new Map<string, DynamicCodeFact[]>();

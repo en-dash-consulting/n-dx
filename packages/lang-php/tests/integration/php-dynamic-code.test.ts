@@ -2,8 +2,9 @@
  * Dynamic code (`src/php-dynamic-code.ts`) through the pack entry, over
  * `php-dynamic-code`: one file per kind of site under `exec/`, `dispatch/`
  * and `include/`, each beside the near misses that are no site, and under
- * `lib/` files with none (a polyfill among them). Skips when the grammar is
- * not built.
+ * `lib/` files with none (a polyfill among them); and over
+ * `php-function-shadowing`, namespaced helpers and a global polyfill named as
+ * built-ins. Skips when the grammar is not built.
  */
 
 import { join } from "node:path";
@@ -13,18 +14,20 @@ import type { DynamicCodeFact, FactKind } from "@n-dx/lang-kit";
 import { PHP_DYNAMIC_DISPATCH, PHP_DYNAMIC_EXEC, pack, phpGrammarPath, phpPack } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-dynamic-code");
+/** Namespaced helpers and a global polyfill named as built-ins. */
+const shadowing = join(import.meta.dirname, "..", "fixtures", "php-function-shadowing");
 
-async function analyze(kinds: readonly FactKind[] = ["dynamicCode"]) {
-  const result = await pack.analyzeProject({ projectDir: dir, files: listFixtureFiles(dir, [...phpPack.config.extensions]), kinds });
+async function analyze(kinds: readonly FactKind[] = ["dynamicCode"], projectDir = dir) {
+  const result = await pack.analyzeProject({ projectDir, files: listFixtureFiles(projectDir, [...phpPack.config.extensions]), kinds });
   expect(result.degraded).toBeUndefined();
   expect(result.unparsed).toEqual([]);
   return result;
 }
 
 /** Each file's sites as `kind construct line scope [literal]`. */
-async function sites(): Promise<Map<string, string[]>> {
+async function sites(projectDir = dir): Promise<Map<string, string[]>> {
   const brief = (f: DynamicCodeFact) => [f.kind, f.construct, f.position.line, f.scope ?? "-", ...(f.literal ? ["literal"] : [])].join(" ");
-  return new Map((await analyze()).facts.map((f) => [f.path, (f.dynamicCode ?? []).map(brief)]));
+  return new Map((await analyze(["dynamicCode"], projectDir)).facts.map((f) => [f.path, (f.dynamicCode ?? []).map(brief)]));
 }
 
 describe("php dynamic code", () => {
@@ -83,6 +86,22 @@ describe("php dynamic code", () => {
     const by = await sites();
     expect(by.get("lib/static.php")).toEqual([]);
     expect(by.get("lib/helpers.php")).toEqual([]);
+  });
+
+  it("suppresses only calls that resolve to a repository function, namespace by namespace", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const found = await sites(shadowing);
+    const by = { get: (path: string) => found.get(path) ?? [] };
+    // `namespace Helpers; function call_user_func()` never hides PHP's: not explicitly global, nor from another namespace.
+    expect(by.get("explicit.php")).toEqual(["dispatch call_user_func 3 -"]);
+    expect(by.get("other-namespace.php")).toEqual(["dispatch call_user_func 5 -"]);
+    // Inside Helpers, or imported with `use function`, the call is the helper.
+    expect(by.get("own-namespace.php")).toEqual([]);
+    // Jobs imports PHP's own under another name, and App's import does not reach it.
+    expect(by.get("aliased.php")).toEqual(["dispatch call_user_func 15 -"]);
+    // A global polyfill takes unqualified calls in any namespace and explicit global ones.
+    expect(by.get("polyfill.php")).toEqual([]);
+    expect(by.get("polyfill-caller.php")).toEqual([]);
   });
 
   it("notices exec and dispatch sites with their locations, never includes again", async (ctx) => {

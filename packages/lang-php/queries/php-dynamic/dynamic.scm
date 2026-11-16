@@ -15,7 +15,6 @@
 (argument (_) @dynamic.argument-value)
 (array_creation_expression) @dynamic.array
 (array_element_initializer (_) @dynamic.element)
-(function_definition name: (name) @dynamic.declared)
 
 ; ── Methods and classes named by a value ──
 ; `$o->$m()`, `$o->{$expr}()`, `$o?->$m()`, `$c::$m()`, `$c::{$expr}()`:

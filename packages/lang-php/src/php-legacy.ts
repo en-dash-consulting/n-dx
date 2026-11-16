@@ -19,10 +19,12 @@
  *
  * How each rule reads the captures:
  *
- * - Function rules: a call of the global function by name, in any letter case
- *   (`mysql_*`, `ereg*`, `mcrypt_*`, `each`, …). A namespaced call
- *   (`\App\each()`) and a call of a name the repository itself declares as a
- *   function (a polyfill) are not PHP's function.
+ * - Function rules: a call that reaches the global function, in any letter
+ *   case (`mysql_*`, `ereg*`, `mcrypt_*`, `each`, …), resolved as PHP does
+ *   (`php-namespaces.ts`). A namespaced call (`\App\each()`) and a call that
+ *   resolves to a function the repository declares (a namespaced helper of
+ *   the same name, a global polyfill) are not PHP's function; `\mysql_query()`
+ *   is PHP's even beside a namespaced helper of that name.
  * - `__autoload`: a function declared with that name.
  * - `string-dollar-brace`: `"${…}"` in a string or heredoc, never
  *   `"{${…}}"` (a variable variable in the complex syntax).
@@ -47,6 +49,7 @@ import { join } from "node:path";
 import type { FactKind, FileFacts, LanguageBoundary, LegacyConstructFact, LegacyStatus, SourcePosition } from "@n-dx/lang-kit";
 import { atOrBefore, contains, innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
+import { builtinCallResolver, declaredFunctions } from "./php-namespaces.js";
 import { phpVersionSource, phpVersionSourceName } from "./php-version-sources.js";
 
 /** One removed, deprecated or changed construct, with the php.net page of every version it names. */
@@ -307,8 +310,9 @@ function inlineHtmlHits(segments: readonly Capture[]): LegacyHit[] {
   return hits;
 }
 
-/** Every rule a file's captures match. `declared` holds the lower-cased functions the repository declares. */
+/** Every rule a file's captures match. `declared` holds the functions the repository declares ({@link declaredFunctions}). */
 export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> = new Set()): LegacyHit[] {
+  const builtin = builtinCallResolver(file, declared);
   const by = new Map<string, Capture[]>();
   for (const capture of file.captures[QUERY] ?? []) {
     const name = capture.name.slice(PREFIX.length);
@@ -318,11 +322,9 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
   }
   const hits: LegacyHit[] = [];
   for (const call of by.get("call") ?? []) {
-    const written = call.text.replace(/^\\/, "");
-    if (written.includes("\\")) continue;
-    const lower = written.toLowerCase();
-    const rule = functionRule(lower);
-    if (rule !== undefined && !declared.has(lower)) hits.push({ rule, position: call.start, construct: `${written}()` });
+    const name = builtin(call);
+    const rule = name === undefined ? undefined : functionRule(name.toLowerCase());
+    if (rule !== undefined) hits.push({ rule, position: call.start, construct: `${name}()` });
   }
   for (const fn of by.get("function") ?? []) {
     if (fn.text.toLowerCase() === "__autoload") hits.push({ rule: "autoload-function", position: fn.start });
@@ -366,15 +368,6 @@ export function legacyFact(hit: LegacyHit): LegacyConstructFact {
     ...(rule.likely === undefined ? {} : { likely: true as const }),
     position: hit.position,
   };
-}
-
-/** Lower-cased names of the functions any of `files` declares. */
-function declaredFunctions(files: readonly PackSourceFile[]): Set<string> {
-  const names = new Set<string>();
-  for (const file of files) {
-    for (const c of file.captures[QUERY] ?? []) if (c.name === `${PREFIX}function`) names.add(c.text.toLowerCase());
-  }
-  return names;
 }
 
 const GRAMMAR = "tree-sitter-php@0.25.1";

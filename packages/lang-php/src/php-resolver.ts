@@ -92,15 +92,13 @@ import { findCrontabFiles, readCrontabFiles } from "./php-cron.js";
 import { dirOf } from "./php-docroots.js";
 import { dynamicIncludeNotices, hostReader, type DynamicInclude } from "./php-include-notices.js";
 import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
+import { inNamespace, regionAt, regionsOf, tidy, useAliases, type Region } from "./php-namespaces.js";
 
 // ── Names and paths ─────────────────────────────────────────────────────────
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 const joinPath = (...parts: string[]): string => parts.filter((p) => p !== "").join("/");
-
-/** A name as written, without the whitespace PHP 7 allowed around `\`. */
-const tidy = (text: string): string => text.replace(/\s+/g, "");
 
 /** First namespace segment; for an un-namespaced class, its PSR-0 prefix (`Zend` of `Zend_Db_Table`). */
 function headOf(qualified: string): string {
@@ -122,8 +120,6 @@ function psr0Path(qualified: string): string {
   const namespace = sep < 0 ? "" : qualified.slice(0, sep + 1).replace(/\\/g, "/");
   return `${namespace}${qualified.slice(sep + 1).replace(/_/g, "/")}.php`;
 }
-
-const before = (a: SourcePosition, b: SourcePosition): boolean => a.line < b.line || (a.line === b.line && a.column <= b.column);
 
 // ── References ──────────────────────────────────────────────────────────────
 
@@ -196,63 +192,10 @@ const RELATIVE_CLASSES = new Set(["self", "static", "parent"]);
  */
 const SCALAR_TYPES = new Set(["array", "bool", "callable", "false", "float", "int", "iterable", "mixed", "never", "null", "object", "string", "true", "void"]);
 
-/** A namespace region: a braced block, or an unbraced statement up to the next. */
-interface Region {
-  readonly name: string;
-  readonly start: SourcePosition;
-  /** Set for a braced namespace. */
-  readonly end?: SourcePosition;
-}
-
-/** The file's namespace regions, in document order. */
-function regionsOf(file: PackSourceFile): Region[] {
-  const defs = file.captures.definitions ?? [];
-  const names = defs.filter((c) => c.name === "namespace.name");
-  const bodies = defs.filter((c) => c.name === "namespace.body");
-  return defs
-    .filter((c) => c.name === "namespace.declaration")
-    .map((declaration): Region | undefined => {
-      const name = names.find((n) => contains(declaration, n));
-      if (name === undefined) return undefined;
-      const braced = bodies.some((b) => contains(declaration, b));
-      return { name: tidy(name.text).replace(/^\\/, ""), start: declaration.start, ...(braced ? { end: declaration.end } : {}) };
-    })
-    .filter((r): r is Region => r !== undefined)
-    .sort((a, b) => (before(a.start, b.start) ? -1 : 1));
-}
-
-/** The region holding `at`; undefined in the global namespace. */
-function regionAt(regions: readonly Region[], at: SourcePosition): Region | undefined {
-  let found: Region | undefined;
-  for (const region of regions) {
-    if (!before(region.start, at)) break;
-    found = region;
-  }
-  if (found?.end !== undefined && !before(at, found.end)) return undefined;
-  return found;
-}
-
-const inNamespace = (region: Region | undefined, name: string): string => (region === undefined ? name : `${region.name}\\${name}`);
-
-/** A file's class imports per region (undefined is global): local name, lowercase, to the qualified name. */
-function classAliases(regions: readonly Region[], written: readonly WrittenImport[]): Map<Region | undefined, Map<string, string>> {
-  const byRegion = new Map<Region | undefined, Map<string, string>>();
-  for (const w of written) {
-    if (w.form !== "use") continue;
-    const region = regionAt(regions, w.position);
-    let aliases = byRegion.get(region);
-    if (!aliases) byRegion.set(region, (aliases = new Map()));
-    const qualified = w.specifier.replace(/^\\/, "");
-    const local = w.alias ?? qualified.slice(qualified.lastIndexOf("\\") + 1);
-    aliases.set(local.toLowerCase(), qualified);
-  }
-  return byRegion;
-}
-
 /** Every name the file refers to, in document order. */
 export function readPhpReferences(file: PackSourceFile, written: readonly WrittenImport[] = readWrittenImports(file)): PhpReference[] {
   const regions = regionsOf(file);
-  const aliases = classAliases(regions, written);
+  const aliases = useAliases(regions, written, "use");
   const refs: PhpReference[] = [];
 
   for (const w of written) {

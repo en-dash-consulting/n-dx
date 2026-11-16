@@ -3,8 +3,9 @@
 ; it counts, is decided in code. Run only when legacy constructs are wanted.
 
 ; ── Calls and declarations by name ──
-; Every call of a global function, and every function the repository
-; declares (a polyfill of a removed function is not a use of PHP's).
+; Every call of a function by name, and every function declaration (for
+; `__autoload`). Which calls reach PHP's own function is decided in code
+; (src/php-namespaces.ts, over definitions.scm).
 (function_call_expression function: [(name) (qualified_name)] @legacy.call)
 (function_definition name: (name) @legacy.function)
 

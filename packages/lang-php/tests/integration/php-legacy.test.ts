@@ -5,7 +5,8 @@
  * shapes a curly-brace offset leaves in the parse plus a PHP 4-era app
  * (`shapes/`), and JavaScript templates in script elements
  * (`shapes/js-templates.php`); and `php-legacy-polyfill`, a project that declares its own
- * `each()`. Skips when the grammar is not built.
+ * `each()`; and `php-function-shadowing`, namespaced helpers and a global
+ * polyfill named as built-ins. Skips when the grammar is not built.
  */
 
 import { readdirSync } from "node:fs";
@@ -18,6 +19,8 @@ import { LEGACY_RULES, legacySource, legacyStatus, pack, phpGrammarPath, phpPack
 const dir = join(import.meta.dirname, "..", "fixtures", "php-legacy");
 /** A project that declares its own `each()`. */
 const polyfill = join(import.meta.dirname, "..", "fixtures", "php-legacy-polyfill");
+/** Namespaced helpers and a global polyfill named as built-ins. */
+const shadowing = join(import.meta.dirname, "..", "fixtures", "php-function-shadowing");
 
 async function analyze(kinds: readonly FactKind[] = ["legacyConstructs"], projectDir = dir) {
   return pack.analyzeProject({ projectDir, files: listFixtureFiles(projectDir, [...phpPack.config.extensions]), kinds });
@@ -82,6 +85,24 @@ describe("php legacy constructs", () => {
     const result = await analyze(["legacyConstructs"], polyfill);
     expect(result.facts.map((f) => f.path).sort()).toEqual(["polyfill-define.php", "polyfill-use.php"]);
     expect(result.facts.flatMap((f) => f.legacyConstructs ?? [])).toEqual([]);
+  });
+
+  it("suppresses only calls that resolve to a repository function, namespace by namespace", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const result = await analyze(["legacyConstructs"], shadowing);
+    expect(result.degraded).toBeUndefined();
+    const facts = new Map(result.facts.map((f) => [f.path, (f.legacyConstructs ?? []).map((c) => `${c.rule}@${c.position.line} ${c.construct}`)]));
+    const by = { get: (path: string) => facts.get(path) ?? [] };
+    // `namespace Helpers; function mysql_query()` never hides PHP's: not explicitly global, nor from another namespace.
+    expect(by.get("explicit.php")).toEqual(["mysql-functions@2 mysql_query()"]);
+    expect(by.get("other-namespace.php")).toEqual(["mysql-functions@4 mysql_query()"]);
+    // Inside Helpers, or imported with `use function`, the call is the helper.
+    expect(by.get("own-namespace.php")).toEqual([]);
+    // Jobs imports PHP's own under another name, and App's import does not reach it.
+    expect(by.get("aliased.php")).toEqual(["mysql-functions@14 mysql_query()", "mysql-functions@16 mysql_query()"]);
+    // A global polyfill takes unqualified calls in any namespace and explicit global ones.
+    expect(by.get("polyfill.php")).toEqual([]);
+    expect(by.get("polyfill-caller.php")).toEqual([]);
   });
 
   it("finds every curly-brace offset, however the parse breaks around it, once each at its brace", async (ctx) => {
