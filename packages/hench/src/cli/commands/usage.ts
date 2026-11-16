@@ -83,7 +83,9 @@ async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise
   }
 
   const measurement = transcriptUsageStatus(text);
-  if (measurement.status === "unavailable" || (measurement.sessionId && measurement.sessionId !== sessionId)) {
+  if (measurement.status === "unavailable" ||
+      (session.vendor && session.vendor !== measurement.vendor) ||
+      (measurement.sessionId && measurement.sessionId !== sessionId)) {
     warn("Usage unavailable or session identity mismatched — nothing marked. Pass a supported Claude or Codex rollout transcript with cumulative usage.");
     return;
   }

@@ -55,7 +55,7 @@ const ZERO_USAGE: Required<TokenUsage> = {
 /**
  * Write a lightweight, assisted run record to `.hench/runs/`.
  *
- * Used by the skills so work driven through Claude Code is visible in run
+ * Used by the skills so work driven through Claude Code or Codex is visible in run
  * history and auditable after the fact — closing the gap where slash-command
  * work left no `.hench/runs/` entry (issue #271). The record is marked
  * `assisted: true` to distinguish it from a spawned hench agent's run.
@@ -86,9 +86,8 @@ const ZERO_USAGE: Required<TokenUsage> = {
  * typed timestamp is not a measurement, and the mark is. `--since` remains an
  * explicit override for the rare case that needs a time window.
  *
- * Zeros remain a valid outcome rather than an error: an unrecorded run is worse
- * than one recorded without its tokens, and `assisted` already marks the record
- * so analytics do not read a 0-token entry as an anomaly.
+ * Unavailable measurements retain zero fields for compatibility, with explicit
+ * unavailable diagnostics. Only a supported measurement can establish zero spend.
  */
 export async function cmdRecord(
   dir: string,
@@ -283,12 +282,13 @@ async function resolveUsage(
   const snapshot = snapshotTranscriptUsage(transcript.text);
   const regressed = measurement.vendor === "codex" && usageCountersRegressed(snapshot.totals, cursor);
   if (measurement.status === "unavailable" || regressed ||
+      (session.vendor && session.vendor !== measurement.vendor) ||
       (measurement.vendor === "codex" && (!sessionId || (measurement.sessionId && measurement.sessionId !== sessionId)))) {
     // Preserve the watermark and marks so a later complete read can recover.
-    return { tokenUsage: explicitUsage ?? ZERO_USAGE, messages: 0, vendor: measurement.vendor,
+    return { tokenUsage: explicitUsage ?? ZERO_USAGE, messages: 0, vendor: session.vendor ?? measurement.vendor,
       source: explicitUsage ? "flags" : "none", diagnosticStatus: explicitUsage ? "complete" : "unavailable",
       note: explicitUsage ? "Token usage taken from flags; unreadable measurement boundary preserved."
-        : "Usage unavailable: unsupported/missing counters, counter reset, or session identity mismatch. No measured zero is claimed; usage marks and watermark are preserved.",
+        : "Usage unavailable: unsupported/missing counters, counter reset, or session/vendor identity mismatch. No measured zero is claimed; usage marks and watermark are preserved.",
     };
   }
 
@@ -327,6 +327,7 @@ async function resolveUsage(
 
   if (explicitUsage) {
     return {
+      vendor: measurement.vendor,
       tokenUsage: explicitUsage,
       messages: delta.messages,
       model: delta.model,
@@ -339,6 +340,8 @@ async function resolveUsage(
     // Burn, don't defer: the suppressed spend is deliberately unattributed,
     // and must not roll into whichever record happens to come next.
     return {
+      vendor: measurement.vendor,
+      model: measurement.vendor === "codex" ? delta.model : undefined,
       tokenUsage: ZERO_USAGE,
       messages: 0,
       source: "none",

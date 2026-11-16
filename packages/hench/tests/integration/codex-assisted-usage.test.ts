@@ -172,7 +172,40 @@ describe("Codex assisted marks through record persistence", () => {
     await record(dir, "task");
     const [run] = await listRuns(henchDir);
     expect(run.diagnostics?.tokenDiagnosticStatus).toBe("unavailable");
+    expect(run.vendor).toBe("codex");
+    expect(run.model).toBe("unknown");
     expect((await loadUsageCursor(henchDir, "session-a")).marks).toBeUndefined();
+  });
+
+  it.each([
+    { "input-tokens": "7" },
+    { "no-tokens": "true" },
+  ])("keeps Codex provenance when usage is overridden: %j", async (flags) => {
+    await writeFile(transcript, [meta(), usage(1)].join("\n"));
+    await mark(dir, "task");
+    await writeFile(transcript, [meta(), usage(1), usage(2)].join("\n"));
+    await cmdRecord(dir, { task: "task", ...flags });
+    const [run] = await listRuns(henchDir);
+    expect(run.vendor).toBe("codex");
+    expect(run.model).toBe("unknown");
+    await record(dir, "repeat");
+    expect((await listRuns(henchDir)).find((r) => r.taskId === "repeat")?.tokenUsage.input).toBe(0);
+  });
+
+  it("refuses another vendor's transcript without consuming the Codex boundary", async () => {
+    await writeFile(transcript, [meta(), usage(1)].join("\n"));
+    await mark(dir, "task");
+    const before = await loadUsageCursor(henchDir, "session-a");
+    await writeFile(transcript, JSON.stringify({ uuid: "claude-message", message: {
+      id: "claude-request", model: "claude-synthetic", usage: { input_tokens: 999, output_tokens: 10 },
+    } }));
+    await mark(dir, "wrong-vendor");
+    await record(dir, "task");
+    const [run] = await listRuns(henchDir);
+    expect(run.diagnostics?.tokenDiagnosticStatus).toBe("unavailable");
+    expect(run.vendor).toBe("codex");
+    expect(run.tokenUsage.input).toBe(0);
+    expect(await loadUsageCursor(henchDir, "session-a")).toEqual(before);
   });
 
   it("isolates a new session, searches archived rollouts, and refuses ambiguous matches", async () => {
