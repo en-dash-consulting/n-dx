@@ -51,6 +51,12 @@ describe("shouldSendRetryNotice", () => {
 });
 
 describe("resolveRetryResume", () => {
+  it("requires explicit Codex capability and identity admission", () => {
+    expect(resolveRetryResume("codex", "work", true)).toBe("work");
+    expect(resolveRetryResume("codex", "work", false)).toBeUndefined();
+    expect(resolveRetryResume("codex", undefined, true)).toBeUndefined();
+    expect(resolveRetryResume("google", "work", true)).toBeUndefined();
+  });
   it("resumes on the Claude CLI when a session was reported", () => {
     expect(resolveRetryResume("claude", "sess-1")).toBe("sess-1");
   });
