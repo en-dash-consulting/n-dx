@@ -29,7 +29,9 @@ language's own page (migration guide or changelog); versions compare with `compa
 deprecated (`LEGACY_STATUSES`; `notice` is never a removal), each version a
 `LanguageBoundary` with its page. `DynamicCodeFact` is one place code runs a
 string as code or chooses what to run from a value (`DYNAMIC_CODE_KINDS`),
-with the expression as written and never a value. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+with the expression as written and never a value; its optional `database`
+names the tables, `table.column`s and query calls a database-driven site
+reads. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
 never carry a value; a flag's `normalized` name comes from
 `normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`

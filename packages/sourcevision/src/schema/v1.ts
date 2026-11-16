@@ -1586,6 +1586,20 @@ export interface SdlcDynamicCode {
   literal: number;
   /** Sites by construct (`eval`, `variable-function`, `dynamic-include`, …), sorted. */
   constructs: Record<string, number>;
+  /** `exec` and `dispatch` sites fed by database query results; absent when there are none. */
+  database?: SdlcDatabaseDrivenCode;
+}
+
+/** Database-driven dynamic-code sites (lang-kit's `DynamicCodeFact.database`), counted. Names only, never row data. */
+export interface SdlcDatabaseDrivenCode {
+  /** Every database-driven site. */
+  sites: number;
+  /** Sites by kind; a kind with none is 0. */
+  kinds: { exec: number; dispatch: number };
+  /** Sites by table their queries name, sorted. */
+  tables: Record<string, number>;
+  /** Sites by `table.column` their queries' literal SELECT lists name, sorted. */
+  columns: Record<string, number>;
 }
 
 /** What a language pack reports about a repository's code, beyond the SDLC sections. */

@@ -503,6 +503,29 @@ export interface DynamicCodeFact {
   readonly scope?: string;
   /** Set when the code an `exec` site runs is written as literals alone (`eval('return 1;')`). */
   readonly literal?: true;
+  /** Set on an `exec` or `dispatch` site fed by a database query result: what feeds it. */
+  readonly database?: DynamicCodeDatabase;
+  readonly position: SourcePosition;
+}
+
+/**
+ * The database data an `exec` or `dispatch` site runs or dispatches on: the
+ * tables and columns its queries read, and where each value comes from.
+ * Names and locations only, never row data.
+ */
+export interface DynamicCodeDatabase {
+  /** Tables the feeding queries name, sorted; empty when no feeding query's SQL is literal. */
+  readonly tables: readonly string[];
+  /** `table.column` from the feeding queries' literal SELECT lists, sorted; empty for `SELECT *`. */
+  readonly columns: readonly string[];
+  /** Each query or fetch call the value comes from, by file and position, sorted. */
+  readonly sources: readonly DynamicCodeSource[];
+}
+
+/** Where a database-derived value comes from: a query or fetch call. */
+export interface DynamicCodeSource {
+  /** Project-relative path of the file holding the call. */
+  readonly path: string;
   readonly position: SourcePosition;
 }
 

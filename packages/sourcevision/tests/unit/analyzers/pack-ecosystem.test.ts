@@ -191,6 +191,34 @@ describe("packEcosystem: dynamic code", () => {
     });
   });
 
+  it("counts database-driven sites by kind, table and column, only when there is one", () => {
+    const fed = (fact: DynamicCodeFact, tables: string[], columns: string[]): DynamicCodeFact => ({
+      ...fact,
+      database: { tables, columns, sources: [{ path: "lib/db.php", position: { line: 3, column: 2 } }] },
+    });
+    const ecosystem = packEcosystem(
+      [
+        {
+          path: "a.php",
+          dynamicCode: [
+            fed(site("dispatch", "call_user_func"), ["pages"], ["pages.handler"]),
+            fed(site("exec", "eval"), ["blocks", "pages"], ["blocks.body"]),
+            fed(site("dispatch", "variable-new"), ["menu_router"], []),
+            site("exec", "eval"),
+          ],
+        },
+      ],
+      inv,
+    );
+    expect(ecosystem?.php?.dynamicCode?.database).toEqual({
+      sites: 3,
+      kinds: { exec: 1, dispatch: 2 },
+      tables: { blocks: 1, menu_router: 1, pages: 2 },
+      columns: { "blocks.body": 1, "pages.handler": 1 },
+    });
+    expect(packEcosystem([{ path: "a.php", dynamicCode: [site("exec", "eval")] }], inv)?.php?.dynamicCode).not.toHaveProperty("database");
+  });
+
   it("is absent when no file has a site, and sits beside the other sections when one does", () => {
     expect(packEcosystem([{ path: "a.php", dynamicCode: [] }], inv)).toBeUndefined();
     const ecosystem = packEcosystem([{ path: "a.php", versionFloor: floor("5.3"), legacyConstructs: [use(EACH)], dynamicCode: [site("exec", "eval")] }], inv);
@@ -204,7 +232,14 @@ describe("the profile's ecosystem", () => {
       versionFloors: { files: 2, floors: { "5.3": 1, "8.0": 1 }, none: 0, highest: "8.0" },
       legacyConstructs: packEcosystem([{ path: "a.php", legacyConstructs: [use(MYSQL), use(DYNAMIC), use(SHORT_TAG)] }], inventory({ "a.php": "PHP" }))!.php!
         .legacyConstructs!,
-      dynamicCode: { files: 1, sites: 2, kinds: { exec: 1, dispatch: 1, include: 0 }, literal: 0, constructs: { eval: 1, "variable-new": 1 } },
+      dynamicCode: {
+        files: 1,
+        sites: 2,
+        kinds: { exec: 1, dispatch: 1, include: 0 },
+        literal: 0,
+        constructs: { eval: 1, "variable-new": 1 },
+        database: { sites: 1, kinds: { exec: 0, dispatch: 1 }, tables: { routes: 1 }, columns: { "routes.controller": 1 } },
+      },
     },
   };
 
@@ -234,5 +269,8 @@ describe("the profile's ecosystem", () => {
     expect(validate(SdlcProfileSchema, badVersion).ok).toBe(false);
     const badKinds = { ...EMPTY_PROFILE, ecosystem: { php: { dynamicCode: { ...ecosystem.php.dynamicCode, kinds: { exec: 1, dispatch: 1 } } } } };
     expect(validate(SdlcProfileSchema, badKinds).ok).toBe(false);
+    const dynamic = ecosystem.php.dynamicCode;
+    const badDatabase = { ...EMPTY_PROFILE, ecosystem: { php: { dynamicCode: { ...dynamic, database: { ...dynamic.database, sites: 0 } } } } };
+    expect(validate(SdlcProfileSchema, badDatabase).ok).toBe(false);
   });
 });

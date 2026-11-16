@@ -35,8 +35,14 @@
  * (`Class::name`, `class@anonymous::name`) or closure (`{closure:<outer>}`,
  * `{closure}` at the top level) holding the site; absent at a file's top level.
  *
+ * An `exec` or `dispatch` site whose code or callable is read from a database
+ * query result carries `database`: the tables and literal SELECT columns it
+ * reads and where the value comes from (`php-database-flow.ts`).
+ *
  * Notices: `[php-dynamic-exec]` and `[php-dynamic-dispatch]`, each with its
- * sites' locations, as `php-include-notices.ts` lists dynamic includes.
+ * sites' locations, as `php-include-notices.ts` lists dynamic includes;
+ * `[php-db-exec]` and `[php-db-dispatch]` for the database-driven ones, with
+ * the tables they read.
  *
  * @module lang-php/php-dynamic-code
  */
@@ -45,6 +51,7 @@ import { join } from "node:path";
 import type { DynamicCodeFact, FactKind, FileFacts, SourcePosition } from "@n-dx/lang-kit";
 import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
+import { databaseFeeds, nodeKey, type FlowSite } from "./php-database-flow.js";
 import { readWrittenImports } from "./php-imports.js";
 import { hostReader, noticeLocations } from "./php-include-notices.js";
 import { isDynamicIncludePath, isInclude, repositoryConstants, type ConstantLookup } from "./php-includes.js";
@@ -53,6 +60,10 @@ import { isDynamicIncludePath, isInclude, repositoryConstants, type ConstantLook
 export const PHP_DYNAMIC_EXEC = "php-dynamic-exec";
 /** The notice code of sites that choose what to run from a value. */
 export const PHP_DYNAMIC_DISPATCH = "php-dynamic-dispatch";
+/** The notice code of exec sites whose code is read from a database (`php-database-flow.ts`). */
+export const PHP_DB_EXEC = "php-db-exec";
+/** The notice code of dispatch sites that choose what to run from database data. */
+export const PHP_DB_DISPATCH = "php-db-dispatch";
 
 const QUERY = "dynamic";
 const PREFIX = "dynamic.";
@@ -101,8 +112,12 @@ function isLiteral(node: Capture | undefined): boolean {
 }
 
 /** One file's captures, grouped and paired. */
-class FileCaptures {
+export class FileCaptures {
   private readonly by = new Map<string, Capture[]>();
+  /** Each call's callee, by the call's node. */
+  private readonly calleeOf = new Map<string, Capture>();
+  /** {@link partsOf}'s pairings, computed on first use. */
+  private readonly parts = new Map<string, Map<string, Capture[]>>();
   /** Each argument list's arguments, in order. */
   private readonly argumentsOf = new Map<Capture, Capture[]>();
   /** Each argument's value: its last own child. */
@@ -130,10 +145,42 @@ class FileCaptures {
     const arrays = new Map<Capture, Capture[]>();
     group(arrays, innermostEach(this.get("array"), elements), elements);
     for (const [array, list] of arrays) this.elementsOf.set(span(array), list);
+    // Strict, since a callee may itself be a call of the same span (`$f()()`).
+    const callees = this.get("callee");
+    innermostEach(this.get("call"), callees, true).forEach((call, i) => {
+      if (call !== undefined) this.calleeOf.set(nodeKey(call), callees[i]!);
+    });
   }
 
   get(name: string): Capture[] {
     return this.by.get(name) ?? [];
+  }
+
+  /** A function call's callee, for the call as any pattern captured it. */
+  callee(call: Capture): Capture | undefined {
+    return this.calleeOf.get(nodeKey(call));
+  }
+
+  /**
+   * Each `owner` capture's `part` captures, in document order, keyed by the
+   * owner's node (`nodeKey`), so an expression captured by another pattern
+   * finds its parts. A part belongs to the innermost owner strictly holding it.
+   */
+  partsOf(owner: string, part: string): ReadonlyMap<string, readonly Capture[]> {
+    const id = `${owner} ${part}`;
+    let found = this.parts.get(id);
+    if (found === undefined) {
+      found = new Map();
+      const parts = this.get(part);
+      innermostEach(this.get(owner), parts, true).forEach((o, i) => {
+        if (o === undefined) return;
+        const list = found!.get(nodeKey(o));
+        if (list === undefined) found!.set(nodeKey(o), [parts[i]!]);
+        else list.push(parts[i]!);
+      });
+      this.parts.set(id, found);
+    }
+    return found;
   }
 
   /** The values of a call's arguments, in order. */
@@ -179,11 +226,10 @@ export function patternModifiers(literal: Capture): string | undefined {
 }
 
 /** One site before its scope is named. */
-interface Site {
+interface Site extends FlowSite {
   readonly kind: DynamicCodeFact["kind"];
   readonly construct: string;
   readonly expression: string;
-  readonly position: SourcePosition;
   readonly literal?: true;
 }
 
@@ -194,34 +240,27 @@ function namedCallSite(name: string, call: Capture, captures: FileCaptures): Sit
   const literal = (...nodes: (Capture | undefined)[]) => (nodes.length > 0 && nodes.every(isLiteral) ? { literal: true as const } : {});
   switch (name) {
     case "eval":
-      return { kind: "exec", ...at, ...literal(args[0]) };
+      return { kind: "exec", ...at, operands: [args[0]], ...literal(args[0]) };
     case "assert":
-      return args[0] !== undefined && STRING_TYPES.has(args[0].nodeType) ? { kind: "exec", ...at, ...literal(args[0]) } : undefined;
+      return args[0] !== undefined && STRING_TYPES.has(args[0].nodeType) ? { kind: "exec", ...at, operands: [args[0]], ...literal(args[0]) } : undefined;
     case "preg_replace": {
       const pattern = args[0];
       if (pattern === undefined || !isLiteral(pattern) || !STRING_TYPES.has(pattern.nodeType) || pattern.nodeType === "heredoc" || pattern.nodeType === "nowdoc") return undefined;
-      return patternModifiers(pattern)?.includes("e") ? { kind: "exec", ...at, ...literal(args[1]) } : undefined;
+      return patternModifiers(pattern)?.includes("e") ? { kind: "exec", ...at, operands: [args[1]], ...literal(args[1]) } : undefined;
     }
     case "create_function":
-      return { kind: "exec", ...at, ...literal(args[0], args[1]) };
+      return { kind: "exec", ...at, operands: [args[0], args[1]], ...literal(args[0], args[1]) };
   }
   const index = CALLERS.has(name) ? 0 : CALLBACK_ARGUMENT.get(name);
   if (index === undefined || index >= args.length) return undefined;
-  return captures.isStaticCallable(args[index]) ? undefined : { kind: "dispatch", ...at };
+  return captures.isStaticCallable(args[index]) ? undefined : { kind: "dispatch", ...at, operands: [args[index]] };
 }
 
 /** Every exec and dispatch site in a file. `declared` holds the lower-cased functions the repository declares. */
 function codeSites(captures: FileCaptures, declared: ReadonlySet<string>): Site[] {
   const sites: Site[] = [];
-  // Strict, since a callee may itself be a call of the same span (`$f()()`).
-  const calls = captures.get("call");
-  const callees = captures.get("callee");
-  const calleeOf = new Map<Capture, Capture>();
-  innermostEach(calls, callees, true).forEach((call, i) => {
-    if (call !== undefined) calleeOf.set(call, callees[i]!);
-  });
-  for (const call of calls) {
-    const callee = calleeOf.get(call);
+  for (const call of captures.get("call")) {
+    const callee = captures.callee(call);
     if (callee === undefined) continue;
     if (NAME_TYPES.has(callee.nodeType)) {
       const written = callee.text.replace(/^\\/, "");
@@ -231,19 +270,24 @@ function codeSites(captures: FileCaptures, declared: ReadonlySet<string>): Site[
       const site = namedCallSite(name, call, captures);
       if (site !== undefined) sites.push(site);
     } else if (!captures.isStaticCallable(callee)) {
-      sites.push({ kind: "dispatch", construct: "variable-function", expression: call.text, position: call.start });
+      sites.push({ kind: "dispatch", construct: "variable-function", expression: call.text, position: call.start, operands: [callee] });
     }
   }
-  // Each call's one name is owned by it; strict, since a name may itself be a call of the same span (`$o->{$a->b()}()`).
-  const byValue = (calls: string, names: string, construct: string) => {
-    const named = captures.get(names);
-    innermostEach(captures.get(calls), named, true).forEach((call, i) => {
-      if (call !== undefined && named[i]!.nodeType !== "name") sites.push({ kind: "dispatch", construct, expression: call.text, position: call.start });
-    });
+  // A method named by a value; a static one's class may be a value too (`$c::$m()`).
+  const byValue = (calls: string, names: string, construct: string, scopes?: string) => {
+    for (const call of captures.get(calls)) {
+      const name = captures.partsOf(calls, names).get(nodeKey(call))?.[0];
+      if (name === undefined || name.nodeType === "name") continue;
+      const scope = scopes === undefined ? undefined : captures.partsOf(calls, scopes).get(nodeKey(call))?.[0];
+      sites.push({ kind: "dispatch", construct, expression: call.text, position: call.start, operands: [name, scope] });
+    }
   };
   byValue("method-call", "method-name", "variable-method");
-  byValue("static-call", "static-name", "variable-static-method");
-  for (const created of captures.get("new")) sites.push({ kind: "dispatch", construct: "variable-new", expression: created.text, position: created.start });
+  byValue("static-call", "static-name", "variable-static-method", "static-scope");
+  const classes = captures.partsOf("new", "class");
+  for (const created of captures.get("new")) {
+    sites.push({ kind: "dispatch", construct: "variable-new", expression: created.text, position: created.start, operands: [classes.get(nodeKey(created))?.[0]] });
+  }
   return sites;
 }
 
@@ -287,7 +331,7 @@ function scopeNamer(captures: FileCaptures): (at: SourcePosition) => string | un
   };
 }
 
-/** Each include in `file` whose path is not computable. */
+/** Each include in `file` whose path is not computable; counted only, so the database flow reads no operand of theirs. */
 function includeSites(file: PackSourceFile, constant: ConstantLookup): Site[] {
   const dynamic = readWrittenImports(file).filter((w) => isInclude(w) && isDynamicIncludePath(w.specifier, file.path, constant));
   if (dynamic.length === 0) return [];
@@ -297,6 +341,7 @@ function includeSites(file: PackSourceFile, constant: ConstantLookup): Site[] {
     construct: readsHost(w.specifier, w.position) ? "host-include" : "dynamic-include",
     expression: w.specifier,
     position: w.position,
+    operands: [],
   }));
 }
 
@@ -311,23 +356,37 @@ function declaredFunctions(files: readonly PackSourceFile[]): Set<string> {
 
 const before = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
 
-/** Every dynamic-code site of each file, in document order; files without one are left out. */
+/** Every dynamic-code site of each file, in document order, database-driven ones marked; files without one are left out. */
 export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, DynamicCodeFact[]> {
   const declared = declaredFunctions(files);
   const constant = repositoryConstants(files);
-  const out = new Map<string, DynamicCodeFact[]>();
-  for (const file of files) {
+  const read = files.map((file) => {
     const captures = new FileCaptures(file);
-    const sites = [...codeSites(captures, declared), ...includeSites(file, constant)];
+    return { file, captures, sites: codeSites(captures, declared) };
+  });
+  const feeds = databaseFeeds(read, constant);
+  const out = new Map<string, DynamicCodeFact[]>();
+  for (const { file, captures, sites: code } of read) {
+    const sites = [...code, ...includeSites(file, constant)];
     if (sites.length === 0) continue;
     const scopeAt = scopeNamer(captures);
     out.set(
       file.path,
       sites
         .sort((a, b) => before(a.position, b.position))
-        .map((site) => {
-          const scope = scopeAt(site.position);
-          return { ...site, ...(scope === undefined ? {} : { scope }) };
+        .map((site): DynamicCodeFact => {
+          const { kind, construct, expression, position, literal } = site;
+          const scope = scopeAt(position);
+          const database = feeds.get(site);
+          return {
+            kind,
+            construct,
+            expression,
+            position,
+            ...(literal === undefined ? {} : { literal }),
+            ...(scope === undefined ? {} : { scope }),
+            ...(database === undefined ? {} : { database }),
+          };
         }),
     );
   }
@@ -351,7 +410,29 @@ export function dynamicCodeNotices(facts: ReadonlyMap<string, readonly DynamicCo
     const one = dispatch.length === 1;
     notices.push(`PHP: [${PHP_DYNAMIC_DISPATCH}] ${dispatch.length} site${one ? " chooses" : "s choose"} what to run from a value: ${noticeLocations(dispatch)}.`);
   }
+  const fed = (list: typeof exec) => list.filter((f) => f.database !== undefined);
+  const dbExec = fed(exec);
+  if (dbExec.length > 0) {
+    const one = dbExec.length === 1;
+    notices.push(`PHP: [${PHP_DB_EXEC}] ${dbExec.length} site${one ? " runs" : "s run"} code read from a database: ${noticeLocations(dbExec)}${tablesRead(dbExec)}.`);
+  }
+  const dbDispatch = fed(dispatch);
+  if (dbDispatch.length > 0) {
+    const one = dbDispatch.length === 1;
+    notices.push(`PHP: [${PHP_DB_DISPATCH}] ${dbDispatch.length} site${one ? " chooses" : "s choose"} what to run from database data: ${noticeLocations(dbDispatch)}${tablesRead(dbDispatch)}.`);
+  }
   return notices;
+}
+
+/** How many tables a notice names before the rest are counted. */
+const NOTICE_TABLES = 5;
+
+/** `; tables a, b`: the tables database-driven sites read, the rest counted; empty when no query's SQL is literal. */
+function tablesRead(found: readonly DynamicCodeFact[]): string {
+  const tables = [...new Set(found.flatMap((f) => f.database!.tables))].sort((a, b) => a.localeCompare(b));
+  if (tables.length === 0) return "";
+  const more = tables.length > NOTICE_TABLES ? `, and ${tables.length - NOTICE_TABLES} more` : "";
+  return `; table${tables.length === 1 ? "" : "s"} ${tables.slice(0, NOTICE_TABLES).join(", ")}${more}`;
 }
 
 const GRAMMAR = "tree-sitter-php@0.25.1";
@@ -371,6 +452,19 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   "variable-functions": rule("functions.variable-functions.php"),
   "variable-new": rule("language.oop5.basic.php#language.oop5.basic.new"),
   includes: rule("function.include.php"),
+  // Database flow (php-database-flow.ts): the fetch functions and methods that return a result's rows.
+  "mysql-fetch": rule("function.mysql-fetch-assoc.php"),
+  "mysqli-fetch": rule("class.mysqli-result.php"),
+  "pdo-fetch": rule("class.pdostatement.php"),
+  "pgsql-fetch": rule("function.pg-fetch-assoc.php"),
+  "oci-fetch": rule("function.oci-fetch-assoc.php"),
+  "sqlsrv-fetch": rule("function.sqlsrv-fetch-array.php"),
+  "odbc-fetch": rule("function.odbc-fetch-array.php"),
+  "database-clients": rule("class.pdo.php"),
+  // WordPress's $wpdb and its get_var, get_row, get_col and get_results.
+  wpdb: { verifiedAgainst: ["WordPress developer reference"], verifiedOn: "2026-11-16", source: "https://developer.wordpress.org/reference/classes/wpdb/" },
+  // CodeIgniter 3's result(), result_array(), row() and row_array().
+  "codeigniter-results": { verifiedAgainst: ["CodeIgniter 3 user guide"], verifiedOn: "2026-11-16", source: "https://codeigniter.com/userguide3/database/results.html" },
 };
 
 export const phpDynamicCode: FrameworkPack = {

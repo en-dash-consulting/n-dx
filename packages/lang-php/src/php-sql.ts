@@ -5,7 +5,7 @@
  *
  * Works on the PHP pack's `sql` query (`queries/php/sql.scm`): the mysql,
  * mysqli, pgsql, oci8, sqlsrv and odbc query and prepare functions, Drupal 7's
- * `db_query`, and query, prepare, exec and fetch methods on any receiver or
+ * `db_query`, and query, prepare, exec, fetch and wpdb getter methods on any receiver or
  * scope. Method names such as `query` or `select` are common, so an argument
  * counts only when its text begins with a statement verb (lang-kit's
  * `looksLikeSql`).
@@ -21,7 +21,7 @@
  * @module lang-php/php-sql
  */
 
-import { extractSqlTableReferences, looksLikeSql, type EmbeddedSqlTable, type SourcePosition } from "@n-dx/lang-kit";
+import { extractSqlTableReferences, looksLikeSql, type EmbeddedSqlTable, type SourcePosition, type SqlTableReference } from "@n-dx/lang-kit";
 import { innermostEach, type Capture, type PackSourceFile } from "@n-dx/lang-runtime";
 import { before, readAssignments, scopeAt, type Assignment } from "./php-assignments.js";
 import { evaluatePath, repositoryConstants, type ConstantLookup } from "./php-includes.js";
@@ -43,6 +43,7 @@ export const PHP_SQL_METHODS: readonly string[] = [
   "fetchall", "fetchassoc", "fetchrow", "fetchone", "fetchcol", "fetchpairs", "fetchcolumn", "fetcharray",
   "fetchallassociative", "fetchassociative", "fetchallnumeric", "fetchnumeric", "fetchfirstcolumn",
   "select", "insert", "update", "delete", "statement", "unprepared",
+  "get_var", "get_row", "get_col", "get_results",
 ];
 
 /** Stands for a value that is not known; never part of a table name. */
@@ -244,16 +245,16 @@ class SqlText {
     }
   }
 
-  /** The tables the text names, on their source lines. */
-  tables(): { name: string; schema?: string; line: number }[] {
+  /** The statement read, placeholders scrubbed and Drupal's braces dropped; undefined when it is not SQL. */
+  statement(): { readonly sql: string; readonly line: number } | undefined {
     const sql = scrubPlaceholders(this.text).replace(DRUPAL_TABLE, "$1");
-    if (this.first === undefined || !looksLikeSql(sql)) return [];
-    return extractSqlTableReferences(sql, this.first);
+    return this.first === undefined || !looksLikeSql(sql) ? undefined : { sql, line: this.first };
   }
 }
 
-/** One call of the `sql` query: its name as written and its arguments in order. */
+/** One call of the `sql` query: the call, its name as written and its arguments in order. */
 interface SqlCall {
+  readonly node: Capture;
   readonly name: string;
   readonly arguments: readonly Capture[];
 }
@@ -273,8 +274,8 @@ function readSqlCalls(captures: readonly Capture[]): SqlCall[] {
     if (part.name === "sql.argument") call.arguments.set(spanKey(part), part);
     else if (call.name === undefined || before(part.start, call.name.start)) call.name = part;
   });
-  return [...calls.values()].flatMap(({ name, arguments: args }) =>
-    name ? [{ name: name.text.replace(/^\\/, ""), arguments: [...args.values()].sort((a, b) => (before(a.start, b.start) ? -1 : 1)) }] : [],
+  return [...calls.values()].flatMap(({ node, name, arguments: args }) =>
+    name ? [{ node, name: name.text.replace(/^\\/, ""), arguments: [...args.values()].sort((a, b) => (before(a.start, b.start) ? -1 : 1)) }] : [],
   );
 }
 
@@ -291,32 +292,112 @@ function assignedText(assignments: readonly (Assignment & { readonly scope: Capt
   return chain;
 }
 
-/** One file's embedded SQL tables, in call order. */
-export function readFileEmbeddedSql(file: PackSourceFile, constant: ConstantLookup): EmbeddedSqlTable[] {
+/** One SQL statement passed to a database call. */
+export interface SqlStatement {
+  /** The call, as the `sql` query captured it. */
+  readonly call: Capture;
+  /** The function or method name as written. */
+  readonly via: string;
+  /** The tables the statement names, on their source lines. */
+  readonly tables: readonly SqlTableReference[];
+  /** `table.column` for each column of a literal SELECT list ({@link selectColumns}). */
+  readonly columns: readonly string[];
+}
+
+/** Each SQL statement passed to one file's database calls, in call order: one per argument whose text is SQL. */
+export function readSqlStatements(file: PackSourceFile, constant: ConstantLookup): SqlStatement[] {
   const captures = file.captures[SQL_QUERY] ?? [];
   if (captures.length === 0) return [];
   let assignments: (Assignment & { readonly scope: Capture | undefined })[] | undefined;
-  const tables: EmbeddedSqlTable[] = [];
+  const statements: SqlStatement[] = [];
   for (const call of readSqlCalls(captures)) {
     for (const argument of call.arguments) {
       const written = argument.text.trim();
       if (written.startsWith("...") || /^[A-Za-z_]\w*\s*:(?!:)/.test(written)) continue; // a spread or a named argument
-      const sql = new SqlText();
+      const text = new SqlText();
       const variable = /^\$([A-Za-z_]\w*)$/.exec(written);
       if (variable) {
         assignments ??= readAssignments(file).map((a) => ({ ...a, scope: scopeAt(file, a.start) }));
-        for (const a of assignedText(assignments, variable[1]!, scopeAt(file, argument.start), argument.start)) sql.add(a.value!, a.start.line, file.path, constant);
-      } else sql.add(argument.text, argument.start.line, file.path, constant);
-      for (const ref of sql.tables()) {
-        tables.push({ name: ref.name, ...(ref.schema === undefined ? {} : { schema: ref.schema }), path: file.path, line: ref.line, origin: "call", via: call.name });
-      }
+        for (const a of assignedText(assignments, variable[1]!, scopeAt(file, argument.start), argument.start)) text.add(a.value!, a.start.line, file.path, constant);
+      } else text.add(argument.text, argument.start.line, file.path, constant);
+      const statement = text.statement();
+      if (statement === undefined) continue;
+      const tables = extractSqlTableReferences(statement.sql, statement.line);
+      statements.push({ call: call.node, via: call.name, tables, columns: selectColumns(statement.sql, tables) });
     }
   }
-  return tables;
+  return statements;
+}
+
+/** One file's embedded SQL tables, in call order. */
+export function readFileEmbeddedSql(file: PackSourceFile, constant: ConstantLookup): EmbeddedSqlTable[] {
+  return readSqlStatements(file, constant).flatMap(({ via, tables }) =>
+    tables.map((ref) => ({ name: ref.name, ...(ref.schema === undefined ? {} : { schema: ref.schema }), path: file.path, line: ref.line, origin: "call" as const, via })),
+  );
 }
 
 /** The tables named by SQL passed to PHP database calls, file by file. */
 export function extractPhpEmbeddedSql(files: readonly PackSourceFile[]): EmbeddedSqlTable[] {
   const constant = repositoryConstants(files);
   return files.flatMap((file) => readFileEmbeddedSql(file, constant));
+}
+
+const IDENTIFIER = /^[A-Za-z_][\w$]*$/;
+/** An identifier without its MySQL backticks, ANSI double quotes or SQL Server brackets. */
+const unquoted = (part: string): string => (/^(`[^`]*`|"[^"]*"|\[[^\]]*\])$/.test(part) ? part.slice(1, -1) : part);
+
+/** Each top-level item of a statement's first SELECT list; undefined when it starts no SELECT or no `FROM` ends the list. Linear in `sql`. */
+function selectList(sql: string): string[] | undefined {
+  const text = sql.trimStart();
+  const head = /^select\s+(?:(?:distinct|all)\s+)?/i.exec(text);
+  if (!head) return undefined;
+  const items: string[] = [];
+  let depth = 0;
+  let start = head[0].length;
+  for (let i = start; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (c === "'" || c === '"' || c === "`") {
+      const close = text.indexOf(c, i + 1);
+      if (close < 0) return undefined;
+      i = close;
+    } else if (c === "(") depth += 1;
+    else if (c === ")") depth -= 1;
+    else if (depth === 0 && c === ",") {
+      items.push(text.slice(start, i).trim());
+      start = i + 1;
+    } else if (depth === 0 && /\s/.test(c) && /^from\b/i.test(text.slice(i + 1, i + 6))) {
+      items.push(text.slice(start, i).trim());
+      return items;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The columns a statement's first SELECT list names, as `table.column`, in
+ * list order. Only when the list is literal (no placeholder for a value) and
+ * only plain columns (`handler`, `p.handler`, `` `handler` AS h ``): `*`,
+ * `t.*`, functions and expressions name none. A column belongs to the table
+ * its qualifier names, else to the statement's one table; with several tables
+ * an unqualified column, or a qualifier that names none of them, is left out
+ * rather than guessed.
+ */
+export function selectColumns(sql: string, tables: readonly { readonly name: string }[]): string[] {
+  const items = selectList(sql);
+  if (items === undefined || items.some((item) => item.includes("?"))) return [];
+  const names = [...new Set(tables.map((t) => t.name))];
+  const columns: string[] = [];
+  for (const item of items) {
+    const words = item.split(/\s+/);
+    const aliased = words.length === 2 || (words.length === 3 && words[1]!.toLowerCase() === "as");
+    if (words.length > 1 && !aliased) continue;
+    const parts = words[0]!.split(".").map(unquoted);
+    if (parts.length > 3 || !parts.every((p) => IDENTIFIER.test(p))) continue;
+    const qualifier = parts.length > 1 ? parts[parts.length - 2]!.toLowerCase() : undefined;
+    const table = (qualifier === undefined ? undefined : names.find((n) => n.toLowerCase() === qualifier)) ?? (names.length === 1 ? names[0] : undefined);
+    if (table === undefined) continue;
+    const named = `${table}.${parts[parts.length - 1]}`;
+    if (!columns.includes(named)) columns.push(named);
+  }
+  return columns;
 }

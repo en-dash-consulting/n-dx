@@ -147,6 +147,7 @@ describe("PHP version floors and legacy constructs in the SDLC profile and readi
 // Routes and code chosen at run time: a stored block, a handler looked up by name, a module include.
 const DYNAMIC_FILES: Record<string, string> = {
   "index.php": "<?php\ninclude $module . '.php';\n$handler = $routes[$path];\ncall_user_func($handler);\n",
+  "lib/pages.php": "<?php\n$row = mysql_fetch_assoc(mysql_query('SELECT handler FROM pages'));\ncall_user_func_array($row['handler'], []);\n",
   "lib/blocks.php": "<?php\nfunction render($body) { return eval($body); }\n$c = new $class();\n",
 };
 
@@ -164,11 +165,12 @@ describe("a PHP repository that runs code chosen at run time", () => {
     await skipUnlessPackRuns(ctx, "php");
     const profile = await profileOf(dir, inventory, PHP);
     const expected = {
-      files: 2,
-      sites: 4,
-      kinds: { exec: 1, dispatch: 2, include: 1 },
+      files: 3,
+      sites: 5,
+      kinds: { exec: 1, dispatch: 3, include: 1 },
       literal: 0,
-      constructs: { call_user_func: 1, "dynamic-include": 1, eval: 1, "variable-new": 1 },
+      constructs: { call_user_func: 1, call_user_func_array: 1, "dynamic-include": 1, eval: 1, "variable-new": 1 },
+      database: { sites: 1, kinds: { exec: 0, dispatch: 1 }, tables: { pages: 1 }, columns: { "pages.handler": 1 } },
     };
     expect(profile.ecosystem?.php?.dynamicCode).toEqual(expected);
 

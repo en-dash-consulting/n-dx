@@ -8,7 +8,9 @@
  *   deprecated, by rule and by the version that removed (or deprecated) them,
  *   with review notices counted apart.
  * - `dynamicCode`: sites that run a string as code, choose what to run from a
- *   value or include a path built at run time, by kind and by construct.
+ *   value or include a path built at run time, by kind and by construct;
+ *   `database` counts those fed by database query results, by kind, table
+ *   and column, only when there is one.
  *
  * Readiness carries it through (`readiness-score.ts`). `versionFloors`
  * appears when a pack was asked for floors over the language's files, even if
@@ -133,6 +135,7 @@ export function legacyConstructs(facts: readonly PackFrameworkFacts[number][]): 
 export function dynamicCode(facts: readonly PackFrameworkFacts[number][]): SdlcDynamicCode | undefined {
   const kinds = { exec: 0, dispatch: 0, include: 0 };
   const constructs = new Map<string, number>();
+  const db = { sites: 0, kinds: { exec: 0, dispatch: 0 }, tables: new Map<string, number>(), columns: new Map<string, number>() };
   let files = 0;
   let sites = 0;
   let literal = 0;
@@ -144,11 +147,26 @@ export function dynamicCode(facts: readonly PackFrameworkFacts[number][]): SdlcD
       kinds[fact.kind]++;
       if (fact.literal === true) literal++;
       add(constructs, fact.construct);
+      if (fact.database !== undefined && fact.kind !== "include") {
+        db.sites++;
+        db.kinds[fact.kind]++;
+        for (const table of new Set(fact.database.tables)) add(db.tables, table);
+        for (const column of new Set(fact.database.columns)) add(db.columns, column);
+      }
     }
   }
   if (files === 0) return undefined;
-  return { files, sites, kinds, literal, constructs: Object.fromEntries([...constructs].sort(([a], [b]) => a.localeCompare(b))) };
+  return {
+    files,
+    sites,
+    kinds,
+    literal,
+    constructs: sortedCounts(constructs),
+    ...(db.sites === 0 ? {} : { database: { sites: db.sites, kinds: db.kinds, tables: sortedCounts(db.tables), columns: sortedCounts(db.columns) } }),
+  };
 }
+
+const sortedCounts = (counts: ReadonlyMap<string, number>): Record<string, number> => Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b)));
 
 /**
  * Each language's sections, keyed by the inventory's language lower-cased;

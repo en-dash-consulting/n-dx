@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../lang-kit/tests/helpers/call-within-budget.js";
-import { extractPhpEmbeddedSql, PHP_SQL_FUNCTIONS, PHP_SQL_METHODS, scrubPlaceholders, sqlOperands } from "../../src/index.js";
+import { extractPhpEmbeddedSql, PHP_SQL_FUNCTIONS, PHP_SQL_METHODS, scrubPlaceholders, selectColumns, sqlOperands } from "../../src/index.js";
 
 const SQL = new URL("../../src/php-sql.ts", import.meta.url);
 const MIB = 1024 * 1024;
@@ -87,5 +87,31 @@ describe("scrubPlaceholders", () => {
   ])("stays linear on a 1 MiB run of word characters %s", async (_, text) => {
     const out = await callWithinBudget<typeof scrubPlaceholders>(SQL, "scrubPlaceholders", text);
     expect(out.startsWith("INSERT INTO blobs (b) VALUES (")).toBe(true);
+  }, BOUNDED_TEST_TIMEOUT_MS);
+});
+
+describe("selectColumns", () => {
+  const columns = (sql: string, ...tables: string[]) => selectColumns(sql, tables.map((name) => ({ name })));
+
+  it("names plain columns of a literal SELECT list by their table", () => {
+    expect(columns("SELECT handler FROM pages WHERE slug = 'x'", "pages")).toEqual(["pages.handler"]);
+    expect(columns("select distinct `p`.`handler` as h, p.title t FROM pages p", "pages")).toEqual(["pages.handler", "pages.title"]);
+    // Two tables: an alias names neither, so nothing is guessed.
+    expect(columns("SELECT p.handler, u.name FROM pages p JOIN users u ON u.id = p.owner", "pages", "users")).toEqual([]);
+    expect(columns("SELECT pages.handler, users.name, id FROM pages JOIN users ON users.id = pages.owner", "pages", "users")).toEqual(["pages.handler", "users.name"]);
+  });
+
+  it("names none for *, functions, expressions, a list holding a placeholder or a statement with no list", () => {
+    expect(columns("SELECT * FROM menu_router", "menu_router")).toEqual([]);
+    expect(columns("SELECT p.*, COUNT(*), a + b FROM pages p", "pages")).toEqual([]);
+    expect(columns("SELECT  ?  FROM pages", "pages")).toEqual([]);
+    expect(columns("UPDATE pages SET handler = 'x'", "pages")).toEqual([]);
+    expect(columns("SELECT handler", "pages")).toEqual([]);
+  });
+
+  it("stays linear on a 1 MiB SELECT list", async () => {
+    const sql = `SELECT ${"a, ".repeat(MIB / 4)}b FROM t`;
+    const out = await callWithinBudget<typeof selectColumns>(SQL, "selectColumns", sql, [{ name: "t" }]);
+    expect(out).toEqual(["t.a", "t.b"]);
   }, BOUNDED_TEST_TIMEOUT_MS);
 });

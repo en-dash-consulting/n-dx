@@ -697,6 +697,14 @@ const SdlcDynamicCodeSchema = z.object({
   kinds: z.object({ exec: COUNT, dispatch: COUNT, include: COUNT }),
   literal: COUNT,
   constructs: z.record(z.string().min(1), z.number().int().positive()),
+  database: z
+    .object({
+      sites: z.number().int().positive(),
+      kinds: z.object({ exec: COUNT, dispatch: COUNT }),
+      tables: z.record(z.string().min(1), z.number().int().positive()),
+      columns: z.record(z.string().min(1), z.number().int().positive()),
+    })
+    .optional(),
 });
 
 const SdlcLanguageEcosystemSchema = z.object({
