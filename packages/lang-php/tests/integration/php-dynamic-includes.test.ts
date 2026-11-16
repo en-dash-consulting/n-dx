@@ -14,11 +14,16 @@ import { MAX_INCLUDE_CANDIDATES, pack, PhpIncludes, phpGrammarPath, phpPack, pre
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-dynamic-includes");
 
-async function analyze(): Promise<{ index: FileFacts | undefined; notices: readonly string[] | undefined }> {
+async function analyze(): Promise<{
+  index: FileFacts | undefined;
+  boot: FileFacts | undefined;
+  notices: readonly string[] | undefined;
+}> {
   const files = listFixtureFiles(dir, [...phpPack.config.extensions]);
   const result = await pack.analyzeProject({ projectDir: dir, files, kinds: ["imports"] });
   expect(result.degraded).toBeUndefined();
-  return { index: result.facts.find((f) => f.path === "htdocs/index.php"), notices: result.notices };
+  const facts = (path: string) => result.facts.find((f) => f.path === path);
+  return { index: facts("htdocs/index.php"), boot: facts("htdocs/boot.php"), notices: result.notices };
 }
 
 describe("php dynamic includes", () => {
@@ -42,11 +47,21 @@ describe("php dynamic includes", () => {
     expect(index?.imports?.files).toEqual([{ to: "modules/blog/index.php", symbols: ["*"] }]);
   });
 
+  it("matches a repository-root file for a suffix starting with `/` after an unknown prefix", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const { boot } = await analyze();
+    // SOME_RUNTIME_ROOT is getcwd(): not computable, so the whole repository is searched.
+    expect(boot?.imports?.written?.map((w) => [w.specifier, w.candidates ?? null])).toEqual([
+      ["SOME_RUNTIME_ROOT . '/includes/bootstrap.inc'", ["includes/bootstrap.inc"]],
+    ]);
+    expect(boot?.imports?.files ?? []).toEqual([]);
+  });
+
   it("counts dynamic includes with their lines, host-based ones under their own code", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const { notices } = await analyze();
     expect(notices).toEqual([
-      "PHP: [php-dynamic-include] 8 includes build their path at run time and give no edge: htdocs/index.php:4, htdocs/index.php:5, htdocs/index.php:6, htdocs/index.php:7, htdocs/index.php:8, and 3 more; 5 with candidate files, never edges.",
+      "PHP: [php-dynamic-include] 9 includes build their path at run time and give no edge: htdocs/boot.php:3, htdocs/index.php:4, htdocs/index.php:5, htdocs/index.php:6, htdocs/index.php:7, and 4 more; 6 with candidate files, never edges.",
       "PHP: [php-host-include] 5 includes choose their file by the request's host name and give no edge: htdocs/index.php:3, htdocs/index.php:9, htdocs/tenant.php:3, htdocs/tenant.php:9, htdocs/tenant.php:15; 3 with candidate files, never edges.",
     ]);
   });

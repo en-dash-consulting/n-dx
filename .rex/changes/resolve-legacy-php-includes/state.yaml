@@ -15,7 +15,14 @@ items:
     lastModified: "2026-11-14T08:52:49.432Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3679880e-8370-4938-9834-2fe6c87b8265":
-    lastModified: "2026-11-14T08:52:46.973Z"
+    status: "completed"
+    startedAt: "2026-11-16T16:02:47.898Z"
+    completedAt: "2026-11-16T16:05:56.357Z"
+    endedAt: "2026-11-16T16:05:56.357Z"
+    activeIntervals: [{"end":"2026-11-16T16:05:56.357Z","start":"2026-11-16T16:02:47.898Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PhpIncludes.candidates: with no computable prefix and a suffix starting with '/', a file matches when '/' + f ends with the suffix, so repository-root files match; bare-extension rule kept; candidates stay notices."
+    lastModified: "2026-11-16T16:05:56.357Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5e709987-9fd3-4e9f-8a0d-b4ba282c51c0":
     lastModified: "2026-11-14T08:52:49.432Z"

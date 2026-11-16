@@ -741,7 +741,9 @@ export class PhpIncludes {
    * would look up a path (anchored, `./`, or under each include-path root and
    * then the including directory), and end with its computable suffix.
    * Without a prefix the whole repository is searched, but only for a suffix
-   * holding a `/` (`/index.php`); a bare extension constrains nothing.
+   * holding a `/` (`/index.php`); a bare extension constrains nothing. There
+   * a leading `/` ends the unknown prefix (`DRUPAL_ROOT . '/includes/x.inc'`),
+   * so a file at the repository root matches it too.
    * Undefined when nothing matches.
    */
   candidates(file: string, specifier: string): PhpIncludeCandidates | undefined {
@@ -750,7 +752,11 @@ export class PhpIncludes {
     const { suffix } = ends;
     const found = new Set<string>();
     for (const start of this.candidateStarts(file, ends.prefix)) {
-      if (start === "" && !suffix.includes("/")) continue;
+      if (start === "") {
+        if (!suffix.includes("/")) continue;
+        for (const f of this.files) if (`/${f}`.endsWith(suffix)) found.add(f);
+        continue;
+      }
       for (const f of this.startingWith(start)) {
         if (f.length >= start.length + suffix.length && f.endsWith(suffix)) found.add(f);
       }
