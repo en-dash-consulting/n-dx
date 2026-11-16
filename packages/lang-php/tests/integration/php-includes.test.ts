@@ -86,11 +86,12 @@ describe("php include resolver", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     expect(await includeOutcomes("shop/admin/includes/application_top.php", entryDir)).toEqual([
       "'includes/configure.php' shop/admin/includes/configure.php (include-path)",
+      // shop/includes/classes/logger.php exists too: the nearest entry directory wins.
       "DIR_WS_CLASSES . 'logger.php' shop/admin/includes/classes/logger.php (include-path)",
       // shop/admin has no includes/functions/; the outer entry directory, shop, does.
       "'includes/functions/general.php' shop/includes/functions/general.php (include-path)",
       "'./includes/version.php' shop/includes/version.php (relative)",
-      "DIR_WS_CLASSES . $module . '.php' dynamic [shop/admin/includes/classes/logger.php]",
+      "DIR_WS_CLASSES . $module . '.php' dynamic [shop/admin/includes/classes/logger.php, shop/includes/classes/logger.php]",
     ]);
   });
 

@@ -11,8 +11,15 @@ items:
     lastModified: "2026-11-14T08:18:48.850Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2de61a9f-a479-4873-b203-9f38169e7401":
+    status: "completed"
+    startedAt: "2026-11-16T16:10:27.158Z"
+    completedAt: "2026-11-16T16:10:27.158Z"
+    endedAt: "2026-11-16T16:10:27.158Z"
+    activeIntervals: [{"end":"2026-11-16T16:10:27.158Z","start":"2026-11-16T16:10:27.158Z"}]
+    appliedAt: "2026-11-16T16:10:27.158Z"
+    appliedAmendsHash: "ff848ae48b137f3cb45cbb224f03dd66af1aef6741ffa8f768d55b0a95c70e68"
     createdAt: "2026-11-14T05:17:55.679Z"
-    lastModified: "2026-11-14T08:52:49.432Z"
+    lastModified: "2026-11-16T16:10:27.158Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3679880e-8370-4938-9834-2fe6c87b8265":
     status: "completed"
@@ -25,10 +32,14 @@ items:
     lastModified: "2026-11-16T16:05:56.357Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5e709987-9fd3-4e9f-8a0d-b4ba282c51c0":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T16:07:02.062Z"
-    activeIntervals: [{"start":"2026-11-16T16:07:02.062Z"}]
-    lastModified: "2026-11-16T16:07:02.736Z"
+    completedAt: "2026-11-16T16:10:27.158Z"
+    endedAt: "2026-11-16T16:10:27.158Z"
+    activeIntervals: [{"end":"2026-11-16T16:10:27.158Z","start":"2026-11-16T16:07:02.062Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php php-includes.ts: workingDirectories(file) = including dir, ancestors holding index.php nearest first, then docroot; used for ./ ../ paths, relative include-path roots and dynamic candidate starts; existing via values kept. Fixture php-entry-directories (osCommerce-shaped)."
+    lastModified: "2026-11-16T16:10:27.158Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "62d00b31-5486-4414-ab7d-8beb84c5cb2f":
     status: "completed"
