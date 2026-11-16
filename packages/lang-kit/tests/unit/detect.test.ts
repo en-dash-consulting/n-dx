@@ -261,8 +261,13 @@ describe("PHP detection", () => {
     await mkdir(join(dir, "catalog", "admin"), { recursive: true });
     await writeFile(join(dir, "catalog", "index.php"), "<?php\n");
     await writeFile(join(dir, "catalog", "admin", "index.php"), "<?php\n");
-    expect(await detectLanguage(dir, recordingSearch(0))).toBe(phpConfig);
-    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([phpConfig]);
+    // The weak marker decides, not the source count: no counting search runs.
+    const search = recordingSearch(0);
+    expect(await detectLanguage(dir, search)).toBe(phpConfig);
+    expect(search.calls).toEqual([]);
+    const all = recordingSearch(0);
+    expect(await detectLanguages(dir, all)).toEqual([phpConfig]);
+    expect(all.calls).toEqual([{ others: [phpConfig], count: false }]);
   });
 
   it.each(["php", "legacy"])(
