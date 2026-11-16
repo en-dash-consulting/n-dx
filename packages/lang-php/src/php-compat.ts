@@ -24,6 +24,18 @@
  * - `$this` in a closure: a `$this` whose innermost enclosing body is a
  *   closure's, not a function's or a method's.
  * - flexible heredoc: a heredoc or nowdoc closing marker that is indented.
+ * - attributes: an attribute group that spans lines, or one followed on its
+ *   line by code. A group alone on its line (after it only whitespace, a
+ *   comment or another group) is a `#` line comment to PHP before 8.0, so the
+ *   file still runs there (Drupal 7's `#[\ReturnTypeWillChange]`); it, and
+ *   whatever it holds, dates nothing.
+ *
+ * Parse recovery: where the grammar cannot parse the source (a PHP 5
+ * curly-brace offset `$s{0}`), tree-sitter's error recovery builds nodes the
+ * source does not hold, such as `catch (Exception $e)` read as a call with a
+ * named argument. A capture inside an ERROR node, or the node recovery built
+ * beside or around an ERROR or MISSING node, dates nothing; a hit elsewhere in
+ * the same file still does.
  *
  * Syntax only: what a file calls (functions, classes, extensions) and how
  * PHP is configured play no part, so a file may need a newer PHP than its
@@ -147,13 +159,51 @@ const isRule = (id: string): id is PhpSyntaxRuleId => Object.hasOwn(SYNTAX_RULES
 
 const before = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
 
+const within = (inner: Capture, outer: Capture): boolean => before(outer.start, inner.start) <= 0 && before(inner.end, outer.end) <= 0;
+
+const nodeKey = (c: Capture): string => `${c.nodeType}@${c.start.line}:${c.start.column}-${c.end.line}:${c.end.column}`;
+
+/**
+ * The captures parse recovery did not make: none inside an ERROR node, and
+ * none that is the node recovery built beside or around an ERROR or MISSING
+ * node (`@compat.recovered`).
+ */
+function parsedCaptures(captures: readonly Capture[]): Capture[] {
+  const errors = captures.filter((c) => c.name === `${PREFIX}error`);
+  if (errors.length === 0) return captures.filter((c) => c.name !== `${PREFIX}recovered`);
+  const recovered = new Set(captures.filter((c) => c.name === `${PREFIX}recovered`).map(nodeKey));
+  return captures.filter(
+    (c) => c.name !== `${PREFIX}error` && c.name !== `${PREFIX}recovered` && !recovered.has(nodeKey(c)) && !errors.some((e) => within(c, e)),
+  );
+}
+
+/**
+ * Attribute groups split into those that date the file and those PHP before
+ * 8.0 reads as a `#` line comment: a group on one line with nothing after it
+ * on that line but whitespace, a comment or another such group.
+ */
+function attributeGroups(captures: readonly Capture[]): { readonly dating: Capture[]; readonly comments: Capture[] } {
+  const code = captures.filter((c) => c.name === `${PREFIX}attribute-next` && c.nodeType !== "comment");
+  const dating: Capture[] = [];
+  const comments: Capture[] = [];
+  for (const group of captures) {
+    if (group.name !== `${PREFIX}attribute-group`) continue;
+    const followed = code.some((c) => c.start.line === group.end.line && before(group.end, c.start) <= 0);
+    (group.start.line !== group.end.line || followed ? dating : comments).push(group);
+  }
+  return { dating, comments };
+}
+
 /** Every rule a file's captures match, each at the capture's start. */
 export function syntaxHits(file: PackSourceFile): { readonly rule: PhpSyntaxRuleId; readonly position: SourcePosition }[] {
-  const captures = file.captures[COMPAT_QUERY] ?? [];
-  const hits: { rule: PhpSyntaxRuleId; position: SourcePosition }[] = [];
+  const parsed = parsedCaptures(file.captures[COMPAT_QUERY] ?? []);
+  const { dating, comments } = attributeGroups(parsed);
+  const hits: { rule: PhpSyntaxRuleId; position: SourcePosition }[] = dating.map((group) => ({ rule: "attributes", position: group.start }));
   const thisReads: Capture[] = [];
   const bodies: Capture[] = [];
-  for (const capture of captures) {
+  for (const capture of parsed) {
+    // What an attribute read as a comment holds dates nothing either.
+    if (comments.some((group) => within(capture, group))) continue;
     const name = capture.name.slice(PREFIX.length);
     if (isRule(name)) hits.push({ rule: name, position: capture.start });
     else if (name === "primitive-type") {

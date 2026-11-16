@@ -1,8 +1,20 @@
 ; What the version-floor rules (src/php-compat.ts) read: each capture named
 ; @compat.<rule> is one use of the construct that rule dates; the others
-; (primitive-type, this, closure-body, function-body, heredoc-end) are read
-; by the rules in code. Run only when the version floor is wanted.
+; (primitive-type, this, closure-body, function-body, heredoc-end,
+; attribute-group, attribute-next, error, recovered) are read in code. Run
+; only when the version floor is wanted.
 ; Keywords are matched in any case, as PHP matches them.
+
+; ── Parser error recovery ──
+; A node inside an ERROR, beside an ERROR or MISSING node, or with one as a
+; child is what recovery made of the source; it dates nothing.
+(ERROR) @compat.error
+(_ (ERROR)) @compat.recovered
+(_ (MISSING)) @compat.recovered
+(_ (ERROR) . _ @compat.recovered)
+(_ _ @compat.recovered . (ERROR))
+(_ (MISSING) . _ @compat.recovered)
+(_ _ @compat.recovered . (MISSING))
 
 ; ── PHP 5.3 ──
 (namespace_definition) @compat.namespaces
@@ -106,7 +118,10 @@
 
 ; ── PHP 8.0 ──
 (match_expression) @compat.match
-(attribute_list) @compat.attributes
+; Attribute groups and what follows their list, read in code: a group alone
+; on its line is a `#` comment before 8.0.
+(attribute_group) @compat.attribute-group
+(_ (attribute_list) . _ @compat.attribute-next)
 (argument name: (_)) @compat.named-arguments
 (nullsafe_member_call_expression) @compat.nullsafe
 (nullsafe_member_access_expression) @compat.nullsafe

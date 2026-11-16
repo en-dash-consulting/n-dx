@@ -2,8 +2,9 @@
  * The version floor (`src/php-compat.ts`) through the pack entry, over
  * `php-compat`: one file per rule (`<version>/<rule>.php`, that construct
  * alone), a PHP 4/5.2-style file that uses nothing a rule dates, and a file
- * where two rules share the highest version. Skips when the grammar is not
- * built.
+ * where two rules share the highest version, and under `exceptions/` what
+ * dates nothing: parse-recovered nodes and attributes alone on their line.
+ * Skips when the grammar is not built.
  */
 
 import { readdirSync } from "node:fs";
@@ -66,6 +67,22 @@ describe("php version floor", () => {
     expect(byPath.get("case/upper-object.php")).toMatchObject({ version: "7.2", rule: "object-type" });
     // A class name dates nothing; the qualified one is a namespace (5.3).
     expect(byPath.get("case/class-hint.php")).toMatchObject({ version: "5.3", rule: "namespaces" });
+  });
+
+  it("dates nothing from nodes parser error recovery produced", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const byPath = new Map((await analyze()).facts.map((f) => [f.path, f.versionFloor]));
+    // `$var{$c}` offsets break the parse; recovery reads `catch (Exception $e)` as a named argument.
+    expect(byPath.get("exceptions/curly-offsets.php")).toBeUndefined();
+    expect(byPath.get("exceptions/curly-offsets-clean-hit.php")).toMatchObject({ version: "5.3", rule: "closures", position: { line: 4, column: 8 } });
+  });
+
+  it("dates an attribute only where PHP before 8.0 would not read it as a # comment", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const byPath = new Map((await analyze()).facts.map((f) => [f.path, f.versionFloor]));
+    expect(byPath.get("exceptions/attribute-own-line.php")).toBeUndefined();
+    expect(byPath.get("exceptions/attribute-before-code.php")).toMatchObject({ version: "8.0", rule: "attributes", position: { line: 3, column: 0 } });
+    expect(byPath.get("exceptions/attribute-multi-line.php")).toMatchObject({ version: "8.0", rule: "attributes", position: { line: 3, column: 0 } });
   });
 
   it("reads nothing when the version floor is not wanted", async (ctx) => {

@@ -1,3 +1,2 @@
 <?php
-#[Route('/home')]
-function home() {}
+#[Route('/home')] function home() {}
