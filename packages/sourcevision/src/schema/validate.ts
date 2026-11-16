@@ -700,6 +700,55 @@ export const OutboundSchema = z.object({
   contracts: z.array(DeclaredContractSchema),
 });
 
+// ── Config reads and flag checks ────────────────────────────────────────────
+
+const ConfigSourceSchema = z.enum(["file", "env", "ini", "yaml", "xml", "json", "define", "unknown"]);
+const FlagMechanismSchema = z.enum(["constant", "config", "function", "sdk", "env"]);
+const LineSchema = z.number().int().positive();
+const ColumnSchema = z.number().int().nonnegative();
+
+const ConfigReadSchema = z.object({
+  key: z.string().min(1),
+  source: ConfigSourceSchema,
+  sourceFile: z.string().min(1).optional(),
+  line: LineSchema,
+  column: ColumnSchema,
+});
+
+const FlagCheckSchema = z.object({
+  name: z.string().min(1),
+  normalized: z.string().min(1),
+  mechanism: FlagMechanismSchema,
+  client: z.string().min(1).optional(),
+  line: LineSchema,
+  column: ColumnSchema,
+  gated: z.object({ start: LineSchema, end: LineSchema })
+    .refine((g) => g.end >= g.start, { message: "gated.end must not precede gated.start" })
+    .optional(),
+});
+
+export const ConfigSchema = z.object({
+  files: z.array(z.object({
+    file: z.string().min(1),
+    configReads: z.array(ConfigReadSchema),
+    flagChecks: z.array(FlagCheckSchema),
+  })),
+  flags: z.array(z.object({
+    normalized: z.string().min(1),
+    names: z.array(z.string().min(1)).min(1),
+    mechanisms: z.array(FlagMechanismSchema).min(1),
+    files: z.array(z.string().min(1)).min(1),
+    checks: z.number().int().positive(),
+    gatedLines: z.number().int().nonnegative(),
+  })),
+  keys: z.array(z.object({
+    key: z.string().min(1),
+    sources: z.array(ConfigSourceSchema).min(1),
+    sourceFiles: z.array(z.string().min(1)),
+    files: z.array(z.string().min(1)).min(1),
+  })),
+});
+
 // ── Validation helpers ──────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
@@ -741,6 +790,8 @@ export function validateModule(
       return validate(SdlcProfileSchema, data);
     case "outbound":
       return validate(OutboundSchema, data);
+    case "config":
+      return validate(ConfigSchema, data);
     default:
       return {
         ok: false,

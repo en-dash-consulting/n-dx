@@ -310,6 +310,93 @@ export interface OutboundCallFact {
   readonly position: SourcePosition;
 }
 
+// ── Config reads and flag checks (produced) ─────────────────────────────────
+//
+// Language-neutral: any pack may fill them. Neither records a value — only
+// names, keys, files and positions — so no secret or setting is ever copied
+// out of the code.
+
+/**
+ * Where a configuration value is read from.
+ *
+ * - `file`: a code file of the project that holds settings (`config.php`'s array).
+ * - `env`: an environment variable.
+ * - `ini`, `yaml`, `xml`, `json`: a settings file in that format.
+ * - `define`: a constant defined from configuration (PHP `define('DB_HOST', …)`).
+ * - `unknown`: the pack sees a read but not its source.
+ */
+export const CONFIG_SOURCES = ["file", "env", "ini", "yaml", "xml", "json", "define", "unknown"] as const;
+
+export type ConfigSource = (typeof CONFIG_SOURCES)[number];
+
+/** One place a file reads a configuration value. No value is recorded. */
+export interface ConfigReadFact {
+  /**
+   * The key as written; nested access is dotted (`$config['db']['host']`
+   * gives `db.host`), an environment variable is its name.
+   */
+  readonly key: string;
+  readonly source: ConfigSource;
+  /** Project-relative, forward-slash file the value comes from, when the pack knows it. */
+  readonly sourceFile?: string;
+  /** Where the read starts. */
+  readonly position: SourcePosition;
+}
+
+/**
+ * How a flag is checked.
+ *
+ * - `constant`: a constant (`if (FEATURE_NEW_CHECKOUT)`).
+ * - `config`: a configuration value (`$config['features']['new_checkout']`).
+ * - `function`: a project helper (`feature_enabled('new_checkout')`).
+ * - `sdk`: a feature-flag SDK call (`$ld->variation('new-checkout', …)`).
+ * - `env`: an environment variable (`getenv('FF_NEW_CHECKOUT')`).
+ */
+export const FLAG_MECHANISMS = ["constant", "config", "function", "sdk", "env"] as const;
+
+export type FlagMechanism = (typeof FLAG_MECHANISMS)[number];
+
+/** A range of whole lines, one-based and inclusive at both ends. */
+export interface LineRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+/** One place a file checks a feature flag. No value is recorded. */
+export interface FlagCheckFact {
+  /** The flag as written: the constant, key, helper argument or SDK key. */
+  readonly name: string;
+  /** `name` through {@link normalizeFlagName}, so one flag checked several ways meets itself. */
+  readonly normalized: string;
+  readonly mechanism: FlagMechanism;
+  /** The SDK or helper that checks it (`LaunchDarkly`, `feature_enabled`); absent for a bare constant or key. */
+  readonly client?: string;
+  /** Where the check starts. */
+  readonly position: SourcePosition;
+  /**
+   * The lines the check controls when it is the condition of an `if`,
+   * ternary or `match` (the branch bodies, `else` included). Absent when the
+   * check gates no code the pack can see (its result is stored or returned).
+   */
+  readonly gated?: LineRange;
+}
+
+/** Prefixes that mark a name as a flag rather than naming it, after separators are unified. */
+const FLAG_PREFIXES = ["features_", "feature_", "ff_"] as const;
+
+/**
+ * A flag name in the form two spellings of one flag share: lower-case, runs of
+ * `.`, `-`, `/`, `:` and white space unified to `_`, one leading `features_`,
+ * `feature_` or `ff_` dropped, outer `_` trimmed. `FEATURE_NEW_CHECKOUT`,
+ * `features.new_checkout` and `ff-new-checkout` all give `new_checkout`. A name
+ * that is only a prefix keeps it (`feature` stays `feature`).
+ */
+export function normalizeFlagName(name: string): string {
+  const unified = name.toLowerCase().replace(/[\s./:\-_]+/g, "_").replace(/^_+|_+$/g, "");
+  const prefix = FLAG_PREFIXES.find((p) => unified.startsWith(p) && unified.length > p.length);
+  return prefix === undefined ? unified : unified.slice(prefix.length).replace(/^_+/, "");
+}
+
 // ── Resources (produced) ────────────────────────────────────────────────────
 
 /** The provider a resource belongs to. */
@@ -424,10 +511,24 @@ export interface FileFacts {
   readonly outboundCalls?: readonly OutboundCallFact[];
   readonly resources?: readonly ResourceFact[];
   readonly entryPoints?: readonly EntryPointFact[];
+  /** In document order. */
+  readonly configReads?: readonly ConfigReadFact[];
+  /** In document order. */
+  readonly flagChecks?: readonly FlagCheckFact[];
 }
 
 /** Fact kinds a pack produces today. */
-export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints"] as const;
+export const PRODUCED_FACT_KINDS = [
+  "imports",
+  "symbols",
+  "calls",
+  "resources",
+  "routes",
+  "outboundCalls",
+  "entryPoints",
+  "configReads",
+  "flagChecks",
+] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */
 export const DECLARED_FACT_KINDS = ["components"] as const;

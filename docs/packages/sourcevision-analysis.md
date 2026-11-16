@@ -246,6 +246,7 @@ All output is written to `.sourcevision/`:
 | `zones.json` | Zone boundaries, cohesion/coupling metrics, findings, enrichment metadata |
 | `components.json` | React component catalog with props and usage edges |
 | `callgraph.json` | Function/method definitions and call edges |
+| `config.json` | **New.** Config reads and feature-flag checks from language packs, per file, with flag and config-key indexes; no values. Only written when a pack produces them |
 | `llms.txt` | Structured Markdown summary for LLM consumption |
 | `CONTEXT.md` | Dense XML-tagged summary optimized for Claude |
 | `zones/{zone-id}/context.md` | Detailed per-zone context |

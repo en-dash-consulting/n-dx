@@ -1617,3 +1617,95 @@ export interface OutboundData {
   dependencies: OutboundDependency[];
   contracts: DeclaredContract[];
 }
+
+// ── Config reads and flag checks ────────────────────────────────────────────
+// Where code reads configuration and where it checks feature flags, from
+// language packs' `configReads` and `flagChecks` facts (lang-kit's
+// `ConfigReadFact` and `FlagCheckFact`). Names, keys, files and positions
+// only: never a value.
+//
+// Written to `config.json` only when some pack produced either kind; every
+// other analysis writes no such file.
+
+/** Where a configuration value is read from; lang-kit's `ConfigSource`. */
+export type ConfigSource = "file" | "env" | "ini" | "yaml" | "xml" | "json" | "define" | "unknown";
+
+/** How a flag is checked; lang-kit's `FlagMechanism`. */
+export type FlagMechanism = "constant" | "config" | "function" | "sdk" | "env";
+
+/** One configuration read. */
+export interface ConfigRead {
+  /** The key as written, nested access dotted (`db.host`); an environment variable's name. */
+  key: string;
+  source: ConfigSource;
+  /** Project-relative file the value comes from, when the pack knows it. */
+  sourceFile?: string;
+  /** 1-indexed line of the read. */
+  line: number;
+  /** 0-indexed column, in UTF-16 code units. */
+  column: number;
+}
+
+/** Lines a flag check controls, 1-indexed and inclusive. */
+export interface GatedLines {
+  start: number;
+  end: number;
+}
+
+/** One feature-flag check. */
+export interface FlagCheck {
+  /** The flag as written. */
+  name: string;
+  /** Lower-case, separators unified, `feature_`/`features_`/`ff_` prefix dropped (lang-kit's `normalizeFlagName`). */
+  normalized: string;
+  mechanism: FlagMechanism;
+  /** The SDK or helper that checks it, when there is one. */
+  client?: string;
+  line: number;
+  column: number;
+  /** The lines the check controls, when it is a branch condition. */
+  gated?: GatedLines;
+}
+
+/** One file's reads and checks, each sorted by position. */
+export interface ConfigFileEntry {
+  file: string;
+  configReads: ConfigRead[];
+  flagChecks: FlagCheck[];
+}
+
+/** One flag across the project, keyed by its normalized name. */
+export interface ConfigFlagEntry {
+  normalized: string;
+  /** Every spelling seen, sorted. */
+  names: string[];
+  /** Sorted. */
+  mechanisms: FlagMechanism[];
+  /** Files that check it, sorted. */
+  files: string[];
+  /** Number of checks. */
+  checks: number;
+  /** Distinct lines its checks gate, summed over files (nested checks count a line once). */
+  gatedLines: number;
+}
+
+/** One configuration key across the project. */
+export interface ConfigKeyEntry {
+  key: string;
+  /** Sorted. */
+  sources: ConfigSource[];
+  /** Files the value comes from, when known; sorted. */
+  sourceFiles: string[];
+  /** Files that read it (its consumers), sorted. */
+  files: string[];
+}
+
+/** `config.json` — config reads and flag checks for one analysis. */
+export interface ConfigData {
+  /** Files with at least one read or check, sorted by path. */
+  files: ConfigFileEntry[];
+  /** Sorted by `normalized`. */
+  flags: ConfigFlagEntry[];
+  /** Sorted by `key`. */
+  keys: ConfigKeyEntry[];
+}

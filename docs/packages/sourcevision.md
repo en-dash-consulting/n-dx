@@ -160,6 +160,7 @@ All output is written to `.sourcevision/`:
 | `components.json` | React component catalog |
 | `sdlc-profile.json` | SDLC practices detected, each claim tied to the file proving it |
 | `readiness.json` | Readiness score computed from that profile |
+| `config.json` | **New.** Where code reads configuration and checks feature flags, per file, with indexes of flags (by normalized name, with the lines each gates) and config keys (with their consumer files). Names, keys and positions only, never values. Written only when a language pack produces config reads or flag checks; otherwise absent. Field names are under review. |
 | `llms.txt` | AI-readable codebase summary |
 | `CONTEXT.md` | Detailed AI context document |
 | `zones/{zone-id}/` | Per-zone context and summary files |

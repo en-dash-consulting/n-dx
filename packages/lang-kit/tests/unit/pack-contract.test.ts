@@ -1,19 +1,55 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  CONFIG_SOURCES,
   DECLARED_FACT_KINDS,
   FACT_KINDS,
+  FLAG_MECHANISMS,
   IMPORT_FORMS,
   IMPORT_GUARDS,
   PRODUCED_FACT_KINDS,
   SYMBOL_KINDS,
   isFactKind,
+  normalizeFlagName,
+  type FlagCheckFact,
   type OutboundCallFact,
 } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols, calls, resources, routes, outbound calls and entry points as produced", () => {
-    expect([...PRODUCED_FACT_KINDS]).toEqual(["imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints"]);
+  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads and flag checks as produced", () => {
+    expect([...PRODUCED_FACT_KINDS]).toEqual([
+      "imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks",
+    ]);
+  });
+
+  it("names config sources and flag mechanisms", () => {
+    expect([...CONFIG_SOURCES]).toEqual(["file", "env", "ini", "yaml", "xml", "json", "define", "unknown"]);
+    expect([...FLAG_MECHANISMS]).toEqual(["constant", "config", "function", "sdk", "env"]);
+  });
+
+  it("records a flag check's gated lines, optionally", () => {
+    const check: FlagCheckFact = {
+      name: "FEATURE_NEW_CHECKOUT",
+      normalized: normalizeFlagName("FEATURE_NEW_CHECKOUT"),
+      mechanism: "constant",
+      position: { line: 3, column: 4 },
+      gated: { start: 4, end: 9 },
+    };
+    expect(check.normalized).toBe("new_checkout");
+  });
+
+  it("normalizes one flag's spellings to one name", () => {
+    for (const name of ["FEATURE_NEW_CHECKOUT", "features.new_checkout", "ff-new-checkout", "FF_NEW_CHECKOUT", "Feature.New-Checkout", "new_checkout", "features:new checkout"]) {
+      expect(normalizeFlagName(name), name).toBe("new_checkout");
+    }
+  });
+
+  it("keeps a name that is only a prefix, and strips one prefix only", () => {
+    expect(normalizeFlagName("feature")).toBe("feature");
+    expect(normalizeFlagName("FEATURE_")).toBe("feature");
+    expect(normalizeFlagName("FF_FEATURE_X")).toBe("feature_x");
+    expect(normalizeFlagName("__beta__")).toBe("beta");
+    expect(normalizeFlagName("featured_items")).toBe("featured_items");
   });
 
   it("names components as declared", () => {

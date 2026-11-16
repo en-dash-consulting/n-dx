@@ -18,7 +18,14 @@ items:
     lastModified: "2026-11-16T18:14:59.912Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d1f293e3-9051-443f-b0f5-3a0839302edf":
-    lastModified: "2026-11-14T05:21:37.963Z"
+    status: "completed"
+    startedAt: "2026-11-16T18:25:57.473Z"
+    completedAt: "2026-11-16T18:34:44.045Z"
+    endedAt: "2026-11-16T18:34:44.045Z"
+    activeIntervals: [{"end":"2026-11-16T18:34:44.045Z","start":"2026-11-16T18:25:57.473Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit ConfigReadFact/FlagCheckFact + normalizeFlagName in PRODUCED_FACT_KINDS; sourcevision config.json (ConfigSchema, DATA_FILES.config in sv + web mirror) written only when a pack produced surviving facts, stale file removed otherwise."
+    lastModified: "2026-11-16T18:34:44.045Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "efa70788-9d7a-49e7-9250-1890d7455315":
     lastModified: "2026-11-14T05:22:42.409Z"

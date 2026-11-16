@@ -53,6 +53,7 @@ import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
+import { packConfigData, writeConfigData } from "../../analyzers/pack-config-facts.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { ANALYSIS_HISTORY_FILE, startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -813,6 +814,11 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       join(ctx.svDir, DATA_FILES.outbound),
       toCanonicalJSON(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory))),
     );
+
+    // Config reads and flag checks, only when a language pack produced them:
+    // without one there is no config.json, and a stale one from a run that
+    // had a producing pack is removed rather than left to mislead.
+    writeConfigData(ctx.svDir, packConfigData(await packFrameworkFacts(ctx, inventory), inventory));
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[0]), llmsTxt);

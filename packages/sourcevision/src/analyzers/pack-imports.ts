@@ -48,7 +48,8 @@ export interface PackImportsOptions {
    */
   readonly fallbacks?: ReadonlyMap<string, string>;
   /**
-   * Receives each pack's routes, outbound-call and entry-point facts. When set, the same
+   * Receives each pack's routes, outbound-call, entry-point, config-read and
+   * flag-check facts. When set, the same
    * `analyzeProject` call also asks for the {@link FRAMEWORK_FACT_KINDS} the
    * pack produces, so a file is parsed once per analysis; unset, only
    * imports are asked for.
@@ -67,7 +68,7 @@ export interface PackImportsOptions {
 }
 
 /** The fact kinds a pack's framework rules produce for later phases. */
-export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls", "entryPoints"] as const satisfies readonly FactKind[];
+export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls", "entryPoints", "configReads", "flagChecks"] as const satisfies readonly FactKind[];
 
 /** The {@link FRAMEWORK_FACT_KINDS} `entry` produces. */
 export const frameworkKindsOf = (entry: LanguagePackEntry): FactKind[] =>

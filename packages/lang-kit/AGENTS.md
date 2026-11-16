@@ -21,8 +21,10 @@ the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
 pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
-routes, outbound calls, entry points) and `DECLARED_FACT_KINDS` (components, typed but not
-yet produced). `OutboundCallFact.confidence` means what sourcevision's
+routes, outbound calls, entry points, config reads, flag checks) and `DECLARED_FACT_KINDS` (components, typed but not
+yet produced). `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+never carry a value; a flag's `normalized` name comes from
+`normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`
 and `attributes` are filled by the Terraform pack; attribute values are kept
 as written, never normalised, except that an optional `instance` marks a fact

@@ -22,8 +22,12 @@ import { inferPrefix } from "./go-route-detection.js";
 import { SKIP_ROLES } from "./outbound-detection.js";
 import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
 
-/** The routes, outbound-call and entry-point facts packs returned for one analysis. */
-export type PackFrameworkFacts = readonly Pick<FileFacts, "path" | "routes" | "outboundCalls" | "entryPoints">[];
+/**
+ * The routes, outbound-call, entry-point, config-read and flag-check facts
+ * packs returned for one analysis. The last two become config.json
+ * (`pack-config-facts.ts`).
+ */
+export type PackFrameworkFacts = readonly Pick<FileFacts, "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks">[];
 
 const HTTP_METHODS: ReadonlySet<string> = new Set<HttpMethod>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 

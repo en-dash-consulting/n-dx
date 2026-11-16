@@ -9,6 +9,7 @@ export {
   ComponentsSchema,
   CallGraphSchema,
   OutboundSchema,
+  ConfigSchema,
   BranchWorkRecordSchema,
   validate,
   validateModule,

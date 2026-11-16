@@ -92,7 +92,7 @@ export interface AnalyzeContext {
   /** Result from phase 1 (inventory), used by later phases for incremental hints. */
   inventoryResult: InventoryResult | null;
   /**
-   * Language packs' routes, outbound calls and entry points, collected by the imports phase
+   * Language packs' routes, outbound calls, entry points, config reads and flag checks, collected by the imports phase
    * in the call that reads imports; read on demand when it did not run.
    */
   packFacts?: PackFrameworkFacts;
@@ -249,7 +249,8 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
         fileSetChanged,
       } : {}),
       packs: {
-        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls, entryPoints }) => ({ path, routes, outboundCalls, entryPoints }))),
+        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks }) =>
+          ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks }))),
         analysed: (id) => analysedPacks.push(id),
         suggest: (id) => suggestPack(ctx, id),
       },
