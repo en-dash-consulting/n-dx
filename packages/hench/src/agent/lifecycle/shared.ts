@@ -74,6 +74,7 @@ import {
   type ValidationSlotRunOptions,
 } from "../../process/validation-run.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
+import { runPhpGuards, type RunPhpGuardsOptions } from "../../tools/php-guards.js";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
 import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
 import { section, subsection, stream, detail, info, warn, formatDuration, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
@@ -1206,6 +1207,55 @@ export async function promptTestGateFailure(
   } catch {
     // On any error, default to abort
     return "abort";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PHP guards (identical in both loops)
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the PHP guards (`php -l` on changed PHP files, `composer validate`) on a
+ * completed run in a PHP project. A failing check fails the run.
+ */
+export async function runPhpGuardsIfNeeded(
+  run: RunRecord,
+  projectDir: string,
+  config: Pick<HenchConfig, "language" | "guard"> | undefined,
+  deps: Pick<RunPhpGuardsOptions, "onPath" | "shellKind" | "execCommand"> = {},
+): Promise<void> {
+  if (config?.language !== "php" || run.status !== "completed" || !run.structuredSummary) return;
+
+  const result = await runPhpGuards({
+    projectDir,
+    filesChanged: run.structuredSummary.filesChanged,
+    timeout: config.guard.commandTimeout,
+    ...deps,
+  });
+  if (result.results.length === 0 && result.errors.length === 0 && result.skipped.length === 0) return;
+
+  subsection("PHP Guards");
+  for (const note of result.skipped) detail(`Skipped ${note}`);
+  for (const r of result.results) {
+    stream("PHP Guard", `${r.passed ? "✓" : "✗"} ${r.command}`);
+    if (r.output) detail(r.output);
+  }
+  for (const e of result.errors) stream("PHP Guard", `✗ ${e}`);
+
+  const failed = [
+    ...result.results.filter((r) => !r.passed).map((r) => r.command),
+    ...result.errors,
+  ];
+  emitRunEvent("gate", result.passed ? "PHP guards passed" : `PHP guards failed — ${failed.length} check(s)`, {
+    ok: result.passed,
+    detail: failed.join(", ") || undefined,
+    counts: { checks: result.results.length, failed: failed.length },
+  });
+
+  if (!result.passed) {
+    run.status = "failed";
+    run.error = `PHP guards failed: ${failed.join("; ")}`;
+    info(`\n${run.error}`);
   }
 }
 
@@ -3830,6 +3880,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       };
     }
   }
+
+  // PHP projects: lint the changed PHP files and validate composer.json
+  // before the test gate. A failure fails the run, so the task is not marked
+  // done. Independent of --skip-test-gate: these checks take seconds.
+  await runPhpGuardsIfNeeded(run, projectDir, config);
 
   // Full test suite gate (mandatory before commit, unless skipped via flag).
   // Runs whenever the run completed successfully and gate is not explicitly skipped.

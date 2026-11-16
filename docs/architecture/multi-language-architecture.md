@@ -164,10 +164,12 @@ Archetypes without language-scoped signals (utility, middleware, model, service,
 
 Hench's security guard uses language-specific allowed commands. Blocked paths are the same for every language — n-dx state, `.git/**`, credential files, and every ecosystem's dependency directories — because the language is detected from marker files the repository ships, and a marker must not loosen what an untrusted checkout is kept out of:
 
-| Setting | TypeScript/JS | Go |
-|---------|--------------|-----|
-| Allowed commands | `npm`, `npx`, `node`, `git`, `tsc`, `vitest` | `go`, `make`, `git`, `golangci-lint` |
-| Blocked paths | `.hench/**`, `.rex/**`, `.ndx/**`, `.git/**`, `**/node_modules/**`, `**/vendor/**`, `**/.build/**`, `**/DerivedData/**`, `**/Pods/**`, `**/Carthage/**`, credential files | same |
+| Setting | TypeScript/JS | Go | PHP |
+|---------|--------------|-----|-----|
+| Allowed commands | `npm`, `npx`, `node`, `git`, `tsc`, `vitest` | `go`, `make`, `git`, `golangci-lint` | `php`, `composer`, `phpunit` (as `vendor/bin/phpunit`), `git` |
+| Blocked paths | `.hench/**`, `.rex/**`, `.ndx/**`, `.git/**`, `**/node_modules/**`, `**/vendor/**`, `**/.build/**`, `**/DerivedData/**`, `**/Pods/**`, `**/Carthage/**`, credential files | same | same |
+
+A PHP project is one with a root `composer.json`. Before the test gate, hench runs `php -l` on each changed `.php`/`.phtml`/`.inc` file and `composer validate --no-check-publish` when `composer.json` exists; a failure fails the run. The test gate auto-detects `vendor/bin/phpunit` when `phpunit.xml` or `phpunit.xml.dist` exists and the binary is installed. Each check needs its tool already present (on PATH, or in `vendor/`): n-dx installs nothing, and a missing tool skips its check (`packages/hench/src/tools/php-guards.ts`).
 
 Dependency directories are blocked at any depth: the guard anchors a pattern at the project root, and a workspace package's or a polyglot frontend's `node_modules/` runs at the next install as the root's does.
 

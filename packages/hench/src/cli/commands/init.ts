@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { access, readFile, readdir, writeFile } from "node:fs/promises";
+import { access, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import {configExists, initConfig} from "../../store/config.js";
 import { henchRuntimeGitignoreEntries } from "../../store/artifacts.js";
 import { resolveHenchPaths } from "../../store/paths.js";
@@ -21,6 +21,11 @@ async function hasXcodeProjectMarker(dir: string): Promise<boolean> {
 
 async function fileExists(path: string): Promise<boolean> {
   try { await access(path); return true; } catch { return false; }
+}
+
+/** True when `path` is a regular file (not a directory of that name). */
+async function isRegularFile(path: string): Promise<boolean> {
+  try { return (await stat(path)).isFile(); } catch { return false; }
 }
 
 /**
@@ -55,16 +60,20 @@ async function ensureGitignoreEntries(dir: string, entries: readonly string[]): 
  * 1. Explicit project-config `language` override
  * 2. `go.mod` present → "go"
  * 3. `Package.swift` OR `*.xcodeproj` / `*.xcworkspace` directory → "swift"
- * 4. Otherwise → undefined (JS/TS defaults)
+ * 4. `composer.json` → "php"
+ * 5. Otherwise → undefined (JS/TS defaults)
+ *
+ * Steps 2–4 match `detectRepoLanguage` in `@n-dx/llm-client`, which picks the
+ * guard baseline repository trust compares this config against.
  */
-async function detectProjectLanguage(dir: string): Promise<ProjectLanguage | undefined> {
+export async function detectProjectLanguage(dir: string): Promise<ProjectLanguage | undefined> {
   // Step 1: Check the project config for an explicit language override
   try {
     const raw = await readFile(resolveLayout(dir).configFile, "utf-8");
     const config = JSON.parse(raw) as Record<string, unknown>;
     if (typeof config.language === "string" && config.language !== "auto") {
       const lang = config.language;
-      if (lang === "go" || lang === "swift" || lang === "typescript" || lang === "javascript") {
+      if (lang === "go" || lang === "swift" || lang === "php" || lang === "typescript" || lang === "javascript") {
         return lang;
       }
     }
@@ -78,6 +87,9 @@ async function detectProjectLanguage(dir: string): Promise<ProjectLanguage | und
   // Step 3: Check for Swift markers — Package.swift OR an Xcode project.
   if (await fileExists(join(dir, "Package.swift"))) return "swift";
   if (await hasXcodeProjectMarker(dir)) return "swift";
+
+  // Step 4: Composer manifest. A file, as detectRepoLanguage requires.
+  if (await isRegularFile(join(dir, "composer.json"))) return "php";
 
   return undefined;
 }

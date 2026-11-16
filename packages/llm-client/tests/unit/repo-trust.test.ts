@@ -84,6 +84,15 @@ describe("guardBaselineForLanguage", () => {
     expect(guardBaselineForLanguage("go").allowedCommands).not.toContain("npm");
     expect(guardBaselineForLanguage("swift").allowedCommands).not.toContain("go");
   });
+
+  // PHP's tools are admitted for PHP checkouts only.
+  it("admits php, composer and phpunit for PHP alone", () => {
+    expect(guardBaselineForLanguage("php").allowedCommands).toEqual(["php", "composer", "phpunit", "git"]);
+    for (const lang of ["typescript", "javascript", "go", "swift", undefined, "cobol"]) {
+      const { allowedCommands } = guardBaselineForLanguage(lang);
+      for (const c of ["php", "composer", "phpunit"]) expect(allowedCommands, lang ?? "default").not.toContain(c);
+    }
+  });
 });
 
 describe("untrusted clamp and marker files", () => {
@@ -115,6 +124,7 @@ describe("untrusted clamp and marker files", () => {
     ["typescript", null, ["node_modules/**"]],
     ["go", "go.mod", ["vendor/**"]],
     ["swift", "Package.swift", [".build/**", "DerivedData/**", "Pods/**", "Carthage/**"]],
+    ["php", "composer.json", ["vendor/**"]],
   ])("still reads a %s project's pre-upgrade init defaults as baseline", (language, marker, deps) => {
     if (marker) writeFileSync(join(repo, marker), "");
     const current = guardBaselineForLanguage(language);
@@ -397,6 +407,7 @@ describe("assessRepoExecutionConfig", () => {
     ["swift", "Package.swift", false],
     ["swift", "App.xcodeproj", true],
     ["swift", "App.xcworkspace", true],
+    ["php", "composer.json", false],
   ])("raises no mismatch for a %s checkout (%s) declaring its own language", (language, marker, isDir) => {
     if (isDir) mkdirSync(join(repo, marker));
     else writeFileSync(join(repo, marker), "");
@@ -414,6 +425,20 @@ describe("assessRepoExecutionConfig", () => {
       const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);
       expect(codes, language).not.toContain("language-mismatch");
     }
+  });
+
+  it("keeps the PHP tools out of a JS/TS checkout that declares php", () => {
+    writeJson(".hench/config.json", { language: "php", guard: guardBaselineForLanguage("php") });
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.detectedLanguage).toBe("typescript");
+    const byCode = Object.fromEntries(assessRepoExecutionConfig(config).map((f) => [f.code, f]));
+    expect(byCode["language-mismatch"]).toBeDefined();
+    expect(byCode["commands-added"].values).toEqual(["php", "composer", "phpunit"]);
+  });
+
+  it("does not count a directory named composer.json as a php marker", () => {
+    mkdirSync(join(repo, "composer.json"));
+    expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");
   });
 
   it("does not count a file named like an Xcode project as a swift marker", () => {

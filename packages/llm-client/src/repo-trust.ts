@@ -220,6 +220,12 @@ const LANGUAGE_BASELINES: Record<string, Pick<GuardBaseline, "allowedCommands"> 
     allowedCommands: ["swift", "make", "xcodebuild", "xcrun", "git"],
     extraBlocked: [".build/**", "DerivedData/**", "Pods/**", "Carthage/**"],
   },
+  // The project's own tools only; n-dx installs nothing. `phpunit` is what the
+  // allowlist sees of `vendor/bin/phpunit`, which it reduces to a base name.
+  php: {
+    allowedCommands: ["php", "composer", "phpunit", "git"],
+    extraBlocked: ["vendor/**"],
+  },
 };
 
 /**
@@ -256,12 +262,13 @@ export function guardBaselineForLanguage(language?: string | null): GuardBaselin
 }
 
 /** The languages {@link detectRepoLanguage} can report; one per baseline. */
-export type DetectedRepoLanguage = "go" | "swift" | "typescript";
+export type DetectedRepoLanguage = "go" | "swift" | "php" | "typescript";
 
 /**
  * The project language as the host sees it, from marker files alone:
  * `go.mod` → go; `Package.swift` or a top-level `*.xcodeproj` /
- * `*.xcworkspace` directory → swift; otherwise the JS/TS default.
+ * `*.xcworkspace` directory → swift; a root `composer.json` → php; otherwise
+ * the JS/TS default.
  *
  * Mirrors hench init's detection without its config override, because the
  * config is the repository's own claim and this is what checks it.
@@ -278,18 +285,20 @@ export function detectRepoLanguage(projectDir: string): DetectedRepoLanguage {
   const xcode = entries.some(
     (e) => e.isDirectory() && (e.name.endsWith(".xcodeproj") || e.name.endsWith(".xcworkspace")),
   );
-  return xcode ? "swift" : "typescript";
+  if (xcode) return "swift";
+  return entries.some((e) => e.isFile() && e.name === "composer.json") ? "php" : "typescript";
 }
 
 /** The baseline a declared language names, or null when it names none. */
 function declaredLanguageFamily(language: string | null): DetectedRepoLanguage | null {
   if (language === "typescript" || language === "javascript") return "typescript";
-  if (language === "go" || language === "swift") return language;
+  if (language === "go" || language === "swift" || language === "php") return language;
   return null;
 }
 
 function languageLabel(language: DetectedRepoLanguage): string {
-  return language === "typescript" ? "JavaScript/TypeScript" : language;
+  if (language === "typescript") return "JavaScript/TypeScript";
+  return language === "php" ? "PHP" : language;
 }
 
 /**
