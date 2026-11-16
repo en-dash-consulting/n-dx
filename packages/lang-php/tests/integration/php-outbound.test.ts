@@ -42,6 +42,8 @@ describe("php outbound calls", () => {
       'env.php:4 env $_SERVER "APP_SECRET" (env, certain)',
       'env.php:5 env $_SERVER "CACHE_DIR" (env, certain)',
       'env.php:6 env getenv "" (unknown, certain)',
+      // Request keys read through getenv are not reported; OpenSSL's own SSL_CERT_FILE is.
+      'env.php:36 env getenv "SSL_CERT_FILE" (env, certain)',
       'soap.php:2 http SoapClient "https://billing.example.com/service?wsdl" (literal, certain)',
       // No WSDL: the `location` option.
       'soap.php:3 http SoapClient "https://crm.example.com/soap" (literal, certain)',

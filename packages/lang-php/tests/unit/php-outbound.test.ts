@@ -62,13 +62,13 @@ describe("connectionTarget", () => {
 
 describe("isRequestKey", () => {
   it("is true for the request and script keys of $_SERVER", () => {
-    for (const key of ["HTTP_HOST", "HTTP_X_FORWARDED_FOR", "REQUEST_URI", "REQUEST_METHOD", "QUERY_STRING", "REMOTE_ADDR", "SERVER_NAME", "SERVER_PORT", "SERVER_ADDR", "SCRIPT_NAME", "PHP_SELF", "DOCUMENT_ROOT", "HTTPS", "argv", "PHP_AUTH_USER", "CONTENT_TYPE"]) {
+    for (const key of ["HTTP_HOST", "HTTP_X_FORWARDED_FOR", "REQUEST_URI", "REQUEST_METHOD", "QUERY_STRING", "REMOTE_ADDR", "SERVER_NAME", "SERVER_PORT", "SERVER_ADDR", "SCRIPT_NAME", "PHP_SELF", "DOCUMENT_ROOT", "HTTPS", "argv", "PHP_AUTH_USER", "CONTENT_TYPE", "SSL_SESSION_ID", "SSL_CLIENT_S_DN"]) {
       expect(isRequestKey(key), key).toBe(true);
     }
   });
 
   it("is false for anything else, case-sensitively", () => {
-    for (const key of ["APP_ENV", "DB_HOST", "SERVER_ROLE", "https", "ARGV"]) expect(isRequestKey(key), key).toBe(false);
+    for (const key of ["APP_ENV", "DB_HOST", "SERVER_ROLE", "https", "ARGV", "SSL_CERT_FILE", "SSL_CERT_DIR"]) expect(isRequestKey(key), key).toBe(false);
   });
 });
 
@@ -89,6 +89,11 @@ describe("envKey", () => {
 
   it("is undefined for request keys and other expressions", () => {
     expect(envKey("$_SERVER['HTTP_HOST']")).toBeUndefined();
+    // Under CGI and Apache, getenv returns the request's meta-variables.
+    expect(envKey("getenv('REMOTE_ADDR')")).toBeUndefined();
+    expect(envKey("getenv('SSL_SESSION_ID')")).toBeUndefined();
+    // $_ENV keeps every key.
+    expect(envKey("$_ENV['HTTPS']")).toBe("HTTPS");
     expect(envKey("$_GET['A']")).toBeUndefined();
     expect(envKey("my_getenv('A')")).toBeUndefined();
   });

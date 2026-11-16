@@ -20,14 +20,14 @@
  *   or `base_url` (Guzzle 5) option, and `get`, `post`, `put`, `patch`,
  *   `delete`, `head`, `options` (uri first) and `request` (uri second), and
  *   their `…Async` forms, on a receiver bound to one; client `guzzle`.
- * - `env`: `getenv('X')`, `$_ENV['X']`, and `$_SERVER['X']` unless `X` is a
- *   request key ({@link isRequestKey}): kind `env`, target `X`, target source
+ * - `env`: `getenv('X')` and `$_SERVER['X']` unless `X` is a request key
+ *   ({@link isRequestKey}), and `$_ENV['X']`: kind `env`, target `X`, target source
  *   `env`; clients `getenv`, `$_ENV`, `$_SERVER`. An assignment to or `unset`
  *   of one is a write and not reported; a `$_SERVER` key that is not a literal
  *   is not reported, a `getenv`/`$_ENV` one is, with an unknown target.
  * - `database` (kind `database`; client the PHP extension): `mysql_connect`
  *   and `mysql_pconnect` (`mysql`), `mysqli_connect` and `new mysqli`
- *   (`mysqli`, the port appended), `new PDO(dsn)` (`pdo_<driver>` from the
+ *   (`mysqli`, the persistent prefix `p:` dropped, the port appended), `new PDO(dsn)` (`pdo_<driver>` from the
  *   DSN's prefix, `pdo` when unknown), `pg_connect` and `pg_pconnect`
  *   (`pgsql`), `oci_connect`, `oci_pconnect` and `oci_new_connect` (`oci8`),
  *   `sqlsrv_connect` (`sqlsrv`), `odbc_connect` and `odbc_pconnect`
@@ -53,7 +53,9 @@
  * `env` with its key; `$config['key']` (a variable or property named
  * {@link CONFIG_NAMES}, keys joined with `.`) is `config`; a concatenation or
  * interpolated string takes its computable leading text as `literal`, else
- * the source of its first part; a variable takes the target of its last
+ * the source of its first part (a database host written as a whole value,
+ * not a connection string, never takes partial text: it is the source of
+ * its first part that is not computable, never `literal`); a variable takes the target of its last
  * plain assignment before the call in its scope; anything else is `unknown`
  * with target `""`.
  *
@@ -132,11 +134,18 @@ const REQUEST_KEYS: ReadonlySet<string> = new Set([
   "CONTENT_TYPE", "CONTENT_LENGTH",
 ]);
 
-/** Prefixes of request indices: `HTTP_*` headers, `REQUEST_*`, `REMOTE_*`, `SCRIPT_*`, `REDIRECT_*`, `PHP_AUTH_*`. */
-const REQUEST_PREFIXES = ["HTTP_", "REQUEST_", "REMOTE_", "SCRIPT_", "REDIRECT_", "PHP_AUTH_"] as const;
+/**
+ * Prefixes of request indices: `HTTP_*` headers, `REQUEST_*`, `REMOTE_*`, `SCRIPT_*`, `REDIRECT_*`, `PHP_AUTH_*`,
+ * and mod_ssl's per-connection `SSL_*` (https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#envvars).
+ */
+const REQUEST_PREFIXES = ["HTTP_", "REQUEST_", "REMOTE_", "SCRIPT_", "REDIRECT_", "PHP_AUTH_", "SSL_"] as const;
 
-/** Whether a `$_SERVER` key describes the request or the script, not the environment. */
-export const isRequestKey = (key: string): boolean => REQUEST_KEYS.has(key) || REQUEST_PREFIXES.some((p) => key.startsWith(p));
+/** OpenSSL's own environment variables, which mod_ssl does not set (https://docs.openssl.org/master/man7/openssl-env/). */
+const OPENSSL_ENV: ReadonlySet<string> = new Set(["SSL_CERT_FILE", "SSL_CERT_DIR"]);
+
+/** Whether a `$_SERVER` or `getenv` key describes the request or the script, not the environment. */
+export const isRequestKey = (key: string): boolean =>
+  REQUEST_KEYS.has(key) || (!OPENSSL_ENV.has(key) && REQUEST_PREFIXES.some((p) => key.startsWith(p)));
 
 // ── Targets ─────────────────────────────────────────────────────────────────
 
@@ -166,11 +175,18 @@ const SCHEME_ONLY = /^[A-Za-z][\w+.-]*:\/\/$/;
 /** The keys of a subscript chain, joined with `.`. */
 const keysOf = (subscripts: string): string => [...subscripts.matchAll(KEYS)].map((m) => m[1] ?? m[2] ?? m[3]).join(".");
 
-/** What an environment read names: its key, `""` when the key is not a literal; undefined for a request key or anything else. */
+/**
+ * What an environment read names: its key, `""` when the key is not a literal; undefined for a request key of
+ * `$_SERVER` or `getenv` (which returns the request's meta-variables under CGI and Apache:
+ * https://www.php.net/manual/en/function.getenv.php) or anything else. `$_ENV` keeps every key.
+ */
 export function envKey(text: string): string | undefined {
   const t = text.trim();
   const getenv = GETENV.exec(t);
-  if (getenv) return getenv[1] ?? getenv[2];
+  if (getenv) {
+    const key = getenv[1] ?? getenv[2]!;
+    return isRequestKey(key) ? undefined : key;
+  }
   const read = SUPERGLOBAL.exec(t);
   if (read) {
     const key = read[2] ?? read[3] ?? read[4]!;
@@ -333,6 +349,11 @@ class TargetReader {
       }
       const ends = interpolatedEnds(operand);
       written += ends?.head ?? "";
+      if (form === "plain") {
+        // The value is the target: its computable part alone is not one (`'p:' . $server`).
+        const rest = ends === undefined ? this.of(operand, at, depth + 1) : UNKNOWN;
+        return { target: rest.targetSource === "literal" ? UNKNOWN : rest };
+      }
       const parsed = connectionTarget(written, form);
       if (parsed.target.targetSource !== "unknown" || !OPEN_HOST_KEY.test(written)) return parsed;
       const filled = ends === undefined ? this.of(operand, at, depth + 1) : UNKNOWN;
@@ -511,6 +532,12 @@ const odbc: DatabaseFunction = { client: "odbc", position: 0, name: "dsn", form:
 const MYSQLI_PORT = [4, "port"] as const;
 const MYSQLI: DatabaseFunction = { client: "mysqli", position: 0, name: "hostname", form: "plain", port: MYSQLI_PORT };
 
+/** A mysqli host without its persistent-connection prefix `p:` (https://www.php.net/manual/en/mysqli.persistconns.php). */
+function mysqliHost(host: Target): Target {
+  if (host.targetSource !== "literal" || !host.target.startsWith("p:")) return host;
+  return literal(host.target.slice(2));
+}
+
 const DATABASE_FUNCTIONS: Readonly<Record<string, DatabaseFunction>> = {
   mysql_connect: mysql,
   mysql_pconnect: mysql,
@@ -645,7 +672,8 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
       const name = call.function;
       const database = DATABASE_FUNCTIONS[name];
       if (database !== undefined) {
-        const host = connection(argumentAt(call, database.position, database.name), database.form).target;
+        const written = connection(argumentAt(call, database.position, database.name), database.form).target;
+        const host = database === MYSQLI ? mysqliHost(written) : written;
         add("database", database.client, database.port ? port(host, argumentAt(call, ...database.port), at) : host, at);
       } else if (name === "curl_init") {
         const url = argumentAt(call, 0, "url");
@@ -679,7 +707,7 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
         const base = options.get("base_uri") ?? options.get("base_url");
         if (base) add("http", "guzzle", targets.of(base.value.text, at), at);
       } else if (qualified === MYSQLI_CLASS) {
-        add("database", "mysqli", port(connection(argumentAt(call, 0, "hostname"), "plain").target, argumentAt(call, ...MYSQLI_PORT), at), at);
+        add("database", "mysqli", port(mysqliHost(connection(argumentAt(call, 0, "hostname"), "plain").target), argumentAt(call, ...MYSQLI_PORT), at), at);
       } else if (qualified === PDO_CLASS) {
         const { target: dsn, driver } = connection(argumentAt(call, 0, "dsn"), "dsn");
         add("database", (driver && PDO_DRIVERS.get(driver)) || "pdo", dsn, at);

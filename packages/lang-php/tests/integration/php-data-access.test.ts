@@ -79,6 +79,13 @@ describe("php database and cache outbound calls", () => {
       'pdo/app.php:8 database pdo_odbc "LegacyDSN" (literal, certain)',
       // The driver is not known.
       'pdo/app.php:9 database pdo "dsn" (config, certain)',
+      // 'p:' . $server, $server a parameter: not the literal "p:".
+      'persistent.php:10 database mysqli "" (unknown, certain)',
+      // mysqli's persistent-connection prefix is dropped.
+      'persistent.php:14 database mysqli "db.internal" (literal, certain)',
+      'persistent.php:15 database mysqli "db.internal:3307" (literal, certain)',
+      'persistent.php:16 database mysqli "db.internal" (literal, certain)',
+      'persistent.php:17 database mysqli "DB_HOST" (env, certain)',
     ]);
     // Not reported: connect() on a receiver that is not a cache client, including classes named
     // `Constructor` and `__proto__`, which once threw and lost every outbound call (cache.php).

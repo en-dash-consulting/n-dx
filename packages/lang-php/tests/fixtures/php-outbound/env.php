@@ -24,3 +24,13 @@ $m = $_SERVER[$key];
 $_ENV['WRITTEN'] = 'x';
 $_SERVER['ALSO_WRITTEN'] .= 'y';
 unset($_ENV['REMOVED']);
+
+// getenv returns the request's meta-variables under CGI and Apache, and mod_ssl's SSL_* ones.
+$n = getenv('HTTPS');
+$o = getenv('REQUEST_URI');
+$p = getenv('PATH_INFO');
+$q = getenv('HTTP_USER_AGENT');
+$r = getenv('SSL_SESSION_ID');
+$s = $_SERVER['SSL_SESSION_ID'];
+// OpenSSL's own variables are the environment.
+$t = getenv('SSL_CERT_FILE');
