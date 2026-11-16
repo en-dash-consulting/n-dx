@@ -15,7 +15,9 @@ import { createTreeSitterRunner, listFixtureFiles, skipUnlessGrammar, type PackS
 import { pack, phpGrammarPath, phpPack, preparePhpImports, readPhpProjectFacts } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-legacy-includes");
-const files = (): string[] => listFixtureFiles(dir, [...phpPack.config.extensions]);
+/** osCommerce-shaped: entry scripts `shop/index.php` and `shop/admin/index.php`, no docroot directory. */
+const entryDir = join(import.meta.dirname, "..", "fixtures", "php-entry-directories");
+const files = (from = dir): string[] => listFixtureFiles(from, [...phpPack.config.extensions]);
 
 async function analyze(): Promise<{ facts: Map<string, FileFacts>; notices: readonly string[] | undefined }> {
   const result = await pack.analyzeProject({ projectDir: dir, files: files(), kinds: ["imports"] });
@@ -25,25 +27,27 @@ async function analyze(): Promise<{ facts: Map<string, FileFacts>; notices: read
 
 const edges = (f: FileFacts | undefined): string[] => (f?.imports?.files ?? []).map((r) => `${r.to} ${r.symbols.join(",")}`);
 
-/** `specifier outcome` for each include of `path`. */
-async function includeOutcomes(path: string): Promise<string[]> {
-  const paths = files();
+/** `specifier outcome` for each include of `path` in the fixture `from`; a dynamic one lists its candidates. */
+async function includeOutcomes(path: string, from = dir): Promise<string[]> {
+  const paths = files(from);
   const runner = createTreeSitterRunner();
   const parsed: PackSourceFile[] = [];
   try {
     for (const p of paths) {
-      const result = await runner.parseFile({ pack: phpPack, grammarPath: phpGrammarPath() }, join(dir, p));
+      const result = await runner.parseFile({ pack: phpPack, grammarPath: phpGrammarPath() }, join(from, p));
       if (result.status === "parsed") parsed.push({ path: p, captures: result.captures });
     }
   } finally {
     runner.dispose();
   }
-  const facts = await readPhpProjectFacts(dir, paths);
+  const facts = await readPhpProjectFacts(from, paths);
   return preparePhpImports(facts.projects, parsed, [], facts)
     .includes(path)
-    .map(({ include, outcome }) =>
-      `${include.specifier} ${outcome.kind === "internal" ? `${outcome.target} (${outcome.via})` : outcome.reason}`,
-    );
+    .map(({ include, outcome }) => {
+      if (outcome.kind === "internal") return `${include.specifier} ${outcome.target} (${outcome.via})`;
+      const candidates = outcome.reason === "dynamic" && outcome.candidates ? ` [${outcome.candidates.files.join(", ")}]` : "";
+      return `${include.specifier} ${outcome.reason}${candidates}`;
+    });
 }
 
 describe("php include resolver", () => {
@@ -65,7 +69,7 @@ describe("php include resolver", () => {
       // ROOT is the repository root: a trailing slash does not keep dirname() inside it.
       "dirname(ROOT . '/') . '/header.php' outside",
       // dirname() with levels 0 is an error in PHP.
-      "dirname(__FILE__, 0) . '/partials/header.php' dynamic",
+      "dirname(__FILE__, 0) . '/partials/header.php' dynamic [htdocs/partials/header.php]",
       "\"partials/footer.php\" htdocs/partials/footer.php (include-path)",
     ]);
     expect(await includeOutcomes("inc/db.php")).toEqual([
@@ -75,6 +79,18 @@ describe("php include resolver", () => {
     expect(await includeOutcomes("lib/Shop/Cart.php")).toEqual([
       "dirname(__FILE__, 2) . '/Shop.php' lib/Shop.php (anchored)",
       "dirname(__DIR__, 2) . '/inc/db.php' inc/db.php (anchored)",
+    ]);
+  });
+
+  it("tries the including file's ancestors holding index.php, nearest first, as PHP's working directory", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    expect(await includeOutcomes("shop/admin/includes/application_top.php", entryDir)).toEqual([
+      "'includes/configure.php' shop/admin/includes/configure.php (include-path)",
+      "DIR_WS_CLASSES . 'logger.php' shop/admin/includes/classes/logger.php (include-path)",
+      // shop/admin has no includes/functions/; the outer entry directory, shop, does.
+      "'includes/functions/general.php' shop/includes/functions/general.php (include-path)",
+      "'./includes/version.php' shop/includes/version.php (relative)",
+      "DIR_WS_CLASSES . $module . '.php' dynamic [shop/admin/includes/classes/logger.php]",
     ]);
   });
 

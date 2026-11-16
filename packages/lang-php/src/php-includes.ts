@@ -18,12 +18,16 @@
  * - a path built from `__DIR__`, `__FILE__` or a constant holding one is the
  *   repository file it names;
  * - a path starting with `./` or `../` is relative to the working directory;
- *   PHP's working directory is unknown here, so the including file's
- *   directory is tried first, then the docroot;
  * - any other relative path is looked up under each include-path root, then
  *   in the including file's directory.
  * An absolute path outside the repository (`/usr/share/php/x.php`) resolves
  * to nothing. A target must be one of the pack's files.
+ *
+ * **Working directory**: PHP's is the directory of the entry script the
+ * request started at, unknown here, so these are tried in order: the
+ * including file's directory, each of its ancestors holding an `index.php`
+ * (an entry script, as osCommerce's `catalog/` and `catalog/admin/`),
+ * nearest first, then the docroot. The first that has the file wins.
  *
  * **Docroot**: the first of lang-kit's {@link PHP_DOCROOT_DIRECTORIES} holding
  * an `index.php`, else the repository root.
@@ -39,8 +43,7 @@
  *    https://www.php.net/manual/en/configuration.changes.php);
  * 3. `include_path` of any `php.ini` in the repository, by path.
  * With none, PHP's default `.` applies. A relative root (`.`, `lib`) is
- * relative to the working directory: the including file's directory, then
- * the docroot. A root outside the repository is ignored with a notice.
+ * relative to the working directory, tried as above. A root outside the repository is ignored with a notice.
  *
  * @module lang-php/php-includes
  */
@@ -641,6 +644,9 @@ export class PhpIncludes {
   private readonly files: ReadonlySet<string>;
   private readonly sortedFiles: readonly string[];
   private readonly docroot: string;
+  /** Directories holding an `index.php`: entry-script directories, candidates for the working directory. */
+  private readonly entryDirectories = new Set<string>();
+  private readonly workingDirectoryCache = new Map<string, readonly string[]>();
   private readonly constants = new Map<string, ConstantDefinition[]>();
   private readonly constantValues = new Map<string, string | undefined>();
   private readonly evaluating = new Set<string>();
@@ -653,6 +659,7 @@ export class PhpIncludes {
     this.files = files;
     this.sortedFiles = [...files].sort(compare);
     this.docroot = PHP_DOCROOT_DIRECTORIES.find((d) => files.has(`${d}/index.php`)) ?? "";
+    for (const f of files) if (f === "index.php" || f.endsWith("/index.php")) this.entryDirectories.add(dirOf(f));
     const ordered = [...sources].sort((a, b) => compare(a.path, b.path));
     for (const file of ordered) {
       for (const { name, definition } of constantsOf(file)) {
@@ -717,6 +724,25 @@ export class PhpIncludes {
     return roots.length > 0 ? roots : [{ kind: "relative", path: "." }];
   }
 
+  /**
+   * Where PHP's working directory may be for an include in `file`, in search
+   * order: its directory, its ancestors holding an `index.php` nearest first,
+   * then the docroot.
+   */
+  private workingDirectories(file: string): readonly string[] {
+    const here = dirOf(file);
+    const cached = this.workingDirectoryCache.get(here);
+    if (cached !== undefined) return cached;
+    const dirs = [here];
+    for (let dir = here; dir !== ""; ) {
+      dir = dirOf(dir);
+      if (this.entryDirectories.has(dir)) dirs.push(dir);
+    }
+    if (!dirs.includes(this.docroot)) dirs.push(this.docroot);
+    this.workingDirectoryCache.set(here, dirs);
+    return dirs;
+  }
+
   /** The first candidate that is a pack file. */
   private first(candidates: Array<string | undefined>): string | undefined {
     return candidates.find((c): c is string => c !== undefined && this.files.has(c));
@@ -778,11 +804,12 @@ export class PhpIncludes {
       bases = [""];
     } else {
       path = located.path;
+      const working = this.workingDirectories(file);
       bases = /^\.\.?(\/|$)/.test(path)
-        ? [here, this.docroot]
+        ? [...working]
         : [
             ...this.rootsFor(file).flatMap((root) =>
-              root.kind === "repo" ? [root.path] : [normalize(here, root.path), normalize(this.docroot, root.path)],
+              root.kind === "repo" ? [root.path] : working.map((dir) => normalize(dir, root.path)),
             ),
             here,
           ];
@@ -824,12 +851,12 @@ export class PhpIncludes {
       target === undefined ? undefined : { kind: "internal", target, via };
     let outcome: PhpIncludeOutcome | undefined;
     if (located.kind === "repo") outcome = found(this.first([located.path]), "anchored");
-    else if (/^\.\.?(\/|$)/.test(located.path)) outcome = found(this.first([normalize(here, located.path), normalize(this.docroot, located.path)]), "relative");
-    else {
+    else if (/^\.\.?(\/|$)/.test(located.path)) {
+      outcome = found(this.first(this.workingDirectories(file).map((dir) => normalize(dir, located.path))), "relative");
+    } else {
+      const working = this.workingDirectories(file);
       const underRoots = this.rootsFor(file).flatMap((root) =>
-        root.kind === "repo"
-          ? [normalize(root.path, located.path)]
-          : [normalize(here, root.path, located.path), normalize(this.docroot, root.path, located.path)],
+        root.kind === "repo" ? [normalize(root.path, located.path)] : working.map((dir) => normalize(dir, root.path, located.path)),
       );
       outcome = found(this.first(underRoots), "include-path") ?? found(this.first([normalize(here, located.path)]), "including-directory");
     }
