@@ -6,7 +6,8 @@
  * A framework pack (lang-runtime's `FrameworkPack`): its query
  * (`queries/php-docroot/docroot.scm`) runs in the PHP parse only when routes
  * are wanted. `.htaccess` text comes from the resolver's `configFiles`
- * (read beside the sources by `phpResolver.forProject`). Rules (keys of
+ * (read beside the sources by `phpResolver.forProject`; its crontabs are
+ * `php-entry-points.ts`'s). Rules (keys of
  * {@link PROVENANCE}):
  *
  * - `docroots`: `php-docroots.ts`'s `phpDocroots` — each `public/`, `web/`,
@@ -174,6 +175,8 @@ export const phpDocroot: FrameworkPack = {
   },
   provenance: PROVENANCE,
   read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext): FrameworkFacts {
-    return kinds.includes("routes") ? readDocrootRoutes(files, context?.configFiles?.() ?? new Map()) : { facts: new Map(), notices: [] };
+    if (!kinds.includes("routes")) return { facts: new Map(), notices: [] };
+    const htaccess = [...(context?.configFiles?.() ?? [])].filter(([path]) => path === ".htaccess" || path.endsWith("/.htaccess"));
+    return readDocrootRoutes(files, new Map(htaccess));
   },
 };

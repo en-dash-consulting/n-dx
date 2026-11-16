@@ -21,7 +21,7 @@ the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
 pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
-routes, outbound calls) and `DECLARED_FACT_KINDS` (components, typed but not
+routes, outbound calls, entry points) and `DECLARED_FACT_KINDS` (components, typed but not
 yet produced). `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`
 and `attributes` are filled by the Terraform pack; attribute values are kept
@@ -37,7 +37,9 @@ namespace does not), the `conditional` `ImportGuard`, `WrittenImport.form`
 (`IMPORT_FORMS`) and `alias`, `WrittenImport.candidates` (a dynamic
 include's possible files, held in memory, never import edges),
 `CallFact.construct` (`new`) and `RouteFact.source` (a docroot or
-`.htaccess` line, for a route not declared in its handler's code). The contract names no parser type; `@n-dx/lang-runtime`'s
+`.htaccess` line, for a route not declared in its handler's code), and
+`EntryPointFact` (`cli` or `cron`, with its `source` and a cron job's
+`schedule` as written). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

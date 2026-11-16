@@ -11,7 +11,8 @@
  * autoload rules, legacy autoloaders and the PSR-0 path (`php-resolver.ts`,
  * `php-autoloaders.ts`); includes with a computable path resolve through
  * PHP's include search order (`php-includes.ts`). Routes are the files under
- * each document root and the `.htaccess` front controllers (`php-docroot.ts`).
+ * each document root and the `.htaccess` front controllers (`php-docroot.ts`);
+ * entry points are CLI scripts and the scripts crontabs run (`php-entry-points.ts`).
  *
  * @module lang-php/php-pack
  */
@@ -22,6 +23,7 @@ import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
 import { PHP_BUILTINS_PROVENANCE } from "./php-builtins.js";
 import { phpDocroot } from "./php-docroot.js";
+import { phpEntryPoints } from "./php-entry-points.js";
 import { phpResolver } from "./php-resolver.js";
 
 const QUERY_NAMES = ["imports", "guards", "definitions", "calls", "references"] as const;
@@ -51,9 +53,9 @@ export const phpPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: phpResolver,
-  // Routes come from the docroot rules, whose query runs only when routes are wanted.
-  produces: ["imports", "symbols", "calls", "routes"],
-  frameworks: [phpDocroot],
+  // Routes and entry points come from the docroot and entry rules, whose queries run only when those kinds are wanted.
+  produces: ["imports", "symbols", "calls", "routes", "entryPoints"],
+  frameworks: [phpDocroot, phpEntryPoints],
   provenance: {
     ...Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
     // Constructors: `__construct`, and a method named as its class (the old style) in a class outside a namespace without `__construct`.

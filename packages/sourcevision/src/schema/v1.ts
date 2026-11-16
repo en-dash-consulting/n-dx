@@ -897,7 +897,8 @@ export interface ArchetypeDefinition {
 
 export interface ClassificationEvidence {
   archetypeId: string;
-  signalKind: ArchetypeSignal["kind"];
+  /** `pack`: a language pack read it from the file's content (a PHP script a crontab runs), `detail` saying what. */
+  signalKind: ArchetypeSignal["kind"] | "pack";
   detail: string;
   weight: number;
 }

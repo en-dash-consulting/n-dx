@@ -214,7 +214,7 @@ const ArchetypeDefinitionSchema = z.object({
 
 const ClassificationEvidenceSchema = z.object({
   archetypeId: z.string(),
-  signalKind: z.enum(["path", "import", "export", "filename", "directory"]),
+  signalKind: z.enum(["path", "import", "export", "filename", "directory", "pack"]),
   detail: z.string(),
   weight: z.number().min(0).max(1),
 });

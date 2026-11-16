@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import type { OutboundCallFact, RouteFact } from "@n-dx/lang-kit";
 import {
+  packEntryPointSignals,
   packOutboundDependencies,
   packRouteGroups,
   withPackOutbound,
@@ -147,5 +148,34 @@ describe("withPackOutbound", () => {
     const merged = withPackOutbound(data, inventory({ "m/C.java": "source" }), [{ path: "m/C.java", outboundCalls: [call(4)] }]);
     expect(merged.dependencies.map((d) => d.file)).toEqual(["a.ts", "m/C.java", "z.ts"]);
     expect(merged.contracts).toEqual(data.contracts);
+  });
+});
+
+describe("packEntryPointSignals", () => {
+  it("gives one entrypoint signal per fact, a cron job's schedule in its detail", () => {
+    const signals = packEntryPointSignals([
+      { path: "a.php", routes: [route("/a")] },
+      {
+        path: "bin/x.php",
+        entryPoints: [
+          { kind: "cli", source: "shebang", position: at(1) },
+          { kind: "cron", source: "crontab:3", schedule: "*/5 * * * *", position: at(1) },
+        ],
+      },
+    ]);
+    expect([...signals]).toEqual([
+      [
+        "bin/x.php",
+        [
+          { archetypeId: "entrypoint", detail: "cli entry point: shebang (line 1)", weight: 1 },
+          { archetypeId: "entrypoint", detail: "cron entry point: */5 * * * * (crontab:3)", weight: 1 },
+        ],
+      ],
+    ]);
+  });
+
+  it("is empty without entry-point facts", () => {
+    expect(packEntryPointSignals(undefined).size).toBe(0);
+    expect(packEntryPointSignals([{ path: "a.php", entryPoints: [] }]).size).toBe(0);
   });
 });

@@ -1,7 +1,8 @@
 /**
  * Language packs' framework facts in the artifacts sourcevision already
  * writes: `routes` facts become `serverRoutes` groups in components.json,
- * `outboundCalls` facts become `outbound.json` dependencies.
+ * `outboundCalls` facts become `outbound.json` dependencies, `entryPoints`
+ * facts become `entrypoint` evidence in classifications.json.
  *
  * The imports phase collects these facts in the same pack call that reads
  * imports (`PackImportsOptions.framework`), so no file is parsed twice; a
@@ -16,12 +17,13 @@
 import type { FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
 import type { HttpMethod, Inventory, OutboundData, OutboundDependency, ServerRoute, ServerRouteGroup } from "../schema/index.js";
 import { sortOutbound } from "../util/sort.js";
+import type { PackSignal } from "./classify.js";
 import { inferPrefix } from "./go-route-detection.js";
 import { SKIP_ROLES } from "./outbound-detection.js";
 import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
 
-/** The routes and outbound-call facts packs returned for one analysis. */
-export type PackFrameworkFacts = readonly Pick<FileFacts, "path" | "routes" | "outboundCalls">[];
+/** The routes, outbound-call and entry-point facts packs returned for one analysis. */
+export type PackFrameworkFacts = readonly Pick<FileFacts, "path" | "routes" | "outboundCalls" | "entryPoints">[];
 
 const HTTP_METHODS: ReadonlySet<string> = new Set<HttpMethod>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 
@@ -118,6 +120,33 @@ export function packOutboundDependencies(facts: PackFrameworkFacts, inventory: I
     }
   }
   return dependencies;
+}
+
+/** A pack's entry-point fact is decisive on its own: the pack read the file's content, not its name. */
+const ENTRY_POINT_WEIGHT = 1;
+
+/**
+ * The packs' entry-point facts as classification signals for the
+ * `entrypoint` archetype, by file: `cli entry point: shebang (line 1)`,
+ * `cron entry point: 0 3 * * * (crontab:4)`. No artifact has a field for a
+ * cron schedule, so it is kept only in this evidence text.
+ */
+export function packEntryPointSignals(facts: PackFrameworkFacts | undefined): Map<string, PackSignal[]> {
+  const signals = new Map<string, PackSignal[]>();
+  for (const { path, entryPoints } of facts ?? []) {
+    if (!entryPoints?.length) continue;
+    signals.set(
+      path,
+      entryPoints.map((e) => ({
+        archetypeId: "entrypoint",
+        detail: e.kind === "cron" && e.schedule !== undefined
+          ? `cron entry point: ${e.schedule} (${e.source})`
+          : `${e.kind} entry point: ${e.source} (line ${e.position.line})`,
+        weight: ENTRY_POINT_WEIGHT,
+      })),
+    );
+  }
+  return signals;
 }
 
 /** `data` with the packs' outbound calls added and sorted canonically. Without any, `data` itself. */

@@ -261,6 +261,21 @@ export interface RouteFact {
   readonly position: SourcePosition;
 }
 
+// ── Entry points (produced) ─────────────────────────────────────────────────
+
+/**
+ * A way into the program other than a request route: a script run from the
+ * command line (a PHP file with a `#!/usr/bin/env php` shebang) or by cron.
+ */
+export interface EntryPointFact {
+  readonly kind: "cli" | "cron";
+  /** Why the pack calls it one: the rule (`shebang`), or the line that runs it (`crontab:3`). */
+  readonly source: string;
+  /** For `cron`: the schedule as written (`*\/5 * * * *`, `@daily`). */
+  readonly schedule?: string;
+  readonly position: SourcePosition;
+}
+
 // ── Components (declared: no pack produces them yet) ────────────────────────
 
 /** A framework-managed unit a file declares (a React component, a Spring bean). */
@@ -408,10 +423,11 @@ export interface FileFacts {
   readonly components?: readonly ComponentFact[];
   readonly outboundCalls?: readonly OutboundCallFact[];
   readonly resources?: readonly ResourceFact[];
+  readonly entryPoints?: readonly EntryPointFact[];
 }
 
 /** Fact kinds a pack produces today. */
-export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources", "routes", "outboundCalls"] as const;
+export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints"] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */
 export const DECLARED_FACT_KINDS = ["components"] as const;

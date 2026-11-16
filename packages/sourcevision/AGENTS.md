@@ -119,6 +119,14 @@ reuse the detectors' role sets (`ROUTE_SKIP_ROLES`, outbound's `SKIP_ROLES`),
 prefix rule and order, and return their input itself when nothing is added.
 Pack `notices` go to the same `warn` as degrade notices.
 
+`entryPoints` facts (PHP's CLI and cron scripts) ride the same call and
+`packFacts`; `packEntryPointSignals` turns each into an `entrypoint` signal
+that `analyzeClassifications` scores (weight 1), recorded as evidence with
+`signalKind` `pack` and a detail such as `cron entry point: 0 3 * * *
+(crontab:4)`. No artifact has a schedule field, so the schedule lives only in
+that detail. A file with pack signals, or pack evidence last run, is always
+reclassified. Without facts classifications.json is unchanged.
+
 ### Terraform as a database-engine source
 
 `language/database-engines.ts` takes the Terraform pack's resource facts as

@@ -12,6 +12,8 @@ export * from "./php-pack.js";
 export * from "./php-builtins.js";
 export * from "./php-docroot.js";
 export * from "./php-docroots.js";
+export * from "./php-cron.js";
+export * from "./php-entry-points.js";
 export * from "./php-htaccess.js";
 export * from "./php-imports.js";
 export * from "./php-include-notices.js";

@@ -80,6 +80,7 @@ import { contains, type Capture, type PackResolver, type PackSourceFile, type Pr
 import { isPhpBuiltinClass } from "./php-builtins.js";
 import { readWrittenImports } from "./php-imports.js";
 import { PhpAutoloaders } from "./php-autoloaders.js";
+import { findCrontabFiles, readCrontabFiles } from "./php-cron.js";
 import { dirOf } from "./php-docroots.js";
 import { dynamicIncludeNotices, hostReader, type DynamicInclude } from "./php-include-notices.js";
 import { isInclude, PhpIncludes, readPhpIncludeConfigs, type PhpIncludeConfig, type PhpIncludeOutcome } from "./php-includes.js";
@@ -574,17 +575,26 @@ export async function readPhpResolveProjects(projectDir: string, files: readonly
 export interface PhpProjectFacts {
   readonly projects: readonly ComposerProject[];
   readonly includeConfigs: readonly PhpIncludeConfig[];
-  /** Each `.htaccess`'s text by path: the resolver's `configFiles`, for the docroot routes. */
+  /** Each `.htaccess`'s text by path: part of the resolver's `configFiles`, for the docroot routes. */
   readonly htaccess: ReadonlyMap<string, string>;
+  /** Each crontab-like file's text by path (`php-cron.ts`): part of the resolver's `configFiles`, for the entry points. */
+  readonly crontabs: ReadonlyMap<string, string>;
   /** Configuration files that could not be read. */
   readonly notices: readonly string[];
 }
 
-/** What resolution reads from outside the PHP files: Composer manifests, php.ini, `.user.ini` and `.htaccess`. */
+/** What resolution and the frameworks read from outside the PHP files: Composer manifests, php.ini, `.user.ini`, `.htaccess` and crontabs. */
 export async function readPhpProjectFacts(projectDir: string, files: readonly string[]): Promise<PhpProjectFacts> {
   const listed = await listBeside(projectDir, files);
   const { configs, htaccess, notices } = await readPhpIncludeConfigs(projectDir, listed);
-  return { projects: await readComposerProjects(projectDir, listed), includeConfigs: configs, htaccess, notices };
+  const cron = await readCrontabFiles(projectDir, await findCrontabFiles(projectDir, listed));
+  return {
+    projects: await readComposerProjects(projectDir, listed),
+    includeConfigs: configs,
+    htaccess,
+    crontabs: cron.crontabs,
+    notices: [...notices, ...cron.notices],
+  };
 }
 
 /** `files` and every file in a directory holding one of them or above one, sorted. */
@@ -688,7 +698,7 @@ export function preparePhpImports(
 function createPhpResolver(facts: PhpProjectFacts): PackResolver {
   return {
     forProject: async (projectDir, files) => createPhpResolver(await readPhpProjectFacts(projectDir, files)),
-    configFiles: () => facts.htaccess,
+    configFiles: () => new Map([...facts.htaccess, ...facts.crontabs]),
     prepare: (files, unparsed) => preparePhpImports(facts.projects, files, unparsed, facts),
   };
 }
@@ -698,4 +708,4 @@ function createPhpResolver(facts: PhpProjectFacts): PackResolver {
  * Composer project and no configuration file, so only classes declared in
  * the repository and includes set up in PHP code resolve.
  */
-export const phpResolver: PackResolver = createPhpResolver({ projects: [], htaccess: new Map(), ...NO_INCLUDE_SETTINGS });
+export const phpResolver: PackResolver = createPhpResolver({ projects: [], htaccess: new Map(), crontabs: new Map(), ...NO_INCLUDE_SETTINGS });

@@ -58,6 +58,21 @@ export interface ClassifyOptions {
    * languages match. Falls back to `[projectLanguage]` when omitted.
    */
   projectLanguages?: string[];
+  /**
+   * Path → what a language pack read in the file's content that points to an
+   * archetype (a PHP script cron runs is an entry point). Scored like any
+   * signal, recorded with `signalKind` `pack`. A file with pack signals, or
+   * whose previous classification had any, is always reclassified: the
+   * facts can change without the file changing (an edited crontab).
+   */
+  packSignals?: ReadonlyMap<string, readonly PackSignal[]>;
+}
+
+/** A language pack's evidence for an archetype, read from file content rather than its path. */
+export interface PackSignal {
+  archetypeId: string;
+  detail: string;
+  weight: number;
 }
 
 /**
@@ -102,10 +117,13 @@ export function analyzeClassifications(
     }
 
     // Incremental: reuse cached classification for unchanged files
+    const packSignals = options?.packSignals?.get(file.path);
     if (
       options?.changedFiles &&
       !options.changedFiles.has(file.path) &&
-      previousMap.has(file.path)
+      previousMap.has(file.path) &&
+      !packSignals?.length &&
+      !previousMap.get(file.path)!.evidence?.some((e) => e.signalKind === "pack")
     ) {
       const prev = previousMap.get(file.path)!;
       // Don't reuse user overrides that were removed
@@ -122,6 +140,7 @@ export function analyzeClassifications(
       exportMap.get(file.path),
       options?.projectLanguages
         ?? (options?.projectLanguage ? [options.projectLanguage] : undefined),
+      packSignals,
     );
     classifications.push(result);
   }
@@ -143,6 +162,7 @@ function classifyFile(
   archetypes: ArchetypeDefinition[],
   exports?: string[],
   projectLanguages?: string[],
+  packSignals: readonly PackSignal[] = [],
 ): FileClassification {
   const fileName = basename(filePath);
   const evidence: ClassificationEvidence[] = [];
@@ -152,6 +172,12 @@ function classifyFile(
 
   for (const archetype of archetypes) {
     let archetypeScore = 0;
+
+    for (const signal of packSignals) {
+      if (signal.archetypeId !== archetype.id) continue;
+      archetypeScore += signal.weight;
+      evidence.push({ archetypeId: archetype.id, signalKind: "pack", detail: signal.detail, weight: signal.weight });
+    }
 
     for (const signal of archetype.signals) {
       // Skip signals scoped to languages that don't match any project language

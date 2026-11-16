@@ -12,8 +12,8 @@ import {
 } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols, calls, resources, routes and outbound calls as produced", () => {
-    expect([...PRODUCED_FACT_KINDS]).toEqual(["imports", "symbols", "calls", "resources", "routes", "outboundCalls"]);
+  it("names imports, symbols, calls, resources, routes, outbound calls and entry points as produced", () => {
+    expect([...PRODUCED_FACT_KINDS]).toEqual(["imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints"]);
   });
 
   it("names components as declared", () => {

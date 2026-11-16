@@ -60,7 +60,7 @@ import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers
 import { mergeTokenUsage } from "../../analyzers/token-usage.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
-import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
+import { packEntryPointSignals, type PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 /**
  * Machine-local record of the {@link inventoryFingerprint} the last inventory
@@ -92,7 +92,7 @@ export interface AnalyzeContext {
   /** Result from phase 1 (inventory), used by later phases for incremental hints. */
   inventoryResult: InventoryResult | null;
   /**
-   * Language packs' routes and outbound calls, collected by the imports phase
+   * Language packs' routes, outbound calls and entry points, collected by the imports phase
    * in the call that reads imports; read on demand when it did not run.
    */
   packFacts?: PackFrameworkFacts;
@@ -249,7 +249,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
         fileSetChanged,
       } : {}),
       packs: {
-        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls }) => ({ path, routes, outboundCalls }))),
+        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls, entryPoints }) => ({ path, routes, outboundCalls, entryPoints }))),
         analysed: (id) => analysedPacks.push(id),
         suggest: (id) => suggestPack(ctx, id),
       },
@@ -296,6 +296,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     const projectLanguage = manifest.language;
     const projectLanguages = manifest.languages;
 
+    const packSignals = packEntryPointSignals(await packFrameworkFacts(ctx, inventory));
     let classifications = analyzeClassifications(inventory, importsData, {
       previousClassifications: !ctx.fullMode ? previousClassifications : undefined,
       changedFiles: ctx.inventoryResult?.changedFiles,
@@ -303,6 +304,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
       overrides: Object.keys(fileOverrides).length > 0 ? fileOverrides : undefined,
       projectLanguage,
       projectLanguages,
+      ...(packSignals.size > 0 ? { packSignals } : {}),
     });
 
     // LLM enrichment (skip in --fast mode)
