@@ -53,9 +53,11 @@ describe("php dynamic code", () => {
     expect(by.get("dispatch/variable-function.php")).toEqual(["dispatch variable-function 5 dispatch", "dispatch variable-function 6 dispatch"]);
     expect(by.get("dispatch/variable-new.php")).toEqual(["dispatch variable-new 3 -"]);
     expect(by.get("dispatch/variable-method.php")).toEqual(["dispatch variable-method 6 Front::run", "dispatch variable-method 7 Front::run"]);
+    // A class chosen by a value is a site with a literal method too; `self`, `static`, `parent`, `$this` and names are not.
     expect(by.get("dispatch/variable-static-method.php")).toEqual([
       "dispatch variable-static-method 4 make",
       "dispatch variable-static-method 5 make",
+      "dispatch variable-static-class 7 make",
     ]);
     expect(by.get("dispatch/callbacks.php")).toEqual(["dispatch array_map 2 -", "dispatch array_filter 3 -", "dispatch usort 4 -"]);
   });

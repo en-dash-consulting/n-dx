@@ -20,7 +20,9 @@
  *   on their callback argument; a callee that is not a name (`$f()`,
  *   `$handlers[$k]()`); `new` of a class that is not a name (`new $class`);
  *   a method named by a value (`$o->$m()`, `$o->{$expr}()`, `$c::$m()`,
- *   `$c::{$expr}()`). A static callable is a string without interpolation, a
+ *   `$c::{$expr}()`); a static call on a class that is a value (`$c::run()`,
+ *   `variable-static-class`; not `self`, `static`, `parent` or `$this`). A
+ *   static callable is a string without interpolation, a
  *   closure, a name or `X::class`, a first-class callable `f(...)`, or an
  *   array of those and `$this` (`[$this, 'save']`); `[$this, $name]` is not.
  * - `include`, an include whose path is not computable (`php-includes.ts`),
@@ -112,6 +114,12 @@ function isLiteral(node: Capture | undefined): boolean {
   if (node === undefined) return false;
   if (node.nodeType === "string" || node.nodeType === "nowdoc" || SCALAR_TYPES.has(node.nodeType)) return true;
   return (node.nodeType === "encapsed_string" || node.nodeType === "heredoc") && !node.text.includes("$");
+}
+
+/** Whether a static call's class is chosen by a value: not a name, `self`, `static`, `parent` or `$this`. */
+function isClassValue(scope: Capture): boolean {
+  if (NAME_TYPES.has(scope.nodeType) || scope.nodeType === "relative_scope") return false;
+  return !(scope.nodeType === "variable_name" && scope.text === "$this");
 }
 
 /** One file's captures, grouped and paired. */
@@ -274,17 +282,30 @@ function codeSites(captures: FileCaptures, builtin: (callee: Capture) => string 
       sites.push({ kind: "dispatch", construct: "variable-function", expression: call.text, position: call.start, operands: [callee] });
     }
   }
-  // A method named by a value; a static one's class may be a value too (`$c::$m()`).
-  const byValue = (calls: string, names: string, construct: string, scopes?: string) => {
-    for (const call of captures.get(calls)) {
-      const name = captures.partsOf(calls, names).get(nodeKey(call))?.[0];
-      if (name === undefined || name.nodeType === "name") continue;
-      const scope = scopes === undefined ? undefined : captures.partsOf(calls, scopes).get(nodeKey(call))?.[0];
-      sites.push({ kind: "dispatch", construct, expression: call.text, position: call.start, operands: [name, scope] });
-    }
-  };
-  byValue("method-call", "method-name", "variable-method");
-  byValue("static-call", "static-name", "variable-static-method", "static-scope");
+  // A method named by a value (`$o->$m()`); an instance method named as written is no site.
+  const methodNames = captures.partsOf("method-call", "method-name");
+  for (const call of captures.get("method-call")) {
+    const name = methodNames.get(nodeKey(call))?.[0];
+    if (name === undefined || name.nodeType === "name") continue;
+    sites.push({ kind: "dispatch", construct: "variable-method", expression: call.text, position: call.start, operands: [name] });
+  }
+  // A static call whose method or class is a value: `$c::$m()`, `$c::run()`. The value operands choose the code.
+  const staticNames = captures.partsOf("static-call", "static-name");
+  const staticScopes = captures.partsOf("static-call", "static-scope");
+  for (const call of captures.get("static-call")) {
+    const name = staticNames.get(nodeKey(call))?.[0];
+    const scope = staticScopes.get(nodeKey(call))?.[0];
+    const byName = name !== undefined && name.nodeType !== "name";
+    const byClass = scope !== undefined && isClassValue(scope);
+    if (!byName && !byClass) continue;
+    sites.push({
+      kind: "dispatch",
+      construct: byName ? "variable-static-method" : "variable-static-class",
+      expression: call.text,
+      position: call.start,
+      operands: [byName ? name : undefined, byClass ? scope : undefined],
+    });
+  }
   const classes = captures.partsOf("new", "class");
   for (const created of captures.get("new")) {
     sites.push({ kind: "dispatch", construct: "variable-new", expression: created.text, position: created.start, operands: [classes.get(nodeKey(created))?.[0]] });

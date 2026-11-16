@@ -27,13 +27,18 @@
  *
  * **Flow**, a forward pass in document order within one function, method,
  * closure or file top level: `=` and `= &` replace a variable's sources
- * (inside an `if` condition too), `.=` adds to them, an assignment to an
- * element or property (`$a[$k] = $row`, `$o->p = $row`) adds to its root
- * variable's and never clears them, `list()` and `[…]` destructuring give
- * each variable the value's, `foreach` gives its value variable the
- * subject's, `global` clears. A value read through `$row['x']`, `$row->x`,
- * `( … )`, `.` or interpolation keeps its sources; any other call or
- * operator gives none. Parameters, properties of `$this`, loop-carried and
+ * (inside an `if` condition too), `.=` adds to them, `list()` and `[…]`
+ * destructuring give each variable the value's, `foreach` gives its value
+ * variable the subject's, `global` clears. Sources are kept per element or
+ * property of a variable, one level deep (`$a['k']`, `$a[0]`, `$o->p`):
+ * `$o->p = …` replaces that path's, a literal clearing it; a write with any
+ * other key (`$a[$k] = $row`, `$a[] = $row`) or deeper (`$o->p['x'] = $row`)
+ * adds and never clears. Reading a literal path gives what was last written
+ * to it, else the variable's own (`$obj = $row; $obj['handler']`), never a
+ * sibling's; reading any other key gives every such write's and the
+ * variable's own; reading the variable whole gives all of them, and `$b = $a`
+ * copies them. A value read through `$row['x']`, `$row->x`, `( … )`, `.` or
+ * interpolation keeps its sources; any other call or operator gives none. Parameters, properties of `$this`, loop-carried and
  * branch-merged values are never sources: what cannot be decided is missed,
  * not guessed.
  *
@@ -119,9 +124,15 @@ type Event =
 
 /** A scope's variables while its events are read. */
 interface State {
+  /** Each variable's own value, as last assigned whole. */
   readonly vars: Map<string, Sources>;
+  /** Each variable's elements and properties written since (`['k']`, `->p`, {@link ANY_ELEMENT}); a cleared one is kept, empty. */
+  readonly paths: Map<string, Map<string, Sources>>;
   readonly clients: Set<string>;
 }
+
+/** The path of elements written or read by a key that is not a literal (`$a[$k]`, `$a[]`, `$o->$p`). */
+const ANY_ELEMENT = "*";
 
 const variable = (c: Capture): string | undefined => (c.nodeType === "variable_name" ? c.text.slice(1) : undefined);
 
@@ -319,13 +330,13 @@ class RepositoryFlow {
 
   /** Reads one scope's events in order, calling `visit` on each with the state before it takes effect. */
   private run(file: FileFlow, scope: Capture | undefined, visit: (event: Event, state: State) => void): void {
-    const state: State = { vars: new Map(), clients: new Set() };
+    const state: State = { vars: new Map(), paths: new Map(), clients: new Set() };
     for (const event of file.events.get(scope) ?? []) {
       visit(event, state);
       if (event.kind === "assign") this.assign(file, event.left, event.right, event.append, state);
-      else if (event.kind === "foreach") set(state, event.variable, this.evaluate(file, event.subject, state));
+      else if (event.kind === "foreach") replace(state, event.variable, this.evaluate(file, event.subject, state));
       else if (event.kind === "global") {
-        state.vars.delete(event.variable);
+        replace(state, event.variable, NONE);
         state.clients.delete(event.variable);
       }
     }
@@ -337,18 +348,28 @@ class RepositoryFlow {
     if (name !== undefined) {
       if (append) set(state, name, union(state.vars.get(name) ?? NONE, value));
       else {
-        set(state, name, value);
+        // A copy of a variable keeps what each of its elements and properties holds.
+        const from = variable(right);
+        const paths = from === undefined ? undefined : state.paths.get(from);
+        replace(state, name, from === undefined ? value : (state.vars.get(from) ?? NONE));
+        if (paths !== undefined) state.paths.set(name, new Map(paths));
         if (isClient(file, right)) state.clients.add(name);
         else state.clients.delete(name);
       }
       return;
     }
     if (left.nodeType === "list_literal") {
-      for (const v of file.captures.partsOf("list", "list-variable").get(nodeKey(left)) ?? []) set(state, variable(v)!, value);
+      for (const v of file.captures.partsOf("list", "list-variable").get(nodeKey(left)) ?? []) replace(state, variable(v)!, value);
       return;
     }
-    const root = rootVariable(file, left);
-    if (root !== undefined && root !== "this" && value.size > 0) set(state, root, union(state.vars.get(root) ?? NONE, value));
+    const written = writtenPath(file, left);
+    if (written === undefined || written.root === "this") return;
+    const { root, path, whole } = written;
+    let paths = state.paths.get(root);
+    if (paths === undefined) state.paths.set(root, (paths = new Map()));
+    // Only a literal path written whole is replaced; any other write may leave what was there.
+    if (whole && !append && path !== ANY_ELEMENT) paths.set(path, value);
+    else if (value.size > 0) paths.set(path, union(path === ANY_ELEMENT ? (paths.get(path) ?? NONE) : readPath(state, root, path), value));
   }
 
   /** How deep {@link evaluate} is nested now. */
@@ -381,12 +402,14 @@ class RepositoryFlow {
     const of = (next: Capture | undefined): Sources => (next === undefined ? NONE : this.evaluate(file, next, state));
     switch (node.nodeType) {
       case "variable_name":
-        return state.vars.get(node.text.slice(1)) ?? NONE;
+        return readWhole(state, node.text.slice(1));
       case "subscript_expression":
-        return of(part("subscript", "subscript-base"));
       case "member_access_expression":
-      case "nullsafe_member_access_expression":
-        return of(part("member", "member-object"));
+      case "nullsafe_member_access_expression": {
+        const read = readPathOf(file, node);
+        if (read !== undefined) return read.root === "this" ? NONE : readPath(state, read.root, read.path);
+        return of(node.nodeType === "subscript_expression" ? part("subscript", "subscript-base") : part("member", "member-object"));
+      }
       case "parenthesized_expression":
         return of(part("parenthesized", "parenthesized-inner"));
       case "binary_expression":
@@ -473,9 +496,88 @@ class RepositoryFlow {
 
 const NAME_TYPES = new Set(["name", "qualified_name", "relative_name"]);
 
+/** Sets a variable's own value, keeping what its elements and properties hold (`.=`). */
 function set(state: State, name: string, value: Sources): void {
   if (value.size === 0) state.vars.delete(name);
   else state.vars.set(name, value);
+}
+
+/** Assigns a variable whole: its elements and properties are what `value`'s are. */
+function replace(state: State, name: string, value: Sources): void {
+  set(state, name, value);
+  state.paths.delete(name);
+}
+
+/** A variable read whole: its own value and everything written into it. */
+function readWhole(state: State, name: string): Sources {
+  let out = state.vars.get(name) ?? NONE;
+  for (const held of state.paths.get(name)?.values() ?? []) out = union(out, held);
+  return out;
+}
+
+/**
+ * One element or property of a variable. A literal path holds what was last
+ * written to it, else the variable's own value (`$obj = $row`); a path that is
+ * not a literal may be any element written by such a path, or the variable's
+ * own. Never another literal path's: which one it is cannot be decided.
+ */
+function readPath(state: State, root: string, path: string): Sources {
+  const own = state.vars.get(root) ?? NONE;
+  const written = state.paths.get(root)?.get(path);
+  if (path === ANY_ELEMENT) return union(own, written ?? NONE);
+  return written ?? own;
+}
+
+/** A path read or written: the variable and its element or property. */
+interface VariablePath {
+  readonly root: string;
+  readonly path: string;
+}
+
+/** `$a['k']`, `$a[0]` and `$o->p` as `['k']`, `[0]` and `->p`; {@link ANY_ELEMENT} for any other key; undefined unless `node`'s base is a variable. */
+function readPathOf(file: FileFlow, node: Capture): VariablePath | undefined {
+  const c = file.captures;
+  if (node.nodeType === "subscript_expression") {
+    const base = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
+    const root = base === undefined ? undefined : variable(base);
+    if (root === undefined) return undefined;
+    const key = literalKey(c.partsOf("indexed", "subscript-index").get(nodeKey(node))?.[0]);
+    return { root, path: key === undefined ? ANY_ELEMENT : `[${key}]` };
+  }
+  if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") {
+    const object = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
+    const root = object === undefined ? undefined : variable(object);
+    if (root === undefined) return undefined;
+    const name = c.partsOf("named-member", "member-name").get(nodeKey(node))?.[0];
+    return { root, path: name?.nodeType === "name" ? `->${name.text}` : ANY_ELEMENT };
+  }
+  return undefined;
+}
+
+/** An array key written as a literal, as PHP compares it (`'1'` and `1` alike); undefined when it is not one. */
+function literalKey(index: Capture | undefined): string | undefined {
+  if (index === undefined) return undefined;
+  if (index.nodeType === "integer") return index.text;
+  const quoted = index.nodeType === "string" || (index.nodeType === "encapsed_string" && !index.text.includes("$"));
+  return quoted && !index.text.includes("\\") ? index.text.slice(1, -1) : undefined;
+}
+
+/**
+ * The path an element or property assignment writes: the outermost access on
+ * the variable (`['a']` of `$v['a'][$k]`, `->p` of `$o->p->q`), and whether
+ * that path is written whole rather than into.
+ */
+function writtenPath(file: FileFlow, left: Capture): (VariablePath & { readonly whole: boolean }) | undefined {
+  const c = file.captures;
+  let node: Capture | undefined = left;
+  for (let depth = 0; node !== undefined && depth < 64; depth++) {
+    const path = readPathOf(file, node);
+    if (path !== undefined) return { ...path, whole: node === left };
+    if (node.nodeType === "subscript_expression") node = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
+    else if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") node = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
+    else return undefined;
+  }
+  return undefined;
 }
 
 /** Whether `value` makes a database client: `new PDO`, `new mysqli`, `new wpdb`, `mysqli_connect(…)`, `mysqli_init()`. */
@@ -490,19 +592,6 @@ function isClient(file: FileFlow, value: Capture): boolean {
     return callee !== undefined && callee.nodeType === "name" && CLIENT_FUNCTIONS.has(callee.text.toLowerCase());
   }
   return false;
-}
-
-/** The variable an element or property assignment writes into (`$a` of `$a[$k]['x']`, `$o` of `$o->p`). */
-function rootVariable(file: FileFlow, left: Capture): string | undefined {
-  const c = file.captures;
-  let node: Capture | undefined = left;
-  for (let depth = 0; node !== undefined && depth < 64; depth++) {
-    if (node.nodeType === "variable_name") return variable(node);
-    if (node.nodeType === "subscript_expression") node = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
-    else if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") node = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
-    else return undefined;
-  }
-  return undefined;
 }
 
 const sorted = (values: Iterable<string>): string[] => [...new Set(values)].sort((a, b) => a.localeCompare(b));

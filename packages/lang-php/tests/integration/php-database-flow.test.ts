@@ -3,7 +3,9 @@
  * entry, over `php-database-flow`: a custom app with WordPress-like patterns
  * (a `pages.handler` dispatched with `call_user_func`, a `blocks.body` passed
  * to `eval`, a route row loaded by `lib/routes.php`'s `get_route()` and
- * dispatched by `front.php`, a repository class), Drupal 7's menu router
+ * dispatched by `front.php`, a repository class, a controller class from a
+ * routing table called statically in `routes-static.php`, per-property and
+ * per-element provenance in `properties.php`), Drupal 7's menu router
  * shape under `drupal/`, and `not-database.php`, whose sites no database
  * result reaches or the forward pass cannot decide. Skips when the grammar
  * is not built.
@@ -68,6 +70,30 @@ describe("php database-driven dynamic code", () => {
     ]);
   });
 
+  it("marks a static call whose class, or class and method, come from a routing table", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    expect((await sites()).get("routes-static.php")).toEqual([
+      "variable-static-class 6 [routes] [routes.controller] [routes-static.php:4]",
+      "variable-static-method 13 [routes] [routes.action,routes.controller] [routes-static.php:10]",
+    ]);
+  });
+
+  it("tracks provenance per property and element, a whole row still reaching its elements", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    expect((await sites()).get("properties.php")).toEqual([
+      // A literal sibling of a database-fed property, then the fed one.
+      "call_user_func 8 -",
+      "eval 9 [blocks] [blocks.body] [properties.php:4]",
+      // A literal written over a database-fed property clears it.
+      "call_user_func 17 -",
+      "call_user_func 25 -",
+      "call_user_func 26 [pages] [pages.handler] [properties.php:21]",
+      "call_user_func 32 [pages] [pages.handler] [properties.php:30]",
+      "call_user_func 40 [pages] [pages.handler] [properties.php:36]",
+      "call_user_func 47 [pages] [pages.handler] [properties.php:45]",
+    ]);
+  });
+
   it("never marks a parameter-fed site, nor a flow it cannot decide", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     // A variable replaced by a closure or arrow function no longer holds the row.
@@ -109,10 +135,10 @@ describe("php database-driven dynamic code", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const notices = (await analyze()).notices ?? [];
     expect(notices.filter((n) => n.includes(`[${PHP_DB_EXEC}]`))).toEqual([
-      `PHP: [${PHP_DB_EXEC}] 1 site runs code read from a database: blocks.php:7; table blocks.`,
+      `PHP: [${PHP_DB_EXEC}] 2 sites run code read from a database: blocks.php:7, properties.php:9; table blocks.`,
     ]);
     expect(notices.filter((n) => n.includes(`[${PHP_DB_DISPATCH}]`))).toEqual([
-      `PHP: [${PHP_DB_DISPATCH}] 6 sites choose what to run from database data: drupal/menu.php:26, front.php:5, front.php:6, lib/PageRepository.php:18, lib/PageRepository.php:24, and 1 more; tables menu_router, pages, routes.`,
+      `PHP: [${PHP_DB_DISPATCH}] 12 sites choose what to run from database data: drupal/menu.php:26, front.php:5, front.php:6, lib/PageRepository.php:18, lib/PageRepository.php:24, and 7 more; tables menu_router, pages, routes.`,
     ]);
   });
 });

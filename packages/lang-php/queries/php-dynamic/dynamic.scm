@@ -64,6 +64,10 @@
 (subscript_expression . (_) @dynamic.subscript-base) @dynamic.subscript
 (member_access_expression object: (_) @dynamic.member-object) @dynamic.member
 (nullsafe_member_access_expression object: (_) @dynamic.member-object) @dynamic.member
+; Which element or property: provenance is kept per `$a['k']` and `$o->p`.
+(subscript_expression . (_) . (_) @dynamic.subscript-index) @dynamic.indexed
+(member_access_expression name: (_) @dynamic.member-name) @dynamic.named-member
+(nullsafe_member_access_expression name: (_) @dynamic.member-name) @dynamic.named-member
 (parenthesized_expression (_) @dynamic.parenthesized-inner) @dynamic.parenthesized
 (binary_expression left: (_) @dynamic.concat-operand operator: "." right: (_) @dynamic.concat-operand) @dynamic.concat
 (encapsed_string (_) @dynamic.interpolated-part) @dynamic.interpolated
