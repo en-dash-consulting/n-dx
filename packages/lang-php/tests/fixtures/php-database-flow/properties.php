@@ -47,3 +47,12 @@ function collected_rows() {
         call_user_func($r['handler']);
     }
 }
+
+function copied_sibling() {
+    $row = mysql_fetch_assoc(mysql_query('SELECT body FROM blocks'));
+    $x = new stdClass();
+    $x->body = $row['body'];
+    $x->handler = 'trim';
+    $y = $x;
+    call_user_func($y->handler);
+}

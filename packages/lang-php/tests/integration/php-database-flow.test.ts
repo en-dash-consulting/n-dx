@@ -91,6 +91,8 @@ describe("php database-driven dynamic code", () => {
       "call_user_func 32 [pages] [pages.handler] [properties.php:30]",
       "call_user_func 40 [pages] [pages.handler] [properties.php:36]",
       "call_user_func 47 [pages] [pages.handler] [properties.php:45]",
+      // A copy keeps each property's own sources, not the object's as a whole.
+      "call_user_func 57 -",
     ]);
   });
 
