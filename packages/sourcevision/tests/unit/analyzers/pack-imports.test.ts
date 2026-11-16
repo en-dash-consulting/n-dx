@@ -115,15 +115,20 @@ describe("buildPackImportGraph", () => {
       produces: ["imports", "routes", "outboundCalls"] as const,
     };
     const collected: unknown[] = [];
+    const asked: unknown[] = [];
     const messages: string[] = [];
     await buildPackImportGraph([file("src/A.java")], "/project", {
       packs: [knownPack(javaConfig, { entry: entry as LanguagePackEntry })],
       loader: { packDir, version: VERSION },
       warn: (m) => messages.push(m),
-      framework: (f) => collected.push(...f),
+      framework: (f, kinds) => {
+        collected.push(...f);
+        asked.push(kinds);
+      },
     });
     expect(requests.map((r) => r.kinds)).toEqual([["imports", "routes", "outboundCalls"]]);
     expect(collected).toEqual(facts);
+    expect(asked).toEqual([["routes", "outboundCalls"]]);
     expect(messages).toEqual(["Spring Boot: 1 skipped."]);
   });
 
@@ -421,12 +426,12 @@ describe("readPackFrameworkFacts", () => {
     return { facts, messages };
   };
 
-  it("asks only for the framework kinds, on the pack's files", async () => {
+  it("asks only for the framework kinds, on the pack's files, and tags each file's facts with them", async () => {
     const requests: PackProjectRequest[] = [];
     const facts = [{ path: "src/A.java", outboundCalls: [] }];
     const result = await read([knownPack(javaConfig, { entry: framework({ facts, unparsed: [] }, requests) })]);
     expect(requests).toEqual([{ projectDir: "/project", files: ["src/A.java"], kinds: ["routes", "outboundCalls"] }]);
-    expect(result).toEqual({ facts, messages: [] });
+    expect(result).toEqual({ facts: [{ ...facts[0], asked: ["routes", "outboundCalls"] }], messages: [] });
   });
 
   it("passes over quietly a pack that cannot load or produces no framework kinds", async () => {

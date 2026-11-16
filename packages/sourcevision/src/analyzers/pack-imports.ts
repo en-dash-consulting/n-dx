@@ -33,6 +33,7 @@ import {
   type KnownPack,
   type PackLoaderOptions,
 } from "../language/pack-loader.js";
+import type { PackFrameworkFact } from "./pack-framework-facts.js";
 
 export interface PackImportsOptions {
   /** Defaults to {@link KNOWN_PACKS}. */
@@ -52,9 +53,10 @@ export interface PackImportsOptions {
    * flag-check facts. When set, the same
    * `analyzeProject` call also asks for the {@link FRAMEWORK_FACT_KINDS} the
    * pack produces, so a file is parsed once per analysis; unset, only
-   * imports are asked for.
+   * imports are asked for. `asked` is the framework kinds that call asked
+   * for (see {@link packFrameworkFactsOf}).
    */
-  readonly framework?: (facts: readonly FileFacts[]) => void;
+  readonly framework?: (facts: readonly FileFacts[], asked: readonly FactKind[]) => void;
   /** Receives the id of each pack that ran without degrading. */
   readonly analysed?: (packId: string) => void;
   /** The project's `sourcevision.packs`: a missing pack listed here is warned about. */
@@ -69,6 +71,12 @@ export interface PackImportsOptions {
 
 /** The fact kinds a pack's framework rules produce for later phases. */
 export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor", "legacyConstructs"] as const satisfies readonly FactKind[];
+
+/** `facts`, the entries one pack call returned, as framework facts, each with the framework kinds that call `asked` for. */
+export function packFrameworkFactsOf(facts: readonly FileFacts[], asked: readonly FactKind[]): PackFrameworkFact[] {
+  return facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs }) =>
+    ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs, asked }));
+}
 
 /** The {@link FRAMEWORK_FACT_KINDS} `entry` produces. */
 export const frameworkKindsOf = (entry: LanguagePackEntry): FactKind[] =>
@@ -176,7 +184,8 @@ export async function buildPackImportGraph(
     // The entry contract says a pack does not throw for its own failures, but a
     // resolver bug or a pack built against another contract can still reject;
     // that must cost only this language, as a missing pack does.
-    const kinds: FactKind[] = ["imports", ...(options.framework ? frameworkKindsOf(load.entry) : [])];
+    const framework = options.framework ? frameworkKindsOf(load.entry) : [];
+    const kinds: FactKind[] = ["imports", ...framework];
     let result: PackProjectResult;
     try {
       result = await load.entry.analyzeProject({ projectDir: targetDir, files: paths, kinds });
@@ -194,7 +203,7 @@ export async function buildPackImportGraph(
     options.analysed?.(pack.id);
     unparsed.push(...result.unparsed);
     for (const notice of result.notices ?? []) warn(notice);
-    if (kinds.length > 1) options.framework?.(result.facts);
+    if (framework.length > 0) options.framework?.(result.facts, framework);
 
     for (const { path, imports } of result.facts) {
       if (!imports) continue;
@@ -227,9 +236,9 @@ export async function readPackFrameworkFacts(
   files: Inventory["files"],
   targetDir: string,
   options: Pick<PackImportsOptions, "packs" | "loader" | "warn"> = {},
-): Promise<FileFacts[]> {
+): Promise<PackFrameworkFact[]> {
   const warn = options.warn ?? ((message: string) => console.warn(message));
-  const facts: FileFacts[] = [];
+  const facts: PackFrameworkFact[] = [];
   for (const pack of options.packs ?? KNOWN_PACKS) {
     const paths = files.filter((f) => isPackFile(f.path, [pack])).map((f) => f.path);
     if (paths.length === 0) continue;
@@ -255,7 +264,7 @@ export async function readPackFrameworkFacts(
       continue;
     }
     for (const notice of result.notices ?? []) warn(notice);
-    facts.push(...result.facts);
+    facts.push(...packFrameworkFactsOf(result.facts, kinds));
   }
   return facts;
 }

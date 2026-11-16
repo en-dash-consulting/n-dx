@@ -61,6 +61,7 @@ import { mergeTokenUsage } from "../../analyzers/token-usage.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
 import { packEntryPointSignals, type PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
+import { packFrameworkFactsOf } from "../../analyzers/pack-imports.js";
 
 /**
  * Machine-local record of the {@link inventoryFingerprint} the last inventory
@@ -249,8 +250,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
         fileSetChanged,
       } : {}),
       packs: {
-        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs }) =>
-          ({ path, routes, outboundCalls, entryPoints, configReads, flagChecks, versionFloor, legacyConstructs }))),
+        framework: (facts, asked) => packFacts.push(...packFrameworkFactsOf(facts, asked)),
         analysed: (id) => analysedPacks.push(id),
         suggest: (id) => suggestPack(ctx, id),
       },

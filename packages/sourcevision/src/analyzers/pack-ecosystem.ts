@@ -7,10 +7,12 @@
  *   deprecated, by rule and by the version that removed (or deprecated) them,
  *   with review notices counted apart.
  *
- * Readiness carries it through (`readiness-score.ts`). A section appears only
- * when a pack produced something for it, a language only with a section, and
- * the profile gains `ecosystem` only then, so a repository without such a
- * pack, or one the pack finds nothing in, writes the profile it always did.
+ * Readiness carries it through (`readiness-score.ts`). `versionFloors`
+ * appears when a pack was asked for floors over the language's files, even if
+ * none has one; `legacyConstructs` only when a file has a use. A language
+ * appears only with a section, and the profile gains `ecosystem` only then, so
+ * a repository without such a pack, or without files of its language, writes
+ * the profile it always did.
  *
  * @module sourcevision/analyzers/pack-ecosystem
  */
@@ -47,19 +49,26 @@ const byVersion = (counts: ReadonlyMap<string, number>): Record<string, number> 
 const add = (counts: Map<string, number>, key: string, n = 1) => counts.set(key, (counts.get(key) ?? 0) + n);
 
 /**
- * A language's files by floor: `files` counts every file a pack returned facts
- * for, `none` those without a floor. Undefined when no file has one.
+ * A language's files by floor. `files` counts the pack's fact entries, which
+ * lang-kit's contract makes one per file the pack read (`PackProjectResult.facts`),
+ * facts or none; files it could not read are not counted. `none` counts those
+ * without a floor, and `highest` is absent when no file has one. Written when
+ * the pack was asked for `versionFloor` (`asked`), so "no file uses syntax a
+ * rule dates" is told from "no pack ran"; undefined otherwise.
  */
 export function versionFloors(facts: readonly PackFrameworkFacts[number][]): SdlcVersionFloors | undefined {
   const floors = new Map<string, number>();
   let none = 0;
-  for (const { versionFloor } of facts) {
-    if (versionFloor === undefined) none++;
-    else add(floors, versionFloor.version);
+  let asked = false;
+  for (const fact of facts) {
+    if (fact.asked?.includes("versionFloor")) asked = true;
+    if (fact.versionFloor === undefined) none++;
+    else add(floors, fact.versionFloor.version);
   }
-  if (floors.size === 0) return undefined;
+  if (floors.size === 0 && !asked) return undefined;
   const ordered = byVersion(floors);
-  return { files: facts.length, floors: ordered, none, highest: Object.keys(ordered).at(-1)! };
+  const highest = Object.keys(ordered).at(-1);
+  return { files: facts.length, floors: ordered, none, ...(highest === undefined ? {} : { highest }) };
 }
 
 /** One rule's count, from its first fact; the boundaries are the rule's, so every fact of a rule carries the same. */

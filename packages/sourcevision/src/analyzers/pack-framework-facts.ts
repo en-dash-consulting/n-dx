@@ -14,7 +14,7 @@
  * @module sourcevision/analyzers/pack-framework-facts
  */
 
-import type { FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
+import type { FactKind, FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
 import type { HttpMethod, Inventory, OutboundData, OutboundDependency, ServerRoute, ServerRouteGroup } from "../schema/index.js";
 import { sortOutbound } from "../util/sort.js";
 import type { PackSignal } from "./classify.js";
@@ -29,10 +29,20 @@ import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
  * version floors and legacy constructs become the SDLC profile's `ecosystem`
  * (`pack-ecosystem.ts`).
  */
-export type PackFrameworkFacts = readonly Pick<
+export type PackFrameworkFacts = readonly PackFrameworkFact[];
+
+/** One file's framework facts, as its pack returned them (`packFrameworkFactsOf` in `pack-imports.ts`). */
+export type PackFrameworkFact = Pick<
   FileFacts,
   "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs"
->[];
+> & {
+  /**
+   * The framework fact kinds the file's pack was asked for, which tells a
+   * kind it found nothing of from one it was never asked for: a pack asked
+   * for `versionFloor` gets the histogram even when no file has a floor.
+   */
+  readonly asked?: readonly FactKind[];
+};
 
 const HTTP_METHODS: ReadonlySet<string> = new Set<HttpMethod>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 

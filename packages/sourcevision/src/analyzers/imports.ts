@@ -22,10 +22,11 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
+import type { PackFrameworkFact } from "./pack-framework-facts.js";
 import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
 import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
-import { type FileFacts, type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
+import { type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
 import { isTerraformSource } from "./terraform-infrastructure.js";
 import { parseJsTsSource } from "./ts-source.js";
 
@@ -375,7 +376,7 @@ export async function readImportsPackFrameworkFacts(
   targetDir: string,
   inventory: Inventory,
   options?: Pick<ImportsOptions, "language" | "packs">,
-): Promise<FileFacts[]> {
+): Promise<PackFrameworkFact[]> {
   const packs = packsFor(await parseableExtensionsFor(targetDir, options), options?.packs?.packs);
   const packFiles = inventory.files.filter((f) => isPackFile(f.path, packs));
   return readPackFrameworkFacts(packFiles, targetDir, { ...options?.packs, packs });

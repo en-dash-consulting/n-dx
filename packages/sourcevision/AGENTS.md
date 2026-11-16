@@ -122,8 +122,10 @@ that `analyzeClassifications` scores (weight 1), recorded as evidence with
 reclassified. Without facts classifications.json is unchanged.
 
 `configReads` and `flagChecks` become config.json, `versionFloor` and
-`legacyConstructs` sdlc-profile.json's `ecosystem` (`pack-ecosystem.ts`),
-each only when present.
+`legacyConstructs` sdlc-profile.json's `ecosystem` (`pack-ecosystem.ts`):
+config facts and legacy constructs only when present, the version-floor
+histogram whenever the pack was asked for floors (`PackFrameworkFact.asked`),
+even with none found.
 
 ### Terraform as a database-engine source
 

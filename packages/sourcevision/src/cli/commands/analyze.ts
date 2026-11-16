@@ -789,7 +789,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // because the inventory's codeOnly filter drops the YAML, TOML and
     // Dockerfiles this reads. Deterministic: no LLM call and no network.
     // Language packs' version floors and legacy constructs join it as
-    // `ecosystem`, only when a pack produced one.
+    // `ecosystem`, only when a pack that produces them ran over files of its language.
     const sdlcProfile = withEcosystem(
       await buildSdlcProfile(ctx.absDir),
       packEcosystem(await packFrameworkFacts(ctx, inventory), inventory),

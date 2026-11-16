@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "c68b966b-0160-440f-a9db-194ee6281775":
+    status: "completed"
+    startedAt: "2026-11-16T20:26:09.936Z"
+    completedAt: "2026-11-16T20:26:09.936Z"
+    endedAt: "2026-11-16T20:26:09.936Z"
+    activeIntervals: [{"end":"2026-11-16T20:26:09.936Z","start":"2026-11-16T20:26:09.936Z"}]
+    appliedAt: "2026-11-16T20:26:09.936Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-16T20:19:08.111Z"
-    lastModified: "2026-11-16T20:19:22.263Z"
+    lastModified: "2026-11-16T20:26:09.936Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c9ef9a9e-15ea-46e6-ab20-f83bf64b9010":
-    lastModified: "2026-11-16T20:19:11.151Z"
+    status: "completed"
+    startedAt: "2026-11-16T20:19:51.832Z"
+    completedAt: "2026-11-16T20:26:09.936Z"
+    endedAt: "2026-11-16T20:26:09.936Z"
+    activeIntervals: [{"end":"2026-11-16T20:26:09.936Z","start":"2026-11-16T20:19:51.832Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "versionFloors is written whenever the pack was asked for versionFloor (new PackFrameworkFact.asked, set by packFrameworkFactsOf on both collection paths); floors {} and no highest when nothing is dated."
+    lastModified: "2026-11-16T20:26:09.936Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

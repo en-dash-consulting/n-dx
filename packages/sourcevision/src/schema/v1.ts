@@ -1517,7 +1517,7 @@ export interface SdlcIac extends SdlcDetection {
  * `VersionFloorFact`): the oldest version whose syntax covers each file.
  */
 export interface SdlcVersionFloors {
-  /** Files the language pack read. */
+  /** Files the language pack read. The section is written whenever the pack was asked for floors, so a repository no rule dates has `floors` `{}` and `none` equal to `files`. */
   files: number;
   /** `major.minor` → files whose floor it is, oldest version first. */
   floors: Record<string, number>;

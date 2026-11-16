@@ -94,6 +94,18 @@ describe("packEcosystem: version floors", () => {
     expect(packEcosystem([{ path: "gone.php", versionFloor: floor("8.0"), legacyConstructs: [use(EACH)] }], inv)).toBeUndefined();
   });
 
+  it("writes the histogram with no floor when the pack was asked for floors and no rule dated a file", () => {
+    const inv = inventory({ "a.php": "PHP", "b.php": "PHP", "App.java": "Java" });
+    const asked = ["routes", "versionFloor"] as const;
+    const ecosystem = packEcosystem(
+      [{ path: "a.php", asked }, { path: "b.php", asked }, { path: "App.java", asked: ["routes"] }],
+      inv,
+    );
+    expect(ecosystem).toEqual({ php: { versionFloors: { files: 2, floors: {}, none: 2 } } });
+    expect("highest" in ecosystem!.php!.versionFloors!).toBe(false);
+    expect(validate(SdlcProfileSchema, withEcosystem(EMPTY_PROFILE, ecosystem)).ok).toBe(true);
+  });
+
   it("leaves out a language whose files have neither", () => {
     const inv = inventory({ "a.php": "PHP", "App.java": "Java" });
     expect(packEcosystem([{ path: "a.php", versionFloor: floor("8.1") }, { path: "App.java" }], inv)).toEqual({
