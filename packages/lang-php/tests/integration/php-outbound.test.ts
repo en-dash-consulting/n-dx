@@ -67,6 +67,18 @@ describe("php outbound calls", () => {
     // local files and mail() (streams.php), an unknown receiver and App\SoapClient (src/Api.php).
   });
 
+  it("follows a variable rebuilt from itself once per line, not once per path through the lines", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    // Each `$long = $long . …` line re-read every earlier one: 60 lines never finished before the test timed out.
+    const rebuilt = join(import.meta.dirname, "..", "fixtures", "php-outbound-rebuilt");
+    const result = await pack.analyzeProject({ projectDir: rebuilt, files: ["index.php"], kinds: ["outboundCalls"] });
+    expect(result.facts.flatMap((f) => (f.outboundCalls ?? []).map((c) => `${c.position.line} ${c.target} (${c.targetSource})`))).toEqual([
+      "5 https://short.example.com/q?a=1&b=2 (literal)",
+      // Past the depth bound, the target is unknown rather than guessed.
+      "68  (unknown)",
+    ]);
+  });
+
   it("gives no outbound calls when they are not wanted", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     expect(await outbound(["imports", "routes", "entryPoints"])).toEqual([]);

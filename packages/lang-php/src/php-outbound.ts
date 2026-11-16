@@ -136,6 +136,7 @@ export function envKey(text: string): string | undefined {
 /** Reads targets in one file. */
 class TargetReader {
   private readonly assignments: Array<Assignment & { readonly scope: Capture | undefined }>;
+  private readonly memo = new Map<string, string | undefined>();
 
   constructor(
     private readonly file: PackSourceFile,
@@ -179,18 +180,33 @@ class TargetReader {
     return evaluatePath(text, this.file.path, this.constant, (name) => this.variable(name, at, depth));
   }
 
-  /** What a variable holds at `at`: its assignments before it in its scope, `.=` appending; undefined when not computable. */
+  /**
+   * What a variable holds at `at`: its last plain assignment before it in its
+   * scope, then each `.=` appending; undefined when not computable. Memoized,
+   * and earlier assignments are never evaluated, so a variable rebuilt from
+   * itself line after line (`$u = $u . '&a=1';`) costs one evaluation per line,
+   * not one per path through them.
+   */
   private variable(name: string, at: SourcePosition, depth: number): string | undefined {
     if (depth >= MAX_DEPTH) return undefined;
+    const key = `${name}@${at.line}:${at.column}#${depth}`;
+    if (this.memo.has(key)) return this.memo.get(key);
     const scope = scopeAt(this.file, at);
-    let value: string | undefined;
+    const relevant: Array<Assignment & { readonly scope: Capture | undefined }> = [];
     for (const a of this.assignments) {
       if (!before(a.start, at)) break;
       if (a.name !== name || a.scope !== scope) continue;
+      if (a.operator === undefined) relevant.length = 0;
+      relevant.push(a);
+    }
+    let value: string | undefined;
+    for (const a of relevant) {
       const assigned = a.value === undefined ? undefined : this.evaluate(a.value, a.start, depth + 1);
       if (a.operator === undefined) value = assigned;
       else value = a.operator === ".=" && value !== undefined && assigned !== undefined ? value + assigned : undefined;
+      if (value === undefined) break;
     }
+    this.memo.set(key, value);
     return value;
   }
 
