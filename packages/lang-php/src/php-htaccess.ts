@@ -7,7 +7,9 @@
  *   or `Require all denied` (2.4's mod_authz_core) outside a `<Files>`
  *   block denies the directory and everything below it; `Allow from all` or
  *   `Require all granted` with no denial grants it again below a denied
- *   parent. Other containers (`<IfModule>`, `<Limit>`) are read through.
+ *   parent. A rule inside `<Limit>`/`<LimitExcept>` counts only when the
+ *   block covers GET or POST (`<LimitExcept GET POST>` covers neither);
+ *   other containers (`<IfModule>`) are read through.
  * - **File access**: the same denials inside `<Files name>`,
  *   `<Files ~ "regex">` or `<FilesMatch "regex">` deny the files whose name
  *   matches, in the directory and below.
@@ -120,8 +122,11 @@ export function parseHtaccess(file: string, text: string): Htaccess {
   const frontControllers: HtaccessFrontController[] = [];
   const notices: string[] = [];
   let rewriteBase: string | undefined;
-  /** Open containers: a `<Files>` block's matcher, or null for one read through. */
-  const containers: Array<((name: string) => boolean) | null | "unreadable"> = [];
+  /**
+   * Open containers: a `<Files>` block's matcher, `other-methods` for a
+   * `<Limit>`/`<LimitExcept>` that covers neither GET nor POST, or null for one read through.
+   */
+  const containers: Array<((name: string) => boolean) | null | "unreadable" | "other-methods"> = [];
 
   for (const { text: lineText, line } of logicalLines(text)) {
     const trimmed = lineText.trim();
@@ -133,6 +138,11 @@ export function parseHtaccess(file: string, text: string): Htaccess {
         const matcher = filesMatcher(words(open[2]!), name === "filesmatch");
         if (matcher === undefined) notices.push(`${file}:${line} <${open[1]}> has a pattern that could not be read; its access rules are not applied.`);
         containers.push(matcher ?? "unreadable");
+      } else if (name === "limit" || name === "limitexcept") {
+        // <Limit m…> applies to the methods listed, <LimitExcept m…> to all others.
+        const listed = new Set(words(open[2]!).map((m) => m.toUpperCase()));
+        const pages = name === "limit" ? listed.has("GET") || listed.has("POST") : !listed.has("GET") || !listed.has("POST");
+        containers.push(pages ? null : "other-methods");
       } else {
         containers.push(null);
       }
@@ -144,7 +154,9 @@ export function parseHtaccess(file: string, text: string): Htaccess {
     }
     const raw = words(trimmed);
     const w = raw.map((x) => x.toLowerCase());
-    const files = containers.find((c) => c !== null);
+    // Access rules for methods other than GET and POST say nothing about the pages.
+    if (containers.includes("other-methods") && (isDenial(w) || isGrant(w))) continue;
+    const files = containers.find((c) => c !== null && c !== "other-methods");
     if (isDenial(w)) {
       if (files === undefined) denied ??= line;
       else if (files !== "unreadable") fileDenials.push({ matches: files, line });

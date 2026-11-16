@@ -35,6 +35,13 @@ describe("parseHtaccess", () => {
     expect(parseHtaccess("a/.htaccess", "Options -Indexes\n").access).toBeUndefined();
   });
 
+  it("applies a <Limit>/<LimitExcept> rule only when the block covers GET or POST", () => {
+    expect(parseHtaccess(".htaccess", "<LimitExcept GET POST>\n  Deny from all\n</LimitExcept>\n").access).toBeUndefined();
+    expect(parseHtaccess(".htaccess", "<Limit PUT DELETE>\n  Require all denied\n</Limit>\n").access).toBeUndefined();
+    expect(parseHtaccess(".htaccess", "<Limit GET POST>\n  Deny from all\n</Limit>\n").access).toEqual({ denied: true, line: 2 });
+    expect(parseHtaccess(".htaccess", "<LimitExcept OPTIONS>\n  Require all denied\n</LimitExcept>\n").access).toEqual({ denied: true, line: 2 });
+  });
+
   it("scopes a denial inside <Files> and <FilesMatch> to the names they match", () => {
     const h = parseHtaccess(".htaccess", '<Files "*.ini">\nDeny from all\n</Files>\n<FilesMatch "\\.(bak|sql)$">\nRequire all denied\n</FilesMatch>\n');
     expect(h.access).toBeUndefined();
