@@ -19,6 +19,7 @@ import { pack, phpGrammarPath, phpPack, preparePhpImports, readPhpResolveProject
 const dir = join(import.meta.dirname, "..", "fixtures", "php-composer");
 const sharedRoot = join(import.meta.dirname, "..", "fixtures", "php-shared-root");
 const apps = join(import.meta.dirname, "..", "fixtures", "php-composer-apps");
+const monorepo = join(import.meta.dirname, "..", "fixtures", "php-composer-monorepo");
 const files = (): string[] => listFixtureFiles(dir, [...phpPack.config.extensions]);
 
 async function facts(): Promise<Map<string, FileFacts>> {
@@ -188,5 +189,17 @@ describe("php namespace resolver", () => {
     expect(byPath.get("a/main.php")?.imports?.external).toEqual([lib]);
     expect(byPath.get("b/main.php")?.imports?.external).toEqual([{ package: "php:Lib", symbols: ["Lib\\Thing"] }]);
     expect(byPath.get("loose/script.php")?.imports?.external).toEqual([lib]);
+  });
+
+  it("keeps a path package and a nested plugin in the loader of the project that loads or encloses them", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    // The root requires acme/x from its path repositories packages/*, and acme/x requires acme/y
+    // from the same repositories; plugins/p has its own manifest inside the root project.
+    const outcomes = await outcomesIn(monorepo);
+    expect(outcomes("packages/x/src/A.php")).toEqual(["new Y\\B psr-4", "new Root\\Kernel psr-4", "new Lib\\Thing external"]);
+    expect(outcomes("plugins/p/src/Ext.php")).toEqual(["new Root\\Kernel psr-4", "new Legacy declared"]);
+    const result = await pack.analyzeProject({ projectDir: monorepo, files: listFixtureFiles(monorepo, [...phpPack.config.extensions]), kinds: ["imports"] });
+    const a = result.facts.find((f) => f.path === "packages/x/src/A.php");
+    expect(a?.imports?.external).toEqual([{ package: "php:Lib", symbols: ["Lib\\Thing"], module: { path: "vendor/lib", version: "0.0.0-fixture" } }]);
   });
 });

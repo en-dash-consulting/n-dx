@@ -21,7 +21,9 @@
  * **Scope.** A file resolves through the `autoload` and `autoload-dev` of
  * the project owning it (the nearest enclosing `composer.json`) and of each
  * project a `path` repository of that project points at and it requires,
- * merged as Composer's one loader merges them; the same scope holds for the
+ * merged as Composer's one loader merges them, plus the loader of any
+ * project that requires the owner through its own path repositories or
+ * encloses the owner's directory; the same scope holds for the
  * classmap, `composer.lock` prefixes and the declared-class fallback, so two
  * apps mapping one namespace never link to each other. A file outside every
  * project resolves through every project's.
@@ -384,7 +386,7 @@ function pathRepositoryMatches(base: string, url: string, dir: string): boolean 
  * through another such project (Composer reads repositories from the root
  * manifest only).
  */
-function projectsInScope(owner: ComposerProject, projects: readonly ComposerProject[]): ComposerProject[] {
+function loadedBy(owner: ComposerProject, projects: readonly ComposerProject[]): ComposerProject[] {
   const paths = owner.repositories.filter((r) => r.type === "path");
   const available = projects.filter((p) => p !== owner && p.name !== undefined && paths.some((r) => pathRepositoryMatches(owner.dir, r.url, p.dir)));
   const inScope = [owner];
@@ -394,6 +396,29 @@ function projectsInScope(owner: ComposerProject, projects: readonly ComposerProj
       if (required !== undefined) inScope.push(required);
     }
   }
+  return inScope;
+}
+
+/**
+ * The projects whose autoload code in `owner` runs under: what `owner`
+ * loads, then the loader of each project that loads `owner` through a path
+ * repository (a monorepo root installing its packages), then of each
+ * project enclosing `owner`'s directory (a plugin with its own manifest),
+ * nearest first. Two sibling apps neither loading nor enclosing the other
+ * stay apart.
+ */
+function projectsInScope(
+  owner: ComposerProject,
+  projects: readonly ComposerProject[],
+  loaders: ReadonlyMap<ComposerProject, readonly ComposerProject[]>,
+): ComposerProject[] {
+  const inScope = [...loaders.get(owner)!];
+  const add = (more: readonly ComposerProject[]): void => {
+    for (const p of more) if (!inScope.includes(p)) inScope.push(p);
+  };
+  for (const p of projects) if (p !== owner && loaders.get(p)!.includes(owner)) add(loaders.get(p)!);
+  const enclosing = projects.filter((p) => p !== owner && underEntry(owner.dir, p.dir)).sort((a, b) => b.dir.length - a.dir.length);
+  for (const p of enclosing) add(loaders.get(p)!);
   return inScope;
 }
 
@@ -421,6 +446,8 @@ class Index {
   private readonly everyProject: Scope;
   /** Each project's scope by its directory, built on first use. */
   private readonly scopes = new Map<string, Scope>();
+  /** What each project loads ({@link loadedBy}), built with the first scope. */
+  private loaders: Map<ComposerProject, readonly ComposerProject[]> | undefined;
   /** Each file's owning project directory (undefined: none), by path. */
   private readonly owners = new Map<string, string | undefined>();
   private readonly classes = new Map<string, string[]>();
@@ -516,7 +543,8 @@ class Index {
     if (owner === undefined) return this.everyProject;
     let scope = this.scopes.get(owner);
     if (scope === undefined) {
-      const inScope = projectsInScope(this.projects.find((p) => p.dir === owner)!, this.projects);
+      this.loaders ??= new Map(this.projects.map((p) => [p, loadedBy(p, this.projects)]));
+      const inScope = projectsInScope(this.projects.find((p) => p.dir === owner)!, this.projects, this.loaders);
       scope = this.scopeOver(inScope, new Set(inScope.map((p) => p.dir)));
       this.scopes.set(owner, scope);
     }

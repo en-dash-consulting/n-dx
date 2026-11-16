@@ -1,10 +1,14 @@
 schema: "rex/v2"
 items:
   "08c6f81a-f090-4a59-8966-08d65bf3a58b":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-16T22:51:30.168Z"
-    activeIntervals: [{"start":"2026-11-16T22:51:30.168Z"}]
-    lastModified: "2026-11-16T22:51:31.263Z"
+    completedAt: "2026-11-16T23:05:00.091Z"
+    endedAt: "2026-11-16T23:05:00.091Z"
+    activeIntervals: [{"end":"2026-11-16T23:05:00.091Z","start":"2026-11-16T22:51:30.168Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-resolver.ts scopes PSR-4/PSR-0/classmap/lock prefixes and the declared-class fallback to the referring file's owning Composer project plus required path repositories; project-less files keep every project's mappings."
+    lastModified: "2026-11-16T23:05:00.091Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "938d1611-a5d7-4fd9-81e5-422e2b47a776":
     lastModified: "2026-11-16T22:46:25.242Z"
