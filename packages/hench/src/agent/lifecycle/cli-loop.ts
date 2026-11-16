@@ -1019,6 +1019,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       proc.stdin.end();
     }
 
+    const unfinishedTracker = adapter.createUnfinishedSessionTracker?.();
     const result: SpawnResult = {
       turns: 0,
       toolCalls: [],
@@ -1340,6 +1341,9 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
         result.error = formatCloseError({ code, stderr, vendor: adapter.vendor, cliBinary });
       }
 
+      if (!result.error && !result.planModeIntercept) {
+        result.backgroundWait ??= unfinishedTracker?.signal();
+      }
       resolve(result);
     });
 
@@ -1358,6 +1362,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
      * Claude shape, which is what this function used to hardcode.
      */
     function captureSessionId(rawJson: unknown): void {
+      unfinishedTracker?.observe(rawJson);
       if (result.sessionId) return;
       if (adapter.extractSessionId) {
         const id = adapter.extractSessionId(rawJson);
@@ -1866,12 +1871,9 @@ async function runExecutorFix(
 /**
  * Run the adversarial review pass for a completed task.
  *
- * The pass never fails the task. By the time it runs, completion validation
- * has already passed and the work is real; a reviewer that crashes, times out,
- * or writes an unparseable report tells us nothing about the work's quality,
- * so the failure is reported and the run continues. The alternative — treating
- * a broken reviewer as a broken task — would make `--review` strictly riskier
- * than not reviewing at all, which is the fastest way to get it switched off.
+ * Completion validation has already passed. A failed pass records its outcome;
+ * finalizeRun refuses reviewed completion without a usable report, preserving
+ * the work. The explicit review-optional setting allows best-effort review.
  *
  * What the pass *can* change is the working tree: a must-fix repair lands
  * before the commit prompt, so it ships in the same commit as the work it
@@ -2040,6 +2042,11 @@ export async function runAdversarialReviewPass(
     return failed;
   };
 
+  const reviewerIdentity = () => ctx.vendor === "codex" ? codexReuseIdentity({
+    binary: ctx.cliBinary, env: ctx.cliEnv, cwd: inv.projectDir,
+    model: ctx.reviewModel, policy: ctx.policy, permissionMode: ctx.permissionMode,
+  }) : undefined;
+  const firstReviewerIdentity = reviewerIdentity();
   const first = await spawnReviewer(spawnConfig);
   if (!first.ok) return failReview(first);
   if (ctx.vendor === "codex" && resumeSessionId && first.spawned.sessionId !== resumeSessionId) {
@@ -2049,8 +2056,8 @@ export async function runAdversarialReviewPass(
 
   let outcome = await readReviewReport(reportPath);
 
-  // A reviewer that ended waiting on a background command, with no report
-  // written, is resumed once and told to write the report now. It had usually
+  // A Codex reviewer with no report, or a Claude reviewer that ended waiting
+  // on a background command, is resumed once to write the report now. It had usually
   // done the review — run 01d15d75's reviewer printed its findings and then
   // deferred the file for a suite that would never report back.
   const reviewerSession = ctx.adapter.resumesUnfinishedSessions
@@ -2058,11 +2065,15 @@ export async function runAdversarialReviewPass(
     : undefined;
   if (
     !outcome.ok && outcome.reason === "no-report" && reviewerSession &&
-    (first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
+    (ctx.vendor === "codex" || first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
   ) {
+    if (ctx.vendor === "codex" && !sameCodexSessionIdentity(firstReviewerIdentity, reviewerIdentity())) {
+      return failReview({ ok: false, reason: "no-report",
+        detail: "Codex reviewer wrote no report and its session cannot be safely resumed. Check CLI resume support and execution identity, then rerun the review." });
+    }
     backgroundResumed = true;
     info(
-      "⚠ The reviewer ended waiting on a background command without writing its report. " +
+      "⚠ The reviewer ended without writing its required report. " +
         "Resuming it once to write the report now.",
     );
     const resumeEnvelope = createPromptEnvelope([
@@ -2080,10 +2091,16 @@ export async function runAdversarialReviewPass(
       }),
     );
     if (!resumed.ok) return failReview(resumed);
+    if (ctx.vendor === "codex" && resumed.spawned.sessionId !== reviewerSession) {
+      return failReview({ ok: false, reason: "spawn-failed",
+        detail: "Codex review continuation did not confirm the reviewer session id; rerun the review." });
+    }
     outcome = await readReviewReport(reportPath);
   }
 
-  if (!outcome.ok) return failReview(outcome);
+  if (!outcome.ok) return failReview(backgroundResumed ? {
+    ...outcome, detail: `${outcome.detail} Review continuation failed to produce a valid report; rerun the review.`,
+  } : outcome);
 
   // A re-review does not repeat the lesser findings of the round before it, so
   // they are copied in: the last report is the whole review.
@@ -3238,8 +3255,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // triggering ExitPlanMode (or when the plan-respawn cap is hit / the
       // user rejects the plan).
       while (true) {
+        const expectedContinuationSession = backgroundResumeSessionId ?? retryResumeSessionId;
         const codexSpawnIdentity = vendor === "codex"
           ? reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits") : undefined;
+        if (vendor === "codex" && backgroundResumeSessionId &&
+            !sameCodexSessionIdentity(codexWorkSession?.identity, codexSpawnIdentity)) {
+          throw new Error("Codex unfinished session identity changed; refusing to replay work. Restore the execution identity and rerun the task.");
+        }
         // Recheck immediately before using a retry handle; backoff may outlive
         // a checkout, credential, model or execution-policy change.
         if (vendor === "codex" && attempt > 0) {
@@ -3381,7 +3403,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
         recordSpawn(spawnLedger, nextSpawnReason);
 
-        codexRetryAttempt = vendor === "codex" && retryResumeSessionId !== undefined;
+        codexRetryAttempt = vendor === "codex" && (retryResumeSessionId !== undefined || backgroundResumeSessionId !== undefined);
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         resetLiveSpawnProgress(liveProgress);
         result = await withHeartbeat(
@@ -3449,7 +3471,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
         if (vendor === "codex") {
           codexWorkSession = result.sessionId ? { id: result.sessionId, identity: codexSpawnIdentity } : undefined;
-          if (codexRetryAttempt && !result.error && result.sessionId !== retryResumeSessionId) {
+          if (codexRetryAttempt && !result.error && result.sessionId !== expectedContinuationSession) {
             result.error = "Codex did not confirm the resumed work session id; refusing to replay this task";
           }
         }
@@ -3466,7 +3488,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           (await hasUnfinishedWork({ projectDir, autoCommit: config.autoCommit === true }))
         ) {
           const signal = result.backgroundWait;
-          const resumeId = adapter.resumesUnfinishedSessions ? result.sessionId : undefined;
+          const resumeId = adapter.resumesUnfinishedSessions && (vendor !== "codex" ||
+            sameCodexSessionIdentity(codexWorkSession?.identity,
+              reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits")))
+            ? result.sessionId : undefined;
           if (backgroundResumes === 0 && resumeId) {
             backgroundResumes++;
             backgroundResumeSessionId = resumeId;

@@ -44,8 +44,9 @@ export type { BackgroundWaitSignal };
 export const WORK_SESSION_RESUME_MESSAGE =
   "Nothing will notify you: this run is non-interactive, and a background command, " +
   "scheduled wake-up, or monitor will never report back to this session. " +
-  "Run the command again in the foreground and wait for it to exit, then finish: " +
-  "commit your work, update the task status, and write your summary.";
+  "Inspect existing progress first; do not repeat completed commands, task mutations or commits. " +
+  "Finish only the remaining work in the foreground under the original task's commit and " +
+  "status instructions, then write your summary. Do not bypass validation or review.";
 
 /**
  * The message that resumes a review session which ended waiting instead of
@@ -57,6 +58,7 @@ export function buildReviewResumeMessage(reportPath: string): string {
     "scheduled wake-up, or monitor will never report back to this session. Do not wait " +
     "for anything and do not start another check. Write the JSON report now, from what " +
     `you already have, to this exact path:\n\n    ${reportPath}\n\n` +
+    "Do not repeat task mutations, commits or repairs. " +
     "Say in `summary` which checks you did not see finish."
   );
 }

@@ -10,19 +10,11 @@ import {
 } from "../helpers/scripted-claude-cli.js";
 import { loadConfig } from "../../src/store/config.js";
 
-/**
- * Codex runs are unchanged by the background-wait resume (PR BG).
- *
- * The resume is gated on the adapter: the Codex adapter reports no
- * background waits (`codex exec` has no known background tool, and a shell
- * `&` is not parsed) and does not resume unfinished sessions. So a Codex
- * session that leaves its work uncommitted must end exactly as before — one
- * spawn, and the uncommitted-work gate's refusal.
- */
+/** Shell ampersands are not evidence of unfinished Codex work. */
 
 const THREAD = "01a05958-2931-73f1-9aba-38fa915bb8df";
 
-describe("cliLoop — Codex sessions are not resumed", () => {
+describe("cliLoop — shell text cannot trigger Codex recovery", () => {
   let projectDir: string;
   let henchDir: string;
   let rexDir: string;

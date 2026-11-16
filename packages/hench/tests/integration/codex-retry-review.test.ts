@@ -63,11 +63,11 @@ describe("Codex retry and self-review loop contract", () => {
     };
   }
 
-  async function run(taskId: string, reviewModel?: string) {
+  async function run(taskId: string, reviewModel?: string, abortSignal?: AbortSignal) {
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
     return cliLoop({ config: await loadConfig(henchDir), store: createStore("file", rexDir),
-      projectDir, henchDir, taskId, spawnModel: "gpt-6-astra", autonomous: true, yes: true, reviewOptional: reviewModel === undefined, reviewPass: reviewModel !== undefined, reviewModel });
+      projectDir, henchDir, taskId, abortSignal, spawnModel: "gpt-6-astra", autonomous: true, yes: true, reviewOptional: reviewModel === undefined, reviewPass: reviewModel !== undefined, reviewModel });
   }
 
   const failed = (id?: string) => ({ code: 1, lines: [
@@ -157,4 +157,128 @@ describe("Codex retry and self-review loop contract", () => {
     expect(cli.invocations[1].args.includes("resume")).toBe(sameModel);
     expect(outcome.run.review?.resumedSession).toBe(sameModel);
   });
+
+  const unfinished = (id = "work") => ({ lines: [
+    { type: "thread.started", thread_id: id },
+    { type: "turn.started" },
+    { type: "item.started", item: { id: "check", type: "command_execution", command: "node check.js", status: "in_progress" } },
+  ] });
+
+  function leavesWork(): ReturnType<ScriptedTurn> {
+    writeFileSync(join(projectDir, "done.ts"), "export const done = true;\n");
+    return unfinished();
+  }
+
+  it("continues unfinished structured work once without replaying the brief", async () => {
+    cli.script(leavesWork, works("done.ts", "work"));
+    const outcome = await run("task-1");
+    expect(outcome.run.status, outcome.run.error).toBe("completed");
+    expect(cli.invocations).toHaveLength(2);
+    expect(cli.invocations[1].args.slice(0, 3)).toEqual(["exec", "resume", "work"]);
+    expect(cli.invocations[1].stdin).toContain("do not repeat completed commands, task mutations or commits");
+    expect(cli.invocations[1].stdin).not.toContain("## Current task");
+    expect(outcome.run.spawnBreakdown?.["background-resume"]).toBe(1);
+  });
+
+  it("does not resume already committed work despite an unfinished stream", async () => {
+    cli.script(() => { works("done.ts", "work")({ args: [], stdin: "" }); return unfinished(); });
+    const outcome = await run("task-1");
+    expect(outcome.run.status, outcome.run.error).toBe("completed");
+    expect(cli.invocations).toHaveLength(1);
+  });
+
+  it.each(["wait", "error", "wrong-thread"])("fails a %s continuation without replay or another retry", async (kind) => {
+    cli.script(leavesWork, () => kind === "wait" ? unfinished() : kind === "error" ? failed("work") : result("wrong"));
+    const outcome = await run("task-1");
+    expect(outcome.run.status).not.toBe("completed");
+    expect(cli.invocations).toHaveLength(2);
+    if (kind === "wait") expect(outcome.run.error).toContain("again after being resumed");
+    if (kind === "wrong-thread") expect(outcome.run.error).toContain("did not confirm");
+  });
+
+  it.each(["unsupported", "identity", "branch", "missing-id"])("does not continue unfinished work with %s", async (change) => {
+    cli.script(() => {
+      const turn = leavesWork();
+      if (change === "unsupported") supported = false;
+      if (change === "identity") identity = "changed";
+      if (change === "branch") execFileSync("git", ["checkout", "-b", "moved"], { cwd: projectDir, stdio: "ignore" });
+      if (change === "missing-id") turn.lines.shift();
+      return turn;
+    });
+    const outcome = await run("task-1");
+    expect(outcome.run.status).not.toBe("completed");
+    expect(cli.invocations).toHaveLength(1);
+  });
+
+  it("keeps the test gate after a successful unfinished-work continuation", async () => {
+    await saveConfig(henchDir, { ...await loadConfig(henchDir), fullTestCommand: 'node -e "process.exit(1)"' });
+    execFileSync("git", ["add", ".hench/config.json"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "fixture failing gate"], { cwd: projectDir, stdio: "ignore" });
+    cli.script(leavesWork, works("done.ts", "work"));
+    const outcome = await run("task-1");
+    expect(outcome.run.status).not.toBe("completed");
+    expect(outcome.run.testGate?.passed).toBe(false);
+    expect(cli.invocations).toHaveLength(2);
+  });
+
+  it("does not classify an interrupted turn as unfinished successful work", async () => {
+    cli.script(() => ({ code: 130, lines: [...leavesWork().lines,
+      { type: "turn.failed", error: { message: "Interrupted by user" } },
+    ] }));
+    const outcome = await run("task-1");
+    expect(outcome.run.status).not.toBe("completed");
+    expect(outcome.run.backgroundResume).toBeUndefined();
+    expect(cli.invocations).toHaveLength(1);
+  });
+
+  it("cancellation never starts an unfinished-work continuation", async () => {
+    const controller = new AbortController();
+    cli.script(() => {
+      const turn = leavesWork();
+      setTimeout(() => controller.abort(), 10);
+      return { ...turn, hang: true };
+    });
+    const outcome = await run("task-1", undefined, controller.signal);
+    expect(outcome.run.status).not.toBe("completed");
+    expect(cli.invocations).toHaveLength(1);
+  });
+
+  const writesReport: ScriptedTurn = (call) => {
+    const path = call.stdin.match(/(\S+[\\/]\.hench[\\/]reviews[\\/][\w-]+\.json)/)?.[1];
+    if (!path) throw new Error("missing review report path");
+    writeFileSync(path, JSON.stringify({ findings: [] }));
+    return result("review");
+  };
+
+  it("continues the fresh reviewer, never the executor, when its report is missing", async () => {
+    cli.script(works("done.ts", "work"), () => result("review"), writesReport);
+    const outcome = await run("task-1", "different-model");
+    expect(outcome.run.status, outcome.run.error).toBe("completed");
+    expect(cli.invocations).toHaveLength(3);
+    expect(cli.invocations[2].args.slice(0, 3)).toEqual(["exec", "resume", "review"]);
+    expect(cli.invocations[2].stdin).toContain("Write the JSON report now");
+    expect(outcome.run.review?.backgroundResumed).toBe(true);
+  });
+
+  it.each(["no-report", "wrong-thread", "error", "identity", "cancel"])("keeps %s review recovery gated", async (kind) => {
+    const controller = new AbortController();
+    cli.script(works("done.ts", "work"), () => {
+      if (kind === "identity") identity = "changed";
+      if (kind === "cancel") {
+        setTimeout(() => controller.abort(), 10);
+        return { ...result("review"), hang: true };
+      }
+      return result("review");
+    }, (call) => {
+      if (kind === "error") return failed("review");
+      if (kind === "wrong-thread") { writesReport(call); return result("wrong"); }
+      return result("review");
+    });
+    const outcome = await run("task-1", "different-model", controller.signal);
+    expect(outcome.run.review?.failed).toBeDefined();
+    expect(outcome.run.review?.gated).toBe(true);
+    expect(outcome.run.status).not.toBe("completed");
+    expect(cli.invocations).toHaveLength(kind === "identity" || kind === "cancel" ? 2 : 3);
+  });
+
 });

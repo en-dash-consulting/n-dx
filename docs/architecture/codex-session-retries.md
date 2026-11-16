@@ -58,3 +58,36 @@ Scripted protocol tests separately cover retry and self-review argv, child
 continuity, identity invalidation, prior attempt accounting, bounded resume
 failure, review gates and existing batch/pair behavior. They do not establish
 real model behavior.
+
+## Unfinished work and missing reports
+
+Codex recovery recognizes a clean process exit with an open `turn.started`, or
+an `in_progress` command item with no matching `item.completed`. These are
+structured [CLI events](https://github.com/openai/codex/blob/main/sdk/typescript/src/events.ts)
+and [command statuses](https://github.com/openai/codex/blob/main/sdk/typescript/src/items.ts),
+not prose promises or shell ampersands. Failed/interrupted processes stay on
+their error/cancellation path. Recovery requires work still unfinished according
+to the normal commit gate; completed commits or correctly staged work are not
+replayed.
+
+An eligible session gets one continuation under the existing spawn cap, with its
+execution identity rechecked and its returned thread ID verified. Failed or
+repeated unfinished continuations cannot recursively resume or retry cold. The
+continuation prompt forbids repeating completed mutations or commits. Normal
+validation and review remain required.
+
+A Codex reviewer that exits successfully without its report gets one continuation
+of that reviewer session, including when the reviewer started fresh on a different
+model. The report-only continuation rechecks the reviewer's own identity. Missing
+or malformed reports fail the review gate for all vendors while preserving work;
+`--review-optional` remains the explicit best-effort override.
+
+Additional observations on 2026-11-16: installed `codex-cli 0.167.0-alpha.3.2`
+accepted fresh and explicit-ID resume invocations in a disposable, credential-free
+fixture. Both emitted the same thread ID, but each hit its six-second bound with
+no completed turn. A separate read-only Codex self-review of this patch hit its
+20-second bound with no completed turn or report. This verifies thread selection
+only: authenticated model availability, successful live recovery and live
+self-review remain unverified. No other versions or browser flows were tested.
+Scripted fixture tests cover work/reviewer continuation, repeat failure, wrong
+thread IDs, identity invalidation, cancellation, shell-text rejection and gates.

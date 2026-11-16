@@ -302,6 +302,12 @@ export interface VendorAdapter {
    *
    * @param toolCall - The tool name and input from one `tool_use` event
    */
+  /** Per-spawn structured stream state; inspected only after a successful exit. */
+  createUnfinishedSessionTracker?(): {
+    observe(rawJson: unknown): void;
+    signal(): BackgroundWaitSignal | undefined;
+  };
+
   detectBackgroundWait?(toolCall: {
     tool: string;
     input: Readonly<Record<string, unknown>> | undefined;

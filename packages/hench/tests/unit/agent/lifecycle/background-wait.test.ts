@@ -59,8 +59,8 @@ describe("codex adapter: background waits and resume", () => {
       .toBeUndefined();
   });
 
-  it("does not resume unfinished sessions, while the Claude adapter does", () => {
-    expect(codexCliAdapter.resumesUnfinishedSessions).toBe(false);
+  it("supports bounded unfinished-session resume for both CLI adapters", () => {
+    expect(codexCliAdapter.resumesUnfinishedSessions).toBe(true);
     expect(claudeCliAdapter.resumesUnfinishedSessions).toBe(true);
   });
 });
@@ -121,5 +121,40 @@ describe("hasUnfinishedWork", () => {
 
     await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: the feature\n", "utf-8");
     expect(await hasUnfinishedWork({ projectDir, autoCommit: false, listDirty: staged })).toBe(false);
+  });
+});
+
+
+describe("Codex structured unfinished stream", () => {
+  it("tracks command completion by id without interpreting shell text", () => {
+    const tracker = codexCliAdapter.createUnfinishedSessionTracker!();
+    tracker.observe({ type: "item.started", item: { id: "a", type: "command_execution", status: "in_progress", command: "echo 'a&b'" } });
+    tracker.observe({ type: "item.started", item: { id: "b", type: "command_execution", status: "in_progress" } });
+    tracker.observe({ type: "item.completed", item: { id: "a", type: "command_execution", status: "completed" } });
+    expect(tracker.signal()?.tool).toBe("command_execution");
+    tracker.observe({ type: "item.completed", item: { id: "b", type: "command_execution", status: "failed" } });
+    expect(tracker.signal()).toBeUndefined();
+  });
+
+  it.each(["turn.failed", "error"])("never recovers a %s stream as successful unfinished work", (type) => {
+    const tracker = codexCliAdapter.createUnfinishedSessionTracker!();
+    tracker.observe({ type: "turn.started" });
+    tracker.observe({ type });
+    expect(tracker.signal()).toBeUndefined();
+  });
+
+  it("clears an open turn only on its terminal event and keeps spawns independent", () => {
+    const tracker = codexCliAdapter.createUnfinishedSessionTracker!();
+    tracker.observe({ type: "turn.started" });
+    expect(tracker.signal()?.tool).toBe("turn.started");
+    expect(codexCliAdapter.createUnfinishedSessionTracker!().signal()).toBeUndefined();
+    tracker.observe({ type: "turn.completed" });
+    expect(tracker.signal()).toBeUndefined();
+  });
+
+  it("ignores unknown events and text promising to wait", () => {
+    const tracker = codexCliAdapter.createUnfinishedSessionTracker!();
+    for (const event of [null, "waiting", { type: "unknown" }, { type: "item.completed", item: { type: "agent_message", text: "I will wait for pnpm test &" } }]) tracker.observe(event);
+    expect(tracker.signal()).toBeUndefined();
   });
 });

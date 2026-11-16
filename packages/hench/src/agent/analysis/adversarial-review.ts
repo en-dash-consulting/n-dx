@@ -37,9 +37,9 @@
  * fishing a JSON object out of it means guessing where the object starts. A
  * file has one writer, one reader, and an unambiguous "absent" state.
  *
- * A missing or malformed report is **not** a task failure. The task's own
- * validation already passed; a broken review is a broken review, and the
- * caller reports it as such rather than reverting completed work.
+ * Missing or malformed reports cannot establish a reviewed completion. The
+ * review gate refuses completion while preserving the validated work; the
+ * explicit review-optional setting remains the best-effort override.
  *
  * @module hench/agent/analysis/adversarial-review
  */
@@ -194,8 +194,8 @@ export type ReviewFailureReason =
  *
  * `no-report` and `malformed-report` are the opposite case: a reviewer did
  * run and did attack the change, and only the report transport broke. That is
- * a lost result, not an absent pass, and the module contract above keeps it a
- * warning rather than a refusal.
+ * a lost result, not an absent process. Both cases fail the review gate, but
+ * retain distinct diagnostics.
  */
 export const REVIEW_NEVER_RAN_REASONS: readonly ReviewFailureReason[] = [
   "spawn-failed",
@@ -1351,8 +1351,15 @@ export function reviewNeverRan(
   return REVIEW_NEVER_RAN_REASONS.includes(review.failed as ReviewFailureReason);
 }
 
+/** A started process without a usable report is not evidence of a passed review. */
+export function reviewHasNoUsableReport(
+  review: RunReviewRecord | undefined,
+): review is FailedReviewRecord {
+  return reviewNeverRan(review) || review?.failed === "no-report" || review?.failed === "malformed-report";
+}
+
 /**
- * The refusal text for a run whose reviewer never started.
+ * The refusal text for a run whose reviewer never started or produced no report.
  *
  * Names the missing review first, because the thing an operator must not
  * conclude from this run is "reviewed, nothing found". The remedy lines matter
@@ -1362,9 +1369,9 @@ export function reviewNeverRan(
  */
 export function formatMissingReviewRefusal(review: FailedReviewRecord): string {
   return [
-    `Refusing to report this task completed: the adversarial review never ran (${review.failed}).`,
+    `Refusing to report this task completed: the adversarial review ${reviewNeverRan(review) ? "never ran" : "produced no usable report"} (${review.failed}).`,
     `  ${review.detail}`,
-    "  --review is a gate. A reviewer that could not start is not a reviewer that",
+    "  --review is a gate. A missing review report cannot show that a reviewer",
     "  found nothing, so the run does not get to claim a reviewed completion.",
     "  The work itself validated and is left in place — fix the reviewer (usually",
     "  --review-model or the vendor CLI version) and re-run, or pass",
