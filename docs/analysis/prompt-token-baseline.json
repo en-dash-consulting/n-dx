@@ -5,29 +5,43 @@
     "perCallTokens": 24246,
     "uniqueTokens": 15199,
     "skills": 15,
-    "skillTokens": 25685
+    "skillTokens": 26655
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 24117,
-      "tokens": 6030
+      "chars": 24745,
+      "tokens": 6187
     },
     {
       "name": "ndx-reshape",
       "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
       "shipped": true,
-      "chars": 10250,
-      "tokens": 2563
+      "chars": 10897,
+      "tokens": 2725
     },
     {
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 9264,
-      "tokens": 2316
+      "chars": 9911,
+      "tokens": 2478
+    },
+    {
+      "name": "ndx-plan",
+      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
+      "shipped": true,
+      "chars": 8907,
+      "tokens": 2227
+    },
+    {
+      "name": "ndx-work",
+      "file": "packages/core/assistant-assets/skills/ndx-work.md",
+      "shipped": true,
+      "chars": 8647,
+      "tokens": 2162
     },
     {
       "name": "iso-map",
@@ -35,20 +49,6 @@
       "shipped": false,
       "chars": 8285,
       "tokens": 2072
-    },
-    {
-      "name": "ndx-plan",
-      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
-      "shipped": true,
-      "chars": 8260,
-      "tokens": 2065
-    },
-    {
-      "name": "ndx-work",
-      "file": "packages/core/assistant-assets/skills/ndx-work.md",
-      "shipped": true,
-      "chars": 7984,
-      "tokens": 1996
     },
     {
       "name": "ndx-release-notes",
@@ -65,18 +65,18 @@
       "tokens": 1856
     },
     {
+      "name": "ndx-config",
+      "file": "packages/core/assistant-assets/skills/ndx-config.md",
+      "shipped": true,
+      "chars": 5632,
+      "tokens": 1408
+    },
+    {
       "name": "dev-link",
       "file": ".claude/skills/dev-link/SKILL.md",
       "shipped": false,
       "chars": 5054,
       "tokens": 1264
-    },
-    {
-      "name": "ndx-config",
-      "file": "packages/core/assistant-assets/skills/ndx-config.md",
-      "shipped": true,
-      "chars": 4985,
-      "tokens": 1247
     },
     {
       "name": "ndx-graview",
@@ -1090,8 +1090,8 @@
       }
     ]
   },
-  "contentHash": "e53962bc0b723f47",
-  "recordedAt": "2026-11-12T16:42:45.076Z",
-  "commit": "d340697c8081",
+  "contentHash": "3b6f56a675e97830",
+  "recordedAt": "2026-11-16T23:32:43.992Z",
+  "commit": "4ddd1667ae9c",
   "dirty": false
 }

@@ -10,9 +10,9 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-11-12T16:42:45.076Z
-- **Commit** — `d340697c8081`
-- **Content hash** — `e53962bc0b723f47` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-11-16T23:32:43.992Z
+- **Commit** — `4ddd1667ae9c`
+- **Content hash** — `3b6f56a675e97830` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
 - **Per-call total** — 24,246 tokens (what every surface costs, summed)
@@ -228,7 +228,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 3,162 | 791 | 82.6% |
 | `brief` | 668 | 167 | 17.4% |
 
-## Workflow skills — 25,685 tokens, 15 skills
+## Workflow skills — 26,655 tokens, 15 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -241,16 +241,16 @@ portability guards until this table gave them a number.
 
 | Skill | Shipped | Chars | Tokens |
 |---|:-:|---:|---:|
-| `ndx-adversarial-review` | yes | 24,117 | 6,030 |
-| `ndx-reshape` | yes | 10,250 | 2,563 |
-| `ndx-capture` | yes | 9,264 | 2,316 |
+| `ndx-adversarial-review` | yes | 24,745 | 6,187 |
+| `ndx-reshape` | yes | 10,897 | 2,725 |
+| `ndx-capture` | yes | 9,911 | 2,478 |
+| `ndx-plan` | yes | 8,907 | 2,227 |
+| `ndx-work` | yes | 8,647 | 2,162 |
 | `iso-map` | — | 8,285 | 2,072 |
-| `ndx-plan` | yes | 8,260 | 2,065 |
-| `ndx-work` | yes | 7,984 | 1,996 |
 | `ndx-release-notes` | — | 7,846 | 1,962 |
 | `triage` | — | 7,421 | 1,856 |
+| `ndx-config` | yes | 5,632 | 1,408 |
 | `dev-link` | — | 5,054 | 1,264 |
-| `ndx-config` | yes | 4,985 | 1,247 |
 | `ndx-graview` | yes | 2,611 | 653 |
 | `ndx-feedback` | yes | 2,565 | 642 |
 | `no-plan-mode` | yes | 2,476 | 619 |
